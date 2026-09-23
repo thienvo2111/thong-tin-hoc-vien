@@ -37,7 +37,7 @@ Mã lỗi chuẩn: `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (
 
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
-| POST | `/auth/dang-nhap` | `{ ten_dang_nhap, mat_khau }` → `{ token, phai_doi_mat_khau, nguoi_dung }`. `ten_dang_nhap` = email (Sở/Phòng/Trường/QuảnTrị) hoặc ĐDCN (Học viên). | Công khai |
+| POST | `/auth/dang-nhap` | `{ ten_dang_nhap, mat_khau }` → `{ token, phai_doi_mat_khau, nguoi_dung }`. `ten_dang_nhap` = `nguoi_dung.ten_dang_nhap`, gán 1 lần lúc tạo tài khoản và **không đổi theo dữ liệu hồ sơ về sau**: ĐDCN (Học viên tự đăng ký), Mã định danh CSDL MOET (Học viên do Quản trị import), hoặc email (Sở/Phòng/Trường/QuảnTrị). | Công khai |
 | POST | `/auth/dang-xuat` | Vô hiệu hóa token hiện tại | Đã đăng nhập |
 | POST | `/auth/doi-mat-khau` | `{ mat_khau_cu, mat_khau_moi }` — bắt buộc nếu `phai_doi_mat_khau=true` | Đã đăng nhập |
 | GET | `/auth/toi` | Thông tin tài khoản hiện tại + phạm vi quyền suy ra | Đã đăng nhập |
@@ -48,14 +48,15 @@ Mã lỗi chuẩn: `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (
 
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
-| POST | `/hoc-vien` | Tự đăng ký. Body = toàn bộ field khai báo (xem `database-ddl.sql#hoc_vien`). **Side effect**: tạo `hoc_vien` (trang_thai=`nhap`) VÀ `nguoi_dung` (vai_tro=`hoc_vien`, mật khẩu mặc định = ngày sinh) trong 1 transaction — xem chi tiết ở mục "Luồng đăng ký". | Công khai |
-| GET | `/hoc-vien/toi` | Hồ sơ của chính mình | Học viên |
-| PATCH | `/hoc-vien/toi` | Sửa hồ sơ — chỉ cho phép khi `trang_thai='nhap'` (đã `cho_duyet` thì khóa sửa, trừ khi bị `tu_choi` thì mở lại `nhap`) | Học viên |
+| POST | `/hoc-vien` | Tự đăng ký (`nguon_tao='tu_dang_ky'`). Body = toàn bộ field khai báo (xem `database-ddl.sql#hoc_vien`). **Side effect**: tạo `hoc_vien` (trang_thai=`nhap`) VÀ `nguoi_dung` (vai_tro=`hoc_vien`, `ten_dang_nhap`=ĐDCN, mật khẩu mặc định = ngày sinh) trong 1 transaction — xem chi tiết ở mục "Luồng đăng ký". | Công khai |
+| GET | `/hoc-vien/toi` | Hồ sơ của chính mình, kèm `chuyen_mon: string[]` | Học viên |
+| PATCH | `/hoc-vien/toi` | Sửa hồ sơ — chỉ cho phép khi `trang_thai='nhap'` (đã `cho_duyet` thì khóa sửa, trừ khi bị `tu_choi` thì mở lại `nhap`). Với hồ sơ `nguon_tao='import_moet'`, đây cũng chính là màn "bổ sung thông tin" lần đầu (điền CCCD, nơi sinh, phường xã, email, trình độ, cấp giảng dạy, môn giảng dạy) | Học viên |
+| POST / DELETE | `/hoc-vien/toi/chuyen-mon` | Thêm / xóa 1 giá trị trong `hoc_vien_chuyen_mon` (nhiều chuyên môn/người) | Học viên |
 | POST | `/hoc-vien/toi/kiem-tra-truoc-xac-nhan` | Dry-run validate toàn bộ hồ sơ, trả danh sách lỗi (chặn) + cảnh báo (không chặn) — dùng cho màn `XacNhanThongTin.dc.html` | Học viên |
-| POST | `/hoc-vien/toi/xac-nhan` | Chuyển `nhap` → `cho_duyet`. **Side effect**: gọi Dịch vụ Thông báo gửi email bản sao dữ liệu, set `email_ban_sao_da_gui_at` | Học viên |
-| GET | `/hoc-vien` | Danh sách hồ sơ trong phạm vi quyền (query: `trang_thai`, `don_vi_cong_tac_id`, `cap_giang_day`, `q` tìm theo tên/ĐDCN) | Trường, Phòng VHXH, Sở, QuảnTrị |
+| POST | `/hoc-vien/toi/xac-nhan` | Chuyển `nhap` → `cho_duyet`. **Side effect**: gọi Dịch vụ Thông báo gửi email bản sao dữ liệu, set `email_ban_sao_da_gui_at`. Hồ sơ `import_moet` đã `da_duyet` sẵn nên **không gọi endpoint này để được duyệt** — chỉ dùng nó nếu muốn gửi lại email xác nhận sau khi bổ sung thông tin | Học viên |
+| GET | `/hoc-vien` | Danh sách hồ sơ trong phạm vi quyền (query: `trang_thai`, `don_vi_cong_tac_id`, `cap_giang_day`, `nguon_tao`, `q` tìm theo tên/ĐDCN/Mã MOET) | Trường, Phòng VHXH, Sở, QuảnTrị |
 | GET | `/hoc-vien/{id}` | Chi tiết 1 hồ sơ (phải trong phạm vi quyền) | Trường, Phòng VHXH, Sở, QuảnTrị |
-| POST | `/hoc-vien/{id}/duyet` | `{ ket_qua: "da_duyet" \| "tu_choi", ly_do? }`. Đơn vị duyệt xác định theo `cap_giang_day` của hồ sơ (xem bảng routing dưới) | Trường (nếu được phân công xác minh nội bộ), Phòng VHXH, Sở |
+| POST | `/hoc-vien/{id}/duyet` | `{ ket_qua: "da_duyet" \| "tu_choi", ly_do? }`. Đơn vị duyệt xác định theo `cap_giang_day` của hồ sơ (xem bảng routing dưới). Chỉ áp dụng hồ sơ `nguon_tao='tu_dang_ky'` — hồ sơ `import_moet` bỏ qua bước này | Trường (nếu được phân công xác minh nội bộ), Phòng VHXH, Sở |
 | GET | `/hoc-vien/kiem-tra-trung?so_dinh_danh_ca_nhan=` | Kiểm tra ĐDCN đã tồn tại chưa (gọi trước khi submit form, tránh lỗi 409 muộn) | Công khai |
 
 ### Routing đơn vị duyệt (theo `cap_giang_day` của hồ sơ)
@@ -71,6 +72,20 @@ Sở luôn được phép duyệt thay Phòng VHXH (escalation trong scope-based
 3. `INSERT INTO hoc_vien (..., created_by = nguoi_dung.id)` → lấy `hoc_vien.id`.
 4. `UPDATE nguoi_dung SET hoc_vien_id = hoc_vien.id WHERE id = nguoi_dung.id`.
 5. Commit. Trả về `{ hoc_vien_id, ten_dang_nhap: so_dinh_danh_ca_nhan, luu_y: "Mật khẩu mặc định là ngày sinh — bắt buộc đổi khi đăng nhập lần đầu" }`.
+
+### Luồng import nhân sự từ CSDL MOET (`POST /import/ho-so-nhan-su-moet`, xem mục 5)
+
+File nhận từ Sở/Bộ theo mẫu: `Đơn vị`, `Mã định danh (CDSL moet)`, `Họ và tên`, `Ngày`, `Tháng`, `Năm` (3 cột riêng), `Chức vụ`, `Chuyên môn` (có thể nhiều giá trị/dòng, phân tách bằng `;`), `Số điện thoại`, `Ghi chú`.
+
+Với mỗi dòng hợp lệ:
+1. Khớp cột `Đơn vị` với `don_vi_cong_tac.ten_don_vi` (chỉ trong phạm vi quyền của người chạy import). Không khớp được / khớp nhiều hơn 1 → dòng lỗi.
+2. `INSERT INTO nguoi_dung (vai_tro='hoc_vien', ten_dang_nhap=ma_dinh_danh_moet, mat_khau_hash=hash(ngay_sinh dạng ddmmyyyy), phai_doi_mat_khau=true, email=NULL, hoc_vien_id=NULL)`.
+3. `INSERT INTO hoc_vien (nguon_tao='import_moet', ma_dinh_danh_moet, ho_ten, ngay_sinh, thang_sinh, nam_sinh, chuc_vu, don_vi_cong_tac_id, so_dien_thoai_lien_he, ghi_chu, trang_thai='da_duyet', nguoi_duyet_id=<tài khoản đang chạy import>, cap_duyet_thuc_te='quan_tri', ngay_duyet=now(), created_by=<nguoi_dung.id bước 2>)`. Mọi field khác (CCCD, nơi sinh, phường xã, email, trình độ, cấp giảng dạy, môn giảng dạy) để `NULL`.
+4. Tách `Chuyên môn` theo `;`, `INSERT` từng giá trị vào `hoc_vien_chuyen_mon`.
+5. `UPDATE nguoi_dung SET hoc_vien_id = ...`.
+6. Dòng lỗi điển hình: `Mã định danh` trùng đã tồn tại (`uq_hoc_vien_ma_moet`), thiếu `Đơn vị`/không khớp, ngày sinh không hợp lệ.
+
+Học viên nhận tài khoản đăng nhập bằng **Mã định danh CSDL MOET + ngày sinh** (không phải CCCD — hệ thống không giả định 2 mã này trùng nhau). Sau khi đăng nhập lần đầu, học viên tự bổ sung CCCD và các thông tin còn thiếu qua `PATCH /hoc-vien/toi` — hồ sơ đã `da_duyet` sẵn nên không cần Trường/Sở/Phòng duyệt lại.
 
 ---
 
@@ -110,7 +125,7 @@ Sở luôn được phép duyệt thay Phòng VHXH (escalation trong scope-based
 
 ## 5. Dịch vụ Import
 
-Dùng chung 1 luồng cho cả 4 loại (`loai_danh_muc_import`): `dia_danh`, `don_vi_cong_tac`, `mon_hoc`, `phan_lop_hoc_vien`.
+Dùng chung 1 luồng cho cả 5 loại (`loai_danh_muc_import`): `dia_danh`, `don_vi_cong_tac`, `mon_hoc`, `phan_lop_hoc_vien`, `ho_so_nhan_su_moet` (`POST /import/ho-so-nhan-su-moet` — chi tiết ở mục "Luồng import nhân sự từ CSDL MOET", mục 2).
 
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|

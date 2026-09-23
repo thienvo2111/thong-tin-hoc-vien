@@ -66,8 +66,15 @@ CREATE TYPE trang_thai_dang_ky AS ENUM (
 
 CREATE TYPE ket_qua_hoc AS ENUM ('dang_hoc', 'dat', 'khong_dat', 'vang');
 
+CREATE TYPE nguon_tao_ho_so AS ENUM ('tu_dang_ky', 'import_moet');
+-- 'tu_dang_ky'  : học viên tự truy cập khai báo (form đầy đủ 1 lần)
+-- 'import_moet' : Quản trị hệ thống import từ danh sách nhân sự tiếp nhận
+--                 (CSDL ngành MOET) — hồ sơ tạo THIẾU nhiều trường, người
+--                 dùng tự bổ sung sau khi đăng nhập lần đầu.
+
 CREATE TYPE loai_danh_muc_import AS ENUM (
-    'dia_danh', 'don_vi_cong_tac', 'mon_hoc', 'phan_lop_hoc_vien'
+    'dia_danh', 'don_vi_cong_tac', 'mon_hoc', 'phan_lop_hoc_vien',
+    'ho_so_nhan_su_moet'
 );
 
 CREATE TYPE trang_thai_import AS ENUM ('dang_xu_ly', 'hoan_thanh', 'loi');
@@ -158,7 +165,15 @@ CREATE INDEX idx_mon_hoc_cap ON mon_hoc(cap_hoc);
 CREATE TABLE nguoi_dung (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     ho_ten              varchar(255) NOT NULL,
-    email               varchar(255) NOT NULL,
+    email               varchar(255),   -- NULL cho tới khi tài khoản hoc_vien tự bổ sung
+    ten_dang_nhap       varchar(50) NOT NULL,
+    -- Định danh đăng nhập ỔN ĐỊNH, gán 1 LẦN lúc tạo tài khoản, KHÔNG tự đổi
+    -- theo dữ liệu hồ sơ về sau (kể cả khi hoc_vien cập nhật CCCD) — vì quan
+    -- hệ giữa Mã định danh CSDL MOET và CCCD chưa được xác nhận là trùng
+    -- nhau tuyệt đối cho mọi người:
+    --   vai_tro='hoc_vien', nguon_tao='tu_dang_ky'  → = so_dinh_danh_ca_nhan lúc đăng ký
+    --   vai_tro='hoc_vien', nguon_tao='import_moet' → = ma_dinh_danh_moet lúc import
+    --   vai_tro khác                                → do Quản trị hệ thống gán khi cấp tài khoản
     vai_tro             vai_tro_nguoi_dung NOT NULL,
     don_vi_id           uuid REFERENCES don_vi_cong_tac(id),  -- NULL nếu vai_tro='hoc_vien'
     hoc_vien_id         uuid,                                  -- FK thêm sau (xem PHẦN 2)
@@ -169,12 +184,15 @@ CREATE TABLE nguoi_dung (
     updated_at          timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT uq_nguoi_dung_email UNIQUE (email),
+    CONSTRAINT uq_nguoi_dung_ten_dang_nhap UNIQUE (ten_dang_nhap),
     CONSTRAINT uq_nguoi_dung_hoc_vien UNIQUE (hoc_vien_id),
     CONSTRAINT chk_nguoi_dung_scope CHECK (
         (vai_tro = 'hoc_vien' AND don_vi_id IS NULL AND hoc_vien_id IS NOT NULL)
         OR
         (vai_tro <> 'hoc_vien' AND don_vi_id IS NOT NULL AND hoc_vien_id IS NULL)
-    )
+    ),
+    CONSTRAINT chk_nguoi_dung_email_bat_buoc
+        CHECK (vai_tro = 'hoc_vien' OR email IS NOT NULL)
 );
 
 CREATE INDEX idx_nguoi_dung_vai_tro ON nguoi_dung(vai_tro);
@@ -195,31 +213,41 @@ CREATE INDEX idx_import_loai ON nhat_ky_import(loai_danh_muc);
 CREATE TABLE hoc_vien (
     id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 
+    -- Nguồn tạo hồ sơ — quyết định field nào bắt buộc lúc tạo (xem
+    -- validation-checklist.md); DB chỉ ràng buộc phần chung cho cả 2 luồng,
+    -- phần còn lại bắt buộc có điều kiện ở tầng API.
+    nguon_tao               nguon_tao_ho_so NOT NULL DEFAULT 'tu_dang_ky',
+
     -- Định danh
     ho_ten                  varchar(255) NOT NULL,
-    so_dinh_danh_ca_nhan    char(12) NOT NULL,
+    so_dinh_danh_ca_nhan    char(12),           -- NULL cho tới khi bổ sung (luồng import_moet)
+    ma_dinh_danh_moet       varchar(20),        -- chỉ có ở luồng import_moet; KHÔNG giả định trùng CCCD
     ngay_sinh               smallint NOT NULL,
     thang_sinh              smallint NOT NULL,
     nam_sinh                smallint NOT NULL,
     gioi_tinh               varchar(20),
+    chuc_vu                 varchar(100),       -- vd: TTCM, Giáo viên, Nhân viên — tự do (từ import)
 
-    -- Nơi sinh / cư trú (danh mục dùng chung)
-    noi_sinh_id             uuid NOT NULL REFERENCES dia_danh(id),      -- cấp tinh_thanh
-    phuong_xa_id            uuid NOT NULL REFERENCES dia_danh(id),      -- cấp phuong_xa_dac_khu
+    -- Nơi sinh / cư trú (danh mục dùng chung) — không có trong danh sách
+    -- tiếp nhận MOET, học viên import tự bổ sung sau
+    noi_sinh_id             uuid REFERENCES dia_danh(id),      -- cấp tinh_thanh
+    phuong_xa_id            uuid REFERENCES dia_danh(id),      -- cấp phuong_xa_dac_khu
 
-    -- Công tác
+    -- Công tác — CÓ trong cả 2 luồng (self: chọn tay; import: khớp theo cột "Đơn vị")
     don_vi_cong_tac_id      uuid NOT NULL REFERENCES don_vi_cong_tac(id),
 
-    -- Liên hệ (bắt buộc)
+    -- Liên hệ — SĐT có ở cả 2 luồng; email KHÔNG có trong danh sách MOET
     so_dien_thoai_lien_he   varchar(20) NOT NULL,
-    email_lien_he           varchar(255) NOT NULL,
+    email_lien_he           varchar(255),
 
-    -- Trình độ & chuyên môn
-    trinh_do_chuyen_mon     trinh_do_chuyen_mon NOT NULL,
+    -- Trình độ & chuyên môn — không có trong danh sách MOET, bổ sung sau
+    trinh_do_chuyen_mon     trinh_do_chuyen_mon,
     trinh_do_chuyen_mon_khac varchar(255),   -- chỉ khi trinh_do_chuyen_mon = 'khac'
-    chuyen_mon_dao_tao      varchar(255) NOT NULL,   -- tự do, có gợi ý ở tầng API, KHÔNG FK
-    cap_giang_day           cap_hoc NOT NULL,
-    mon_giang_day_id        uuid NOT NULL REFERENCES mon_hoc(id),
+    cap_giang_day           cap_hoc,             -- NULL hợp lệ cho nhân sự không trực tiếp giảng dạy
+    mon_giang_day_id        uuid REFERENCES mon_hoc(id),
+
+    -- Ghi chú mang theo từ danh sách tiếp nhận (nếu có)
+    ghi_chu                 text,
 
     -- Vòng đời hồ sơ & duyệt
     trang_thai              trang_thai_ho_so NOT NULL DEFAULT 'nhap',
@@ -233,16 +261,24 @@ CREATE TABLE hoc_vien (
     -- Audit
     created_at               timestamptz NOT NULL DEFAULT now(),
     updated_at                timestamptz NOT NULL DEFAULT now(),
-    created_by                uuid REFERENCES nguoi_dung(id),   -- = tài khoản NguoiDung của chính học viên
+    created_by                uuid REFERENCES nguoi_dung(id),
+        -- 'tu_dang_ky'  : = tài khoản NguoiDung của chính học viên
+        -- 'import_moet' : = tài khoản Quản trị hệ thống đã chạy import
 
     CONSTRAINT uq_hoc_vien_ddcn UNIQUE (so_dinh_danh_ca_nhan),
+    CONSTRAINT uq_hoc_vien_ma_moet UNIQUE (ma_dinh_danh_moet),
     CONSTRAINT chk_hoc_vien_ddcn_12_so
-        CHECK (so_dinh_danh_ca_nhan ~ '^[0-9]{12}$'),
+        CHECK (so_dinh_danh_ca_nhan IS NULL OR so_dinh_danh_ca_nhan ~ '^[0-9]{12}$'),
+    CONSTRAINT chk_hoc_vien_nguon_tao CHECK (
+        (nguon_tao = 'tu_dang_ky' AND so_dinh_danh_ca_nhan IS NOT NULL)
+        OR
+        (nguon_tao = 'import_moet' AND ma_dinh_danh_moet IS NOT NULL)
+    ),
     CONSTRAINT chk_hoc_vien_ngay_sinh CHECK (ngay_sinh BETWEEN 1 AND 31),
     CONSTRAINT chk_hoc_vien_thang_sinh CHECK (thang_sinh BETWEEN 1 AND 12),
     CONSTRAINT chk_hoc_vien_nam_sinh
         CHECK (nam_sinh BETWEEN 1940 AND date_part('year', now())::int - 15),
-        -- độ tuổi tối thiểu 15 — điều chỉnh theo quy định thực tế nếu khác
+        -- độ tuổi tối thiểu 15 — xác nhận đúng quy định (2026-09-23)
     CONSTRAINT chk_hoc_vien_ngay_sinh_hop_le
         CHECK (make_date(nam_sinh, thang_sinh, ngay_sinh) IS NOT NULL),
         -- bắt lỗi 31/04, 30/02, 29/02 năm không nhuận, v.v. Postgres tự raise
@@ -250,8 +286,8 @@ CREATE TABLE hoc_vien (
         -- để tài liệu hóa ý định — chặn thật sự nên làm ở tầng ứng dụng để
         -- trả thông báo lỗi rõ ràng thay vì lỗi SQL khó hiểu.
     CONSTRAINT chk_hoc_vien_trinh_do_khac
-        CHECK ( (trinh_do_chuyen_mon = 'khac' AND trinh_do_chuyen_mon_khac IS NOT NULL)
-             OR (trinh_do_chuyen_mon <> 'khac') ),
+        CHECK ( trinh_do_chuyen_mon IS DISTINCT FROM 'khac'
+             OR trinh_do_chuyen_mon_khac IS NOT NULL ),
     CONSTRAINT chk_hoc_vien_duyet_dong_bo
         CHECK ( (trang_thai IN ('da_duyet', 'tu_choi') AND nguoi_duyet_id IS NOT NULL)
              OR (trang_thai NOT IN ('da_duyet', 'tu_choi')) )
@@ -262,6 +298,23 @@ CREATE INDEX idx_hoc_vien_trang_thai ON hoc_vien(trang_thai);
 CREATE INDEX idx_hoc_vien_cap_giang_day ON hoc_vien(cap_giang_day);
 CREATE INDEX idx_hoc_vien_phuong_xa ON hoc_vien(phuong_xa_id);
 CREATE INDEX idx_hoc_vien_ho_ten_trgm ON hoc_vien USING gin (ho_ten gin_trgm_ops);
+CREATE INDEX idx_hoc_vien_ma_moet ON hoc_vien(ma_dinh_danh_moet);
+
+-- Chuyên môn: 1 học viên có thể có NHIỀU chuyên môn (dữ liệu thực tế từ danh
+-- sách MOET xác nhận điều này) — tách bảng con thay vì 1 cột varchar đơn.
+-- Tự do, có gợi ý autocomplete ở tầng API, KHÔNG FK vào danh mục quản lý
+-- (giữ nguyên quyết định trước đó: chấp nhận dữ liệu không đồng nhất).
+CREATE TABLE hoc_vien_chuyen_mon (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    hoc_vien_id         uuid NOT NULL REFERENCES hoc_vien(id) ON DELETE CASCADE,
+    chuyen_mon          varchar(255) NOT NULL,
+
+    CONSTRAINT uq_hoc_vien_chuyen_mon UNIQUE (hoc_vien_id, chuyen_mon)
+);
+
+CREATE INDEX idx_hoc_vien_chuyen_mon_hv ON hoc_vien_chuyen_mon(hoc_vien_id);
+CREATE INDEX idx_hoc_vien_chuyen_mon_trgm
+    ON hoc_vien_chuyen_mon USING gin (chuyen_mon gin_trgm_ops);
 
 ALTER TABLE nguoi_dung
     ADD CONSTRAINT fk_nguoi_dung_hoc_vien
@@ -425,12 +478,28 @@ CREATE TRIGGER trg_khoa_updated_at BEFORE UPDATE ON khoa_boi_duong
 --    chuyên môn đào tạo, tên học viên) đã có "CREATE EXTENSION pg_trgm"
 --    ở đầu file — chạy trước mọi CREATE INDEX ... USING gin (... gin_trgm_ops).
 --
--- 3. "chuyen_mon_dao_tao" cố ý KHÔNG có FK/danh mục — theo quyết định thiết
---    kế: chấp nhận dữ liệu không đồng nhất 100%, gợi ý autocomplete lấy từ
---    SELECT DISTINCT chuyen_mon_dao_tao ... (tầng ứng dụng), không chuẩn hóa.
+-- 3. "hoc_vien_chuyen_mon.chuyen_mon" cố ý KHÔNG có FK/danh mục — theo quyết
+--    định thiết kế: chấp nhận dữ liệu không đồng nhất 100%, gợi ý autocomplete
+--    lấy từ SELECT DISTINCT chuyen_mon FROM hoc_vien_chuyen_mon ...
+--    (tầng ứng dụng), không chuẩn hóa. Bảng tách riêng (1-nhiều) vì dữ liệu
+--    thực tế từ danh sách tiếp nhận CSDL MOET xác nhận 1 người có thể có
+--    nhiều chuyên môn cùng lúc.
 --
 -- 4. Chuẩn hóa NFC: thực hiện ở tầng ứng dụng (Node.js: String.prototype.
 --    normalize('NFC')) trước khi INSERT/UPDATE các cột: ho_ten, ten,
---    ten_don_vi, ten_mon, ten_khoa, ten_lop, ten_giai_doan. Không thực thi
---    được bằng CHECK constraint thuần Postgres.
+--    ten_don_vi, ten_mon, ten_khoa, ten_lop, ten_giai_doan, chuyen_mon. Không
+--    thực thi được bằng CHECK constraint thuần Postgres.
+--
+-- 5. Hồ sơ tạo từ import_moet (nguon_tao='import_moet') CỐ Ý thiếu nhiều
+--    trường (so_dinh_danh_ca_nhan, noi_sinh_id, phuong_xa_id, email_lien_he,
+--    trinh_do_chuyen_mon, cap_giang_day, mon_giang_day_id đều NULL lúc tạo).
+--    trang_thai vẫn set thẳng 'da_duyet' (danh sách tiếp nhận coi như đã xác
+--    thực) — KHÔNG đồng nghĩa hồ sơ đã đầy đủ. Tầng API chịu trách nhiệm:
+--      a) không cho hồ sơ import_moet đăng ký khóa bồi dưỡng cho tới khi các
+--         trường bắt buộc-có-điều-kiện đã được người dùng tự bổ sung;
+--      b) validate lại đầy đủ (cùng bộ quy tắc như tu_dang_ky) tại thời điểm
+--         người dùng bổ sung, không phải lúc import.
+--    Câu hỏi CHƯA CHỐT: cap_giang_day/mon_giang_day_id có bắt buộc với
+--    chuc_vu='Nhân viên' (không trực tiếp giảng dạy) hay không — hiện để
+--    NULL hợp lệ cho mọi chuc_vu, cần xác nhận lại với nghiệp vụ thực tế.
 -- =====================================================================
