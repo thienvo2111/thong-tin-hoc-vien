@@ -63,6 +63,9 @@ Mã lỗi chuẩn: `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (
 ```
 THPT               → Sở GD&ĐT quản lý tỉnh chứa dia_ban_id của đơn vị công tác
 MN / TH / THCS     → Phòng Văn hóa - Xã hội quản lý đúng xã/phường đó
+NULL (không có)    → Sở GD&ĐT quản lý tỉnh (mặc định an toàn cho nhân viên
+                     không trực tiếp giảng dạy — họ vẫn có thể để trống
+                     cap_giang_day vĩnh viễn, không chỉ tạm thời)
 ```
 Sở luôn được phép duyệt thay Phòng VHXH (escalation trong scope-based). Chiều ngược lại — Phòng VHXH duyệt hồ sơ THPT — bị từ chối `403`.
 

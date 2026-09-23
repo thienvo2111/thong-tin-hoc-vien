@@ -499,7 +499,10 @@ CREATE TRIGGER trg_khoa_updated_at BEFORE UPDATE ON khoa_boi_duong
 --         trường bắt buộc-có-điều-kiện đã được người dùng tự bổ sung;
 --      b) validate lại đầy đủ (cùng bộ quy tắc như tu_dang_ky) tại thời điểm
 --         người dùng bổ sung, không phải lúc import.
---    Câu hỏi CHƯA CHỐT: cap_giang_day/mon_giang_day_id có bắt buộc với
---    chuc_vu='Nhân viên' (không trực tiếp giảng dạy) hay không — hiện để
---    NULL hợp lệ cho mọi chuc_vu, cần xác nhận lại với nghiệp vụ thực tế.
+--    Đã chốt (2026-09-23): cap_giang_day/mon_giang_day_id là TÙY CHỌN cho
+--    mọi hồ sơ, vĩnh viễn — không chỉ tạm thời chờ bổ sung. Nhân viên không
+--    trực tiếp giảng dạy (chuc_vu='Nhân viên'...) được phép để trống 2
+--    trường này mãi mãi. Khi cap_giang_day = NULL, routing duyệt mặc định
+--    về Sở GD&ĐT thay vì chặn — xem docs/api-contract.md mục "Routing đơn
+--    vị duyệt".
 -- =====================================================================
