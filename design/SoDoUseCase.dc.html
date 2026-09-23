@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Sơ đồ Use Case</title>
+<script src="./support.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif}
+.uc-chip{background:#EAF2FB;border:1px solid #C9DCF2;border-radius:999px;padding:9px 16px;font-size:12.5px;font-weight:500;color:#0B3B60;white-space:nowrap}
+.uc-chip.shared{background:#FDF3E2;border-color:#EFD8A4;color:#7A4E07}
+.actor-name{font-size:13px;font-weight:600;color:#0B3B60;line-height:1.3}
+.actor-desc{font-size:11px;color:#8894A6;line-height:1.35;margin-top:2px}
+</style>
+</helmet>
+<div style="width: 1600px; height: 1420px; box-sizing: border-box; padding: 48px 56px; display: flex; flex-direction: column; gap: 16px; background: #F5F7FA; color: #1A2233;">
+
+  <div style="display: flex; flex-direction: column; gap: 4px;">
+    <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #1868B7;">Hệ thống thu thập thông tin học viên</div>
+    <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #0B3B60;">Sơ đồ Use Case (theo tác nhân)</h1>
+    <div style="font-size: 13px; color: #5B6472;">Tác nhân theo mô hình chính quyền 2 cấp — không còn Phòng Giáo dục cấp huyện; quản lý chuyên môn phân theo cấp học.</div>
+  </div>
+
+  <!-- System boundary -->
+  <div style="flex: 1; border: 1.5px dashed #9FB0C4; border-radius: 16px; padding: 22px 26px; display: flex; flex-direction: column; gap: 14px; background: #ffffff;">
+    <div style="align-self: center; background: #ffffff; padding: 0 12px; margin-top: -34px; font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #5B6472;">Hệ thống thu thập thông tin học viên</div>
+
+    <!-- Lane: Truong -->
+    <div style="display: flex; gap: 18px; align-items: flex-start; padding-bottom: 12px; border-bottom: 1px solid #ECEFF3;">
+      <div style="width: 210px; flex-shrink: 0; display: flex; gap: 10px; align-items: flex-start;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1868B7" stroke-width="1.8" style="flex-shrink: 0;"><circle cx="12" cy="7" r="4"></circle><path d="M4 21v-1a8 8 0 0 1 16 0v1"></path></svg>
+        <div>
+          <div class="actor-name">Trường / đơn vị đào tạo</div>
+          <div class="actor-desc">Mọi cấp học (MN/TH/THCS/THPT) — nhập &amp; quản lý hồ sơ học viên của đơn vị mình</div>
+        </div>
+      </div>
+      <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 10px;">
+        <div class="uc-chip">Nhập thông tin học viên</div>
+        <div class="uc-chip">Tra cứu / chỉnh sửa hồ sơ học viên</div>
+        <div class="uc-chip">Nộp hồ sơ để cấp quản lý xác nhận</div>
+        <div class="uc-chip">Tạo &amp; quản lý khóa bồi dưỡng (giai đoạn, lớp, giảng viên)</div>
+        <div class="uc-chip">Nộp khóa bồi dưỡng để duyệt</div>
+      </div>
+    </div>
+
+    <!-- Lane: So GDDT -->
+    <div style="display: flex; gap: 18px; align-items: flex-start; padding-bottom: 12px; border-bottom: 1px solid #ECEFF3;">
+      <div style="width: 210px; flex-shrink: 0; display: flex; gap: 10px; align-items: flex-start;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1868B7" stroke-width="1.8" style="flex-shrink: 0;"><circle cx="12" cy="7" r="4"></circle><path d="M4 21v-1a8 8 0 0 1 16 0v1"></path></svg>
+        <div>
+          <div class="actor-name">Sở Giáo dục &amp; Đào tạo</div>
+          <div class="actor-desc">Cấp tỉnh — quản lý trực tiếp Trường THPT, được duyệt thay mọi cấp học trong tỉnh</div>
+        </div>
+      </div>
+      <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 10px;">
+        <div class="uc-chip">Duyệt / xác nhận hồ sơ học viên — mọi cấp học toàn tỉnh (duyệt thay Phòng VHXH khi cần)</div>
+        <div class="uc-chip">Duyệt danh sách khóa bồi dưỡng do Trường đề xuất</div>
+        <div class="uc-chip">Xem báo cáo, thống kê tổng hợp toàn tỉnh theo đơn vị / địa bàn</div>
+        <div class="uc-chip">Xuất báo cáo Excel/CSV (UTF-8)</div>
+      </div>
+    </div>
+
+    <!-- Lane: Phong Van hoa - Xa hoi -->
+    <div style="display: flex; gap: 18px; align-items: flex-start; padding-bottom: 12px; border-bottom: 1px solid #ECEFF3;">
+      <div style="width: 210px; flex-shrink: 0; display: flex; gap: 10px; align-items: flex-start;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1868B7" stroke-width="1.8" style="flex-shrink: 0;"><circle cx="12" cy="7" r="4"></circle><path d="M4 21v-1a8 8 0 0 1 16 0v1"></path></svg>
+        <div>
+          <div class="actor-name">Phòng Văn hóa - Xã hội (UBND cấp Xã)</div>
+          <div class="actor-desc">Quản lý Trường Mầm non / Tiểu học / THCS trên địa bàn xã, phường</div>
+        </div>
+      </div>
+      <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 10px;">
+        <div class="uc-chip">Duyệt / xác nhận hồ sơ học viên (Trường MN / Tiểu học / THCS)</div>
+        <div class="uc-chip">Duyệt danh sách khóa bồi dưỡng do Trường MN/TH/THCS đề xuất</div>
+        <div class="uc-chip">Xem báo cáo tổng hợp theo địa bàn xã, phường</div>
+      </div>
+    </div>
+
+    <!-- Lane: Hoc vien -->
+    <div style="display: flex; gap: 18px; align-items: flex-start; padding-bottom: 12px; border-bottom: 1px solid #ECEFF3;">
+      <div style="width: 210px; flex-shrink: 0; display: flex; gap: 10px; align-items: flex-start;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1868B7" stroke-width="1.8" style="flex-shrink: 0;"><circle cx="12" cy="7" r="4"></circle><path d="M4 21v-1a8 8 0 0 1 16 0v1"></path></svg>
+        <div>
+          <div class="actor-name">Học viên</div>
+          <div class="actor-desc">Tự truy cập, không cần được cấp tài khoản trước — chỉ thấy &amp; thao tác trên dữ liệu của chính mình</div>
+        </div>
+      </div>
+      <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 10px;">
+        <div class="uc-chip">Tự khai báo thông tin cá nhân (tài khoản tự sinh từ ĐDCN + ngày sinh)</div>
+        <div class="uc-chip">Xem lại &amp; xác nhận thông tin trước khi lưu chính thức</div>
+        <div class="uc-chip">Cập nhật thông tin cá nhân</div>
+        <div class="uc-chip">Xem thông tin khóa bồi dưỡng &amp; lớp học đã được phân</div>
+        <div class="uc-chip">Xem kết quả khóa học</div>
+      </div>
+    </div>
+
+    <!-- Lane: Quan tri he thong -->
+    <div style="display: flex; gap: 18px; align-items: flex-start;">
+      <div style="width: 210px; flex-shrink: 0; display: flex; gap: 10px; align-items: flex-start;">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#1868B7" stroke-width="1.8" style="flex-shrink: 0;"><circle cx="12" cy="7" r="4"></circle><path d="M4 21v-1a8 8 0 0 1 16 0v1"></path></svg>
+        <div>
+          <div class="actor-name">Quản trị hệ thống</div>
+          <div class="actor-desc">Vai trò dọc — không theo cấp hành chính</div>
+        </div>
+      </div>
+      <div style="flex: 1; display: flex; flex-wrap: wrap; gap: 10px;">
+        <div class="uc-chip">Import danh mục địa danh (Xã/Phường/Đặc khu)</div>
+        <div class="uc-chip">Import danh mục đơn vị công tác</div>
+        <div class="uc-chip">Import phân lớp học viên (gán vào LopHoc theo lô)</div>
+        <div class="uc-chip">Quản lý tài khoản &amp; phân quyền</div>
+        <div class="uc-chip">Theo dõi &amp; xử lý nhật ký import lỗi</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Approval hierarchy note -->
+  <div style="background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 12px; padding: 12px 20px; font-size: 12px; color: #0B3B60; line-height: 1.5;">
+    <b>Nguyên tắc phân quyền duyệt (scope-based, không có bảng phân quyền riêng):</b> quyền được suy ra động bằng cách đi lên cây <code>DonViCongTac.don_vi_cha_id</code> — cấp trên tự động có quyền trên mọi đơn vị con, nên Sở GD&amp;ĐT duyệt được hồ sơ của mọi cấp học toàn tỉnh (kể cả thay Phòng Văn hóa - Xã hội); chiều ngược lại không áp dụng. Mỗi lượt duyệt ghi nhận người duyệt &amp; vai trò lúc duyệt (<code>HocVien.nguoi_duyet_id</code>, <code>cap_duyet_thuc_te</code>) để tra soát.
+  </div>
+
+  <!-- Shared use cases -->
+  <div style="background: #FDF8EE; border: 1px solid #EFD8A4; border-radius: 12px; padding: 14px 20px; display: flex; flex-direction: column; gap: 8px;">
+    <div style="font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: #7A4E07;">Use case dùng chung (quan hệ include / extend)</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+      <div class="uc-chip shared">Kiểm tra dữ liệu hợp lệ</div>
+      <div style="font-size: 11.5px; color: #7A4E07;">«include» bởi:</div>
+      <div style="font-size: 11.5px; color: #5B6472;">Nhập thông tin học viên · Import danh mục địa danh · Import danh mục đơn vị công tác · Import phân lớp học viên</div>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+      <div class="uc-chip shared">Cảnh báo trùng ĐDCN / sai định dạng dữ liệu</div>
+      <div style="font-size: 11.5px; color: #7A4E07;">«extend» của:</div>
+      <div style="font-size: 11.5px; color: #5B6472;">Kiểm tra dữ liệu hợp lệ — chỉ kích hoạt khi phát hiện bất thường</div>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+      <div class="uc-chip shared">Gửi email bản sao dữ liệu đã khai báo</div>
+      <div style="font-size: 11.5px; color: #7A4E07;">«include» bởi:</div>
+      <div style="font-size: 11.5px; color: #5B6472;">Xem lại &amp; xác nhận thông tin trước khi lưu chính thức — chạy tự động ngay sau khi lưu</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1600,"height":1420}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

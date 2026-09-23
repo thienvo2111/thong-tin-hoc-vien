@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Mô hình dữ liệu: Khóa bồi dưỡng &amp; Lớp học</title>
+<script src="./support.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif}
+</style>
+</helmet>
+<div style="width: 1600px; height: 1350px; box-sizing: border-box; padding: 48px 56px; display: flex; flex-direction: column; gap: 16px; background: #F5F7FA; color: #1A2233;">
+
+  <div style="display: flex; align-items: flex-end; justify-content: space-between;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #1868B7;">Hệ thống thu thập thông tin học viên</div>
+      <h1 style="margin: 0; font-size: 30px; font-weight: 700; color: #0B3B60;">Mô hình dữ liệu: Khóa bồi dưỡng &amp; Lớp học</h1>
+    </div>
+    <div style="display: flex; gap: 16px; font-size: 12px; color: #5B6472;">
+      <div style="display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #B8720A; display: inline-block;"></span>Khóa chính (PK)</div>
+      <div style="display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #1868B7; display: inline-block;"></span>Khóa ngoại (FK)</div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px;">
+
+    <!-- KhoaBoiDuong -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; overflow: hidden;">
+      <div style="background: #0B3B60; color: #ffffff; padding: 10px 14px; font-size: 14px; font-weight: 600;">KhoaBoiDuong <span style="font-weight: 400; opacity: .75; font-size: 12px;">— khóa bồi dưỡng</span></div>
+      <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 7px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #B8720A;">●</span> id</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ma_khoa / ten_khoa</span><span style="color: #8894A6;">varchar</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> don_vi_to_chuc_id → DonViCongTac</span><span style="color: #8894A6;">= Trường/đơn vị đào tạo tạo khóa</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>dia_diem</span><span style="color: #8894A6;">varchar, địa điểm chính</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>thoi_gian_bat_dau / ket_thuc</span><span style="color: #8894A6;">date, tổng thể cả khóa</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>trang_thai</span><span style="color: #8894A6;">nháp/chờ duyệt/đã duyệt/từ chối/đóng đăng ký</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> nguoi_duyet_id → NguoiDung</span><span style="color: #8894A6;">Sở hoặc Phòng VHXH (theo don_vi_cha_id)</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>cap_duyet_thuc_te</span><span style="color: #8894A6;">ghi nhận vai_tro lúc duyệt (audit)</span></div>
+      </div>
+    </div>
+
+    <!-- GiaiDoanKhoa -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; overflow: hidden;">
+      <div style="background: #0B3B60; color: #ffffff; padding: 10px 14px; font-size: 14px; font-weight: 600;">GiaiDoanKhoa <span style="font-weight: 400; opacity: .75; font-size: 12px;">— nội dung khóa</span></div>
+      <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 7px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #B8720A;">●</span> id</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> khoa_id → KhoaBoiDuong</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>thu_tu</span><span style="color: #8894A6;">int — thứ tự giai đoạn trong khóa</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ten_giai_doan</span><span style="color: #8894A6;">vd: "Đánh giá đầu vào"</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>hinh_thuc</span><span style="color: #8894A6;">enum: TrựcTiếp/TrựcTuyến/ĐánhGiá/Khác</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>thoi_gian_bat_dau / ket_thuc</span><span style="color: #8894A6;">date</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>trang_thai</span><span style="color: #8894A6;">active/ngừng</span></div>
+      </div>
+    </div>
+
+    <!-- LopHoc -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; overflow: hidden;">
+      <div style="background: #0B3B60; color: #ffffff; padding: 10px 14px; font-size: 14px; font-weight: 600;">LopHoc <span style="font-weight: 400; opacity: .75; font-size: 12px;">— lớp cụ thể</span></div>
+      <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 7px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #B8720A;">●</span> id</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> khoa_id → KhoaBoiDuong</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ten_lop</span><span style="color: #8894A6;">varchar</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>si_so_toi_da</span><span style="color: #8894A6;">int, tùy chọn</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>trang_thai</span><span style="color: #8894A6;">active/đã đóng</span></div>
+      </div>
+    </div>
+
+    <!-- LichHocLop -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; overflow: hidden;">
+      <div style="background: #0B3B60; color: #ffffff; padding: 10px 14px; font-size: 14px; font-weight: 600;">LichHocLop <span style="font-weight: 400; opacity: .75; font-size: 12px;">— lịch học theo lớp</span></div>
+      <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 7px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #B8720A;">●</span> id</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> lop_id → LopHoc</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> giai_doan_id → GiaiDoanKhoa</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>thoi_gian_bat_dau / ket_thuc</span><span style="color: #8894A6;">date, cụ thể cho lớp này</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>dia_diem_hoac_link</span><span style="color: #8894A6;">địa điểm (trực tiếp) / link (trực tuyến)</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>trang_thai</span><span style="color: #8894A6;">chưa diễn ra/đang diễn ra/kết thúc</span></div>
+      </div>
+    </div>
+
+    <!-- LopHoc_NhanSu -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; overflow: hidden;">
+      <div style="background: #0B3B60; color: #ffffff; padding: 10px 14px; font-size: 14px; font-weight: 600;">LopHoc_NhanSu <span style="font-weight: 400; opacity: .75; font-size: 12px;">— giảng viên / hỗ trợ</span></div>
+      <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 7px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #B8720A;">●</span> id</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> lop_id → LopHoc</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ho_ten</span><span style="color: #8894A6;">varchar, NFC</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>vai_tro</span><span style="color: #8894A6;">enum: GiảngViên/ĐộiNgũHỗTrợ</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>so_dien_thoai</span><span style="color: #8894A6;">tùy chọn</span></div>
+      </div>
+    </div>
+
+    <!-- DangKyHoc -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; overflow: hidden;">
+      <div style="background: #0B3B60; color: #ffffff; padding: 10px 14px; font-size: 14px; font-weight: 600;">DangKyHoc <span style="font-weight: 400; opacity: .75; font-size: 12px;">— n-n, cầu nối HocVien</span></div>
+      <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 7px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #B8720A;">●</span> id</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> hoc_vien_id → HocVien</span><span style="color: #8894A6;">uuid (board Mô hình dữ liệu)</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> khoa_id → KhoaBoiDuong</span><span style="color: #8894A6;">uuid, gán ngay khi hồ sơ được xác nhận</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> lop_id → LopHoc</span><span style="color: #8894A6;">uuid, NULLABLE — gán qua Import bởi Quản trị hệ thống</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ngay_dang_ky</span><span style="color: #8894A6;">date</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>trang_thai</span><span style="color: #8894A6;">chờ/duyệt/từ chối/đã phân lớp</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ket_qua</span><span style="color: #8894A6;">enum: đang học/đạt/không đạt/vắng</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ngay_hoan_thanh</span><span style="color: #8894A6;">date, tùy chọn — học viên xem được</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+    <div style="background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 16px; font-size: 12px; color: #0B3B60; line-height: 1.5;">
+      Nguyên tắc 3: mỗi <b>KhoaBoiDuong</b> tự định nghĩa chuỗi <b>GiaiDoanKhoa</b> riêng (thứ tự + hình thức) — khóa này có thể là Đánh giá đầu vào → Trực tuyến → Trực tiếp → Trực tuyến, khóa khác có thể tổ chức khác hẳn; không có chuỗi giai đoạn cố định dùng chung.
+    </div>
+    <div style="background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 16px; font-size: 12px; color: #0B3B60; line-height: 1.5;">
+      Nguyên tắc 4: gán khóa (<code>DangKyHoc.khoa_id</code>) và phân lớp (<code>DangKyHoc.lop_id</code>) là <b>2 bước tách biệt</b> — khóa được gán ngay sau khi hồ sơ học viên xác nhận; phân lớp do <b>Quản trị hệ thống thực hiện qua Import</b> (Excel/CSV, khớp theo ĐDCN → LopHoc), không thao tác tay từng người, vì số lượng lớn. Dùng chung cơ chế import/validate/báo lỗi theo dòng như danh mục.
+    </div>
+    <div style="background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 16px; font-size: 12px; color: #0B3B60; line-height: 1.5;">
+      Nguyên tắc 5: <b>Trường/đơn vị đào tạo</b> tạo &amp; quản lý khóa bồi dưỡng của chính mình (giai đoạn, lớp, giảng viên) rồi nộp duyệt; <b>Sở GD&amp;ĐT / Phòng Văn hóa - Xã hội chỉ duyệt danh sách &amp; xem thống kê</b> — không tự tạo khóa. Đơn vị duyệt xác định theo <code>DonViCongTac.don_vi_cha_id</code> của Trường tổ chức, cùng cơ chế scope-based như duyệt hồ sơ học viên.
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1600,"height":1350}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

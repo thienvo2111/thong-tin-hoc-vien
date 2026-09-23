@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Quản trị &amp; import danh mục dùng chung</title>
+<script src="./support.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:8px;font-size:13.5px;color:#D7E2EE;text-decoration:none}
+.nav-item.active{background:#15517F;color:#ffffff;font-weight:600}
+th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#5B6472;padding:9px 12px;border-bottom:1px solid #DCE1E8}
+td{font-size:13px;padding:11px 12px;border-bottom:1px solid #ECEFF3;color:#1A2233}
+</style>
+</helmet>
+<div style="width: 1400px; height: 1000px; box-sizing: border-box; display: flex; background: #F5F7FA; color: #1A2233;">
+
+  <!-- Sidebar -->
+  <div style="width: 220px; flex-shrink: 0; background: #0B3B60; padding: 24px 14px; display: flex; flex-direction: column; gap: 4px;">
+    <div style="color: #ffffff; font-size: 14px; font-weight: 700; padding: 0 10px 18px;">Quản trị hệ thống</div>
+    <a href="#" class="nav-item active">Địa danh</a>
+    <a href="#" class="nav-item">Đơn vị công tác</a>
+    <a href="#" class="nav-item">Môn học (CT GDPT 2018)</a>
+    <a href="#" class="nav-item">Khóa bồi dưỡng</a>
+    <a href="#" class="nav-item">Phân lớp học viên (import)</a>
+    <a href="#" class="nav-item">Nhật ký import</a>
+    <div style="height: 1px; background: #1E5C8A; margin: 10px 4px;"></div>
+    <a href="#" class="nav-item">Người dùng &amp; phân quyền</a>
+  </div>
+
+  <!-- Main -->
+  <div style="flex: 1; padding: 32px 36px; display: flex; flex-direction: column; gap: 16px; overflow: hidden;">
+
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 12.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #1868B7;">Danh mục dùng chung</div>
+      <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #0B3B60;">Địa danh — Tỉnh/Thành &amp; Phường/Xã/Đặc khu</h1>
+    </div>
+
+    <!-- Toolbar -->
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <div style="position: relative; flex: 1; max-width: 320px;">
+        <input type="text" placeholder="Tìm theo tên hoặc mã..." style="width: 100%; box-sizing: border-box; padding: 9px 12px 9px 34px; border-radius: 8px; border: 1px solid #DCE1E8; font-size: 13px; font-family: inherit;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8894A6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 11px; top: 10px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </div>
+      <select style="padding: 9px 12px; border-radius: 8px; border: 1px solid #DCE1E8; font-size: 13px; font-family: inherit; background: #fff;">
+        <option>Cấp: Tất cả</option>
+      </select>
+      <select style="padding: 9px 12px; border-radius: 8px; border: 1px solid #DCE1E8; font-size: 13px; font-family: inherit; background: #fff;">
+        <option>Trạng thái: Tất cả</option>
+      </select>
+      <div style="flex: 1;"></div>
+      <button type="button" style="display: flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 8px; border: 1px solid #DCE1E8; background: #ffffff; color: #1A2233; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A2233" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Tải mẫu Excel
+      </button>
+      <button type="button" style="display: flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 8px; border: none; background: #1868B7; color: #ffffff; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        Import dữ liệu
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; overflow: hidden;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="width: 100px;">Mã</th>
+            <th>Tên</th>
+            <th style="width: 120px;">Cấp</th>
+            <th style="width: 160px;">Thuộc Tỉnh/Thành</th>
+            <th style="width: 150px;">Trạng thái</th>
+            <th style="width: 110px;">Cập nhật</th>
+            <th style="width: 60px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>79</td><td style="font-weight: 600;">Thành phố Hồ Chí Minh</td><td>Tỉnh/Thành</td><td>—</td>
+            <td><span style="background: #E8F5E9; color: #1E7B34; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px;">Đang dùng</span></td>
+            <td style="color: #8894A6;">12/08/2026</td><td><a href="#" style="font-size: 12px;">Sửa</a></td>
+          </tr>
+          <tr>
+            <td>79.026</td><td>Phường Bến Nghé</td><td>Phường/Xã</td><td>TP. Hồ Chí Minh</td>
+            <td><span style="background: #E8F5E9; color: #1E7B34; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px;">Đang dùng</span></td>
+            <td style="color: #8894A6;">12/08/2026</td><td><a href="#" style="font-size: 12px;">Sửa</a></td>
+          </tr>
+          <tr>
+            <td>79.027</td><td>Phường Bến Thành</td><td>Phường/Xã</td><td>TP. Hồ Chí Minh</td>
+            <td><span style="background: #E8F5E9; color: #1E7B34; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px;">Đang dùng</span></td>
+            <td style="color: #8894A6;">12/08/2026</td><td><a href="#" style="font-size: 12px;">Sửa</a></td>
+          </tr>
+          <tr>
+            <td>01.003</td><td>Phường Ba Đình (cũ)</td><td>Phường/Xã</td><td>Hà Nội</td>
+            <td><span style="background: #EEF0F3; color: #5B6472; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px;">Ngừng dùng (đã sáp nhập)</span></td>
+            <td style="color: #8894A6;">03/06/2026</td><td><a href="#" style="font-size: 12px;">Sửa</a></td>
+          </tr>
+          <tr>
+            <td>01</td><td style="font-weight: 600;">Thành phố Hà Nội</td><td>Tỉnh/Thành</td><td>—</td>
+            <td><span style="background: #E8F5E9; color: #1E7B34; font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px;">Đang dùng</span></td>
+            <td style="color: #8894A6;">12/08/2026</td><td><a href="#" style="font-size: 12px;">Sửa</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Import result panel -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="font-size: 13.5px; font-weight: 700; color: #0B3B60;">Kết quả import gần nhất — danh_sach_phuong_xa_2026.xlsx</div>
+        <div style="font-size: 11.5px; color: #8894A6;">Quản trị hệ thống &middot; 22/09/2026 14:32</div>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <div style="flex: 1; background: #F5F7FA; border-radius: 8px; padding: 10px 14px;">
+          <div style="font-size: 20px; font-weight: 700; color: #0B3B60;">1.821</div>
+          <div style="font-size: 11.5px; color: #5B6472;">Tổng số dòng</div>
+        </div>
+        <div style="flex: 1; background: #E8F5E9; border-radius: 8px; padding: 10px 14px;">
+          <div style="font-size: 20px; font-weight: 700; color: #1E7B34;">1.798</div>
+          <div style="font-size: 11.5px; color: #2E7D32;">Hợp lệ, sẵn sàng nhập</div>
+        </div>
+        <div style="flex: 1; background: #FBEAE8; border-radius: 8px; padding: 10px 14px;">
+          <div style="font-size: 20px; font-weight: 700; color: #C0392B;">23</div>
+          <div style="font-size: 11.5px; color: #A6392C;">Dòng lỗi, cần sửa</div>
+        </div>
+        <div style="flex: 2; display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: #5B6472; justify-content: center;">
+          <div>&middot; Dòng 45: Mã hành chính bị trùng với dòng 12</div>
+          <div>&middot; Dòng 118: Tên phường/xã để trống</div>
+          <div>&middot; Dòng 302: Không xác định được Tỉnh/Thành cha (mã 999 không tồn tại)</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button type="button" style="padding: 9px 16px; border-radius: 8px; border: 1px solid #DCE1E8; background: #ffffff; color: #1A2233; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;">Tải file lỗi (23 dòng)</button>
+        <button type="button" style="padding: 9px 16px; border-radius: 8px; border: none; background: #1E7B34; color: #ffffff; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;">Xác nhận nhập 1.798 dòng hợp lệ</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1400,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

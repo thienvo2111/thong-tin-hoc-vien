@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Mô hình dữ liệu (ERD)</title>
+<script src="./support.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif}
+</style>
+</helmet>
+<div style="width: 1600px; height: 1500px; box-sizing: border-box; padding: 48px 56px; display: flex; flex-direction: column; gap: 16px; background: #F5F7FA; color: #1A2233;">
+
+  <div style="display: flex; align-items: flex-end; justify-content: space-between;">
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #1868B7;">Hệ thống thu thập thông tin học viên</div>
+      <h1 style="margin: 0; font-size: 30px; font-weight: 700; color: #0B3B60;">Mô hình dữ liệu (ERD rút gọn)</h1>
+    </div>
+    <div style="display: flex; gap: 16px; font-size: 12px; color: #5B6472;">
+      <div style="display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #B8720A; display: inline-block;"></span>Khóa chính (PK)</div>
+      <div style="display: flex; align-items: center; gap: 6px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #1868B7; display: inline-block;"></span>Khóa ngoại (FK)</div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px;">
+
+    <!-- HocVien -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; overflow: hidden; grid-column: span 2;">
+      <div style="background: #0B3B60; color: #ffffff; padding: 10px 14px; font-size: 14px; font-weight: 600;">HocVien <span style="font-weight: 400; opacity: .75; font-size: 12px;">— hồ sơ học viên</span></div>
+      <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 7px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #B8720A;">●</span> id</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ho_ten</span><span style="color: #8894A6;">varchar(255), NOT NULL, NFC</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>so_dinh_danh_ca_nhan</span><span style="color: #8894A6;">char(12), UNIQUE, regex ^[0-9]{12}$</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ngay_sinh / thang_sinh / nam_sinh</span><span style="color: #8894A6;">smallint × 3, hợp lệ theo lịch</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> noi_sinh_id → DiaDanh</span><span style="color: #8894A6;">uuid, cấp Tỉnh</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> phuong_xa_id → DiaDanh</span><span style="color: #8894A6;">uuid, cấp Phường/Xã</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> don_vi_cong_tac_id → DonViCongTac</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>gioi_tinh</span><span style="color: #8894A6;">tùy chọn</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>so_dien_thoai_lien_he / email_lien_he</span><span style="color: #8894A6;">NOT NULL</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>trinh_do_chuyen_mon</span><span style="color: #8894A6;">enum: TrungCấp…TiếnSĩ/Khác + trinh_do_khac</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>chuyen_mon_dao_tao</span><span style="color: #8894A6;">varchar, tự do có gợi ý (không FK)</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>cap_giang_day</span><span style="color: #8894A6;">enum MN/TH/THCS/THPT — quyết định đơn vị duyệt</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> mon_giang_day_id → MonHoc</span><span style="color: #8894A6;">uuid, lọc theo cap_giang_day</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>trang_thai</span><span style="color: #8894A6;">enum: nhap_dang/da_xac_nhan/loi</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> nguoi_duyet_id → NguoiDung</span><span style="color: #8894A6;">có thể là cấp trên duyệt thay</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>cap_duyet_thuc_te</span><span style="color: #8894A6;">ghi nhận vai_tro lúc duyệt (audit)</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>created_at / updated_at</span><span style="color: #8894A6;">audit</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>created_by</span><span style="color: #8894A6;">= chính hồ sơ này (tự đăng ký) — xem Nguyên tắc 6</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>email_ban_sao_da_gui_at</span><span style="color: #8894A6;">timestamp, tùy chọn — audit gửi email</span></div>
+      </div>
+    </div>
+
+    <!-- DiaDanh -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; overflow: hidden;">
+      <div style="background: #0B3B60; color: #ffffff; padding: 10px 14px; font-size: 14px; font-weight: 600;">DiaDanh <span style="font-weight: 400; opacity: .75; font-size: 12px;">— danh mục</span></div>
+      <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 7px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #B8720A;">●</span> id</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ma</span><span style="color: #8894A6;">mã hành chính</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ten</span><span style="color: #8894A6;">varchar, NFC</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>cap</span><span style="color: #8894A6;">Tỉnh / Phường-Xã / Đặc khu</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> parent_id → DiaDanh</span><span style="color: #8894A6;">tự tham chiếu</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>trang_thai</span><span style="color: #8894A6;">active/ngừng (sáp nhập)</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> nguon_import_id</span><span style="color: #8894A6;">→ NhatKyImport</span></div>
+      </div>
+    </div>
+
+    <!-- DonViCongTac -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; overflow: hidden;">
+      <div style="background: #0B3B60; color: #ffffff; padding: 10px 14px; font-size: 14px; font-weight: 600;">DonViCongTac <span style="font-weight: 400; opacity: .75; font-size: 12px;">— danh mục</span></div>
+      <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 7px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #B8720A;">●</span> id</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ma_don_vi / ten_don_vi</span><span style="color: #8894A6;">varchar</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>loai_don_vi</span><span style="color: #8894A6;">SởGDĐT/PhòngVHXH-Xã/Trường/Khác</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> dia_ban_id → DiaDanh</span><span style="color: #8894A6;">uuid, cấp Xã/Phường nơi đặt trụ sở</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> don_vi_cha_id → DonViCongTac</span><span style="color: #8894A6;">tổ chức hành chính — không dùng duyệt hồ sơ (Nguyên tắc 2), nhưng dùng để duyệt Khóa bồi dưỡng do đơn vị này tổ chức</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>trang_thai</span><span style="color: #8894A6;">active/ngừng</span></div>
+      </div>
+    </div>
+
+    <!-- NguoiDung -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; overflow: hidden;">
+      <div style="background: #0B3B60; color: #ffffff; padding: 10px 14px; font-size: 14px; font-weight: 600;">NguoiDung <span style="font-weight: 400; opacity: .75; font-size: 12px;">— tài khoản</span></div>
+      <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 7px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #B8720A;">●</span> id</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ho_ten / email</span><span style="color: #8894A6;">varchar</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>vai_tro</span><span style="color: #8894A6;">SởGDĐT/PhòngVHXH-Xã/Trường/HọcViên/QuảnTrị</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> don_vi_id → DonViCongTac</span><span style="color: #8894A6;">uuid, NULL nếu vai_tro=HọcViên</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> hoc_vien_id → HocVien</span><span style="color: #8894A6;">uuid, NULLABLE — chỉ khi vai_tro=HọcViên</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>trang_thai</span><span style="color: #8894A6;">active/khóa</span></div>
+      </div>
+    </div>
+
+    <!-- MonHoc -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; overflow: hidden;">
+      <div style="background: #0B3B60; color: #ffffff; padding: 10px 14px; font-size: 14px; font-weight: 600;">MonHoc <span style="font-weight: 400; opacity: .75; font-size: 12px;">— danh mục</span></div>
+      <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 7px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #B8720A;">●</span> id</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ten_mon</span><span style="color: #8894A6;">varchar, NFC</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>cap_hoc</span><span style="color: #8894A6;">MN/TiểuHọc/THCS/THPT — theo CT GDPT 2018</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>trang_thai</span><span style="color: #8894A6;">active/ngừng</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> nguon_import_id</span><span style="color: #8894A6;">→ NhatKyImport</span></div>
+      </div>
+    </div>
+
+    <!-- NhatKyImport -->
+    <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 12px; overflow: hidden;">
+      <div style="background: #0B3B60; color: #ffffff; padding: 10px 14px; font-size: 14px; font-weight: 600;">NhatKyImport <span style="font-weight: 400; opacity: .75; font-size: 12px;">— nhật ký</span></div>
+      <div style="padding: 10px 14px; display: flex; flex-direction: column; gap: 7px;">
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #B8720A;">●</span> id</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>loai_danh_muc</span><span style="color: #8894A6;">DiaDanh/DonViCongTac/MonHoc/PhanLopHocVien</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>ten_file_goc</span><span style="color: #8894A6;">varchar</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span><span style="color: #1868B7;">●</span> nguoi_import_id → NguoiDung</span><span style="color: #8894A6;">uuid</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>tong_so_dong / thanh_cong / loi</span><span style="color: #8894A6;">int × 3</span></div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px;"><span>file_loi_url</span><span style="color: #8894A6;">object storage</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+    <div style="background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 16px; font-size: 12px; color: #0B3B60; line-height: 1.5;">
+      Nguyên tắc 1: mọi trường "dữ liệu chọn lựa" trên form (Nơi sinh, Phường/Xã, Đơn vị công tác) đều trỏ khóa ngoại vào <b>DiaDanh</b> / <b>DonViCongTac</b> — không lưu chuỗi tự do, để tránh sai chính tả và đảm bảo báo cáo tổng hợp chính xác theo địa bàn/đơn vị.
+    </div>
+    <div style="background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 16px; font-size: 12px; color: #0B3B60; line-height: 1.5;">
+      Nguyên tắc 2: đơn vị duyệt hồ sơ xác định theo <b><code>HocVien.cap_giang_day</code></b> (theo từng học viên, kể cả trường liên cấp) — Trung học phổ thông → Sở GD&amp;ĐT quản lý tỉnh chứa <code>dia_ban_id</code> của đơn vị công tác; Mầm non/Tiểu học/THCS → Phòng Văn hóa - Xã hội quản lý đúng xã/phường đó. Quyền hạn vẫn <b>scope-based</b> (không bảng phân quyền riêng): Sở duyệt thay được Phòng VHXH trong toàn tỉnh, chiều ngược lại không áp dụng.
+    </div>
+    <div style="background: #F5F7FA; border: 1px dashed #C3CAD4; border-radius: 10px; padding: 12px 16px; font-size: 12px; color: #5B6472; line-height: 1.5;">
+      <b>KhoaBoiDuong / GiaiDoanKhoa / LopHoc / DangKyHoc</b> (khóa bồi dưỡng, giai đoạn, lớp học, đăng ký) tách sang board riêng <b>"Mô hình dữ liệu: Khóa bồi dưỡng &amp; Lớp học"</b> để giữ board này gọn — xem board kế bên.
+    </div>
+    <div style="background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 16px; font-size: 12px; color: #0B3B60; line-height: 1.5;">
+      Nguyên tắc 6: <b>Học viên tự đăng ký</b> — không cần Trường tạo tài khoản trước. Học viên vào Cổng học viên, tự khai <code>HocVien</code> (<code>created_by</code> = chính họ); ngay khi lưu thành công, hệ thống tự sinh <code>NguoiDung</code> (<code>vai_tro=HọcViên</code>, <code>hoc_vien_id</code> trỏ về hồ sơ vừa tạo) với tên đăng nhập = <code>so_dinh_danh_ca_nhan</code>, mật khẩu mặc định = ngày sinh — bắt buộc đổi ngay lần đăng nhập đầu. Tài khoản chỉ đọc/sửa đúng hồ sơ của chính mình.
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1600,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

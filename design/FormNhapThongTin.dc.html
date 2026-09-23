@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Form thu thập thông tin học viên</title>
+<script src="./support.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif}
+.fld-input{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid #DCE1E8;font-size:14px;font-family:inherit;color:#1A2233;background:#ffffff}
+.fld-input::placeholder{color:#98A2B0}
+.fld-label{font-size:13px;font-weight:600;color:#0B3B60;margin-bottom:6px;display:block}
+.fld-help{font-size:11.5px;color:#5B6472;margin-top:6px;line-height:1.4}
+</style>
+</helmet>
+<div style="width: 900px; height: 2150px; box-sizing: border-box; padding: 40px 40px 32px; display: flex; flex-direction: column; gap: 18px; background: #F5F7FA; color: #1A2233;">
+
+  <div style="display: flex; flex-direction: column; gap: 4px;">
+    <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #1868B7;">Cổng học viên — Tự khai báo thông tin</div>
+    <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #0B3B60;">Khai báo thông tin học viên</h1>
+    <div style="font-size: 13px; color: #5B6472;">Học viên tự truy cập &amp; khai báo lần đầu — đơn vị công tác: Trường THPT Lê Quý Đôn</div>
+  </div>
+
+  <div style="background: #FBEAE8; border: 1px solid #EFC3BC; border-radius: 10px; padding: 12px 16px; display: flex; gap: 10px; align-items: flex-start;">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C0392B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+    <div style="font-size: 12.5px; color: #8A2E22; line-height: 1.5;"><b>Có 2 trường cần kiểm tra lại</b> trước khi lưu: Họ và tên (nghi ngờ sai định dạng), Số định danh cá nhân (chưa đủ 12 số).</div>
+  </div>
+
+  <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 16px; padding: 26px 28px; display: flex; flex-direction: column; gap: 20px;">
+
+    <!-- Ho ten - warning state -->
+    <div>
+      <label class="fld-label" for="f-hoten">Họ và tên <span style="color: #C0392B;">*</span></label>
+      <input id="f-hoten" class="fld-input" type="text" value="nguyễn Thị a" style="border-color: #E8B45C; background: #FDF8EE;">
+      <div class="fld-help" style="display: flex; gap: 6px; color: #8A5A0A;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B8720A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        <span>Cảnh báo định dạng: chữ cái đầu mỗi từ nên viết hoa. Hệ thống sẽ chuẩn hóa gợi ý thành "Nguyễn Thị A" — vui lòng xác nhận lại.</span>
+      </div>
+      <div class="fld-help">Chỉ nhập chữ cái tiếng Việt có dấu, sử dụng bảng mã Unicode dựng sẵn (chuẩn TCVN 6909); dữ liệu được chuẩn hóa Unicode NFC khi lưu để tránh lỗi font khi xuất báo cáo.</div>
+    </div>
+
+    <!-- So dinh danh - error state -->
+    <div>
+      <label class="fld-label" for="f-ddcn">Số định danh cá nhân (ĐDCN) <span style="color: #C0392B;">*</span></label>
+      <input id="f-ddcn" class="fld-input" type="text" inputmode="numeric" maxlength="12" value="0123456789 1" style="border-color: #C0392B; background: #FEF6F5;">
+      <div class="fld-help" style="display: flex; gap: 6px; color: #A6392C;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C0392B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+        <span>Số định danh cá nhân phải gồm đúng 12 chữ số, không khoảng trắng, không ký tự khác (hiện có 11 số).</span>
+      </div>
+    </div>
+
+    <div style="background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 16px; display: flex; gap: 10px; align-items: flex-start;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0B3B60" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px;"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+      <div style="font-size: 12px; color: #0B3B60; line-height: 1.5;"><b>Lưu ý bảo mật:</b> ngay khi hoàn tất khai báo, hệ thống <b>tự động tạo tài khoản đăng nhập</b> — tên đăng nhập = ĐDCN, mật khẩu mặc định = ngày sinh (dùng cho chính hệ thống này &amp; một số hệ thống liên quan khác sau này). Vì vậy phải khai đúng tuyệt đối. Bắt buộc đổi mật khẩu ngay lần đăng nhập đầu tiên (rủi ro nếu không: mật khẩu mặc định dễ đoán).</div>
+    </div>
+
+    <!-- Ngay/thang/nam sinh - valid state -->
+    <div>
+      <label class="fld-label">Ngày sinh <span style="color: #C0392B;">*</span></label>
+      <div style="display: flex; gap: 10px;">
+        <select class="fld-input" aria-label="Ngày sinh" style="border-color: #2E8B47;">
+          <option>15</option>
+        </select>
+        <select class="fld-input" aria-label="Tháng sinh" style="border-color: #2E8B47;">
+          <option>Tháng 03</option>
+        </select>
+        <select class="fld-input" aria-label="Năm sinh" style="border-color: #2E8B47;">
+          <option>2001</option>
+        </select>
+        <div style="display: flex; align-items: center; padding: 0 4px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2E8B47" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </div>
+      </div>
+      <div class="fld-help">Ba ô nhập tách biệt (ngày/tháng/năm), tự kiểm tra ngày hợp lệ theo tháng &amp; năm nhuận, và độ tuổi hợp lý so với khóa bồi dưỡng.</div>
+    </div>
+
+    <!-- Noi sinh -->
+    <div>
+      <label class="fld-label" for="f-noisinh">Nơi sinh (Tỉnh/Thành phố) <span style="color: #C0392B;">*</span></label>
+      <div style="position: relative;">
+        <select id="f-noisinh" class="fld-input" style="padding-left: 36px; appearance: none;">
+          <option>Thành phố Hồ Chí Minh</option>
+        </select>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8894A6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 12px; top: 12px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </div>
+      <div class="fld-help">Dữ liệu chọn lựa từ danh mục địa danh dùng chung (do quản trị viên import), không nhập tự do.</div>
+    </div>
+
+    <!-- Phuong xa -->
+    <div>
+      <label class="fld-label" for="f-phuongxa">Phường / Xã / Đặc khu <span style="color: #C0392B;">*</span></label>
+      <div style="position: relative;">
+        <select id="f-phuongxa" class="fld-input" style="padding-left: 36px; appearance: none;">
+          <option style="color: #98A2B0;">-- Chọn sau khi đã chọn Tỉnh/Thành --</option>
+        </select>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8894A6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 12px; top: 12px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </div>
+      <div class="fld-help">Danh sách được lọc theo Tỉnh/Thành phố đã chọn ở trên (quan hệ cha–con trong danh mục địa danh).</div>
+    </div>
+
+    <!-- Don vi cong tac - open combobox example -->
+    <div>
+      <label class="fld-label" for="f-donvi">Đơn vị công tác <span style="color: #C0392B;">*</span></label>
+      <div style="position: relative;">
+        <input id="f-donvi" class="fld-input" type="text" value="THPT Lê" style="padding-left: 36px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8894A6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 12px; top: 12px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <div style="margin-top: 4px; background: #ffffff; border: 1px solid #DCE1E8; border-radius: 8px; box-shadow: 0 6px 16px rgba(11,59,96,0.10); overflow: hidden;">
+          <div style="padding: 6px 12px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #8894A6; background: #F5F7FA;">Trường</div>
+          <div style="padding: 9px 12px; font-size: 13px; background: #EAF2FB;">THPT Lê Quý Đôn — Quận 3, TP. Hồ Chí Minh</div>
+          <div style="padding: 9px 12px; font-size: 13px;">THPT Lê Hồng Phong — Quận 5, TP. Hồ Chí Minh</div>
+        </div>
+      </div>
+      <div class="fld-help">Gõ để tìm theo tên hoặc mã đơn vị; danh mục do quản trị viên import (không tự thêm đơn vị mới tại đây).</div>
+    </div>
+
+    <div style="font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #8894A6; padding-top: 6px; border-top: 1px solid #ECEFF3;">Thông tin liên hệ</div>
+
+    <!-- So dien thoai lien he -->
+    <div>
+      <label class="fld-label" for="f-sdt">Số điện thoại liên hệ <span style="color: #C0392B;">*</span></label>
+      <input id="f-sdt" class="fld-input" type="tel" value="0909 123 456">
+      <div class="fld-help">Dùng để liên hệ khi cần xác minh hồ sơ; đúng định dạng số điện thoại Việt Nam.</div>
+    </div>
+
+    <!-- Email lien he -->
+    <div>
+      <label class="fld-label" for="f-email">Email liên hệ <span style="color: #C0392B;">*</span></label>
+      <input id="f-email" class="fld-input" type="email" value="nguyen.thi.a@example.edu.vn">
+      <div class="fld-help">Dùng để gửi thông báo kết quả duyệt hồ sơ &amp; thông tin khóa bồi dưỡng.</div>
+    </div>
+
+    <div style="font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #8894A6; padding-top: 6px; border-top: 1px solid #ECEFF3;">Trình độ &amp; chuyên môn</div>
+
+    <!-- Trinh do chuyen mon -->
+    <div>
+      <label class="fld-label" for="f-trinhdo">Trình độ chuyên môn <span style="color: #C0392B;">*</span></label>
+      <select id="f-trinhdo" class="fld-input">
+        <option>Trung cấp</option>
+        <option>Cao đẳng</option>
+        <option selected>Đại học</option>
+        <option>Thạc sĩ</option>
+        <option>Tiến sĩ</option>
+        <option>Khác</option>
+      </select>
+      <div class="fld-help">Chọn "Khác" nếu không thuộc các nhóm trên — hệ thống hiện thêm ô nhập tự do để mô tả.</div>
+    </div>
+
+    <!-- Chuyen mon dao tao - autocomplete -->
+    <div>
+      <label class="fld-label" for="f-chuyenmon">Chuyên môn đào tạo <span style="color: #C0392B;">*</span></label>
+      <div style="position: relative;">
+        <input id="f-chuyenmon" class="fld-input" type="text" value="Sư phạm Toán">
+        <div style="margin-top: 4px; background: #ffffff; border: 1px solid #DCE1E8; border-radius: 8px; box-shadow: 0 6px 16px rgba(11,59,96,0.10); overflow: hidden;">
+          <div style="padding: 9px 12px; font-size: 13px; background: #EAF2FB;">Sư phạm Toán học</div>
+          <div style="padding: 9px 12px; font-size: 13px;">Sư phạm Toán - Tin</div>
+          <div style="padding: 9px 12px; font-size: 13px;">Sư phạm Toán (hệ Cao đẳng)</div>
+        </div>
+      </div>
+      <div class="fld-help">Gợi ý tự động từ các giá trị học viên khác đã từng nhập — vẫn cho nhập tự do nếu không có gợi ý phù hợp (không ràng buộc theo danh mục cố định, không cần quản trị viên import).</div>
+    </div>
+
+    <!-- Cap giang day -->
+    <div>
+      <label class="fld-label" for="f-capgd">Cấp giảng dạy phù hợp nhất <span style="color: #C0392B;">*</span></label>
+      <select id="f-capgd" class="fld-input">
+        <option>Mầm non</option>
+        <option>Tiểu học</option>
+        <option selected>Trung học cơ sở</option>
+        <option>Trung học phổ thông</option>
+      </select>
+      <div class="fld-help">Khai theo từng học viên (không theo trường) — đúng cho cả trường liên cấp. Giá trị này quyết định đơn vị duyệt hồ sơ: Phòng Văn hóa - Xã hội (Mầm non/Tiểu học/THCS) hoặc Sở GD&amp;ĐT (Trung học phổ thông).</div>
+    </div>
+
+    <!-- Mon giang day - dependent -->
+    <div>
+      <label class="fld-label" for="f-mongd">Môn giảng dạy <span style="color: #C0392B;">*</span></label>
+      <div style="position: relative;">
+        <select id="f-mongd" class="fld-input" style="padding-left: 36px; appearance: none;">
+          <option>Toán học</option>
+        </select>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8894A6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 12px; top: 12px;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </div>
+      <div class="fld-help">Danh mục môn học theo Chương trình GDPT 2018, lọc theo Cấp giảng dạy đã chọn ở trên; do quản trị viên import.</div>
+    </div>
+
+  </div>
+
+  <div style="display: flex; align-items: center; justify-content: flex-end; gap: 12px;">
+    <div style="font-size: 12px; color: #8A2E22; margin-right: auto;">Cần khắc phục 2 lỗi ở trên để hoàn tất.</div>
+    <button type="button" style="padding: 11px 20px; border-radius: 8px; border: 1px solid #DCE1E8; background: #ffffff; color: #1A2233; font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;">Hủy</button>
+    <button type="button" disabled style="padding: 11px 22px; border-radius: 8px; border: none; background: #B7C3D1; color: #ffffff; font-size: 14px; font-weight: 600; font-family: inherit; cursor: not-allowed;">Hoàn tất khai báo &amp; tạo tài khoản</button>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":900,"height":2150}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

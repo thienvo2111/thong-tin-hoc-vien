@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Kiến trúc hệ thống</title>
+<script src="./support.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:'Be Vietnam Pro',system-ui,sans-serif}
+a{color:#1868B7}a:hover{color:#0B3B60}
+</style>
+</helmet>
+<div style="width: 1600px; height: 1180px; box-sizing: border-box; padding: 48px 56px; display: flex; flex-direction: column; gap: 18px; background: #F5F7FA; color: #1A2233;">
+
+  <div style="display: flex; flex-direction: column; gap: 4px;">
+    <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #1868B7;">Hệ thống thu thập thông tin học viên</div>
+    <h1 style="margin: 0; font-size: 30px; font-weight: 700; color: #0B3B60;">Kiến trúc hệ thống (tổng quan)</h1>
+    <div style="font-size: 14px; color: #5B6472; max-width: 1100px; line-height: 1.5;">Mô hình 4 tầng, tách dịch vụ theo nghiệp vụ (danh mục dùng chung tách khỏi hồ sơ học viên) để có thể mở rộng thêm loại danh mục, khóa bồi dưỡng, hoặc kênh phối hợp mới mà không sửa lõi hệ thống.</div>
+  </div>
+
+  <!-- Layer 1: Actors -->
+  <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 14px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; align-items: baseline; justify-content: space-between;">
+      <div style="font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #5B6472;">Đơn vị phối hợp &amp; người dùng</div>
+      <div style="font-size: 11px; color: #8894A6;">Chính quyền 2 cấp (từ 01/07/2025) — phân quyền quản lý theo cấp học, không theo địa giới hành chính cũ</div>
+    </div>
+    <div style="display: flex; gap: 14px;">
+      <div style="flex: 1; background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 14px; font-weight: 600; color: #0B3B60;">Sở Giáo dục &amp; Đào tạo (cấp tỉnh)</div>
+        <div style="font-size: 12px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Quản lý trực tiếp Trường THPT; chỉ <b>duyệt</b> hồ sơ &amp; khóa bồi dưỡng, xem thống kê toàn tỉnh — không tự tạo khóa</div>
+      </div>
+      <div style="flex: 1; background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 14px; font-weight: 600; color: #0B3B60;">Phòng Văn hóa - Xã hội (thuộc UBND cấp Xã)</div>
+        <div style="font-size: 12px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Quản lý Trường Mầm non / Tiểu học / THCS trên địa bàn xã, phường — cũng chỉ duyệt, không tự tạo khóa</div>
+      </div>
+      <div style="flex: 1; background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 14px; font-weight: 600; color: #0B3B60;">Trường / đơn vị đào tạo (mọi cấp học)</div>
+        <div style="font-size: 12px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Nhập hồ sơ học viên; tự tạo &amp; quản lý khóa bồi dưỡng của mình, nộp lên cấp trên duyệt</div>
+      </div>
+      <div style="flex: 1; background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 14px; font-weight: 600; color: #0B3B60;">Học viên</div>
+        <div style="font-size: 12px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Tự khai báo hồ sơ, xem khóa/lớp được phân &amp; kết quả — chỉ dữ liệu của chính mình</div>
+      </div>
+      <div style="flex: 1; background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 14px; font-weight: 600; color: #0B3B60;">Quản trị hệ thống</div>
+        <div style="font-size: 12px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Quản lý danh mục dùng chung, phân quyền, import dữ liệu &amp; phân lớp</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: center;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8894A6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+  </div>
+
+  <!-- Layer 2: Frontend -->
+  <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 14px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #5B6472;">Ứng dụng web (Frontend — SPA, responsive)</div>
+    <div style="display: flex; gap: 14px;">
+      <div style="flex: 1; background: #F5F7FA; border: 1px solid #DCE1E8; border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 14px; font-weight: 600; color: #0B3B60;">Cổng nhập thông tin học viên</div>
+        <div style="font-size: 12px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Biểu mẫu có ràng buộc &amp; cảnh báo ngay khi nhập</div>
+      </div>
+      <div style="flex: 1; background: #F5F7FA; border: 1px solid #DCE1E8; border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 14px; font-weight: 600; color: #0B3B60;">Cổng quản trị danh mục</div>
+        <div style="font-size: 12px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Import / sửa / vô hiệu hóa dữ liệu chọn lựa</div>
+      </div>
+      <div style="flex: 1; background: #F5F7FA; border: 1px solid #DCE1E8; border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 14px; font-weight: 600; color: #0B3B60;">Cổng báo cáo &amp; xuất dữ liệu</div>
+        <div style="font-size: 12px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Tổng hợp theo Sở / Trường / địa bàn Xã-Phường, xuất Excel chuẩn UTF-8</div>
+      </div>
+      <div style="flex: 1; background: #F5F7FA; border: 1px solid #DCE1E8; border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 14px; font-weight: 600; color: #0B3B60;">Cổng học viên (tự phục vụ)</div>
+        <div style="font-size: 12px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Khai báo hồ sơ, xem khóa/lớp &amp; kết quả — đăng nhập bằng ĐDCN + ngày sinh</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: center;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8894A6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+  </div>
+
+  <!-- Layer 3: Backend services -->
+  <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 14px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #5B6472;">Tầng dịch vụ (Backend API — REST/JSON, mỗi dịch vụ một trách nhiệm)</div>
+    <div style="display: flex; gap: 12px;">
+      <div style="flex: 1; background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 12px;">
+        <div style="font-size: 13px; font-weight: 600; color: #0B3B60;">Auth &amp; Phân quyền</div>
+        <div style="font-size: 11.5px; color: #5B6472; margin-top: 4px; line-height: 1.4;">SSO / tài khoản theo đơn vị; scope-based — quyền suy ra từ cây DonViCongTac, không có bảng phân quyền riêng</div>
+      </div>
+      <div style="flex: 1; background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 12px;">
+        <div style="font-size: 13px; font-weight: 600; color: #0B3B60;">Dịch vụ Học viên</div>
+        <div style="font-size: 11.5px; color: #5B6472; margin-top: 4px; line-height: 1.4;">CRUD hồ sơ, tra trùng ĐDCN</div>
+      </div>
+      <div style="flex: 1; background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 12px;">
+        <div style="font-size: 13px; font-weight: 600; color: #0B3B60;">Dịch vụ Danh mục dùng chung</div>
+        <div style="font-size: 11.5px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Địa danh, đơn vị công tác, phiên bản hóa</div>
+      </div>
+      <div style="flex: 1; background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 12px;">
+        <div style="font-size: 13px; font-weight: 600; color: #0B3B60;">Dịch vụ Import</div>
+        <div style="font-size: 11.5px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Đọc file, dò lỗi, nạp theo lô (job)</div>
+      </div>
+      <div style="flex: 1; background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 12px;">
+        <div style="font-size: 13px; font-weight: 600; color: #0B3B60;">Dịch vụ Kiểm tra dữ liệu</div>
+        <div style="font-size: 11.5px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Quy tắc ràng buộc dùng chung 2 chiều nhập/import</div>
+      </div>
+      <div style="flex: 1; background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 12px;">
+        <div style="font-size: 13px; font-weight: 600; color: #0B3B60;">Dịch vụ Báo cáo</div>
+        <div style="font-size: 11.5px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Tổng hợp, xuất Excel/CSV UTF-8 (BOM)</div>
+      </div>
+      <div style="flex: 1; background: #EAF2FB; border: 1px solid #C9DCF2; border-radius: 10px; padding: 12px 12px;">
+        <div style="font-size: 13px; font-weight: 600; color: #0B3B60;">Dịch vụ Thông báo</div>
+        <div style="font-size: 11.5px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Email bản sao hồ sơ, kết quả duyệt, kết quả khóa học</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: center;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8894A6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+  </div>
+
+  <!-- Layer 4: Data -->
+  <div style="background: #ffffff; border: 1px solid #DCE1E8; border-radius: 14px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px;">
+    <div style="display: flex; align-items: baseline; justify-content: space-between;">
+      <div style="font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #5B6472;">Tầng dữ liệu &amp; hạ tầng</div>
+      <div style="font-size: 11px; color: #8894A6;">Bảng mã: UTF-8 / NFC toàn hệ thống (chống lỗi font tiếng Việt khi xuất dữ liệu)</div>
+    </div>
+    <div style="display: flex; gap: 14px;">
+      <div style="flex: 1.4; background: #F5F7FA; border: 1px solid #DCE1E8; border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 14px; font-weight: 600; color: #0B3B60;">PostgreSQL</div>
+        <div style="font-size: 12px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Dữ liệu chuẩn hóa 3NF, collation utf8mb4/ICU tiếng Việt</div>
+      </div>
+      <div style="flex: 1; background: #F5F7FA; border: 1px solid #DCE1E8; border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 14px; font-weight: 600; color: #0B3B60;">Redis Cache</div>
+        <div style="font-size: 12px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Cache danh mục chọn lựa tần suất đọc cao</div>
+      </div>
+      <div style="flex: 1; background: #F5F7FA; border: 1px solid #DCE1E8; border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 14px; font-weight: 600; color: #0B3B60;">Object Storage</div>
+        <div style="font-size: 12px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Lưu file Excel/CSV import gốc, có thể tra soát lại</div>
+      </div>
+      <div style="flex: 1; background: #F5F7FA; border: 1px solid #DCE1E8; border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 14px; font-weight: 600; color: #0B3B60;">Hàng đợi tác vụ</div>
+        <div style="font-size: 12px; color: #5B6472; margin-top: 4px; line-height: 1.4;">Xử lý import/báo cáo khối lượng lớn nền (async)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Layer 5: future integration -->
+  <div style="display: flex; gap: 14px; align-items: center;">
+    <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: #8894A6; white-space: nowrap;">Tích hợp tương lai</div>
+    <div style="flex: 1; border: 1.5px dashed #C3CAD4; border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #5B6472;">CSDL quốc gia về dân cư (xác thực ĐDCN) — qua Dịch vụ Kiểm tra dữ liệu, không thay đổi lõi</div>
+    <div style="flex: 1; border: 1.5px dashed #C3CAD4; border-radius: 10px; padding: 10px 14px; font-size: 12px; color: #5B6472;">Cổng Dịch vụ công / trục liên thông LGSP cấp tỉnh</div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1600,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
