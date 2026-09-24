@@ -16,45 +16,6 @@ function sinhMatKhauNgauNhien(): string {
   return crypto.randomBytes(12).toString('base64url');
 }
 
-// DB CHECK `chk_nguoi_dung_scope` (database-ddl.sql) bắt buộc don_vi_id
-// NOT NULL cho MỌI vai_tro <> 'hoc_vien', kể cả quan_tri — dù scope của
-// quan_tri là toàn hệ thống, không phụ thuộc đơn vị nào (xem ScopeService).
-// Đây là điểm chưa khớp hoàn toàn giữa spec (quan_tri = "toàn hệ thống",
-// không đơn vị cụ thể) và constraint DB hiện có — flag lại, không tự sửa
-// schema/migration ở lượt này. Workaround: tạo 1 don_vi_cong_tac gốc dùng
-// riêng cho việc seed, để thỏa constraint mà không ảnh hưởng danh mục thật.
-async function layHoacTaoDonViSeed(): Promise<string> {
-  const maDonViSeed = 'SEED-QUANTRI';
-  const existing = await prisma.don_vi_cong_tac.findUnique({
-    where: { ma_don_vi: maDonViSeed },
-  });
-  if (existing) return existing.id;
-
-  const maDiaDanhSeed = 'SEED';
-  let diaDanh = await prisma.dia_danh.findUnique({
-    where: { ma: maDiaDanhSeed },
-  });
-  if (!diaDanh) {
-    diaDanh = await prisma.dia_danh.create({
-      data: {
-        ma: maDiaDanhSeed,
-        ten: '(Địa danh seed — chưa cấu hình)',
-        cap: 'tinh_thanh',
-      },
-    });
-  }
-
-  const donVi = await prisma.don_vi_cong_tac.create({
-    data: {
-      ma_don_vi: maDonViSeed,
-      ten_don_vi: 'Đơn vị gốc cho tài khoản quan_tri (seed)',
-      loai_don_vi: 'khac',
-      dia_ban_id: diaDanh.id,
-    },
-  });
-  return donVi.id;
-}
-
 async function main() {
   const tenDangNhap =
     process.env.SEED_QUAN_TRI_TEN_DANG_NHAP ?? 'quantri@thongtinhocvien.local';
@@ -76,14 +37,13 @@ async function main() {
       ? matKhauTuEnv
       : sinhMatKhauNgauNhien();
   const matKhauHash = await bcrypt.hash(matKhau, BCRYPT_SALT_ROUNDS);
-  const donViId = await layHoacTaoDonViSeed();
 
   await prisma.nguoi_dung.create({
     data: {
       ho_ten: 'Quản trị hệ thống',
       ten_dang_nhap: tenDangNhap,
       email,
-      don_vi_id: donViId,
+      don_vi_id: null,
       vai_tro: 'quan_tri',
       mat_khau_hash: matKhauHash,
       phai_doi_mat_khau: true,
