@@ -39,3 +39,48 @@ Xem chi tiết đầy đủ trong các board ở trên. Tóm tắt:
 ## Bước tiếp theo
 
 Soạn tài liệu kỹ thuật chính thức từ bộ thiết kế này: API contract (REST endpoints theo từng dịch vụ), DDL PostgreSQL đầy đủ (constraints, index, enum), checklist quy tắc ràng buộc/validate — rồi triển khai.
+
+## Development setup
+
+**Stack:** Node.js + [NestJS](https://nestjs.com/) + TypeScript, PostgreSQL, [Prisma](https://www.prisma.io/) ORM/migrations. Modular monolith — không tách microservices, vì một số luồng (vd. luồng đăng ký học viên ở `docs/api-contract.md` mục "Luồng đăng ký") cần 1 transaction DB duy nhất trải qua nhiều "dịch vụ" logic.
+
+**Cấu trúc thư mục:** code backend nằm ở [`backend/`](backend/) (subfolder riêng, không đặt ở gốc repo) để chừa chỗ cho một `frontend/` sibling sau này. `design/` (canvas snapshot) và `docs/` (spec chính thức) giữ nguyên ở gốc repo.
+
+### Cài đặt
+
+```bash
+cd backend
+npm install
+cp .env.example .env   # chỉnh DATABASE_URL nếu cần
+```
+
+### Chạy PostgreSQL cục bộ
+
+Repo có sẵn `docker-compose.yml` ở gốc, khởi động Postgres 16:
+
+```bash
+docker compose up -d
+```
+
+Việc này tạo container `thong-tin-hoc-vien-db`, database `thong_tin_hoc_vien`, cổng `5432`, khớp với `DATABASE_URL` mặc định trong `backend/.env.example`. Nếu không dùng Docker, trỏ `DATABASE_URL` trong `backend/.env` tới một Postgres 14+ bất kỳ có cài được extension `pgcrypto` và `pg_trgm`.
+
+### Chạy migration
+
+```bash
+cd backend
+npx prisma migrate deploy
+```
+
+Migration khởi tạo (`prisma/migrations/20260924000000_init/`) dịch nguyên trạng từ [`docs/database-ddl.sql`](docs/database-ddl.sql) — bảng, enum, index, và cả những phần Prisma schema DSL không biểu diễn được (extension `pgcrypto`/`pg_trgm`, mọi `CHECK` constraint, GIN trgm index, 2 trigger function `trg_dang_ky_lop_thuoc_khoa` và `trg_set_updated_at`) được nối thêm dưới dạng raw SQL ở cuối file migration, chép nguyên văn từ DDL gốc.
+
+Schema Prisma (`prisma/schema.prisma`) đặt tên model/field trùng chính xác tên bảng/cột trong DDL, và mọi quan hệ khóa ngoại khai báo tường minh `onDelete`/`onUpdate` để khớp đúng ngữ nghĩa gốc (`NoAction` mặc định — DDL không hard-delete các bảng danh mục, chỉ soft-disable qua `trang_thai`; `Cascade` chỉ ở những FK DDL khai báo `ON DELETE CASCADE` tường minh) thay vì để Prisma tự suy luận `SetNull`/`Restrict`.
+
+### Chạy dev server
+
+```bash
+npm run start:dev
+```
+
+### Cấu trúc module backend
+
+7 module NestJS rỗng (chưa có controller/service, sẽ thêm ở lượt triển khai kế tiếp), mỗi module ứng với 1 dịch vụ trong `docs/api-contract.md`: `auth`, `hoc-vien`, `khoa-boi-duong`, `danh-muc`, `import`, `bao-cao`, `thong-bao`.
