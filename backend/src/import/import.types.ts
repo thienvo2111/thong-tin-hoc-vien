@@ -1,12 +1,13 @@
 import { loai_danh_muc_import } from '@prisma/client';
 
-// Chỉ 3/5 loại được triển khai ở lượt này (theo phạm vi công việc được giao):
-// phan_lop_hoc_vien và ho_so_nhan_su_moet phụ thuộc module hoc-vien/khoa-boi-duong
-// chưa tồn tại — bỏ qua, trả lỗi rõ ràng nếu bị gọi.
+// 4/5 loại được triển khai (dia_danh/don_vi_cong_tac/mon_hoc từ lượt trước +
+// ho_so_nhan_su_moet ở lượt này, xem HocVienService). phan_lop_hoc_vien vẫn
+// bị hoãn (cần module khoa-boi-duong chưa tồn tại) — trả lỗi rõ ràng nếu bị gọi.
 export const SUPPORTED_IMPORT_TYPES = [
   'dia_danh',
   'don_vi_cong_tac',
   'mon_hoc',
+  'ho_so_nhan_su_moet',
 ] as const satisfies readonly loai_danh_muc_import[];
 
 export type SupportedImportType = (typeof SUPPORTED_IMPORT_TYPES)[number];

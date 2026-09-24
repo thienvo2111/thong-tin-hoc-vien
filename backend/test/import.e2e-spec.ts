@@ -103,9 +103,9 @@ describe('Import (e2e)', () => {
   });
 
   describe('GET /import/mau-excel', () => {
-    it('loại chưa hỗ trợ (ho_so_nhan_su_moet) -> 400', async () => {
+    it('loại chưa hỗ trợ (phan_lop_hoc_vien) -> 400', async () => {
       const res = await request(app.getHttpServer())
-        .get('/import/mau-excel?loai=ho_so_nhan_su_moet')
+        .get('/import/mau-excel?loai=phan_lop_hoc_vien')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .expect(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -124,6 +124,31 @@ describe('Import (e2e)', () => {
       await workbook.xlsx.load(res.body as unknown as ExcelJS.Buffer);
       const headerRow = workbook.worksheets[0].getRow(1).values as unknown[];
       expect(headerRow.slice(1)).toEqual(['ten_mon', 'cap_hoc']);
+    });
+
+    it('ho_so_nhan_su_moet -> trả file xlsx đúng cột theo api-contract.md', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/import/mau-excel?loai=ho_so_nhan_su_moet')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .buffer(true)
+        .parse(binaryParser)
+        .expect(200);
+
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(res.body as unknown as ExcelJS.Buffer);
+      const headerRow = workbook.worksheets[0].getRow(1).values as unknown[];
+      expect(headerRow.slice(1)).toEqual([
+        'Đơn vị',
+        'Mã định danh (CDSL moet)',
+        'Họ và tên',
+        'Ngày',
+        'Tháng',
+        'Năm',
+        'Chức vụ',
+        'Chuyên môn',
+        'Số điện thoại',
+        'Ghi chú',
+      ]);
     });
   });
 
