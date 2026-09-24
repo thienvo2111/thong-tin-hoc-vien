@@ -70,22 +70,25 @@ NULL (không có)    → Sở GD&ĐT quản lý tỉnh (mặc định an toàn c
 Sở luôn được phép duyệt thay Phòng VHXH (escalation trong scope-based). Chiều ngược lại — Phòng VHXH duyệt hồ sơ THPT — bị từ chối `403`.
 
 ### Luồng đăng ký (chi tiết transaction của `POST /hoc-vien`)
+
+**Thứ tự tạo bảng ĐÃ SỬA (2026-09-25):** bản đầu ghi tạo `nguoi_dung` trước `hoc_vien` — nhưng vậy vi phạm ngay `chk_nguoi_dung_scope` (`vai_tro='hoc_vien'` đòi `hoc_vien_id IS NOT NULL` tại chính câu `INSERT`, mà lúc đó `hoc_vien` chưa tồn tại nên không thể có id để gán). Thứ tự đúng là tạo `hoc_vien` trước, `nguoi_dung` sau (đã có sẵn `hoc_vien.id` để gán ngay), rồi backfill `hoc_vien.created_by` — phát hiện khi implement thật, xem `backend/src/hoc-vien/hoc-vien.service.ts`.
+
 1. Validate toàn bộ body (xem `validation-checklist.md`).
-2. `INSERT INTO nguoi_dung (vai_tro='hoc_vien', email=email_lien_he, mat_khau_hash=hash(ngay_sinh dạng ddmmyyyy), phai_doi_mat_khau=true, hoc_vien_id=NULL)` → lấy `nguoi_dung.id`.
-3. `INSERT INTO hoc_vien (..., created_by = nguoi_dung.id)` → lấy `hoc_vien.id`.
-4. `UPDATE nguoi_dung SET hoc_vien_id = hoc_vien.id WHERE id = nguoi_dung.id`.
+2. `INSERT INTO hoc_vien (..., created_by=NULL)` → lấy `hoc_vien.id`.
+3. `INSERT INTO nguoi_dung (vai_tro='hoc_vien', ten_dang_nhap=so_dinh_danh_ca_nhan, mat_khau_hash=hash(ngay_sinh dạng ddmmyyyy), phai_doi_mat_khau=true, hoc_vien_id=hoc_vien.id)` → lấy `nguoi_dung.id`. Thỏa `chk_nguoi_dung_scope` ngay từ câu lệnh này vì `hoc_vien_id` đã có giá trị thật.
+4. `UPDATE hoc_vien SET created_by = nguoi_dung.id WHERE id = hoc_vien.id`.
 5. Commit. Trả về `{ hoc_vien_id, ten_dang_nhap: so_dinh_danh_ca_nhan, luu_y: "Mật khẩu mặc định là ngày sinh — bắt buộc đổi khi đăng nhập lần đầu" }`.
 
 ### Luồng import nhân sự từ CSDL MOET (`POST /import/ho-so-nhan-su-moet`, xem mục 5)
 
 File nhận từ Sở/Bộ theo mẫu: `Đơn vị`, `Mã định danh (CDSL moet)`, `Họ và tên`, `Ngày`, `Tháng`, `Năm` (3 cột riêng), `Chức vụ`, `Chuyên môn` (có thể nhiều giá trị/dòng, phân tách bằng `;`), `Số điện thoại`, `Ghi chú`.
 
-Với mỗi dòng hợp lệ:
+Với mỗi dòng hợp lệ (cùng thứ tự tạo bảng đã sửa như "Luồng đăng ký" ở trên — `hoc_vien` trước `nguoi_dung`):
 1. Khớp cột `Đơn vị` với `don_vi_cong_tac.ten_don_vi` (chỉ trong phạm vi quyền của người chạy import). Không khớp được / khớp nhiều hơn 1 → dòng lỗi.
-2. `INSERT INTO nguoi_dung (vai_tro='hoc_vien', ten_dang_nhap=ma_dinh_danh_moet, mat_khau_hash=hash(ngay_sinh dạng ddmmyyyy), phai_doi_mat_khau=true, email=NULL, hoc_vien_id=NULL)`.
-3. `INSERT INTO hoc_vien (nguon_tao='import_moet', ma_dinh_danh_moet, ho_ten, ngay_sinh, thang_sinh, nam_sinh, chuc_vu, don_vi_cong_tac_id, so_dien_thoai_lien_he, ghi_chu, trang_thai='da_duyet', nguoi_duyet_id=<tài khoản đang chạy import>, cap_duyet_thuc_te='quan_tri', ngay_duyet=now(), created_by=<nguoi_dung.id bước 2>)`. Mọi field khác (CCCD, nơi sinh, phường xã, email, trình độ, cấp giảng dạy, môn giảng dạy) để `NULL`.
+2. `INSERT INTO hoc_vien (nguon_tao='import_moet', ma_dinh_danh_moet, ho_ten, ngay_sinh, thang_sinh, nam_sinh, chuc_vu, don_vi_cong_tac_id, so_dien_thoai_lien_he, ghi_chu, trang_thai='da_duyet', nguoi_duyet_id=<tài khoản đang chạy import>, cap_duyet_thuc_te='quan_tri', ngay_duyet=now(), created_by=NULL)` → lấy `hoc_vien.id`. Mọi field khác (CCCD, nơi sinh, phường xã, email, trình độ, cấp giảng dạy, môn giảng dạy) để `NULL`.
+3. `INSERT INTO nguoi_dung (vai_tro='hoc_vien', ten_dang_nhap=ma_dinh_danh_moet, mat_khau_hash=hash(ngay_sinh dạng ddmmyyyy), phai_doi_mat_khau=true, email=NULL, hoc_vien_id=hoc_vien.id)` → lấy `nguoi_dung.id`.
 4. Tách `Chuyên môn` theo `;`, `INSERT` từng giá trị vào `hoc_vien_chuyen_mon`.
-5. `UPDATE nguoi_dung SET hoc_vien_id = ...`.
+5. `UPDATE hoc_vien SET created_by = nguoi_dung.id WHERE id = hoc_vien.id`.
 6. Dòng lỗi điển hình: `Mã định danh` trùng đã tồn tại (`uq_hoc_vien_ma_moet`), thiếu `Đơn vị`/không khớp, ngày sinh không hợp lệ.
 
 Học viên nhận tài khoản đăng nhập bằng **Mã định danh CSDL MOET + ngày sinh** (không phải CCCD — hệ thống không giả định 2 mã này trùng nhau). Sau khi đăng nhập lần đầu, học viên tự bổ sung CCCD và các thông tin còn thiếu qua `PATCH /hoc-vien/toi` — hồ sơ đã `da_duyet` sẵn nên không cần Trường/Sở/Phòng duyệt lại.
