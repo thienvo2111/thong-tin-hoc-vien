@@ -175,7 +175,7 @@ CREATE TABLE nguoi_dung (
     --   vai_tro='hoc_vien', nguon_tao='import_moet' → = ma_dinh_danh_moet lúc import
     --   vai_tro khác                                → do Quản trị hệ thống gán khi cấp tài khoản
     vai_tro             vai_tro_nguoi_dung NOT NULL,
-    don_vi_id           uuid REFERENCES don_vi_cong_tac(id),  -- NULL nếu vai_tro='hoc_vien'
+    don_vi_id           uuid REFERENCES don_vi_cong_tac(id),  -- NULL nếu vai_tro='hoc_vien' hoặc 'quan_tri'
     hoc_vien_id         uuid,                                  -- FK thêm sau (xem PHẦN 2)
     mat_khau_hash       varchar(255) NOT NULL,
     phai_doi_mat_khau   boolean NOT NULL DEFAULT true,
@@ -189,7 +189,13 @@ CREATE TABLE nguoi_dung (
     CONSTRAINT chk_nguoi_dung_scope CHECK (
         (vai_tro = 'hoc_vien' AND don_vi_id IS NULL AND hoc_vien_id IS NOT NULL)
         OR
-        (vai_tro <> 'hoc_vien' AND don_vi_id IS NOT NULL AND hoc_vien_id IS NULL)
+        (vai_tro = 'quan_tri' AND hoc_vien_id IS NULL)
+            -- don_vi_id KHÔNG bị ràng buộc cho quan_tri (được phép NULL —
+            -- phạm vi quan_tri là toàn hệ thống, không nên bắt gắn giả vào
+            -- 1 đơn vị nào; sửa 2026-09-24 sau khi bản seed đầu tiên phải
+            -- tạo "đơn vị bootstrap" giả chỉ để thỏa constraint cũ)
+        OR
+        (vai_tro NOT IN ('hoc_vien', 'quan_tri') AND don_vi_id IS NOT NULL AND hoc_vien_id IS NULL)
     ),
     CONSTRAINT chk_nguoi_dung_email_bat_buoc
         CHECK (vai_tro = 'hoc_vien' OR email IS NOT NULL)
