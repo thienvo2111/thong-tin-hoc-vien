@@ -103,9 +103,9 @@ describe('Import (e2e)', () => {
   });
 
   describe('GET /import/mau-excel', () => {
-    it('loại chưa hỗ trợ (phan_lop_hoc_vien) -> 400', async () => {
+    it('loại không tồn tại -> 400', async () => {
       const res = await request(app.getHttpServer())
-        .get('/import/mau-excel?loai=phan_lop_hoc_vien')
+        .get('/import/mau-excel?loai=khong_ton_tai')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .expect(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');

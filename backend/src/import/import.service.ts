@@ -6,10 +6,12 @@ import { DiaDanhService } from '../danh-muc/dia-danh/dia-danh.service';
 import { DonViCongTacService } from '../danh-muc/don-vi-cong-tac/don-vi-cong-tac.service';
 import { MonHocService } from '../danh-muc/mon-hoc/mon-hoc.service';
 import { HocVienService } from '../hoc-vien/hoc-vien.service';
+import { KhoaBoiDuongService } from '../khoa-boi-duong/khoa-boi-duong.service';
 import { CreateDiaDanhDto } from '../danh-muc/dto/dia-danh.dto';
 import { CreateDonViCongTacDto } from '../danh-muc/dto/don-vi-cong-tac.dto';
 import { CreateMonHocDto } from '../danh-muc/dto/mon-hoc.dto';
 import { HoSoNhanSuMoetRowDto } from '../hoc-vien/dto/import-moet-row.dto';
+import { PhanLopHocVienRowDto } from '../khoa-boi-duong/dto/phan-lop-row.dto';
 import {
   ConflictAppException,
   NotFoundAppException,
@@ -38,16 +40,17 @@ import {
 import { buildValidatedDto } from './util/dto-validate.util';
 import { LichSuImportQueryDto } from './dto/lich-su-import-query.dto';
 
-// Dịch vụ Import — docs/api-contract.md mục 5. Triển khai dia_danh /
-// don_vi_cong_tac / mon_hoc / ho_so_nhan_su_moet ở lượt này (phan_lop_hoc_vien
-// vẫn cần module khoa-boi-duong, chưa tồn tại).
+// Dịch vụ Import — docs/api-contract.md mục 5. Cả 5 loại đã triển khai:
+// dia_danh / don_vi_cong_tac / mon_hoc / ho_so_nhan_su_moet (lượt trước) +
+// phan_lop_hoc_vien (lượt này, xem KhoaBoiDuongService).
 //
 // Cột file Excel cho dia_danh/don_vi_cong_tac/mon_hoc KHÔNG được
 // api-contract.md định nghĩa chi tiết — tự thiết kế ở đây (flag lại trong
 // self-review): dùng "mã" (ma/ma_don_vi) làm khóa tham chiếu giữa các dòng
 // thay vì UUID nội bộ, vì người nhập liệu thực tế không biết UUID. Cột của
-// ho_so_nhan_su_moet THÌ được định nghĩa rõ trong api-contract.md mục 2
-// ("Luồng import nhân sự từ CSDL MOET") — dùng đúng nguyên văn.
+// ho_so_nhan_su_moet và phan_lop_hoc_vien THÌ được định nghĩa rõ trong
+// api-contract.md ("Luồng import nhân sự từ CSDL MOET" mục 2, mục 5 ghi chú
+// riêng cho phan_lop_hoc_vien) — dùng đúng nguyên văn.
 @Injectable()
 export class ImportService {
   constructor(
@@ -56,12 +59,13 @@ export class ImportService {
     private readonly donViCongTacService: DonViCongTacService,
     private readonly monHocService: MonHocService,
     private readonly hocVienService: HocVienService,
+    private readonly khoaBoiDuongService: KhoaBoiDuongService,
   ) {}
 
   assertSupported(loai: string): SupportedImportType {
     if (!isSupportedImportType(loai)) {
       throw new ValidationException(
-        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet)`,
+        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien)`,
       );
     }
     return loai;
@@ -316,6 +320,10 @@ export class ImportService {
         ];
       case 'mon_hoc':
         return ['ten_mon', 'cap_hoc'];
+      case 'phan_lop_hoc_vien':
+        // Nguyên văn cột theo docs/api-contract.md mục 5, ghi chú riêng cho
+        // phan_lop_hoc_vien.
+        return ['so_dinh_danh_ca_nhan', 'ma_khoa', 'ten_lop'];
       case 'ho_so_nhan_su_moet':
         // Nguyên văn cột theo docs/api-contract.md mục 2 "Luồng import nhân
         // sự từ CSDL MOET".
@@ -351,6 +359,7 @@ export class ImportService {
       | CreateDonViCongTacDto
       | CreateMonHocDto
       | HoSoNhanSuMoetRowDto
+      | PhanLopHocVienRowDto
     >
   > {
     switch (loai) {
@@ -363,6 +372,12 @@ export class ImportService {
           ten_mon: raw.ten_mon,
           cap_hoc: raw.cap_hoc,
         });
+      case 'phan_lop_hoc_vien':
+        return this.khoaBoiDuongService.resolvePhanLopRow({
+          so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
+          ma_khoa: raw.ma_khoa,
+          ten_lop: raw.ten_lop,
+        });
       case 'ho_so_nhan_su_moet':
         return this.buildHoSoMoetDto(raw);
     }
@@ -374,7 +389,8 @@ export class ImportService {
       | CreateDiaDanhDto
       | CreateDonViCongTacDto
       | CreateMonHocDto
-      | HoSoNhanSuMoetRowDto,
+      | HoSoNhanSuMoetRowDto
+      | PhanLopHocVienRowDto,
   ): Promise<string | undefined> {
     try {
       if (loai === 'dia_danh') {
@@ -397,6 +413,10 @@ export class ImportService {
           ten_mon: d.ten_mon,
           cap_hoc: d.cap_hoc,
         });
+      } else if (loai === 'phan_lop_hoc_vien') {
+        await this.khoaBoiDuongService.checkValidPhanLop(
+          dto as PhanLopHocVienRowDto,
+        );
       } else {
         const d = dto as HoSoNhanSuMoetRowDto;
         await this.hocVienService.checkValidMoetImportRow({
@@ -422,7 +442,8 @@ export class ImportService {
       | CreateDiaDanhDto
       | CreateDonViCongTacDto
       | CreateMonHocDto
-      | HoSoNhanSuMoetRowDto,
+      | HoSoNhanSuMoetRowDto
+      | PhanLopHocVienRowDto,
     importId: string,
     nguoiImportId: string,
   ): Promise<void> {
@@ -435,6 +456,8 @@ export class ImportService {
       );
     } else if (loai === 'mon_hoc') {
       await this.monHocService.create(dto as CreateMonHocDto, importId);
+    } else if (loai === 'phan_lop_hoc_vien') {
+      await this.khoaBoiDuongService.commitPhanLop(dto as PhanLopHocVienRowDto);
     } else {
       const d = dto as HoSoNhanSuMoetRowDto;
       await this.hocVienService.createFromMoetImport(
