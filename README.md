@@ -75,6 +75,19 @@ Migration khởi tạo (`prisma/migrations/20260924000000_init/`) dịch nguyên
 
 Schema Prisma (`prisma/schema.prisma`) đặt tên model/field trùng chính xác tên bảng/cột trong DDL, và mọi quan hệ khóa ngoại khai báo tường minh `onDelete`/`onUpdate` để khớp đúng ngữ nghĩa gốc (`NoAction` mặc định — DDL không hard-delete các bảng danh mục, chỉ soft-disable qua `trang_thai`; `Cascade` chỉ ở những FK DDL khai báo `ON DELETE CASCADE` tường minh) thay vì để Prisma tự suy luận `SetNull`/`Restrict`.
 
+### Tạo tài khoản quan_tri đầu tiên (seed)
+
+Chưa có luồng tự cấp tài khoản Sở/Phòng VHXH/Trường/QuảnTrị (chỉ Học viên tự đăng ký) — chạy seed 1 lần để có tài khoản `quan_tri` đăng nhập/quản lý danh mục/import:
+
+```bash
+cd backend
+npx prisma db seed
+```
+
+In ra `ten_dang_nhap` + mật khẩu (tự sinh nếu không đặt `SEED_QUAN_TRI_MAT_KHAU` trong `.env`) — đổi mật khẩu ngay qua `POST /auth/doi-mat-khau` sau khi đăng nhập lần đầu. Idempotent: chạy lại không tạo trùng nếu tài khoản đã tồn tại.
+
+Nhớ đặt `JWT_SECRET` riêng (đủ dài/ngẫu nhiên) trong `backend/.env` trước khi deploy thật — xem `backend/.env.example`.
+
 ### Chạy dev server
 
 ```bash
@@ -83,4 +96,6 @@ npm run start:dev
 
 ### Cấu trúc module backend
 
-7 module NestJS rỗng (chưa có controller/service, sẽ thêm ở lượt triển khai kế tiếp), mỗi module ứng với 1 dịch vụ trong `docs/api-contract.md`: `auth`, `hoc-vien`, `khoa-boi-duong`, `danh-muc`, `import`, `bao-cao`, `thong-bao`.
+7 module NestJS, mỗi module ứng với 1 dịch vụ trong `docs/api-contract.md`: `auth`, `hoc-vien`, `khoa-boi-duong`, `danh-muc`, `import`, `bao-cao`, `thong-bao`.
+
+Đã triển khai (2026-09-24): **`auth`** (đăng nhập/đổi mật khẩu/thông tin tài khoản, JWT guard, phân quyền scope-based qua `ScopeService`) và **`danh-muc`** + **`import`** (CRUD danh mục địa danh/đơn vị công tác/môn học dùng chung 1 bộ validate với luồng import Excel — chỉ 3/5 loại import, xem ghi chú trong `src/import/import.service.ts`). Còn lại (`hoc-vien`, `khoa-boi-duong`, `bao-cao`, `thong-bao`) vẫn là module rỗng.

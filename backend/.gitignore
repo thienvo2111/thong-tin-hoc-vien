@@ -6,3 +6,7 @@ dist
 .env.local
 
 /generated/prisma
+
+# Lưu trữ cục bộ file gốc/kết quả import (xem src/import/util/import-storage.util.ts) —
+# thay thế tạm cho object storage thật, không commit dữ liệu người dùng tải lên
+/storage
