@@ -142,7 +142,7 @@ Dùng chung 1 luồng cho cả 5 loại (`loai_danh_muc_import`): `dia_danh`, `d
 | POST | `/import/{id}/xac-nhan` | Nạp chính thức các dòng hợp lệ (bước riêng sau khi xem preview, đề phòng import nhầm file) | QuảnTrị |
 | GET | `/import` | Nhật ký import `?loai=&tu_ngay=&den_ngay=` | QuảnTrị |
 
-Riêng `phan_lop_hoc_vien`: cột file = `so_dinh_danh_ca_nhan`, `ma_khoa`, `ten_lop`. Dòng lỗi điển hình: ĐDCN không tồn tại/chưa được duyệt, khóa/lớp không tồn tại, học viên đã ở lớp khác trong cùng khóa.
+Riêng `phan_lop_hoc_vien`: cột file = `so_dinh_danh_ca_nhan`, `ma_khoa`, `ten_lop` (**`ten_lop` tùy chọn**). Đây là **cơ chế duy nhất** để ghi danh học viên vào khóa — **đã sửa 2026-09-25**: `dang_ky_hoc.khoa_id` KHÔNG tự gán khi hồ sơ học viên `da_duyet` (bản trước ghi vậy nhưng vô nghĩa — không có cơ sở để biết tự động ghi danh vào khóa nào), toàn bộ việc gán khóa cho học viên do Quản trị hệ thống chủ động thực hiện qua import này, học viên không tự chọn/đăng ký khóa. Với mỗi dòng: ĐDCN phải tồn tại và có hồ sơ `da_duyet`; tạo (hoặc lấy nếu đã có) `dang_ky_hoc` cho `(hoc_vien_id, khoa_id)`; nếu `ten_lop` có giá trị thì khớp `lop_hoc` trong đúng `khoa_id` đó và gán `lop_id` + `trang_thai='da_phan_lop'`, nếu để trống thì chỉ ghi danh (`lop_id=NULL`, `trang_thai='da_duyet'`) — cho phép chạy import 2 lần tách biệt (ghi danh trước, phân lớp sau) hoặc 1 lần luôn. Dòng lỗi điển hình: ĐDCN không tồn tại/chưa được duyệt, mã khóa không tồn tại, tên lớp không tồn tại trong đúng khóa đó.
 
 ---
 
