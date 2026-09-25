@@ -1,7 +1,6 @@
 import { HocVienService } from './hoc-vien.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from '../auth/scope/scope.service';
-import { KhoaBoiDuongService } from '../khoa-boi-duong/khoa-boi-duong.service';
 import {
   ConflictAppException,
   ForbiddenAppException,
@@ -50,7 +49,6 @@ describe('HocVienService', () => {
     getAccessibleDonViIds: jest.Mock;
     canAccessDonVi: jest.Mock;
   };
-  let khoaBoiDuongService: { autoDangKyKhiHoSoDaDuyet: jest.Mock };
 
   beforeEach(() => {
     prisma = {
@@ -78,13 +76,9 @@ describe('HocVienService', () => {
       getAccessibleDonViIds: jest.fn(),
       canAccessDonVi: jest.fn(),
     };
-    khoaBoiDuongService = {
-      autoDangKyKhiHoSoDaDuyet: jest.fn().mockResolvedValue(undefined),
-    };
     service = new HocVienService(
       prisma as unknown as PrismaService,
       scopeService as unknown as ScopeService,
-      khoaBoiDuongService as unknown as KhoaBoiDuongService,
     );
 
     // Fixture mặc định: mọi FK tra cứu hợp lệ (test override khi cần âm tính).
@@ -469,35 +463,6 @@ describe('HocVienService', () => {
           }),
         }),
       );
-      // tu_choi không kích hoạt hook tự tạo dang_ky_hoc (rule #52 chỉ áp dụng
-      // khi ket_qua=da_duyet).
-      expect(
-        khoaBoiDuongService.autoDangKyKhiHoSoDaDuyet,
-      ).not.toHaveBeenCalled();
-    });
-
-    it('da_duyet -> gọi hook autoDangKyKhiHoSoDaDuyet (rule #52) đúng hoc_vien_id/don_vi_cong_tac_id', async () => {
-      prisma.hoc_vien.findUnique.mockResolvedValue({
-        ...hocVienChoDuyet('tieu_hoc'),
-        don_vi_cong_tac_id: 'truong-1',
-      });
-      prisma.don_vi_cong_tac.findFirst.mockResolvedValue({ id: 'phong-1' });
-      scopeService.canAccessDonVi.mockResolvedValue(true);
-      prisma.hoc_vien.update.mockResolvedValue({
-        id: 'hv-1',
-        don_vi_cong_tac_id: 'truong-1',
-        chuyen_mon: [],
-      });
-
-      await service.duyet('hv-1', { ket_qua: 'da_duyet' }, {
-        id: 'caller-1',
-        vai_tro: 'phong_vhxh',
-      } as AuthenticatedUser);
-
-      expect(khoaBoiDuongService.autoDangKyKhiHoSoDaDuyet).toHaveBeenCalledWith(
-        { id: 'hv-1', don_vi_cong_tac_id: 'truong-1' },
-        prisma,
-      );
     });
   });
 
@@ -644,11 +609,6 @@ describe('HocVienService', () => {
         where: { id: 'hv-1' },
         data: { created_by: 'nd-1' },
       });
-      // Rule #52: import_moet cũng kích hoạt hook (đã da_duyet ngay lúc tạo).
-      expect(khoaBoiDuongService.autoDangKyKhiHoSoDaDuyet).toHaveBeenCalledWith(
-        { id: 'hv-1', don_vi_cong_tac_id: 'truong-1' },
-        { nguoi_dung: txNguoiDung, hoc_vien: txHocVien },
-      );
     });
 
     it('dữ liệu không hợp lệ -> ném lỗi trước khi mở transaction', async () => {

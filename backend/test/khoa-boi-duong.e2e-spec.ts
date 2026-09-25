@@ -662,136 +662,15 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     });
   });
 
-  describe('Auto-tạo dang_ky_hoc khi hồ sơ học viên da_duyet (rule #52) + GET /hoc-vien/toi/khoa-hoc, /ket-qua', () => {
-    let khoaId: string;
-    let hocVienId: string;
-    let tokenHocVien: string;
-    let soDinhDanh: string;
-
-    beforeAll(async () => {
-      // Khóa PHẢI đã da_duyet TRƯỚC khi hồ sơ học viên được duyệt — hook chỉ
-      // quét khóa da_duyet tại thời điểm hồ sơ chuyển trạng thái (xem flag
-      // trong KhoaBoiDuongService.autoDangKyKhiHoSoDaDuyet).
-      const k = await request(app.getHttpServer())
-        .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send(baseKhoaBody())
-        .expect(201);
-      khoaId = k.body.id;
-      khoaIds.push(khoaId);
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaId}/nop-duyet`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .expect(201);
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaId}/duyet`)
-        .set('Authorization', `Bearer ${tokenPhong}`)
-        .send({ ket_qua: 'da_duyet' })
-        .expect(201);
-
-      soDinhDanh = soDinhDanhNgauNhien();
-      const suf = uniqueSuffix();
-      const dk = await request(app.getHttpServer())
-        .post('/hoc-vien')
-        .send({
-          ho_ten: 'Phạm Thị Đăng Ký',
-          so_dinh_danh_ca_nhan: soDinhDanh,
-          ngay_sinh: 20,
-          thang_sinh: 5,
-          nam_sinh: NAM_HOP_LE,
-          noi_sinh_id: tinh.id,
-          phuong_xa_id: xa.id,
-          don_vi_cong_tac_id: truong1.id,
-          so_dien_thoai_lien_he: '0912345000',
-          email_lien_he: `dk-${suf}@test.local`,
-          trinh_do_chuyen_mon: 'dai_hoc',
-          chuyen_mon: ['Sư phạm Văn'],
-        })
-        .expect(201);
-      hocVienId = dk.body.hoc_vien_id;
-      hocVienIds.push(hocVienId);
-      const nd = await prisma.nguoi_dung.findUnique({
-        where: { ten_dang_nhap: soDinhDanh },
-      });
-      if (nd) nguoiDungHocVienIds.push(nd.id);
-
-      tokenHocVien = await dangNhap(soDinhDanh, `2005${NAM_HOP_LE}`);
-      await request(app.getHttpServer())
-        .post('/hoc-vien/toi/xac-nhan')
-        .set('Authorization', `Bearer ${tokenHocVien}`)
-        .expect(201);
-
-      // cap_giang_day để trống -> routing mặc định về so_gddt (rule #25b).
-      await request(app.getHttpServer())
-        .post(`/hoc-vien/${hocVienId}/duyet`)
-        .set('Authorization', `Bearer ${tokenSo}`)
-        .send({ ket_qua: 'da_duyet' })
-        .expect(201);
-    });
-
-    it('dang_ky_hoc được tự động tạo với khoa_id đúng, trang_thai=da_duyet, lop_id=null', async () => {
-      const dangKy = await prisma.dang_ky_hoc.findUnique({
-        where: { hoc_vien_id_khoa_id: { hoc_vien_id: hocVienId, khoa_id: khoaId } },
-      });
-      expect(dangKy).not.toBeNull();
-      expect(dangKy?.trang_thai).toBe('da_duyet');
-      expect(dangKy?.lop_id).toBeNull();
-    });
-
-    it('GET /hoc-vien/toi/khoa-hoc chứa đúng khóa vừa được tự động đăng ký', async () => {
-      // Không assert độ dài mảng tuyệt đối: hoc_vien này thuộc truong1, và
-      // truong1 có thể đã có khóa da_duyet KHÁC từ describe trước trong cùng
-      // file (hook rule #52 tự đăng ký MỌI khóa da_duyet do đúng trường tổ
-      // chức — xem flag ở KhoaBoiDuongService) — hành vi đúng, không phải lỗi
-      // test, nên chỉ kiểm tra khóa mong đợi có mặt.
-      const res = await request(app.getHttpServer())
-        .get('/hoc-vien/toi/khoa-hoc')
-        .set('Authorization', `Bearer ${tokenHocVien}`)
-        .expect(200);
-      const entry = res.body.find(
-        (r: { khoa: { id: string } }) => r.khoa.id === khoaId,
-      );
-      expect(entry).toBeDefined();
-    });
-
-    it('GET /hoc-vien/toi/ket-qua chứa khóa với trang_thai=da_duyet, ket_qua/ngay_hoan_thanh=null', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/hoc-vien/toi/ket-qua')
-        .set('Authorization', `Bearer ${tokenHocVien}`)
-        .expect(200);
-      const entry = res.body.find(
-        (r: { khoa: { id: string } }) => r.khoa.id === khoaId,
-      );
-      expect(entry).toBeDefined();
-      expect(entry.trang_thai).toBe('da_duyet');
-      expect(entry.ket_qua).toBeNull();
-      expect(entry.ngay_hoan_thanh).toBeNull();
-    });
-
-    it('hoc_vien chỉ thấy khóa đã da_duyet trong GET /khoa-boi-duong', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenHocVien}`)
-        .expect(200);
-      expect(
-        res.body.data.every(
-          (k: { trang_thai: string }) => k.trang_thai === 'da_duyet',
-        ),
-      ).toBe(true);
-      expect(
-        res.body.data.some((k: { id: string }) => k.id === khoaId),
-      ).toBe(true);
-    });
-  });
-
-  describe('Import phan_lop_hoc_vien', () => {
+  describe('Import phan_lop_hoc_vien — nguồn duy nhất gán dang_ky_hoc.khoa_id/lop_id (sửa 2026-09-25: bỏ hook tự ghi danh theo hồ sơ da_duyet)', () => {
     let khoaId: string;
     let maKhoa: string;
     let lopId: string;
     let tenLop: string;
-    let hocVienDaDangKyId: string;
-    let sddDaDangKy: string;
-    let sddChuaDangKy: string;
+    let hocVienDaDuyetId: string;
+    let sddDaDuyet: string;
+    let sddChuaDuyet: string;
+    let tokenHocVienDaDuyet: string;
 
     beforeAll(async () => {
       const suf = uniqueSuffix();
@@ -822,14 +701,14 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         .expect(201);
       lopId = lop.body.id;
 
-      // Học viên đã có hồ sơ da_duyet (dưới truong1) -> hook rule #52 tự tạo
-      // dang_ky_hoc cho khóa này.
-      sddDaDangKy = soDinhDanhNgauNhien();
+      // Học viên có hồ sơ da_duyet — điều kiện CẦN để được import ghi danh,
+      // nhưng KHÔNG tự động có dang_ky_hoc nào (không còn hook rule #52).
+      sddDaDuyet = soDinhDanhNgauNhien();
       const dk = await request(app.getHttpServer())
         .post('/hoc-vien')
         .send({
           ho_ten: 'Vũ Thị Phân Lớp',
-          so_dinh_danh_ca_nhan: sddDaDangKy,
+          so_dinh_danh_ca_nhan: sddDaDuyet,
           ngay_sinh: 12,
           thang_sinh: 7,
           nam_sinh: NAM_HOP_LE,
@@ -842,32 +721,31 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
           chuyen_mon: ['Sư phạm Sử'],
         })
         .expect(201);
-      hocVienDaDangKyId = dk.body.hoc_vien_id;
-      hocVienIds.push(hocVienDaDangKyId);
+      hocVienDaDuyetId = dk.body.hoc_vien_id;
+      hocVienIds.push(hocVienDaDuyetId);
       const nd = await prisma.nguoi_dung.findUnique({
-        where: { ten_dang_nhap: sddDaDangKy },
+        where: { ten_dang_nhap: sddDaDuyet },
       });
       if (nd) nguoiDungHocVienIds.push(nd.id);
-      const tokenHv = await dangNhap(sddDaDangKy, `1207${NAM_HOP_LE}`);
+      tokenHocVienDaDuyet = await dangNhap(sddDaDuyet, `1207${NAM_HOP_LE}`);
       await request(app.getHttpServer())
         .post('/hoc-vien/toi/xac-nhan')
-        .set('Authorization', `Bearer ${tokenHv}`)
+        .set('Authorization', `Bearer ${tokenHocVienDaDuyet}`)
         .expect(201);
       await request(app.getHttpServer())
-        .post(`/hoc-vien/${hocVienDaDangKyId}/duyet`)
+        .post(`/hoc-vien/${hocVienDaDuyetId}/duyet`)
         .set('Authorization', `Bearer ${tokenSo}`)
         .send({ ket_qua: 'da_duyet' })
         .expect(201);
 
-      // Học viên khác, hồ sơ da_duyet nhưng dưới truong2 (không tổ chức khóa
-      // này -> hook không tạo dang_ky_hoc cho khóa này) -> dùng để test lỗi
-      // "chưa đăng ký khóa này".
-      sddChuaDangKy = soDinhDanhNgauNhien();
+      // Học viên hồ sơ CHƯA duyệt (còn cho_duyet) — dùng để test lỗi
+      // "chưa được duyệt".
+      sddChuaDuyet = soDinhDanhNgauNhien();
       const dk2 = await request(app.getHttpServer())
         .post('/hoc-vien')
         .send({
-          ho_ten: 'Đỗ Văn Chưa Đăng Ký',
-          so_dinh_danh_ca_nhan: sddChuaDangKy,
+          ho_ten: 'Đỗ Văn Chưa Duyệt',
+          so_dinh_danh_ca_nhan: sddChuaDuyet,
           ngay_sinh: 3,
           thang_sinh: 9,
           nam_sinh: NAM_HOP_LE,
@@ -882,19 +760,15 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         .expect(201);
       hocVienIds.push(dk2.body.hoc_vien_id);
       const nd2 = await prisma.nguoi_dung.findUnique({
-        where: { ten_dang_nhap: sddChuaDangKy },
+        where: { ten_dang_nhap: sddChuaDuyet },
       });
       if (nd2) nguoiDungHocVienIds.push(nd2.id);
-      const tokenHv2 = await dangNhap(sddChuaDangKy, `0309${NAM_HOP_LE}`);
+      const tokenHv2 = await dangNhap(sddChuaDuyet, `0309${NAM_HOP_LE}`);
       await request(app.getHttpServer())
         .post('/hoc-vien/toi/xac-nhan')
         .set('Authorization', `Bearer ${tokenHv2}`)
         .expect(201);
-      await request(app.getHttpServer())
-        .post(`/hoc-vien/${dk2.body.hoc_vien_id}/duyet`)
-        .set('Authorization', `Bearer ${tokenSo}`)
-        .send({ ket_qua: 'da_duyet' })
-        .expect(201);
+      // Cố tình KHÔNG duyệt hồ sơ này -> vẫn ở trang_thai=cho_duyet.
     });
 
     it('GET /import/mau-excel?loai=phan_lop_hoc_vien -> đúng 3 cột', async () => {
@@ -905,21 +779,21 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       expect(res.headers['content-type']).toContain('spreadsheetml');
     });
 
-    it('preview + xác nhận: 1 dòng hợp lệ + các dòng lỗi (rule #45)', async () => {
+    it('ten_lop để trống -> chỉ ghi danh (lop_id=null, trang_thai=da_duyet); các dòng lỗi khác (rule #45)', async () => {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('data');
       sheet.addRow(['so_dinh_danh_ca_nhan', 'ma_khoa', 'ten_lop']);
-      sheet.addRow([sddDaDangKy, maKhoa, tenLop]); // hợp lệ
-      sheet.addRow(['000000000000', maKhoa, tenLop]); // ĐDCN không tồn tại
-      sheet.addRow([sddDaDangKy, 'KHONG-TON-TAI', tenLop]); // khóa không tồn tại
-      sheet.addRow([sddDaDangKy, maKhoa, 'Lớp không tồn tại']); // lớp không tồn tại
-      sheet.addRow([sddChuaDangKy, maKhoa, tenLop]); // chưa có dang_ky_hoc cho khóa này
+      sheet.addRow([sddDaDuyet, maKhoa, '']); // hợp lệ — chỉ ghi danh
+      sheet.addRow(['000000000000', maKhoa, '']); // ĐDCN không tồn tại
+      sheet.addRow([sddChuaDuyet, maKhoa, '']); // hồ sơ chưa được duyệt
+      sheet.addRow([sddDaDuyet, 'KHONG-TON-TAI', '']); // khóa không tồn tại
+      sheet.addRow([sddDaDuyet, maKhoa, 'Lớp không tồn tại']); // lớp không tồn tại trong khóa
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
         .post('/import/phan_lop_hoc_vien')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .attach('file', buffer, 'phan-lop.xlsx')
+        .attach('file', buffer, 'phan-lop-1.xlsx')
         .expect(201);
       const importId = res.body.import_id;
       importIds.push(importId);
@@ -942,11 +816,131 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       const dangKy = await prisma.dang_ky_hoc.findUnique({
         where: {
           hoc_vien_id_khoa_id: {
-            hoc_vien_id: hocVienDaDangKyId,
+            hoc_vien_id: hocVienDaDuyetId,
             khoa_id: khoaId,
           },
         },
       });
+      expect(dangKy).not.toBeNull();
+      expect(dangKy?.lop_id).toBeNull();
+      expect(dangKy?.trang_thai).toBe('da_duyet');
+    });
+
+    it('GET /hoc-vien/toi/khoa-hoc, /ket-qua phản ánh đúng ghi danh (lop=null) vừa import', async () => {
+      const khoaHoc = await request(app.getHttpServer())
+        .get('/hoc-vien/toi/khoa-hoc')
+        .set('Authorization', `Bearer ${tokenHocVienDaDuyet}`)
+        .expect(200);
+      const entry = khoaHoc.body.find(
+        (r: { khoa: { id: string } }) => r.khoa.id === khoaId,
+      );
+      expect(entry).toBeDefined();
+      expect(entry.lop).toBeNull();
+
+      const ketQua = await request(app.getHttpServer())
+        .get('/hoc-vien/toi/ket-qua')
+        .set('Authorization', `Bearer ${tokenHocVienDaDuyet}`)
+        .expect(200);
+      const entryKq = ketQua.body.find(
+        (r: { khoa: { id: string } }) => r.khoa.id === khoaId,
+      );
+      expect(entryKq).toBeDefined();
+      expect(entryKq.trang_thai).toBe('da_duyet');
+      expect(entryKq.lop).toBeNull();
+    });
+
+    it('chạy lại import lần 2 với ten_lop có giá trị -> phân lớp cho học viên đã ghi danh (lop_id, trang_thai=da_phan_lop)', async () => {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('data');
+      sheet.addRow(['so_dinh_danh_ca_nhan', 'ma_khoa', 'ten_lop']);
+      sheet.addRow([sddDaDuyet, maKhoa, tenLop]);
+      const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+      const res = await request(app.getHttpServer())
+        .post('/import/phan_lop_hoc_vien')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .attach('file', buffer, 'phan-lop-2.xlsx')
+        .expect(201);
+      const importId = res.body.import_id;
+      importIds.push(importId);
+      await request(app.getHttpServer())
+        .post(`/import/${importId}/xac-nhan`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(201);
+
+      const dangKy = await prisma.dang_ky_hoc.findUnique({
+        where: {
+          hoc_vien_id_khoa_id: {
+            hoc_vien_id: hocVienDaDuyetId,
+            khoa_id: khoaId,
+          },
+        },
+      });
+      expect(dangKy?.lop_id).toBe(lopId);
+      expect(dangKy?.trang_thai).toBe('da_phan_lop');
+    });
+
+    it('ghi danh + phân lớp trong 1 lần import duy nhất (ten_lop có giá trị ngay từ đầu, học viên chưa từng đăng ký)', async () => {
+      const suf = uniqueSuffix();
+      const sddMoi = soDinhDanhNgauNhien();
+      const dk = await request(app.getHttpServer())
+        .post('/hoc-vien')
+        .send({
+          ho_ten: 'Ghi Danh Một Lần',
+          so_dinh_danh_ca_nhan: sddMoi,
+          ngay_sinh: 8,
+          thang_sinh: 8,
+          nam_sinh: NAM_HOP_LE,
+          noi_sinh_id: tinh.id,
+          phuong_xa_id: xa.id,
+          don_vi_cong_tac_id: truong1.id,
+          so_dien_thoai_lien_he: '0912348000',
+          email_lien_he: `gd1-${suf}@test.local`,
+          trinh_do_chuyen_mon: 'dai_hoc',
+          chuyen_mon: ['Sư phạm Toán'],
+        })
+        .expect(201);
+      const hocVienMoiId = dk.body.hoc_vien_id;
+      hocVienIds.push(hocVienMoiId);
+      const nd = await prisma.nguoi_dung.findUnique({
+        where: { ten_dang_nhap: sddMoi },
+      });
+      if (nd) nguoiDungHocVienIds.push(nd.id);
+      const tokenHvMoi = await dangNhap(sddMoi, `0808${NAM_HOP_LE}`);
+      await request(app.getHttpServer())
+        .post('/hoc-vien/toi/xac-nhan')
+        .set('Authorization', `Bearer ${tokenHvMoi}`)
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/hoc-vien/${hocVienMoiId}/duyet`)
+        .set('Authorization', `Bearer ${tokenSo}`)
+        .send({ ket_qua: 'da_duyet' })
+        .expect(201);
+
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('data');
+      sheet.addRow(['so_dinh_danh_ca_nhan', 'ma_khoa', 'ten_lop']);
+      sheet.addRow([sddMoi, maKhoa, tenLop]);
+      const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+      const res = await request(app.getHttpServer())
+        .post('/import/phan_lop_hoc_vien')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .attach('file', buffer, 'phan-lop-3.xlsx')
+        .expect(201);
+      const importId = res.body.import_id;
+      importIds.push(importId);
+      await request(app.getHttpServer())
+        .post(`/import/${importId}/xac-nhan`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(201);
+
+      const dangKy = await prisma.dang_ky_hoc.findUnique({
+        where: {
+          hoc_vien_id_khoa_id: { hoc_vien_id: hocVienMoiId, khoa_id: khoaId },
+        },
+      });
+      expect(dangKy).not.toBeNull();
       expect(dangKy?.lop_id).toBe(lopId);
       expect(dangKy?.trang_thai).toBe('da_phan_lop');
     });

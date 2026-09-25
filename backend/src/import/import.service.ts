@@ -76,7 +76,10 @@ export class ImportService {
   ): Promise<{ buffer: Buffer; filename: string }> {
     const loai = this.assertSupported(loaiRaw);
     const columns = this.getColumns(loai);
-    const buffer = await buildTemplateWorkbook(columns);
+    const buffer = await buildTemplateWorkbook(
+      columns,
+      this.getColumnNotes(loai),
+    );
     return { buffer, filename: `mau-${loai}.xlsx` };
   }
 
@@ -322,7 +325,9 @@ export class ImportService {
         return ['ten_mon', 'cap_hoc'];
       case 'phan_lop_hoc_vien':
         // Nguyên văn cột theo docs/api-contract.md mục 5, ghi chú riêng cho
-        // phan_lop_hoc_vien.
+        // phan_lop_hoc_vien. ten_lop TÙY CHỌN (đã sửa 2026-09-25) — để trống
+        // = chỉ ghi danh, có giá trị = ghi danh + phân lớp (xem getColumnNotes
+        // cho ghi chú hiển thị trên file mẫu Excel).
         return ['so_dinh_danh_ca_nhan', 'ma_khoa', 'ten_lop'];
       case 'ho_so_nhan_su_moet':
         // Nguyên văn cột theo docs/api-contract.md mục 2 "Luồng import nhân
@@ -340,6 +345,16 @@ export class ImportService {
           'Ghi chú',
         ];
     }
+  }
+
+  private getColumnNotes(loai: SupportedImportType): Record<string, string> {
+    if (loai === 'phan_lop_hoc_vien') {
+      return {
+        ten_lop:
+          'Tùy chọn — để trống nếu chỉ muốn ghi danh vào khóa, chưa phân lớp. Có thể chạy lại import sau với ten_lop để phân lớp cho học viên đã ghi danh.',
+      };
+    }
+    return {};
   }
 
   // Rule #24/#36e: "Chuyên môn" có thể nhiều giá trị/dòng, phân tách bằng ";".
@@ -414,9 +429,8 @@ export class ImportService {
           cap_hoc: d.cap_hoc,
         });
       } else if (loai === 'phan_lop_hoc_vien') {
-        await this.khoaBoiDuongService.checkValidPhanLop(
-          dto as PhanLopHocVienRowDto,
-        );
+        // Không cần kiểm tra thêm: resolvePhanLopRow() (buildDto) đã tra
+        // cứu/validate toàn bộ FK + trạng thái hồ sơ cho dòng này rồi.
       } else {
         const d = dto as HoSoNhanSuMoetRowDto;
         await this.hocVienService.checkValidMoetImportRow({

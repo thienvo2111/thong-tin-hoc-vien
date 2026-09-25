@@ -115,7 +115,7 @@ Ký hiệu: 🔴 lỗi chặn lưu · 🟡 cảnh báo không chặn (chỉ nh�
 | 42 | Mỗi dòng chạy qua **cùng bộ quy tắc** như nhập tay tương ứng (không có luật riêng nới lỏng cho import) | 🔴 | API (dùng chung "Dịch vụ Kiểm tra dữ liệu") |
 | 43 | Báo lỗi theo từng dòng, kèm số dòng + lý do cụ thể (không chỉ "file lỗi") | 🔴 | API |
 | 44 | Preview trước khi nạp chính thức: hiển thị tổng dòng / hợp lệ / lỗi, xác nhận riêng một bước (`POST /import/{id}/xac-nhan`) trước khi ghi vào bảng thật | 🔴 (quy trình) | API |
-| 45 | Import `phan_lop_hoc_vien`: dòng lỗi nếu ĐDCN không tồn tại/chưa `da_duyet`, khóa/lớp không tồn tại, hoặc học viên đã có `dang_ky_hoc` khác cho cùng `khoa_id` (vi phạm `UNIQUE(hoc_vien_id, khoa_id)`) | 🔴 | API + DB (`UNIQUE` bắt lỗi tầng cuối) |
+| 45 | Import `phan_lop_hoc_vien`: dòng lỗi nếu ĐDCN không tồn tại/chưa `da_duyet`, mã khóa không tồn tại, hoặc `ten_lop` (khi có giá trị) không tồn tại trong đúng `khoa_id` đó. **Đã sửa 2026-09-25**: chạy lại import cho cùng `(hoc_vien_id, khoa_id)` KHÔNG còn là lỗi — là upsert hợp lệ (xem rule #52) | 🔴 | API |
 | 45b | Import `ho_so_nhan_su_moet`: quy tắc riêng ở mục "Nguồn tạo hồ sơ & import nhân sự CSDL MOET" (#36b–36f) | 🔴 | API |
 | 46 | File nguồn gốc lưu lại ở object storage, không chỉ lưu kết quả (có thể tra soát lại) | — | Hạ tầng (`Main.dc.html` — Object Storage) |
 

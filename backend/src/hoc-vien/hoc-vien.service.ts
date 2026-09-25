@@ -10,7 +10,6 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from '../auth/scope/scope.service';
-import { KhoaBoiDuongService } from '../khoa-boi-duong/khoa-boi-duong.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { normalizeNfcName } from '../common/utils/normalize-text.util';
 import { paginate } from '../common/dto/pagination-query.dto';
@@ -71,7 +70,6 @@ export class HocVienService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scopeService: ScopeService,
-    private readonly khoaBoiDuongService: KhoaBoiDuongService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -746,28 +744,16 @@ export class HocVienService {
         ? `${hocVien.ghi_chu ? hocVien.ghi_chu + '\n' : ''}[Từ chối] ${dto.ly_do}`
         : hocVien.ghi_chu;
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const rec = await tx.hoc_vien.update({
-        where: { id },
-        data: {
-          trang_thai: dto.ket_qua,
-          nguoi_duyet_id: caller.id,
-          cap_duyet_thuc_te: caller.vai_tro,
-          ngay_duyet: new Date(),
-          ghi_chu: ghiChuMoi,
-        },
-        include: { chuyen_mon: true },
-      });
-      // Rule #52: dang_ky_hoc.khoa_id gán ngay khi hồ sơ học viên da_duyet —
-      // xem KhoaBoiDuongService.autoDangKyKhiHoSoDaDuyet cho diễn giải/flag chi
-      // tiết (api-contract.md không nói rõ "khoa nào").
-      if (dto.ket_qua === 'da_duyet') {
-        await this.khoaBoiDuongService.autoDangKyKhiHoSoDaDuyet(
-          { id: rec.id, don_vi_cong_tac_id: rec.don_vi_cong_tac_id },
-          tx,
-        );
-      }
-      return rec;
+    const updated = await this.prisma.hoc_vien.update({
+      where: { id },
+      data: {
+        trang_thai: dto.ket_qua,
+        nguoi_duyet_id: caller.id,
+        cap_duyet_thuc_te: caller.vai_tro,
+        ngay_duyet: new Date(),
+        ghi_chu: ghiChuMoi,
+      },
+      include: { chuyen_mon: true },
     });
     this.guiEmailDuyetStub(id, dto.ket_qua);
     return this.toResponse(updated);
@@ -943,17 +929,10 @@ export class HocVienService {
           phai_doi_mat_khau: true,
         },
       });
-      const ketQua = await tx.hoc_vien.update({
+      return tx.hoc_vien.update({
         where: { id: hocVien.id },
         data: { created_by: nguoiDung.id },
       });
-      // Rule #52 — cùng hook như luồng duyệt tu_dang_ky ở duyet() (import_moet
-      // đã da_duyet ngay lúc tạo, xem comment ở KhoaBoiDuongService).
-      await this.khoaBoiDuongService.autoDangKyKhiHoSoDaDuyet(
-        { id: ketQua.id, don_vi_cong_tac_id: input.don_vi_cong_tac_id },
-        tx,
-      );
-      return ketQua;
     });
   }
 }

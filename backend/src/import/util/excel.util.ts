@@ -57,13 +57,25 @@ export async function readWorkbookRows(
   return rows;
 }
 
+// columnNotes: ghi chú (Excel cell comment) cho từng cột, vd đánh dấu cột tùy
+// chọn — không đổi tên cột (header vẫn phải khớp nguyên văn để readWorkbookRows
+// nhận diện khi người dùng nộp lại đúng file mẫu).
 export async function buildTemplateWorkbook(
   columns: string[],
+  columnNotes?: Record<string, string>,
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Mau');
   sheet.addRow(columns);
   sheet.getRow(1).font = { bold: true };
+  if (columnNotes) {
+    columns.forEach((col, i) => {
+      const note = columnNotes[col];
+      if (note) {
+        sheet.getRow(1).getCell(i + 1).note = note;
+      }
+    });
+  }
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }

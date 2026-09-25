@@ -544,52 +544,18 @@ export class KhoaBoiDuongService {
   }
 
   // ---------------------------------------------------------------------
-  // Hook gọi từ HocVienService khi hồ sơ học viên chuyển sang da_duyet (cả
-  // luồng duyệt tu_dang_ky VÀ import_moet, đã da_duyet ngay lúc tạo) — rule
-  // #52 "dang_ky_hoc.khoa_id gán ngay khi hồ sơ học viên da_duyet".
-  //
-  // FLAG (self-review): api-contract.md/validation-checklist.md KHÔNG có bất
-  // kỳ endpoint nào để học viên tự chọn 1 khóa cụ thể để đăng ký — rule #52
-  // giả định việc gán khoa_id xảy ra tự động nhưng không nói rõ khoa_id nào.
-  // Diễn giải hẹp nhất có thể ở đây: tự động tạo dang_ky_hoc (trang_thai=
-  // da_duyet, vì không có bước duyệt riêng nào cho dang_ky_hoc được mô tả)
-  // cho MỌI khoa_boi_duong đang trang_thai=da_duyet do ĐÚNG đơn vị công tác
-  // của học viên tổ chức (don_vi_cong_tac_id = don_vi_to_chuc_id). Hệ quả
-  // biết trước: (1) khóa được duyệt SAU khi hồ sơ học viên đã da_duyet sẽ
-  // KHÔNG tự động ghi danh học viên đó (rule chỉ nêu trigger phía hồ sơ, không
-  // nêu trigger phía khóa — cố ý không tự suy rộng thêm); (2) học viên có hồ
-  // sơ nhưng khóa do đơn vị KHÁC tổ chức sẽ không bao giờ được tự động ghi
-  // danh — cần một cơ chế đăng ký/chọn khóa thủ công nếu nghiệp vụ thực tế
-  // không giới hạn học viên chỉ học khóa do đúng trường mình tổ chức. Cần xác
-  // nhận lại với nghiệp vụ trước khi coi đây là hành vi cuối cùng.
-  // ---------------------------------------------------------------------
-  async autoDangKyKhiHoSoDaDuyet(
-    hocVien: { id: string; don_vi_cong_tac_id: string },
-    tx: Prisma.TransactionClient = this.prisma,
-  ): Promise<void> {
-    const khoaMoDangKy = await tx.khoa_boi_duong.findMany({
-      where: {
-        don_vi_to_chuc_id: hocVien.don_vi_cong_tac_id,
-        trang_thai: 'da_duyet',
-      },
-      select: { id: true },
-    });
-    if (khoaMoDangKy.length === 0) return;
-    await tx.dang_ky_hoc.createMany({
-      data: khoaMoDangKy.map((k) => ({
-        hoc_vien_id: hocVien.id,
-        khoa_id: k.id,
-        trang_thai: 'da_duyet' as const,
-      })),
-      skipDuplicates: true,
-    });
-  }
-
-  // ---------------------------------------------------------------------
   // Import phan_lop_hoc_vien (gọi từ ImportService) — cột file:
-  // so_dinh_danh_ca_nhan, ma_khoa, ten_lop (api-contract.md mục 5). Rule #45:
-  // ĐDCN không tồn tại, khóa/lớp không tồn tại, hoặc chưa có dang_ky_hoc
-  // da_duyet cho khóa đó -> dòng lỗi.
+  // so_dinh_danh_ca_nhan, ma_khoa, ten_lop (ten_lop TÙY CHỌN). Đây là CƠ CHẾ
+  // DUY NHẤT gán dang_ky_hoc.khoa_id/lop_id — không có ghi danh/tự động nào
+  // khác (đã sửa 2026-09-25, xem docs/api-contract.md mục 5 và
+  // validation-checklist.md #45: trước đó có một hook tự tạo dang_ky_hoc khi
+  // hồ sơ học viên da_duyet, nhưng không có cơ sở để biết tự động ghi danh
+  // vào khóa nào — đã bỏ, không thay bằng suy đoán khác).
+  //
+  // ten_lop để trống -> chỉ ghi danh (lop_id=NULL, trang_thai=da_duyet); có
+  // giá trị -> ghi danh + phân lớp luôn (lop_id, trang_thai=da_phan_lop). Cho
+  // phép chạy import 2 lần: ghi danh trước (ten_lop trống), phân lớp sau
+  // (chạy lại với ten_lop có giá trị cho học viên đã ghi danh).
   // ---------------------------------------------------------------------
   async resolvePhanLopRow(raw: {
     so_dinh_danh_ca_nhan?: string;
@@ -608,6 +574,11 @@ export class KhoaBoiDuongService {
         error: `Số định danh cá nhân "${sdd}" không tồn tại (chưa có hồ sơ học viên)`,
       };
     }
+    if (hocVien.trang_thai !== 'da_duyet') {
+      return {
+        error: `Số định danh cá nhân "${sdd}" chưa được duyệt (trang_thai hiện tại: "${hocVien.trang_thai}")`,
+      };
+    }
 
     const maKhoa = raw.ma_khoa?.trim();
     if (!maKhoa) {
@@ -621,63 +592,63 @@ export class KhoaBoiDuongService {
     }
 
     const tenLop = raw.ten_lop?.trim();
-    if (!tenLop) {
-      return { error: 'Thiếu cột "ten_lop"' };
-    }
-    const lop = await this.prisma.lop_hoc.findFirst({
-      where: { khoa_id: khoa.id, ten_lop: tenLop },
-    });
-    if (!lop) {
-      return {
-        error: `Lớp "${tenLop}" không tồn tại trong khóa "${maKhoa}"`,
-      };
+    let lopId: string | null = null;
+    if (tenLop) {
+      const lop = await this.prisma.lop_hoc.findFirst({
+        where: { khoa_id: khoa.id, ten_lop: tenLop },
+      });
+      if (!lop) {
+        return {
+          error: `Lớp "${tenLop}" không tồn tại trong khóa "${maKhoa}"`,
+        };
+      }
+      lopId = lop.id;
     }
 
     return {
       dto: {
         hoc_vien_id: hocVien.id,
         khoa_id: khoa.id,
-        lop_id: lop.id,
+        lop_id: lopId,
       },
     };
   }
 
-  async checkValidPhanLop(dto: PhanLopHocVienRowDto): Promise<void> {
-    const dangKy = await this.prisma.dang_ky_hoc.findUnique({
-      where: {
-        hoc_vien_id_khoa_id: {
-          hoc_vien_id: dto.hoc_vien_id,
-          khoa_id: dto.khoa_id,
-        },
-      },
-    });
-    if (!dangKy) {
-      throw new ValidationException(
-        'Học viên chưa có đăng ký học (dang_ky_hoc) cho khóa này — chưa thể phân lớp',
-        [{ field: 'so_dinh_danh_ca_nhan', message: 'Chưa đăng ký khóa này' }],
-      );
-    }
-    if (
-      dangKy.trang_thai !== 'da_duyet' &&
-      dangKy.trang_thai !== 'da_phan_lop'
-    ) {
-      throw new ValidationException(
-        `Đăng ký học của học viên cho khóa này đang ở trạng thái "${dangKy.trang_thai}", chưa được duyệt`,
-        [{ field: 'so_dinh_danh_ca_nhan', message: 'Đăng ký chưa được duyệt' }],
-      );
-    }
-  }
-
+  // Không cần bước checkValid riêng: resolvePhanLopRow() (buildDto) đã tra
+  // cứu/validate toàn bộ FK + trạng thái hồ sơ; commitPhanLop() là upsert nên
+  // không còn ràng buộc "phải có dang_ky_hoc từ trước" để kiểm tra thêm.
   async commitPhanLop(dto: PhanLopHocVienRowDto): Promise<void> {
-    await this.prisma.dang_ky_hoc.update({
-      where: {
-        hoc_vien_id_khoa_id: {
+    const where = {
+      hoc_vien_id_khoa_id: {
+        hoc_vien_id: dto.hoc_vien_id,
+        khoa_id: dto.khoa_id,
+      },
+    };
+    if (dto.lop_id) {
+      await this.prisma.dang_ky_hoc.upsert({
+        where,
+        create: {
           hoc_vien_id: dto.hoc_vien_id,
           khoa_id: dto.khoa_id,
+          lop_id: dto.lop_id,
+          trang_thai: 'da_phan_lop',
         },
-      },
-      data: { lop_id: dto.lop_id, trang_thai: 'da_phan_lop' },
-    });
+        update: { lop_id: dto.lop_id, trang_thai: 'da_phan_lop' },
+      });
+    } else {
+      // ten_lop trống: chỉ đảm bảo đã ghi danh. Nếu dang_ky_hoc đã tồn tại
+      // (kể cả đã da_phan_lop), giữ nguyên — không hạ cấp lại trang_thai/lop_id.
+      await this.prisma.dang_ky_hoc.upsert({
+        where,
+        create: {
+          hoc_vien_id: dto.hoc_vien_id,
+          khoa_id: dto.khoa_id,
+          lop_id: null,
+          trang_thai: 'da_duyet',
+        },
+        update: {},
+      });
+    }
   }
 
   // ---------------------------------------------------------------------

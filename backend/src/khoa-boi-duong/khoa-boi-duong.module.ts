@@ -6,9 +6,10 @@ import { DangKyHocController } from './dang-ky-hoc.controller';
 import { KhoaBoiDuongService } from './khoa-boi-duong.service';
 
 // Dịch vụ Khóa bồi dưỡng & Lớp học — xem docs/api-contract.md mục 3. Export
-// service ra để HocVienModule (hook auto-tạo dang_ky_hoc khi hồ sơ da_duyet)
-// và ImportModule (phan_lop_hoc_vien) tái dùng — không import ngược lại
-// HocVienModule/ImportModule để tránh vòng lặp phụ thuộc module.
+// service ra để ImportModule tái dùng (import phan_lop_hoc_vien — nguồn duy
+// nhất gán dang_ky_hoc.khoa_id/lop_id, xem
+// KhoaBoiDuongService.resolvePhanLopRow/commitPhanLop) — không import ngược
+// lại ImportModule để tránh vòng lặp phụ thuộc module.
 @Module({
   imports: [AuthModule],
   controllers: [KhoaBoiDuongController, LopHocController, DangKyHocController],
