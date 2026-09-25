@@ -112,6 +112,7 @@ Học viên nhận tài khoản đăng nhập bằng **Mã định danh CSDL MOE
 | DELETE | `/lop/{id}/nhan-su/{nhan_su_id}` | Gỡ 1 nhân sự khỏi lớp | Trường (chủ khóa) |
 | GET | `/hoc-vien/toi/khoa-hoc` | Học viên xem khóa/lớp mình đã đăng ký/được phân | Học viên |
 | GET | `/hoc-vien/toi/ket-qua` | Học viên xem `ket_qua`, `ngay_hoan_thanh` từng `DangKyHoc` | Học viên |
+| PATCH | `/dang-ky-hoc/{id}/ket-qua` | **Thêm 2026-09-25** (thiếu ở bản trước — không ai nhập được `ket_qua` dù học viên xem được). `{ ket_qua, ngay_hoan_thanh? }`. Phạm vi theo Trường tổ chức khóa (dùng `ScopeService` như `duyet` khóa) — Sở/Phòng VHXH cũng gọi được (escalation, giống quy tắc duyệt). **Side effect**: kích hoạt sự kiện thông báo `dang_ky_hoc_ket_qua` (mục 8) | Trường (chủ khóa), Phòng VHXH, Sở, QuảnTrị |
 
 ---
 
@@ -171,16 +172,16 @@ Chi tiết quy tắc: [`validation-checklist.md`](validation-checklist.md). Endp
 
 ## 8. Dịch vụ Thông báo
 
-Nội bộ, không có endpoint public cho FE trừ 1 mục xem lịch sử. Sự kiện kích hoạt gửi email:
+Nội bộ, không có endpoint public cho FE trừ 1 mục xem lịch sử. Mỗi lần gửi (kể cả thất bại) ghi 1 dòng vào `nhat_ky_thong_bao` (`database-ddl.sql` PHẦN 4, thêm 2026-09-25 — bản trước có endpoint `lich-su` nhưng không có bảng nào để đọc). Sự kiện kích hoạt gửi email — cột "Sự kiện" khớp trực tiếp với enum `loai_su_kien_thong_bao`:
 
 | Sự kiện | Người nhận | Nội dung |
 |---|---|---|
-| `hoc_vien.xac_nhan` | Học viên | Bản sao toàn bộ dữ liệu vừa khai báo |
-| `hoc_vien.duyet` | Học viên | Kết quả duyệt hồ sơ (đã duyệt / từ chối + lý do) |
-| `khoa_boi_duong.duyet` | Trường (người tạo khóa) | Kết quả duyệt khóa |
-| `dang_ky_hoc.phan_lop` | Học viên | Thông báo lớp, lịch học, giảng viên |
-| `dang_ky_hoc.ket_qua` | Học viên | Kết quả khóa học |
+| `hoc_vien_xac_nhan` | Học viên | Bản sao toàn bộ dữ liệu vừa khai báo |
+| `hoc_vien_duyet` | Học viên | Kết quả duyệt hồ sơ (đã duyệt / từ chối + lý do) |
+| `khoa_boi_duong_duyet` | Trường (tài khoản đã tạo khóa) | Kết quả duyệt khóa — `nhat_ky_thong_bao.hoc_vien_id` để `NULL` cho loại sự kiện này, người nhận không phải học viên |
+| `dang_ky_hoc_phan_lop` | Học viên | Thông báo lớp, lịch học, giảng viên — kích hoạt khi import `phan_lop_hoc_vien` gán `lop_id` (không kích hoạt ở nhánh chỉ ghi danh, `lop_id` vẫn NULL) |
+| `dang_ky_hoc_ket_qua` | Học viên | Kết quả khóa học — kích hoạt bởi `PATCH /dang-ky-hoc/{id}/ket-qua` (mục 3) |
 
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
-| GET | `/thong-bao/lich-su?hoc_vien_id=` | Lịch sử email đã gửi cho 1 hồ sơ (đối chiếu khi học viên báo không nhận được) | QuảnTrị |
+| GET | `/thong-bao/lich-su?hoc_vien_id=&loai_su_kien=` | Lịch sử gửi cho 1 hồ sơ (đối chiếu khi học viên báo không nhận được), lọc thêm theo loại sự kiện nếu cần | QuảnTrị |

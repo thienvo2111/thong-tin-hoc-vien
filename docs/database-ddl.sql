@@ -79,6 +79,16 @@ CREATE TYPE loai_danh_muc_import AS ENUM (
 
 CREATE TYPE trang_thai_import AS ENUM ('dang_xu_ly', 'hoan_thanh', 'loi');
 
+CREATE TYPE loai_su_kien_thong_bao AS ENUM (
+    'hoc_vien_xac_nhan',      -- gửi bản sao dữ liệu sau khi học viên xác nhận
+    'hoc_vien_duyet',         -- kết quả duyệt hồ sơ (đã duyệt/từ chối)
+    'khoa_boi_duong_duyet',   -- kết quả duyệt khóa bồi dưỡng
+    'dang_ky_hoc_phan_lop',   -- thông báo lớp/lịch học sau khi được phân lớp
+    'dang_ky_hoc_ket_qua'     -- thông báo kết quả khóa học
+);
+
+CREATE TYPE trang_thai_gui_thong_bao AS ENUM ('thanh_cong', 'that_bai');
+
 
 -- =====================================================================
 -- PHẦN 1 — DANH MỤC DÙNG CHUNG (board MoHinhDuLieu.dc.html)
@@ -444,6 +454,34 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_dang_ky_hoc_kiem_tra_lop
     BEFORE INSERT OR UPDATE ON dang_ky_hoc
     FOR EACH ROW EXECUTE FUNCTION trg_dang_ky_lop_thuoc_khoa();
+
+
+-- =====================================================================
+-- PHẦN 4 — THÔNG BÁO (board Main.dc.html — "Dịch vụ Thông báo")
+-- =====================================================================
+
+-- Ghi nhận MỖI lần gửi (kể cả thất bại) cho 1 trong 5 sự kiện ở
+-- api-contract.md mục 8. Không có bảng này thì GET /thong-bao/lich-su
+-- không có gì để đọc, và không thể tra soát khi học viên báo không nhận
+-- được email.
+CREATE TABLE nhat_ky_thong_bao (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    loai_su_kien        loai_su_kien_thong_bao NOT NULL,
+    hoc_vien_id         uuid REFERENCES hoc_vien(id),
+    email_nguoi_nhan    varchar(255) NOT NULL,
+    tieu_de             varchar(255) NOT NULL,
+    gui_luc             timestamptz NOT NULL DEFAULT now(),
+    trang_thai          trang_thai_gui_thong_bao NOT NULL,
+    loi                 text,   -- thông báo lỗi nếu trang_thai='that_bai'
+
+    CONSTRAINT chk_thong_bao_loi
+        CHECK ( (trang_thai = 'that_bai' AND loi IS NOT NULL)
+             OR (trang_thai = 'thanh_cong') )
+);
+
+CREATE INDEX idx_thong_bao_hoc_vien ON nhat_ky_thong_bao(hoc_vien_id);
+CREATE INDEX idx_thong_bao_loai_su_kien ON nhat_ky_thong_bao(loai_su_kien);
+CREATE INDEX idx_thong_bao_gui_luc ON nhat_ky_thong_bao(gui_luc);
 
 
 -- =====================================================================
