@@ -128,6 +128,19 @@ enum trang_thai_import {
   loi
 }
 
+enum loai_su_kien_thong_bao {
+  hoc_vien_xac_nhan
+  hoc_vien_duyet
+  khoa_boi_duong_duyet
+  dang_ky_hoc_phan_lop
+  dang_ky_hoc_ket_qua
+}
+
+enum trang_thai_gui_thong_bao {
+  thanh_cong
+  that_bai
+}
+
 // =====================================================================
 // PHẦN 1 — DANH MỤC DÙNG CHUNG
 // =====================================================================
@@ -304,6 +317,7 @@ model hoc_vien {
   nguoi_dung_account nguoi_dung?           @relation("nguoi_dung_hoc_vien")
   chuyen_mon         hoc_vien_chuyen_mon[]
   dang_ky_hoc        dang_ky_hoc[]
+  nhat_ky_thong_bao  nhat_ky_thong_bao[]
 
   @@index([don_vi_cong_tac_id], map: "idx_hoc_vien_don_vi")
   @@index([trang_thai], map: "idx_hoc_vien_trang_thai")
@@ -433,4 +447,29 @@ model dang_ky_hoc {
   @@index([hoc_vien_id], map: "idx_dang_ky_hoc_vien")
   @@index([khoa_id], map: "idx_dang_ky_khoa")
   @@index([lop_id], map: "idx_dang_ky_lop")
+}
+
+// =====================================================================
+// PHẦN 4 — THÔNG BÁO
+// =====================================================================
+
+// chk_thong_bao_loi (trang_thai='that_bai' => loi NOT NULL) không biểu diễn
+// được bằng Prisma DSL — thêm bằng raw SQL nối vào migration này, cùng cách
+// làm với các CHECK constraint khác trong migration khởi tạo (xem comment ở
+// đầu file).
+model nhat_ky_thong_bao {
+  id               String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  loai_su_kien     loai_su_kien_thong_bao
+  hoc_vien_id      String?                  @db.Uuid
+  email_nguoi_nhan String                   @db.VarChar(255)
+  tieu_de          String                   @db.VarChar(255)
+  gui_luc          DateTime                 @default(now()) @db.Timestamptz(6)
+  trang_thai       trang_thai_gui_thong_bao
+  loi              String?
+
+  hoc_vien hoc_vien? @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([hoc_vien_id], map: "idx_thong_bao_hoc_vien")
+  @@index([loai_su_kien], map: "idx_thong_bao_loai_su_kien")
+  @@index([gui_luc], map: "idx_thong_bao_gui_luc")
 }

@@ -154,6 +154,13 @@ describe('Hồ sơ Học viên (e2e)', () => {
   });
 
   afterAll(async () => {
+    // Xóa trước khi xóa hoc_vien — nhat_ky_thong_bao.hoc_vien_id FK
+    // onDelete: NoAction (docs/database-ddl.sql PHẦN 4). xac-nhan/duyet giờ
+    // gửi email thật (Ethereal) nên luôn ghi ít nhất 1 dòng cho mỗi hoc_vien
+    // đã gọi 2 endpoint đó trong suite này.
+    await prisma.nhat_ky_thong_bao.deleteMany({
+      where: { hoc_vien_id: { in: hocVienIds } },
+    });
     if (hocVienIds.length > 0) {
       // chk_nguoi_dung_scope bắt buộc nguoi_dung.hoc_vien_id NOT NULL cho
       // vai_tro='hoc_vien' (không null được để tách rời) — phải gỡ FK phía

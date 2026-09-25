@@ -11,6 +11,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from '../auth/scope/scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { normalizeNfcName } from '../common/utils/normalize-text.util';
 import { paginate } from '../common/dto/pagination-query.dto';
 import {
@@ -70,6 +71,7 @@ export class HocVienService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scopeService: ScopeService,
+    private readonly thongBaoService: ThongBaoService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -588,7 +590,7 @@ export class HocVienService {
         data: { trang_thai: 'cho_duyet', email_ban_sao_da_gui_at: new Date() },
         include: { chuyen_mon: true },
       });
-      this.guiEmailXacNhanStub(hocVien.id);
+      await this.thongBaoService.guiHocVienXacNhan(hocVien.id);
       return this.toResponse(updated);
     }
 
@@ -598,28 +600,12 @@ export class HocVienService {
         data: { email_ban_sao_da_gui_at: new Date() },
         include: { chuyen_mon: true },
       });
-      this.guiEmailXacNhanStub(hocVien.id);
+      await this.thongBaoService.guiHocVienXacNhan(hocVien.id);
       return this.toResponse(updated);
     }
 
     throw new ConflictAppException(
       `Hồ sơ đang ở trạng thái "${hocVien.trang_thai}", không thể xác nhận`,
-    );
-  }
-
-  // TODO: Dịch vụ Thông báo (docs/api-contract.md mục 8, event
-  // hoc_vien.xac_nhan) chưa được triển khai — log rõ ràng thay vì gửi email
-  // thật, để không bỏ sót việc chuyển trạng thái/ghi email_ban_sao_da_gui_at.
-  private guiEmailXacNhanStub(hocVienId: string) {
-    console.log(
-      `[thong-bao:TODO] Gửi email bản sao dữ liệu cho hoc_vien_id=${hocVienId} (event hoc_vien.xac_nhan)`,
-    );
-  }
-
-  // TODO: tương tự — event hoc_vien.duyet.
-  private guiEmailDuyetStub(hocVienId: string, ketQua: string) {
-    console.log(
-      `[thong-bao:TODO] Gửi email kết quả duyệt (${ketQua}) cho hoc_vien_id=${hocVienId} (event hoc_vien.duyet)`,
     );
   }
 
@@ -755,7 +741,7 @@ export class HocVienService {
       },
       include: { chuyen_mon: true },
     });
-    this.guiEmailDuyetStub(id, dto.ket_qua);
+    await this.thongBaoService.guiHocVienDuyet(id, dto.ket_qua, dto.ly_do);
     return this.toResponse(updated);
   }
 

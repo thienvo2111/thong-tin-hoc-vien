@@ -8,6 +8,7 @@ import {
   ValidationException,
 } from '../common/exceptions/app.exceptions';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { ThongBaoService } from '../thong-bao/thong-bao.service';
 
 const namHopLe = new Date().getUTCFullYear() - 20;
 
@@ -49,6 +50,10 @@ describe('HocVienService', () => {
     getAccessibleDonViIds: jest.Mock;
     canAccessDonVi: jest.Mock;
   };
+  let thongBaoService: {
+    guiHocVienXacNhan: jest.Mock;
+    guiHocVienDuyet: jest.Mock;
+  };
 
   beforeEach(() => {
     prisma = {
@@ -76,9 +81,14 @@ describe('HocVienService', () => {
       getAccessibleDonViIds: jest.fn(),
       canAccessDonVi: jest.fn(),
     };
+    thongBaoService = {
+      guiHocVienXacNhan: jest.fn().mockResolvedValue(undefined),
+      guiHocVienDuyet: jest.fn().mockResolvedValue(undefined),
+    };
     service = new HocVienService(
       prisma as unknown as PrismaService,
       scopeService as unknown as ScopeService,
+      thongBaoService as unknown as ThongBaoService,
     );
 
     // Fixture mặc định: mọi FK tra cứu hợp lệ (test override khi cần âm tính).

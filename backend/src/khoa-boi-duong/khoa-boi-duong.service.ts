@@ -3,6 +3,7 @@ import { Prisma, khoa_boi_duong, lop_hoc } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from '../auth/scope/scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { normalizeNfcName } from '../common/utils/normalize-text.util';
 import { paginate } from '../common/dto/pagination-query.dto';
 import {
@@ -20,6 +21,7 @@ import { CreateLopHocDto } from './dto/create-lop-hoc.dto';
 import { CreateLichHocDto } from './dto/create-lich-hoc.dto';
 import { CreateNhanSuDto } from './dto/create-nhan-su.dto';
 import { PhanLopHocVienRowDto } from './dto/phan-lop-row.dto';
+import { KetQuaDangKyDto } from './dto/ket-qua-dang-ky.dto';
 import { RowBuildResult } from '../import/import.types';
 
 type LopHocVoiKhoa = lop_hoc & { khoa: khoa_boi_duong };
@@ -33,6 +35,7 @@ export class KhoaBoiDuongService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scopeService: ScopeService,
+    private readonly thongBaoService: ThongBaoService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -220,7 +223,7 @@ export class KhoaBoiDuongService {
         ngay_duyet: new Date(),
       },
     });
-    this.guiEmailDuyetKhoaStub(id, dto.ket_qua);
+    await this.thongBaoService.guiKhoaBoiDuongDuyet(id, dto.ket_qua);
     return updated;
   }
 
@@ -257,13 +260,45 @@ export class KhoaBoiDuongService {
     return donViDuyet;
   }
 
-  // TODO: Dịch vụ Thông báo (docs/api-contract.md mục 8, event
-  // khoa_boi_duong.duyet) chưa được triển khai — log rõ ràng, cùng mẫu với
-  // hoc-vien.service.ts.
-  private guiEmailDuyetKhoaStub(khoaId: string, ketQua: string) {
-    console.log(
-      `[thong-bao:TODO] Gửi email kết quả duyệt khóa (${ketQua}) cho khoa_id=${khoaId} tới Trường tổ chức (event khoa_boi_duong.duyet)`,
+  // ---------------------------------------------------------------------
+  // PATCH /dang-ky-hoc/{id}/ket-qua — docs/api-contract.md mục 3 (thêm
+  // 2026-09-25). Phạm vi theo Trường tổ chức khóa TRỰC TIẾP (khác duyet()
+  // khóa ở trên, vốn routing lên don_vi_cha_id của Trường — ở đây chính
+  // Trường tổ chức là người nhập kết quả, Phòng VHXH/Sở chỉ escalation lên
+  // được nhờ ScopeService.canAccessDonVi đã bao gồm cây con của họ).
+  // ---------------------------------------------------------------------
+  async capNhatKetQua(
+    id: string,
+    dto: KetQuaDangKyDto,
+    caller: AuthenticatedUser,
+  ) {
+    const dangKy = await this.prisma.dang_ky_hoc.findUnique({
+      where: { id },
+      include: { khoa: true },
+    });
+    if (!dangKy) throw new NotFoundAppException('Không tìm thấy đăng ký học');
+
+    const coQuyen = await this.scopeService.canAccessDonVi(
+      caller,
+      dangKy.khoa.don_vi_to_chuc_id,
     );
+    if (!coQuyen) {
+      throw new ForbiddenAppException(
+        'Không có quyền cập nhật kết quả — nằm ngoài phạm vi đơn vị tổ chức khóa',
+      );
+    }
+
+    const updated = await this.prisma.dang_ky_hoc.update({
+      where: { id },
+      data: {
+        ket_qua: dto.ket_qua,
+        ngay_hoan_thanh: dto.ngay_hoan_thanh
+          ? new Date(dto.ngay_hoan_thanh)
+          : undefined,
+      },
+    });
+    await this.thongBaoService.guiDangKyHocKetQua(id);
+    return updated;
   }
 
   // ---------------------------------------------------------------------
@@ -625,7 +660,7 @@ export class KhoaBoiDuongService {
       },
     };
     if (dto.lop_id) {
-      await this.prisma.dang_ky_hoc.upsert({
+      const dangKy = await this.prisma.dang_ky_hoc.upsert({
         where,
         create: {
           hoc_vien_id: dto.hoc_vien_id,
@@ -635,6 +670,10 @@ export class KhoaBoiDuongService {
         },
         update: { lop_id: dto.lop_id, trang_thai: 'da_phan_lop' },
       });
+      // Event dang_ky_hoc_phan_lop CHỈ kích hoạt ở nhánh gán lop_id thực sự
+      // (docs/api-contract.md mục 8) — nhánh else dưới đây (chỉ ghi danh,
+      // lop_id vẫn NULL) không gọi.
+      await this.thongBaoService.guiDangKyHocPhanLop(dangKy.id);
     } else {
       // ten_lop trống: chỉ đảm bảo đã ghi danh. Nếu dang_ky_hoc đã tồn tại
       // (kể cả đã da_phan_lop), giữ nguyên — không hạ cấp lại trang_thai/lop_id.

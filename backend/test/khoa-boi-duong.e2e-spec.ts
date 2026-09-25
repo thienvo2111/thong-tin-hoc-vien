@@ -202,6 +202,11 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         ],
       },
     });
+    // Xóa trước khi xóa hoc_vien — nhat_ky_thong_bao.hoc_vien_id FK
+    // onDelete: NoAction, xem docs/database-ddl.sql PHẦN 4.
+    await prisma.nhat_ky_thong_bao.deleteMany({
+      where: { hoc_vien_id: { in: hocVienIds } },
+    });
     if (hocVienIds.length > 0) {
       await prisma.hoc_vien.updateMany({
         where: { id: { in: hocVienIds } },
@@ -824,6 +829,16 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       expect(dangKy).not.toBeNull();
       expect(dangKy?.lop_id).toBeNull();
       expect(dangKy?.trang_thai).toBe('da_duyet');
+
+      // Nhánh chỉ ghi danh (lop_id vẫn NULL) KHÔNG kích hoạt sự kiện
+      // dang_ky_hoc_phan_lop (docs/api-contract.md mục 8).
+      const thongBaoPhanLop = await prisma.nhat_ky_thong_bao.findMany({
+        where: {
+          hoc_vien_id: hocVienDaDuyetId,
+          loai_su_kien: 'dang_ky_hoc_phan_lop',
+        },
+      });
+      expect(thongBaoPhanLop).toHaveLength(0);
     });
 
     it('GET /hoc-vien/toi/khoa-hoc, /ket-qua phản ánh đúng ghi danh (lop=null) vừa import', async () => {
@@ -878,6 +893,18 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       });
       expect(dangKy?.lop_id).toBe(lopId);
       expect(dangKy?.trang_thai).toBe('da_phan_lop');
+
+      // Nhánh gán lop_id thực sự -> kích hoạt sự kiện dang_ky_hoc_phan_lop,
+      // gửi thật qua Ethereal (không SMTP giả) -> ghi trang_thai=thanh_cong.
+      const thongBaoPhanLop = await prisma.nhat_ky_thong_bao.findMany({
+        where: {
+          hoc_vien_id: hocVienDaDuyetId,
+          loai_su_kien: 'dang_ky_hoc_phan_lop',
+        },
+      });
+      expect(thongBaoPhanLop).toHaveLength(1);
+      expect(thongBaoPhanLop[0].trang_thai).toBe('thanh_cong');
+      expect(thongBaoPhanLop[0].email_nguoi_nhan).toContain('pl-');
     });
 
     it('ghi danh + phân lớp trong 1 lần import duy nhất (ten_lop có giá trị ngay từ đầu, học viên chưa từng đăng ký)', async () => {
@@ -943,6 +970,117 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       expect(dangKy).not.toBeNull();
       expect(dangKy?.lop_id).toBe(lopId);
       expect(dangKy?.trang_thai).toBe('da_phan_lop');
+
+      const thongBaoPhanLop = await prisma.nhat_ky_thong_bao.findMany({
+        where: {
+          hoc_vien_id: hocVienMoiId,
+          loai_su_kien: 'dang_ky_hoc_phan_lop',
+        },
+      });
+      expect(thongBaoPhanLop).toHaveLength(1);
+    });
+  });
+
+  describe('PATCH /dang-ky-hoc/{id}/ket-qua', () => {
+    let khoaKetQuaId: string;
+    let dangKyId: string;
+    let hocVienKetQuaId: string;
+
+    beforeAll(async () => {
+      const suf = uniqueSuffix();
+      const hv = await prisma.hoc_vien.create({
+        data: {
+          ho_ten: 'Học Viên Kết Quả',
+          so_dinh_danh_ca_nhan: soDinhDanhNgauNhien(),
+          ngay_sinh: 1,
+          thang_sinh: 1,
+          nam_sinh: NAM_HOP_LE,
+          don_vi_cong_tac_id: truong1.id,
+          so_dien_thoai_lien_he: '0900000000',
+          email_lien_he: `kq-${suf}@test.local`,
+          trang_thai: 'da_duyet',
+          // chk_hoc_vien_duyet_dong_bo: trang_thai=da_duyet đòi hỏi
+          // nguoi_duyet_id NOT NULL — tạo fixture trực tiếp qua Prisma nên
+          // phải tự set, không đi qua HocVienService.duyet().
+          nguoi_duyet_id: quanTri.nguoiDung.id,
+          cap_duyet_thuc_te: 'quan_tri',
+          ngay_duyet: new Date(),
+        },
+      });
+      hocVienKetQuaId = hv.id;
+      hocVienIds.push(hocVienKetQuaId);
+
+      const khoa = await prisma.khoa_boi_duong.create({
+        data: {
+          ma_khoa: `K-KQ-${suf}`,
+          ten_khoa: 'Khóa kiểm tra kết quả',
+          don_vi_to_chuc_id: truong1.id,
+          thoi_gian_bat_dau: new Date('2026-01-01'),
+          thoi_gian_ket_thuc: new Date('2026-01-31'),
+        },
+      });
+      khoaKetQuaId = khoa.id;
+      khoaIds.push(khoaKetQuaId);
+
+      const dk = await prisma.dang_ky_hoc.create({
+        data: {
+          hoc_vien_id: hocVienKetQuaId,
+          khoa_id: khoaKetQuaId,
+          trang_thai: 'da_duyet',
+        },
+      });
+      dangKyId = dk.id;
+    });
+
+    it('chủ khóa (truong1) cập nhật kết quả -> 200, ghi ket_qua/ngay_hoan_thanh, bắn sự kiện dang_ky_hoc_ket_qua', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/dang-ky-hoc/${dangKyId}/ket-qua`)
+        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .send({ ket_qua: 'dat', ngay_hoan_thanh: '2026-01-31' })
+        .expect(200);
+      expect(res.body.ket_qua).toBe('dat');
+      expect(res.body.ngay_hoan_thanh).toBeDefined();
+
+      const thongBao = await prisma.nhat_ky_thong_bao.findMany({
+        where: {
+          hoc_vien_id: hocVienKetQuaId,
+          loai_su_kien: 'dang_ky_hoc_ket_qua',
+        },
+      });
+      expect(thongBao).toHaveLength(1);
+      expect(thongBao[0].trang_thai).toBe('thanh_cong');
+    });
+
+    it('Phòng VHXH quản lý (escalation, theo don_vi_id trực tiếp của Trường tổ chức) cũng cập nhật được -> 200', async () => {
+      await request(app.getHttpServer())
+        .patch(`/dang-ky-hoc/${dangKyId}/ket-qua`)
+        .set('Authorization', `Bearer ${tokenPhong}`)
+        .send({ ket_qua: 'khong_dat' })
+        .expect(200);
+    });
+
+    it('truong2 (không liên quan) -> 403', async () => {
+      await request(app.getHttpServer())
+        .patch(`/dang-ky-hoc/${dangKyId}/ket-qua`)
+        .set('Authorization', `Bearer ${tokenTruong2}`)
+        .send({ ket_qua: 'dat' })
+        .expect(403);
+    });
+
+    it('ket_qua ngoài enum ket_qua_hoc -> 400', async () => {
+      await request(app.getHttpServer())
+        .patch(`/dang-ky-hoc/${dangKyId}/ket-qua`)
+        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .send({ ket_qua: 'gioi' })
+        .expect(400);
+    });
+
+    it('id không tồn tại -> 404', async () => {
+      await request(app.getHttpServer())
+        .patch('/dang-ky-hoc/00000000-0000-0000-0000-000000000000/ket-qua')
+        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .send({ ket_qua: 'dat' })
+        .expect(404);
     });
   });
 
