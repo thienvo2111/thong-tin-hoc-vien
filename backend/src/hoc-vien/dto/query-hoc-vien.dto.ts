@@ -1,5 +1,12 @@
 import { cap_hoc, nguon_tao_ho_so, trang_thai_ho_so } from '@prisma/client';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
 // GET /hoc-vien — docs/api-contract.md mục 2.
@@ -23,4 +30,17 @@ export class QueryHocVienDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   q?: string;
+
+  // T9: lọc theo "hồ sơ đầy đủ" (tính động qua HocVienService.danhGiaDayDu,
+  // không phải cột DB) — dùng cho Quản trị/Sở/Phòng/Trường đôn đốc.
+  // Transform thủ công vì query string ("false") qua Type(() => Boolean) sẽ
+  // thành true (chuỗi không rỗng) — gotcha kinh điển của class-transformer.
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value as unknown;
+  })
+  @IsBoolean()
+  day_du?: boolean;
 }

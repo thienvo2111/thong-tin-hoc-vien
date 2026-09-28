@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -11,10 +12,17 @@ import { ImportModule } from './import/import.module';
 import { BaoCaoModule } from './bao-cao/bao-cao.module';
 import { ThongBaoModule } from './thong-bao/thong-bao.module';
 import { ValidateModule } from './validate/validate.module';
+import { NguoiDungModule } from './nguoi-dung/nguoi-dung.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // T1 (mo-rong-nls-an-giang.md): 10 request/phút/IP. Module này là
+    // @Global() nên ThrottlerGuard dùng được ở bất kỳ controller nào chỉ cần
+    // @UseGuards(ThrottlerGuard) — KHÔNG đăng ký làm APP_GUARD toàn cục, chỉ
+    // áp thủ công cho POST /auth/dang-nhap và GET /hoc-vien/kiem-tra-trung
+    // (xem 2 controller đó) để không ảnh hưởng các endpoint còn lại.
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60000, limit: 10 }]),
     PrismaModule,
     AuthModule,
     HocVienModule,
@@ -24,6 +32,7 @@ import { ValidateModule } from './validate/validate.module';
     BaoCaoModule,
     ThongBaoModule,
     ValidateModule,
+    NguoiDungModule,
   ],
   controllers: [AppController],
   providers: [AppService],

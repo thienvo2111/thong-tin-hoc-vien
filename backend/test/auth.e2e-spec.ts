@@ -15,7 +15,11 @@ describe('Auth (e2e)', () => {
   let taiKhoan: Awaited<ReturnType<typeof taoNguoiDungTest>>;
 
   beforeAll(async () => {
-    app = await createTestApp();
+    // Nới giới hạn throttler CHỈ cho file này — file này tự gọi
+    // /auth/dang-nhap hơn 10 lần cho các test KHÔNG liên quan tới T1 rate
+    // limit (đã có test riêng ở test/rate-limit.e2e-spec.ts). Xem comment ở
+    // createTestApp().
+    app = await createTestApp({ raiseThrottlerLimit: true });
     donVi = await taoDonViTest('auth');
     taiKhoan = await taoNguoiDungTest({
       vai_tro: 'truong',
@@ -157,6 +161,73 @@ describe('Auth (e2e)', () => {
 
       // Cập nhật lại để các test khác trong file (chạy sau) vẫn dùng đúng mật khẩu gốc
       taiKhoan.mat_khau = 'MatKhauMoiHon123';
+    });
+
+    // T1 (mo-rong-nls-an-giang.md): mật khẩu mới >=8 ký tự, có cả chữ và số,
+    // khác mật khẩu cũ.
+    it.each([
+      ['Ab1', 'quá ngắn'],
+      ['abcdefgh', 'không có số'],
+      ['12345678', 'không có chữ'],
+    ])(
+      'mật khẩu mới "%s" (%s) -> 400 VALIDATION_ERROR, field mat_khau_moi',
+      async (matKhauMoi) => {
+        const login = await request(app.getHttpServer())
+          .post('/auth/dang-nhap')
+          .send({
+            ten_dang_nhap: taiKhoan.ten_dang_nhap,
+            mat_khau: taiKhoan.mat_khau,
+          });
+
+        const res = await request(app.getHttpServer())
+          .post('/auth/doi-mat-khau')
+          .set('Authorization', `Bearer ${login.body.token}`)
+          .send({ mat_khau_cu: taiKhoan.mat_khau, mat_khau_moi: matKhauMoi })
+          .expect(400);
+
+        expect(
+          res.body.error.fields.some(
+            (f: { field: string }) => f.field === 'mat_khau_moi',
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it('mật khẩu mới trùng mật khẩu cũ -> 400 VALIDATION_ERROR', async () => {
+      const login = await request(app.getHttpServer())
+        .post('/auth/dang-nhap')
+        .send({
+          ten_dang_nhap: taiKhoan.ten_dang_nhap,
+          mat_khau: taiKhoan.mat_khau,
+        });
+
+      await request(app.getHttpServer())
+        .post('/auth/doi-mat-khau')
+        .set('Authorization', `Bearer ${login.body.token}`)
+        .send({
+          mat_khau_cu: taiKhoan.mat_khau,
+          mat_khau_moi: taiKhoan.mat_khau,
+        })
+        .expect(400);
+    });
+  });
+
+  describe('Bảo mật đăng nhập (T1) — thông báo lỗi, mã lỗi', () => {
+    it('sai tên đăng nhập trả cùng thông báo/UNAUTHORIZED như sai mật khẩu (không lộ tài khoản tồn tại)', async () => {
+      const resSaiUser = await request(app.getHttpServer())
+        .post('/auth/dang-nhap')
+        .send({ ten_dang_nhap: 'khong-ton-tai-xyz', mat_khau: 'x' })
+        .expect(401);
+      const resSaiPass = await request(app.getHttpServer())
+        .post('/auth/dang-nhap')
+        .send({
+          ten_dang_nhap: taiKhoan.ten_dang_nhap,
+          mat_khau: 'sai-chac-chan',
+        })
+        .expect(401);
+      expect(resSaiUser.body.error.code).toBe('UNAUTHORIZED');
+      expect(resSaiPass.body.error.code).toBe('UNAUTHORIZED');
+      expect(resSaiUser.body.error.message).toBe(resSaiPass.body.error.message);
     });
   });
 

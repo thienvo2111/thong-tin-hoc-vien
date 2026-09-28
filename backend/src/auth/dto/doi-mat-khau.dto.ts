@@ -1,13 +1,15 @@
-import { IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 export class DoiMatKhauDto {
   @IsString()
   @IsNotEmpty()
   mat_khau_cu: string;
 
-  // Độ dài tối thiểu không có trong validation-checklist.md — ràng buộc hợp
-  // lý tối thiểu do tự thêm (flag: cải tiến ngoài spec), tránh mật khẩu rỗng/1 ký tự.
+  // Độ phức tạp thật (≥8 ký tự, có chữ và số, khác ngày sinh ddmmyyyy, khác
+  // mật khẩu cũ — T1 mo-rong-nls-an-giang.md) được kiểm tra ở AuthService,
+  // không phải ở DTO, vì cần so sánh với dữ liệu hồ sơ (ngày sinh) và mật
+  // khẩu cũ (bcrypt hash) — DTO chỉ giữ ràng buộc không phụ thuộc dữ liệu khác.
   @IsString()
-  @MinLength(6, { message: 'Mật khẩu mới phải có ít nhất 6 ký tự' })
+  @IsNotEmpty()
   mat_khau_moi: string;
 }

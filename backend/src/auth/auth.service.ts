@@ -6,6 +6,7 @@ import { Prisma, nguoi_dung } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService, DonViScope } from './scope/scope.service';
 import {
+  AccountLockedException,
   UnauthorizedAppException,
   ValidationException,
 } from '../common/exceptions/app.exceptions';
@@ -15,8 +16,17 @@ import {
   AuthenticatedUser,
   JwtPayload,
 } from './interfaces/jwt-payload.interface';
+import {
+  FieldMessage,
+  matKhauMacDinhTuNgaySinh,
+} from '../hoc-vien/hoc-vien-validation.util';
 
 const BCRYPT_SALT_ROUNDS = 10;
+
+// T1 (bảo mật đăng nhập, mo-rong-nls-an-giang.md): sai 5 lần liên tiếp ->
+// khóa 15 phút.
+const NGUONG_SO_LAN_SAI_KHOA = 5;
+const THOI_GIAN_KHOA_MS = 15 * 60 * 1000;
 
 export type SafeNguoiDung = Omit<nguoi_dung, 'mat_khau_hash'>;
 
@@ -45,17 +55,51 @@ export class AuthService {
       throw new UnauthorizedAppException();
     }
 
+    const now = new Date();
+    // T1: đang trong thời gian khóa -> 423, KHÔNG kiểm tra mật khẩu (đúng
+    // hay sai cũng bị chặn như nhau — spec mo-rong-nls-an-giang.md mục T1).
+    if (nguoiDung.khoa_den && nguoiDung.khoa_den > now) {
+      throw new AccountLockedException(nguoiDung.khoa_den);
+    }
+
     const khop = await bcrypt.compare(dto.mat_khau, nguoiDung.mat_khau_hash);
     if (!khop) {
+      // Nếu từng có khoa_den nhưng đã hết hạn (đã "hết 15 phút"), coi như
+      // bắt đầu đếm lại từ 0 trước khi cộng lần sai này — không cộng dồn lên
+      // bộ đếm cũ đã hết hiệu lực.
+      const soLanTruoc =
+        nguoiDung.khoa_den && nguoiDung.khoa_den <= now
+          ? 0
+          : nguoiDung.so_lan_dang_nhap_sai;
+      const soLanMoi = soLanTruoc + 1;
+      await this.prisma.nguoi_dung.update({
+        where: { id: nguoiDung.id },
+        data: {
+          so_lan_dang_nhap_sai: soLanMoi,
+          khoa_den:
+            soLanMoi >= NGUONG_SO_LAN_SAI_KHOA
+              ? new Date(now.getTime() + THOI_GIAN_KHOA_MS)
+              : null,
+        },
+      });
       throw new UnauthorizedAppException();
     }
 
-    const token = await this.signToken(nguoiDung);
+    const updated = await this.prisma.nguoi_dung.update({
+      where: { id: nguoiDung.id },
+      data: {
+        so_lan_dang_nhap_sai: 0,
+        khoa_den: null,
+        dang_nhap_lan_cuoi: now,
+      },
+    });
+
+    const token = await this.signToken(updated);
 
     return {
       token,
-      phai_doi_mat_khau: nguoiDung.phai_doi_mat_khau,
-      nguoi_dung: sanitizeNguoiDung(nguoiDung),
+      phai_doi_mat_khau: updated.phai_doi_mat_khau,
+      nguoi_dung: sanitizeNguoiDung(updated),
     };
   }
 
@@ -74,12 +118,9 @@ export class AuthService {
         },
       });
     } catch (e) {
-      if (
-        !(
-          e instanceof Prisma.PrismaClientKnownRequestError &&
-          e.code === 'P2002'
-        )
-      ) {
+      if (!(
+        e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002'
+      )) {
         throw e;
       }
     }
@@ -98,6 +139,14 @@ export class AuthService {
       ]);
     }
 
+    const loiPhucTap = await this.kiemTraDoPhucTapMatKhauMoi(nguoiDung, dto);
+    if (loiPhucTap.length > 0) {
+      throw new ValidationException(
+        'Mật khẩu mới không đạt yêu cầu',
+        loiPhucTap,
+      );
+    }
+
     const matKhauHashMoi = await bcrypt.hash(
       dto.mat_khau_moi,
       BCRYPT_SALT_ROUNDS,
@@ -109,6 +158,55 @@ export class AuthService {
     });
 
     return { nguoi_dung: sanitizeNguoiDung(updated) };
+  }
+
+  // T1: mật khẩu mới >= 8 ký tự, có cả chữ và số, khác mật khẩu cũ, và (nếu
+  // tài khoản gắn hồ sơ học viên) khác chuỗi ngày sinh ddmmyyyy — chính là
+  // mật khẩu mặc định lúc tạo tài khoản, xem hoc-vien-validation.util.ts.
+  private async kiemTraDoPhucTapMatKhauMoi(
+    nguoiDung: nguoi_dung,
+    dto: DoiMatKhauDto,
+  ): Promise<FieldMessage[]> {
+    const loi: FieldMessage[] = [];
+    const mk = dto.mat_khau_moi;
+
+    if (mk.length < 8) {
+      loi.push({ field: 'mat_khau_moi', message: 'Phải có ít nhất 8 ký tự' });
+    }
+    if (!/\d/.test(mk) || !/\p{L}/u.test(mk)) {
+      loi.push({
+        field: 'mat_khau_moi',
+        message: 'Phải có cả chữ và số',
+      });
+    }
+    if (mk === dto.mat_khau_cu) {
+      loi.push({
+        field: 'mat_khau_moi',
+        message: 'Phải khác mật khẩu cũ',
+      });
+    }
+
+    if (nguoiDung.hoc_vien_id) {
+      const hocVien = await this.prisma.hoc_vien.findUnique({
+        where: { id: nguoiDung.hoc_vien_id },
+        select: { ngay_sinh: true, thang_sinh: true, nam_sinh: true },
+      });
+      if (hocVien) {
+        const ngaySinhStr = matKhauMacDinhTuNgaySinh(
+          hocVien.ngay_sinh,
+          hocVien.thang_sinh,
+          hocVien.nam_sinh,
+        );
+        if (mk === ngaySinhStr) {
+          loi.push({
+            field: 'mat_khau_moi',
+            message: 'Không được trùng ngày sinh (định dạng ddmmyyyy)',
+          });
+        }
+      }
+    }
+
+    return loi;
   }
 
   async layThongTinHienTai(user: AuthenticatedUser) {

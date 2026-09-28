@@ -8,7 +8,9 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { HocVienService } from './hoc-vien.service';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -32,10 +34,19 @@ export class HocVienController {
     return this.hocVienService.dangKy(dto);
   }
 
+  // T1: giới hạn 10 request/phút/IP — xem ghi chú ở AuthController.dangNhap.
   @Public()
+  @UseGuards(ThrottlerGuard)
   @Get('kiem-tra-trung')
   kiemTraTrung(@Query() query: KiemTraTrungQueryDto) {
     return this.hocVienService.kiemTraTrung(query.so_dinh_danh_ca_nhan);
+  }
+
+  // T9: cổng học viên xem danh sách còn thiếu để hồ sơ được coi là "đầy đủ".
+  @Roles('hoc_vien')
+  @Get('toi/muc-do-day-du')
+  mucDoDayDu(@CurrentUser() user: AuthenticatedUser) {
+    return this.hocVienService.mucDoDayDuCuaToi(user);
   }
 
   @Roles('hoc_vien')

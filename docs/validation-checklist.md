@@ -129,3 +129,20 @@ Ký hiệu: 🔴 lỗi chặn lưu · 🟡 cảnh báo không chặn (chỉ nh�
 | 50 | `lich_hoc_lop.lop_id` và `.giai_doan_id` phải cùng thuộc 1 `khoa_id` | 🔴 | API (kiểm tra chéo trước khi insert — DB không ràng buộc trực tiếp vì 2 FK khác bảng) |
 | 51 | `dang_ky_hoc.lop_id` (nếu có) phải thuộc đúng `dang_ky_hoc.khoa_id` | 🔴 | DB (trigger `trg_dang_ky_lop_thuoc_khoa`) |
 | 52 | **Đã sửa 2026-09-25** (bản trước giả định `khoa_id` tự gán khi hồ sơ `da_duyet` — sai, không có cơ sở "học viên thuộc khóa nào" khi tự động; xem `database-ddl.sql` ghi chú triển khai): cả `dang_ky_hoc.khoa_id` **và** `lop_id` đều **chỉ gán qua Import `phan_lop_hoc_vien` bởi Quản trị hệ thống** — không tự động theo hồ sơ duyệt, không phải học viên tự chọn/đăng ký. `ten_lop` trong file import là tùy chọn: để trống → chỉ ghi danh vào khóa (`lop_id=NULL`); có giá trị → ghi danh + phân lớp cùng lúc. Không có API gán tay từng người (số lượng lớn). | 🔴 (quy trình) | API (không expose endpoint tạo/sửa `dang_ky_hoc` ngoài luồng import) |
+
+## Bảo mật đăng nhập (T1, 2026-09-28 — mo-rong-nls-an-giang.md)
+
+| # | Quy tắc | Mức | Nơi thực thi |
+|---|---|---|---|
+| 53 | Sai mật khẩu 5 lần liên tiếp → `nguoi_dung.khoa_den = now() + 15 phút`; đăng nhập đúng (kể cả ngay sau khi `khoa_den` đã hết hạn) → reset `so_lan_dang_nhap_sai=0, khoa_den=NULL` | 🔴 | API (`AuthService.dangNhap`) |
+| 54 | Đang trong thời gian khóa → `POST /auth/dang-nhap` trả `423 ACCOUNT_LOCKED` kèm thời điểm mở khóa, **không kiểm tra mật khẩu** (đúng hay sai cũng bị chặn như nhau) | 🔴 | API |
+| 55 | Sai tên đăng nhập và sai mật khẩu trả **cùng một thông báo** `UNAUTHORIZED` — không tiết lộ tài khoản có tồn tại hay không (ngoại lệ: `423` tự nó đã tiết lộ tài khoản tồn tại — đánh đổi chấp nhận theo spec) | 🔴 | API |
+| 56 | `POST /auth/doi-mat-khau`: mật khẩu mới ≥8 ký tự, có cả chữ và số, khác mật khẩu cũ, và (nếu tài khoản gắn hồ sơ học viên) khác chuỗi ngày sinh `ddmmyyyy` — vi phạm trả `VALIDATION_ERROR` kèm `fields` | 🔴 | API |
+| 57 | `POST /auth/dang-nhap` và `GET /hoc-vien/kiem-tra-trung`: giới hạn 10 request/phút/IP, vượt quá trả `429 RATE_LIMITED` (`@nestjs/throttler`, áp riêng 2 route này — không đăng ký guard toàn cục) | 🔴 | API |
+| 58 | `POST /nguoi-dung/{id}/dat-lai-mat-khau` (`quan_tri`): chỉ áp dụng tài khoản `vai_tro='hoc_vien'`; đặt mật khẩu về ngày sinh `ddmmyyyy`, `phai_doi_mat_khau=true`, xóa `khoa_den`/bộ đếm sai, ghi `nhat_ky_dat_lai_mat_khau` | 🔴 (quy trình) | API |
+
+## Hồ sơ đầy đủ (T9, 2026-09-28 — mo-rong-nls-an-giang.md)
+
+| # | Quy tắc | Mức | Nơi thực thi |
+|---|---|---|---|
+| 59 | "Đầy đủ" = qua toàn bộ quy tắc #1-26b của luồng `tu_dang_ky` (`validateHocVien(requireFull=true)`) — cảnh báo 🟡 KHÔNG làm hồ sơ "chưa đầy đủ", chỉ lỗi 🔴 mới tính. Tính động (`HocVienService.danhGiaDayDu`), không lưu cột tính sẵn | 🔴 | API (`GET /hoc-vien/toi/muc-do-day-du`, `GET /hoc-vien?day_du=`) |

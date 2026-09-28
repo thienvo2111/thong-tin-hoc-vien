@@ -20,6 +20,13 @@ const STATUS_TO_CODE: Record<number, string> = {
   [HttpStatus.FORBIDDEN]: 'FORBIDDEN',
   [HttpStatus.NOT_FOUND]: 'NOT_FOUND',
   [HttpStatus.CONFLICT]: 'CONFLICT',
+  // T1 (bảo mật đăng nhập): 423 luôn đi kèm body { error: {...} } đã định dạng
+  // sẵn (AccountLockedException) nên nhánh isPreformatted xử lý trước khi tới
+  // map này — 423 chỉ có mặt ở đây như lưới an toàn. 429 thì ngược lại: đến
+  // từ ThrottlerException (@nestjs/throttler), luôn KHÔNG preformatted, nên
+  // map này là nơi DUY NHẤT gán code cho nó.
+  423: 'ACCOUNT_LOCKED',
+  [HttpStatus.TOO_MANY_REQUESTS]: 'RATE_LIMITED',
 };
 
 @Catch()

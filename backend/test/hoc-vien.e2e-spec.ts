@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
+import * as bcrypt from 'bcryptjs';
 import { createTestApp } from './utils/test-app';
 import {
   prisma,
@@ -642,6 +643,138 @@ describe('Hồ sơ Học viên (e2e)', () => {
         .set('Authorization', `Bearer ${tokenSo}`)
         .send({ ket_qua: 'da_duyet' })
         .expect(409);
+    });
+  });
+
+  describe('T9 — Hồ sơ đầy đủ (mo-rong-nls-an-giang.md)', () => {
+    let hocVienMoetId: string;
+    let tokenMoet: string;
+    const suf = uniqueSuffix();
+    const tenDangNhap = `MOET-T9-${suf}`;
+    const NGAY = 10;
+    const THANG = 3;
+
+    beforeAll(async () => {
+      const hocVienMoet = await prisma.hoc_vien.create({
+        data: {
+          nguon_tao: 'import_moet',
+          ma_dinh_danh_moet: tenDangNhap,
+          ho_ten: 'Ho So Day Du Test',
+          ngay_sinh: NGAY,
+          thang_sinh: THANG,
+          nam_sinh: NAM_HOP_LE,
+          don_vi_cong_tac_id: truong.id,
+          so_dien_thoai_lien_he: '0900000001',
+          trang_thai: 'da_duyet',
+          nguoi_duyet_id: quanTri.nguoiDung.id,
+          cap_duyet_thuc_te: 'quan_tri',
+          ngay_duyet: new Date(),
+          chuyen_mon: { create: [{ chuyen_mon: 'CNTT' }] },
+        },
+      });
+      hocVienMoetId = hocVienMoet.id;
+      const nguoiDungMoet = await prisma.nguoi_dung.create({
+        data: {
+          ho_ten: 'Ho So Day Du Test',
+          ten_dang_nhap: tenDangNhap,
+          vai_tro: 'hoc_vien',
+          hoc_vien_id: hocVienMoet.id,
+          mat_khau_hash: await bcrypt.hash(
+            ddmmyyyy(NGAY, THANG, NAM_HOP_LE),
+            4,
+          ),
+          phai_doi_mat_khau: true,
+        },
+      });
+      await prisma.hoc_vien.update({
+        where: { id: hocVienMoet.id },
+        data: { created_by: nguoiDungMoet.id },
+      });
+      hocVienIds.push(hocVienMoet.id);
+      nguoiDungHocVienIds.push(nguoiDungMoet.id);
+
+      tokenMoet = await dangNhap(
+        tenDangNhap,
+        ddmmyyyy(NGAY, THANG, NAM_HOP_LE),
+      );
+    });
+
+    it('hồ sơ MOET vừa import -> GET /hoc-vien/toi/muc-do-day-du trả day_du=false, liệt kê đủ trường thiếu', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/hoc-vien/toi/muc-do-day-du')
+        .set('Authorization', `Bearer ${tokenMoet}`)
+        .expect(200);
+      expect(res.body.day_du).toBe(false);
+      const thieuFields = res.body.thieu.map((t: { field: string }) => t.field);
+      expect(thieuFields).toEqual(
+        expect.arrayContaining([
+          'so_dinh_danh_ca_nhan',
+          'noi_sinh_id',
+          'phuong_xa_id',
+          'email_lien_he',
+          'trinh_do_chuyen_mon',
+        ]),
+      );
+    });
+
+    it('GET /hoc-vien?day_du=false (Sở) -> có mặt hồ sơ MOET chưa bổ sung', async () => {
+      const res = await request(app.getHttpServer())
+        .get(
+          `/hoc-vien?day_du=false&don_vi_cong_tac_id=${truong.id}&page_size=100`,
+        )
+        .set('Authorization', `Bearer ${tokenSo}`)
+        .expect(200);
+      expect(
+        res.body.data.some((hv: { id: string }) => hv.id === hocVienMoetId),
+      ).toBe(true);
+    });
+
+    // Case "phuong_xa_id không thuộc noi_sinh_id -> vẫn day_du=false kèm lý
+    // do" (nghiệm thu T9) đã có unit test đầy đủ ở hoc-vien.service.spec.ts
+    // (mock dia_danh trực tiếp) — ở e2e chỉ cần xác nhận happy path bổ sung
+    // đủ thông tin thật sự lật day_du sang true.
+    it('bổ sung đủ mọi trường còn thiếu -> muc-do-day-du trả day_du=true, thieu=[]', async () => {
+      await request(app.getHttpServer())
+        .patch('/hoc-vien/toi')
+        .set('Authorization', `Bearer ${tokenMoet}`)
+        .send({
+          so_dinh_danh_ca_nhan: soDinhDanhNgauNhien(),
+          noi_sinh_id: tinh.id,
+          phuong_xa_id: xaTruong.id,
+          email_lien_he: `t9-${suf}@test.local`,
+          trinh_do_chuyen_mon: 'dai_hoc',
+        })
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get('/hoc-vien/toi/muc-do-day-du')
+        .set('Authorization', `Bearer ${tokenMoet}`)
+        .expect(200);
+      expect(res.body).toEqual({ day_du: true, thieu: [] });
+    });
+
+    it('GET /hoc-vien?day_du=true (Sở) -> có mặt; ?day_du=false -> KHÔNG còn', async () => {
+      const resTrue = await request(app.getHttpServer())
+        .get(
+          `/hoc-vien?day_du=true&don_vi_cong_tac_id=${truong.id}&page_size=100`,
+        )
+        .set('Authorization', `Bearer ${tokenSo}`)
+        .expect(200);
+      expect(
+        resTrue.body.data.some((hv: { id: string }) => hv.id === hocVienMoetId),
+      ).toBe(true);
+
+      const resFalse = await request(app.getHttpServer())
+        .get(
+          `/hoc-vien?day_du=false&don_vi_cong_tac_id=${truong.id}&page_size=100`,
+        )
+        .set('Authorization', `Bearer ${tokenSo}`)
+        .expect(200);
+      expect(
+        resFalse.body.data.some(
+          (hv: { id: string }) => hv.id === hocVienMoetId,
+        ),
+      ).toBe(false);
     });
   });
 });

@@ -249,6 +249,12 @@ model nguoi_dung {
   mat_khau_hash     String             @db.VarChar(255)
   phai_doi_mat_khau Boolean            @default(true)
   trang_thai        trang_thai_active  @default(active)
+  // Thêm 2026-09-28 (T1 bảo mật đăng nhập): đếm số lần sai liên tiếp, khóa
+  // tạm 15 phút sau 5 lần sai — xem AuthService.dangNhap.
+  so_lan_dang_nhap_sai Int             @default(0) @db.SmallInt
+  khoa_den          DateTime?          @db.Timestamptz(6)
+  // Dùng cho báo cáo "chưa đăng nhập" (T14) — cập nhật mỗi lần đăng nhập thành công.
+  dang_nhap_lan_cuoi DateTime?         @db.Timestamptz(6)
   created_at        DateTime           @default(now()) @db.Timestamptz(6)
   updated_at        DateTime           @default(now()) @db.Timestamptz(6)
 
@@ -261,6 +267,8 @@ model nguoi_dung {
   khoa_boi_duong_duyet      khoa_boi_duong[]   @relation("khoa_boi_duong_nguoi_duyet")
   khoa_boi_duong_created_by khoa_boi_duong[]   @relation("khoa_boi_duong_created_by")
   token_thu_hoi             token_thu_hoi[]
+  nhat_ky_dat_lai_mat_khau_cua_toi  nhat_ky_dat_lai_mat_khau[] @relation("nhat_ky_dlmk_nguoi_dung")
+  nhat_ky_dat_lai_mat_khau_thuc_hien nhat_ky_dat_lai_mat_khau[] @relation("nhat_ky_dlmk_thuc_hien_boi")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -279,6 +287,22 @@ model token_thu_hoi {
 
   @@index([nguoi_dung_id], map: "idx_token_thu_hoi_nguoi_dung")
   @@index([het_han], map: "idx_token_thu_hoi_het_han")
+}
+
+// T1 (bảo mật đăng nhập, 2026-09-28): nhật ký cho POST
+// /nguoi-dung/{id}/dat-lai-mat-khau — ai đặt lại mật khẩu cho ai, lúc nào.
+// Không có bảng/spec sẵn cho việc này trong mo-rong-nls-an-giang.md (chỉ nói
+// "ghi nhật ký"), nên bảng này là tối thiểu tự thêm — flagged trong self-review.
+model nhat_ky_dat_lai_mat_khau {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nguoi_dung_id String   @db.Uuid
+  thuc_hien_boi String   @db.Uuid
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  nguoi_dung nguoi_dung @relation("nhat_ky_dlmk_nguoi_dung", fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  thuc_hien  nguoi_dung @relation("nhat_ky_dlmk_thuc_hien_boi", fields: [thuc_hien_boi], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([nguoi_dung_id], map: "idx_nhat_ky_dlmk_nguoi_dung")
 }
 
 // =====================================================================

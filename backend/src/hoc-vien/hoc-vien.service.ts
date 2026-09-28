@@ -567,6 +567,28 @@ export class HocVienService {
     );
   }
 
+  // ---------------------------------------------------------------------
+  // T9 — Hồ sơ đầy đủ (mo-rong-nls-an-giang.md mục T9). "Đầy đủ" = qua toàn
+  // bộ quy tắc của luồng tu_dang_ky (validateHocVien requireFull=true) —
+  // TRỪ cảnh báo (canh_bao không làm hồ sơ "chưa đầy đủ"). Không lưu cột
+  // tính sẵn — luôn tính lại từ dữ liệu hiện tại, tái dùng đúng 1 bộ quy tắc
+  // với kiemTraTruocXacNhan()/xacNhan().
+  // ---------------------------------------------------------------------
+  async danhGiaDayDu(
+    hocVien: HocVienDayDu,
+  ): Promise<{ day_du: boolean; thieu: FieldMessage[] }> {
+    const { loi } = await this.validateHocVien(
+      { ...hocVien, chuyen_mon: hocVien.chuyen_mon.map((c) => c.chuyen_mon) },
+      { requireFull: true, excludeHocVienId: hocVien.id },
+    );
+    return { day_du: loi.length === 0, thieu: loi };
+  }
+
+  async mucDoDayDuCuaToi(caller: AuthenticatedUser) {
+    const hocVien = await this.getHocVienCuaToi(caller);
+    return this.danhGiaDayDu(hocVien);
+  }
+
   // POST /hoc-vien/toi/xac-nhan — chuyển nhap/tu_choi -> cho_duyet (stub gửi
   // email); nếu đã da_duyet (điển hình: import_moet sau khi tự bổ sung) thì
   // chỉ gửi lại email, KHÔNG đổi trang_thai (api-contract.md mục 2: "chỉ dùng
@@ -645,6 +667,32 @@ export class HocVienService {
 
     const page = query.page ?? 1;
     const pageSize = query.page_size ?? 20;
+
+    // T9: day_du không phải cột DB (luôn tính lại, xem danhGiaDayDu) — phải
+    // lấy TOÀN BỘ hồ sơ khớp các filter khác rồi lọc/trang trong bộ nhớ.
+    // Chấp nhận đánh đổi hiệu năng ở quy mô hiện tại (~9.000 hồ sơ/lần đôn
+    // đốc, không phải endpoint tần suất cao) — flagged trong self-review,
+    // cần đánh giá lại nếu số lượng hồ sơ tăng đáng kể.
+    if (query.day_du !== undefined) {
+      const candidates = await this.prisma.hoc_vien.findMany({
+        where,
+        include: { chuyen_mon: true },
+        orderBy: { created_at: 'desc' },
+      });
+      const danhGia = await Promise.all(
+        candidates.map(async (hv) => ({
+          hv,
+          dayDu: (await this.danhGiaDayDu(hv)).day_du,
+        })),
+      );
+      const filtered = danhGia
+        .filter((d) => d.dayDu === query.day_du)
+        .map((d) => this.toResponse(d.hv));
+      const start = (page - 1) * pageSize;
+      const data = filtered.slice(start, start + pageSize);
+      return paginate(data, filtered.length, page, pageSize);
+    }
+
     const [data, total] = await Promise.all([
       this.prisma.hoc_vien.findMany({
         where,

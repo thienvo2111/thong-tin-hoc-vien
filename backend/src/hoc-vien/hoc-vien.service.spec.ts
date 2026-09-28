@@ -517,6 +517,102 @@ describe('HocVienService', () => {
     });
   });
 
+  describe('danhGiaDayDu / mucDoDayDuCuaToi — T9 Hồ sơ đầy đủ', () => {
+    function baseHocVienDayDu(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'hv-1',
+        ho_ten: 'Nguyễn Văn An',
+        so_dinh_danh_ca_nhan: '123456789012',
+        ngay_sinh: 15,
+        thang_sinh: 6,
+        nam_sinh: namHopLe,
+        noi_sinh_id: 'tinh-1',
+        phuong_xa_id: 'xa-1',
+        don_vi_cong_tac_id: 'truong-1',
+        so_dien_thoai_lien_he: '0912345678',
+        email_lien_he: 'an@example.com',
+        trinh_do_chuyen_mon: 'dai_hoc',
+        trinh_do_chuyen_mon_khac: null,
+        cap_giang_day: null,
+        mon_giang_day_id: null,
+        chuyen_mon: [
+          { id: 'cm-1', hoc_vien_id: 'hv-1', chuyen_mon: 'Sư phạm Toán' },
+        ],
+        ...overrides,
+      };
+    }
+
+    it('hồ sơ MOET vừa import (nhiều field NULL) -> day_du=false, liệt kê đủ trường thiếu', async () => {
+      const hocVien = baseHocVienDayDu({
+        so_dinh_danh_ca_nhan: null,
+        noi_sinh_id: null,
+        phuong_xa_id: null,
+        email_lien_he: null,
+        trinh_do_chuyen_mon: null,
+        chuyen_mon: [],
+      });
+      const res = await service.danhGiaDayDu(hocVien as never);
+      expect(res.day_du).toBe(false);
+      const thieuFields = res.thieu.map((t) => t.field);
+      expect(thieuFields).toEqual(
+        expect.arrayContaining([
+          'so_dinh_danh_ca_nhan',
+          'noi_sinh_id',
+          'phuong_xa_id',
+          'email_lien_he',
+          'trinh_do_chuyen_mon',
+          'chuyen_mon',
+        ]),
+      );
+    });
+
+    it('bổ sung đủ mọi trường -> day_du=true', async () => {
+      const res = await service.danhGiaDayDu(baseHocVienDayDu() as never);
+      expect(res).toEqual({ day_du: true, thieu: [] });
+    });
+
+    it('phuong_xa_id không thuộc noi_sinh_id đã chọn -> vẫn day_du=false kèm lý do', async () => {
+      prisma.dia_danh.findUnique.mockImplementation(({ where: { id } }) => {
+        if (id === 'tinh-1')
+          return {
+            id,
+            cap: 'tinh_thanh',
+            trang_thai: 'active',
+            parent_id: null,
+          };
+        if (id === 'xa-1')
+          return {
+            id,
+            cap: 'phuong_xa_dac_khu',
+            trang_thai: 'active',
+            parent_id: 'tinh-khac',
+          };
+        return null;
+      });
+      const res = await service.danhGiaDayDu(baseHocVienDayDu() as never);
+      expect(res.day_du).toBe(false);
+      expect(res.thieu.some((t) => t.field === 'phuong_xa_id')).toBe(true);
+    });
+
+    it('cảnh báo (canh_bao) không làm hồ sơ "chưa đầy đủ"', async () => {
+      // Họ tên chữ cái đầu không viết hoa -> canh_bao (rule #4), không phải loi.
+      const res = await service.danhGiaDayDu(
+        baseHocVienDayDu({ ho_ten: 'nguyễn văn an' }) as never,
+      );
+      expect(res.day_du).toBe(true);
+    });
+
+    it('mucDoDayDuCuaToi -> lấy hồ sơ của caller rồi tái dùng danhGiaDayDu', async () => {
+      prisma.hoc_vien.findUnique.mockImplementation(({ where }) => {
+        if (where.id === 'hv-1') return baseHocVienDayDu();
+        return null;
+      });
+      const caller = { hoc_vien_id: 'hv-1' } as AuthenticatedUser;
+      const res = await service.mucDoDayDuCuaToi(caller);
+      expect(res).toEqual({ day_du: true, thieu: [] });
+    });
+  });
+
   describe('checkValidMoetImportRow — luồng import CSDL MOET (#36b-36f)', () => {
     function baseMoetInput() {
       return {

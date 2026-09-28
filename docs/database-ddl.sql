@@ -190,6 +190,14 @@ CREATE TABLE nguoi_dung (
     mat_khau_hash       varchar(255) NOT NULL,
     phai_doi_mat_khau   boolean NOT NULL DEFAULT true,
     trang_thai          trang_thai_active NOT NULL DEFAULT 'active',
+
+    -- Thêm 2026-09-28 (T1 bảo mật đăng nhập, mo-rong-nls-an-giang.md): đếm số
+    -- lần sai liên tiếp, khóa tạm 15 phút sau 5 lần sai — xem AuthService.dangNhap.
+    so_lan_dang_nhap_sai smallint NOT NULL DEFAULT 0,
+    khoa_den            timestamptz,
+    -- Dùng cho báo cáo "chưa đăng nhập" (T14) — cập nhật mỗi lần đăng nhập thành công.
+    dang_nhap_lan_cuoi  timestamptz,
+
     created_at          timestamptz NOT NULL DEFAULT now(),
     updated_at          timestamptz NOT NULL DEFAULT now(),
 
@@ -235,6 +243,19 @@ CREATE TABLE token_thu_hoi (
 
 CREATE INDEX idx_token_thu_hoi_nguoi_dung ON token_thu_hoi(nguoi_dung_id);
 CREATE INDEX idx_token_thu_hoi_het_han ON token_thu_hoi(het_han);
+
+-- T1 (bảo mật đăng nhập, 2026-09-28): nhật ký cho POST
+-- /nguoi-dung/{id}/dat-lai-mat-khau — ai đặt lại mật khẩu cho ai, lúc nào.
+-- Không có trong mo-rong-nls-an-giang.md (chỉ nói "ghi nhật ký") — bảng tối
+-- thiểu tự thêm, flagged trong self-review.
+CREATE TABLE nhat_ky_dat_lai_mat_khau (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    nguoi_dung_id   uuid NOT NULL REFERENCES nguoi_dung(id),
+    thuc_hien_boi   uuid NOT NULL REFERENCES nguoi_dung(id),
+    created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_nhat_ky_dlmk_nguoi_dung ON nhat_ky_dat_lai_mat_khau(nguoi_dung_id);
 
 
 -- =====================================================================

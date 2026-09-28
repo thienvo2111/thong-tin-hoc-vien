@@ -26,7 +26,7 @@ Endpoint trả **403** nếu tài nguyên yêu cầu nằm ngoài phạm vi trê
 ```json
 { "error": { "code": "VALIDATION_ERROR", "message": "...", "fields": [ { "field": "so_dinh_danh_ca_nhan", "message": "Phải gồm đúng 12 chữ số" } ] } }
 ```
-Mã lỗi chuẩn: `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `CONFLICT` (409 — trùng ĐDCN, trùng mã danh mục...), `INTERNAL` (500).
+Mã lỗi chuẩn: `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `CONFLICT` (409 — trùng ĐDCN, trùng mã danh mục...), `ACCOUNT_LOCKED` (423 — tài khoản tạm khóa sau nhiều lần đăng nhập sai, xem mục T1 `mo-rong-nls-an-giang.md`; body kèm `khoa_den` ISO), `RATE_LIMITED` (429 — vượt giới hạn tần suất theo IP), `INTERNAL` (500).
 
 ### Phân trang
 `?page=1&page_size=20` (mặc định), response bọc `{ "data": [...], "total": N, "page": 1, "page_size": 20 }`.
@@ -37,10 +37,19 @@ Mã lỗi chuẩn: `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (
 
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
-| POST | `/auth/dang-nhap` | `{ ten_dang_nhap, mat_khau }` → `{ token, phai_doi_mat_khau, nguoi_dung }`. `ten_dang_nhap` = `nguoi_dung.ten_dang_nhap`, gán 1 lần lúc tạo tài khoản và **không đổi theo dữ liệu hồ sơ về sau**: ĐDCN (Học viên tự đăng ký), Mã định danh CSDL MOET (Học viên do Quản trị import), hoặc email (Sở/Phòng/Trường/QuảnTrị). | Công khai |
+| POST | `/auth/dang-nhap` | `{ ten_dang_nhap, mat_khau }` → `{ token, phai_doi_mat_khau, nguoi_dung }`. `ten_dang_nhap` = `nguoi_dung.ten_dang_nhap`, gán 1 lần lúc tạo tài khoản và **không đổi theo dữ liệu hồ sơ về sau**: ĐDCN (Học viên tự đăng ký), Mã định danh CSDL MOET (Học viên do Quản trị import), hoặc email (Sở/Phòng/Trường/QuảnTrị). **T1 (2026-09-28):** sai tên đăng nhập và sai mật khẩu trả cùng thông báo (không lộ tài khoản tồn tại); sai 5 lần liên tiếp → khóa 15 phút, các lần gọi trong lúc khóa trả `423 ACCOUNT_LOCKED` (không kiểm tra mật khẩu); giới hạn 10 request/phút/IP (`429 RATE_LIMITED`) | Công khai |
 | POST | `/auth/dang-xuat` | Vô hiệu hóa token hiện tại. **Làm rõ 2026-09-28**: JWT vốn stateless, "vô hiệu hóa" nghĩa là ghi `jti` của token vào bảng thu hồi (`token_thu_hoi`, xem `database-ddl.sql`) tới hết hạn tự nhiên của nó; `JwtAuthGuard` phải tra bảng này trên mọi request, không chỉ giải mã chữ ký | Đã đăng nhập |
-| POST | `/auth/doi-mat-khau` | `{ mat_khau_cu, mat_khau_moi }` — bắt buộc nếu `phai_doi_mat_khau=true` | Đã đăng nhập |
+| POST | `/auth/doi-mat-khau` | `{ mat_khau_cu, mat_khau_moi }` — bắt buộc nếu `phai_doi_mat_khau=true`. **T1 (2026-09-28):** `mat_khau_moi` phải ≥8 ký tự, có cả chữ và số, khác `mat_khau_cu`, và (nếu tài khoản gắn hồ sơ học viên) khác chuỗi ngày sinh `ddmmyyyy` — vi phạm trả `400 VALIDATION_ERROR` kèm `fields` | Đã đăng nhập |
 | GET | `/auth/toi` | Thông tin tài khoản hiện tại + phạm vi quyền suy ra | Đã đăng nhập |
+
+### Quản lý tài khoản (T1, 2026-09-28 — mới, không thuộc 7 dịch vụ gốc của canvas)
+
+Thao tác Quản trị lên tài khoản **người khác** (khác `/auth/*`, luôn thao tác lên chính tài khoản đang đăng nhập) — hỗ trợ N4 khi học viên gọi hỗ trợ quên mật khẩu/bị khóa.
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| POST | `/nguoi-dung/{id}/dat-lai-mat-khau` | Đặt lại mật khẩu về ngày sinh `ddmmyyyy` của hồ sơ, `phai_doi_mat_khau=true`, xóa `khoa_den`/bộ đếm sai (mở khóa ngay nếu đang khóa). Chỉ áp dụng tài khoản `vai_tro='hoc_vien'` (mật khẩu mặc định suy từ ngày sinh hồ sơ — không có khái niệm này cho Sở/Phòng/Trường/QuảnTrị) — gọi cho tài khoản khác trả `400 VALIDATION_ERROR`. Ghi 1 dòng `nhat_ky_dat_lai_mat_khau` (ai đặt lại, cho ai, lúc nào). Quy trình vận hành: N4 xác minh người gọi (họ tên + ngày sinh + đơn vị + SĐT khớp hồ sơ) trước khi gọi endpoint này | Quản trị |
+| GET | `/nguoi-dung?q=` | Tìm tài khoản theo mã định danh đăng nhập (`ten_dang_nhap`)/họ tên/SĐT (SĐT tra qua hồ sơ học viên liên kết). Trả tối đa 20 kết quả, kèm dữ liệu hồ sơ học viên (họ tên/ngày sinh/SĐT/đơn vị) để N4 đối chiếu xác minh danh tính. **Improvised** — `api-contract.md` không có sẵn shape response cho endpoint này | Quản trị |
 
 ---
 
@@ -54,10 +63,15 @@ Mã lỗi chuẩn: `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (
 | POST / DELETE | `/hoc-vien/toi/chuyen-mon` | Thêm / xóa 1 giá trị trong `hoc_vien_chuyen_mon` (nhiều chuyên môn/người) | Học viên |
 | POST | `/hoc-vien/toi/kiem-tra-truoc-xac-nhan` | Dry-run validate toàn bộ hồ sơ, trả danh sách lỗi (chặn) + cảnh báo (không chặn) — dùng cho màn `XacNhanThongTin.dc.html` | Học viên |
 | POST | `/hoc-vien/toi/xac-nhan` | Chuyển `nhap` → `cho_duyet`. **Side effect**: gọi Dịch vụ Thông báo gửi email bản sao dữ liệu, set `email_ban_sao_da_gui_at`. Hồ sơ `import_moet` đã `da_duyet` sẵn nên **không gọi endpoint này để được duyệt** — chỉ dùng nó nếu muốn gửi lại email xác nhận sau khi bổ sung thông tin | Học viên |
-| GET | `/hoc-vien` | Danh sách hồ sơ trong phạm vi quyền (query: `trang_thai`, `don_vi_cong_tac_id`, `cap_giang_day`, `nguon_tao`, `q` tìm theo tên/ĐDCN/Mã MOET) | Trường, Phòng VHXH, Sở, QuảnTrị |
+| GET | `/hoc-vien` | Danh sách hồ sơ trong phạm vi quyền (query: `trang_thai`, `don_vi_cong_tac_id`, `cap_giang_day`, `nguon_tao`, `q` tìm theo tên/ĐDCN/Mã MOET, `day_du` — T1/T9 2026-09-28, xem mục "Hồ sơ đầy đủ" bên dưới) | Trường, Phòng VHXH, Sở, QuảnTrị |
 | GET | `/hoc-vien/{id}` | Chi tiết 1 hồ sơ (phải trong phạm vi quyền) | Trường, Phòng VHXH, Sở, QuảnTrị |
 | POST | `/hoc-vien/{id}/duyet` | `{ ket_qua: "da_duyet" \| "tu_choi", ly_do? }`. Đơn vị duyệt xác định theo `cap_giang_day` của hồ sơ (xem bảng routing dưới). Chỉ áp dụng hồ sơ `nguon_tao='tu_dang_ky'` — hồ sơ `import_moet` bỏ qua bước này | Trường (nếu được phân công xác minh nội bộ), Phòng VHXH, Sở |
-| GET | `/hoc-vien/kiem-tra-trung?so_dinh_danh_ca_nhan=` | Kiểm tra ĐDCN đã tồn tại chưa (gọi trước khi submit form, tránh lỗi 409 muộn) | Công khai |
+| GET | `/hoc-vien/kiem-tra-trung?so_dinh_danh_ca_nhan=` | Kiểm tra ĐDCN đã tồn tại chưa (gọi trước khi submit form, tránh lỗi 409 muộn). **T1 (2026-09-28):** giới hạn 10 request/phút/IP (`429 RATE_LIMITED`) | Công khai |
+| GET | `/hoc-vien/toi/muc-do-day-du` | T9 (2026-09-28): `{ day_du: boolean, thieu: [{field, message}] }` — cổng học viên xem còn thiếu gì để hồ sơ được coi là "đầy đủ" (xem mục "Hồ sơ đầy đủ" bên dưới) | Học viên |
+
+### Hồ sơ đầy đủ (T9, 2026-09-28)
+
+"Đầy đủ" = qua **toàn bộ** quy tắc của luồng `tu_dang_ky` trong `validation-checklist.md` (không chỉ "không NULL"): họ tên hợp lệ, CCCD 12 số không trùng, ngày sinh hợp lệ, nơi sinh + phường xã đúng cấp và khớp nhau, đơn vị `active` loại `truong`, SĐT + email hợp lệ, trình độ, ≥1 chuyên môn. Cảnh báo 🟡 **không** làm hồ sơ "chưa đầy đủ". Tính động qua `HocVienService.danhGiaDayDu()` (tái dùng đúng bộ quy tắc của `validateHocVien`/Dịch vụ Kiểm tra dữ liệu) — **không lưu cột tính sẵn**, luôn tính lại từ dữ liệu hiện tại. `GET /hoc-vien?day_du=false` lọc theo giá trị tính động này ở tầng ứng dụng (không phải điều kiện `WHERE` trên DB) — chấp nhận đánh đổi hiệu năng ở quy mô hiện tại (~9.000 hồ sơ).
 
 ### Routing đơn vị duyệt (theo `cap_giang_day` của hồ sơ)
 ```

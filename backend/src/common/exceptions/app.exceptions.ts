@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -41,6 +42,29 @@ export class NotFoundAppException extends NotFoundException {
 export class ConflictAppException extends ConflictException {
   constructor(message: string, fields?: ValidationFieldError[]) {
     super({ error: { code: 'CONFLICT', message, fields } });
+  }
+}
+
+// T1 (bảo mật đăng nhập): 423 khi tài khoản đang bị khóa tạm sau 5 lần sai
+// mật khẩu liên tiếp — không dùng HttpStatus.LOCKED (không tồn tại trong
+// @nestjs/common ở phiên bản đang dùng), dùng literal 423.
+export class AccountLockedException extends HttpException {
+  constructor(khoaDen: Date) {
+    const gioMoKhoa = new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(khoaDen);
+    super(
+      {
+        error: {
+          code: 'ACCOUNT_LOCKED',
+          message: `Tài khoản tạm khóa do nhập sai nhiều lần. Thử lại sau ${gioMoKhoa}`,
+          khoa_den: khoaDen.toISOString(),
+        },
+      },
+      423,
+    );
   }
 }
 
