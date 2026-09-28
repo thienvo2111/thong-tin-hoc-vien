@@ -58,7 +58,7 @@ Thao tác Quản trị lên tài khoản **người khác** (khác `/auth/*`, lu
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
 | POST | `/hoc-vien` | Tự đăng ký (`nguon_tao='tu_dang_ky'`). Body = toàn bộ field khai báo (xem `database-ddl.sql#hoc_vien`). **Side effect**: tạo `hoc_vien` (trang_thai=`nhap`) VÀ `nguoi_dung` (vai_tro=`hoc_vien`, `ten_dang_nhap`=ĐDCN, mật khẩu mặc định = ngày sinh) trong 1 transaction — xem chi tiết ở mục "Luồng đăng ký". | Công khai |
-| GET | `/hoc-vien/toi` | Hồ sơ của chính mình, kèm `chuyen_mon: string[]` | Học viên |
+| GET | `/hoc-vien/toi` | Hồ sơ của chính mình, kèm `chuyen_mon: string[]`. **Thêm 2026-09-28**: kèm sẵn tên đã join cho mọi FK chọn-từ-danh-mục — `noi_sinh_ten`, `phuong_xa_ten`, `don_vi_cong_tac_ten`, `mon_giang_day_ten` (song song giữ nguyên `*_id`) — để màn "Xem lại & xác nhận" hiển thị tên thay vì UUID mà không phải gọi thêm request. Áp dụng tương tự cho `GET /hoc-vien/{id}` (mục "Ai gọi" khác) | Học viên |
 | PATCH | `/hoc-vien/toi` | Sửa hồ sơ — chỉ cho phép khi `trang_thai='nhap'` (đã `cho_duyet` thì khóa sửa, trừ khi bị `tu_choi` thì mở lại `nhap`). Với hồ sơ `nguon_tao='import_moet'`, đây cũng chính là màn "bổ sung thông tin" lần đầu (điền CCCD, nơi sinh, phường xã, email, trình độ, cấp giảng dạy, môn giảng dạy) | Học viên |
 | POST / DELETE | `/hoc-vien/toi/chuyen-mon` | Thêm / xóa 1 giá trị trong `hoc_vien_chuyen_mon` (nhiều chuyên môn/người) | Học viên |
 | POST | `/hoc-vien/toi/kiem-tra-truoc-xac-nhan` | Dry-run validate toàn bộ hồ sơ, trả danh sách lỗi (chặn) + cảnh báo (không chặn) — dùng cho màn `XacNhanThongTin.dc.html` | Học viên |
