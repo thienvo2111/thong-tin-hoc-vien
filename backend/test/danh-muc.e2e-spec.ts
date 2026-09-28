@@ -10,6 +10,14 @@ import {
   xoaNguoiDungTest,
 } from './utils/test-data';
 
+const NAM_HOP_LE = new Date().getUTCFullYear() - 20;
+
+function soDinhDanhNgauNhien(): string {
+  const t = Date.now().toString().slice(-6);
+  const r = Math.floor(100000 + Math.random() * 899999).toString();
+  return `${t}${r}`;
+}
+
 describe('Danh mục (e2e)', () => {
   let app: INestApplication;
   let donViFixture: Awaited<ReturnType<typeof taoDonViTest>>;
@@ -21,6 +29,8 @@ describe('Danh mục (e2e)', () => {
   const createdDiaDanhIds: string[] = [];
   const createdDonViIds: string[] = [];
   const createdMonHocIds: string[] = [];
+  const createdHocVienIds: string[] = [];
+  const createdNguoiDungHocVienIds: string[] = [];
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -54,6 +64,18 @@ describe('Danh mục (e2e)', () => {
     await prisma.mon_hoc.deleteMany({
       where: { id: { in: createdMonHocIds } },
     });
+    if (createdHocVienIds.length > 0) {
+      await prisma.hoc_vien.updateMany({
+        where: { id: { in: createdHocVienIds } },
+        data: { created_by: null },
+      });
+      await prisma.nguoi_dung.deleteMany({
+        where: { id: { in: createdNguoiDungHocVienIds } },
+      });
+      await prisma.hoc_vien.deleteMany({
+        where: { id: { in: createdHocVienIds } },
+      });
+    }
     await prisma.don_vi_cong_tac.deleteMany({
       where: { id: { in: createdDonViIds } },
     });
@@ -192,6 +214,75 @@ describe('Danh mục (e2e)', () => {
         .send({ ten_mon, cap_hoc: 'thpt' })
         .expect(409);
       expect(res.body.error.code).toBe('CONFLICT');
+    });
+  });
+
+  describe('GET /danh-muc/chuyen-mon-dao-tao/goi-y', () => {
+    let chuyenMonPrefix: string;
+
+    beforeAll(async () => {
+      // Tạo 1 hồ sơ học viên (tu_dang_ky) với 2 giá trị chuyen_mon riêng biệt
+      // (prefix ngẫu nhiên để không đụng dữ liệu test khác) — nguồn gợi ý
+      // (hoc_vien_chuyen_mon) chỉ có được qua đường này, không có CRUD riêng.
+      chuyenMonPrefix = `GoiY-${uniqueSuffix()}`;
+      const suf = uniqueSuffix();
+      const res = await request(app.getHttpServer())
+        .post('/hoc-vien')
+        .send({
+          ho_ten: 'Phạm Thị Gợi Ý',
+          so_dinh_danh_ca_nhan: soDinhDanhNgauNhien(),
+          ngay_sinh: 12,
+          thang_sinh: 5,
+          nam_sinh: NAM_HOP_LE,
+          noi_sinh_id: donViFixture.diaDanhTinh.id,
+          phuong_xa_id: donViFixture.diaDanhXa.id,
+          don_vi_cong_tac_id: donViFixture.donVi.id,
+          so_dien_thoai_lien_he: '0913333333',
+          email_lien_he: `goi-y-${suf}@test.local`,
+          trinh_do_chuyen_mon: 'dai_hoc',
+          chuyen_mon: [`${chuyenMonPrefix} Toán`, `${chuyenMonPrefix} Lý`],
+        })
+        .expect(201);
+      createdHocVienIds.push(res.body.hoc_vien_id);
+      const nd = await prisma.nguoi_dung.findUnique({
+        where: { ten_dang_nhap: res.body.ten_dang_nhap },
+      });
+      if (nd) createdNguoiDungHocVienIds.push(nd.id);
+    });
+
+    it('không có token -> 401', async () => {
+      await request(app.getHttpServer())
+        .get('/danh-muc/chuyen-mon-dao-tao/goi-y')
+        .expect(401);
+    });
+
+    it('q khớp 1 phần, không phân biệt hoa/thường -> trả các chuyen_mon riêng biệt khớp', async () => {
+      const res = await request(app.getHttpServer())
+        .get(
+          `/danh-muc/chuyen-mon-dao-tao/goi-y?q=${encodeURIComponent(chuyenMonPrefix.toLowerCase())}`,
+        )
+        .set('Authorization', `Bearer ${tokenTruong}`)
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.sort()).toEqual(
+        [`${chuyenMonPrefix} Toán`, `${chuyenMonPrefix} Lý`].sort(),
+      );
+    });
+
+    it('q không khớp gì -> mảng rỗng', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/danh-muc/chuyen-mon-dao-tao/goi-y?q=${uniqueSuffix()}-khong-ton-tai`)
+        .set('Authorization', `Bearer ${tokenTruong}`)
+        .expect(200);
+      expect(res.body).toEqual([]);
+    });
+
+    it('bất kỳ vai trò đã đăng nhập nào cũng gọi được (kể cả truong)', async () => {
+      await request(app.getHttpServer())
+        .get(`/danh-muc/chuyen-mon-dao-tao/goi-y?q=${chuyenMonPrefix}`)
+        .set('Authorization', `Bearer ${tokenTruong}`)
+        .expect(200);
     });
   });
 });

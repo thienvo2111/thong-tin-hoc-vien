@@ -1,4 +1,5 @@
 import * as bcrypt from 'bcryptjs';
+import { Prisma } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from './scope/scope.service';
@@ -7,6 +8,15 @@ import {
   ValidationException,
 } from '../common/exceptions/app.exceptions';
 
+// Lỗi unique violation giả lập P2002 của Prisma — dùng để test nhánh
+// idempotent của dangXuat() (gọi 2 lần cùng jti không được throw).
+function p2002(): Prisma.PrismaClientKnownRequestError {
+  return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+    code: 'P2002',
+    clientVersion: '6.19.3',
+  });
+}
+
 describe('AuthService', () => {
   let service: AuthService;
   let prisma: {
@@ -14,6 +24,9 @@ describe('AuthService', () => {
       findUnique: jest.Mock;
       findUniqueOrThrow: jest.Mock;
       update: jest.Mock;
+    };
+    token_thu_hoi: {
+      create: jest.Mock;
     };
   };
   let jwtService: { signAsync: jest.Mock };
@@ -41,6 +54,9 @@ describe('AuthService', () => {
         findUnique: jest.fn(),
         findUniqueOrThrow: jest.fn(),
         update: jest.fn(),
+      },
+      token_thu_hoi: {
+        create: jest.fn(),
       },
     };
     jwtService = { signAsync: jest.fn().mockResolvedValue('fake.jwt.token') };
@@ -94,6 +110,40 @@ describe('AuthService', () => {
       expect(res.token).toBe('fake.jwt.token');
       expect(res.nguoi_dung).not.toHaveProperty('mat_khau_hash');
       expect(res.phai_doi_mat_khau).toBe(false);
+    });
+  });
+
+  describe('dangXuat', () => {
+    const user = {
+      id: 'user-1',
+      jti: 'jti-abc',
+      exp: 1_800_000_000,
+    };
+
+    it('ghi token_thu_hoi với jti/nguoi_dung_id/het_han suy từ exp (giây -> ms)', async () => {
+      prisma.token_thu_hoi.create.mockResolvedValue({});
+      const res = await service.dangXuat(user as never);
+
+      expect(prisma.token_thu_hoi.create).toHaveBeenCalledWith({
+        data: {
+          jti: user.jti,
+          nguoi_dung_id: user.id,
+          het_han: new Date(user.exp * 1000),
+        },
+      });
+      expect(res).toEqual({ da_dang_xuat: true });
+    });
+
+    it('gọi lại với jti đã tồn tại (P2002) -> không throw, vẫn trả về thành công (idempotent)', async () => {
+      prisma.token_thu_hoi.create.mockRejectedValue(p2002());
+      await expect(service.dangXuat(user as never)).resolves.toEqual({
+        da_dang_xuat: true,
+      });
+    });
+
+    it('lỗi khác P2002 -> ném lại nguyên lỗi', async () => {
+      prisma.token_thu_hoi.create.mockRejectedValue(new Error('DB sập'));
+      await expect(service.dangXuat(user as never)).rejects.toThrow('DB sập');
     });
   });
 

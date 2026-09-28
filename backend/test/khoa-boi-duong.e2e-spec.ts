@@ -244,7 +244,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
   });
 
   describe('POST /khoa-boi-duong', () => {
-    it('truong tạo khóa -> 201, trang_thai=nhap, don_vi_to_chuc_id=own', async () => {
+    it('truong tạo khóa -> 201, trang_thai=nhap, don_vi_to_chuc_id=own, created_by=tài khoản gọi (gap 4)', async () => {
       const res = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenTruong1}`)
@@ -252,6 +252,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         .expect(201);
       expect(res.body.trang_thai).toBe('nhap');
       expect(res.body.don_vi_to_chuc_id).toBe(truong1.id);
+      expect(res.body.created_by).toBe(truong1Account.nguoiDung.id);
       khoaIds.push(res.body.id);
     });
 

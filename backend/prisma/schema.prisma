@@ -255,13 +255,30 @@ model nguoi_dung {
   don_vi   don_vi_cong_tac? @relation(fields: [don_vi_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   hoc_vien hoc_vien?        @relation("nguoi_dung_hoc_vien", fields: [hoc_vien_id], references: [id], map: "fk_nguoi_dung_hoc_vien", onDelete: NoAction, onUpdate: NoAction)
 
-  nhat_ky_import       nhat_ky_import[] @relation("nhat_ky_import_nguoi_import")
-  hoc_vien_nguoi_duyet hoc_vien[]       @relation("hoc_vien_nguoi_duyet")
-  hoc_vien_created_by  hoc_vien[]       @relation("hoc_vien_created_by")
-  khoa_boi_duong_duyet khoa_boi_duong[] @relation("khoa_boi_duong_nguoi_duyet")
+  nhat_ky_import            nhat_ky_import[]   @relation("nhat_ky_import_nguoi_import")
+  hoc_vien_nguoi_duyet      hoc_vien[]         @relation("hoc_vien_nguoi_duyet")
+  hoc_vien_created_by       hoc_vien[]         @relation("hoc_vien_created_by")
+  khoa_boi_duong_duyet      khoa_boi_duong[]   @relation("khoa_boi_duong_nguoi_duyet")
+  khoa_boi_duong_created_by khoa_boi_duong[]   @relation("khoa_boi_duong_created_by")
+  token_thu_hoi             token_thu_hoi[]
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
+}
+
+// Thêm 2026-09-28: cơ chế thu hồi token cho POST /auth/dang-xuat (JWT vốn
+// stateless — xem docs/database-ddl.sql comment tại đây). PK = jti, tra cứu
+// trên mọi request đã xác thực (JwtAuthGuard) nên cần rẻ (PK lookup).
+model token_thu_hoi {
+  jti           String   @id @db.Uuid
+  nguoi_dung_id String   @db.Uuid
+  het_han       DateTime @db.Timestamptz(6)
+  thu_hoi_luc   DateTime @default(now()) @db.Timestamptz(6)
+
+  nguoi_dung nguoi_dung @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([nguoi_dung_id], map: "idx_token_thu_hoi_nguoi_dung")
+  @@index([het_han], map: "idx_token_thu_hoi_het_han")
 }
 
 // =====================================================================
@@ -355,9 +372,14 @@ model khoa_boi_duong {
   ngay_duyet         DateTime?           @db.Timestamptz(6)
   created_at         DateTime            @default(now()) @db.Timestamptz(6)
   updated_at         DateTime            @default(now()) @db.Timestamptz(6)
+  created_by         String?             @db.Uuid
+      // Thêm 2026-09-28: tài khoản đã gọi POST /khoa-boi-duong lúc tạo khóa —
+      // NULL cho khóa tạo trước migration này (không truy ngược được), xem
+      // docs/database-ddl.sql comment tại đây.
 
-  don_vi_to_chuc don_vi_cong_tac @relation(fields: [don_vi_to_chuc_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  nguoi_duyet    nguoi_dung?     @relation("khoa_boi_duong_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  don_vi_to_chuc  don_vi_cong_tac @relation(fields: [don_vi_to_chuc_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nguoi_duyet     nguoi_dung?     @relation("khoa_boi_duong_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  created_by_user nguoi_dung?     @relation("khoa_boi_duong_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   giai_doan   giai_doan_khoa[]
   lop_hoc     lop_hoc[]

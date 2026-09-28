@@ -5,7 +5,7 @@ import { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UnauthorizedAppException } from '../../common/exceptions/app.exceptions';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { JwtPayload } from '../interfaces/jwt-payload.interface';
+import { DecodedJwtPayload } from '../interfaces/jwt-payload.interface';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -30,11 +30,21 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedAppException('Thiếu token xác thực');
     }
 
-    let payload: JwtPayload;
+    let payload: DecodedJwtPayload;
     try {
-      payload = await this.jwtService.verifyAsync<JwtPayload>(token);
+      payload = await this.jwtService.verifyAsync<DecodedJwtPayload>(token);
     } catch {
       throw new UnauthorizedAppException('Token không hợp lệ hoặc đã hết hạn');
+    }
+
+    // Gap 1 (2026-09-28): JWT vốn stateless — tra bảng thu hồi TRÊN MỖI
+    // REQUEST, không chỉ giải mã chữ ký, để POST /auth/dang-xuat có tác dụng
+    // thật. PK lookup theo jti, chi phí không đáng kể.
+    const daThuHoi = await this.prisma.token_thu_hoi.findUnique({
+      where: { jti: payload.jti },
+    });
+    if (daThuHoi) {
+      throw new UnauthorizedAppException('Token đã bị thu hồi (đã đăng xuất)');
     }
 
     const nguoiDung = await this.prisma.nguoi_dung.findUnique({
@@ -53,6 +63,8 @@ export class JwtAuthGuard implements CanActivate {
       don_vi_id: nguoiDung.don_vi_id,
       hoc_vien_id: nguoiDung.hoc_vien_id,
       phai_doi_mat_khau: nguoiDung.phai_doi_mat_khau,
+      jti: payload.jti,
+      exp: payload.exp,
     };
     return true;
   }

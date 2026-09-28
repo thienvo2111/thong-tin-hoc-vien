@@ -24,6 +24,12 @@ export class AuthController {
     return this.authService.dangNhap(dto);
   }
 
+  @Post('dang-xuat')
+  @HttpCode(HttpStatus.OK)
+  dangXuat(@CurrentUser() user: AuthenticatedUser) {
+    return this.authService.dangXuat(user);
+  }
+
   @Post('doi-mat-khau')
   @HttpCode(HttpStatus.OK)
   doiMatKhau(

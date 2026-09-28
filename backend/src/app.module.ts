@@ -10,6 +10,7 @@ import { DanhMucModule } from './danh-muc/danh-muc.module';
 import { ImportModule } from './import/import.module';
 import { BaoCaoModule } from './bao-cao/bao-cao.module';
 import { ThongBaoModule } from './thong-bao/thong-bao.module';
+import { ValidateModule } from './validate/validate.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ThongBaoModule } from './thong-bao/thong-bao.module';
     ImportModule,
     BaoCaoModule,
     ThongBaoModule,
+    ValidateModule,
   ],
   controllers: [AppController],
   providers: [AppService],

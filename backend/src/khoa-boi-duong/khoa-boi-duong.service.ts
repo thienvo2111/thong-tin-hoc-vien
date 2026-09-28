@@ -127,6 +127,7 @@ export class KhoaBoiDuongService {
           dia_diem: dto.dia_diem,
           thoi_gian_bat_dau: new Date(dto.thoi_gian_bat_dau),
           thoi_gian_ket_thuc: new Date(dto.thoi_gian_ket_thuc),
+          created_by: caller.id,
         },
       });
     } catch (e) {

@@ -142,8 +142,42 @@ describe('ThongBaoService', () => {
       don_vi_to_chuc_id: 'truong-1',
     };
 
-    it('tìm được tài khoản Trường có email -> gửi, hoc_vien_id=null', async () => {
-      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoa);
+    // Gap 4 (2026-09-28): created_by nay là nguồn CHÍNH — findFirst chỉ là
+    // fallback cho dữ liệu cũ (created_by=NULL). Tách rõ 2 nhánh để không lẫn
+    // lộn — nhánh created_by phải THẮNG kể cả khi findFirst sẽ trả về một
+    // tài khoản khác (chứng minh không còn đoán mò).
+    it('khoa.created_by_user có -> dùng trực tiếp, KHÔNG gọi findFirst (gap 4, nguồn chính)', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue({
+        ...khoa,
+        created_by_user: { id: 'nd-creator', email: 'creator@test.local' },
+      });
+      // Nếu code vẫn lỡ dùng heuristic, findFirst sẽ trả về 1 tài khoản KHÁC —
+      // giúp phát hiện ngay nếu nhánh created_by không thực sự được ưu tiên.
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
+        id: 'nd-heuristic-sai',
+        email: 'sai@test.local',
+      });
+
+      await service.guiKhoaBoiDuongDuyet('khoa-1', 'da_duyet');
+
+      expect(prisma.khoa_boi_duong.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ include: { created_by_user: true } }),
+      );
+      expect(prisma.nguoi_dung.findFirst).not.toHaveBeenCalled();
+      expect(prisma.nhat_ky_thong_bao.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          loai_su_kien: 'khoa_boi_duong_duyet',
+          hoc_vien_id: null,
+          email_nguoi_nhan: 'creator@test.local',
+        }),
+      });
+    });
+
+    it('khoa.created_by_user = null (dữ liệu cũ) -> fallback tìm tài khoản Trường có email', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue({
+        ...khoa,
+        created_by_user: null,
+      });
       prisma.nguoi_dung.findFirst.mockResolvedValue({
         id: 'nd-1',
         email: 'truong@test.local',
@@ -164,10 +198,24 @@ describe('ThongBaoService', () => {
       });
     });
 
-    it('không tìm được tài khoản Trường có email -> bỏ qua', async () => {
-      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoa);
+    it('created_by_user = null VÀ không tìm được tài khoản Trường nào -> bỏ qua', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue({
+        ...khoa,
+        created_by_user: null,
+      });
       prisma.nguoi_dung.findFirst.mockResolvedValue(null);
       await service.guiKhoaBoiDuongDuyet('khoa-1', 'da_duyet');
+      expect(sendMail).not.toHaveBeenCalled();
+      expect(prisma.nhat_ky_thong_bao.create).not.toHaveBeenCalled();
+    });
+
+    it('created_by_user có nhưng thiếu email -> bỏ qua, KHÔNG rơi xuống fallback', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue({
+        ...khoa,
+        created_by_user: { id: 'nd-creator', email: null },
+      });
+      await service.guiKhoaBoiDuongDuyet('khoa-1', 'da_duyet');
+      expect(prisma.nguoi_dung.findFirst).not.toHaveBeenCalled();
       expect(sendMail).not.toHaveBeenCalled();
       expect(prisma.nhat_ky_thong_bao.create).not.toHaveBeenCalled();
     });

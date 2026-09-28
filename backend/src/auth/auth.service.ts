@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { nguoi_dung } from '@prisma/client';
+import { randomUUID } from 'crypto';
+import { Prisma, nguoi_dung } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService, DonViScope } from './scope/scope.service';
 import {
@@ -56,6 +57,33 @@ export class AuthService {
       phai_doi_mat_khau: nguoiDung.phai_doi_mat_khau,
       nguoi_dung: sanitizeNguoiDung(nguoiDung),
     };
+  }
+
+  // POST /auth/dang-xuat (gap 1, 2026-09-28) — xem docs/api-contract.md mục 1
+  // + docs/database-ddl.sql (token_thu_hoi). Ghi jti hiện tại vào bảng thu
+  // hồi, het_han = hạn gốc của token (từ payload.exp, KHÔNG phải thời điểm
+  // đăng xuất) để JwtAuthGuard từ chối đúng tới khi token hết hạn tự nhiên.
+  // Idempotent: gọi lại với cùng token (đã bị thu hồi) không được ném lỗi.
+  async dangXuat(user: AuthenticatedUser): Promise<{ da_dang_xuat: true }> {
+    try {
+      await this.prisma.token_thu_hoi.create({
+        data: {
+          jti: user.jti,
+          nguoi_dung_id: user.id,
+          het_han: new Date(user.exp * 1000),
+        },
+      });
+    } catch (e) {
+      if (
+        !(
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === 'P2002'
+        )
+      ) {
+        throw e;
+      }
+    }
+    return { da_dang_xuat: true };
   }
 
   async doiMatKhau(user: AuthenticatedUser, dto: DoiMatKhauDto) {
@@ -117,6 +145,7 @@ export class AuthService {
       vai_tro: nguoiDung.vai_tro,
       don_vi_id: nguoiDung.don_vi_id,
       hoc_vien_id: nguoiDung.hoc_vien_id,
+      jti: randomUUID(),
     };
     return this.jwtService.signAsync(payload);
   }

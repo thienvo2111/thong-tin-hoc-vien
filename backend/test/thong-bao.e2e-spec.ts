@@ -303,6 +303,58 @@ describe('Dịch vụ Thông báo (e2e)', () => {
       expect(thongBao[0].hoc_vien_id).toBeNull();
       expect(thongBao[0].trang_thai).toBe('thanh_cong');
     });
+
+    // Gap 4 (2026-09-28): created_by=NULL chỉ còn xảy ra với dữ liệu tạo TRƯỚC
+    // migration này — mô phỏng bằng cách null hóa thủ công qua Prisma ngay
+    // sau khi tạo (API luôn set created_by, không có đường nào tạo khóa mới
+    // với created_by=NULL). Xác nhận fallback về heuristic cũ vẫn hoạt động,
+    // không panic/500 khi thiếu created_by.
+    it('created_by=NULL (dữ liệu cũ, trước migration) -> fallback tìm tài khoản Trường trong đơn vị, vẫn gửi được', async () => {
+      const tokenTruong = await dangNhap(
+        truongAccount.ten_dang_nhap,
+        'MatKhau123',
+      );
+      const suf = uniqueSuffix();
+      const khoa = await request(app.getHttpServer())
+        .post('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${tokenTruong}`)
+        .send({
+          ma_khoa: `K-TB-LEGACY-${suf}`,
+          ten_khoa: `Khóa Thông Báo Legacy ${suf}`,
+          thoi_gian_bat_dau: '2026-01-01',
+          thoi_gian_ket_thuc: '2026-01-31',
+        })
+        .expect(201);
+      khoaIds.push(khoa.body.id);
+      expect(khoa.body.created_by).toBe(truongAccount.nguoiDung.id);
+
+      // Mô phỏng dữ liệu tạo trước migration này (created_by chưa từng có).
+      await prisma.khoa_boi_duong.update({
+        where: { id: khoa.body.id },
+        data: { created_by: null },
+      });
+
+      await request(app.getHttpServer())
+        .post(`/khoa-boi-duong/${khoa.body.id}/nop-duyet`)
+        .set('Authorization', `Bearer ${tokenTruong}`)
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/khoa-boi-duong/${khoa.body.id}/duyet`)
+        .set('Authorization', `Bearer ${tokenSo}`)
+        .send({ ket_qua: 'da_duyet' })
+        .expect(201);
+
+      const thongBao = await prisma.nhat_ky_thong_bao.findMany({
+        where: {
+          loai_su_kien: 'khoa_boi_duong_duyet',
+          email_nguoi_nhan: truongAccount.ten_dang_nhap,
+          hoc_vien_id: null,
+        },
+        orderBy: { gui_luc: 'desc' },
+      });
+      expect(thongBao.length).toBeGreaterThanOrEqual(1);
+      expect(thongBao[0].trang_thai).toBe('thanh_cong');
+    });
   });
 
   describe('GET /thong-bao/lich-su', () => {

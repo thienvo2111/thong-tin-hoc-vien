@@ -109,26 +109,27 @@ export class ThongBaoService {
 
   // Người nhận: KHÔNG phải hoc_vien (nhat_ky_thong_bao.hoc_vien_id = NULL,
   // đúng ghi chú api-contract.md mục 8) mà là tài khoản nguoi_dung của Trường
-  // tổ chức khóa. khoa_boi_duong không có cột lưu "tài khoản đã tạo khóa"
-  // (không có trong database-ddl.sql) — suy ra bằng nguoi_dung(vai_tro=
-  // 'truong', don_vi_id=don_vi_to_chuc_id), lấy tài khoản tạo sớm nhất. Giả
-  // định 1 đơn vị Trường có 1 tài khoản đăng nhập vai_tro=truong — khớp với
-  // cách các module khác/test fixture đang tạo dữ liệu (1 don_vi <-> 1
-  // nguoi_dung truong). Flagged trong self-review — nếu sau này 1 Trường có
-  // nhiều tài khoản truong, cần thêm cột created_by thật vào khoa_boi_duong.
+  // tổ chức khóa. Gap 4 (2026-09-28): khoa_boi_duong.created_by nay ghi rõ
+  // đúng tài khoản đã gọi POST /khoa-boi-duong — dùng trực tiếp, đơn giản hơn
+  // hẳn heuristic cũ. Fallback về heuristic cũ (findFirst tài khoản truong
+  // trong đơn vị) CHỈ khi created_by = NULL (dữ liệu cũ tạo trước migration
+  // này, không truy ngược được) để không phá test/dữ liệu có sẵn.
   async guiKhoaBoiDuongDuyet(
     khoaId: string,
     ketQua: 'da_duyet' | 'tu_choi',
   ): Promise<void> {
     const khoa = await this.prisma.khoa_boi_duong.findUnique({
       where: { id: khoaId },
+      include: { created_by_user: true },
     });
     if (!khoa) return;
 
-    const nguoiDungTruong = await this.prisma.nguoi_dung.findFirst({
-      where: { vai_tro: 'truong', don_vi_id: khoa.don_vi_to_chuc_id },
-      orderBy: { created_at: 'asc' },
-    });
+    const nguoiDungTruong =
+      khoa.created_by_user ??
+      (await this.prisma.nguoi_dung.findFirst({
+        where: { vai_tro: 'truong', don_vi_id: khoa.don_vi_to_chuc_id },
+        orderBy: { created_at: 'asc' },
+      }));
     if (!nguoiDungTruong?.email) {
       console.warn(
         `[thong-bao] Bỏ qua gửi email khoa_boi_duong_duyet cho khoa_id=${khoaId}: không tìm thấy tài khoản Trường có email`,

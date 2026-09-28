@@ -63,6 +63,10 @@ export async function taoNguoiDungTest(params: {
 }
 
 export async function xoaNguoiDungTest(id: string) {
+  // token_thu_hoi.nguoi_dung_id -> nguoi_dung(id) không có ON DELETE CASCADE
+  // (xem docs/database-ddl.sql) — dọn trước để test POST /auth/dang-xuat
+  // (ghi token_thu_hoi) không làm vỡ FK ở bước cleanup chung này.
+  await prisma.token_thu_hoi.deleteMany({ where: { nguoi_dung_id: id } });
   await prisma.nguoi_dung.deleteMany({ where: { id } });
 }
 

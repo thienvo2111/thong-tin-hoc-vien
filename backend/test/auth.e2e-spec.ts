@@ -159,4 +159,77 @@ describe('Auth (e2e)', () => {
       taiKhoan.mat_khau = 'MatKhauMoiHon123';
     });
   });
+
+  describe('POST /auth/dang-xuat', () => {
+    it('không có token -> 401', async () => {
+      await request(app.getHttpServer()).post('/auth/dang-xuat').expect(401);
+    });
+
+    it('đăng xuất xong: token vừa dùng bị 401, token khác của cùng tài khoản KHÔNG bị ảnh hưởng', async () => {
+      const loginA = await request(app.getHttpServer())
+        .post('/auth/dang-nhap')
+        .send({
+          ten_dang_nhap: taiKhoan.ten_dang_nhap,
+          mat_khau: taiKhoan.mat_khau,
+        });
+      const tokenA = loginA.body.token as string;
+      const loginB = await request(app.getHttpServer())
+        .post('/auth/dang-nhap')
+        .send({
+          ten_dang_nhap: taiKhoan.ten_dang_nhap,
+          mat_khau: taiKhoan.mat_khau,
+        });
+      const tokenB = loginB.body.token as string;
+
+      // Trước khi đăng xuất: cả 2 token còn hợp lệ.
+      await request(app.getHttpServer())
+        .get('/auth/toi')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .post('/auth/dang-xuat')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.da_dang_xuat).toBe(true);
+        });
+
+      // Token vừa đăng xuất -> 401 dù chữ ký vẫn hợp lệ (đã bị thu hồi).
+      await request(app.getHttpServer())
+        .get('/auth/toi')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(401);
+
+      // Token B (chưa đăng xuất) của CÙNG tài khoản không bị ảnh hưởng — không
+      // được reject nhầm token còn hợp lệ (regression rất dễ gặp ở cơ chế thu hồi).
+      await request(app.getHttpServer())
+        .get('/auth/toi')
+        .set('Authorization', `Bearer ${tokenB}`)
+        .expect(200);
+    });
+
+    it('gọi đăng xuất lần 2 với token đã bị thu hồi -> vẫn 401 (không lỗi 500), idempotent', async () => {
+      const login = await request(app.getHttpServer())
+        .post('/auth/dang-nhap')
+        .send({
+          ten_dang_nhap: taiKhoan.ten_dang_nhap,
+          mat_khau: taiKhoan.mat_khau,
+        });
+      const token = login.body.token as string;
+
+      await request(app.getHttpServer())
+        .post('/auth/dang-xuat')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      // JwtAuthGuard đã chặn từ bước xác thực (token bị thu hồi) nên request
+      // dang-xuat lần 2 không tới được AuthService.dangXuat — vẫn phải trả về
+      // lỗi có kiểm soát (401), không phải 500.
+      await request(app.getHttpServer())
+        .post('/auth/dang-xuat')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(401);
+    });
+  });
 });
