@@ -44,10 +44,10 @@ Xem chi tiết đầy đủ trong các board ở trên. Tóm tắt:
 
 - **Frontend** — chưa bắt đầu.
 - **SMTP thật** — `thong-bao` hiện dùng tài khoản test Ethereal khi không đặt `SMTP_HOST`; cần cấu hình SMTP thật trước khi dùng thật (xem `backend/.env.example`).
-- Vài lỗ hổng nhỏ phát hiện trong lúc code, chưa xử lý (không chặn dùng được, nhưng nên biết):
-  - `POST /auth/dang-xuat` chưa thu hồi token thật (JWT stateless — cần cơ chế blocklist nếu muốn logout tức thì).
-  - `GET /danh-muc/chuyen-mon-dao-tao/goi-y` (gợi ý autocomplete) và `POST /validate/hoc-vien` (dry-run validate độc lập) có trong `api-contract.md` nhưng chưa code — `hoc-vien` module đã có `POST /hoc-vien/toi/kiem-tra-truoc-xac-nhan` phủ phần lớn nhu cầu dry-run.
-  - Thông báo `khoa_boi_duong_duyet` gửi tới tài khoản Trường qua `findFirst` (không có cột `created_by` trên `khoa_boi_duong` để biết đúng người tạo) — nếu 1 Trường có nhiều tài khoản, có thể gửi nhầm người trong đơn vị.
+
+4 lỗ hổng nhỏ ghi nhận ở vòng triển khai trước (thu hồi token đăng xuất, autocomplete chuyên môn, dry-run validate độc lập, người nhận thông báo duyệt khóa) đã được vá xong (2026-09-28, commit `e01def9`) — 269/269 test pass.
+
+**Gotcha khi thêm migration mới:** `prisma migrate dev` đã 2 lần tự ý `DROP INDEX` các GIN trgm index (chỉ tồn tại dưới dạng raw SQL, không khai báo trong `schema.prisma`) vì tưởng chúng thừa. Luôn đọc kỹ file migration Prisma tự sinh trước khi áp dụng — xóa mọi `DROP INDEX`/`DROP CONSTRAINT`/`DROP TRIGGER` nhắm vào các object raw-SQL (index trgm, 2 trigger function, mọi `CHECK` constraint) trước khi chạy.
 
 ## Development setup
 
