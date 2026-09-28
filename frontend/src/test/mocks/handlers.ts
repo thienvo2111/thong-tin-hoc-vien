@@ -60,6 +60,8 @@ export const handlers = [
 
   http.post('/hoc-vien/toi/kiem-tra-truoc-xac-nhan', () => HttpResponse.json({ loi: [], canh_bao: [] })),
 
+  http.get('/hoc-vien/toi/danh-gia-dau-vao', () => HttpResponse.json(db.danhGiaDauVao)),
+
   http.post('/hoc-vien/toi/xac-nhan', () => {
     const xacNhanLuc = new Date().toISOString();
     db.dotXacNhan.da_xac_nhan = true;

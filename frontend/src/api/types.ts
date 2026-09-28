@@ -140,8 +140,18 @@ export interface DanhGiaDauVaoDuDieuKien {
 export interface DanhGiaDauVaoChuaDu {
   du_dieu_kien: false;
   het_han?: boolean;
-  ly_do?: ApiFieldError[];
-  dot?: { ten: string; dong_luc: string } | null;
+  // ly_do là danh sách câu tiếng Việt hoàn chỉnh do backend dựng sẵn (T15,
+  // hoc-vien.service.ts#danhGiaDauVaoCuaToi — vd "Chưa xác nhận hồ sơ ở đợt
+  // xác nhận trước đánh giá (đợt 2)" hoặc thieu[].message của muc-do-day-du),
+  // KHÔNG phải field code — không map qua nhanTruong.ts.
+  ly_do?: string[];
+  dot?: {
+    id: string;
+    ten: string;
+    loai: 'kiem_tra_bo_sung' | 'xac_nhan_truoc_danh_gia';
+    mo_luc: string;
+    dong_luc: string;
+  } | null;
 }
 
 export type DanhGiaDauVao = DanhGiaDauVaoDuDieuKien | DanhGiaDauVaoChuaDu;

@@ -73,3 +73,16 @@ export const mucDoDayDuKey = ['hoc-vien', 'toi', 'muc-do-day-du'] as const;
 export function useMucDoDayDu(enabled = true) {
   return useQuery({ queryKey: mucDoDayDuKey, queryFn: layMucDoDayDu, enabled });
 }
+
+export const danhGiaDauVaoKey = ['hoc-vien', 'toi', 'danh-gia-dau-vao'] as const;
+// M6 (dac-ta § M6): phản hồi chứa tài khoản VLE + mật khẩu tạm — không được lưu lâu trong cache
+// (gcTime: 0 dọn ngay khi rời trang) và không tự làm mới nền (mỗi lần vào lại trang phải gọi API mới).
+export function useDanhGiaDauVao(enabled = true) {
+  return useQuery({
+    queryKey: danhGiaDauVaoKey,
+    queryFn: layDanhGiaDauVao,
+    enabled,
+    gcTime: 0,
+    refetchOnReconnect: false,
+  });
+}

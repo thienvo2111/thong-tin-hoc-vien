@@ -37,6 +37,10 @@ export const router = createBrowserRouter([
                 path: '/toi/xac-nhan',
                 lazy: () => import('@/pages/M5/XacNhan').then((m) => ({ Component: m.default })),
               },
+              {
+                path: '/toi/danh-gia-dau-vao',
+                lazy: () => import('@/pages/M6/DanhGiaDauVao').then((m) => ({ Component: m.default })),
+              },
             ],
           },
         ],

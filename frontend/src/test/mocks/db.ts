@@ -1,4 +1,4 @@
-import type { DiaDanh, DonViCongTac, DotXacNhan, HocVien, MonHoc } from '@/api/types';
+import type { DanhGiaDauVao, DiaDanh, DonViCongTac, DotXacNhan, HocVien, MonHoc } from '@/api/types';
 
 // "CSDL" giả lập trong bộ nhớ cho MSW — mỗi test có thể sửa trực tiếp rồi resetDb() ở afterEach.
 export const TINH_AN_GIANG: DiaDanh = { id: 'tinh-1', ma: '89', ten: 'An Giang', cap: 'tinh_thanh', parent_id: null, trang_thai: 'active' };
@@ -59,9 +59,19 @@ export function taoDotXacNhanDangMoThieu(): DotXacNhan {
   };
 }
 
+export function taoDanhGiaDauVaoDuDieuKien(): DanhGiaDauVao {
+  return {
+    du_dieu_kien: true,
+    duong_dan: 'https://vle.example.edu.vn/danh-gia-dau-vao',
+    ten_dang_nhap_vle: '9115131060',
+    mat_khau_tam: 'Tam123456',
+  };
+}
+
 export const db = {
   hoSo: taoHoSoMoi(),
   dotXacNhan: taoDotXacNhanDangMoThieu(),
+  danhGiaDauVao: taoDanhGiaDauVaoDuDieuKien(),
   soLanDangNhapSai: 0,
   daDangNhap: true,
 };
@@ -69,6 +79,7 @@ export const db = {
 export function resetDb(): void {
   db.hoSo = taoHoSoMoi();
   db.dotXacNhan = taoDotXacNhanDangMoThieu();
+  db.danhGiaDauVao = taoDanhGiaDauVaoDuDieuKien();
   db.soLanDangNhapSai = 0;
   db.daDangNhap = true;
 }
