@@ -3,8 +3,11 @@ import * as bcrypt from 'bcryptjs';
 import {
   Prisma,
   cap_hoc,
+  dia_danh,
+  don_vi_cong_tac,
   hoc_vien,
   hoc_vien_chuyen_mon,
+  mon_hoc,
   nguon_tao_ho_so,
   trinh_do_chuyen_mon,
 } from '@prisma/client';
@@ -59,6 +62,25 @@ interface HocVienValidateInput {
 }
 
 type HocVienDayDu = hoc_vien & { chuyen_mon: hoc_vien_chuyen_mon[] };
+
+// GET /hoc-vien/toi + GET /hoc-vien/{id} — kèm sẵn tên đã join cho mọi FK
+// chọn-từ-danh-mục (docs/api-contract.md mục 2, "Thêm 2026-09-28"). 3/4 quan
+// hệ nullable (noi_sinh/phuong_xa/mon_giang_day — FK optional trên hoc_vien),
+// riêng don_vi_cong_tac NOT NULL nên luôn có.
+type HocVienDayDuVoiTen = HocVienDayDu & {
+  noi_sinh: dia_danh | null;
+  phuong_xa: dia_danh | null;
+  don_vi_cong_tac: don_vi_cong_tac;
+  mon_giang_day: mon_hoc | null;
+};
+
+const INCLUDE_HOC_VIEN_DAY_DU_VOI_TEN = {
+  chuyen_mon: true,
+  noi_sinh: true,
+  phuong_xa: true,
+  don_vi_cong_tac: true,
+  mon_giang_day: true,
+} as const;
 
 // Dịch vụ Học viên — docs/api-contract.md mục 2 + docs/validation-checklist.md
 // #1-36f. Đây là module có nhiều quy tắc validate nhất hệ thống — validateHocVien()
@@ -306,9 +328,21 @@ export class HocVienService {
     return { ...rest, chuyen_mon: chuyen_mon.map((c) => c.chuyen_mon) };
   }
 
+  private toResponseVoiTen(hocVien: HocVienDayDuVoiTen) {
+    const { noi_sinh, phuong_xa, don_vi_cong_tac, mon_giang_day, ...rest } =
+      hocVien;
+    return {
+      ...this.toResponse(rest),
+      noi_sinh_ten: noi_sinh?.ten ?? null,
+      phuong_xa_ten: phuong_xa?.ten ?? null,
+      don_vi_cong_tac_ten: don_vi_cong_tac.ten_don_vi,
+      mon_giang_day_ten: mon_giang_day?.ten_mon ?? null,
+    };
+  }
+
   private async getHocVienCuaToi(
     caller: AuthenticatedUser,
-  ): Promise<HocVienDayDu> {
+  ): Promise<HocVienDayDuVoiTen> {
     if (!caller.hoc_vien_id) {
       throw new ForbiddenAppException(
         'Tài khoản hiện tại không gắn với hồ sơ học viên nào',
@@ -316,7 +350,7 @@ export class HocVienService {
     }
     const hocVien = await this.prisma.hoc_vien.findUnique({
       where: { id: caller.hoc_vien_id },
-      include: { chuyen_mon: true },
+      include: INCLUDE_HOC_VIEN_DAY_DU_VOI_TEN,
     });
     if (!hocVien) {
       throw new NotFoundAppException('Không tìm thấy hồ sơ học viên');
@@ -440,7 +474,7 @@ export class HocVienService {
   // ---------------------------------------------------------------------
   async layHoSoCuaToi(caller: AuthenticatedUser) {
     const hocVien = await this.getHocVienCuaToi(caller);
-    return this.toResponse(hocVien);
+    return this.toResponseVoiTen(hocVien);
   }
 
   async capNhatHoSoCuaToi(caller: AuthenticatedUser, dto: UpdateHocVienDto) {
@@ -708,7 +742,7 @@ export class HocVienService {
   async findOne(id: string, caller: AuthenticatedUser) {
     const hocVien = await this.prisma.hoc_vien.findUnique({
       where: { id },
-      include: { chuyen_mon: true },
+      include: INCLUDE_HOC_VIEN_DAY_DU_VOI_TEN,
     });
     if (!hocVien)
       throw new NotFoundAppException('Không tìm thấy hồ sơ học viên');
@@ -721,7 +755,7 @@ export class HocVienService {
         'Hồ sơ này nằm ngoài phạm vi quyền của tài khoản hiện tại',
       );
     }
-    return this.toResponse(hocVien);
+    return this.toResponseVoiTen(hocVien);
   }
 
   async kiemTraTrung(soDinhDanh: string) {

@@ -497,6 +497,113 @@ describe('HocVienService', () => {
     });
   });
 
+  // Thêm 2026-09-28 (docs/api-contract.md mục 2, "Thêm 2026-09-28"): GET
+  // /hoc-vien/toi và GET /hoc-vien/{id} phải kèm sẵn *_ten đã join cho 4 FK
+  // chọn-từ-danh-mục, song song giữ nguyên *_id.
+  describe('GET /hoc-vien/toi + GET /hoc-vien/{id} — tên đã join cho FK danh mục (2026-09-28)', () => {
+    function hocVienDayDuCoTen(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'hv-1',
+        ho_ten: 'Nguyễn Văn An',
+        don_vi_cong_tac_id: 'truong-1',
+        noi_sinh_id: 'tinh-1',
+        phuong_xa_id: 'xa-1',
+        mon_giang_day_id: 'mon-1',
+        chuyen_mon: [],
+        noi_sinh: { id: 'tinh-1', ten: 'An Giang' },
+        phuong_xa: { id: 'xa-1', ten: 'Phường Long Xuyên' },
+        don_vi_cong_tac: { id: 'truong-1', ten_don_vi: 'Trường THPT An Giang' },
+        mon_giang_day: { id: 'mon-1', ten_mon: 'Toán' },
+        ...overrides,
+      };
+    }
+
+    it('layHoSoCuaToi — đủ cả 4 FK -> response kèm cả 4 *_ten cạnh *_id', async () => {
+      prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDuCoTen());
+      const res = await service.layHoSoCuaToi({
+        hoc_vien_id: 'hv-1',
+      } as AuthenticatedUser);
+
+      expect(res).toMatchObject({
+        noi_sinh_id: 'tinh-1',
+        noi_sinh_ten: 'An Giang',
+        phuong_xa_id: 'xa-1',
+        phuong_xa_ten: 'Phường Long Xuyên',
+        don_vi_cong_tac_id: 'truong-1',
+        don_vi_cong_tac_ten: 'Trường THPT An Giang',
+        mon_giang_day_id: 'mon-1',
+        mon_giang_day_ten: 'Toán',
+      });
+      // Không lộ nguyên object quan hệ Prisma ra response, chỉ *_ten phẳng.
+      expect(res).not.toHaveProperty('noi_sinh');
+      expect(res).not.toHaveProperty('phuong_xa');
+      expect(res).not.toHaveProperty('mon_giang_day');
+    });
+
+    it('layHoSoCuaToi — hồ sơ import_moet chưa bổ sung (3 FK optional NULL) -> *_ten tương ứng là null, không lỗi', async () => {
+      prisma.hoc_vien.findUnique.mockResolvedValue(
+        hocVienDayDuCoTen({
+          noi_sinh_id: null,
+          phuong_xa_id: null,
+          mon_giang_day_id: null,
+          noi_sinh: null,
+          phuong_xa: null,
+          mon_giang_day: null,
+        }),
+      );
+      const res = await service.layHoSoCuaToi({
+        hoc_vien_id: 'hv-1',
+      } as AuthenticatedUser);
+
+      expect(res).toMatchObject({
+        noi_sinh_id: null,
+        noi_sinh_ten: null,
+        phuong_xa_id: null,
+        phuong_xa_ten: null,
+        mon_giang_day_id: null,
+        mon_giang_day_ten: null,
+        // don_vi_cong_tac_id NOT NULL trên DDL -> luôn có tên đi kèm.
+        don_vi_cong_tac_id: 'truong-1',
+        don_vi_cong_tac_ten: 'Trường THPT An Giang',
+      });
+    });
+
+    it('findOne — đủ cả 4 FK -> response kèm cả 4 *_ten cạnh *_id', async () => {
+      prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDuCoTen());
+      scopeService.canAccessDonVi.mockResolvedValue(true);
+      const res = await service.findOne('hv-1', {} as AuthenticatedUser);
+
+      expect(res).toMatchObject({
+        noi_sinh_ten: 'An Giang',
+        phuong_xa_ten: 'Phường Long Xuyên',
+        don_vi_cong_tac_ten: 'Trường THPT An Giang',
+        mon_giang_day_ten: 'Toán',
+      });
+    });
+
+    it('findOne — 3 FK optional NULL -> *_ten tương ứng là null, không lỗi', async () => {
+      prisma.hoc_vien.findUnique.mockResolvedValue(
+        hocVienDayDuCoTen({
+          noi_sinh_id: null,
+          phuong_xa_id: null,
+          mon_giang_day_id: null,
+          noi_sinh: null,
+          phuong_xa: null,
+          mon_giang_day: null,
+        }),
+      );
+      scopeService.canAccessDonVi.mockResolvedValue(true);
+      const res = await service.findOne('hv-1', {} as AuthenticatedUser);
+
+      expect(res).toMatchObject({
+        noi_sinh_ten: null,
+        phuong_xa_ten: null,
+        mon_giang_day_ten: null,
+        don_vi_cong_tac_ten: 'Trường THPT An Giang',
+      });
+    });
+  });
+
   describe('kiemTraTrung', () => {
     it('sai định dạng (không đủ 12 số) -> ValidationException', async () => {
       await expect(service.kiemTraTrung('123')).rejects.toBeInstanceOf(
