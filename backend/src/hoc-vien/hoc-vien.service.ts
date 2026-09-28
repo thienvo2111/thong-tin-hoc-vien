@@ -5,20 +5,24 @@ import {
   cap_hoc,
   dia_danh,
   don_vi_cong_tac,
+  dot_xac_nhan,
   hoc_vien,
   hoc_vien_chuyen_mon,
   mon_hoc,
   nguon_tao_ho_so,
   trinh_do_chuyen_mon,
+  vai_tro_nguoi_dung,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from '../auth/scope/scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
+import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
 import { normalizeNfcName } from '../common/utils/normalize-text.util';
 import { paginate } from '../common/dto/pagination-query.dto';
 import {
   ConflictAppException,
+  DotXacNhanDongException,
   ForbiddenAppException,
   NotFoundAppException,
   ValidationException,
@@ -94,6 +98,7 @@ export class HocVienService {
     private readonly prisma: PrismaService,
     private readonly scopeService: ScopeService,
     private readonly thongBaoService: ThongBaoService,
+    private readonly dotXacNhanService: DotXacNhanService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -312,15 +317,93 @@ export class HocVienService {
     return { loi, canh_bao: canhBao };
   }
 
-  private isEditable(hocVien: {
+  // T14 (mo-rong-nls-an-giang.md): thay isEditable() cũ (boolean đơn giản)
+  // — với import_moet, "sửa được" phụ thuộc đợt xác nhận đang mở (không còn
+  // đúng-luôn như trước), nên cần trả về CHÍNH đợt đó (dùng để gắn dot_id
+  // vào lich_su_thay_doi_ho_so + kiểm tra hủy xác nhận). null = tu_dang_ky
+  // (không có khái niệm đợt) hoặc import_moet nhưng gọi từ luồng quan_tri
+  // (PATCH /hoc-vien/{id}, không bị chặn bởi đợt).
+  private async kiemTraEditableVaLayDot(hocVien: {
+    id: string;
     trang_thai: hoc_vien['trang_thai'];
     nguon_tao: nguon_tao_ho_so;
-  }): boolean {
-    return (
-      hocVien.trang_thai === 'nhap' ||
-      hocVien.trang_thai === 'tu_choi' ||
-      hocVien.nguon_tao === 'import_moet'
-    );
+  }): Promise<dot_xac_nhan | null> {
+    if (hocVien.nguon_tao === 'import_moet') {
+      const dot = await this.dotXacNhanService.dotDangMoCuaHocVien(hocVien.id);
+      if (!dot) throw new DotXacNhanDongException();
+      return dot;
+    }
+    if (hocVien.trang_thai !== 'nhap' && hocVien.trang_thai !== 'tu_choi') {
+      throw new ConflictAppException(
+        'Hồ sơ đang chờ duyệt hoặc đã duyệt, không thể sửa',
+      );
+    }
+    return null;
+  }
+
+  // Các trường PATCH /hoc-vien/toi (UpdateHocVienDto) ghi 1 dòng lịch sử mỗi
+  // khi giá trị thực sự đổi (T14). la_truong_goc_moet=true cho đúng 7 trường
+  // liệt kê trong tài liệu — KHÔNG gồm so_dinh_danh_ca_nhan (CCCD chưa từng
+  // có trong file MOET) dù CCCD cũng nằm trong danh sách trường được log.
+  private static readonly TRUONG_GOC_MOET = new Set<string>([
+    'ho_ten',
+    'ngay_sinh',
+    'thang_sinh',
+    'nam_sinh',
+    'don_vi_cong_tac_id',
+    'chuc_vu',
+    'so_dien_thoai_lien_he',
+  ]);
+
+  private static readonly DIFF_FIELDS: (keyof UpdateHocVienDto)[] = [
+    'ho_ten',
+    'so_dinh_danh_ca_nhan',
+    'ngay_sinh',
+    'thang_sinh',
+    'nam_sinh',
+    'gioi_tinh',
+    'chuc_vu',
+    'noi_sinh_id',
+    'phuong_xa_id',
+    'don_vi_cong_tac_id',
+    'so_dien_thoai_lien_he',
+    'email_lien_he',
+    'trinh_do_chuyen_mon',
+    'trinh_do_chuyen_mon_khac',
+    'cap_giang_day',
+    'mon_giang_day_id',
+    'ghi_chu',
+  ];
+
+  // So sánh dto (những field caller THỰC SỰ gửi lên) với hồ sơ cũ — chỉ field
+  // nào có mặt trong dto VÀ giá trị (sau chuẩn hóa cho ho_ten) khác giá trị
+  // cũ mới tính là 1 thay đổi. Không dùng "merged" (đã lấp field thiếu bằng
+  // giá trị cũ) vì merged luôn khác undefined nên sẽ luôn "trông như đổi".
+  private tinhDiffHoSo(
+    existing: hoc_vien,
+    dto: UpdateHocVienDto,
+    hoTenChuan: string,
+  ): { field: string; oldValue: string | null; newValue: string | null }[] {
+    const diffs: {
+      field: string;
+      oldValue: string | null;
+      newValue: string | null;
+    }[] = [];
+    const dtoRecord = dto as unknown as Record<string, unknown>;
+    const existingRecord = existing as unknown as Record<string, unknown>;
+    for (const field of HocVienService.DIFF_FIELDS) {
+      if (dtoRecord[field] === undefined) continue;
+      const newRaw = field === 'ho_ten' ? hoTenChuan : dtoRecord[field];
+      const oldRaw = existingRecord[field];
+      const oldStr =
+        oldRaw === null || oldRaw === undefined ? null : String(oldRaw);
+      const newStr =
+        newRaw === null || newRaw === undefined ? null : String(newRaw);
+      if (oldStr !== newStr) {
+        diffs.push({ field, oldValue: oldStr, newValue: newStr });
+      }
+    }
+    return diffs;
   }
 
   private toResponse(hocVien: HocVienDayDu) {
@@ -479,12 +562,59 @@ export class HocVienService {
 
   async capNhatHoSoCuaToi(caller: AuthenticatedUser, dto: UpdateHocVienDto) {
     const existing = await this.getHocVienCuaToi(caller);
-    if (!this.isEditable(existing)) {
-      throw new ConflictAppException(
-        'Hồ sơ đang chờ duyệt hoặc đã duyệt, không thể sửa',
-      );
-    }
+    const dot = await this.kiemTraEditableVaLayDot(existing);
+    return this.suaHoSo(
+      existing,
+      dto,
+      { id: caller.id, vai_tro: caller.vai_tro },
+      dot,
+      existing.nguon_tao === 'import_moet',
+    );
+  }
 
+  // PATCH /hoc-vien/{id} (T14, quan_tri) — sửa hồ sơ import_moet NGOÀI thời
+  // gian đợt (học viên chỉ xem lúc đó). KHÔNG bị chặn bởi kiemTraEditableVaLayDot
+  // (đó là gate riêng cho học viên tự sửa) — quan_tri sửa được bất kỳ lúc
+  // nào, với mọi hồ sơ (không chỉ import_moet, dù trong thực tế đây chủ yếu
+  // dùng cho import_moet — tu_dang_ky vẫn có PATCH /hoc-vien/toi riêng cho
+  // chính học viên). Vẫn ghi lịch sử + hủy xác nhận nếu đang có đợt mở trùng
+  // lúc sửa, để dữ liệu nhất quán dù ai sửa.
+  async suaHoSoByAdmin(
+    id: string,
+    dto: UpdateHocVienDto,
+    caller: AuthenticatedUser,
+  ) {
+    const existing = await this.prisma.hoc_vien.findUnique({
+      where: { id },
+      include: { chuyen_mon: true },
+    });
+    if (!existing) {
+      throw new NotFoundAppException('Không tìm thấy hồ sơ học viên');
+    }
+    const dot =
+      existing.nguon_tao === 'import_moet'
+        ? await this.dotXacNhanService.dotDangMoCuaHocVien(existing.id)
+        : null;
+    return this.suaHoSo(
+      existing,
+      dto,
+      { id: caller.id, vai_tro: caller.vai_tro },
+      dot,
+      existing.nguon_tao === 'import_moet',
+    );
+  }
+
+  // Lõi dùng chung cho capNhatHoSoCuaToi (học viên) + suaHoSoByAdmin (quan_tri)
+  // — chỉ khác ở việc gate quyền TRƯỚC khi gọi vào đây. ghiLichSu=true CHỈ
+  // cho hồ sơ import_moet (rule T14 chỉ thay đổi hành vi cho nguồn này —
+  // tu_dang_ky giữ nguyên như trước, không ghi lịch sử).
+  private async suaHoSo(
+    existing: HocVienDayDu,
+    dto: UpdateHocVienDto,
+    nguoiSua: { id: string; vai_tro: vai_tro_nguoi_dung },
+    dot: dot_xac_nhan | null,
+    ghiLichSu: boolean,
+  ) {
     const merged: HocVienValidateInput = {
       ho_ten: dto.ho_ten ?? existing.ho_ten,
       so_dinh_danh_ca_nhan:
@@ -514,34 +644,76 @@ export class HocVienService {
       throw new ValidationException('Dữ liệu cập nhật không hợp lệ', loi);
     }
 
+    const hoTenChuan = merged.ho_ten
+      ? normalizeNfcName(merged.ho_ten)
+      : existing.ho_ten;
+    // Rule T14: đổi ngày sinh KHÔNG đổi mật khẩu (mật khẩu đã đổi ở lần đăng
+    // nhập đầu, rule #35) — không có logic nào ở đây tự đổi mật khẩu, chỉ ghi
+    // chú lại lý do vì đây là điểm dễ nhầm khi thấy ngay_sinh đổi.
+    const diffs = ghiLichSu ? this.tinhDiffHoSo(existing, dto, hoTenChuan) : [];
+
     try {
-      const updated = await this.prisma.hoc_vien.update({
-        where: { id: existing.id },
-        data: {
-          ho_ten: merged.ho_ten ? normalizeNfcName(merged.ho_ten) : undefined,
-          so_dinh_danh_ca_nhan: merged.so_dinh_danh_ca_nhan,
-          ngay_sinh: merged.ngay_sinh,
-          thang_sinh: merged.thang_sinh,
-          nam_sinh: merged.nam_sinh,
-          gioi_tinh: dto.gioi_tinh,
-          chuc_vu: dto.chuc_vu,
-          noi_sinh_id: merged.noi_sinh_id,
-          phuong_xa_id: merged.phuong_xa_id,
-          don_vi_cong_tac_id: merged.don_vi_cong_tac_id ?? undefined,
-          so_dien_thoai_lien_he: merged.so_dien_thoai_lien_he ?? undefined,
-          email_lien_he: merged.email_lien_he,
-          trinh_do_chuyen_mon: merged.trinh_do_chuyen_mon,
-          trinh_do_chuyen_mon_khac: merged.trinh_do_chuyen_mon_khac,
-          cap_giang_day: merged.cap_giang_day,
-          mon_giang_day_id: merged.mon_giang_day_id,
-          ghi_chu: dto.ghi_chu,
-          // Rule #27: hồ sơ bị tu_choi thì sửa xong tự mở lại nhap (coi như
-          // resubmit chờ xác nhận lại).
-          trang_thai: existing.trang_thai === 'tu_choi' ? 'nhap' : undefined,
+      const { updated, xacNhanBiHuy } = await this.prisma.$transaction(
+        async (tx) => {
+          const updated = await tx.hoc_vien.update({
+            where: { id: existing.id },
+            data: {
+              ho_ten: merged.ho_ten ? hoTenChuan : undefined,
+              so_dinh_danh_ca_nhan: merged.so_dinh_danh_ca_nhan,
+              ngay_sinh: merged.ngay_sinh,
+              thang_sinh: merged.thang_sinh,
+              nam_sinh: merged.nam_sinh,
+              gioi_tinh: dto.gioi_tinh,
+              chuc_vu: dto.chuc_vu,
+              noi_sinh_id: merged.noi_sinh_id,
+              phuong_xa_id: merged.phuong_xa_id,
+              don_vi_cong_tac_id: merged.don_vi_cong_tac_id ?? undefined,
+              so_dien_thoai_lien_he: merged.so_dien_thoai_lien_he ?? undefined,
+              email_lien_he: merged.email_lien_he,
+              trinh_do_chuyen_mon: merged.trinh_do_chuyen_mon,
+              trinh_do_chuyen_mon_khac: merged.trinh_do_chuyen_mon_khac,
+              cap_giang_day: merged.cap_giang_day,
+              mon_giang_day_id: merged.mon_giang_day_id,
+              ghi_chu: dto.ghi_chu,
+              // Rule #27 (chỉ áp dụng tu_dang_ky — import_moet luôn da_duyet
+              // sẵn, không đi qua trang_thai='tu_choi'): hồ sơ bị tu_choi thì
+              // sửa xong tự mở lại nhap (coi như resubmit chờ xác nhận lại).
+              trang_thai:
+                existing.trang_thai === 'tu_choi' ? 'nhap' : undefined,
+            },
+            include: { chuyen_mon: true },
+          });
+
+          let xacNhanBiHuy = false;
+          if (ghiLichSu && diffs.length > 0) {
+            await tx.lich_su_thay_doi_ho_so.createMany({
+              data: diffs.map((d) => ({
+                hoc_vien_id: existing.id,
+                truong: d.field,
+                gia_tri_cu: d.oldValue,
+                gia_tri_moi: d.newValue,
+                la_truong_goc_moet: HocVienService.TRUONG_GOC_MOET.has(d.field),
+                nguoi_sua_id: nguoiSua.id,
+                vai_tro_nguoi_sua: nguoiSua.vai_tro,
+                dot_id: dot?.id ?? null,
+              })),
+            });
+            // Rule T14: sửa tiếp sau khi đã xác nhận ở đợt đang mở -> hủy
+            // xác nhận đó. Chỉ có ý nghĩa khi đang có đợt MỞ (dot != null) —
+            // sửa ngoài giờ đợt (quan_tri) không "hủy" gì vì không có đợt
+            // đang mở để đối chiếu.
+            if (dot) {
+              xacNhanBiHuy = await this.dotXacNhanService.huyXacNhanNeuCo(
+                tx,
+                dot.id,
+                existing.id,
+              );
+            }
+          }
+          return { updated, xacNhanBiHuy };
         },
-        include: { chuyen_mon: true },
-      });
-      return this.toResponse(updated);
+      );
+      return { ...this.toResponse(updated), xac_nhan_bi_huy: xacNhanBiHuy };
     } catch (e) {
       if (
         e instanceof Prisma.PrismaClientKnownRequestError &&
@@ -555,42 +727,107 @@ export class HocVienService {
 
   async themChuyenMon(caller: AuthenticatedUser, dto: ChuyenMonDto) {
     const hocVien = await this.getHocVienCuaToi(caller);
-    if (!this.isEditable(hocVien)) {
-      throw new ConflictAppException(
-        'Hồ sơ đang chờ duyệt hoặc đã duyệt, không thể sửa chuyên môn',
-      );
-    }
+    const dot = await this.kiemTraEditableVaLayDot(hocVien);
     const chuyenMon = normalizeNfcName(dto.chuyen_mon);
-    try {
-      await this.prisma.hoc_vien_chuyen_mon.create({
-        data: { hoc_vien_id: hocVien.id, chuyen_mon: chuyenMon },
-      });
-    } catch (e) {
-      if (
-        e instanceof Prisma.PrismaClientKnownRequestError &&
-        e.code === 'P2002'
-      ) {
-        throw new ConflictAppException('Chuyên môn này đã có trong hồ sơ');
+    const ghiLichSu = hocVien.nguon_tao === 'import_moet';
+    await this.prisma.$transaction(async (tx) => {
+      try {
+        await tx.hoc_vien_chuyen_mon.create({
+          data: { hoc_vien_id: hocVien.id, chuyen_mon: chuyenMon },
+        });
+      } catch (e) {
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === 'P2002'
+        ) {
+          throw new ConflictAppException('Chuyên môn này đã có trong hồ sơ');
+        }
+        throw e;
       }
-      throw e;
-    }
+      if (ghiLichSu) {
+        await tx.lich_su_thay_doi_ho_so.create({
+          data: {
+            hoc_vien_id: hocVien.id,
+            truong: 'chuyen_mon',
+            gia_tri_cu: null,
+            gia_tri_moi: chuyenMon,
+            la_truong_goc_moet: true,
+            nguoi_sua_id: caller.id,
+            vai_tro_nguoi_sua: caller.vai_tro,
+            dot_id: dot?.id ?? null,
+          },
+        });
+        if (dot) {
+          await this.dotXacNhanService.huyXacNhanNeuCo(tx, dot.id, hocVien.id);
+        }
+      }
+    });
     return this.layHoSoCuaToi(caller);
   }
 
   async xoaChuyenMon(caller: AuthenticatedUser, dto: ChuyenMonDto) {
     const hocVien = await this.getHocVienCuaToi(caller);
-    if (!this.isEditable(hocVien)) {
-      throw new ConflictAppException(
-        'Hồ sơ đang chờ duyệt hoặc đã duyệt, không thể sửa chuyên môn',
-      );
-    }
-    await this.prisma.hoc_vien_chuyen_mon.deleteMany({
-      where: {
-        hoc_vien_id: hocVien.id,
-        chuyen_mon: normalizeNfcName(dto.chuyen_mon),
-      },
+    const dot = await this.kiemTraEditableVaLayDot(hocVien);
+    const chuyenMon = normalizeNfcName(dto.chuyen_mon);
+    const ghiLichSu = hocVien.nguon_tao === 'import_moet';
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.hoc_vien_chuyen_mon.deleteMany({
+        where: { hoc_vien_id: hocVien.id, chuyen_mon: chuyenMon },
+      });
+      if (ghiLichSu && count > 0) {
+        await tx.lich_su_thay_doi_ho_so.create({
+          data: {
+            hoc_vien_id: hocVien.id,
+            truong: 'chuyen_mon',
+            gia_tri_cu: chuyenMon,
+            gia_tri_moi: null,
+            la_truong_goc_moet: true,
+            nguoi_sua_id: caller.id,
+            vai_tro_nguoi_sua: caller.vai_tro,
+            dot_id: dot?.id ?? null,
+          },
+        });
+        if (dot) {
+          await this.dotXacNhanService.huyXacNhanNeuCo(tx, dot.id, hocVien.id);
+        }
+      }
     });
     return this.layHoSoCuaToi(caller);
+  }
+
+  // GET /hoc-vien/toi/dot-xac-nhan (T14) — đợt đang mở/sắp mở (nếu hiện
+  // không có đợt nào mở), da_xac_nhan (ở đợt ĐANG MỞ, nếu có), day_du/thieu
+  // (T9, tái dùng danhGiaDayDu). Chỉ có ý nghĩa cho import_moet — tu_dang_ky
+  // trả dot=null (không có khái niệm đợt xác nhận).
+  async dotXacNhanCuaToi(caller: AuthenticatedUser) {
+    const hocVien = await this.getHocVienCuaToi(caller);
+    const { day_du, thieu } = await this.danhGiaDayDu(hocVien);
+
+    if (hocVien.nguon_tao !== 'import_moet') {
+      return { dot: null, dang_mo: false, da_xac_nhan: false, day_du, thieu };
+    }
+
+    const dotMo = await this.dotXacNhanService.dotDangMoCuaHocVien(hocVien.id);
+    const dot = dotMo ?? (await this.dotXacNhanService.dotSapMoCuaHocVien());
+    const daXacNhan = dotMo
+      ? await this.dotXacNhanService.coXacNhanConHieuLuc(dotMo.id, hocVien.id)
+      : false;
+
+    return {
+      dot: dot
+        ? {
+            id: dot.id,
+            ten: dot.ten,
+            loai: dot.loai,
+            mo_luc: dot.mo_luc,
+            dong_luc: dot.dong_luc,
+          }
+        : null,
+      dang_mo: dotMo !== null,
+      da_xac_nhan: daXacNhan,
+      day_du,
+      thieu,
+    };
   }
 
   async kiemTraTruocXacNhan(caller: AuthenticatedUser) {
@@ -624,11 +861,17 @@ export class HocVienService {
   }
 
   // POST /hoc-vien/toi/xac-nhan — chuyển nhap/tu_choi -> cho_duyet (stub gửi
-  // email); nếu đã da_duyet (điển hình: import_moet sau khi tự bổ sung) thì
-  // chỉ gửi lại email, KHÔNG đổi trang_thai (api-contract.md mục 2: "chỉ dùng
-  // nó nếu muốn gửi lại email xác nhận sau khi bổ sung thông tin").
+  // email); nếu đã da_duyet (tu_dang_ky đã duyệt) thì chỉ gửi lại email,
+  // KHÔNG đổi trang_thai (api-contract.md mục 2: "chỉ dùng nó nếu muốn gửi
+  // lại email xác nhận sau khi bổ sung thông tin"). T14: import_moet đi qua
+  // nhánh RIÊNG hoàn toàn (xacNhanImportMoet) — tạo xac_nhan_ho_so gắn với
+  // đợt đang mở, thay vì chỉ resend email như trước.
   async xacNhan(caller: AuthenticatedUser) {
     const hocVien = await this.getHocVienCuaToi(caller);
+
+    if (hocVien.nguon_tao === 'import_moet') {
+      return this.xacNhanImportMoet(hocVien);
+    }
 
     if (hocVien.trang_thai === 'nhap' || hocVien.trang_thai === 'tu_choi') {
       const { loi } = await this.validateHocVien(
@@ -663,6 +906,38 @@ export class HocVienService {
     throw new ConflictAppException(
       `Hồ sơ đang ở trạng thái "${hocVien.trang_thai}", không thể xác nhận`,
     );
+  }
+
+  // T14: POST /hoc-vien/toi/xac-nhan với import_moet — bắt buộc có đợt đang
+  // mở (không thì không có gì để gắn xác nhận vào -> DOT_XAC_NHAN_DONG,
+  // cùng mã lỗi với PATCH để FE xử lý thống nhất) VÀ day_du=true (T9); tạo
+  // xac_nhan_ho_so có bản chụp hồ sơ tại thời điểm xác nhận, gửi email bản
+  // sao (sự kiện hoc_vien_xac_nhan như cũ).
+  private async xacNhanImportMoet(hocVien: HocVienDayDuVoiTen) {
+    const dot = await this.dotXacNhanService.dotDangMoCuaHocVien(hocVien.id);
+    if (!dot) throw new DotXacNhanDongException();
+
+    const { day_du, thieu } = await this.danhGiaDayDu(hocVien);
+    if (!day_du) {
+      throw new ValidationException(
+        'Hồ sơ chưa đầy đủ, không thể xác nhận',
+        thieu,
+      );
+    }
+
+    const snapshot = this.toResponse(
+      hocVien,
+    ) as unknown as Prisma.InputJsonValue;
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.dotXacNhanService.taoXacNhan(tx, dot.id, hocVien.id, snapshot);
+      return tx.hoc_vien.update({
+        where: { id: hocVien.id },
+        data: { email_ban_sao_da_gui_at: new Date() },
+        include: { chuyen_mon: true },
+      });
+    });
+    await this.thongBaoService.guiHocVienXacNhan(hocVien.id);
+    return this.toResponse(updated);
   }
 
   // ---------------------------------------------------------------------

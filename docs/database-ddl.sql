@@ -89,6 +89,10 @@ CREATE TYPE loai_su_kien_thong_bao AS ENUM (
 
 CREATE TYPE trang_thai_gui_thong_bao AS ENUM ('thanh_cong', 'that_bai');
 
+-- T14 (mo-rong-nls-an-giang.md, 2026-09-28): đợt xác nhận cho hồ sơ
+-- import_moet — xem PHẦN 2b bên dưới.
+CREATE TYPE loai_dot_xac_nhan AS ENUM ('kiem_tra_bo_sung', 'xac_nhan_truoc_danh_gia');
+
 
 -- =====================================================================
 -- PHẦN 1 — DANH MỤC DÙNG CHUNG (board MoHinhDuLieu.dc.html)
@@ -371,6 +375,77 @@ CREATE INDEX idx_hoc_vien_chuyen_mon_trgm
 ALTER TABLE nguoi_dung
     ADD CONSTRAINT fk_nguoi_dung_hoc_vien
     FOREIGN KEY (hoc_vien_id) REFERENCES hoc_vien(id);
+
+
+-- =====================================================================
+-- PHẦN 2b — ĐỢT XÁC NHẬN & LỊCH SỬ THAY ĐỔI HỒ SƠ (T14, 2026-09-28)
+-- =====================================================================
+-- khoa_id NULL = áp dụng cho MỌI hồ sơ import_moet (quyết định "rút gọn để
+-- kịp P0", mo-rong-nls-an-giang.md mục 3) — gắn khóa cụ thể để dùng sau này
+-- nếu cần thu hẹp phạm vi 1 đợt về đúng học viên đã ghi danh khóa đó.
+CREATE TABLE dot_xac_nhan (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    khoa_id         uuid REFERENCES khoa_boi_duong(id),
+    ten             varchar(255) NOT NULL,
+    loai            loai_dot_xac_nhan NOT NULL,
+    mo_luc          timestamptz NOT NULL,
+    dong_luc        timestamptz NOT NULL,
+    created_by      uuid REFERENCES nguoi_dung(id),
+    created_at      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT chk_dot_xac_nhan_thoi_gian CHECK (dong_luc > mo_luc)
+);
+
+CREATE INDEX idx_dot_xac_nhan_khoa ON dot_xac_nhan(khoa_id);
+
+-- "Đợt đang mở" của 1 học viên (DotXacNhanService.dotDangMoCuaHocVien) = đợt
+-- có mo_luc <= now() < dong_luc VÀ (khoa_id IS NULL HOẶC học viên đã ghi danh
+-- khóa đó qua dang_ky_hoc). Các đợt không được chồng thời gian trong CÙNG
+-- khoa_id (kể cả cùng NULL) — thực thi ở tầng API (DotXacNhanService.
+-- kiemTraChongCheo), không phải CHECK/EXCLUDE constraint (cần so sánh với
+-- các dòng khác trong cùng bảng, giống chk_dang_ky_lop_thuoc_khoa).
+CREATE TABLE xac_nhan_ho_so (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    dot_id              uuid NOT NULL REFERENCES dot_xac_nhan(id) ON DELETE CASCADE,
+    hoc_vien_id         uuid NOT NULL REFERENCES hoc_vien(id),
+    xac_nhan_luc        timestamptz NOT NULL DEFAULT now(),
+    du_lieu             jsonb NOT NULL,          -- bản chụp hồ sơ tại thời điểm xác nhận
+    con_hieu_luc        boolean NOT NULL DEFAULT true,
+    vo_hieu_luc_luc     timestamptz,
+
+    CONSTRAINT chk_xac_nhan_hieu_luc CHECK (con_hieu_luc OR vo_hieu_luc_luc IS NOT NULL)
+);
+
+CREATE INDEX idx_xac_nhan_hv ON xac_nhan_ho_so(hoc_vien_id);
+CREATE INDEX idx_xac_nhan_dot ON xac_nhan_ho_so(dot_id);
+
+-- 1 xác nhận CÒN HIỆU LỰC cho mỗi (đợt, học viên) — sửa hồ sơ sau khi đã xác
+-- nhận sẽ set con_hieu_luc=false cho dòng cũ TRƯỚC khi tạo dòng mới
+-- (DotXacNhanService.huyXacNhanNeuCo/taoXacNhan), nên index này không bao
+-- giờ xung đột trong luồng bình thường.
+CREATE UNIQUE INDEX uq_xac_nhan_con_hieu_luc ON xac_nhan_ho_so(dot_id, hoc_vien_id) WHERE con_hieu_luc;
+
+-- Mỗi TRƯỜNG thay đổi (không phải mỗi request PATCH) là 1 dòng riêng — 1 lần
+-- PATCH sửa 3 trường sinh 3 dòng. la_truong_goc_moet=true cho đúng 7 trường
+-- liệt kê trong mo-rong-nls-an-giang.md mục T14 (+ 'chuyen_mon', ghi qua
+-- POST/DELETE /hoc-vien/toi/chuyen-mon) — dùng lọc cho GET /bao-cao/sua-truong-moet
+-- (N1 rà soát). Giá trị so_dinh_danh_ca_nhan (CCCD) trong lịch sử chỉ Quản
+-- trị xem được — không có endpoint nào khác đọc trực tiếp bảng này.
+CREATE TABLE lich_su_thay_doi_ho_so (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    hoc_vien_id         uuid NOT NULL REFERENCES hoc_vien(id),
+    truong              varchar(64) NOT NULL,
+    gia_tri_cu          text,
+    gia_tri_moi         text,
+    la_truong_goc_moet  boolean NOT NULL DEFAULT false,
+    nguoi_sua_id        uuid NOT NULL REFERENCES nguoi_dung(id),
+    vai_tro_nguoi_sua   vai_tro_nguoi_dung NOT NULL,
+    dot_id              uuid REFERENCES dot_xac_nhan(id),
+    sua_luc             timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_lich_su_hv ON lich_su_thay_doi_ho_so(hoc_vien_id);
+CREATE INDEX idx_lich_su_goc_moet ON lich_su_thay_doi_ho_so(la_truong_goc_moet) WHERE la_truong_goc_moet;
 
 
 -- =====================================================================

@@ -4,13 +4,22 @@ import {
   KHONG_XAC_DINH,
   KET_QUA_HOC,
   CHUA_CO_KET_QUA,
+  SuaTruongMoetRow,
   TRANG_THAI_DANG_KY,
   TRANG_THAI_HO_SO,
   TongHopDiaBanRow,
   TongHopDonViRow,
   TongHopKhoaRow,
   TongHopResult,
+  XacNhanRow,
+  XuatChoVleRow,
 } from '../bao-cao.types';
+
+const NHAN_TRANG_THAI_XAC_NHAN: Record<string, string> = {
+  chua_dang_nhap: 'Chưa đăng nhập',
+  dang_bo_sung: 'Đang bổ sung',
+  da_xac_nhan: 'Đã xác nhận',
+};
 
 const NHAN_TRANG_THAI_HO_SO: Record<string, string> = {
   nhap: 'Nháp',
@@ -142,4 +151,91 @@ function buildKhoaSheet(
       row.theo_ket_qua[CHUA_CO_KET_QUA] ?? 0,
     ]);
   }
+}
+
+// T14 — GET /bao-cao/xac-nhan/xuat-excel.
+export async function buildXacNhanWorkbook(
+  rows: XacNhanRow[],
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Tiến độ xác nhận');
+  sheet.addRow([
+    'Mã định danh CSDL MOET',
+    'Họ và tên',
+    'Đơn vị công tác',
+    'Đăng nhập lần cuối',
+    'Trạng thái',
+  ]);
+  sheet.getRow(1).font = { bold: true };
+  for (const row of rows) {
+    sheet.addRow([
+      row.ma_dinh_danh_moet ?? '',
+      row.ho_ten,
+      row.don_vi_cong_tac_ten,
+      row.dang_nhap_lan_cuoi ? row.dang_nhap_lan_cuoi.toISOString() : '',
+      NHAN_TRANG_THAI_XAC_NHAN[row.trang_thai] ?? row.trang_thai,
+    ]);
+  }
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+// T14 — GET /bao-cao/sua-truong-moet/xuat-excel.
+export async function buildSuaTruongMoetWorkbook(
+  rows: SuaTruongMoetRow[],
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Sửa trường gốc MOET');
+  sheet.addRow([
+    'Mã định danh CSDL MOET',
+    'Họ và tên học viên',
+    'Trường',
+    'Giá trị cũ',
+    'Giá trị mới',
+    'Người sửa',
+    'Vai trò người sửa',
+    'Sửa lúc',
+  ]);
+  sheet.getRow(1).font = { bold: true };
+  for (const row of rows) {
+    sheet.addRow([
+      row.ma_dinh_danh_moet ?? '',
+      row.ho_ten_hoc_vien,
+      row.truong,
+      row.gia_tri_cu ?? '',
+      row.gia_tri_moi ?? '',
+      row.nguoi_sua,
+      row.vai_tro_nguoi_sua,
+      row.sua_luc.toISOString(),
+    ]);
+  }
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+// T14 — GET /bao-cao/xuat-cho-vle (file chuyển Phòng CNTT tạo tài khoản VLE).
+export async function buildXuatChoVleWorkbook(
+  rows: XuatChoVleRow[],
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Xuất cho VLE');
+  sheet.addRow([
+    'Mã định danh CSDL MOET',
+    'Họ và tên',
+    'Email',
+    'Đơn vị',
+    'Trạng thái đợt 1',
+  ]);
+  sheet.getRow(1).font = { bold: true };
+  for (const row of rows) {
+    sheet.addRow([
+      row.ma_dinh_danh_moet ?? '',
+      row.ho_ten,
+      row.email ?? '',
+      row.don_vi,
+      row.trang_thai_dot_1 === 'da_xac_nhan' ? 'Đã xác nhận' : 'Chưa xác nhận',
+    ]);
+  }
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
 }

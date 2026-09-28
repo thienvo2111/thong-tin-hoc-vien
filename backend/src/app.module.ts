@@ -13,6 +13,7 @@ import { BaoCaoModule } from './bao-cao/bao-cao.module';
 import { ThongBaoModule } from './thong-bao/thong-bao.module';
 import { ValidateModule } from './validate/validate.module';
 import { NguoiDungModule } from './nguoi-dung/nguoi-dung.module';
+import { DotXacNhanModule } from './dot-xac-nhan/dot-xac-nhan.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { NguoiDungModule } from './nguoi-dung/nguoi-dung.module';
     ThongBaoModule,
     ValidateModule,
     NguoiDungModule,
+    DotXacNhanModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -5,8 +5,10 @@ import { createTestApp } from './utils/test-app';
 import {
   prisma,
   taoDonViTest,
+  taoDotXacNhanTest,
   taoNguoiDungTest,
   uniqueSuffix,
+  xoaDotXacNhanTest,
   xoaNguoiDungTest,
   xoaDonViTest,
 } from './utils/test-data';
@@ -649,12 +651,18 @@ describe('Hồ sơ Học viên (e2e)', () => {
   describe('T9 — Hồ sơ đầy đủ (mo-rong-nls-an-giang.md)', () => {
     let hocVienMoetId: string;
     let tokenMoet: string;
+    let dotId: string;
     const suf = uniqueSuffix();
     const tenDangNhap = `MOET-T9-${suf}`;
     const NGAY = 10;
     const THANG = 3;
 
     beforeAll(async () => {
+      // T14: PATCH /hoc-vien/toi cho import_moet (dùng ở test "bổ sung đủ mọi
+      // trường còn thiếu" bên dưới) giờ đòi có đợt xác nhận đang mở.
+      const dot = await taoDotXacNhanTest();
+      dotId = dot.id;
+
       const hocVienMoet = await prisma.hoc_vien.create({
         data: {
           nguon_tao: 'import_moet',
@@ -697,6 +705,10 @@ describe('Hồ sơ Học viên (e2e)', () => {
         tenDangNhap,
         ddmmyyyy(NGAY, THANG, NAM_HOP_LE),
       );
+    });
+
+    afterAll(async () => {
+      await xoaDotXacNhanTest([dotId]);
     });
 
     it('hồ sơ MOET vừa import -> GET /hoc-vien/toi/muc-do-day-du trả day_du=false, liệt kê đủ trường thiếu', async () => {

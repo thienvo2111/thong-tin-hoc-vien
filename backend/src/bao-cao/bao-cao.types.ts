@@ -58,3 +58,54 @@ export interface TongHopResult {
   den_ngay: string | null;
   rows: TongHopRow[];
 }
+
+// T14 (mo-rong-nls-an-giang.md) — GET /bao-cao/xac-nhan.
+export const TRANG_THAI_XAC_NHAN = [
+  'chua_dang_nhap',
+  'dang_bo_sung',
+  'da_xac_nhan',
+] as const;
+export type TrangThaiXacNhan = (typeof TRANG_THAI_XAC_NHAN)[number];
+
+export interface XacNhanRow {
+  hoc_vien_id: string;
+  ho_ten: string;
+  ma_dinh_danh_moet: string | null;
+  don_vi_cong_tac_ten: string;
+  dang_nhap_lan_cuoi: Date | null;
+  trang_thai: TrangThaiXacNhan;
+}
+
+// T14 — GET /bao-cao/sua-truong-moet.
+export interface SuaTruongMoetRow {
+  id: string;
+  hoc_vien_id: string;
+  ho_ten_hoc_vien: string;
+  ma_dinh_danh_moet: string | null;
+  truong: string;
+  gia_tri_cu: string | null;
+  gia_tri_moi: string | null;
+  nguoi_sua: string;
+  vai_tro_nguoi_sua: string;
+  sua_luc: Date;
+}
+
+// T15 (mo-rong-nls-an-giang.md) — GET /bao-cao/xuat-cho-vle,
+// GET /bao-cao/dieu-kien-danh-gia.
+export interface XuatChoVleRow {
+  ma_dinh_danh_moet: string | null;
+  ho_ten: string;
+  email: string | null;
+  don_vi: string;
+  trang_thai_dot_1: 'da_xac_nhan' | 'chua_xac_nhan';
+}
+
+export interface DieuKienDanhGiaRow {
+  hoc_vien_id: string;
+  ho_ten: string;
+  ma_dinh_danh_moet: string | null;
+  don_vi_cong_tac_ten: string;
+  du_dieu_kien: boolean;
+  ly_do: string[];
+  da_xem_vle: boolean;
+}

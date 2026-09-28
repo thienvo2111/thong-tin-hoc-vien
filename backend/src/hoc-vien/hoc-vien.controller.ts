@@ -49,6 +49,13 @@ export class HocVienController {
     return this.hocVienService.mucDoDayDuCuaToi(user);
   }
 
+  // T14: cổng học viên xem đợt xác nhận đang mở/sắp mở + trạng thái xác nhận.
+  @Roles('hoc_vien')
+  @Get('toi/dot-xac-nhan')
+  dotXacNhanCuaToi(@CurrentUser() user: AuthenticatedUser) {
+    return this.hocVienService.dotXacNhanCuaToi(user);
+  }
+
   @Roles('hoc_vien')
   @Get('toi')
   layHoSoCuaToi(@CurrentUser() user: AuthenticatedUser) {
@@ -120,5 +127,17 @@ export class HocVienController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.hocVienService.duyet(id, dto, user);
+  }
+
+  // T14: quan_tri sửa hồ sơ import_moet NGOÀI thời gian đợt xác nhận (học
+  // viên chỉ xem lúc đó) — ghi lịch sử với vai_tro_nguoi_sua='quan_tri'.
+  @Roles('quan_tri')
+  @Patch(':id')
+  suaHoSoByAdmin(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateHocVienDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.hocVienService.suaHoSoByAdmin(id, dto, user);
   }
 }

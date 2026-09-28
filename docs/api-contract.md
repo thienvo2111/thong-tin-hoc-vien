@@ -59,19 +59,39 @@ Thao tác Quản trị lên tài khoản **người khác** (khác `/auth/*`, lu
 |---|---|---|---|
 | POST | `/hoc-vien` | Tự đăng ký (`nguon_tao='tu_dang_ky'`). Body = toàn bộ field khai báo (xem `database-ddl.sql#hoc_vien`). **Side effect**: tạo `hoc_vien` (trang_thai=`nhap`) VÀ `nguoi_dung` (vai_tro=`hoc_vien`, `ten_dang_nhap`=ĐDCN, mật khẩu mặc định = ngày sinh) trong 1 transaction — xem chi tiết ở mục "Luồng đăng ký". | Công khai |
 | GET | `/hoc-vien/toi` | Hồ sơ của chính mình, kèm `chuyen_mon: string[]`. **Thêm 2026-09-28**: kèm sẵn tên đã join cho mọi FK chọn-từ-danh-mục — `noi_sinh_ten`, `phuong_xa_ten`, `don_vi_cong_tac_ten`, `mon_giang_day_ten` (song song giữ nguyên `*_id`) — để màn "Xem lại & xác nhận" hiển thị tên thay vì UUID mà không phải gọi thêm request. Áp dụng tương tự cho `GET /hoc-vien/{id}` (mục "Ai gọi" khác) | Học viên |
-| PATCH | `/hoc-vien/toi` | Sửa hồ sơ — chỉ cho phép khi `trang_thai='nhap'` (đã `cho_duyet` thì khóa sửa, trừ khi bị `tu_choi` thì mở lại `nhap`). Với hồ sơ `nguon_tao='import_moet'`, đây cũng chính là màn "bổ sung thông tin" lần đầu (điền CCCD, nơi sinh, phường xã, email, trình độ, cấp giảng dạy, môn giảng dạy) | Học viên |
-| POST / DELETE | `/hoc-vien/toi/chuyen-mon` | Thêm / xóa 1 giá trị trong `hoc_vien_chuyen_mon` (nhiều chuyên môn/người) | Học viên |
+| PATCH | `/hoc-vien/toi` | Sửa hồ sơ. `nguon_tao='tu_dang_ky'`: chỉ khi `trang_thai='nhap'` (đã `cho_duyet` thì khóa sửa, trừ khi bị `tu_choi` thì mở lại `nhap`) — **không đổi** so với trước. `nguon_tao='import_moet'` **(T14, 2026-09-28 — thay đổi hành vi)**: chỉ sửa được khi có **đợt xác nhận đang mở** (bất kể `trang_thai`, luôn `da_duyet`), ngoài giờ đợt trả `403 DOT_XAC_NHAN_DONG`; sửa được mọi trường khai báo kể cả `ho_ten`/ngày sinh/`don_vi_cong_tac_id` (không sửa `ma_dinh_danh_moet`); mỗi trường đổi ghi 1 dòng `lich_su_thay_doi_ho_so`; nếu đang có xác nhận còn hiệu lực ở đợt đó thì bị hủy, response thêm `xac_nhan_bi_huy: boolean`. Xem mục "Đợt xác nhận & lịch sử thay đổi hồ sơ" bên dưới | Học viên |
+| POST / DELETE | `/hoc-vien/toi/chuyen-mon` | Thêm / xóa 1 giá trị trong `hoc_vien_chuyen_mon` (nhiều chuyên môn/người). **T14**: với `import_moet`, cùng gate + ghi lịch sử (`truong='chuyen_mon'`) + hủy xác nhận như PATCH ở trên | Học viên |
 | POST | `/hoc-vien/toi/kiem-tra-truoc-xac-nhan` | Dry-run validate toàn bộ hồ sơ, trả danh sách lỗi (chặn) + cảnh báo (không chặn) — dùng cho màn `XacNhanThongTin.dc.html` | Học viên |
-| POST | `/hoc-vien/toi/xac-nhan` | Chuyển `nhap` → `cho_duyet`. **Side effect**: gọi Dịch vụ Thông báo gửi email bản sao dữ liệu, set `email_ban_sao_da_gui_at`. Hồ sơ `import_moet` đã `da_duyet` sẵn nên **không gọi endpoint này để được duyệt** — chỉ dùng nó nếu muốn gửi lại email xác nhận sau khi bổ sung thông tin | Học viên |
+| POST | `/hoc-vien/toi/xac-nhan` | `tu_dang_ky`: chuyển `nhap` → `cho_duyet` (không đổi). `import_moet` **(T14 — thay đổi hành vi, trước đây chỉ resend email)**: bắt buộc có đợt đang mở (không thì `403 DOT_XAC_NHAN_DONG`) và hồ sơ đầy đủ (T9, không thì `400 VALIDATION_ERROR` kèm `fields`=danh sách thiếu) → tạo `xac_nhan_ho_so` (bản chụp hồ sơ). **Side effect** (cả 2 luồng): gọi Dịch vụ Thông báo gửi email bản sao dữ liệu, set `email_ban_sao_da_gui_at` | Học viên |
 | GET | `/hoc-vien` | Danh sách hồ sơ trong phạm vi quyền (query: `trang_thai`, `don_vi_cong_tac_id`, `cap_giang_day`, `nguon_tao`, `q` tìm theo tên/ĐDCN/Mã MOET, `day_du` — T1/T9 2026-09-28, xem mục "Hồ sơ đầy đủ" bên dưới) | Trường, Phòng VHXH, Sở, QuảnTrị |
 | GET | `/hoc-vien/{id}` | Chi tiết 1 hồ sơ (phải trong phạm vi quyền) | Trường, Phòng VHXH, Sở, QuảnTrị |
+| PATCH | `/hoc-vien/{id}` | **Thêm T14 (2026-09-28)**: Quản trị sửa hồ sơ `import_moet` NGOÀI thời gian đợt (học viên lúc đó chỉ xem) — cùng field/hành vi ghi lịch sử như `PATCH /hoc-vien/toi` (`vai_tro_nguoi_sua='quan_tri'`), nhưng **không** bị chặn bởi đợt đang mở | QuảnTrị |
 | POST | `/hoc-vien/{id}/duyet` | `{ ket_qua: "da_duyet" \| "tu_choi", ly_do? }`. Đơn vị duyệt xác định theo `cap_giang_day` của hồ sơ (xem bảng routing dưới). Chỉ áp dụng hồ sơ `nguon_tao='tu_dang_ky'` — hồ sơ `import_moet` bỏ qua bước này | Trường (nếu được phân công xác minh nội bộ), Phòng VHXH, Sở |
 | GET | `/hoc-vien/kiem-tra-trung?so_dinh_danh_ca_nhan=` | Kiểm tra ĐDCN đã tồn tại chưa (gọi trước khi submit form, tránh lỗi 409 muộn). **T1 (2026-09-28):** giới hạn 10 request/phút/IP (`429 RATE_LIMITED`) | Công khai |
 | GET | `/hoc-vien/toi/muc-do-day-du` | T9 (2026-09-28): `{ day_du: boolean, thieu: [{field, message}] }` — cổng học viên xem còn thiếu gì để hồ sơ được coi là "đầy đủ" (xem mục "Hồ sơ đầy đủ" bên dưới) | Học viên |
+| GET | `/hoc-vien/toi/dot-xac-nhan` | **Thêm T14**: `{ dot: {id, ten, loai, mo_luc, dong_luc} \| null, dang_mo: boolean, da_xac_nhan: boolean, day_du: boolean, thieu: [...] }`. `dot` = đợt đang mở nếu có, hoặc đợt sắp mở gần nhất nếu hiện không có đợt nào mở (`dang_mo=false` phân biệt 2 trường hợp). `tu_dang_ky` luôn trả `dot: null` (không áp dụng khái niệm đợt) | Học viên |
 
 ### Hồ sơ đầy đủ (T9, 2026-09-28)
 
 "Đầy đủ" = qua **toàn bộ** quy tắc của luồng `tu_dang_ky` trong `validation-checklist.md` (không chỉ "không NULL"): họ tên hợp lệ, CCCD 12 số không trùng, ngày sinh hợp lệ, nơi sinh + phường xã đúng cấp và khớp nhau, đơn vị `active` loại `truong`, SĐT + email hợp lệ, trình độ, ≥1 chuyên môn. Cảnh báo 🟡 **không** làm hồ sơ "chưa đầy đủ". Tính động qua `HocVienService.danhGiaDayDu()` (tái dùng đúng bộ quy tắc của `validateHocVien`/Dịch vụ Kiểm tra dữ liệu) — **không lưu cột tính sẵn**, luôn tính lại từ dữ liệu hiện tại. `GET /hoc-vien?day_du=false` lọc theo giá trị tính động này ở tầng ứng dụng (không phải điều kiện `WHERE` trên DB) — chấp nhận đánh đổi hiệu năng ở quy mô hiện tại (~9.000 hồ sơ).
+
+### Đợt xác nhận & lịch sử thay đổi hồ sơ (T14, 2026-09-28)
+
+Áp dụng riêng cho hồ sơ `nguon_tao='import_moet'` (thay rule #27/#28 cũ cho nguồn này — `tu_dang_ky` không đổi). Luồng nghiệp vụ (mo-rong-nls-an-giang.md mục 0): Đợt 1 (`kiem_tra_bo_sung`) — học viên đăng nhập kiểm tra/sửa/bổ sung hồ sơ; hết đợt 1, dữ liệu chuyển Phòng CNTT tạo tài khoản VLE (T15); Đợt 2 (`xac_nhan_truoc_danh_gia`) — ngay trước đánh giá đầu vào, học viên xác nhận lần cuối.
+
+- **"Đợt đang mở"** của 1 học viên = đợt (bất kỳ `loai`) có `mo_luc <= now() < dong_luc` và (`khoa_id IS NULL` — áp dụng mọi hồ sơ import_moet, kịch bản P0 — hoặc học viên đã ghi danh đúng `khoa_id` đó qua `dang_ky_hoc`). Các đợt không được chồng thời gian trong cùng phạm vi (`khoa_id`) — kiểm tra khi `POST`/`PATCH /dot-xac-nhan`.
+- `PATCH /hoc-vien/toi`, `POST`/`DELETE /hoc-vien/toi/chuyen-mon`: chỉ cho phép khi có đợt đang mở. Mỗi trường thay đổi (không phải mỗi request) → 1 dòng `lich_su_thay_doi_ho_so`; sửa tiếp sau khi đã xác nhận trong đợt đó → xác nhận cũ `con_hieu_luc=false` (response trả `xac_nhan_bi_huy: true`).
+- `POST /hoc-vien/toi/xac-nhan`: bắt buộc đợt đang mở + hồ sơ đầy đủ (T9) → tạo `xac_nhan_ho_so` (bản chụp `du_lieu` = response của `GET /hoc-vien/toi` tại thời điểm xác nhận).
+- Ngoài giờ đợt: học viên chỉ xem (`GET` không bị chặn). Quản trị sửa qua `PATCH /hoc-vien/{id}` (không bị chặn bởi đợt).
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| POST | `/dot-xac-nhan` | `{ khoa_id?, ten, loai, mo_luc, dong_luc }` (ISO datetime). `khoa_id` bỏ trống = áp dụng toàn cục | QuảnTrị |
+| PATCH | `/dot-xac-nhan/{id}` | `{ dong_luc }` — gia hạn (chỉ sửa `dong_luc`, không sửa `mo_luc`/`loai`/`khoa_id`) | QuảnTrị |
+| GET | `/dot-xac-nhan?khoa_id=` | Danh sách đợt | QuảnTrị |
+| GET | `/bao-cao/xac-nhan?dot_id=&trang_thai=chua_dang_nhap\|dang_bo_sung\|da_xac_nhan&don_vi_cong_tac_id=` + `/xuat-excel` | Tiến độ xác nhận của 1 đợt cụ thể (`dot_id` bắt buộc — improvised, xem `bao-cao.service.ts`), theo phạm vi đơn vị (Trường/Phòng/Sở chỉ thấy giáo viên của mình). `chua_dang_nhap` dựa trên `nguoi_dung.dang_nhap_lan_cuoi` (T1) | Trường, Phòng VHXH, Sở, QuảnTrị |
+| GET | `/bao-cao/sua-truong-moet?khoa_id=` + `/xuat-excel` | Danh sách thay đổi trường gốc MOET (`la_truong_goc_moet=true`) để N1 rà soát | QuảnTrị |
+| GET | `/bao-cao/xuat-cho-vle?khoa_id=` | File Excel trực tiếp: mã MOET, họ tên, email (nếu có), đơn vị, trạng thái đợt 1 (đợt `kiem_tra_bo_sung` gần nhất khớp `khoa_id`) — chuyển Phòng CNTT tạo tài khoản VLE (T15) | QuảnTrị |
 
 ### Routing đơn vị duyệt (theo `cap_giang_day` của hồ sơ)
 ```

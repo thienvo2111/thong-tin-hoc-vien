@@ -3,12 +3,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from '../auth/scope/scope.service';
 import {
   ConflictAppException,
+  DotXacNhanDongException,
   ForbiddenAppException,
   NotFoundAppException,
   ValidationException,
 } from '../common/exceptions/app.exceptions';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
+import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
 
 const namHopLe = new Date().getUTCFullYear() - 20;
 
@@ -44,6 +46,7 @@ describe('HocVienService', () => {
     don_vi_cong_tac: { findUnique: jest.Mock; findFirst: jest.Mock };
     mon_hoc: { findUnique: jest.Mock };
     nguoi_dung: { create: jest.Mock; update: jest.Mock };
+    lich_su_thay_doi_ho_so: { createMany: jest.Mock; create: jest.Mock };
     $transaction: jest.Mock;
   };
   let scopeService: {
@@ -53,6 +56,13 @@ describe('HocVienService', () => {
   let thongBaoService: {
     guiHocVienXacNhan: jest.Mock;
     guiHocVienDuyet: jest.Mock;
+  };
+  let dotXacNhanService: {
+    dotDangMoCuaHocVien: jest.Mock;
+    dotSapMoCuaHocVien: jest.Mock;
+    coXacNhanConHieuLuc: jest.Mock;
+    huyXacNhanNeuCo: jest.Mock;
+    taoXacNhan: jest.Mock;
   };
 
   beforeEach(() => {
@@ -69,6 +79,10 @@ describe('HocVienService', () => {
       don_vi_cong_tac: { findUnique: jest.fn(), findFirst: jest.fn() },
       mon_hoc: { findUnique: jest.fn() },
       nguoi_dung: { create: jest.fn(), update: jest.fn() },
+      lich_su_thay_doi_ho_so: {
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+        create: jest.fn(),
+      },
       $transaction: jest.fn(),
     };
     // Mặc định: $transaction chạy callback ngay với chính prisma mock làm tx
@@ -85,10 +99,21 @@ describe('HocVienService', () => {
       guiHocVienXacNhan: jest.fn().mockResolvedValue(undefined),
       guiHocVienDuyet: jest.fn().mockResolvedValue(undefined),
     };
+    // T14: các test hiện có đều dùng nguon_tao='tu_dang_ky' (không đi qua
+    // đợt xác nhận) — mock trả "không có đợt" làm mặc định an toàn, test
+    // riêng cho import_moet (nếu có) tự override.
+    dotXacNhanService = {
+      dotDangMoCuaHocVien: jest.fn().mockResolvedValue(null),
+      dotSapMoCuaHocVien: jest.fn().mockResolvedValue(null),
+      coXacNhanConHieuLuc: jest.fn().mockResolvedValue(false),
+      huyXacNhanNeuCo: jest.fn().mockResolvedValue(false),
+      taoXacNhan: jest.fn(),
+    };
     service = new HocVienService(
       prisma as unknown as PrismaService,
       scopeService as unknown as ScopeService,
       thongBaoService as unknown as ThongBaoService,
+      dotXacNhanService as unknown as DotXacNhanService,
     );
 
     // Fixture mặc định: mọi FK tra cứu hợp lệ (test override khi cần âm tính).
@@ -841,6 +866,292 @@ describe('HocVienService', () => {
         ),
       ).rejects.toBeInstanceOf(ValidationException);
       expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('T14 — đợt xác nhận & lịch sử thay đổi hồ sơ', () => {
+    function baseImportMoetHocVien(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'hv-moet-1',
+        nguon_tao: 'import_moet',
+        trang_thai: 'da_duyet',
+        ho_ten: 'Nguyễn Văn Cũ',
+        so_dinh_danh_ca_nhan: null,
+        ngay_sinh: 15,
+        thang_sinh: 6,
+        nam_sinh: namHopLe,
+        noi_sinh_id: null,
+        phuong_xa_id: null,
+        don_vi_cong_tac_id: 'truong-1',
+        chuc_vu: 'Giáo viên',
+        so_dien_thoai_lien_he: '0912345678',
+        email_lien_he: null,
+        trinh_do_chuyen_mon: null,
+        trinh_do_chuyen_mon_khac: null,
+        cap_giang_day: null,
+        mon_giang_day_id: null,
+        chuyen_mon: [
+          { id: 'cm-1', hoc_vien_id: 'hv-moet-1', chuyen_mon: 'Toán' },
+        ],
+        ...overrides,
+      };
+    }
+
+    const callerHocVien = {
+      id: 'nd-hv-1',
+      vai_tro: 'hoc_vien',
+      hoc_vien_id: 'hv-moet-1',
+    } as AuthenticatedUser;
+
+    describe('capNhatHoSoCuaToi — import_moet', () => {
+      it('KHÔNG có đợt đang mở -> DotXacNhanDongException, không update', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseImportMoetHocVien());
+        dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue(null);
+
+        await expect(
+          service.capNhatHoSoCuaToi(callerHocVien, { chuc_vu: 'Nhân viên' }),
+        ).rejects.toBeInstanceOf(DotXacNhanDongException);
+        expect(prisma.hoc_vien.update).not.toHaveBeenCalled();
+      });
+
+      it('CÓ đợt đang mở, sửa ho_ten + chuc_vu -> 2 dòng lịch sử, la_truong_goc_moet=true cả 2, dot_id đúng đợt', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseImportMoetHocVien());
+        dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue({
+          id: 'dot-1',
+        });
+        prisma.hoc_vien.update.mockResolvedValue({
+          ...baseImportMoetHocVien({
+            ho_ten: 'Nguyễn Văn Mới',
+            chuc_vu: 'Nhân viên',
+          }),
+        });
+        dotXacNhanService.huyXacNhanNeuCo.mockResolvedValue(false);
+
+        const res = await service.capNhatHoSoCuaToi(callerHocVien, {
+          ho_ten: 'Nguyễn Văn Mới',
+          chuc_vu: 'Nhân viên',
+        });
+
+        expect(prisma.lich_su_thay_doi_ho_so.createMany).toHaveBeenCalledWith({
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              truong: 'ho_ten',
+              gia_tri_cu: 'Nguyễn Văn Cũ',
+              gia_tri_moi: 'Nguyễn Văn Mới',
+              la_truong_goc_moet: true,
+              dot_id: 'dot-1',
+            }),
+            expect.objectContaining({
+              truong: 'chuc_vu',
+              gia_tri_cu: 'Giáo viên',
+              gia_tri_moi: 'Nhân viên',
+              la_truong_goc_moet: true,
+              dot_id: 'dot-1',
+            }),
+          ]),
+        });
+        expect(
+          (
+            prisma.lich_su_thay_doi_ho_so.createMany.mock.calls[0][0] as {
+              data: unknown[];
+            }
+          ).data,
+        ).toHaveLength(2);
+        expect(dotXacNhanService.huyXacNhanNeuCo).toHaveBeenCalledWith(
+          prisma,
+          'dot-1',
+          'hv-moet-1',
+        );
+        expect(res.xac_nhan_bi_huy).toBe(false);
+      });
+
+      it('gửi field trùng giá trị cũ -> không tạo dòng lịch sử nào (diff rỗng)', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseImportMoetHocVien());
+        dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue({
+          id: 'dot-1',
+        });
+        prisma.hoc_vien.update.mockResolvedValue(baseImportMoetHocVien());
+
+        await service.capNhatHoSoCuaToi(callerHocVien, {
+          chuc_vu: 'Giáo viên', // giá trị y hệt cũ
+        });
+
+        expect(prisma.lich_su_thay_doi_ho_so.createMany).not.toHaveBeenCalled();
+        expect(dotXacNhanService.huyXacNhanNeuCo).not.toHaveBeenCalled();
+      });
+
+      it('sửa so_dinh_danh_ca_nhan (CCCD, không thuộc trường gốc MOET) -> ghi lịch sử nhưng la_truong_goc_moet=false', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseImportMoetHocVien());
+        dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue({
+          id: 'dot-1',
+        });
+        prisma.hoc_vien.update.mockResolvedValue(
+          baseImportMoetHocVien({ so_dinh_danh_ca_nhan: '123456789012' }),
+        );
+
+        await service.capNhatHoSoCuaToi(callerHocVien, {
+          so_dinh_danh_ca_nhan: '123456789012',
+        });
+
+        expect(prisma.lich_su_thay_doi_ho_so.createMany).toHaveBeenCalledWith({
+          data: [
+            expect.objectContaining({
+              truong: 'so_dinh_danh_ca_nhan',
+              la_truong_goc_moet: false,
+            }),
+          ],
+        });
+      });
+    });
+
+    describe('capNhatHoSoCuaToi — tu_dang_ky (không đổi hành vi T14)', () => {
+      it('trang_thai=nhap -> sửa được, KHÔNG ghi lịch sử (rule T14 chỉ áp dụng import_moet)', async () => {
+        const hv = {
+          id: 'hv-tdk-1',
+          nguon_tao: 'tu_dang_ky',
+          trang_thai: 'nhap',
+          ho_ten: 'Học Viên Tự Đăng Ký',
+          so_dinh_danh_ca_nhan: '999999999999',
+          ngay_sinh: 1,
+          thang_sinh: 1,
+          nam_sinh: namHopLe,
+          noi_sinh_id: 'tinh-1',
+          phuong_xa_id: 'xa-1',
+          don_vi_cong_tac_id: 'truong-1',
+          so_dien_thoai_lien_he: '0912345678',
+          email_lien_he: 'a@test.local',
+          trinh_do_chuyen_mon: 'dai_hoc',
+          chuyen_mon: [],
+        };
+        prisma.hoc_vien.findUnique.mockResolvedValue(hv);
+        prisma.hoc_vien.update.mockResolvedValue({
+          ...hv,
+          so_dien_thoai_lien_he: '0987654321',
+        });
+
+        await service.capNhatHoSoCuaToi(
+          { hoc_vien_id: 'hv-tdk-1' } as AuthenticatedUser,
+          { so_dien_thoai_lien_he: '0987654321' },
+        );
+
+        expect(dotXacNhanService.dotDangMoCuaHocVien).not.toHaveBeenCalled();
+        expect(prisma.lich_su_thay_doi_ho_so.createMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('POST /hoc-vien/toi/xac-nhan — import_moet', () => {
+      it('KHÔNG có đợt đang mở -> DotXacNhanDongException', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseImportMoetHocVien());
+        dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue(null);
+
+        await expect(service.xacNhan(callerHocVien)).rejects.toBeInstanceOf(
+          DotXacNhanDongException,
+        );
+        expect(dotXacNhanService.taoXacNhan).not.toHaveBeenCalled();
+      });
+
+      it('có đợt mở nhưng hồ sơ CHƯA đầy đủ -> ValidationException, không tạo xác nhận', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseImportMoetHocVien());
+        dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue({
+          id: 'dot-1',
+        });
+
+        await expect(service.xacNhan(callerHocVien)).rejects.toBeInstanceOf(
+          ValidationException,
+        );
+        expect(dotXacNhanService.taoXacNhan).not.toHaveBeenCalled();
+      });
+
+      it('có đợt mở + hồ sơ đầy đủ -> taoXacNhan được gọi, gửi email, KHÔNG đổi trang_thai', async () => {
+        const hocVienDayDu = baseImportMoetHocVien({
+          so_dinh_danh_ca_nhan: '123456789012',
+          noi_sinh_id: 'tinh-1',
+          phuong_xa_id: 'xa-1',
+          email_lien_he: 'du@test.local',
+          trinh_do_chuyen_mon: 'dai_hoc',
+        });
+        prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDu);
+        dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue({
+          id: 'dot-1',
+        });
+        prisma.hoc_vien.update.mockResolvedValue(hocVienDayDu);
+
+        await service.xacNhan(callerHocVien);
+
+        expect(dotXacNhanService.taoXacNhan).toHaveBeenCalledWith(
+          prisma,
+          'dot-1',
+          'hv-moet-1',
+          expect.any(Object),
+        );
+        expect(thongBaoService.guiHocVienXacNhan).toHaveBeenCalledWith(
+          'hv-moet-1',
+        );
+        expect(prisma.hoc_vien.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'hv-moet-1' },
+            data: expect.objectContaining({
+              email_ban_sao_da_gui_at: expect.any(Date),
+            }),
+          }),
+        );
+      });
+    });
+
+    describe('dotXacNhanCuaToi', () => {
+      it('tu_dang_ky -> dot=null, dang_mo=false', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue({
+          id: 'hv-tdk-1',
+          nguon_tao: 'tu_dang_ky',
+          trang_thai: 'nhap',
+          so_dinh_danh_ca_nhan: '999999999999',
+          ngay_sinh: 1,
+          thang_sinh: 1,
+          nam_sinh: namHopLe,
+          don_vi_cong_tac_id: 'truong-1',
+          so_dien_thoai_lien_he: '0912345678',
+          chuyen_mon: [],
+        });
+        const res = await service.dotXacNhanCuaToi({
+          hoc_vien_id: 'hv-tdk-1',
+        } as AuthenticatedUser);
+        expect(res.dot).toBeNull();
+        expect(res.dang_mo).toBe(false);
+      });
+
+      it('import_moet, có đợt đang mở, chưa xác nhận -> dang_mo=true, da_xac_nhan=false', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseImportMoetHocVien());
+        dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue({
+          id: 'dot-1',
+          ten: 'Đợt 1',
+          loai: 'kiem_tra_bo_sung',
+          mo_luc: new Date('2026-10-01'),
+          dong_luc: new Date('2026-10-05'),
+        });
+        dotXacNhanService.coXacNhanConHieuLuc.mockResolvedValue(false);
+
+        const res = await service.dotXacNhanCuaToi(callerHocVien);
+        expect(res.dang_mo).toBe(true);
+        expect(res.da_xac_nhan).toBe(false);
+        expect(res.dot?.id).toBe('dot-1');
+      });
+
+      it('import_moet, KHÔNG có đợt đang mở nhưng có đợt sắp mở -> dang_mo=false, dot=đợt sắp mở', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseImportMoetHocVien());
+        dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue(null);
+        dotXacNhanService.dotSapMoCuaHocVien.mockResolvedValue({
+          id: 'dot-sap-mo',
+          ten: 'Đợt 2',
+          loai: 'xac_nhan_truoc_danh_gia',
+          mo_luc: new Date('2026-11-01'),
+          dong_luc: new Date('2026-11-05'),
+        });
+
+        const res = await service.dotXacNhanCuaToi(callerHocVien);
+        expect(res.dang_mo).toBe(false);
+        expect(res.da_xac_nhan).toBe(false);
+        expect(res.dot?.id).toBe('dot-sap-mo');
+      });
     });
   });
 });

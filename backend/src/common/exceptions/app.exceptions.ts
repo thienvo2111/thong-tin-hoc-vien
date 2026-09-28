@@ -68,6 +68,15 @@ export class AccountLockedException extends HttpException {
   }
 }
 
+// T14 (mo-rong-nls-an-giang.md): 403 khi học viên nguon_tao='import_moet' cố
+// sửa hồ sơ (PATCH /hoc-vien/toi, POST/DELETE /hoc-vien/toi/chuyen-mon, POST
+// /hoc-vien/toi/xac-nhan) ngoài thời gian đợt xác nhận đang mở.
+export class DotXacNhanDongException extends HttpException {
+  constructor(message = 'Ngoài thời gian đợt xác nhận, không thể sửa hồ sơ') {
+    super({ error: { code: 'DOT_XAC_NHAN_DONG', message } }, 403);
+  }
+}
+
 // Dùng bởi Dịch vụ Import (mỗi dòng file) để biến lỗi ném ra từ đúng 1 bộ
 // quy tắc validate dùng chung (ValidationException/ConflictAppException của
 // các *_hoc.service.ts) thành 1 chuỗi lý do ngắn gọn cho cột "Lý do".

@@ -74,3 +74,43 @@ export async function xoaDonViTest(donViIds: string[], diaDanhIds: string[]) {
   await prisma.don_vi_cong_tac.deleteMany({ where: { id: { in: donViIds } } });
   await prisma.dia_danh.deleteMany({ where: { id: { in: diaDanhIds } } });
 }
+
+// T14: đợt xác nhận scope TOÀN CỤC (khoa_id=NULL, đúng kịch bản P0 —
+// mo-rong-nls-an-giang.md mục 3 "Rút gọn để kịp P0") mở rộng (1 giờ trước ->
+// 1 giờ sau `now`) để mọi test PATCH /hoc-vien/toi cho hồ sơ import_moet
+// chạy được trong cửa sổ này. LUÔN dọn bằng xoaDotXacNhanTest() ở afterAll
+// của MỖI file tạo ra nó — vì scope NULL là TOÀN CỤC, để sót sẽ ảnh hưởng
+// các file e2e khác chạy sau trong cùng lượt (jest --runInBand chạy tuần
+// tự nên không lo chồng NGANG giữa các file, chỉ cần dọn đúng trước khi file
+// tiếp theo bắt đầu).
+export async function taoDotXacNhanTest(
+  overrides: Partial<{
+    loai: 'kiem_tra_bo_sung' | 'xac_nhan_truoc_danh_gia';
+    khoa_id: string | null;
+    mo_luc: Date;
+    dong_luc: Date;
+  }> = {},
+) {
+  const suf = uniqueSuffix();
+  const now = new Date();
+  return prisma.dot_xac_nhan.create({
+    data: {
+      ten: `Đợt test ${suf}`,
+      loai: overrides.loai ?? 'kiem_tra_bo_sung',
+      khoa_id: overrides.khoa_id ?? null,
+      mo_luc: overrides.mo_luc ?? new Date(now.getTime() - 60 * 60 * 1000),
+      dong_luc: overrides.dong_luc ?? new Date(now.getTime() + 60 * 60 * 1000),
+    },
+  });
+}
+
+export async function xoaDotXacNhanTest(dotIds: string[]) {
+  if (dotIds.length === 0) return;
+  // lich_su_thay_doi_ho_so.dot_id KHÔNG có ON DELETE CASCADE (nullable, chỉ
+  // để audit "sửa trong đợt nào") -> dọn trước để không vỡ FK. xac_nhan_ho_so
+  // CÓ CASCADE (xóa dot_xac_nhan tự xóa theo) nên không cần dọn riêng.
+  await prisma.lich_su_thay_doi_ho_so.deleteMany({
+    where: { dot_id: { in: dotIds } },
+  });
+  await prisma.dot_xac_nhan.deleteMany({ where: { id: { in: dotIds } } });
+}

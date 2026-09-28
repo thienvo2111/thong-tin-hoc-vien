@@ -141,6 +141,16 @@ enum trang_thai_gui_thong_bao {
   that_bai
 }
 
+// T14 (mo-rong-nls-an-giang.md, 2026-09-28): tách migration RIÊNG cho enum
+// này trước migration tạo bảng dot_xac_nhan dùng nó (không bắt buộc về mặt kỹ
+// thuật cho CREATE TYPE mới — chỉ ALTER TYPE ... ADD VALUE mới bị Postgres
+// chặn dùng cùng transaction — nhưng làm theo đúng cấu trúc "migration A/B"
+// mà tài liệu task đã chốt để nhất quán).
+enum loai_dot_xac_nhan {
+  kiem_tra_bo_sung
+  xac_nhan_truoc_danh_gia
+}
+
 // =====================================================================
 // PHẦN 1 — DANH MỤC DÙNG CHUNG
 // =====================================================================
@@ -269,6 +279,8 @@ model nguoi_dung {
   token_thu_hoi             token_thu_hoi[]
   nhat_ky_dat_lai_mat_khau_cua_toi  nhat_ky_dat_lai_mat_khau[] @relation("nhat_ky_dlmk_nguoi_dung")
   nhat_ky_dat_lai_mat_khau_thuc_hien nhat_ky_dat_lai_mat_khau[] @relation("nhat_ky_dlmk_thuc_hien_boi")
+  dot_xac_nhan_created_by   dot_xac_nhan[]             @relation("dot_xac_nhan_created_by")
+  lich_su_thay_doi_thuc_hien lich_su_thay_doi_ho_so[]  @relation("lich_su_thay_doi_nguoi_sua")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -359,6 +371,8 @@ model hoc_vien {
   chuyen_mon         hoc_vien_chuyen_mon[]
   dang_ky_hoc        dang_ky_hoc[]
   nhat_ky_thong_bao  nhat_ky_thong_bao[]
+  xac_nhan_ho_so     xac_nhan_ho_so[]
+  lich_su_thay_doi   lich_su_thay_doi_ho_so[]
 
   @@index([don_vi_cong_tac_id], map: "idx_hoc_vien_don_vi")
   @@index([trang_thai], map: "idx_hoc_vien_trang_thai")
@@ -376,6 +390,72 @@ model hoc_vien_chuyen_mon {
 
   @@unique([hoc_vien_id, chuyen_mon], map: "uq_hoc_vien_chuyen_mon")
   @@index([hoc_vien_id], map: "idx_hoc_vien_chuyen_mon_hv")
+}
+
+// ---------------------------------------------------------------------
+// T14 (mo-rong-nls-an-giang.md, 2026-09-28): đợt xác nhận & lịch sử thay
+// đổi hồ sơ cho học viên nguon_tao='import_moet'. khoa_id NULL = áp dụng
+// mọi hồ sơ import_moet (quyết định "rút gọn để kịp P0", mục 3 của tài
+// liệu) — gắn khóa cụ thể để sau này nếu cần, chưa dùng ở lượt này.
+//
+// CHECK constraints KHÔNG biểu diễn được bằng Prisma DSL (chk_dot_xac_nhan_
+// thoi_gian, chk_xac_nhan_hieu_luc) + unique index có điều kiện WHERE
+// (uq_xac_nhan_con_hieu_luc) + index có điều kiện WHERE (idx_lich_su_goc_moet)
+// — thêm bằng raw SQL nối vào migration, cùng cách làm với migration khởi
+// tạo (xem comment đầu file).
+// ---------------------------------------------------------------------
+model dot_xac_nhan {
+  id         String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  khoa_id    String?           @db.Uuid
+  ten        String            @db.VarChar(255)
+  loai       loai_dot_xac_nhan
+  mo_luc     DateTime          @db.Timestamptz(6)
+  dong_luc   DateTime          @db.Timestamptz(6)
+  created_by String?           @db.Uuid
+  created_at DateTime          @default(now()) @db.Timestamptz(6)
+
+  khoa            khoa_boi_duong? @relation(fields: [khoa_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  created_by_user nguoi_dung?     @relation("dot_xac_nhan_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  xac_nhan xac_nhan_ho_so[]
+  lich_su  lich_su_thay_doi_ho_so[]
+
+  @@index([khoa_id], map: "idx_dot_xac_nhan_khoa")
+}
+
+model xac_nhan_ho_so {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dot_id          String    @db.Uuid
+  hoc_vien_id     String    @db.Uuid
+  xac_nhan_luc    DateTime  @default(now()) @db.Timestamptz(6)
+  du_lieu         Json
+  con_hieu_luc    Boolean   @default(true)
+  vo_hieu_luc_luc DateTime? @db.Timestamptz(6)
+
+  dot      dot_xac_nhan @relation(fields: [dot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  hoc_vien hoc_vien     @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([hoc_vien_id], map: "idx_xac_nhan_hv")
+  @@index([dot_id], map: "idx_xac_nhan_dot")
+}
+
+model lich_su_thay_doi_ho_so {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hoc_vien_id        String             @db.Uuid
+  truong             String             @db.VarChar(64)
+  gia_tri_cu         String?
+  gia_tri_moi        String?
+  la_truong_goc_moet Boolean            @default(false)
+  nguoi_sua_id       String             @db.Uuid
+  vai_tro_nguoi_sua  vai_tro_nguoi_dung
+  dot_id             String?            @db.Uuid
+  sua_luc            DateTime           @default(now()) @db.Timestamptz(6)
+
+  hoc_vien  hoc_vien      @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nguoi_sua nguoi_dung    @relation("lich_su_thay_doi_nguoi_sua", fields: [nguoi_sua_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  dot       dot_xac_nhan? @relation(fields: [dot_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([hoc_vien_id], map: "idx_lich_su_hv")
 }
 
 // =====================================================================
@@ -405,9 +485,10 @@ model khoa_boi_duong {
   nguoi_duyet     nguoi_dung?     @relation("khoa_boi_duong_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   created_by_user nguoi_dung?     @relation("khoa_boi_duong_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  giai_doan   giai_doan_khoa[]
-  lop_hoc     lop_hoc[]
-  dang_ky_hoc dang_ky_hoc[]
+  giai_doan    giai_doan_khoa[]
+  lop_hoc      lop_hoc[]
+  dang_ky_hoc  dang_ky_hoc[]
+  dot_xac_nhan dot_xac_nhan[]
 
   @@index([don_vi_to_chuc_id], map: "idx_khoa_don_vi")
   @@index([trang_thai], map: "idx_khoa_trang_thai")

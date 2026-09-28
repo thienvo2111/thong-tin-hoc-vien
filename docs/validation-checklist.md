@@ -148,3 +148,19 @@ Ký hiệu: 🔴 lỗi chặn lưu · 🟡 cảnh báo không chặn (chỉ nh�
 | # | Quy tắc | Mức | Nơi thực thi |
 |---|---|---|---|
 | 59 | "Đầy đủ" = qua toàn bộ quy tắc #1-26b của luồng `tu_dang_ky` (`validateHocVien(requireFull=true)`) — cảnh báo 🟡 KHÔNG làm hồ sơ "chưa đầy đủ", chỉ lỗi 🔴 mới tính. Tính động (`HocVienService.danhGiaDayDu`), không lưu cột tính sẵn | 🔴 | API (`GET /hoc-vien/toi/muc-do-day-du`, `GET /hoc-vien?day_du=`) |
+
+## Đợt xác nhận & lịch sử thay đổi hồ sơ (T14, 2026-09-28 — mo-rong-nls-an-giang.md, QĐ7)
+
+Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_ky` giữ nguyên #27/#28 như cũ.
+
+| # | Quy tắc | Mức | Nơi thực thi |
+|---|---|---|---|
+| 60 | "Đợt đang mở" của 1 học viên = đợt (bất kỳ `loai`) có `mo_luc <= now() < dong_luc` và (`khoa_id IS NULL` hoặc học viên đã ghi danh đúng `khoa_id` đó qua `dang_ky_hoc`) | 🔴 | API (`DotXacNhanService.dotDangMoCuaHocVien`) |
+| 61 | Các đợt không được chồng thời gian trong cùng phạm vi (`khoa_id`, kể cả cùng NULL) | 🔴 | API (`DotXacNhanService.kiemTraChongCheo`, kiểm tra khi tạo/gia hạn đợt — DB không có EXCLUDE constraint cho việc này) |
+| 62 | `import_moet`: `PATCH /hoc-vien/toi`, `POST`/`DELETE /hoc-vien/toi/chuyen-mon`, `POST /hoc-vien/toi/xac-nhan` chỉ thực hiện được khi có đợt đang mở — ngoài giờ đợt trả `403 DOT_XAC_NHAN_DONG` (bất kể `trang_thai`, hồ sơ `import_moet` luôn `da_duyet`) | 🔴 | API |
+| 63 | `import_moet` sửa được mọi trường khai báo (kể cả `ho_ten`, ngày sinh, `don_vi_cong_tac_id`) qua PATCH trong đợt mở; **không** sửa được `ma_dinh_danh_moet`, `nguon_tao`, trạng thái (không có trong `UpdateHocVienDto`) | 🔴 | API |
+| 64 | Mỗi TRƯỜNG thay đổi giá trị (so với hồ sơ trước đó, không phải mỗi request) → 1 dòng `lich_su_thay_doi_ho_so`, cùng transaction với `hoc_vien.update`. `la_truong_goc_moet=true` cho đúng 7 trường: `ho_ten`, `ngay_sinh`, `thang_sinh`, `nam_sinh`, `don_vi_cong_tac_id`, `chuc_vu`, `so_dien_thoai_lien_he` (+ `chuyen_mon` qua POST/DELETE riêng) — các trường khác (CCCD, nơi sinh, phường xã, email, trình độ, cấp/môn giảng dạy, ghi chú) vẫn ghi lịch sử nhưng `la_truong_goc_moet=false` | 🔴 | DB (bảng `lich_su_thay_doi_ho_so`) + API (`HocVienService.tinhDiffHoSo`) |
+| 65 | Nếu học viên đã có xác nhận còn hiệu lực (`xac_nhan_ho_so.con_hieu_luc=true`) ở đợt đang mở mà sửa hồ sơ/chuyên môn tiếp → xác nhận đó `con_hieu_luc=false`, `vo_hieu_luc_luc=now()`; response của endpoint sửa trả thêm `xac_nhan_bi_huy: true` | 🔴 | API (`DotXacNhanService.huyXacNhanNeuCo`, cùng transaction) |
+| 66 | Đổi ngày sinh **không** đổi mật khẩu (mật khẩu chỉ đổi qua `POST /auth/doi-mat-khau`, không có logic nào tự sync lại theo `ngay_sinh` sau lần đăng nhập đầu — rule #35) | 🔴 | API |
+| 67 | `POST /hoc-vien/toi/xac-nhan` (`import_moet`): bắt buộc đợt đang mở **và** `day_du=true` (T9) — thiếu 1 trong 2 → lỗi tương ứng (`403 DOT_XAC_NHAN_DONG` hoặc `400 VALIDATION_ERROR` kèm `fields`=danh sách thiếu); tạo `xac_nhan_ho_so.du_lieu` = bản chụp response `GET /hoc-vien/toi` tại thời điểm xác nhận; gửi lại email `hoc_vien_xac_nhan` | 🔴 | API |
+| 68 | Ngoài giờ đợt: học viên chỉ xem (`GET` không bị chặn); Quản trị vẫn sửa được qua `PATCH /hoc-vien/{id}` (không bị chặn bởi đợt), ghi lịch sử với `vai_tro_nguoi_sua='quan_tri'` | 🔴 | API |

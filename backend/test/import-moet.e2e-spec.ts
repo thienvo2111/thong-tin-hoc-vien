@@ -5,8 +5,10 @@ import { createTestApp } from './utils/test-app';
 import {
   prisma,
   taoDonViTest,
+  taoDotXacNhanTest,
   taoNguoiDungTest,
   uniqueSuffix,
+  xoaDotXacNhanTest,
   xoaNguoiDungTest,
   xoaDonViTest,
 } from './utils/test-data';
@@ -309,6 +311,20 @@ describe('Import ho_so_nhan_su_moet (e2e)', () => {
   });
 
   describe('Học viên import_moet tự bổ sung thông tin qua PATCH /hoc-vien/toi', () => {
+    // T14: PATCH /hoc-vien/toi cho import_moet giờ CHỈ được phép khi có đợt
+    // xác nhận đang mở (không còn "luôn sửa được" như trước) — mở 1 đợt
+    // scope toàn cục (khoa_id=NULL) bao trùm suốt describe block này.
+    let dotId: string;
+
+    beforeAll(async () => {
+      const dot = await taoDotXacNhanTest();
+      dotId = dot.id;
+    });
+
+    afterAll(async () => {
+      await xoaDotXacNhanTest([dotId]);
+    });
+
     it('bổ sung CCCD/email/nơi sinh sau khi đăng nhập lần đầu', async () => {
       const suf = uniqueSuffix();
       const ma = `MOET-PATCH-${suf}`;
@@ -345,8 +361,9 @@ describe('Import ho_so_nhan_su_moet (e2e)', () => {
           .expect(200)
       ).body.token as string;
 
-      // Hồ sơ đã da_duyet nhưng vẫn PATCH được vì nguon_tao=import_moet
-      // (xem HocVienService.isEditable) — đây chính là màn "bổ sung thông tin".
+      // Hồ sơ đã da_duyet nhưng vẫn PATCH được vì có đợt xác nhận đang mở
+      // (T14, xem HocVienService.kiemTraEditableVaLayDot) — đây chính là màn
+      // "bổ sung thông tin".
       const res = await request(app.getHttpServer())
         .patch('/hoc-vien/toi')
         .set('Authorization', `Bearer ${token}`)
@@ -362,12 +379,72 @@ describe('Import ho_so_nhan_su_moet (e2e)', () => {
       expect(res.body.so_dinh_danh_ca_nhan).toBe('198765432109');
       expect(res.body.email_lien_he).toEqual(expect.stringContaining('bosung'));
       expect(res.body.trang_thai).toBe('da_duyet'); // không đổi trạng thái
+      expect(res.body.xac_nhan_bi_huy).toBe(false); // chưa từng xác nhận ở đợt này
 
       // ĐDCN giờ dùng được cho kiểm tra trùng
       const kt = await request(app.getHttpServer())
         .get('/hoc-vien/kiem-tra-trung?so_dinh_danh_ca_nhan=198765432109')
         .expect(200);
       expect(kt.body.ton_tai).toBe(true);
+    });
+
+    it('T14: NGOÀI thời gian đợt (không có đợt nào đang mở) -> 403 DOT_XAC_NHAN_DONG', async () => {
+      const suf = uniqueSuffix();
+      const ma = `MOET-NODOT-${suf}`;
+      const buffer = await buildXlsx([
+        [
+          donViFixture.donVi.ten_don_vi,
+          ma,
+          'Đóng Cửa Sổ',
+          1,
+          1,
+          NAM_HOP_LE,
+          'Giáo viên',
+          'Toán',
+          '0900111222',
+          '',
+        ],
+      ]);
+      const createRes = await request(app.getHttpServer())
+        .post('/import/ho_so_nhan_su_moet')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .attach('file', buffer, 'moet-nodot.xlsx')
+        .expect(201);
+      importIds.push(createRes.body.import_id);
+      await request(app.getHttpServer())
+        .post(`/import/${createRes.body.import_id}/xac-nhan`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(201);
+      await collectCreatedHocVien(ma);
+
+      const token = (
+        await request(app.getHttpServer())
+          .post('/auth/dang-nhap')
+          .send({ ten_dang_nhap: ma, mat_khau: `0101${NAM_HOP_LE}` })
+          .expect(200)
+      ).body.token as string;
+
+      // Tạm đóng đợt đang mở (dong_luc lùi về quá khứ) để mô phỏng "ngoài
+      // thời gian đợt" mà không phải chờ thời gian thật trôi qua.
+      await prisma.dot_xac_nhan.update({
+        where: { id: dotId },
+        data: { dong_luc: new Date(Date.now() - 1000) },
+      });
+      try {
+        const res = await request(app.getHttpServer())
+          .patch('/hoc-vien/toi')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ so_dien_thoai_lien_he: '0900111223' })
+          .expect(403);
+        expect(res.body.error.code).toBe('DOT_XAC_NHAN_DONG');
+      } finally {
+        // Mở lại cho các test khác trong cùng describe block (afterAll xóa
+        // hẳn đợt này nên không cần khôi phục giá trị gốc chính xác).
+        await prisma.dot_xac_nhan.update({
+          where: { id: dotId },
+          data: { dong_luc: new Date(Date.now() + 60 * 60 * 1000) },
+        });
+      }
     });
   });
 
