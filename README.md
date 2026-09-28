@@ -4,7 +4,9 @@ Công cụ phối hợp giữa Sở Giáo dục & Đào tạo, Phòng Văn hóa 
 
 ## Trạng thái
 
-**Backend đã triển khai đầy đủ 7 module** (2026-09-25) theo đúng [`docs/api-contract.md`](docs/api-contract.md) + [`docs/database-ddl.sql`](docs/database-ddl.sql), 248/248 test pass (unit + e2e chạy thật trên Postgres). Xem [`backend/`](backend/) và mục "Development setup" bên dưới. Frontend chưa làm.
+**Backend** (7 module gốc + mở rộng An Giang T1/T4/T9/T14/T15): 393/393 test pass (unit + e2e chạy thật trên Postgres), tính đến commit `89f945b`. **Frontend** (cổng học viên, khóa Bồi dưỡng năng lực số An Giang): scaffold + M0(bản tối thiểu)–M6 đã xong, 47/47 test pass, tính đến commit `677165f`. Xem [`backend/`](backend/), [`frontend/`](frontend/) và mục "Development setup" bên dưới.
+
+**Đang mở rộng cho 1 khóa thật (An Giang, ~9.000 giáo viên, đợt 1 mục tiêu 01/10/2026)** — xem [`docs/mo-rong-nls-an-giang.md`](docs/mo-rong-nls-an-giang.md) (15 task backend T1–T15, ưu tiên P0–P4) và [`docs/dac-ta-cong-hoc-vien.md`](docs/dac-ta-cong-hoc-vien.md) (đặc tả 7 màn hình M0–M6). **P0 + P0b đã xong** (mọi thứ cần cho "mở đợt 1" và "hết đợt 1"): backend T1 (bảo mật đăng nhập), T4 (import chịu định dạng file MOET thật), T9 (hồ sơ đầy đủ), T14 (đợt xác nhận + lịch sử sửa hồ sơ), T15 (cổng điều kiện đánh giá + tài khoản VLE mã hóa); frontend M0(min)–M6 đầy đủ. Còn lại P1–P4 (T2, T3, T5–T8, T10–T13) chưa làm — xem bảng ưu tiên trong `mo-rong-nls-an-giang.md` mục 3.
 
 Bản thiết kế gốc (kiến trúc hệ thống, mô hình dữ liệu, sơ đồ use case, wireframe màn hình, lộ trình triển khai) vẫn còn tham khảo được ở:
 
@@ -42,10 +44,12 @@ Xem chi tiết đầy đủ trong các board ở trên. Tóm tắt:
 
 ## Bước tiếp theo
 
-- **Frontend** — chưa bắt đầu.
+- **P1–P4 của đợt mở rộng An Giang** (T2, T3, T5–T8, T10–T13) — xem `docs/mo-rong-nls-an-giang.md`.
+- **M0 bản đầy đủ** (mục 2/3/5/9) — chờ nội dung chính thức từ đơn vị tổ chức, hiện `frontend/src/content/gioiThieu.ts` mới có nội dung tạm.
 - **SMTP thật** — `thong-bao` hiện dùng tài khoản test Ethereal khi không đặt `SMTP_HOST`; cần cấu hình SMTP thật trước khi dùng thật (xem `backend/.env.example`).
+- **1 điểm giòn (fragile) đã flag ở M6**: màn "Làm bài đánh giá" khi chưa đủ điều kiện so khớp *chuỗi* `ly_do` từ backend để quyết định điều hướng về M4 hay M5 (không có mã lý do có cấu trúc) — nếu backend đổi câu chữ thông báo, FE âm thầm rơi về M4. Nên bổ sung mã lý do (enum) ở `GET /hoc-vien/toi/danh-gia-dau-vao` khi có dịp.
 
-4 lỗ hổng nhỏ ghi nhận ở vòng triển khai trước (thu hồi token đăng xuất, autocomplete chuyên môn, dry-run validate độc lập, người nhận thông báo duyệt khóa) đã được vá xong (2026-09-28, commit `e01def9`) — 269/269 test pass.
+4 lỗ hổng nhỏ ghi nhận ở vòng triển khai trước (thu hồi token đăng xuất, autocomplete chuyên môn, dry-run validate độc lập, người nhận thông báo duyệt khóa) đã được vá xong (2026-09-28, commit `e01def9`).
 
 **Gotcha khi thêm migration mới:** `prisma migrate dev` đã 2 lần tự ý `DROP INDEX` các GIN trgm index (chỉ tồn tại dưới dạng raw SQL, không khai báo trong `schema.prisma`) vì tưởng chúng thừa. Luôn đọc kỹ file migration Prisma tự sinh trước khi áp dụng — xóa mọi `DROP INDEX`/`DROP CONSTRAINT`/`DROP TRIGGER` nhắm vào các object raw-SQL (index trgm, 2 trigger function, mọi `CHECK` constraint) trước khi chạy.
 
@@ -114,4 +118,19 @@ npm run start:dev
 - **`bao-cao`** — tổng hợp theo đơn vị/địa bàn/khóa + xuất Excel (UTF-8, đã test round-trip tiếng Việt).
 - **`thong-bao`** — gửi email qua `nodemailer` (mặc định Ethereal test account khi chưa cấu hình SMTP thật), ghi lịch sử vào `nhat_ky_thong_bao` (kể cả gửi thất bại — không làm rớt nghiệp vụ chính khi email lỗi).
 
-248 test (unit + e2e) đều pass tính đến commit `af1e330`.
+393 test (unit + e2e) đều pass tính đến commit `89f945b` (bao gồm mở rộng An Giang T1/T4/T9/T14/T15 — thêm `dot-xac-nhan`, `nguoi-dung` modules và `HocVienResolver`/`vle-crypto` dùng chung).
+
+## Frontend (cổng học viên)
+
+**Stack:** React 18 + TypeScript + Vite, React Router, TanStack Query, react-hook-form + zod, Mantine, dayjs (`vi`). Chi tiết quy ước ở [`frontend/CLAUDE.md`](frontend/CLAUDE.md).
+
+```bash
+cd frontend
+npm install
+cp .env.example .env   # chỉnh VITE_API_BASE_URL, VITE_HOTRO_LIEN_HE
+npm run dev
+```
+
+Test: `npm test -- --run` (Vitest + Testing Library + MSW, không cần backend chạy thật). Build: `npm run build` — M0 (trang giới thiệu công khai) nằm ở chunk riêng, tách khỏi Mantine form/dates và TanStack Query, mục tiêu <150KB gzip (thực đo ~114KB tính đến M0-M6).
+
+7 màn hình theo `docs/dac-ta-cong-hoc-vien.md`: M0 (giới thiệu, công khai) → M1 (đăng nhập) → M2 (đổi mật khẩu lần đầu) → M3 (trang chính) → M4 (hồ sơ xem/sửa) → M5 (xem lại & xác nhận) → M6 (làm bài đánh giá đầu vào, cần đợt 2 mở). Toàn bộ nội dung M0 lấy từ `src/content/gioiThieu.ts`, không sửa cứng trong component.
