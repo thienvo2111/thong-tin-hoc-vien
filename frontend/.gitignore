@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+
+# Keep environment variables out of version control
+.env
+.env.local
+
+# Bundle analysis output
+dist/bundle-stats.html
