@@ -45,6 +45,10 @@ describe('Import ho_so_nhan_su_moet (e2e)', () => {
   const hocVienIds: string[] = [];
   const nguoiDungHocVienIds: string[] = [];
   const importIds: string[] = [];
+  // T4: đơn vị tạo thêm để test "trùng tên" mà có hoc_vien thật trỏ tới (nên
+  // KHÔNG thể xóa ngay trong từng it() như 2 test rule #36e cũ — phải xóa ở
+  // afterAll, sau khi đã xóa hết hoc_vien/nguoi_dung tham chiếu tới).
+  const extraDonViIds: string[] = [];
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -81,6 +85,11 @@ describe('Import ho_so_nhan_su_moet (e2e)', () => {
     await prisma.nhat_ky_import.deleteMany({
       where: { id: { in: importIds } },
     });
+    if (extraDonViIds.length > 0) {
+      await prisma.don_vi_cong_tac.deleteMany({
+        where: { id: { in: extraDonViIds } },
+      });
+    }
     await xoaNguoiDungTest(quanTri.nguoiDung.id);
     await xoaDonViTest(
       [donViFixture.donVi.id],
@@ -105,7 +114,7 @@ describe('Import ho_so_nhan_su_moet (e2e)', () => {
     return hv;
   }
 
-  it('GET /import/mau-excel?loai=ho_so_nhan_su_moet -> đúng 10 cột', async () => {
+  it('GET /import/mau-excel?loai=ho_so_nhan_su_moet -> đúng 11 cột (T4: thêm "Mã đơn vị")', async () => {
     const res = await request(app.getHttpServer())
       .get('/import/mau-excel?loai=ho_so_nhan_su_moet')
       .set('Authorization', `Bearer ${tokenQuanTri}`)
@@ -412,6 +421,13 @@ describe('Import ho_so_nhan_su_moet (e2e)', () => {
       expect(ketQua.body.danh_sach_loi[0].ly_do).toEqual(
         expect.stringContaining('nhiều hơn 1'),
       );
+      // T4: thông báo phải nêu rõ các đơn vị trùng (mã) để phân biệt.
+      expect(ketQua.body.danh_sach_loi[0].ly_do).toEqual(
+        expect.stringContaining(donVi1.ma_don_vi as string),
+      );
+      expect(ketQua.body.danh_sach_loi[0].ly_do).toEqual(
+        expect.stringContaining(donVi2.ma_don_vi as string),
+      );
 
       await prisma.don_vi_cong_tac.deleteMany({
         where: { id: { in: [donVi1.id, donVi2.id] } },
@@ -446,6 +462,139 @@ describe('Import ho_so_nhan_su_moet (e2e)', () => {
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .expect(200);
       expect(ketQua.body.so_dong_loi).toBe(1);
+    });
+  });
+
+  describe('T4 — chịu định dạng file thực tế (mo-rong-nls-an-giang.md)', () => {
+    it('dòng tiêu đề phía trên + tiêu đề gộp ô 2 tầng + mã MOET/SĐT lưu dạng number -> không lỗi định dạng, SĐT thiếu số 0 -> cảnh báo không chặn', async () => {
+      const suf = uniqueSuffix();
+      const maMoetNum = 9_000_000_000 + (Date.now() % 900_000_000);
+
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('data');
+      sheet.addRow(['DANH SÁCH GIÁO VIÊN TIẾP NHẬN']);
+      sheet.addRow([`Đơn vị: ${donViFixture.donVi.ten_don_vi}`]);
+      sheet.addRow([]);
+      sheet.addRow([
+        'Đơn vị',
+        'Mã định danh (CDSL moet)',
+        'Họ và tên',
+        'Ngày tháng năm sinh',
+        '',
+        '',
+        'Chức vụ',
+        'Chuyên môn',
+        'Số điện thoại',
+        'Ghi chú',
+      ]);
+      sheet.mergeCells(4, 4, 4, 6);
+      sheet.addRow(['', '', '', 'Ngày', 'Tháng', 'Năm', '', '', '', '']);
+      sheet.addRow([
+        donViFixture.donVi.ten_don_vi,
+        maMoetNum, // number, không phải string
+        'Kiểm Tra Thực Tế',
+        8,
+        8,
+        NAM_HOP_LE,
+        'Giáo viên',
+        'Toán',
+        912345678, // number, thiếu số 0 đầu (9 chữ số, bắt đầu 9)
+        '',
+      ]);
+      const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+      const res = await request(app.getHttpServer())
+        .post('/import/ho_so_nhan_su_moet')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .attach('file', buffer, 't4-thuc-te.xlsx')
+        .expect(201);
+      importIds.push(res.body.import_id);
+
+      const ketQua = await request(app.getHttpServer())
+        .get(`/import/${res.body.import_id}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(ketQua.body.tong_so_dong).toBe(1);
+      expect(ketQua.body.so_dong_loi).toBe(0);
+      expect(ketQua.body.so_dong_thanh_cong).toBe(1);
+      expect(ketQua.body.danh_sach_canh_bao).toHaveLength(1);
+      expect(ketQua.body.danh_sach_canh_bao[0].ly_do).toEqual(
+        expect.stringContaining('thiếu số 0 đầu'),
+      );
+
+      const xacNhanRes = await request(app.getHttpServer())
+        .post(`/import/${res.body.import_id}/xac-nhan`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(201);
+      expect(xacNhanRes.body.so_dong_thanh_cong).toBe(1);
+
+      const hv = await collectCreatedHocVien(String(maMoetNum));
+      expect(hv).not.toBeNull();
+      expect(hv?.so_dien_thoai_lien_he).toBe('0912345678');
+      expect(hv?.ho_ten).toBe('Kiểm Tra Thực Tế');
+    });
+
+    it('2 trường trùng tên + có cột "Mã đơn vị" -> khớp đúng theo mã (không lỗi)', async () => {
+      const suf = uniqueSuffix();
+      const tenTrung = `Trường trùng tên T4 ${suf}`;
+      const donVi1 = await prisma.don_vi_cong_tac.create({
+        data: {
+          ma_don_vi: `DV-T4-1-${suf}`,
+          ten_don_vi: tenTrung,
+          loai_don_vi: 'truong',
+          dia_ban_id: donViFixture.diaDanhXa.id,
+        },
+      });
+      const donVi2 = await prisma.don_vi_cong_tac.create({
+        data: {
+          ma_don_vi: `DV-T4-2-${suf}`,
+          ten_don_vi: tenTrung,
+          loai_don_vi: 'truong',
+          dia_ban_id: donViFixture.diaDanhXa.id,
+        },
+      });
+      extraDonViIds.push(donVi1.id, donVi2.id);
+      const maMoet = `MOET-T4-${suf}`;
+
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('data');
+      sheet.addRow(['Mã đơn vị', ...COLUMNS]);
+      sheet.addRow([
+        donVi2.ma_don_vi,
+        tenTrung,
+        maMoet,
+        'Test Mã Đơn Vị',
+        1,
+        1,
+        NAM_HOP_LE,
+        '',
+        'Toán',
+        '0911111111',
+        '',
+      ]);
+      const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+      const res = await request(app.getHttpServer())
+        .post('/import/ho_so_nhan_su_moet')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .attach('file', buffer, 't4-ma-don-vi.xlsx')
+        .expect(201);
+      importIds.push(res.body.import_id);
+
+      const ketQua = await request(app.getHttpServer())
+        .get(`/import/${res.body.import_id}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(ketQua.body.so_dong_loi).toBe(0);
+
+      await request(app.getHttpServer())
+        .post(`/import/${res.body.import_id}/xac-nhan`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(201);
+
+      const hv = await collectCreatedHocVien(maMoet);
+      expect(hv).not.toBeNull();
+      expect(hv?.don_vi_cong_tac_id).toBe(donVi2.id);
     });
   });
 

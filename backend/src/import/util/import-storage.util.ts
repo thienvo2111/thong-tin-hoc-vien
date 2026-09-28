@@ -10,6 +10,10 @@ const STORAGE_ROOT = path.resolve(process.cwd(), 'storage', 'import');
 export interface KetQuaImport {
   danh_sach_loi: { dong: number; ly_do: string }[];
   dong_hop_le: number[];
+  // T4 (mo-rong-nls-an-giang.md): cảnh báo 🟡 không chặn dòng (hiện chỉ
+  // ho_so_nhan_su_moet dùng — SĐT thiếu số 0 đầu đã tự sửa). Optional để
+  // không phá các file ket-qua.json đã lưu từ trước khi thêm field này.
+  danh_sach_canh_bao?: { dong: number; ly_do: string }[];
 }
 
 function thuMucImport(importId: string): string {

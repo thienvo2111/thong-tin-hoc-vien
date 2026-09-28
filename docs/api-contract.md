@@ -95,10 +95,13 @@ Sở luôn được phép duyệt thay Phòng VHXH (escalation trong scope-based
 
 ### Luồng import nhân sự từ CSDL MOET (`POST /import/ho-so-nhan-su-moet`, xem mục 5)
 
-File nhận từ Sở/Bộ theo mẫu: `Đơn vị`, `Mã định danh (CDSL moet)`, `Họ và tên`, `Ngày`, `Tháng`, `Năm` (3 cột riêng), `Chức vụ`, `Chuyên môn` (có thể nhiều giá trị/dòng, phân tách bằng `;`), `Số điện thoại`, `Ghi chú`.
+File nhận từ Sở/Bộ theo mẫu: `Đơn vị`, `Mã đơn vị` (tùy chọn, T4 2026-09-28), `Mã định danh (CDSL moet)`, `Họ và tên`, `Ngày`, `Tháng`, `Năm` (3 cột riêng), `Chức vụ`, `Chuyên môn` (có thể nhiều giá trị/dòng, phân tách bằng `;`), `Số điện thoại`, `Ghi chú`.
+
+**T4 (2026-09-28) — chịu định dạng file thực tế:** parser (`readMoetWorkbookRows`, `backend/src/import/util/moet-excel.util.ts`) tự dò dòng tiêu đề thật (bỏ qua dòng tiêu đề/ghi chú phía trên), nhận tiêu đề gộp ô 2 tầng ("Ngày tháng năm sinh" gộp 3 cột con `Ngày`/`Tháng`/`Năm` ở dòng ngay dưới), khớp tên cột không phân biệt hoa/thường, khoảng trắng thừa, bỏ phần trong ngoặc. Ô số Excel lưu dạng number (mã MOET, SĐT) được đọc về chuỗi không `.0`/ký hiệu khoa học. `Ngày`/`Tháng` dạng `08` hoặc `8` đều hợp lệ (đã hỗ trợ sẵn qua `class-transformer`).
 
 Với mỗi dòng hợp lệ (cùng thứ tự tạo bảng đã sửa như "Luồng đăng ký" ở trên — `hoc_vien` trước `nguoi_dung`):
-1. Khớp cột `Đơn vị` với `don_vi_cong_tac.ten_don_vi` (chỉ trong phạm vi quyền của người chạy import). Không khớp được / khớp nhiều hơn 1 → dòng lỗi.
+1. Nếu có cột `Mã đơn vị` (giá trị khác trống): khớp `don_vi_cong_tac.ma_don_vi` — **ưu tiên hơn** khớp theo tên (cần thiết sau sáp nhập An Giang – Kiên Giang, tên trường dễ trùng giữa 2 tỉnh cũ). Không khớp được → dòng lỗi. Nếu để trống: khớp cột `Đơn vị` với `don_vi_cong_tac.ten_don_vi` (chỉ trong phạm vi quyền của người chạy import). Không khớp được / khớp nhiều hơn 1 → dòng lỗi (thông báo liệt kê `ma_don_vi` của các đơn vị trùng, gợi ý thêm cột `Mã đơn vị`).
+1b. `Số điện thoại` đúng 9 chữ số, bắt đầu bằng `3/5/7/8/9` (thiếu số 0 đầu do Excel lưu dạng number) → tự thêm `0`, ghi **cảnh báo 🟡** vào preview (`GET /import/{id}` trả thêm `danh_sach_canh_bao: [{dong, ly_do}]`, không chặn dòng). Các sai định dạng khác vẫn là dòng lỗi theo rule #20.
 2. `INSERT INTO hoc_vien (nguon_tao='import_moet', ma_dinh_danh_moet, ho_ten, ngay_sinh, thang_sinh, nam_sinh, chuc_vu, don_vi_cong_tac_id, so_dien_thoai_lien_he, ghi_chu, trang_thai='da_duyet', nguoi_duyet_id=<tài khoản đang chạy import>, cap_duyet_thuc_te='quan_tri', ngay_duyet=now(), created_by=NULL)` → lấy `hoc_vien.id`. Mọi field khác (CCCD, nơi sinh, phường xã, email, trình độ, cấp giảng dạy, môn giảng dạy) để `NULL`.
 3. `INSERT INTO nguoi_dung (vai_tro='hoc_vien', ten_dang_nhap=ma_dinh_danh_moet, mat_khau_hash=hash(ngay_sinh dạng ddmmyyyy), phai_doi_mat_khau=true, email=NULL, hoc_vien_id=hoc_vien.id)` → lấy `nguoi_dung.id`.
 4. Tách `Chuyên môn` theo `;`, `INSERT` từng giá trị vào `hoc_vien_chuyen_mon`.
@@ -152,7 +155,7 @@ Dùng chung 1 luồng cho cả 5 loại (`loai_danh_muc_import`): `dia_danh`, `d
 |---|---|---|---|
 | GET | `/import/mau-excel?loai=` | Tải file mẫu đúng cột cho loại đã chọn | QuảnTrị |
 | POST | `/import/{loai}` | `multipart/form-data`, field `file`. Trả ngay `{ import_id, trang_thai: "dang_xu_ly" }` — xử lý bất đồng bộ (job queue) | QuảnTrị |
-| GET | `/import/{id}` | Kết quả: `{ tong_so_dong, so_dong_thanh_cong, so_dong_loi, trang_thai, danh_sach_loi: [{dong, ly_do}] }` | QuảnTrị |
+| GET | `/import/{id}` | Kết quả: `{ tong_so_dong, so_dong_thanh_cong, so_dong_loi, trang_thai, danh_sach_loi: [{dong, ly_do}], danh_sach_canh_bao: [{dong, ly_do}] }` — `danh_sach_canh_bao` thêm T4 (2026-09-28): cảnh báo 🟡 không chặn dòng (hiện chỉ `ho_so_nhan_su_moet` có, xem "Luồng import nhân sự từ CSDL MOET") | QuảnTrị |
 | GET | `/import/{id}/file-loi` | Tải file Excel chỉ chứa các dòng lỗi kèm cột "Lý do" | QuảnTrị |
 | POST | `/import/{id}/xac-nhan` | Nạp chính thức các dòng hợp lệ (bước riêng sau khi xem preview, đề phòng import nhầm file) | QuảnTrị |
 | GET | `/import` | Nhật ký import `?loai=&tu_ngay=&den_ngay=` | QuảnTrị |

@@ -95,8 +95,10 @@ Ký hiệu: 🔴 lỗi chặn lưu · 🟡 cảnh báo không chặn (chỉ nh�
 | 36b | Mọi hồ sơ có `nguon_tao ∈ {tu_dang_ky, import_moet}`; ràng buộc chéo: `tu_dang_ky` → `so_dinh_danh_ca_nhan` bắt buộc có ngay; `import_moet` → `ma_dinh_danh_moet` bắt buộc có ngay | 🔴 | DB (`CHECK chk_hoc_vien_nguon_tao`) |
 | 36c | Hồ sơ `import_moet` nhận `trang_thai='da_duyet'` **ngay khi import** (danh sách tiếp nhận coi như đã xác thực), `nguoi_duyet_id` = tài khoản Quản trị đã chạy import, `cap_duyet_thuc_te='quan_tri'` — **không** qua lại luồng duyệt Trường/Phòng VHXH/Sở | 🔴 (quy trình) | API |
 | 36d | `da_duyet` ngay **không đồng nghĩa hồ sơ đầy đủ** — nhiều trường vẫn `NULL` (CCCD, nơi sinh, phường xã, email, trình độ, cấp giảng dạy, môn giảng dạy). API phải chặn các hành động cần hồ sơ đầy đủ (vd đăng ký khóa bồi dưỡng) cho tới khi người dùng tự bổ sung xong | 🔴 | API |
-| 36e | Cột "Đơn vị" trong file import khớp với `don_vi_cong_tac.ten_don_vi` — không khớp được hoặc khớp nhiều hơn 1 kết quả → dòng lỗi (không tự đoán) | 🔴 | API (Dịch vụ Import) |
+| 36e | Cột "Đơn vị" trong file import khớp với `don_vi_cong_tac.ten_don_vi` — không khớp được hoặc khớp nhiều hơn 1 kết quả → dòng lỗi (không tự đoán). **T4 (2026-09-28)**: nếu file có cột tùy chọn "Mã đơn vị" (giá trị khác trống) thì khớp `don_vi_cong_tac.ma_don_vi` **ưu tiên hơn** tên — dùng khi tên trường trùng giữa nhiều đơn vị (sau sáp nhập An Giang – Kiên Giang) | 🔴 | API (Dịch vụ Import) |
 | 36f | `ma_dinh_danh_moet` duy nhất — dòng import trùng mã đã tồn tại → dòng lỗi (không tự động ghi đè hồ sơ cũ) | 🔴 | DB (`UNIQUE`) + API |
+| 36g | **T4 (2026-09-28)**: parser `ho_so_nhan_su_moet` tự dò dòng tiêu đề thật (bỏ qua dòng tiêu đề/ghi chú phía trên file), nhận tiêu đề gộp ô 2 tầng cho "Ngày tháng năm sinh", khớp tên cột không phân biệt hoa/thường/khoảng trắng thừa/phần trong ngoặc. Ô số Excel lưu dạng number (mã MOET, SĐT) đọc về chuỗi không `.0`/ký hiệu khoa học | 🔴 | API (`readMoetWorkbookRows`) |
+| 36h | **T4 (2026-09-28)**: `Số điện thoại` đúng 9 chữ số bắt đầu `3/5/7/8/9` (mất số 0 đầu do Excel lưu dạng number) → tự thêm `0`, cảnh báo 🟡 không chặn dòng. Sai định dạng khác vẫn là lỗi 🔴 (rule #20) | 🟡 (riêng trường hợp mất số 0 đầu) | API |
 
 ## Danh mục dùng chung (Địa danh / Đơn vị công tác / Môn học)
 

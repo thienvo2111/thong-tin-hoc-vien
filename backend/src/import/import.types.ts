@@ -22,4 +22,8 @@ export function isSupportedImportType(
 export interface RowBuildResult<TDto> {
   dto?: TDto;
   error?: string;
+  // T4 (mo-rong-nls-an-giang.md): cảnh báo 🟡 không chặn dòng (vd SĐT thiếu
+  // số 0 đầu đã tự sửa) — chỉ ho_so_nhan_su_moet dùng, các loại khác luôn
+  // undefined.
+  canhBao?: string;
 }

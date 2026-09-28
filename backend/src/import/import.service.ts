@@ -29,6 +29,7 @@ import {
   buildTemplateWorkbook,
   readWorkbookRows,
 } from './util/excel.util';
+import { readMoetWorkbookRows } from './util/moet-excel.util';
 import {
   docFileGoc,
   docFileLoi,
@@ -98,7 +99,7 @@ export class ImportService {
 
     let rows: Awaited<ReturnType<typeof readWorkbookRows>>;
     try {
-      rows = await readWorkbookRows(file.buffer, columns);
+      rows = await this.readRows(loai, file.buffer, columns);
     } catch (e) {
       await this.prisma.nhat_ky_import.create({
         data: {
@@ -117,10 +118,11 @@ export class ImportService {
 
     const importId = randomUUID();
     const danhSachLoi: { dong: number; ly_do: string }[] = [];
+    const danhSachCanhBao: { dong: number; ly_do: string }[] = [];
     const dongHopLe: number[] = [];
 
     for (const row of rows) {
-      const { dto, error } = await this.buildDto(loai, row.values);
+      const { dto, error, canhBao } = await this.buildDto(loai, row.values);
       if (error || !dto) {
         danhSachLoi.push({
           dong: row.dong,
@@ -128,6 +130,7 @@ export class ImportService {
         });
         continue;
       }
+      if (canhBao) danhSachCanhBao.push({ dong: row.dong, ly_do: canhBao });
       const checkErr = await this.checkValid(loai, dto);
       if (checkErr) {
         danhSachLoi.push({ dong: row.dong, ly_do: checkErr });
@@ -140,6 +143,7 @@ export class ImportService {
     await luuKetQua(importId, {
       danh_sach_loi: danhSachLoi,
       dong_hop_le: dongHopLe,
+      danh_sach_canh_bao: danhSachCanhBao,
     });
     if (danhSachLoi.length > 0) {
       const rowsByDong = new Map(rows.map((r) => [r.dong, r.values]));
@@ -188,6 +192,7 @@ export class ImportService {
       so_dong_loi: nhatKy.so_dong_loi,
       thoi_gian_import: nhatKy.thoi_gian_import,
       danh_sach_loi: ketQua?.danh_sach_loi ?? [],
+      danh_sach_canh_bao: ketQua?.danh_sach_canh_bao ?? [],
     };
   }
 
@@ -229,10 +234,11 @@ export class ImportService {
 
     const columns = this.getColumns(loai);
     const fileGoc = await docFileGoc(id);
-    const rows = await readWorkbookRows(fileGoc, columns);
+    const rows = await this.readRows(loai, fileGoc, columns);
     const rowsByDong = new Map(rows.map((r) => [r.dong, r.values]));
 
     const danhSachLoiMoi = [...ketQuaCu.danh_sach_loi];
+    const danhSachCanhBaoMoi = [...(ketQuaCu.danh_sach_canh_bao ?? [])];
     let soDongThanhCong = 0;
 
     for (const dong of ketQuaCu.dong_hop_le) {
@@ -260,7 +266,11 @@ export class ImportService {
       }
     }
 
-    await luuKetQua(id, { danh_sach_loi: danhSachLoiMoi, dong_hop_le: [] });
+    await luuKetQua(id, {
+      danh_sach_loi: danhSachLoiMoi,
+      dong_hop_le: [],
+      danh_sach_canh_bao: danhSachCanhBaoMoi,
+    });
     if (danhSachLoiMoi.length > 0) {
       const buffer = await buildLoiWorkbook(
         columns,
@@ -309,6 +319,21 @@ export class ImportService {
     return paginate(data, total, page, pageSize);
   }
 
+  // T4 (mo-rong-nls-an-giang.md): ho_so_nhan_su_moet dùng parser riêng, chịu
+  // được file thực tế (dòng tiêu đề phía trên, tiêu đề gộp ô 2 tầng, cột số
+  // lưu dạng number) — 4 loại còn lại giữ nguyên readWorkbookRows (khớp cột
+  // CHÍNH XÁC ở dòng 1, đúng thứ tự) để không đổi hành vi đã ổn định.
+  private async readRows(
+    loai: SupportedImportType,
+    buffer: Buffer,
+    columns: string[],
+  ): Promise<{ dong: number; values: Record<string, string> }[]> {
+    if (loai === 'ho_so_nhan_su_moet') {
+      return readMoetWorkbookRows(buffer);
+    }
+    return readWorkbookRows(buffer, columns);
+  }
+
   private getColumns(loai: SupportedImportType): string[] {
     switch (loai) {
       case 'dia_danh':
@@ -331,9 +356,14 @@ export class ImportService {
         return ['so_dinh_danh_ca_nhan', 'ma_khoa', 'ten_lop'];
       case 'ho_so_nhan_su_moet':
         // Nguyên văn cột theo docs/api-contract.md mục 2 "Luồng import nhân
-        // sự từ CSDL MOET".
+        // sự từ CSDL MOET". "Mã đơn vị" thêm ở T4 (mo-rong-nls-an-giang.md) —
+        // tùy chọn, chỉ dùng để phân biệt khi 2 trường trùng tên sau sáp
+        // nhập An Giang – Kiên Giang. Đọc file thật qua readMoetWorkbookRows
+        // (không phụ thuộc thứ tự cột trong mảng này) — mảng này chỉ dùng để
+        // sinh file mẫu/file lỗi.
         return [
           'Đơn vị',
+          'Mã đơn vị',
           'Mã định danh (CDSL moet)',
           'Họ và tên',
           'Ngày',
@@ -352,6 +382,12 @@ export class ImportService {
       return {
         ten_lop:
           'Tùy chọn — để trống nếu chỉ muốn ghi danh vào khóa, chưa phân lớp. Có thể chạy lại import sau với ten_lop để phân lớp cho học viên đã ghi danh.',
+      };
+    }
+    if (loai === 'ho_so_nhan_su_moet') {
+      return {
+        'Mã đơn vị':
+          'Tùy chọn — chỉ cần điền khi tên đơn vị ở cột "Đơn vị" trùng với đơn vị khác trong danh mục (vd cùng địa danh sau sáp nhập). Nếu có giá trị, hệ thống khớp theo mã này thay vì tên.',
       };
     }
     return {};
@@ -492,34 +528,80 @@ export class ImportService {
     }
   }
 
+  // SĐT lưu dạng number mất số 0 đầu (T4): đúng 9 chữ số, bắt đầu 3/5/7/8/9
+  // -> tự thêm "0" + cảnh báo 🟡 (không chặn dòng). Các sai định dạng khác
+  // (thiếu số khác, sai đầu số...) vẫn là lỗi 🔴 theo rule #20 như cũ, xử lý
+  // bởi HoSoNhanSuMoetRowDto/checkValidMoetImportRow ở bước sau.
+  private static readonly SDT_MAT_SO_0_REGEX = /^[35789]\d{8}$/;
+
+  private suaSoDienThoaiThieuSo0(sdtRaw: string): {
+    sdt: string;
+    canhBao?: string;
+  } {
+    const sdt = sdtRaw?.trim() ?? '';
+    if (ImportService.SDT_MAT_SO_0_REGEX.test(sdt)) {
+      return {
+        sdt: `0${sdt}`,
+        canhBao: `Số điện thoại "${sdt}" thiếu số 0 đầu (9 chữ số) — đã tự thêm thành "0${sdt}"`,
+      };
+    }
+    return { sdt };
+  }
+
   // Rule #36e: khớp cột "Đơn vị" với don_vi_cong_tac.ten_don_vi — không khớp
-  // được hoặc khớp nhiều hơn 1 kết quả -> dòng lỗi (không tự đoán). Phạm vi
-  // quyền "trong phạm vi quyền của người chạy import" (api-contract.md) không
-  // cần lọc thêm ở đây vì toàn bộ ImportController đã @Roles('quan_tri') —
-  // scope của quan_tri luôn là 'ALL' (xem ScopeService) nên không có gì để
-  // thu hẹp; flagged trong self-review.
+  // được hoặc khớp nhiều hơn 1 kết quả -> dòng lỗi (không tự đoán). T4: nếu
+  // có cột "Mã đơn vị" (tùy chọn) thì khớp theo mã này TRƯỚC (ưu tiên hơn
+  // tên) — cần thiết sau sáp nhập An Giang – Kiên Giang vì tên trường dễ
+  // trùng giữa 2 tỉnh cũ. Phạm vi quyền "trong phạm vi quyền của người chạy
+  // import" (api-contract.md) không cần lọc thêm ở đây vì toàn bộ
+  // ImportController đã @Roles('quan_tri') — scope của quan_tri luôn là
+  // 'ALL' (xem ScopeService) nên không có gì để thu hẹp; flagged trong
+  // self-review.
   private async buildHoSoMoetDto(
     raw: Record<string, string>,
   ): Promise<RowBuildResult<HoSoNhanSuMoetRowDto>> {
-    const donViTen = raw['Đơn vị']?.trim();
-    if (!donViTen) {
-      return { error: 'Thiếu cột "Đơn vị"' };
-    }
-    const matches = await this.prisma.don_vi_cong_tac.findMany({
-      where: { ten_don_vi: donViTen },
-    });
-    if (matches.length === 0) {
-      return {
-        error: `Đơn vị "${donViTen}" không khớp với đơn vị công tác nào trong danh mục`,
-      };
-    }
-    if (matches.length > 1) {
-      return {
-        error: `Đơn vị "${donViTen}" khớp nhiều hơn 1 đơn vị công tác trong danh mục`,
-      };
+    const maDonVi = raw['Mã đơn vị']?.trim();
+    let donViId: string;
+
+    if (maDonVi) {
+      const donVi = await this.prisma.don_vi_cong_tac.findUnique({
+        where: { ma_don_vi: maDonVi },
+      });
+      if (!donVi) {
+        return {
+          error: `Mã đơn vị "${maDonVi}" không tồn tại trong danh mục đơn vị công tác`,
+        };
+      }
+      donViId = donVi.id;
+    } else {
+      const donViTen = raw['Đơn vị']?.trim();
+      if (!donViTen) {
+        return { error: 'Thiếu cột "Đơn vị"' };
+      }
+      const matches = await this.prisma.don_vi_cong_tac.findMany({
+        where: { ten_don_vi: donViTen },
+      });
+      if (matches.length === 0) {
+        return {
+          error: `Đơn vị "${donViTen}" không khớp với đơn vị công tác nào trong danh mục`,
+        };
+      }
+      if (matches.length > 1) {
+        const dsMa = matches
+          .map((m) => m.ma_don_vi ?? `(id ${m.id})`)
+          .join(', ');
+        return {
+          error: `Đơn vị "${donViTen}" khớp nhiều hơn 1 đơn vị công tác trong danh mục (${dsMa}) — thêm cột "Mã đơn vị" để phân biệt`,
+        };
+      }
+      donViId = matches[0].id;
     }
 
-    return buildValidatedDto(HoSoNhanSuMoetRowDto, {
+    const { sdt, canhBao } = this.suaSoDienThoaiThieuSo0(
+      raw['Số điện thoại'],
+    );
+
+    const ketQua = await buildValidatedDto(HoSoNhanSuMoetRowDto, {
       ma_dinh_danh_moet: raw['Mã định danh (CDSL moet)'],
       ho_ten: raw['Họ và tên'],
       ngay_sinh: raw['Ngày'],
@@ -527,10 +609,12 @@ export class ImportService {
       nam_sinh: raw['Năm'],
       chuc_vu: raw['Chức vụ'] || undefined,
       chuyen_mon_raw: raw['Chuyên môn'],
-      so_dien_thoai_lien_he: raw['Số điện thoại'],
+      so_dien_thoai_lien_he: sdt,
       ghi_chu: raw['Ghi chú'] || undefined,
-      don_vi_cong_tac_id: matches[0].id,
+      don_vi_cong_tac_id: donViId,
     });
+    if (ketQua.error || !ketQua.dto) return ketQua;
+    return { dto: ketQua.dto, canhBao };
   }
 
   private async buildDiaDanhDto(
