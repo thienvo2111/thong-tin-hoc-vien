@@ -221,6 +221,21 @@ ALTER TABLE nhat_ky_import
 CREATE INDEX idx_import_nguoi ON nhat_ky_import(nguoi_import_id);
 CREATE INDEX idx_import_loai ON nhat_ky_import(loai_danh_muc);
 
+-- Thêm 2026-09-28: JWT vốn stateless — bảng này là cơ chế thu hồi cho
+-- POST /auth/dang-xuat (trước đó endpoint tồn tại nhưng không làm gì
+-- thật). Ghi 1 dòng mỗi lần đăng xuất, giữ tới khi token hết hạn tự
+-- nhiên (het_han = hạn gốc của token, không phải hạn của dòng ghi) rồi
+-- có thể dọn bằng job định kỳ dựa trên idx_token_thu_hoi_het_han.
+CREATE TABLE token_thu_hoi (
+    jti             uuid PRIMARY KEY,
+    nguoi_dung_id   uuid NOT NULL REFERENCES nguoi_dung(id),
+    het_han         timestamptz NOT NULL,
+    thu_hoi_luc     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_token_thu_hoi_nguoi_dung ON token_thu_hoi(nguoi_dung_id);
+CREATE INDEX idx_token_thu_hoi_het_han ON token_thu_hoi(het_han);
+
 
 -- =====================================================================
 -- PHẦN 2 — HỒ SƠ HỌC VIÊN (board MoHinhDuLieu.dc.html)
@@ -355,6 +370,12 @@ CREATE TABLE khoa_boi_duong (
     ngay_duyet          timestamptz,
     created_at          timestamptz NOT NULL DEFAULT now(),
     updated_at          timestamptz NOT NULL DEFAULT now(),
+    created_by          uuid REFERENCES nguoi_dung(id),
+        -- Thêm 2026-09-28: trước đó không có cột này, nên "Dịch vụ Thông báo"
+        -- phải đoán người nhận email khi khóa được duyệt (findFirst tài khoản
+        -- truong trong đơn vị — sai nếu 1 Trường có nhiều tài khoản). Nay ghi
+        -- rõ đúng tài khoản đã gọi POST /khoa-boi-duong lúc tạo, NULL cho các
+        -- khóa tạo trước migration này (dữ liệu cũ không truy ngược được).
 
     CONSTRAINT uq_khoa_ma UNIQUE (ma_khoa),
     CONSTRAINT chk_khoa_thoi_gian CHECK (thoi_gian_ket_thuc >= thoi_gian_bat_dau)

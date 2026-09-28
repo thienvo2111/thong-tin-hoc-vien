@@ -38,7 +38,7 @@ Mã lỗi chuẩn: `VALIDATION_ERROR` (400), `UNAUTHORIZED` (401), `FORBIDDEN` (
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
 | POST | `/auth/dang-nhap` | `{ ten_dang_nhap, mat_khau }` → `{ token, phai_doi_mat_khau, nguoi_dung }`. `ten_dang_nhap` = `nguoi_dung.ten_dang_nhap`, gán 1 lần lúc tạo tài khoản và **không đổi theo dữ liệu hồ sơ về sau**: ĐDCN (Học viên tự đăng ký), Mã định danh CSDL MOET (Học viên do Quản trị import), hoặc email (Sở/Phòng/Trường/QuảnTrị). | Công khai |
-| POST | `/auth/dang-xuat` | Vô hiệu hóa token hiện tại | Đã đăng nhập |
+| POST | `/auth/dang-xuat` | Vô hiệu hóa token hiện tại. **Làm rõ 2026-09-28**: JWT vốn stateless, "vô hiệu hóa" nghĩa là ghi `jti` của token vào bảng thu hồi (`token_thu_hoi`, xem `database-ddl.sql`) tới hết hạn tự nhiên của nó; `JwtAuthGuard` phải tra bảng này trên mọi request, không chỉ giải mã chữ ký | Đã đăng nhập |
 | POST | `/auth/doi-mat-khau` | `{ mat_khau_cu, mat_khau_moi }` — bắt buộc nếu `phai_doi_mat_khau=true` | Đã đăng nhập |
 | GET | `/auth/toi` | Thông tin tài khoản hiện tại + phạm vi quyền suy ra | Đã đăng nhập |
 
@@ -126,7 +126,7 @@ Học viên nhận tài khoản đăng nhập bằng **Mã định danh CSDL MOE
 | POST / PATCH | `/danh-muc/don-vi-cong-tac(/{id})` | Sửa/thêm thủ công | QuảnTrị |
 | GET | `/danh-muc/mon-hoc?cap_hoc=` | Lọc theo cấp học — dùng cho dropdown phụ thuộc "Môn giảng dạy" | Mọi vai trò đã đăng nhập |
 | POST / PATCH | `/danh-muc/mon-hoc(/{id})` | Sửa/thêm thủ công | QuảnTrị |
-| GET | `/danh-muc/chuyen-mon-dao-tao/goi-y?q=` | `SELECT DISTINCT chuyen_mon_dao_tao FROM hoc_vien WHERE chuyen_mon_dao_tao ILIKE '%q%' LIMIT 10` — **không phải danh mục quản lý**, chỉ gợi ý từ dữ liệu đã có | Học viên (khi điền form) |
+| GET | `/danh-muc/chuyen-mon-dao-tao/goi-y?q=` | **Sửa 2026-09-28** (bản trước còn tham chiếu cột `hoc_vien.chuyen_mon_dao_tao` cũ, đã tách thành bảng `hoc_vien_chuyen_mon` 1-nhiều từ đợt MOET): `SELECT DISTINCT chuyen_mon FROM hoc_vien_chuyen_mon WHERE chuyen_mon ILIKE '%q%' LIMIT 10` — **không phải danh mục quản lý**, chỉ gợi ý từ dữ liệu đã có | Học viên (khi điền form) |
 
 ---
 
