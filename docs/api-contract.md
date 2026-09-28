@@ -70,6 +70,7 @@ Thao tác Quản trị lên tài khoản **người khác** (khác `/auth/*`, lu
 | GET | `/hoc-vien/kiem-tra-trung?so_dinh_danh_ca_nhan=` | Kiểm tra ĐDCN đã tồn tại chưa (gọi trước khi submit form, tránh lỗi 409 muộn). **T1 (2026-09-28):** giới hạn 10 request/phút/IP (`429 RATE_LIMITED`) | Công khai |
 | GET | `/hoc-vien/toi/muc-do-day-du` | T9 (2026-09-28): `{ day_du: boolean, thieu: [{field, message}] }` — cổng học viên xem còn thiếu gì để hồ sơ được coi là "đầy đủ" (xem mục "Hồ sơ đầy đủ" bên dưới) | Học viên |
 | GET | `/hoc-vien/toi/dot-xac-nhan` | **Thêm T14**: `{ dot: {id, ten, loai, mo_luc, dong_luc} \| null, dang_mo: boolean, da_xac_nhan: boolean, day_du: boolean, thieu: [...] }`. `dot` = đợt đang mở nếu có, hoặc đợt sắp mở gần nhất nếu hiện không có đợt nào mở (`dang_mo=false` phân biệt 2 trường hợp). `tu_dang_ky` luôn trả `dot: null` (không áp dụng khái niệm đợt) | Học viên |
+| GET | `/hoc-vien/toi/danh-gia-dau-vao` | **Thêm T15 (2026-09-28)**: cổng điều kiện làm đánh giá đầu vào — xem mục "Cổng điều kiện làm đánh giá đầu vào & tài khoản VLE" bên dưới | Học viên |
 
 ### Hồ sơ đầy đủ (T9, 2026-09-28)
 
@@ -92,6 +93,18 @@ Thao tác Quản trị lên tài khoản **người khác** (khác `/auth/*`, lu
 | GET | `/bao-cao/xac-nhan?dot_id=&trang_thai=chua_dang_nhap\|dang_bo_sung\|da_xac_nhan&don_vi_cong_tac_id=` + `/xuat-excel` | Tiến độ xác nhận của 1 đợt cụ thể (`dot_id` bắt buộc — improvised, xem `bao-cao.service.ts`), theo phạm vi đơn vị (Trường/Phòng/Sở chỉ thấy giáo viên của mình). `chua_dang_nhap` dựa trên `nguoi_dung.dang_nhap_lan_cuoi` (T1) | Trường, Phòng VHXH, Sở, QuảnTrị |
 | GET | `/bao-cao/sua-truong-moet?khoa_id=` + `/xuat-excel` | Danh sách thay đổi trường gốc MOET (`la_truong_goc_moet=true`) để N1 rà soát | QuảnTrị |
 | GET | `/bao-cao/xuat-cho-vle?khoa_id=` | File Excel trực tiếp: mã MOET, họ tên, email (nếu có), đơn vị, trạng thái đợt 1 (đợt `kiem_tra_bo_sung` gần nhất khớp `khoa_id`) — chuyển Phòng CNTT tạo tài khoản VLE (T15) | QuảnTrị |
+
+### Cổng điều kiện làm đánh giá đầu vào & tài khoản VLE (T15, 2026-09-28) — QĐ8, QĐ9
+
+Cách B (QĐ8): Phòng CNTT tạo tài khoản VLE cho **TẤT CẢ** học viên `import_moet` (import `tai_khoan_vle`, xem mục 5) — hệ thống chỉ **ẩn/hiện** thông tin đường dẫn + tài khoản, không chặn việc tạo tài khoản (chặn "mềm").
+
+- **Đủ điều kiện** = có `xac_nhan_ho_so` **còn hiệu lực** (`con_hieu_luc=true`) ở 1 đợt `loai='xac_nhan_truoc_danh_gia'` áp dụng cho học viên **VÀ** hồ sơ đầy đủ (T9, `danhGiaDayDu`) **tại thời điểm gọi** — không phải tại lúc xác nhận. Sửa hồ sơ sau khi xác nhận sẽ hủy xác nhận đó (T14) nên tự động mất điều kiện; **không cần đợt đang mở** để vẫn được coi là đủ (chỉ cần xác nhận CÒN HIỆU LỰC, đợt đã đóng hay chưa không quan trọng).
+- `GET /hoc-vien/toi/danh-gia-dau-vao`:
+  - Đủ điều kiện: `{ du_dieu_kien: true, duong_dan, ten_dang_nhap_vle, mat_khau_tam }` (`mat_khau_tam` giải mã tức thời từ `mat_khau_tam_ma_hoa`, `null` nếu dòng import không có mật khẩu tạm) — ghi `tai_khoan_vle.lan_dau_xem_luc=now()` nếu đang `NULL`.
+  - Chưa đủ, đợt 2 chưa đóng (hoặc chưa từng tạo đợt 2): `{ du_dieu_kien: false, ly_do: string[], dot: {id, ten, loai, mo_luc, dong_luc} | null }` — **không** trả bất kỳ trường VLE nào.
+  - Chưa đủ **và** đợt 2 áp dụng cho học viên **đã đóng** (`dong_luc <= now()`) — QĐ9: `{ du_dieu_kien: false, het_han: true }` (không trả `ly_do`/`dot`) — vào danh sách xử lý riêng.
+- `GET /bao-cao/dieu-kien-danh-gia?khoa_id=` + `/xuat-excel` (QuảnTrị): mỗi dòng 1 học viên `import_moet` — `du_dieu_kien`, `ly_do` (rỗng nếu đủ), `da_xem_vle` (`tai_khoan_vle.lan_dau_xem_luc IS NOT NULL`). Cùng logic "đủ điều kiện" ở trên, tính lại cho từng hồ sơ (chấp nhận đánh đổi hiệu năng ở tầng ứng dụng như `GET /hoc-vien?day_du=`).
+- Bảo mật `mat_khau_tam`: mã hóa AES-256-GCM tại `mat_khau_tam_ma_hoa` (xem mục 5, import `tai_khoan_vle`) — chỉ giải mã đúng lúc trả cho **chính học viên đó** qua `GET /hoc-vien/toi/danh-gia-dau-vao` khi đủ điều kiện; không endpoint quản trị nào khác trả giá trị này (kể cả báo cáo `dieu-kien-danh-gia`).
 
 ### Routing đơn vị duyệt (theo `cap_giang_day` của hồ sơ)
 ```
@@ -169,7 +182,7 @@ Học viên nhận tài khoản đăng nhập bằng **Mã định danh CSDL MOE
 
 ## 5. Dịch vụ Import
 
-Dùng chung 1 luồng cho cả 5 loại (`loai_danh_muc_import`): `dia_danh`, `don_vi_cong_tac`, `mon_hoc`, `phan_lop_hoc_vien`, `ho_so_nhan_su_moet` (`POST /import/ho-so-nhan-su-moet` — chi tiết ở mục "Luồng import nhân sự từ CSDL MOET", mục 2).
+Dùng chung 1 luồng cho cả 6 loại (`loai_danh_muc_import`): `dia_danh`, `don_vi_cong_tac`, `mon_hoc`, `phan_lop_hoc_vien`, `ho_so_nhan_su_moet` (`POST /import/ho-so-nhan-su-moet` — chi tiết ở mục "Luồng import nhân sự từ CSDL MOET", mục 2), `tai_khoan_vle` (T15, 2026-09-28 — chi tiết ở mục "Cổng điều kiện làm đánh giá đầu vào & tài khoản VLE", mục 2).
 
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
@@ -181,6 +194,8 @@ Dùng chung 1 luồng cho cả 5 loại (`loai_danh_muc_import`): `dia_danh`, `d
 | GET | `/import` | Nhật ký import `?loai=&tu_ngay=&den_ngay=` | QuảnTrị |
 
 Riêng `phan_lop_hoc_vien`: cột file = `so_dinh_danh_ca_nhan`, `ma_khoa`, `ten_lop` (**`ten_lop` tùy chọn**). Đây là **cơ chế duy nhất** để ghi danh học viên vào khóa — **đã sửa 2026-09-25**: `dang_ky_hoc.khoa_id` KHÔNG tự gán khi hồ sơ học viên `da_duyet` (bản trước ghi vậy nhưng vô nghĩa — không có cơ sở để biết tự động ghi danh vào khóa nào), toàn bộ việc gán khóa cho học viên do Quản trị hệ thống chủ động thực hiện qua import này, học viên không tự chọn/đăng ký khóa. Với mỗi dòng: ĐDCN phải tồn tại và có hồ sơ `da_duyet`; tạo (hoặc lấy nếu đã có) `dang_ky_hoc` cho `(hoc_vien_id, khoa_id)`; nếu `ten_lop` có giá trị thì khớp `lop_hoc` trong đúng `khoa_id` đó và gán `lop_id` + `trang_thai='da_phan_lop'`, nếu để trống thì chỉ ghi danh (`lop_id=NULL`, `trang_thai='da_duyet'`) — cho phép chạy import 2 lần tách biệt (ghi danh trước, phân lớp sau) hoặc 1 lần luôn. Dòng lỗi điển hình: ĐDCN không tồn tại/chưa được duyệt, mã khóa không tồn tại, tên lớp không tồn tại trong đúng khóa đó.
+
+**T15 (2026-09-28) — `tai_khoan_vle`** (`POST /import/tai_khoan_vle`, file Phòng CNTT trả về sau khi tạo tài khoản VLE cho toàn bộ học viên): cột file = `so_dinh_danh_ca_nhan`, `ma_dinh_danh_moet`, `ten_dang_nhap_vle`, `mat_khau_tam`, `duong_dan`. Xác định học viên bằng **HocVienResolver dùng chung** (mục 2 quy tắc chung của `mo-rong-nls-an-giang.md`): phải có ít nhất 1 trong 2 cột `so_dinh_danh_ca_nhan`/`ma_dinh_danh_moet`; có cả 2 thì phải trỏ cùng 1 hồ sơ, không thì là dòng lỗi. `mat_khau_tam` **tùy chọn** — nếu có, mã hóa AES-256-GCM (`vle-crypto.util.ts`, khóa `VLE_SECRET_KEY`) trước khi lưu `tai_khoan_vle.mat_khau_tam_ma_hoa`; **không bao giờ** trả lại mật khẩu dạng rõ qua API quản trị hay file lỗi import (file lỗi tự động ẩn cột này). Upsert theo `hoc_vien_id` (PK) — chạy lại file ghi đè `ten_dang_nhap_vle`/`duong_dan`; nếu dòng KHÔNG có `mat_khau_tam` thì giữ nguyên mật khẩu mã hóa cũ (không tự xóa về NULL).
 
 ---
 

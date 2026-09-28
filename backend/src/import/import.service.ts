@@ -12,6 +12,7 @@ import { CreateDonViCongTacDto } from '../danh-muc/dto/don-vi-cong-tac.dto';
 import { CreateMonHocDto } from '../danh-muc/dto/mon-hoc.dto';
 import { HoSoNhanSuMoetRowDto } from '../hoc-vien/dto/import-moet-row.dto';
 import { PhanLopHocVienRowDto } from '../khoa-boi-duong/dto/phan-lop-row.dto';
+import { TaiKhoanVleRowDto } from './dto/tai-khoan-vle-row.dto';
 import {
   ConflictAppException,
   NotFoundAppException,
@@ -39,6 +40,8 @@ import {
   luuKetQua,
 } from './util/import-storage.util';
 import { buildValidatedDto } from './util/dto-validate.util';
+import { resolveHocVienImportRow } from './util/hoc-vien-resolver.util';
+import { encryptVleMatKhau } from '../common/utils/vle-crypto.util';
 import { LichSuImportQueryDto } from './dto/lich-su-import-query.dto';
 
 // Dịch vụ Import — docs/api-contract.md mục 5. Cả 5 loại đã triển khai:
@@ -66,7 +69,7 @@ export class ImportService {
   assertSupported(loai: string): SupportedImportType {
     if (!isSupportedImportType(loai)) {
       throw new ValidationException(
-        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien)`,
+        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle)`,
       );
     }
     return loai;
@@ -151,7 +154,7 @@ export class ImportService {
         columns,
         danhSachLoi.map((l) => ({
           dong: l.dong,
-          values: rowsByDong.get(l.dong) ?? {},
+          values: this.redactChoFileLoi(loai, rowsByDong.get(l.dong) ?? {}),
           ly_do: l.ly_do,
         })),
       );
@@ -276,7 +279,7 @@ export class ImportService {
         columns,
         danhSachLoiMoi.map((l) => ({
           dong: l.dong,
-          values: rowsByDong.get(l.dong) ?? {},
+          values: this.redactChoFileLoi(loai, rowsByDong.get(l.dong) ?? {}),
           ly_do: l.ly_do,
         })),
       );
@@ -374,7 +377,36 @@ export class ImportService {
           'Số điện thoại',
           'Ghi chú',
         ];
+      case 'tai_khoan_vle':
+        // T15 (mo-rong-nls-an-giang.md): file Phòng CNTT trả về sau khi tạo
+        // tài khoản VLE cho toàn bộ học viên. Mã học viên dùng chung
+        // HocVienResolver (mục 2 quy tắc #3) — cả 2 cột đều "tùy chọn" theo
+        // nghĩa từng cột, nhưng phải có ÍT NHẤT 1 (xem
+        // resolveHocVienImportRow). mat_khau_tam tùy chọn — không phải học
+        // viên nào cũng có mật khẩu tạm riêng (vd SSO).
+        return [
+          'so_dinh_danh_ca_nhan',
+          'ma_dinh_danh_moet',
+          'ten_dang_nhap_vle',
+          'mat_khau_tam',
+          'duong_dan',
+        ];
     }
+  }
+
+  // T15: "không bao giờ trả mật khẩu... trong file lỗi import" — file lỗi
+  // (buildLoiWorkbook) re-export NGUYÊN VĂN giá trị dòng gốc cho từng cột
+  // (để người dùng sửa và nộp lại), nên phải xóa riêng mat_khau_tam ở đây
+  // TRƯỚC khi ghi ra Excel — các loại import khác không có cột nhạy cảm nào
+  // tương tự nên trả nguyên values.
+  private redactChoFileLoi(
+    loai: SupportedImportType,
+    values: Record<string, string>,
+  ): Record<string, string> {
+    if (loai === 'tai_khoan_vle' && values.mat_khau_tam) {
+      return { ...values, mat_khau_tam: '(đã ẩn)' };
+    }
+    return values;
   }
 
   private getColumnNotes(loai: SupportedImportType): Record<string, string> {
@@ -388,6 +420,15 @@ export class ImportService {
       return {
         'Mã đơn vị':
           'Tùy chọn — chỉ cần điền khi tên đơn vị ở cột "Đơn vị" trùng với đơn vị khác trong danh mục (vd cùng địa danh sau sáp nhập). Nếu có giá trị, hệ thống khớp theo mã này thay vì tên.',
+      };
+    }
+    if (loai === 'tai_khoan_vle') {
+      return {
+        so_dinh_danh_ca_nhan:
+          'Tùy chọn — phải có ít nhất 1 trong 2 cột so_dinh_danh_ca_nhan/ma_dinh_danh_moet để xác định học viên. Có cả 2 thì phải trỏ cùng 1 hồ sơ.',
+        ma_dinh_danh_moet: 'Tùy chọn — xem ghi chú cột so_dinh_danh_ca_nhan.',
+        mat_khau_tam:
+          'Tùy chọn — để trống nếu học viên không có mật khẩu tạm riêng. Được mã hóa trước khi lưu, không bao giờ hiển thị lại qua API hay file lỗi import.',
       };
     }
     return {};
@@ -411,6 +452,7 @@ export class ImportService {
       | CreateMonHocDto
       | HoSoNhanSuMoetRowDto
       | PhanLopHocVienRowDto
+      | TaiKhoanVleRowDto
     >
   > {
     switch (loai) {
@@ -431,6 +473,8 @@ export class ImportService {
         });
       case 'ho_so_nhan_su_moet':
         return this.buildHoSoMoetDto(raw);
+      case 'tai_khoan_vle':
+        return this.buildTaiKhoanVleDto(raw);
     }
   }
 
@@ -441,7 +485,8 @@ export class ImportService {
       | CreateDonViCongTacDto
       | CreateMonHocDto
       | HoSoNhanSuMoetRowDto
-      | PhanLopHocVienRowDto,
+      | PhanLopHocVienRowDto
+      | TaiKhoanVleRowDto,
   ): Promise<string | undefined> {
     try {
       if (loai === 'dia_danh') {
@@ -467,6 +512,10 @@ export class ImportService {
       } else if (loai === 'phan_lop_hoc_vien') {
         // Không cần kiểm tra thêm: resolvePhanLopRow() (buildDto) đã tra
         // cứu/validate toàn bộ FK + trạng thái hồ sơ cho dòng này rồi.
+      } else if (loai === 'tai_khoan_vle') {
+        // Không cần kiểm tra thêm: buildTaiKhoanVleDto() (buildDto) đã tra
+        // cứu học viên qua resolveHocVienImportRow() rồi — upsert theo PK
+        // hoc_vien_id nên không có ràng buộc trùng nào khác cần kiểm tra.
       } else {
         const d = dto as HoSoNhanSuMoetRowDto;
         await this.hocVienService.checkValidMoetImportRow({
@@ -493,7 +542,8 @@ export class ImportService {
       | CreateDonViCongTacDto
       | CreateMonHocDto
       | HoSoNhanSuMoetRowDto
-      | PhanLopHocVienRowDto,
+      | PhanLopHocVienRowDto
+      | TaiKhoanVleRowDto,
     importId: string,
     nguoiImportId: string,
   ): Promise<void> {
@@ -508,6 +558,8 @@ export class ImportService {
       await this.monHocService.create(dto as CreateMonHocDto, importId);
     } else if (loai === 'phan_lop_hoc_vien') {
       await this.khoaBoiDuongService.commitPhanLop(dto as PhanLopHocVienRowDto);
+    } else if (loai === 'tai_khoan_vle') {
+      await this.commitTaiKhoanVle(dto as TaiKhoanVleRowDto, importId);
     } else {
       const d = dto as HoSoNhanSuMoetRowDto;
       await this.hocVienService.createFromMoetImport(
@@ -526,6 +578,39 @@ export class ImportService {
         nguoiImportId,
       );
     }
+  }
+
+  // T15: upsert theo PK hoc_vien_id — chạy lại file (vd Phòng CNTT gửi file
+  // cập nhật) ghi đè tài khoản cũ. mat_khau_tam KHÔNG có trong dòng (tùy
+  // chọn) -> giữ nguyên mật khẩu mã hóa cũ (undefined trong data Prisma =
+  // không đụng tới cột), KHÔNG tự xóa về NULL.
+  private async commitTaiKhoanVle(
+    dto: TaiKhoanVleRowDto,
+    importId: string,
+  ): Promise<void> {
+    // Cast qua unknown: @types/node gõ Buffer.concat() là Buffer<ArrayBufferLike>
+    // nhưng Prisma Client (Bytes field) đòi Uint8Array<ArrayBuffer> — không
+    // lệch runtime (Buffer luôn là Uint8Array), chỉ lệch generic parameter.
+    const matKhauMaHoa = dto.mat_khau_tam
+      ? (encryptVleMatKhau(dto.mat_khau_tam) as unknown as Buffer<ArrayBuffer>)
+      : undefined;
+    await this.prisma.tai_khoan_vle.upsert({
+      where: { hoc_vien_id: dto.hoc_vien_id },
+      create: {
+        hoc_vien_id: dto.hoc_vien_id,
+        ten_dang_nhap_vle: dto.ten_dang_nhap_vle,
+        mat_khau_tam_ma_hoa: matKhauMaHoa,
+        duong_dan: dto.duong_dan,
+        nguon_import_id: importId,
+      },
+      update: {
+        ten_dang_nhap_vle: dto.ten_dang_nhap_vle,
+        mat_khau_tam_ma_hoa: matKhauMaHoa,
+        duong_dan: dto.duong_dan,
+        nguon_import_id: importId,
+        cap_nhat_luc: new Date(),
+      },
+    });
   }
 
   // SĐT lưu dạng number mất số 0 đầu (T4): đúng 9 chữ số, bắt đầu 3/5/7/8/9
@@ -597,9 +682,7 @@ export class ImportService {
       donViId = matches[0].id;
     }
 
-    const { sdt, canhBao } = this.suaSoDienThoaiThieuSo0(
-      raw['Số điện thoại'],
-    );
+    const { sdt, canhBao } = this.suaSoDienThoaiThieuSo0(raw['Số điện thoại']);
 
     const ketQua = await buildValidatedDto(HoSoNhanSuMoetRowDto, {
       ma_dinh_danh_moet: raw['Mã định danh (CDSL moet)'],
@@ -615,6 +698,29 @@ export class ImportService {
     });
     if (ketQua.error || !ketQua.dto) return ketQua;
     return { dto: ketQua.dto, canhBao };
+  }
+
+  // T15 — dùng HocVienResolver dùng chung (mục 2 quy tắc #3) để xác định
+  // hoc_vien_id từ so_dinh_danh_ca_nhan/ma_dinh_danh_moet, rồi validate các
+  // trường còn lại (TaiKhoanVleRowDto). mat_khau_tam KHÔNG được validate nội
+  // dung (bất kỳ chuỗi nào Phòng CNTT sinh ra) — chỉ giới hạn độ dài, mã hóa
+  // ngay khi commit (commitTaiKhoanVle), không log ở bất kỳ bước nào.
+  private async buildTaiKhoanVleDto(
+    raw: Record<string, string>,
+  ): Promise<RowBuildResult<TaiKhoanVleRowDto>> {
+    const resolved = await resolveHocVienImportRow(this.prisma, {
+      so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
+      ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
+    });
+    if (resolved.error || !resolved.hocVien) {
+      return { error: resolved.error ?? 'Không xác định được học viên' };
+    }
+    return buildValidatedDto(TaiKhoanVleRowDto, {
+      hoc_vien_id: resolved.hocVien.id,
+      ten_dang_nhap_vle: raw.ten_dang_nhap_vle,
+      mat_khau_tam: raw.mat_khau_tam || undefined,
+      duong_dan: raw.duong_dan,
+    });
   }
 
   private async buildDiaDanhDto(

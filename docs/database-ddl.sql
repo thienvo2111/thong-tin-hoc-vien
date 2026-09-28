@@ -74,7 +74,8 @@ CREATE TYPE nguon_tao_ho_so AS ENUM ('tu_dang_ky', 'import_moet');
 
 CREATE TYPE loai_danh_muc_import AS ENUM (
     'dia_danh', 'don_vi_cong_tac', 'mon_hoc', 'phan_lop_hoc_vien',
-    'ho_so_nhan_su_moet'
+    'ho_so_nhan_su_moet',
+    'tai_khoan_vle'  -- T15 (mo-rong-nls-an-giang.md, 2026-09-28) — thêm SAU CÙNG (migration riêng)
 );
 
 CREATE TYPE trang_thai_import AS ENUM ('dang_xu_ly', 'hoan_thanh', 'loi');
@@ -446,6 +447,22 @@ CREATE TABLE lich_su_thay_doi_ho_so (
 
 CREATE INDEX idx_lich_su_hv ON lich_su_thay_doi_ho_so(hoc_vien_id);
 CREATE INDEX idx_lich_su_goc_moet ON lich_su_thay_doi_ho_so(la_truong_goc_moet) WHERE la_truong_goc_moet;
+
+-- T15 (mo-rong-nls-an-giang.md, 2026-09-28): tài khoản VLE do Phòng CNTT tạo
+-- cho TẤT CẢ học viên import_moet (QĐ8, cách B — chặn "mềm": tài khoản luôn
+-- tồn tại, hệ thống chỉ ẩn/hiện thông tin ở GET /hoc-vien/toi/danh-gia-dau-vao
+-- tùy điều kiện). mat_khau_tam_ma_hoa mã hóa AES-256-GCM ở TẦNG ỨNG DỤNG
+-- (vle-crypto.util.ts, khóa trong env VLE_SECRET_KEY) — DB không bao giờ
+-- chứa mật khẩu dạng rõ.
+CREATE TABLE tai_khoan_vle (
+    hoc_vien_id             uuid PRIMARY KEY REFERENCES hoc_vien(id),
+    ten_dang_nhap_vle       varchar(100) NOT NULL,
+    mat_khau_tam_ma_hoa     bytea,
+    duong_dan               varchar(500) NOT NULL,
+    lan_dau_xem_luc         timestamptz,
+    nguon_import_id         uuid REFERENCES nhat_ky_import(id),
+    cap_nhat_luc            timestamptz NOT NULL DEFAULT now()
+);
 
 
 -- =====================================================================

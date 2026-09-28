@@ -4,6 +4,7 @@ import {
   KHONG_XAC_DINH,
   KET_QUA_HOC,
   CHUA_CO_KET_QUA,
+  DieuKienDanhGiaRow,
   SuaTruongMoetRow,
   TRANG_THAI_DANG_KY,
   TRANG_THAI_HO_SO,
@@ -234,6 +235,35 @@ export async function buildXuatChoVleWorkbook(
       row.email ?? '',
       row.don_vi,
       row.trang_thai_dot_1 === 'da_xac_nhan' ? 'Đã xác nhận' : 'Chưa xác nhận',
+    ]);
+  }
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+// T15 — GET /bao-cao/dieu-kien-danh-gia/xuat-excel.
+export async function buildDieuKienDanhGiaWorkbook(
+  rows: DieuKienDanhGiaRow[],
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Điều kiện đánh giá đầu vào');
+  sheet.addRow([
+    'Mã định danh CSDL MOET',
+    'Họ và tên',
+    'Đơn vị công tác',
+    'Đủ điều kiện',
+    'Lý do (nếu không đủ)',
+    'Đã xem thông tin VLE',
+  ]);
+  sheet.getRow(1).font = { bold: true };
+  for (const row of rows) {
+    sheet.addRow([
+      row.ma_dinh_danh_moet ?? '',
+      row.ho_ten,
+      row.don_vi_cong_tac_ten,
+      row.du_dieu_kien ? 'Đủ điều kiện' : 'Không đủ điều kiện',
+      row.ly_do.join('; '),
+      row.da_xem_vle ? 'Đã xem' : 'Chưa xem',
     ]);
   }
   const buffer = await workbook.xlsx.writeBuffer();

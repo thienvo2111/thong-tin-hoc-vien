@@ -164,3 +164,15 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 66 | Đổi ngày sinh **không** đổi mật khẩu (mật khẩu chỉ đổi qua `POST /auth/doi-mat-khau`, không có logic nào tự sync lại theo `ngay_sinh` sau lần đăng nhập đầu — rule #35) | 🔴 | API |
 | 67 | `POST /hoc-vien/toi/xac-nhan` (`import_moet`): bắt buộc đợt đang mở **và** `day_du=true` (T9) — thiếu 1 trong 2 → lỗi tương ứng (`403 DOT_XAC_NHAN_DONG` hoặc `400 VALIDATION_ERROR` kèm `fields`=danh sách thiếu); tạo `xac_nhan_ho_so.du_lieu` = bản chụp response `GET /hoc-vien/toi` tại thời điểm xác nhận; gửi lại email `hoc_vien_xac_nhan` | 🔴 | API |
 | 68 | Ngoài giờ đợt: học viên chỉ xem (`GET` không bị chặn); Quản trị vẫn sửa được qua `PATCH /hoc-vien/{id}` (không bị chặn bởi đợt), ghi lịch sử với `vai_tro_nguoi_sua='quan_tri'` | 🔴 | API |
+
+## Cổng điều kiện làm đánh giá đầu vào & tài khoản VLE (T15, 2026-09-28 — mo-rong-nls-an-giang.md, QĐ8/QĐ9)
+
+| # | Quy tắc | Mức | Nơi thực thi |
+|---|---|---|---|
+| 69 | Import `tai_khoan_vle`: xác định học viên bằng HocVienResolver dùng chung — phải có ít nhất 1 trong `so_dinh_danh_ca_nhan`/`ma_dinh_danh_moet`; có cả 2 thì phải trỏ cùng 1 hồ sơ, không thì dòng lỗi | 🔴 | API (`resolveHocVienImportRow`) |
+| 70 | `mat_khau_tam` (import `tai_khoan_vle`) mã hóa AES-256-GCM (`vle-crypto.util.ts`, khóa `VLE_SECRET_KEY`) trước khi lưu `tai_khoan_vle.mat_khau_tam_ma_hoa` — DB **không bao giờ** chứa mật khẩu dạng rõ | 🔴 | API + DB (`bytea`) |
+| 71 | Mật khẩu tạm **không bao giờ** xuất hiện trong: response API quản trị (`GET /import/{id}`, `GET /bao-cao/dieu-kien-danh-gia`...), file lỗi import (`GET /import/{id}/file-loi` tự ẩn cột `mat_khau_tam`), log ứng dụng | 🔴 | API |
+| 72 | Đủ điều kiện làm đánh giá đầu vào = có `xac_nhan_ho_so.con_hieu_luc=true` ở 1 đợt `loai='xac_nhan_truoc_danh_gia'` áp dụng cho học viên **và** `day_du=true` (T9) tại thời điểm gọi `GET /hoc-vien/toi/danh-gia-dau-vao` — không cần đợt đó đang mở lúc gọi | 🔴 | API (`HocVienService.danhGiaDauVaoCuaToi`) |
+| 73 | Chưa đủ điều kiện (ở bất kỳ trạng thái nào) → response **không** chứa `duong_dan`/`ten_dang_nhap_vle`/`mat_khau_tam` | 🔴 | API |
+| 74 | Đợt `xac_nhan_truoc_danh_gia` áp dụng cho học viên đã đóng (`dong_luc <= now()`) mà học viên chưa đủ điều kiện → `{ du_dieu_kien: false, het_han: true }` (QĐ9) — vào danh sách xử lý riêng (`GET /bao-cao/dieu-kien-danh-gia`) | 🔴 | API |
+| 75 | Sửa hồ sơ sau khi đã xác nhận đợt 2 → xác nhận đó hết hiệu lực (rule #65) → mất điều kiện xem thông tin VLE cho tới khi xác nhận lại | 🔴 | API (liên kết #65 + #72) |

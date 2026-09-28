@@ -2,6 +2,7 @@ import { Controller, Get, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { BaoCaoService } from './bao-cao.service';
 import {
+  buildDieuKienDanhGiaWorkbook,
   buildSuaTruongMoetWorkbook,
   buildTongHopWorkbook,
   buildXacNhanWorkbook,
@@ -110,6 +111,32 @@ export class BaoCaoController {
         'Content-Type':
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': 'attachment; filename="xuat-cho-vle.xlsx"',
+      })
+      .send(buffer);
+  }
+
+  // T15 — QĐ9: danh sách "không đủ" sau khi đóng đợt 2 là đầu vào xử lý
+  // riêng.
+  @Roles('quan_tri')
+  @Get('dieu-kien-danh-gia')
+  dieuKienDanhGia(@Query() query: KhoaIdQueryDto) {
+    return this.baoCaoService.baoCaoDieuKienDanhGia(query.khoa_id);
+  }
+
+  @Roles('quan_tri')
+  @Get('dieu-kien-danh-gia/xuat-excel')
+  async dieuKienDanhGiaXuatExcel(
+    @Query() query: KhoaIdQueryDto,
+    @Res() res: Response,
+  ) {
+    const rows = await this.baoCaoService.baoCaoDieuKienDanhGia(query.khoa_id);
+    const buffer = await buildDieuKienDanhGiaWorkbook(rows);
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition':
+          'attachment; filename="bao-cao-dieu-kien-danh-gia.xlsx"',
       })
       .send(buffer);
   }

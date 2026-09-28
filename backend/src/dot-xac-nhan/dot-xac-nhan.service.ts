@@ -206,4 +206,66 @@ export class DotXacNhanService {
       data: { dot_id: dotId, hoc_vien_id: hocVienId, du_lieu: duLieu },
     });
   }
+
+  // ---------------------------------------------------------------------
+  // T15 (mo-rong-nls-an-giang.md) — GET /hoc-vien/toi/danh-gia-dau-vao.
+  // ---------------------------------------------------------------------
+
+  // "Đủ điều kiện" đòi xác nhận CÒN HIỆU LỰC ở 1 đợt loai=xac_nhan_truoc_
+  // danh_gia (Đợt 2) — KHÔNG đòi đợt đó đang mở lúc gọi (học viên xác nhận
+  // xong, đợt đóng lại, hồ sơ vẫn còn đầy đủ -> vẫn đủ điều kiện xem thông
+  // tin VLE; QĐ9 chỉ chặn khi CHƯA xác nhận trước lúc đợt đóng). Không cần
+  // lọc theo phạm vi khoa_id ở đây — nếu xac_nhan_ho_so tồn tại thì đợt đó
+  // ĐÃ từng "đang mở" cho đúng học viên này lúc tạo (dotDangMoCuaHocVien đã
+  // gác trước khi cho xác nhận).
+  async coXacNhanTruocDanhGiaConHieuLuc(hocVienId: string): Promise<boolean> {
+    const found = await this.prisma.xac_nhan_ho_so.findFirst({
+      where: {
+        hoc_vien_id: hocVienId,
+        con_hieu_luc: true,
+        dot: { loai: 'xac_nhan_truoc_danh_gia' },
+      },
+    });
+    return found !== null;
+  }
+
+  // Đợt loai=xac_nhan_truoc_danh_gia áp dụng cho học viên (khoa_id NULL hoặc
+  // học viên đã ghi danh đúng khoa_id đó) — dùng để hiển thị "dot" trong
+  // response chưa đủ điều kiện, VÀ để suy ra "het_han" (QĐ9): ưu tiên đợt
+  // đang mở nếu có; không thì đợt đã đóng GẦN NHẤT (để báo het_han); không
+  // thì đợt sắp mở gần nhất (để báo "chưa mở"); null nếu chưa từng tạo đợt
+  // loại này áp dụng cho học viên.
+  async dotXacNhanTruocDanhGiaApDung(
+    hocVienId: string,
+  ): Promise<dot_xac_nhan | null> {
+    const dangKy = await this.prisma.dang_ky_hoc.findMany({
+      where: { hoc_vien_id: hocVienId },
+      select: { khoa_id: true },
+    });
+    const khoaIds = dangKy.map((d) => d.khoa_id);
+    const all = await this.prisma.dot_xac_nhan.findMany({
+      where: {
+        loai: 'xac_nhan_truoc_danh_gia',
+        OR: [
+          { khoa_id: null },
+          ...(khoaIds.length > 0 ? [{ khoa_id: { in: khoaIds } }] : []),
+        ],
+      },
+    });
+    if (all.length === 0) return null;
+
+    const now = new Date();
+    const dangMo = all.find((d) => d.mo_luc <= now && d.dong_luc > now);
+    if (dangMo) return dangMo;
+
+    const daDong = all
+      .filter((d) => d.dong_luc <= now)
+      .sort((a, b) => b.dong_luc.getTime() - a.dong_luc.getTime());
+    if (daDong.length > 0) return daDong[0];
+
+    const sapMo = all
+      .filter((d) => d.mo_luc > now)
+      .sort((a, b) => a.mo_luc.getTime() - b.mo_luc.getTime());
+    return sapMo[0] ?? null;
+  }
 }

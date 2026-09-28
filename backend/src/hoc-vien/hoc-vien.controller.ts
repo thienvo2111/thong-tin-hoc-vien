@@ -56,6 +56,15 @@ export class HocVienController {
     return this.hocVienService.dotXacNhanCuaToi(user);
   }
 
+  // T15: cổng điều kiện làm đánh giá đầu vào (QĐ8/QĐ9) — trả link + tài
+  // khoản VLE nếu đủ điều kiện, không thì lý do (hoặc het_han nếu đợt 2 đã
+  // đóng mà chưa đủ).
+  @Roles('hoc_vien')
+  @Get('toi/danh-gia-dau-vao')
+  danhGiaDauVaoCuaToi(@CurrentUser() user: AuthenticatedUser) {
+    return this.hocVienService.danhGiaDauVaoCuaToi(user);
+  }
+
   @Roles('hoc_vien')
   @Get('toi')
   layHoSoCuaToi(@CurrentUser() user: AuthenticatedUser) {

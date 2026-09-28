@@ -1,14 +1,15 @@
 import { loai_danh_muc_import } from '@prisma/client';
 
-// Cả 5/5 loại đã được triển khai (dia_danh/don_vi_cong_tac/mon_hoc/
-// ho_so_nhan_su_moet từ các lượt trước + phan_lop_hoc_vien ở lượt này, xem
-// KhoaBoiDuongService).
+// Cả 6/6 loại đã được triển khai (dia_danh/don_vi_cong_tac/mon_hoc/
+// ho_so_nhan_su_moet/phan_lop_hoc_vien từ các lượt trước + tai_khoan_vle
+// (T15, mo-rong-nls-an-giang.md) ở lượt này).
 export const SUPPORTED_IMPORT_TYPES = [
   'dia_danh',
   'don_vi_cong_tac',
   'mon_hoc',
   'ho_so_nhan_su_moet',
   'phan_lop_hoc_vien',
+  'tai_khoan_vle',
 ] as const satisfies readonly loai_danh_muc_import[];
 
 export type SupportedImportType = (typeof SUPPORTED_IMPORT_TYPES)[number];

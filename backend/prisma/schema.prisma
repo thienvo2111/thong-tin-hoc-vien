@@ -120,6 +120,11 @@ enum loai_danh_muc_import {
   mon_hoc
   phan_lop_hoc_vien
   ho_so_nhan_su_moet
+  // T15 (mo-rong-nls-an-giang.md, 2026-09-28): thêm SAU CÙNG — Postgres yêu
+  // cầu ALTER TYPE ... ADD VALUE nằm trong migration RIÊNG, chạy trước
+  // migration nào dùng giá trị mới (không thể dùng giá trị enum vừa thêm
+  // trong cùng transaction đã thêm nó).
+  tai_khoan_vle
 }
 
 enum trang_thai_import {
@@ -167,10 +172,11 @@ model nhat_ky_import {
   file_loi_url       String?
   trang_thai         trang_thai_import    @default(dang_xu_ly)
 
-  nguoi_import    nguoi_dung        @relation("nhat_ky_import_nguoi_import", fields: [nguoi_import_id], references: [id], map: "fk_import_nguoi_import", onDelete: NoAction, onUpdate: NoAction)
-  dia_danh_import dia_danh[]
-  don_vi_import   don_vi_cong_tac[]
-  mon_hoc_import  mon_hoc[]
+  nguoi_import         nguoi_dung        @relation("nhat_ky_import_nguoi_import", fields: [nguoi_import_id], references: [id], map: "fk_import_nguoi_import", onDelete: NoAction, onUpdate: NoAction)
+  dia_danh_import      dia_danh[]
+  don_vi_import        don_vi_cong_tac[]
+  mon_hoc_import       mon_hoc[]
+  tai_khoan_vle_import tai_khoan_vle[]
 
   @@index([nguoi_import_id], map: "idx_import_nguoi")
   @@index([loai_danh_muc], map: "idx_import_loai")
@@ -249,38 +255,38 @@ model mon_hoc {
 // sau khi cả 2 bảng tồn tại) — Prisma tự xử lý thứ tự tạo bảng/FK.
 // ---------------------------------------------------------------------
 model nguoi_dung {
-  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ho_ten            String             @db.VarChar(255)
-  email             String?            @unique(map: "uq_nguoi_dung_email") @db.VarChar(255)
-  ten_dang_nhap     String             @unique(map: "uq_nguoi_dung_ten_dang_nhap") @db.VarChar(50)
-  vai_tro           vai_tro_nguoi_dung
-  don_vi_id         String?            @db.Uuid
-  hoc_vien_id       String?            @unique(map: "uq_nguoi_dung_hoc_vien") @db.Uuid
-  mat_khau_hash     String             @db.VarChar(255)
-  phai_doi_mat_khau Boolean            @default(true)
-  trang_thai        trang_thai_active  @default(active)
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ho_ten               String             @db.VarChar(255)
+  email                String?            @unique(map: "uq_nguoi_dung_email") @db.VarChar(255)
+  ten_dang_nhap        String             @unique(map: "uq_nguoi_dung_ten_dang_nhap") @db.VarChar(50)
+  vai_tro              vai_tro_nguoi_dung
+  don_vi_id            String?            @db.Uuid
+  hoc_vien_id          String?            @unique(map: "uq_nguoi_dung_hoc_vien") @db.Uuid
+  mat_khau_hash        String             @db.VarChar(255)
+  phai_doi_mat_khau    Boolean            @default(true)
+  trang_thai           trang_thai_active  @default(active)
   // Thêm 2026-09-28 (T1 bảo mật đăng nhập): đếm số lần sai liên tiếp, khóa
   // tạm 15 phút sau 5 lần sai — xem AuthService.dangNhap.
-  so_lan_dang_nhap_sai Int             @default(0) @db.SmallInt
-  khoa_den          DateTime?          @db.Timestamptz(6)
+  so_lan_dang_nhap_sai Int                @default(0) @db.SmallInt
+  khoa_den             DateTime?          @db.Timestamptz(6)
   // Dùng cho báo cáo "chưa đăng nhập" (T14) — cập nhật mỗi lần đăng nhập thành công.
-  dang_nhap_lan_cuoi DateTime?         @db.Timestamptz(6)
-  created_at        DateTime           @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime           @default(now()) @db.Timestamptz(6)
+  dang_nhap_lan_cuoi   DateTime?          @db.Timestamptz(6)
+  created_at           DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime           @default(now()) @db.Timestamptz(6)
 
   don_vi   don_vi_cong_tac? @relation(fields: [don_vi_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   hoc_vien hoc_vien?        @relation("nguoi_dung_hoc_vien", fields: [hoc_vien_id], references: [id], map: "fk_nguoi_dung_hoc_vien", onDelete: NoAction, onUpdate: NoAction)
 
-  nhat_ky_import            nhat_ky_import[]   @relation("nhat_ky_import_nguoi_import")
-  hoc_vien_nguoi_duyet      hoc_vien[]         @relation("hoc_vien_nguoi_duyet")
-  hoc_vien_created_by       hoc_vien[]         @relation("hoc_vien_created_by")
-  khoa_boi_duong_duyet      khoa_boi_duong[]   @relation("khoa_boi_duong_nguoi_duyet")
-  khoa_boi_duong_created_by khoa_boi_duong[]   @relation("khoa_boi_duong_created_by")
-  token_thu_hoi             token_thu_hoi[]
-  nhat_ky_dat_lai_mat_khau_cua_toi  nhat_ky_dat_lai_mat_khau[] @relation("nhat_ky_dlmk_nguoi_dung")
+  nhat_ky_import                     nhat_ky_import[]           @relation("nhat_ky_import_nguoi_import")
+  hoc_vien_nguoi_duyet               hoc_vien[]                 @relation("hoc_vien_nguoi_duyet")
+  hoc_vien_created_by                hoc_vien[]                 @relation("hoc_vien_created_by")
+  khoa_boi_duong_duyet               khoa_boi_duong[]           @relation("khoa_boi_duong_nguoi_duyet")
+  khoa_boi_duong_created_by          khoa_boi_duong[]           @relation("khoa_boi_duong_created_by")
+  token_thu_hoi                      token_thu_hoi[]
+  nhat_ky_dat_lai_mat_khau_cua_toi   nhat_ky_dat_lai_mat_khau[] @relation("nhat_ky_dlmk_nguoi_dung")
   nhat_ky_dat_lai_mat_khau_thuc_hien nhat_ky_dat_lai_mat_khau[] @relation("nhat_ky_dlmk_thuc_hien_boi")
-  dot_xac_nhan_created_by   dot_xac_nhan[]             @relation("dot_xac_nhan_created_by")
-  lich_su_thay_doi_thuc_hien lich_su_thay_doi_ho_so[]  @relation("lich_su_thay_doi_nguoi_sua")
+  dot_xac_nhan_created_by            dot_xac_nhan[]             @relation("dot_xac_nhan_created_by")
+  lich_su_thay_doi_thuc_hien         lich_su_thay_doi_ho_so[]   @relation("lich_su_thay_doi_nguoi_sua")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -322,43 +328,43 @@ model nhat_ky_dat_lai_mat_khau {
 // =====================================================================
 
 model hoc_vien {
-  id                       String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nguon_tao                nguon_tao_ho_so     @default(tu_dang_ky)
+  id        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nguon_tao nguon_tao_ho_so @default(tu_dang_ky)
 
-  ho_ten                   String              @db.VarChar(255)
-  so_dinh_danh_ca_nhan     String?             @unique(map: "uq_hoc_vien_ddcn") @db.Char(12)
-  ma_dinh_danh_moet        String?             @unique(map: "uq_hoc_vien_ma_moet") @db.VarChar(20)
-  ngay_sinh                Int                 @db.SmallInt
-  thang_sinh               Int                 @db.SmallInt
-  nam_sinh                 Int                 @db.SmallInt
-  gioi_tinh                String?             @db.VarChar(20)
-  chuc_vu                  String?             @db.VarChar(100)
+  ho_ten               String  @db.VarChar(255)
+  so_dinh_danh_ca_nhan String? @unique(map: "uq_hoc_vien_ddcn") @db.Char(12)
+  ma_dinh_danh_moet    String? @unique(map: "uq_hoc_vien_ma_moet") @db.VarChar(20)
+  ngay_sinh            Int     @db.SmallInt
+  thang_sinh           Int     @db.SmallInt
+  nam_sinh             Int     @db.SmallInt
+  gioi_tinh            String? @db.VarChar(20)
+  chuc_vu              String? @db.VarChar(100)
 
-  noi_sinh_id              String?             @db.Uuid
-  phuong_xa_id             String?             @db.Uuid
+  noi_sinh_id  String? @db.Uuid
+  phuong_xa_id String? @db.Uuid
 
-  don_vi_cong_tac_id       String              @db.Uuid
+  don_vi_cong_tac_id String @db.Uuid
 
-  so_dien_thoai_lien_he    String              @db.VarChar(20)
-  email_lien_he            String?             @db.VarChar(255)
+  so_dien_thoai_lien_he String  @db.VarChar(20)
+  email_lien_he         String? @db.VarChar(255)
 
   trinh_do_chuyen_mon      trinh_do_chuyen_mon?
-  trinh_do_chuyen_mon_khac String?             @db.VarChar(255)
+  trinh_do_chuyen_mon_khac String?              @db.VarChar(255)
   cap_giang_day            cap_hoc?
-  mon_giang_day_id         String?             @db.Uuid
+  mon_giang_day_id         String?              @db.Uuid
 
-  ghi_chu                  String?
+  ghi_chu String?
 
-  trang_thai                trang_thai_ho_so   @default(nhap)
-  nguoi_duyet_id             String?           @db.Uuid
-  cap_duyet_thuc_te          vai_tro_nguoi_dung?
-  ngay_duyet                 DateTime?         @db.Timestamptz(6)
+  trang_thai        trang_thai_ho_so    @default(nhap)
+  nguoi_duyet_id    String?             @db.Uuid
+  cap_duyet_thuc_te vai_tro_nguoi_dung?
+  ngay_duyet        DateTime?           @db.Timestamptz(6)
 
-  email_ban_sao_da_gui_at    DateTime?         @db.Timestamptz(6)
+  email_ban_sao_da_gui_at DateTime? @db.Timestamptz(6)
 
-  created_at                 DateTime          @default(now()) @db.Timestamptz(6)
-  updated_at                 DateTime          @default(now()) @db.Timestamptz(6)
-  created_by                 String?           @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  created_by String?  @db.Uuid
 
   noi_sinh        dia_danh?       @relation("hoc_vien_noi_sinh", fields: [noi_sinh_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   phuong_xa       dia_danh?       @relation("hoc_vien_phuong_xa", fields: [phuong_xa_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -367,12 +373,13 @@ model hoc_vien {
   nguoi_duyet     nguoi_dung?     @relation("hoc_vien_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   created_by_user nguoi_dung?     @relation("hoc_vien_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  nguoi_dung_account nguoi_dung?           @relation("nguoi_dung_hoc_vien")
+  nguoi_dung_account nguoi_dung?              @relation("nguoi_dung_hoc_vien")
   chuyen_mon         hoc_vien_chuyen_mon[]
   dang_ky_hoc        dang_ky_hoc[]
   nhat_ky_thong_bao  nhat_ky_thong_bao[]
   xac_nhan_ho_so     xac_nhan_ho_so[]
   lich_su_thay_doi   lich_su_thay_doi_ho_so[]
+  tai_khoan_vle      tai_khoan_vle?
 
   @@index([don_vi_cong_tac_id], map: "idx_hoc_vien_don_vi")
   @@index([trang_thai], map: "idx_hoc_vien_trang_thai")
@@ -458,6 +465,24 @@ model lich_su_thay_doi_ho_so {
   @@index([hoc_vien_id], map: "idx_lich_su_hv")
 }
 
+// T15 (mo-rong-nls-an-giang.md, 2026-09-28): tài khoản VLE do Phòng CNTT tạo
+// cho TẤT CẢ học viên import_moet (cách B, QĐ8) — hệ thống chỉ ẩn/hiện
+// thông tin này ở GET /hoc-vien/toi/danh-gia-dau-vao tùy điều kiện, không
+// chặn tạo tài khoản. mat_khau_tam_ma_hoa mã hóa AES-256-GCM ở tầng ứng
+// dụng (VleCryptoUtil, khóa VLE_SECRET_KEY) — KHÔNG BAO GIỜ lưu dạng rõ.
+model tai_khoan_vle {
+  hoc_vien_id         String    @id @db.Uuid
+  ten_dang_nhap_vle   String    @db.VarChar(100)
+  mat_khau_tam_ma_hoa Bytes?
+  duong_dan           String    @db.VarChar(500)
+  lan_dau_xem_luc     DateTime? @db.Timestamptz(6)
+  nguon_import_id     String?   @db.Uuid
+  cap_nhat_luc        DateTime  @default(now()) @db.Timestamptz(6)
+
+  hoc_vien     hoc_vien        @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nguon_import nhat_ky_import? @relation(fields: [nguon_import_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
 // =====================================================================
 // PHẦN 3 — KHÓA BỒI DƯỠNG & LỚP HỌC
 // =====================================================================
@@ -477,9 +502,9 @@ model khoa_boi_duong {
   created_at         DateTime            @default(now()) @db.Timestamptz(6)
   updated_at         DateTime            @default(now()) @db.Timestamptz(6)
   created_by         String?             @db.Uuid
-      // Thêm 2026-09-28: tài khoản đã gọi POST /khoa-boi-duong lúc tạo khóa —
-      // NULL cho khóa tạo trước migration này (không truy ngược được), xem
-      // docs/database-ddl.sql comment tại đây.
+  // Thêm 2026-09-28: tài khoản đã gọi POST /khoa-boi-duong lúc tạo khóa —
+  // NULL cho khóa tạo trước migration này (không truy ngược được), xem
+  // docs/database-ddl.sql comment tại đây.
 
   don_vi_to_chuc  don_vi_cong_tac @relation(fields: [don_vi_to_chuc_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   nguoi_duyet     nguoi_dung?     @relation("khoa_boi_duong_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)

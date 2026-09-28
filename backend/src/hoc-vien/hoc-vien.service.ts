@@ -19,6 +19,7 @@ import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
 import { normalizeNfcName } from '../common/utils/normalize-text.util';
+import { decryptVleMatKhau } from '../common/utils/vle-crypto.util';
 import { paginate } from '../common/dto/pagination-query.dto';
 import {
   ConflictAppException,
@@ -827,6 +828,83 @@ export class HocVienService {
       da_xac_nhan: daXacNhan,
       day_du,
       thieu,
+    };
+  }
+
+  // GET /hoc-vien/toi/danh-gia-dau-vao (T15, QĐ8/QĐ9) — cổng điều kiện làm
+  // đánh giá đầu vào. Đủ điều kiện = có xác nhận CÒN HIỆU LỰC ở đợt
+  // xac_nhan_truoc_danh_gia (Đợt 2) VÀ day_du=true TẠI THỜI ĐIỂM GỌI (không
+  // phải tại lúc xác nhận — sửa hồ sơ sau khi xác nhận đã tự hủy xác nhận đó
+  // rồi, xem HocVienService.suaHoSo, nên check day_du ở đây chủ yếu bắt case
+  // quan_tri sửa hồ sơ hộ qua PATCH /hoc-vien/{id} làm hồ sơ không còn đầy đủ
+  // mà KHÔNG hủy xác nhận — xem ghi chú suaHoSoByAdmin). Chưa đủ điều kiện
+  // TUYỆT ĐỐI không trả bất kỳ thông tin tai_khoan_vle nào (QĐ8: cách B chặn
+  // mềm nhưng lộ đường dẫn/tài khoản cho người chưa đủ điều kiện vẫn là rò
+  // rỉ không mong muốn).
+  async danhGiaDauVaoCuaToi(caller: AuthenticatedUser) {
+    const hocVien = await this.getHocVienCuaToi(caller);
+    const { day_du, thieu } = await this.danhGiaDayDu(hocVien);
+    const daXacNhanDot2 =
+      await this.dotXacNhanService.coXacNhanTruocDanhGiaConHieuLuc(hocVien.id);
+
+    if (daXacNhanDot2 && day_du) {
+      const taiKhoan = await this.prisma.tai_khoan_vle.findUnique({
+        where: { hoc_vien_id: hocVien.id },
+      });
+      if (!taiKhoan) {
+        // Chưa thấy trong thực tế nếu đúng trình tự vận hành (xuất-cho-vle
+        // -> Phòng CNTT tạo tài khoản cho TẤT CẢ -> import tai_khoan_vle,
+        // xong mới mở đợt 2) — nhưng vẫn xử lý an toàn thay vì throw 500 nếu
+        // trình tự bị đảo; flagged trong self-review.
+        return {
+          du_dieu_kien: false,
+          ly_do: ['Chưa có tài khoản VLE — Phòng CNTT chưa cấp'],
+        };
+      }
+      if (!taiKhoan.lan_dau_xem_luc) {
+        await this.prisma.tai_khoan_vle.update({
+          where: { hoc_vien_id: hocVien.id },
+          data: { lan_dau_xem_luc: new Date() },
+        });
+      }
+      return {
+        du_dieu_kien: true,
+        duong_dan: taiKhoan.duong_dan,
+        ten_dang_nhap_vle: taiKhoan.ten_dang_nhap_vle,
+        mat_khau_tam: taiKhoan.mat_khau_tam_ma_hoa
+          ? decryptVleMatKhau(taiKhoan.mat_khau_tam_ma_hoa)
+          : null,
+      };
+    }
+
+    const dot = await this.dotXacNhanService.dotXacNhanTruocDanhGiaApDung(
+      hocVien.id,
+    );
+    const now = new Date();
+    if (dot && dot.dong_luc <= now) {
+      // QĐ9: đợt 2 đã đóng mà vẫn chưa đủ điều kiện -> vào danh sách xử lý
+      // riêng (GET /bao-cao/dieu-kien-danh-gia), không còn cơ hội tự bổ sung.
+      return { du_dieu_kien: false, het_han: true };
+    }
+
+    const lyDo: string[] = [];
+    if (!daXacNhanDot2) {
+      lyDo.push('Chưa xác nhận hồ sơ ở đợt xác nhận trước đánh giá (đợt 2)');
+    }
+    if (!day_du) lyDo.push(...thieu.map((t) => t.message));
+
+    return {
+      du_dieu_kien: false,
+      ly_do: lyDo,
+      dot: dot
+        ? {
+            id: dot.id,
+            ten: dot.ten,
+            loai: dot.loai,
+            mo_luc: dot.mo_luc,
+            dong_luc: dot.dong_luc,
+          }
+        : null,
     };
   }
 

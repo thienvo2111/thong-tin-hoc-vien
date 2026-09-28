@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService, DonViScope } from '../auth/scope/scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { HocVienService } from '../hoc-vien/hoc-vien.service';
 import {
   ForbiddenAppException,
   NotFoundAppException,
@@ -12,6 +13,7 @@ import { XacNhanQueryDto } from './dto/xac-nhan-query.dto';
 import {
   CAP_GIANG_DAY,
   CHUA_CO_KET_QUA,
+  DieuKienDanhGiaRow,
   KET_QUA_HOC,
   KHONG_XAC_DINH,
   SuaTruongMoetRow,
@@ -55,6 +57,7 @@ export class BaoCaoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scopeService: ScopeService,
+    private readonly hocVienService: HocVienService,
   ) {}
 
   async tongHop(
@@ -381,5 +384,57 @@ export class BaoCaoService {
         ? 'da_xac_nhan'
         : 'chua_xac_nhan') as XuatChoVleRow['trang_thai_dot_1'],
     }));
+  }
+
+  // T15 — GET /bao-cao/dieu-kien-danh-gia?khoa_id= (quan_tri): đủ điều kiện /
+  // không đủ (kèm lý do) / đã xem thông tin VLE, dùng cùng logic "đủ điều
+  // kiện" với GET /hoc-vien/toi/danh-gia-dau-vao (HocVienService.
+  // danhGiaDauVaoCuaToi) — xác nhận còn hiệu lực ở đợt xac_nhan_truoc_
+  // danh_gia + day_du (T9). Gọi danhGiaDayDu() TỪNG hồ sơ (N truy vấn) — cùng
+  // đánh đổi hiệu năng đã chấp nhận cho GET /hoc-vien?day_du= (api-contract.md
+  // mục "Hồ sơ đầy đủ": chấp nhận ở quy mô ~9.000 hồ sơ).
+  async baoCaoDieuKienDanhGia(khoaId?: string): Promise<DieuKienDanhGiaRow[]> {
+    const where: Prisma.hoc_vienWhereInput = { nguon_tao: 'import_moet' };
+    if (khoaId) where.dang_ky_hoc = { some: { khoa_id: khoaId } };
+
+    const hocViens = await this.prisma.hoc_vien.findMany({
+      where,
+      include: {
+        chuyen_mon: true,
+        don_vi_cong_tac: { select: { ten_don_vi: true } },
+        xac_nhan_ho_so: {
+          where: {
+            con_hieu_luc: true,
+            dot: { loai: 'xac_nhan_truoc_danh_gia' },
+          },
+          select: { id: true },
+        },
+        tai_khoan_vle: { select: { lan_dau_xem_luc: true } },
+      },
+      orderBy: { ho_ten: 'asc' },
+    });
+
+    const rows: DieuKienDanhGiaRow[] = [];
+    for (const hv of hocViens) {
+      const { day_du, thieu } = await this.hocVienService.danhGiaDayDu(hv);
+      const daXacNhan = hv.xac_nhan_ho_so.length > 0;
+      const duDieuKien = daXacNhan && day_du;
+      const lyDo: string[] = [];
+      if (!daXacNhan) {
+        lyDo.push('Chưa xác nhận hồ sơ ở đợt xác nhận trước đánh giá (đợt 2)');
+      }
+      if (!day_du) lyDo.push(...thieu.map((t) => t.message));
+
+      rows.push({
+        hoc_vien_id: hv.id,
+        ho_ten: hv.ho_ten,
+        ma_dinh_danh_moet: hv.ma_dinh_danh_moet,
+        don_vi_cong_tac_ten: hv.don_vi_cong_tac.ten_don_vi,
+        du_dieu_kien: duDieuKien,
+        ly_do: duDieuKien ? [] : lyDo,
+        da_xem_vle: hv.tai_khoan_vle?.lan_dau_xem_luc != null,
+      });
+    }
+    return rows;
   }
 }

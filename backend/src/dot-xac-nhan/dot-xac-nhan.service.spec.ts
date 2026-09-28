@@ -227,4 +227,90 @@ describe('DotXacNhanService', () => {
       expect(await service.coXacNhanConHieuLuc('dot-1', 'hv-1')).toBe(false);
     });
   });
+
+  // T15 (mo-rong-nls-an-giang.md)
+  describe('coXacNhanTruocDanhGiaConHieuLuc', () => {
+    it('có xác nhận còn hiệu lực ở đợt loai=xac_nhan_truoc_danh_gia -> true', async () => {
+      prisma.xac_nhan_ho_so.findFirst.mockResolvedValue({ id: 'xn-1' });
+      const result = await service.coXacNhanTruocDanhGiaConHieuLuc('hv-1');
+      expect(result).toBe(true);
+      expect(prisma.xac_nhan_ho_so.findFirst).toHaveBeenCalledWith({
+        where: {
+          hoc_vien_id: 'hv-1',
+          con_hieu_luc: true,
+          dot: { loai: 'xac_nhan_truoc_danh_gia' },
+        },
+      });
+    });
+
+    it('không có -> false', async () => {
+      prisma.xac_nhan_ho_so.findFirst.mockResolvedValue(null);
+      expect(await service.coXacNhanTruocDanhGiaConHieuLuc('hv-1')).toBe(false);
+    });
+  });
+
+  describe('dotXacNhanTruocDanhGiaApDung', () => {
+    it('chưa từng tạo đợt loại này -> null', async () => {
+      prisma.dang_ky_hoc.findMany.mockResolvedValue([]);
+      prisma.dot_xac_nhan.findMany.mockResolvedValue([]);
+      expect(await service.dotXacNhanTruocDanhGiaApDung('hv-1')).toBeNull();
+    });
+
+    it('có đợt đang mở -> ưu tiên trả đợt đó', async () => {
+      prisma.dang_ky_hoc.findMany.mockResolvedValue([]);
+      const now = new Date();
+      prisma.dot_xac_nhan.findMany.mockResolvedValue([
+        {
+          id: 'dot-dong',
+          mo_luc: new Date(now.getTime() - 10_000_000),
+          dong_luc: new Date(now.getTime() - 1_000_000),
+        },
+        {
+          id: 'dot-dang-mo',
+          mo_luc: new Date(now.getTime() - 1000),
+          dong_luc: new Date(now.getTime() + 1_000_000),
+        },
+      ]);
+      const result = await service.dotXacNhanTruocDanhGiaApDung('hv-1');
+      expect(result?.id).toBe('dot-dang-mo');
+    });
+
+    it('không có đợt đang mở nhưng có đợt đã đóng -> trả đợt đóng GẦN NHẤT', async () => {
+      prisma.dang_ky_hoc.findMany.mockResolvedValue([]);
+      const now = new Date();
+      prisma.dot_xac_nhan.findMany.mockResolvedValue([
+        {
+          id: 'dot-dong-xa',
+          mo_luc: new Date(now.getTime() - 20_000_000),
+          dong_luc: new Date(now.getTime() - 10_000_000),
+        },
+        {
+          id: 'dot-dong-gan',
+          mo_luc: new Date(now.getTime() - 5_000_000),
+          dong_luc: new Date(now.getTime() - 1_000_000),
+        },
+      ]);
+      const result = await service.dotXacNhanTruocDanhGiaApDung('hv-1');
+      expect(result?.id).toBe('dot-dong-gan');
+    });
+
+    it('chỉ có đợt sắp mở -> trả đợt sắp mở GẦN NHẤT', async () => {
+      prisma.dang_ky_hoc.findMany.mockResolvedValue([]);
+      const now = new Date();
+      prisma.dot_xac_nhan.findMany.mockResolvedValue([
+        {
+          id: 'dot-xa',
+          mo_luc: new Date(now.getTime() + 10_000_000),
+          dong_luc: new Date(now.getTime() + 20_000_000),
+        },
+        {
+          id: 'dot-gan',
+          mo_luc: new Date(now.getTime() + 1_000_000),
+          dong_luc: new Date(now.getTime() + 2_000_000),
+        },
+      ]);
+      const result = await service.dotXacNhanTruocDanhGiaApDung('hv-1');
+      expect(result?.id).toBe('dot-gan');
+    });
+  });
 });
