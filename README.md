@@ -4,9 +4,9 @@ Công cụ phối hợp giữa Sở Giáo dục & Đào tạo, Phòng Văn hóa 
 
 ## Trạng thái
 
-**Backend** (7 module gốc + mở rộng An Giang T1/T4/T9/T14/T15): 393/393 test pass (unit + e2e chạy thật trên Postgres), tính đến commit `89f945b`. **Frontend** (cổng học viên, khóa Bồi dưỡng năng lực số An Giang): scaffold + M0(bản tối thiểu)–M6 đã xong, 47/47 test pass, tính đến commit `677165f`. Xem [`backend/`](backend/), [`frontend/`](frontend/) và mục "Development setup" bên dưới.
+**Backend** (7 module gốc + mở rộng An Giang T1/T2/T3/T4/T5/T6/T7/T9/T14/T15): 455/455 test pass (223 unit + 232 e2e chạy thật trên Postgres), tính đến commit `b8a4023`. **Frontend** (cổng học viên, khóa Bồi dưỡng năng lực số An Giang): scaffold + M0(bản tối thiểu)–M6 đã xong, 47/47 test pass, tính đến commit `677165f`. Xem [`backend/`](backend/), [`frontend/`](frontend/) và mục "Development setup" bên dưới.
 
-**Đang mở rộng cho 1 khóa thật (An Giang, ~9.000 giáo viên, đợt 1 mục tiêu 01/10/2026)** — xem [`docs/mo-rong-nls-an-giang.md`](docs/mo-rong-nls-an-giang.md) (15 task backend T1–T15, ưu tiên P0–P4) và [`docs/dac-ta-cong-hoc-vien.md`](docs/dac-ta-cong-hoc-vien.md) (đặc tả 7 màn hình M0–M6). **P0 + P0b đã xong** (mọi thứ cần cho "mở đợt 1" và "hết đợt 1"): backend T1 (bảo mật đăng nhập), T4 (import chịu định dạng file MOET thật), T9 (hồ sơ đầy đủ), T14 (đợt xác nhận + lịch sử sửa hồ sơ), T15 (cổng điều kiện đánh giá + tài khoản VLE mã hóa); frontend M0(min)–M6 đầy đủ. Còn lại P1–P4 (T2, T3, T5–T8, T10–T13) chưa làm — xem bảng ưu tiên trong `mo-rong-nls-an-giang.md` mục 3.
+**Đang mở rộng cho 1 khóa thật (An Giang, ~9.000 giáo viên, đợt 1 mục tiêu 01/10/2026)** — xem [`docs/mo-rong-nls-an-giang.md`](docs/mo-rong-nls-an-giang.md) (15 task backend T1–T15, ưu tiên P0–P4) và [`docs/dac-ta-cong-hoc-vien.md`](docs/dac-ta-cong-hoc-vien.md) (đặc tả 7 màn hình M0–M6). **P0 + P0b đã xong** (mọi thứ cần cho "mở đợt 1" và "hết đợt 1"): backend T1 (bảo mật đăng nhập), T4 (import chịu định dạng file MOET thật), T9 (hồ sơ đầy đủ), T14 (đợt xác nhận + lịch sử sửa hồ sơ), T15 (cổng điều kiện đánh giá + tài khoản VLE mã hóa); frontend M0(min)–M6 đầy đủ. **P1 đã xong** (12–16/10, xem `mo-rong-nls-an-giang.md` mục 3): T2 (HCMUE là đơn vị tổ chức khóa + đơn vị theo dõi), T3 (ghi danh/phân lớp bằng mã MOET), T5 (phân mức đầu vào/đầu ra), T6 (thuộc tính lớp, lịch nhiều buổi, tạo hàng loạt), T7 (báo cáo vận hành). Còn lại P2–P4 (T8, T10–T13) chưa làm.
 
 Bản thiết kế gốc (kiến trúc hệ thống, mô hình dữ liệu, sơ đồ use case, wireframe màn hình, lộ trình triển khai) vẫn còn tham khảo được ở:
 
@@ -44,7 +44,7 @@ Xem chi tiết đầy đủ trong các board ở trên. Tóm tắt:
 
 ## Bước tiếp theo
 
-- **P1–P4 của đợt mở rộng An Giang** (T2, T3, T5–T8, T10–T13) — xem `docs/mo-rong-nls-an-giang.md`.
+- **P2–P4 của đợt mở rộng An Giang** (T8, T10–T13) — xem `docs/mo-rong-nls-an-giang.md`.
 - **M0 bản đầy đủ** (mục 2/3/5/9) — chờ nội dung chính thức từ đơn vị tổ chức, hiện `frontend/src/content/gioiThieu.ts` mới có nội dung tạm.
 - **SMTP thật** — `thong-bao` hiện dùng tài khoản test Ethereal khi không đặt `SMTP_HOST`; cần cấu hình SMTP thật trước khi dùng thật (xem `backend/.env.example`).
 - **1 điểm giòn (fragile) đã flag ở M6**: màn "Làm bài đánh giá" khi chưa đủ điều kiện so khớp *chuỗi* `ly_do` từ backend để quyết định điều hướng về M4 hay M5 (không có mã lý do có cấu trúc) — nếu backend đổi câu chữ thông báo, FE âm thầm rơi về M4. Nên bổ sung mã lý do (enum) ở `GET /hoc-vien/toi/danh-gia-dau-vao` khi có dịp.
@@ -117,10 +117,10 @@ Swagger UI có tại http://localhost:3000/api sau khi chạy backend.
 - **`danh-muc`** + **`import`** — CRUD địa danh/đơn vị công tác/môn học, dùng chung 1 bộ validate với luồng import Excel cho cả 5 loại (`dia_danh`, `don_vi_cong_tac`, `mon_hoc`, `phan_lop_hoc_vien`, `ho_so_nhan_su_moet`).
 - **`hoc-vien`** — tự đăng ký (transaction tạo `hoc_vien` trước `nguoi_dung` — xem ghi chú trong `docs/api-contract.md` mục "Luồng đăng ký" về lý do thứ tự này), xác nhận, duyệt có routing theo cấp giảng dạy, quản lý nhiều chuyên môn/người, import nhân sự MOET.
 - **`khoa-boi-duong`** — khóa/giai đoạn/lớp/lịch học/nhân sự, duyệt khóa (routing theo cây đơn vị tổ chức — khác cơ chế routing của hồ sơ học viên), nhập kết quả khóa học. Việc ghi danh (`dang_ky_hoc.khoa_id`) và phân lớp (`lop_id`) **chỉ** qua import `phan_lop_hoc_vien` do Quản trị hệ thống thực hiện — không tự động, học viên không tự chọn khóa.
-- **`bao-cao`** — tổng hợp theo đơn vị/địa bàn/khóa + xuất Excel (UTF-8, đã test round-trip tiếng Việt).
+- **`bao-cao`** — tổng hợp theo đơn vị/địa bàn/khóa + xuất Excel (UTF-8, đã test round-trip tiếng Việt); **báo cáo vận hành** (T7, theo lớp: sĩ số, số có email, số hồ sơ đầy đủ, phân bố mức đầu vào).
 - **`thong-bao`** — gửi email qua `nodemailer` (mặc định Ethereal test account khi chưa cấu hình SMTP thật), ghi lịch sử vào `nhat_ky_thong_bao` (kể cả gửi thất bại — không làm rớt nghiệp vụ chính khi email lỗi).
 
-393 test (unit + e2e) đều pass tính đến commit `89f945b` (bao gồm mở rộng An Giang T1/T4/T9/T14/T15 — thêm `dot-xac-nhan`, `nguoi-dung` modules và `HocVienResolver`/`vle-crypto` dùng chung).
+455 test (223 unit + 232 e2e) đều pass tính đến commit `b8a4023` (bao gồm mở rộng An Giang T1/T2/T3/T4/T5/T6/T7/T9/T14/T15 — thêm `dot-xac-nhan`, `nguoi-dung` modules và `HocVienResolver`/`vle-crypto` dùng chung).
 
 ## Frontend (cổng học viên)
 

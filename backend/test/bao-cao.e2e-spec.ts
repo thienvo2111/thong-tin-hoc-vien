@@ -45,6 +45,13 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
   let truong2: { id: string };
   let truongKhac: { id: string };
 
+  // T7 — đơn vị/khóa/lớp RIÊNG (không tái dùng truong1/khoa1) để tránh làm
+  // sai lệch số liệu tong-hop đã assert đúng số ở các describe khác.
+  let xaVanHanh: { id: string };
+  let truong3: { id: string };
+  let khoaVanHanh: string;
+  let lopVanHanh: { id: string; ten_lop: string };
+
   let quanTri: Awaited<ReturnType<typeof taoNguoiDungTest>>;
   let soAccount: Awaited<ReturnType<typeof taoNguoiDungTest>>;
   let phongAccount: Awaited<ReturnType<typeof taoNguoiDungTest>>;
@@ -151,6 +158,27 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
         loai_don_vi: 'truong',
         dia_ban_id: xaKhac.id,
         don_vi_cha_id: phongKhac.id,
+      },
+    });
+    // T7 — địa bàn/đơn vị RIÊNG (không phải truong1/truong2) để dữ liệu lớp
+    // vận hành không cộng dồn vào số liệu theo=don_vi/dia_ban/khoa đã assert
+    // ở các describe khác — vẫn nằm dưới phongVhxh nên phong_vhxh/so_gddt
+    // vẫn thấy được qua cây đơn vị.
+    xaVanHanh = await prisma.dia_danh.create({
+      data: {
+        ma: `X4-bc-${suf}`,
+        ten: `Xã BC Vận Hành ${suf}`,
+        cap: 'phuong_xa_dac_khu',
+        parent_id: tinh.id,
+      },
+    });
+    truong3 = await prisma.don_vi_cong_tac.create({
+      data: {
+        ma_don_vi: `DV-truong3-bc-${suf}`,
+        ten_don_vi: `Trường Ba BC ${suf}`,
+        loai_don_vi: 'truong',
+        dia_ban_id: xaVanHanh.id,
+        don_vi_cha_id: phongVhxh.id,
       },
     });
 
@@ -331,6 +359,91 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
     });
     khoaIds.push(khoaKhac.id);
 
+    // T7 (mo-rong-nls-an-giang.md) — khóa + lớp RIÊNG (truong3, không phải
+    // khoa1/truong1) để không cộng dồn vào số liệu theo=don_vi/dia_ban/khoa
+    // đã assert ở trên. 2 học viên PHÂN LỚP THỰC SỰ (lop_id gán): hvVh1
+    // thuộc truong3 (dưới phongVhxh — trong phạm vi), hvVhKhac thuộc
+    // truongKhac (NGOÀI phạm vi phongVhxh dù cùng khóa/lớp) — dùng để test
+    // Phòng VHXH không đếm nhầm học viên đơn vị khác trong cùng lớp.
+    const hvVh1 = await prisma.hoc_vien.create({
+      data: {
+        nguon_tao: 'tu_dang_ky',
+        ho_ten: 'Học Viên Vận Hành Một',
+        so_dinh_danh_ca_nhan: `6${Date.now().toString().slice(-11)}`,
+        ngay_sinh: 6,
+        thang_sinh: 6,
+        nam_sinh: NAM_HOP_LE,
+        don_vi_cong_tac_id: truong3.id,
+        so_dien_thoai_lien_he: '0911111116',
+        email_lien_he: `vh1-${suf2}@test.local`,
+        trang_thai: 'da_duyet',
+        cap_giang_day: 'tieu_hoc',
+        nguoi_duyet_id: soAccount.nguoiDung.id,
+        cap_duyet_thuc_te: 'so_gddt',
+        ngay_duyet: new Date(),
+      },
+    });
+    const hvVhKhac = await prisma.hoc_vien.create({
+      data: {
+        nguon_tao: 'tu_dang_ky',
+        ho_ten: 'Học Viên Vận Hành Khác',
+        so_dinh_danh_ca_nhan: `7${Date.now().toString().slice(-11)}`,
+        ngay_sinh: 7,
+        thang_sinh: 7,
+        nam_sinh: NAM_HOP_LE,
+        don_vi_cong_tac_id: truongKhac.id,
+        so_dien_thoai_lien_he: '0911111117',
+        email_lien_he: `vhkhac-${suf2}@test.local`,
+        trang_thai: 'da_duyet',
+        cap_giang_day: 'tieu_hoc',
+        nguoi_duyet_id: soAccount.nguoiDung.id,
+        cap_duyet_thuc_te: 'so_gddt',
+        ngay_duyet: new Date(),
+      },
+    });
+    hocVienIds.push(hvVh1.id, hvVhKhac.id);
+
+    const khoaVanHanhRow = await prisma.khoa_boi_duong.create({
+      data: {
+        ma_khoa: `K-vh-${suf2}`,
+        ten_khoa: 'Khóa Vận Hành Báo Cáo',
+        don_vi_to_chuc_id: truong3.id,
+        thoi_gian_bat_dau: new Date('2026-03-01'),
+        thoi_gian_ket_thuc: new Date('2026-03-10'),
+        trang_thai: 'da_duyet',
+      },
+    });
+    khoaVanHanh = khoaVanHanhRow.id;
+    khoaIds.push(khoaVanHanh);
+
+    lopVanHanh = await prisma.lop_hoc.create({
+      data: {
+        khoa_id: khoaVanHanh,
+        ten_lop: `Lớp Vận Hành ${suf2}`,
+        nhom_hoc_vien: 1,
+        muc_nang_luc: 'co_ban',
+      },
+    });
+    const dkVh1 = await prisma.dang_ky_hoc.create({
+      data: {
+        hoc_vien_id: hvVh1.id,
+        khoa_id: khoaVanHanh,
+        lop_id: lopVanHanh.id,
+        trang_thai: 'da_phan_lop',
+        muc_dau_vao: 'co_ban',
+      },
+    });
+    const dkVhKhac = await prisma.dang_ky_hoc.create({
+      data: {
+        hoc_vien_id: hvVhKhac.id,
+        khoa_id: khoaVanHanh,
+        lop_id: lopVanHanh.id,
+        trang_thai: 'da_phan_lop',
+        muc_dau_vao: 'thanh_thao',
+      },
+    });
+    dangKyIds.push(dkVh1.id, dkVhKhac.id);
+
     // Tài khoản hoc_vien dùng để test 403 — dịch vụ báo cáo không có phạm vi
     // nghiệp vụ cho vai_tro này.
     const hvSuf = uniqueSuffix();
@@ -386,12 +499,13 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
       [
         truong1.id,
         truong2.id,
+        truong3.id,
         truongKhac.id,
         phongVhxh.id,
         phongKhac.id,
         soGddt.id,
       ],
-      [xaTruong1.id, xaTruong2.id, xaKhac.id, tinh.id],
+      [xaTruong1.id, xaTruong2.id, xaKhac.id, xaVanHanh.id, tinh.id],
     );
     await prisma.$disconnect();
     await app.close();
@@ -612,6 +726,140 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
         .get('/bao-cao/xuat-excel?theo=don_vi')
         .set('Authorization', `Bearer ${tokenHocVien}`)
         .expect(403);
+    });
+  });
+
+  // T7 (mo-rong-nls-an-giang.md) — lopVanHanh (khoaVanHanh, chủ truong3) có
+  // 2 học viên phân lớp thật: hvVh1 (truong3, có email, muc_dau_vao=co_ban),
+  // hvVhKhac (truongKhac, ngoài phạm vi phongVhxh, có email,
+  // muc_dau_vao=thanh_thao).
+  describe('GET /bao-cao/van-hanh', () => {
+    it('quan_tri: si_so/so_co_email/phân bố muc_dau_vao đúng, không giới hạn phạm vi học viên', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/bao-cao/van-hanh?khoa_id=${khoaVanHanh}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      const row = (
+        res.body.rows as Array<{
+          lop_id: string;
+          ten_lop: string;
+          si_so: number;
+          so_co_email: number;
+          theo_muc_dau_vao: Record<string, number>;
+        }>
+      ).find((r) => r.lop_id === lopVanHanh.id);
+      expect(row).toBeDefined();
+      expect(row!.ten_lop).toBe(lopVanHanh.ten_lop);
+      expect(row!.si_so).toBe(2);
+      expect(row!.so_co_email).toBe(2);
+      expect(row!.theo_muc_dau_vao).toMatchObject({
+        co_ban: 1,
+        thanh_thao: 1,
+        nang_cao: 0,
+        khong_xac_dinh: 0,
+      });
+      expect(res.body.tong.si_so).toBeGreaterThanOrEqual(2);
+    });
+
+    it('so_gddt (Sở) thấy lớp thuộc phạm vi theo dõi/sở hữu của Sở (truong3 dưới phongVhxh dưới soGddt)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/bao-cao/van-hanh')
+        .set('Authorization', `Bearer ${tokenSo}`)
+        .expect(200);
+      const lopIds = (res.body.rows as Array<{ lop_id: string }>).map(
+        (r) => r.lop_id,
+      );
+      expect(lopIds).toContain(lopVanHanh.id);
+    });
+
+    it('phong_vhxh: xem được lớp (chủ truong3 trong phạm vi) nhưng CHỈ đếm học viên thuộc đơn vị mình, không tính hvVhKhac (truongKhac, phòng khác)', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/bao-cao/van-hanh?khoa_id=${khoaVanHanh}`)
+        .set('Authorization', `Bearer ${tokenPhong}`)
+        .expect(200);
+      const row = (
+        res.body.rows as Array<{
+          lop_id: string;
+          si_so: number;
+          so_co_email: number;
+          theo_muc_dau_vao: Record<string, number>;
+        }>
+      ).find((r) => r.lop_id === lopVanHanh.id);
+      expect(row).toBeDefined();
+      expect(row!.si_so).toBe(1); // chỉ hvVh1 — hvVhKhac (truongKhac) không được tính dù cùng lớp
+      expect(row!.so_co_email).toBe(1);
+      expect(row!.theo_muc_dau_vao).toMatchObject({
+        co_ban: 1,
+        thanh_thao: 0,
+        nang_cao: 0,
+        khong_xac_dinh: 0,
+      });
+    });
+
+    it('phong_vhxh gọi khoa_id ngoài phạm vi (khoaKhac, chủ truongKhac) -> 403', async () => {
+      await request(app.getHttpServer())
+        .get(`/bao-cao/van-hanh?khoa_id=${khoaIds[2]}`)
+        .set('Authorization', `Bearer ${tokenPhong}`)
+        .expect(403);
+    });
+
+    it('lọc theo lop_id chỉ trả đúng 1 lớp', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/bao-cao/van-hanh?lop_id=${lopVanHanh.id}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(res.body.rows).toHaveLength(1);
+      expect(res.body.rows[0].lop_id).toBe(lopVanHanh.id);
+    });
+
+    it('lọc theo nhom_hoc_vien không khớp -> rows rỗng', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/bao-cao/van-hanh?khoa_id=${khoaVanHanh}&nhom_hoc_vien=2`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(
+        (res.body.rows as Array<{ lop_id: string }>).some(
+          (r) => r.lop_id === lopVanHanh.id,
+        ),
+      ).toBe(false);
+    });
+
+    it('khoa_id không tồn tại -> 404', async () => {
+      await request(app.getHttpServer())
+        .get('/bao-cao/van-hanh?khoa_id=00000000-0000-0000-0000-000000000000')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(404);
+    });
+
+    it('hoc_vien gọi -> 403', async () => {
+      await request(app.getHttpServer())
+        .get('/bao-cao/van-hanh')
+        .set('Authorization', `Bearer ${tokenHocVien}`)
+        .expect(403);
+    });
+  });
+
+  describe('GET /bao-cao/van-hanh/xuat-excel', () => {
+    it('trả file .xlsx đúng nội dung + dòng "Tổng cộng"', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/bao-cao/van-hanh/xuat-excel?khoa_id=${khoaVanHanh}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .buffer(true)
+        .parse(binaryParser)
+        .expect(200);
+      expect(res.headers['content-type']).toContain('spreadsheetml');
+      expect(res.headers['content-disposition']).toContain('.xlsx');
+
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(res.body as unknown as ExcelJS.Buffer);
+      const sheet = workbook.worksheets[0];
+      const header = (sheet.getRow(1).values as unknown[]).slice(1);
+      expect(header[0]).toBe('Tên lớp');
+
+      const lastRow = (sheet.getRow(sheet.rowCount).values as unknown[]).slice(
+        1,
+      );
+      expect(lastRow[0]).toBe('Tổng cộng');
     });
   });
 });

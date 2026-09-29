@@ -1,6 +1,9 @@
 import * as ExcelJS from 'exceljs';
-import { buildTongHopWorkbook } from './report-excel.util';
-import { TongHopResult } from '../bao-cao.types';
+import {
+  buildTongHopWorkbook,
+  buildVanHanhWorkbook,
+} from './report-excel.util';
+import { TongHopResult, VanHanhResult } from '../bao-cao.types';
 
 async function readSheetValues(buffer: Buffer): Promise<unknown[][]> {
   const workbook = new ExcelJS.Workbook();
@@ -174,5 +177,84 @@ describe('report-excel.util', () => {
       0,
       1,
     ]);
+  });
+
+  it('van-hanh: đúng header + dòng lớp + dòng "Tổng cộng", giữ dấu tiếng Việt', async () => {
+    const result: VanHanhResult = {
+      khoa_id: 'k1',
+      rows: [
+        {
+          lop_id: 'l1',
+          ten_lop: 'Lớp Zoom – Nhóm 1',
+          nhom_hoc_vien: 1,
+          muc_nang_luc: 'co_ban',
+          si_so: 2,
+          so_co_email: 1,
+          so_ho_so_day_du: 1,
+          theo_muc_dau_vao: {
+            co_ban: 1,
+            thanh_thao: 1,
+            nang_cao: 0,
+            khong_xac_dinh: 0,
+          },
+        },
+        {
+          lop_id: 'l2',
+          ten_lop: 'Lớp Zoom – Nhóm 2',
+          nhom_hoc_vien: 2,
+          muc_nang_luc: null,
+          si_so: 1,
+          so_co_email: 0,
+          so_ho_so_day_du: 0,
+          theo_muc_dau_vao: {
+            co_ban: 0,
+            thanh_thao: 0,
+            nang_cao: 0,
+            khong_xac_dinh: 1,
+          },
+        },
+      ],
+      tong: {
+        si_so: 3,
+        so_co_email: 1,
+        so_ho_so_day_du: 1,
+        theo_muc_dau_vao: {
+          co_ban: 1,
+          thanh_thao: 1,
+          nang_cao: 0,
+          khong_xac_dinh: 1,
+        },
+      },
+    };
+
+    const buffer = await buildVanHanhWorkbook(result);
+    const rows = await readSheetValues(buffer);
+
+    expect(rows[0]).toEqual([
+      'Tên lớp',
+      'Nhóm học viên',
+      'Mức năng lực lớp',
+      'Sĩ số',
+      'Số có email',
+      'Số hồ sơ đầy đủ',
+      'Mức đầu vào: Cơ bản',
+      'Mức đầu vào: Thành thạo',
+      'Mức đầu vào: Nâng cao',
+      'Mức đầu vào: Không xác định',
+    ]);
+    expect(rows[1]).toEqual([
+      'Lớp Zoom – Nhóm 1',
+      1,
+      'Cơ bản',
+      2,
+      1,
+      1,
+      1,
+      1,
+      0,
+      0,
+    ]);
+    expect(rows[2]).toEqual(['Lớp Zoom – Nhóm 2', 2, '', 1, 0, 0, 0, 0, 0, 1]);
+    expect(rows[3]).toEqual(['Tổng cộng', '', '', 3, 1, 1, 1, 1, 0, 1]);
   });
 });

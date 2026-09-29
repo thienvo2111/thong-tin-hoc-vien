@@ -5,6 +5,7 @@ import {
   KET_QUA_HOC,
   CHUA_CO_KET_QUA,
   DieuKienDanhGiaRow,
+  MUC_NANG_LUC,
   SuaTruongMoetRow,
   TRANG_THAI_DANG_KY,
   TRANG_THAI_HO_SO,
@@ -12,6 +13,7 @@ import {
   TongHopDonViRow,
   TongHopKhoaRow,
   TongHopResult,
+  VanHanhResult,
   XacNhanRow,
   XuatChoVleRow,
 } from '../bao-cao.types';
@@ -51,6 +53,13 @@ const NHAN_KET_QUA: Record<string, string> = {
   khong_dat: 'Không đạt',
   vang: 'Vắng',
   [CHUA_CO_KET_QUA]: 'Chưa có kết quả',
+};
+
+const NHAN_MUC_NANG_LUC: Record<string, string> = {
+  co_ban: 'Cơ bản',
+  thanh_thao: 'Thành thạo',
+  nang_cao: 'Nâng cao',
+  [KHONG_XAC_DINH]: 'Không xác định',
 };
 
 // exceljs ghi buffer .xlsx (OOXML/zip), nội dung XML bên trong luôn UTF-8 —
@@ -237,6 +246,54 @@ export async function buildXuatChoVleWorkbook(
       row.trang_thai_dot_1 === 'da_xac_nhan' ? 'Đã xác nhận' : 'Chưa xác nhận',
     ]);
   }
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+// T7 — GET /bao-cao/van-hanh/xuat-excel. Dòng cuối "Tổng cộng" cộng dồn
+// result.tong (đã tính sẵn ở BaoCaoService, chỉ trong phạm vi kết quả lọc).
+export async function buildVanHanhWorkbook(
+  result: VanHanhResult,
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Báo cáo vận hành');
+  sheet.addRow([
+    'Tên lớp',
+    'Nhóm học viên',
+    'Mức năng lực lớp',
+    'Sĩ số',
+    'Số có email',
+    'Số hồ sơ đầy đủ',
+    ...MUC_NANG_LUC.map((m) => `Mức đầu vào: ${NHAN_MUC_NANG_LUC[m]}`),
+    `Mức đầu vào: ${NHAN_MUC_NANG_LUC[KHONG_XAC_DINH]}`,
+  ]);
+  sheet.getRow(1).font = { bold: true };
+
+  for (const row of result.rows) {
+    sheet.addRow([
+      row.ten_lop,
+      row.nhom_hoc_vien ?? '',
+      row.muc_nang_luc ? (NHAN_MUC_NANG_LUC[row.muc_nang_luc] ?? '') : '',
+      row.si_so,
+      row.so_co_email,
+      row.so_ho_so_day_du,
+      ...MUC_NANG_LUC.map((m) => row.theo_muc_dau_vao[m] ?? 0),
+      row.theo_muc_dau_vao[KHONG_XAC_DINH] ?? 0,
+    ]);
+  }
+
+  sheet.addRow([
+    'Tổng cộng',
+    '',
+    '',
+    result.tong.si_so,
+    result.tong.so_co_email,
+    result.tong.so_ho_so_day_du,
+    ...MUC_NANG_LUC.map((m) => result.tong.theo_muc_dau_vao[m] ?? 0),
+    result.tong.theo_muc_dau_vao[KHONG_XAC_DINH] ?? 0,
+  ]);
+  sheet.getRow(sheet.rowCount).font = { bold: true };
+
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }

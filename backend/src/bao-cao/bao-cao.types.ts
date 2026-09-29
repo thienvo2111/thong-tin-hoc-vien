@@ -109,3 +109,32 @@ export interface DieuKienDanhGiaRow {
   ly_do: string[];
   da_xem_vle: boolean;
 }
+
+// T7 (mo-rong-nls-an-giang.md) — GET /bao-cao/van-hanh. muc_nang_luc dùng
+// chung với lop_hoc.muc_nang_luc/dang_ky_hoc.muc_dau_vao (T5/T6) — thêm
+// KHONG_XAC_DINH cho các dòng NULL (chưa có kết quả đánh giá đầu vào).
+export const MUC_NANG_LUC = ['co_ban', 'thanh_thao', 'nang_cao'] as const;
+
+export interface VanHanhRow {
+  lop_id: string;
+  ten_lop: string;
+  nhom_hoc_vien: number | null;
+  muc_nang_luc: string | null;
+  si_so: number;
+  so_co_email: number;
+  so_ho_so_day_du: number;
+  theo_muc_dau_vao: Record<string, number>;
+}
+
+export interface VanHanhTong {
+  si_so: number;
+  so_co_email: number;
+  so_ho_so_day_du: number;
+  theo_muc_dau_vao: Record<string, number>;
+}
+
+export interface VanHanhResult {
+  khoa_id: string | null;
+  rows: VanHanhRow[];
+  tong: VanHanhTong;
+}

@@ -227,6 +227,9 @@ Chi tiết quy tắc: [`validation-checklist.md`](validation-checklist.md). Endp
 |---|---|---|---|
 | GET | `/bao-cao/tong-hop?theo=don_vi\|dia_ban\|khoa&tu_ngay=&den_ngay=` | Số liệu tổng hợp trong phạm vi quyền | Trường, Phòng VHXH, Sở, QuảnTrị |
 | GET | `/bao-cao/xuat-excel?...` (cùng query) | Xuất Excel/CSV UTF-8 (BOM), cùng bộ lọc | Trường, Phòng VHXH, Sở, QuảnTrị |
+| GET | `/bao-cao/van-hanh?khoa_id=&nhom_hoc_vien=&lop_id=` + `/xuat-excel` | **Thêm 2026-09-29 (T7)**: mỗi dòng 1 `lop_hoc` — `ten_lop`, `nhom_hoc_vien`, `muc_nang_luc`, `si_so` (số học viên đã phân lớp, `dang_ky_hoc.lop_id` = lớp này), `so_co_email`, `so_ho_so_day_du` (T9, `danhGiaDayDu`), `theo_muc_dau_vao` (đếm `dang_ky_hoc.muc_dau_vao`, kể cả `NULL`) + dòng `tong` cộng dồn kết quả đã lọc. Chưa có `ty_le_hien_dien_zoom/truc_tiep`, `ty_le_hoan_thanh_vle`, phân bố `ket_qua` (chờ T10/T12). Cả 3 query đều tùy chọn; bỏ `khoa_id` = gộp mọi khóa trong phạm vi xem (không thu hẹp theo hồ sơ theo dõi — xem ghi chú dưới) | Trường, Phòng VHXH, Sở, QuảnTrị |
+
+**Lưu ý (T7):** 2 lớp phạm vi tách biệt, cùng cơ chế với `GET /khoa-boi-duong` (mục 3): lớp nào **hiện ra** theo phạm vi XEM khóa (chủ khóa hoặc đơn vị "theo dõi", `khoa_don_vi_theo_doi`, T2); nhưng học viên **đếm bên trong mỗi lớp** (`si_so`, `so_co_email`, `so_ho_so_day_du`, `theo_muc_dau_vao`) luôn lọc theo phạm vi hồ sơ (`hoc_vien.don_vi_cong_tac_id`) của caller — Phòng VHXH thấy lớp (nếu chủ khóa trong phạm vi mình) nhưng chỉ đếm đúng học viên thuộc xã mình, không đếm nhầm học viên đơn vị khác trong cùng lớp/khóa.
 
 ---
 

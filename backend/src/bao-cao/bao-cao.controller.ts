@@ -5,6 +5,7 @@ import {
   buildDieuKienDanhGiaWorkbook,
   buildSuaTruongMoetWorkbook,
   buildTongHopWorkbook,
+  buildVanHanhWorkbook,
   buildXacNhanWorkbook,
   buildXuatChoVleWorkbook,
 } from './util/report-excel.util';
@@ -14,6 +15,7 @@ import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { TongHopQueryDto } from './dto/tong-hop-query.dto';
 import { XacNhanQueryDto } from './dto/xac-nhan-query.dto';
 import { KhoaIdQueryDto } from './dto/khoa-id-query.dto';
+import { VanHanhQueryDto } from './dto/van-hanh-query.dto';
 
 // Dịch vụ Báo cáo — docs/api-contract.md mục 7. hoc_vien không có phạm vi
 // nghiệp vụ (don_vi) để tổng hợp báo cáo -> không liệt kê trong @Roles(),
@@ -137,6 +139,33 @@ export class BaoCaoController {
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition':
           'attachment; filename="bao-cao-dieu-kien-danh-gia.xlsx"',
+      })
+      .send(buffer);
+  }
+
+  // T7 — mỗi dòng = 1 lớp; @Roles() của class (Trường/Phòng/Sở/QuảnTrị) đủ
+  // dùng, phạm vi xử lý trong BaoCaoService.baoCaoVanHanh (xem ghi chú ở đó).
+  @Get('van-hanh')
+  vanHanh(
+    @Query() query: VanHanhQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.baoCaoService.baoCaoVanHanh(query, user);
+  }
+
+  @Get('van-hanh/xuat-excel')
+  async vanHanhXuatExcel(
+    @Query() query: VanHanhQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const result = await this.baoCaoService.baoCaoVanHanh(query, user);
+    const buffer = await buildVanHanhWorkbook(result);
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="bao-cao-van-hanh.xlsx"',
       })
       .send(buffer);
   }

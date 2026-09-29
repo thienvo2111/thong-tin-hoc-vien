@@ -10,12 +10,14 @@ import {
 } from '../common/exceptions/app.exceptions';
 import { TongHopQueryDto } from './dto/tong-hop-query.dto';
 import { XacNhanQueryDto } from './dto/xac-nhan-query.dto';
+import { VanHanhQueryDto } from './dto/van-hanh-query.dto';
 import {
   CAP_GIANG_DAY,
   CHUA_CO_KET_QUA,
   DieuKienDanhGiaRow,
   KET_QUA_HOC,
   KHONG_XAC_DINH,
+  MUC_NANG_LUC,
   SuaTruongMoetRow,
   TRANG_THAI_DANG_KY,
   TRANG_THAI_HO_SO,
@@ -23,6 +25,9 @@ import {
   TongHopDonViRow,
   TongHopKhoaRow,
   TongHopResult,
+  VanHanhResult,
+  VanHanhRow,
+  VanHanhTong,
   XacNhanRow,
   XuatChoVleRow,
 } from './bao-cao.types';
@@ -436,5 +441,146 @@ export class BaoCaoService {
       });
     }
     return rows;
+  }
+
+  private emptyTheoMucDauVao(): Record<string, number> {
+    return {
+      ...Object.fromEntries(MUC_NANG_LUC.map((m) => [m, 0])),
+      [KHONG_XAC_DINH]: 0,
+    };
+  }
+
+  // -------------------------------------------------------------------
+  // T7 — GET /bao-cao/van-hanh?khoa_id=&nhom_hoc_vien=&lop_id=. Mỗi dòng =
+  // 1 lop_hoc. 2 lớp phạm vi KHÁC NHAU áp dụng đồng thời (T2, QĐ2):
+  //  - Phạm vi XEM lớp (khóa nào hiện ra): chủ khóa (don_vi_to_chuc_id
+  //    trong scope) HOẶC khóa đang được đơn vị của caller "theo dõi"
+  //    (getKhoaIdsTheoDoi) — giống GET /khoa-boi-duong.
+  //  - Phạm vi ĐẾM học viên bên trong mỗi lớp: LUÔN theo scope hồ sơ
+  //    (getAccessibleDonViIds), KHÔNG mở rộng theo "theo dõi" — đúng ghi chú
+  //    T2 "dữ liệu cấp học viên vẫn chỉ gồm học viên trong phạm vi hồ sơ của
+  //    họ". Vì vậy 1 lớp có thể hiện ra (do theo dõi khóa) nhưng si_so/
+  //    so_co_email/... chỉ đếm đúng phần học viên thuộc phạm vi của caller.
+  // -------------------------------------------------------------------
+  async baoCaoVanHanh(
+    query: VanHanhQueryDto,
+    caller: AuthenticatedUser,
+  ): Promise<VanHanhResult> {
+    const where: Prisma.lop_hocWhereInput = {};
+
+    if (query.khoa_id) {
+      const khoa = await this.prisma.khoa_boi_duong.findUnique({
+        where: { id: query.khoa_id },
+        select: { id: true, don_vi_to_chuc_id: true },
+      });
+      if (!khoa)
+        throw new NotFoundAppException('Không tìm thấy khóa bồi dưỡng');
+      if (caller.vai_tro !== 'quan_tri') {
+        const coQuyen = await this.scopeService.canAccessDonVi(
+          caller,
+          khoa.don_vi_to_chuc_id,
+        );
+        if (!coQuyen) {
+          const theoDoiKhoaIds =
+            await this.scopeService.getKhoaIdsTheoDoi(caller);
+          if (!theoDoiKhoaIds.includes(khoa.id)) {
+            throw new ForbiddenAppException(
+              'Khóa này nằm ngoài phạm vi quyền của tài khoản hiện tại',
+            );
+          }
+        }
+      }
+      where.khoa_id = query.khoa_id;
+    } else if (caller.vai_tro !== 'quan_tri') {
+      const scope = await this.scopeService.getAccessibleDonViIds(caller);
+      const scopeIds = scope === 'ALL' ? [] : scope;
+      const theoDoiKhoaIds = await this.scopeService.getKhoaIdsTheoDoi(caller);
+      if (scopeIds.length === 0 && theoDoiKhoaIds.length === 0) {
+        return { khoa_id: null, rows: [], tong: this.emptyVanHanhTong() };
+      }
+      where.khoa = {
+        OR: [
+          ...(scopeIds.length > 0
+            ? [{ don_vi_to_chuc_id: { in: scopeIds } }]
+            : []),
+          ...(theoDoiKhoaIds.length > 0
+            ? [{ id: { in: theoDoiKhoaIds } }]
+            : []),
+        ],
+      };
+    }
+
+    if (query.nhom_hoc_vien !== undefined) {
+      where.nhom_hoc_vien = query.nhom_hoc_vien;
+    }
+    if (query.lop_id) where.id = query.lop_id;
+
+    const hocVienScope =
+      caller.vai_tro === 'quan_tri'
+        ? 'ALL'
+        : await this.scopeService.getAccessibleDonViIds(caller);
+    const dangKyHocWhere: Prisma.dang_ky_hocWhereInput | undefined =
+      hocVienScope === 'ALL'
+        ? undefined
+        : { hoc_vien: { don_vi_cong_tac_id: { in: hocVienScope } } };
+
+    const lops = await this.prisma.lop_hoc.findMany({
+      where,
+      select: {
+        id: true,
+        ten_lop: true,
+        nhom_hoc_vien: true,
+        muc_nang_luc: true,
+        dang_ky_hoc: {
+          where: dangKyHocWhere,
+          select: {
+            muc_dau_vao: true,
+            hoc_vien: { include: { chuyen_mon: true } },
+          },
+        },
+      },
+      orderBy: { ten_lop: 'asc' },
+    });
+
+    const tong = this.emptyVanHanhTong();
+    const rows: VanHanhRow[] = [];
+    for (const lop of lops) {
+      const row: VanHanhRow = {
+        lop_id: lop.id,
+        ten_lop: lop.ten_lop,
+        nhom_hoc_vien: lop.nhom_hoc_vien,
+        muc_nang_luc: lop.muc_nang_luc,
+        si_so: 0,
+        so_co_email: 0,
+        so_ho_so_day_du: 0,
+        theo_muc_dau_vao: this.emptyTheoMucDauVao(),
+      };
+      for (const dk of lop.dang_ky_hoc) {
+        row.si_so += 1;
+        if (dk.hoc_vien.email_lien_he) row.so_co_email += 1;
+        const { day_du } = await this.hocVienService.danhGiaDayDu(dk.hoc_vien);
+        if (day_du) row.so_ho_so_day_du += 1;
+        const muc = dk.muc_dau_vao ?? KHONG_XAC_DINH;
+        row.theo_muc_dau_vao[muc] += 1;
+      }
+      tong.si_so += row.si_so;
+      tong.so_co_email += row.so_co_email;
+      tong.so_ho_so_day_du += row.so_ho_so_day_du;
+      for (const muc of [...MUC_NANG_LUC, KHONG_XAC_DINH]) {
+        tong.theo_muc_dau_vao[muc] += row.theo_muc_dau_vao[muc];
+      }
+      rows.push(row);
+    }
+
+    return { khoa_id: query.khoa_id ?? null, rows, tong };
+  }
+
+  private emptyVanHanhTong(): VanHanhTong {
+    return {
+      si_so: 0,
+      so_co_email: 0,
+      so_ho_so_day_du: 0,
+      theo_muc_dau_vao: this.emptyTheoMucDauVao(),
+    };
   }
 }
