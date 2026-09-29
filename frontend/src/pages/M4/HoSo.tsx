@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBlocker, useLocation, useNavigate } from 'react-router-dom';
 import { useDebouncedValue } from '@mantine/hooks';
 import {
+  Anchor,
   Box,
   Button,
   Card,
@@ -55,6 +56,14 @@ const NHOM_TRUONG = {
 } as const;
 
 const NHOM_NGAY_SINH = new Set(['ngay_sinh', 'thang_sinh', 'nam_sinh']);
+
+const MUC_LUC = [
+  { id: 'section-ca-nhan', nhan: 'Thông tin cá nhân', nhom: NHOM_TRUONG.ca_nhan },
+  { id: 'section-noi-sinh', nhan: 'Nơi sinh & cư trú', nhom: NHOM_TRUONG.noi_sinh },
+  { id: 'section-cong-tac', nhan: 'Công tác', nhom: NHOM_TRUONG.cong_tac },
+  { id: 'section-lien-he', nhan: 'Liên hệ', nhom: NHOM_TRUONG.lien_he },
+  { id: 'section-chuyen-mon', nhan: 'Trình độ & chuyên môn', nhom: NHOM_TRUONG.chuyen_mon },
+] as const;
 
 function toFormValues(hoSo: HocVien | undefined): HoSoHocVienForm {
   return {
@@ -281,7 +290,7 @@ export default function HoSo() {
   }
 
   return (
-    <Container size="sm" py="xl" pb={96}>
+    <Container size="lg" py="xl" pb={96}>
       <Stack gap="lg">
         <Title order={1} size="h2">
           Hồ sơ của tôi
@@ -291,20 +300,45 @@ export default function HoSo() {
           <StatusBanner loai="info">Hiện không trong thời gian chỉnh sửa hồ sơ — mọi thông tin ở chế độ chỉ xem.</StatusBanner>
         )}
 
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          noValidate
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') e.preventDefault();
-          }}
-        >
-          <Stack gap="lg">
-            <Card withBorder radius="md">
-              <Stack gap="md">
-                <Group gap={6}>
-                  {coThieu(NHOM_TRUONG.ca_nhan) && <ChamThieu />}
-                  <Text fw={600}>Thông tin cá nhân</Text>
-                </Group>
+        <Box style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+          <Box visibleFrom="sm" w={220} style={{ flexShrink: 0, position: 'sticky', top: 24 }}>
+            <Stack gap={4}>
+              {MUC_LUC.map((m) => (
+                <Anchor
+                  key={m.id}
+                  href={`#${m.id}`}
+                  underline="never"
+                  fz="sm"
+                  fw={600}
+                  c={coThieu(m.nhom) ? 'red.7' : 'dark'}
+                  px="sm"
+                  py={8}
+                  style={{ borderRadius: 8 }}
+                >
+                  <Group gap={6} wrap="nowrap">
+                    {coThieu(m.nhom) && <ChamThieu />}
+                    {m.nhan}
+                  </Group>
+                </Anchor>
+              ))}
+            </Stack>
+          </Box>
+
+          <Box style={{ flex: 1, minWidth: 0 }}>
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              noValidate
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') e.preventDefault();
+              }}
+            >
+              <Stack gap="lg">
+                <Card id="section-ca-nhan" withBorder radius="md">
+                  <Stack gap="md">
+                    <Group gap={6}>
+                      {coThieu(NHOM_TRUONG.ca_nhan) && <ChamThieu />}
+                      <Text fw={600}>Thông tin cá nhân</Text>
+                    </Group>
 
                 <TextInput label="Mã định danh" value={hoSo?.ma_dinh_danh_moet ?? ''} disabled readOnly />
 
@@ -387,7 +421,7 @@ export default function HoSo() {
               </Stack>
             </Card>
 
-            <Card withBorder radius="md">
+            <Card id="section-noi-sinh" withBorder radius="md">
               <Stack gap="md">
                 <Group gap={6}>
                   {coThieu(NHOM_TRUONG.noi_sinh) && <ChamThieu />}
@@ -432,7 +466,7 @@ export default function HoSo() {
               </Stack>
             </Card>
 
-            <Card withBorder radius="md">
+            <Card id="section-cong-tac" withBorder radius="md">
               <Stack gap="md">
                 <Group gap={6}>
                   {coThieu(NHOM_TRUONG.cong_tac) && <ChamThieu />}
@@ -467,7 +501,7 @@ export default function HoSo() {
               </Stack>
             </Card>
 
-            <Card withBorder radius="md">
+            <Card id="section-lien-he" withBorder radius="md">
               <Stack gap="md">
                 <Group gap={6}>
                   {coThieu(NHOM_TRUONG.lien_he) && <ChamThieu />}
@@ -484,7 +518,7 @@ export default function HoSo() {
               </Stack>
             </Card>
 
-            <Card withBorder radius="md">
+            <Card id="section-chuyen-mon" withBorder radius="md">
               <Stack gap="md">
                 <Group gap={6}>
                   {coThieu(NHOM_TRUONG.chuyen_mon) && <ChamThieu />}
@@ -586,7 +620,9 @@ export default function HoSo() {
               </Container>
             </Box>
           )}
-        </form>
+            </form>
+          </Box>
+        </Box>
       </Stack>
 
       <Modal opened={modalXacNhanLai} onClose={() => setModalXacNhanLai(false)} title="Cần xác nhận lại" centered>

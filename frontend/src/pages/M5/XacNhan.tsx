@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { Button, Center, Checkbox, Container, Group, Loader, Stack, Table, Text, Title } from '@mantine/core';
-import { kiemTraTruocXacNhan, useHoSoToi, xacNhanHoSo } from '@/api/hocVien';
+import { Link, useNavigate } from 'react-router-dom';
+import { Anchor, Box, Button, Card, Center, Checkbox, Container, Group, Loader, Stack, Table, Text, Title } from '@mantine/core';
+import { kiemTraTruocXacNhan, useDotXacNhan, useHoSoToi, xacNhanHoSo } from '@/api/hocVien';
 import type { HocVien, XacNhanResponse } from '@/api/types';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { CAP_GIANG_DAY_OPTIONS, GIOI_TINH_OPTIONS, TRINH_DO_OPTIONS, nhanTuTuyChon } from '@/lib/tuyChonHoSo';
 import { StatusBanner } from '@/components/StatusBanner';
+import { CountdownTimer } from '@/components/CountdownTimer';
 
 function dongHoSo(hoSo: HocVien): { truong: string; giaTri: string }[] {
   const ngaySinh =
@@ -43,6 +44,7 @@ export default function XacNhan() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: hoSo, isLoading: dangTaiHoSo } = useHoSoToi();
+  const { data: dotXacNhan } = useDotXacNhan();
   const kiemTra = useQuery({
     queryKey: ['hoc-vien', 'toi', 'kiem-tra-truoc-xac-nhan'],
     queryFn: kiemTraTruocXacNhan,
@@ -90,6 +92,18 @@ export default function XacNhan() {
           Xem lại &amp; xác nhận
         </Title>
 
+        {dotXacNhan?.dot && (
+          <StatusBanner loai="warning">
+            <Stack gap={4}>
+              <Text size="sm">
+                Đợt <b>{dotXacNhan.dot.ten}</b> đang mở — hạn chót {dinhDangNgayGio(dotXacNhan.dot.dong_luc)}. Vui lòng
+                kiểm tra kỹ thông tin trước khi xác nhận.
+              </Text>
+              <CountdownTimer dongLuc={dotXacNhan.dot.dong_luc} />
+            </Stack>
+          </StatusBanner>
+        )}
+
         {dangTai && (
           <Center py="xl">
             <Loader />
@@ -128,27 +142,36 @@ export default function XacNhan() {
         )}
 
         {!dangTai && hoSo && (
-          <Table withRowBorders={false} verticalSpacing="xs">
-            <Table.Tbody>
-              {dongHoSo(hoSo).map((d) => (
-                <Table.Tr key={d.truong}>
-                  <Table.Td w="45%" fw={500} c="dimmed">
-                    {nhanCuaTruong(d.truong)}
-                  </Table.Td>
-                  <Table.Td>{d.giaTri || '—'}</Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+          <Card withBorder radius="md" p={0}>
+            <Table withRowBorders={false} verticalSpacing="xs">
+              <Table.Tbody>
+                {dongHoSo(hoSo).map((d) => (
+                  <Table.Tr key={d.truong}>
+                    <Table.Td w="45%" fw={500} c="dimmed">
+                      {nhanCuaTruong(d.truong)}
+                    </Table.Td>
+                    <Table.Td>{d.giaTri || '—'}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+            <Box p="md" ta="right">
+              <Anchor component={Link} to="/toi/ho-so" fz="sm" fw={700}>
+                Chỉnh sửa thông tin →
+              </Anchor>
+            </Box>
+          </Card>
         )}
 
         {!dangTai && (
           <>
-            <Checkbox
-              label="Tôi xác nhận các thông tin trên là chính xác và chịu trách nhiệm về thông tin đã khai."
-              checked={daTick}
-              onChange={(e) => setDaTick(e.currentTarget.checked)}
-            />
+            <Card withBorder radius="md">
+              <Checkbox
+                label="Tôi xác nhận các thông tin trên là chính xác và chịu trách nhiệm về thông tin đã khai."
+                checked={daTick}
+                onChange={(e) => setDaTick(e.currentTarget.checked)}
+              />
+            </Card>
 
             {xacNhanMutation.isError && <StatusBanner loai="error">{thongDiepLoiChung(xacNhanMutation.error)}</StatusBanner>}
 
