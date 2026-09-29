@@ -32,19 +32,28 @@ import { mauTrangThaiImport, nhanTrangThaiImport } from '@/lib/trangThaiImport';
 import { AdminPageHeader } from './AdminPageHeader';
 
 // 8 loại import THẬT hỗ trợ qua loai_danh_muc_import (docs/api-contract.md mục 5) — không bịa thêm/bớt.
-const TUY_CHON_LOAI_IMPORT: { value: LoaiDanhMucImport; label: string }[] = [
-  { value: 'ho_so_nhan_su_moet', label: 'Hồ sơ nhân sự (CSDL MOET)' },
-  { value: 'phan_lop_hoc_vien', label: 'Phân lớp học viên (MOET)' },
-  { value: 'lop_va_lich_hoc', label: 'Lớp và lịch học' },
-  { value: 'ket_qua_danh_gia', label: 'Kết quả đánh giá (đầu vào/đầu ra)' },
-  { value: 'tai_khoan_vle', label: 'Tài khoản VLE' },
-  { value: 'don_vi_cong_tac', label: 'Danh mục đơn vị công tác' },
-  { value: 'dia_danh', label: 'Danh mục địa danh' },
-  { value: 'mon_hoc', label: 'Danh mục môn học' },
-];
+// Dùng Record<LoaiDanhMucImport, string> (thay vì mảng dò tìm) để TypeScript báo lỗi biên dịch nếu
+// sau này enum LoaiDanhMucImport (src/api/types.ts) có thêm giá trị mà quên bổ sung nhãn ở đây —
+// tránh tái diễn lỗi cột "Loại dữ liệu" bị bỏ trống do thiếu nhãn.
+export const NHAN_LOAI_IMPORT: Record<LoaiDanhMucImport, string> = {
+  ho_so_nhan_su_moet: 'Hồ sơ nhân sự (CSDL MOET)',
+  phan_lop_hoc_vien: 'Phân lớp học viên (MOET)',
+  lop_va_lich_hoc: 'Lớp và lịch học',
+  ket_qua_danh_gia: 'Kết quả đánh giá (đầu vào/đầu ra)',
+  tai_khoan_vle: 'Tài khoản VLE',
+  don_vi_cong_tac: 'Danh mục đơn vị công tác',
+  dia_danh: 'Danh mục địa danh',
+  mon_hoc: 'Danh mục môn học',
+};
 
-function nhanLoaiImport(loai: string): string {
-  return TUY_CHON_LOAI_IMPORT.find((t) => t.value === loai)?.label ?? loai;
+const TUY_CHON_LOAI_IMPORT: { value: LoaiDanhMucImport; label: string }[] = Object.entries(NHAN_LOAI_IMPORT).map(
+  ([value, label]) => ({ value: value as LoaiDanhMucImport, label }),
+);
+
+// Fallback an toàn: giá trị enum chưa kịp cập nhật nhãn (vd. backend triển khai enum mới trước FE) hiện
+// nguyên giá trị thô thay vì để trống ô — không bao giờ trả về chuỗi rỗng một cách âm thầm.
+export function nhanLoaiImport(loai: string): string {
+  return NHAN_LOAI_IMPORT[loai as LoaiDanhMucImport] ?? loai;
 }
 
 function BadgeTrangThaiImport({ trangThai, soDongLoi }: { trangThai: string; soDongLoi: number }) {

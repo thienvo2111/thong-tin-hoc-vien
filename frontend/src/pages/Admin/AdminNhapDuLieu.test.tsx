@@ -5,7 +5,21 @@ import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
-import AdminNhapDuLieu from './AdminNhapDuLieu';
+import AdminNhapDuLieu, { nhanLoaiImport } from './AdminNhapDuLieu';
+
+// 8 giá trị enum THẬT của loai_danh_muc_import — chép nguyên văn từ docs/database-ddl.sql
+// (CREATE TYPE loai_danh_muc_import), không đoán/bịa. Nếu enum này được mở rộng thêm ở backend,
+// cập nhật danh sách này (và nhãn tương ứng trong AdminNhapDuLieu.tsx) trong cùng 1 lần sửa.
+const CAC_GIA_TRI_ENUM_LOAI_DANH_MUC_IMPORT = [
+  'dia_danh',
+  'don_vi_cong_tac',
+  'mon_hoc',
+  'phan_lop_hoc_vien',
+  'ho_so_nhan_su_moet',
+  'tai_khoan_vle',
+  'ket_qua_danh_gia',
+  'lop_va_lich_hoc',
+] as const;
 
 function renderTrang() {
   datToken('token-gia-lap');
@@ -62,5 +76,17 @@ describe('Admin — Nhập dữ liệu', () => {
     server.use(http.get('/import', () => HttpResponse.error()));
     renderTrang();
     expect(await screen.findByText('Không kết nối được máy chủ. Kiểm tra mạng và thử lại.')).toBeInTheDocument();
+  });
+
+  it('mọi giá trị enum loai_danh_muc_import thật đều có nhãn hiển thị khác rỗng', () => {
+    for (const giaTri of CAC_GIA_TRI_ENUM_LOAI_DANH_MUC_IMPORT) {
+      const nhan = nhanLoaiImport(giaTri);
+      expect(nhan).not.toBe('');
+      expect(nhan.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it('giá trị enum lạ (chưa kịp cập nhật nhãn) hiện nguyên giá trị thô, không để trống', () => {
+    expect(nhanLoaiImport('gia_tri_enum_moi_chua_co_nhan')).toBe('gia_tri_enum_moi_chua_co_nhan');
   });
 });
