@@ -7,11 +7,13 @@ import { DonViCongTacService } from '../danh-muc/don-vi-cong-tac/don-vi-cong-tac
 import { MonHocService } from '../danh-muc/mon-hoc/mon-hoc.service';
 import { HocVienService } from '../hoc-vien/hoc-vien.service';
 import { KhoaBoiDuongService } from '../khoa-boi-duong/khoa-boi-duong.service';
+import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
 import { CreateDiaDanhDto } from '../danh-muc/dto/dia-danh.dto';
 import { CreateDonViCongTacDto } from '../danh-muc/dto/don-vi-cong-tac.dto';
 import { CreateMonHocDto } from '../danh-muc/dto/mon-hoc.dto';
 import { HoSoNhanSuMoetRowDto } from '../hoc-vien/dto/import-moet-row.dto';
 import { PhanLopHocVienRowDto } from '../khoa-boi-duong/dto/phan-lop-row.dto';
+import { KetQuaDanhGiaRowDto } from '../khoa-boi-duong/dto/ket-qua-danh-gia-row.dto';
 import { TaiKhoanVleRowDto } from './dto/tai-khoan-vle-row.dto';
 import {
   ConflictAppException,
@@ -64,12 +66,13 @@ export class ImportService {
     private readonly monHocService: MonHocService,
     private readonly hocVienService: HocVienService,
     private readonly khoaBoiDuongService: KhoaBoiDuongService,
+    private readonly dotXacNhanService: DotXacNhanService,
   ) {}
 
   assertSupported(loai: string): SupportedImportType {
     if (!isSupportedImportType(loai)) {
       throw new ValidationException(
-        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle)`,
+        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia)`,
       );
     }
     return loai;
@@ -405,6 +408,18 @@ export class ImportService {
           'mat_khau_tam',
           'duong_dan',
         ];
+      case 'ket_qua_danh_gia':
+        // T5 (mo-rong-nls-an-giang.md): mã học viên dùng chung HocVienResolver
+        // (mục 2 quy tắc #3, cả 2 cột tùy chọn — xem getColumnNotes). ma_khoa
+        // phải đã có dang_ky_hoc cho học viên đó (ghi danh T3 trước). loai =
+        // "dau_vao"|"dau_ra", muc = "co_ban"|"thanh_thao"|"nang_cao".
+        return [
+          'so_dinh_danh_ca_nhan',
+          'ma_dinh_danh_moet',
+          'ma_khoa',
+          'loai',
+          'muc',
+        ];
     }
   }
 
@@ -448,6 +463,17 @@ export class ImportService {
           'Tùy chọn — để trống nếu học viên không có mật khẩu tạm riêng. Được mã hóa trước khi lưu, không bao giờ hiển thị lại qua API hay file lỗi import.',
       };
     }
+    if (loai === 'ket_qua_danh_gia') {
+      return {
+        so_dinh_danh_ca_nhan:
+          'Tùy chọn — phải có ít nhất 1 trong 2 cột so_dinh_danh_ca_nhan/ma_dinh_danh_moet để xác định học viên. Có cả 2 thì phải trỏ cùng 1 hồ sơ.',
+        ma_dinh_danh_moet: 'Tùy chọn — xem ghi chú cột so_dinh_danh_ca_nhan.',
+        ma_khoa:
+          'Học viên phải đã được ghi danh vào khóa này (import phan_lop_hoc_vien, T3) trước — nếu chưa, dòng sẽ báo lỗi.',
+        loai: 'Bắt buộc — chỉ nhận "dau_vao" hoặc "dau_ra".',
+        muc: 'Bắt buộc — chỉ nhận "co_ban", "thanh_thao" hoặc "nang_cao". Chạy lại file với giá trị mới sẽ ghi đè giá trị cũ.',
+      };
+    }
     return {};
   }
 
@@ -470,6 +496,7 @@ export class ImportService {
       | HoSoNhanSuMoetRowDto
       | PhanLopHocVienRowDto
       | TaiKhoanVleRowDto
+      | KetQuaDanhGiaRowDto
     >
   > {
     switch (loai) {
@@ -493,7 +520,51 @@ export class ImportService {
         return this.buildHoSoMoetDto(raw);
       case 'tai_khoan_vle':
         return this.buildTaiKhoanVleDto(raw);
+      case 'ket_qua_danh_gia': {
+        const resolved = await this.khoaBoiDuongService.resolveKetQuaDanhGiaRow(
+          {
+            so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
+            ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
+            ma_khoa: raw.ma_khoa,
+            loai: raw.loai,
+            muc: raw.muc,
+          },
+        );
+        if (resolved.error || !resolved.dto) return resolved;
+        const ma =
+          raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
+        const canhBao = await this.canhBaoLachCongDanhGia(
+          resolved.dto.hoc_vien_id,
+          ma ?? '',
+        );
+        return { dto: resolved.dto, canhBao };
+      }
     }
+  }
+
+  // T5 (mo-rong-nls-an-giang.md mục 2 dòng 247, cùng đoạn spec với T15 — cách
+  // B "chặn mềm" nghĩa là tài khoản VLE tồn tại cho MỌI học viên bất kể đủ
+  // điều kiện hay không): học viên có kết quả đánh giá (import
+  // ket_qua_danh_gia thành công) nhưng KHÔNG đủ điều kiện làm đánh giá đầu
+  // vào (cùng 2 điều kiện dùng bởi HocVienService.danhGiaDauVaoCuaToi: có
+  // xác nhận CÒN HIỆU LỰC ở đợt xac_nhan_truoc_danh_gia VÀ day_du=true, cả 2
+  // TẠI THỜI ĐIỂM IMPORT) -> cảnh báo 🟡 không chặn dòng, giúp N1 phát hiện
+  // trường hợp lách cổng (dùng VLE dù chưa được phép).
+  private async canhBaoLachCongDanhGia(
+    hocVienId: string,
+    ma: string,
+  ): Promise<string | undefined> {
+    const hocVien = await this.prisma.hoc_vien.findUnique({
+      where: { id: hocVienId },
+      include: { chuyen_mon: true },
+    });
+    if (!hocVien) return undefined;
+    const [{ day_du }, daXacNhan] = await Promise.all([
+      this.hocVienService.danhGiaDayDu(hocVien),
+      this.dotXacNhanService.coXacNhanTruocDanhGiaConHieuLuc(hocVienId),
+    ]);
+    if (day_du && daXacNhan) return undefined;
+    return `Học viên "${ma}" có kết quả đánh giá nhưng CHƯA đủ điều kiện làm đánh giá đầu vào tại thời điểm import (chưa xác nhận đợt xác nhận trước đánh giá hoặc hồ sơ chưa đầy đủ) — kiểm tra khả năng lách cổng`;
   }
 
   private async checkValid(
@@ -504,7 +575,8 @@ export class ImportService {
       | CreateMonHocDto
       | HoSoNhanSuMoetRowDto
       | PhanLopHocVienRowDto
-      | TaiKhoanVleRowDto,
+      | TaiKhoanVleRowDto
+      | KetQuaDanhGiaRowDto,
   ): Promise<string | undefined> {
     try {
       if (loai === 'dia_danh') {
@@ -534,6 +606,9 @@ export class ImportService {
         // Không cần kiểm tra thêm: buildTaiKhoanVleDto() (buildDto) đã tra
         // cứu học viên qua resolveHocVienImportRow() rồi — upsert theo PK
         // hoc_vien_id nên không có ràng buộc trùng nào khác cần kiểm tra.
+      } else if (loai === 'ket_qua_danh_gia') {
+        // Không cần kiểm tra thêm: resolveKetQuaDanhGiaRow() (buildDto) đã
+        // tra cứu học viên + khóa + dang_ky_hoc đã tồn tại rồi.
       } else {
         const d = dto as HoSoNhanSuMoetRowDto;
         await this.hocVienService.checkValidMoetImportRow({
@@ -564,7 +639,8 @@ export class ImportService {
       | CreateMonHocDto
       | HoSoNhanSuMoetRowDto
       | PhanLopHocVienRowDto
-      | TaiKhoanVleRowDto,
+      | TaiKhoanVleRowDto
+      | KetQuaDanhGiaRowDto,
     importId: string,
     nguoiImportId: string,
   ): Promise<{ hocVienChuaCoEmail?: boolean }> {
@@ -585,6 +661,10 @@ export class ImportService {
       return { hocVienChuaCoEmail };
     } else if (loai === 'tai_khoan_vle') {
       await this.commitTaiKhoanVle(dto as TaiKhoanVleRowDto, importId);
+    } else if (loai === 'ket_qua_danh_gia') {
+      await this.khoaBoiDuongService.commitKetQuaDanhGia(
+        dto as KetQuaDanhGiaRowDto,
+      );
     } else {
       const d = dto as HoSoNhanSuMoetRowDto;
       await this.hocVienService.createFromMoetImport(

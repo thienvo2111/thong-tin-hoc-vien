@@ -75,8 +75,13 @@ CREATE TYPE nguon_tao_ho_so AS ENUM ('tu_dang_ky', 'import_moet');
 CREATE TYPE loai_danh_muc_import AS ENUM (
     'dia_danh', 'don_vi_cong_tac', 'mon_hoc', 'phan_lop_hoc_vien',
     'ho_so_nhan_su_moet',
-    'tai_khoan_vle'  -- T15 (mo-rong-nls-an-giang.md, 2026-09-28) — thêm SAU CÙNG (migration riêng)
+    'tai_khoan_vle',  -- T15 (mo-rong-nls-an-giang.md, 2026-09-28) — thêm SAU CÙNG (migration riêng)
+    'ket_qua_danh_gia'  -- T5 (mo-rong-nls-an-giang.md, 2026-09-29) — thêm SAU CÙNG (migration riêng)
 );
+
+-- T5 (mo-rong-nls-an-giang.md, 2026-09-29): mức năng lực đầu vào/đầu ra của
+-- dang_ky_hoc, import qua loai_danh_muc_import.ket_qua_danh_gia.
+CREATE TYPE muc_nang_luc AS ENUM ('co_ban', 'thanh_thao', 'nang_cao');
 
 CREATE TYPE trang_thai_import AS ENUM ('dang_xu_ly', 'hoan_thanh', 'loi');
 
@@ -580,6 +585,10 @@ CREATE TABLE dang_ky_hoc (
     trang_thai          trang_thai_dang_ky NOT NULL DEFAULT 'cho_duyet',
     ket_qua             ket_qua_hoc,
     ngay_hoan_thanh     date,
+    -- T5 (mo-rong-nls-an-giang.md, 2026-09-29): ghi bằng import ket_qua_danh_gia,
+    -- upsert theo (hoc_vien_id, khoa_id) đã tồn tại (phải ghi danh T3 trước).
+    muc_dau_vao         muc_nang_luc,
+    muc_dau_ra          muc_nang_luc,
 
     CONSTRAINT uq_dang_ky_hoc_vien_khoa UNIQUE (hoc_vien_id, khoa_id),
     CONSTRAINT chk_dang_ky_lop_thuoc_khoa

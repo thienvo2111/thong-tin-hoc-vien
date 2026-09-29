@@ -23,6 +23,7 @@ import { CreateNhanSuDto } from './dto/create-nhan-su.dto';
 import { ThemDonViTheoDoiDto } from './dto/them-don-vi-theo-doi.dto';
 import { PhanLopHocVienRowDto } from './dto/phan-lop-row.dto';
 import { KetQuaDangKyDto } from './dto/ket-qua-dang-ky.dto';
+import { KetQuaDanhGiaRowDto } from './dto/ket-qua-danh-gia-row.dto';
 import { RowBuildResult } from '../import/import.types';
 import { resolveHocVienImportRow } from '../import/util/hoc-vien-resolver.util';
 
@@ -812,6 +813,91 @@ export class KhoaBoiDuongService {
       });
       return { hocVienChuaCoEmail: false };
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // Import ket_qua_danh_gia (T5, mo-rong-nls-an-giang.md — gọi từ
+  // ImportService) — cột file: so_dinh_danh_ca_nhan, ma_dinh_danh_moet (cả 2
+  // TÙY CHỌN, HocVienResolver dùng chung), ma_khoa, loai (dau_vao|dau_ra),
+  // muc (co_ban|thanh_thao|nang_cao). Khác với phan_lop_hoc_vien:
+  // dang_ky_hoc PHẢI đã tồn tại (học viên đã được ghi danh vào khóa qua T3)
+  // — dòng lỗi rõ ràng nếu chưa, không tự tạo dang_ky_hoc ở đây (ghi danh và
+  // chấm mức là 2 bước tách biệt theo đúng trình tự vận hành trong spec:
+  // import MOET -> ghi danh (T3) -> import ket_qua_danh_gia -> tạo lớp (T6)
+  // -> phân lớp).
+  async resolveKetQuaDanhGiaRow(raw: {
+    so_dinh_danh_ca_nhan?: string;
+    ma_dinh_danh_moet?: string;
+    ma_khoa?: string;
+    loai?: string;
+    muc?: string;
+  }): Promise<RowBuildResult<KetQuaDanhGiaRowDto>> {
+    const resolved = await resolveHocVienImportRow(this.prisma, {
+      so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
+      ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
+    });
+    if (resolved.error || !resolved.hocVien) {
+      return { error: resolved.error ?? 'Không xác định được học viên' };
+    }
+    const hocVien = resolved.hocVien;
+
+    const maKhoa = raw.ma_khoa?.trim();
+    if (!maKhoa) {
+      return { error: 'Thiếu cột "ma_khoa"' };
+    }
+    const khoa = await this.prisma.khoa_boi_duong.findUnique({
+      where: { ma_khoa: maKhoa },
+    });
+    if (!khoa) {
+      return { error: `Khóa "${maKhoa}" không tồn tại` };
+    }
+
+    const loai = raw.loai?.trim();
+    if (loai !== 'dau_vao' && loai !== 'dau_ra') {
+      return { error: 'Cột "loai" phải là "dau_vao" hoặc "dau_ra"' };
+    }
+
+    const muc = raw.muc?.trim();
+    if (muc !== 'co_ban' && muc !== 'thanh_thao' && muc !== 'nang_cao') {
+      return {
+        error: 'Cột "muc" phải là "co_ban", "thanh_thao" hoặc "nang_cao"',
+      };
+    }
+
+    const dangKy = await this.prisma.dang_ky_hoc.findUnique({
+      where: {
+        hoc_vien_id_khoa_id: { hoc_vien_id: hocVien.id, khoa_id: khoa.id },
+      },
+    });
+    if (!dangKy) {
+      const ma = raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
+      return {
+        error: `Học viên "${ma}" chưa được ghi danh vào khóa "${maKhoa}" — phải chạy ghi danh (import phan_lop_hoc_vien, T3) trước`,
+      };
+    }
+
+    return {
+      dto: { hoc_vien_id: hocVien.id, khoa_id: khoa.id, loai, muc },
+    };
+  }
+
+  // Upsert theo từng cột (không phải theo dòng): dang_ky_hoc đã tồn tại
+  // (đảm bảo bởi resolveKetQuaDanhGiaRow ở trên) nên chỉ update, không cần
+  // nhánh create. Chạy lại cùng file đổi "muc" -> ghi đè đúng cột theo "loai"
+  // của dòng, không đụng tới cột còn lại (Nghiệm thu T5).
+  async commitKetQuaDanhGia(dto: KetQuaDanhGiaRowDto): Promise<void> {
+    await this.prisma.dang_ky_hoc.update({
+      where: {
+        hoc_vien_id_khoa_id: {
+          hoc_vien_id: dto.hoc_vien_id,
+          khoa_id: dto.khoa_id,
+        },
+      },
+      data:
+        dto.loai === 'dau_vao'
+          ? { muc_dau_vao: dto.muc }
+          : { muc_dau_ra: dto.muc },
+    });
   }
 
   // ---------------------------------------------------------------------

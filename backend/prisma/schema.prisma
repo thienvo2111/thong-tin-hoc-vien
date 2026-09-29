@@ -125,6 +125,18 @@ enum loai_danh_muc_import {
   // migration nào dùng giá trị mới (không thể dùng giá trị enum vừa thêm
   // trong cùng transaction đã thêm nó).
   tai_khoan_vle
+  // T5 (mo-rong-nls-an-giang.md, 2026-09-29): cùng lý do như tai_khoan_vle ở
+  // trên — thêm SAU CÙNG, migration riêng (xem migration
+  // *_t5_muc_nang_luc_enum).
+  ket_qua_danh_gia
+}
+
+// T5 (mo-rong-nls-an-giang.md, 2026-09-29): mức năng lực đầu vào/đầu ra của
+// dang_ky_hoc, import qua loai_danh_muc_import.ket_qua_danh_gia.
+enum muc_nang_luc {
+  co_ban
+  thanh_thao
+  nang_cao
 }
 
 enum trang_thai_import {
@@ -611,6 +623,10 @@ model dang_ky_hoc {
   trang_thai      trang_thai_dang_ky @default(cho_duyet)
   ket_qua         ket_qua_hoc?
   ngay_hoan_thanh DateTime?          @db.Date
+  // T5 (mo-rong-nls-an-giang.md, 2026-09-29): import ket_qua_danh_gia ghi đè
+  // đúng cột theo cột "loai" (dau_vao|dau_ra) của dòng import.
+  muc_dau_vao     muc_nang_luc?
+  muc_dau_ra      muc_nang_luc?
 
   hoc_vien hoc_vien       @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   khoa     khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
