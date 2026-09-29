@@ -4,11 +4,16 @@ import { PrismaService } from '../../prisma/prisma.service';
 describe('ScopeService', () => {
   let service: ScopeService;
   let findMany: jest.Mock;
+  let findUniqueDonVi: jest.Mock;
+  let findManyTheoDoi: jest.Mock;
 
   beforeEach(() => {
     findMany = jest.fn();
+    findUniqueDonVi = jest.fn();
+    findManyTheoDoi = jest.fn();
     const prisma = {
-      don_vi_cong_tac: { findMany },
+      don_vi_cong_tac: { findMany, findUnique: findUniqueDonVi },
+      khoa_don_vi_theo_doi: { findMany: findManyTheoDoi },
     } as unknown as PrismaService;
     service = new ScopeService(prisma);
   });
@@ -112,6 +117,98 @@ describe('ScopeService', () => {
       const caller = { vai_tro: 'truong' as const, don_vi_id: 'don-vi-A' };
       expect(await service.canAccessDonVi(caller, 'don-vi-A')).toBe(true);
       expect(await service.canAccessDonVi(caller, 'don-vi-B')).toBe(false);
+    });
+  });
+
+  describe('getKhoaIdsTheoDoi (T2, QĐ2)', () => {
+    it('quan_tri -> mảng rỗng, không truy vấn (phạm vi ALL đã bao trọn)', async () => {
+      const ids = await service.getKhoaIdsTheoDoi({
+        vai_tro: 'quan_tri',
+        don_vi_id: null,
+      });
+      expect(ids).toEqual([]);
+      expect(findManyTheoDoi).not.toHaveBeenCalled();
+    });
+
+    it('hoc_vien -> mảng rỗng (không quản lý don_vi)', async () => {
+      const ids = await service.getKhoaIdsTheoDoi({
+        vai_tro: 'hoc_vien',
+        don_vi_id: null,
+      });
+      expect(ids).toEqual([]);
+    });
+
+    it('không có don_vi_id -> mảng rỗng, không throw', async () => {
+      const ids = await service.getKhoaIdsTheoDoi({
+        vai_tro: 'truong',
+        don_vi_id: null,
+      });
+      expect(ids).toEqual([]);
+    });
+
+    it('truong -> chỉ xét đơn vị của chính mình (không có cha) -> tra 1 lần', async () => {
+      findUniqueDonVi.mockResolvedValueOnce({ don_vi_cha_id: null });
+      findManyTheoDoi.mockResolvedValueOnce([{ khoa_id: 'khoa-1' }]);
+
+      const ids = await service.getKhoaIdsTheoDoi({
+        vai_tro: 'truong',
+        don_vi_id: 'truong-A',
+      });
+      expect(ids).toEqual(['khoa-1']);
+      expect(findManyTheoDoi).toHaveBeenCalledWith({
+        where: { don_vi_id: { in: ['truong-A'] } },
+        select: { khoa_id: true },
+      });
+    });
+
+    it('phong_vhxh nằm dưới so_gddt đang theo dõi -> đi LÊN cây, tìm thấy khóa theo dõi ở cấp Sở', async () => {
+      // phong-B -> cha so-A -> không còn cha.
+      findUniqueDonVi
+        .mockResolvedValueOnce({ don_vi_cha_id: 'so-A' })
+        .mockResolvedValueOnce({ don_vi_cha_id: null });
+      findManyTheoDoi.mockResolvedValueOnce([
+        { khoa_id: 'khoa-hcmue' },
+        { khoa_id: 'khoa-khac' },
+      ]);
+
+      const ids = await service.getKhoaIdsTheoDoi({
+        vai_tro: 'phong_vhxh',
+        don_vi_id: 'phong-B',
+      });
+      expect(ids).toEqual(['khoa-hcmue', 'khoa-khac']);
+      expect(findManyTheoDoi).toHaveBeenCalledWith({
+        where: { don_vi_id: { in: ['phong-B', 'so-A'] } },
+        select: { khoa_id: true },
+      });
+    });
+
+    it('không có khóa nào theo dõi trong toàn bộ chuỗi cha -> mảng rỗng', async () => {
+      findUniqueDonVi.mockResolvedValueOnce({ don_vi_cha_id: null });
+      findManyTheoDoi.mockResolvedValueOnce([]);
+
+      const ids = await service.getKhoaIdsTheoDoi({
+        vai_tro: 'so_gddt',
+        don_vi_id: 'so-doc-lap',
+      });
+      expect(ids).toEqual([]);
+    });
+
+    it('an toàn với chu trình don_vi_cha_id (không lặp vô hạn)', async () => {
+      // don-A -> cha don-B -> cha don-A (chu trình).
+      findUniqueDonVi
+        .mockResolvedValueOnce({ don_vi_cha_id: 'don-B' })
+        .mockResolvedValueOnce({ don_vi_cha_id: 'don-A' });
+      findManyTheoDoi.mockResolvedValueOnce([]);
+
+      const ids = await service.getKhoaIdsTheoDoi({
+        vai_tro: 'truong',
+        don_vi_id: 'don-A',
+      });
+      expect(ids).toEqual([]);
+      expect(findManyTheoDoi).toHaveBeenCalledWith({
+        where: { don_vi_id: { in: ['don-A', 'don-B'] } },
+        select: { khoa_id: true },
+      });
     });
   });
 

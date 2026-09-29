@@ -125,12 +125,13 @@ Ký hiệu: 🔴 lỗi chặn lưu · 🟡 cảnh báo không chặn (chỉ nh�
 
 | # | Quy tắc | Mức | Nơi thực thi |
 |---|---|---|---|
-| 47 | Chỉ Trường tạo khóa; Sở/Phòng VHXH không có endpoint tạo khóa (chỉ duyệt) | 🔴 | API (kiểm tra `vai_tro` ở tầng route) |
+| 47 | **Sửa 2026-09-29 (T2, QĐ2)**: Trường tạo khóa cho đơn vị mình; Quản trị tạo khóa cho bất kỳ đơn vị `khac`/`truong`. Khóa do Quản trị tạo được duyệt ngay. Sở/Phòng VHXH không có endpoint tạo khóa (chỉ duyệt) | 🔴 | API (kiểm tra `vai_tro` ở tầng route + `loai_don_vi`/`trang_thai` của `don_vi_to_chuc_id` khi quan_tri gọi) |
 | 48 | `giai_doan_khoa.thu_tu` duy nhất trong 1 khóa, không có thứ tự cố định dùng chung giữa các khóa | 🔴 | DB (`UNIQUE(khoa_id, thu_tu)`) |
 | 49 | `thoi_gian_ket_thuc >= thoi_gian_bat_dau` cho khóa, giai đoạn, lịch học lớp | 🔴 | DB (`CHECK`) |
 | 50 | `lich_hoc_lop.lop_id` và `.giai_doan_id` phải cùng thuộc 1 `khoa_id` | 🔴 | API (kiểm tra chéo trước khi insert — DB không ràng buộc trực tiếp vì 2 FK khác bảng) |
 | 51 | `dang_ky_hoc.lop_id` (nếu có) phải thuộc đúng `dang_ky_hoc.khoa_id` | 🔴 | DB (trigger `trg_dang_ky_lop_thuoc_khoa`) |
 | 52 | **Đã sửa 2026-09-25** (bản trước giả định `khoa_id` tự gán khi hồ sơ `da_duyet` — sai, không có cơ sở "học viên thuộc khóa nào" khi tự động; xem `database-ddl.sql` ghi chú triển khai): cả `dang_ky_hoc.khoa_id` **và** `lop_id` đều **chỉ gán qua Import `phan_lop_hoc_vien` bởi Quản trị hệ thống** — không tự động theo hồ sơ duyệt, không phải học viên tự chọn/đăng ký. `ten_lop` trong file import là tùy chọn: để trống → chỉ ghi danh vào khóa (`lop_id=NULL`); có giá trị → ghi danh + phân lớp cùng lúc. Không có API gán tay từng người (số lượng lớn). | 🔴 (quy trình) | API (không expose endpoint tạo/sửa `dang_ky_hoc` ngoài luồng import) |
+| 53 | **Thêm 2026-09-29 (T2, QĐ2)**: `POST/DELETE /khoa-boi-duong/{id}/don-vi-theo-doi(/{don_vi_id})` chỉ Quản trị. Đơn vị trong `khoa_don_vi_theo_doi` chỉ mở rộng phạm vi XEM khóa (metadata/giai đoạn/lớp/lịch) cho Sở/Phòng VHXH/Trường có đơn vị là/nằm dưới đơn vị theo dõi — KHÔNG mở rộng phạm vi dữ liệu cấp học viên (`dang_ky_hoc`, kết quả, báo cáo vẫn lọc theo `hoc_vien.don_vi_cong_tac_id` như cũ) | 🔴 | API (`ScopeService.getKhoaIdsTheoDoi`, kiểm tra `vai_tro` ở route) |
 
 ## Bảo mật đăng nhập (T1, 2026-09-28 — mo-rong-nls-an-giang.md)
 

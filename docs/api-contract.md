@@ -149,20 +149,24 @@ Học viên nhận tài khoản đăng nhập bằng **Mã định danh CSDL MOE
 
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
-| POST | `/khoa-boi-duong` | Trường tạo khóa (trang_thai=`nhap`) | Trường |
-| PATCH | `/khoa-boi-duong/{id}` | Sửa khóa — chỉ khi `trang_thai` ∈ {`nhap`, `tu_choi`} | Trường (chủ khóa) |
-| POST | `/khoa-boi-duong/{id}/nop-duyet` | `nhap`/`tu_choi` → `cho_duyet` | Trường (chủ khóa) |
-| POST | `/khoa-boi-duong/{id}/duyet` | `{ ket_qua, ly_do? }` — routing giống hồ sơ học viên, theo `don_vi_cha_id` của Trường tổ chức | Phòng VHXH, Sở |
-| GET | `/khoa-boi-duong` | Danh sách trong phạm vi quyền | Trường, Phòng VHXH, Sở, QuảnTrị, Học viên (chỉ khóa đã `da_duyet`) |
-| GET | `/khoa-boi-duong/{id}` | Chi tiết khóa kèm giai đoạn + lớp | Theo phạm vi |
-| POST | `/khoa-boi-duong/{id}/giai-doan` | Thêm 1 `GiaiDoanKhoa` `{ thu_tu, ten_giai_doan, hinh_thuc, thoi_gian_bat_dau, thoi_gian_ket_thuc }` | Trường (chủ khóa) |
-| POST | `/khoa-boi-duong/{id}/lop` | Tạo `LopHoc` `{ ten_lop, si_so_toi_da? }` | Trường (chủ khóa) |
-| POST | `/lop/{id}/lich-hoc` | Thêm `LichHocLop` `{ giai_doan_id, thoi_gian_bat_dau, thoi_gian_ket_thuc, dia_diem_hoac_link }` | Trường (chủ khóa) |
-| POST | `/lop/{id}/nhan-su` | Thêm giảng viên/hỗ trợ `{ ho_ten, vai_tro, so_dien_thoai? }` | Trường (chủ khóa) |
-| DELETE | `/lop/{id}/nhan-su/{nhan_su_id}` | Gỡ 1 nhân sự khỏi lớp | Trường (chủ khóa) |
+| POST | `/khoa-boi-duong` | Trường tạo khóa (trang_thai=`nhap`). **Sửa 2026-09-29 (T2, QĐ2)**: quan_tri cũng gọi được — body bắt buộc `don_vi_to_chuc_id` (đơn vị `active`, loại `khac` hoặc `truong`), khóa tạo ra `da_duyet` ngay (`nguoi_duyet_id`=quan_tri, `cap_duyet_thuc_te='quan_tri'`, `ngay_duyet=now()`), không qua nộp duyệt/duyệt | Trường, QuảnTrị |
+| PATCH | `/khoa-boi-duong/{id}` | Sửa khóa — chỉ khi `trang_thai` ∈ {`nhap`, `tu_choi`} | Trường (chủ khóa), QuảnTrị |
+| POST | `/khoa-boi-duong/{id}/nop-duyet` | `nhap`/`tu_choi` → `cho_duyet` | Trường (chủ khóa), QuảnTrị |
+| POST | `/khoa-boi-duong/{id}/duyet` | `{ ket_qua, ly_do? }` — routing giống hồ sơ học viên, theo `don_vi_cha_id` của Trường tổ chức | Phòng VHXH, Sở, QuảnTrị |
+| GET | `/khoa-boi-duong` | Danh sách trong phạm vi quyền. **Sửa 2026-09-29 (T2, QĐ2)**: với Trường/Phòng VHXH/Sở, phạm vi mở rộng thêm các khóa mà đơn vị của họ là/nằm dưới 1 đơn vị trong danh sách "theo dõi" của khóa đó (xem `don-vi-theo-doi` bên dưới) | Trường, Phòng VHXH, Sở, QuảnTrị, Học viên (chỉ khóa đã `da_duyet`) |
+| GET | `/khoa-boi-duong/{id}` | Chi tiết khóa kèm giai đoạn + lớp. Phạm vi mở rộng như `GET /khoa-boi-duong` ở trên | Theo phạm vi |
+| POST | `/khoa-boi-duong/{id}/giai-doan` | Thêm 1 `GiaiDoanKhoa` `{ thu_tu, ten_giai_doan, hinh_thuc, thoi_gian_bat_dau, thoi_gian_ket_thuc }` | Trường (chủ khóa), QuảnTrị |
+| POST | `/khoa-boi-duong/{id}/lop` | Tạo `LopHoc` `{ ten_lop, si_so_toi_da? }` | Trường (chủ khóa), QuảnTrị |
+| POST | `/khoa-boi-duong/{id}/don-vi-theo-doi` | **Thêm 2026-09-29 (T2, QĐ2)**: `{ don_vi_id }` — gán thêm 1 đơn vị được XEM khóa (không đổi đơn vị tổ chức thực sự). Dùng cho khóa do quan_tri tạo cho đơn vị loại `khac` (vd. HCMUE), không có Sở/Phòng nào sở hữu theo cây sẵn có | QuảnTrị |
+| DELETE | `/khoa-boi-duong/{id}/don-vi-theo-doi/{don_vi_id}` | **Thêm 2026-09-29 (T2, QĐ2)**: gỡ 1 đơn vị theo dõi | QuảnTrị |
+| POST | `/lop/{id}/lich-hoc` | Thêm `LichHocLop` `{ giai_doan_id, thoi_gian_bat_dau, thoi_gian_ket_thuc, dia_diem_hoac_link }` | Trường (chủ khóa), QuảnTrị |
+| POST | `/lop/{id}/nhan-su` | Thêm giảng viên/hỗ trợ `{ ho_ten, vai_tro, so_dien_thoai? }` | Trường (chủ khóa), QuảnTrị |
+| DELETE | `/lop/{id}/nhan-su/{nhan_su_id}` | Gỡ 1 nhân sự khỏi lớp | Trường (chủ khóa), QuảnTrị |
 | GET | `/hoc-vien/toi/khoa-hoc` | Học viên xem khóa/lớp mình đã đăng ký/được phân | Học viên |
 | GET | `/hoc-vien/toi/ket-qua` | Học viên xem `ket_qua`, `ngay_hoan_thanh` từng `DangKyHoc` | Học viên |
 | PATCH | `/dang-ky-hoc/{id}/ket-qua` | **Thêm 2026-09-25** (thiếu ở bản trước — không ai nhập được `ket_qua` dù học viên xem được). `{ ket_qua, ngay_hoan_thanh? }`. Phạm vi theo Trường tổ chức khóa (dùng `ScopeService` như `duyet` khóa) — Sở/Phòng VHXH cũng gọi được (escalation, giống quy tắc duyệt). **Side effect**: kích hoạt sự kiện thông báo `dang_ky_hoc_ket_qua` (mục 8) | Trường (chủ khóa), Phòng VHXH, Sở, QuảnTrị |
+
+**Lưu ý (T2, QĐ2):** danh sách "đơn vị theo dõi" chỉ mở rộng phạm vi XEM khóa (metadata/giai đoạn/lớp/lịch) cho Sở/Phòng VHXH/Trường. Dữ liệu cấp học viên (`dang_ky_hoc`, kết quả, báo cáo) KHÔNG mở rộng theo bảng này — vẫn lọc theo phạm vi hồ sơ học viên hiện có (`hoc_vien.don_vi_cong_tac_id`).
 
 ---
 

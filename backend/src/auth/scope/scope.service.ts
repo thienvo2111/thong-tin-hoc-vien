@@ -68,6 +68,52 @@ export class ScopeService {
     return caller.hoc_vien_id === targetHocVienId;
   }
 
+  // T2 (mo-rong-nls-an-giang.md, QĐ2, 2026-09-29): khóa do quan_tri tạo cho
+  // đơn vị loại 'khac' (vd. HCMUE, ngoài cây An Giang) gắn 1 danh sách đơn vị
+  // "theo dõi" (khoa_don_vi_theo_doi — mỗi dòng là 1 đơn vị được xem khóa).
+  // so_gddt/phong_vhxh/truong xem được khóa nếu đơn vị của HỌ là chính đơn vị
+  // theo dõi hoặc nằm DƯỚI nó trong cây don_vi_cha_id — tức đi NGƯỢC hướng so
+  // với getAccessibleDonViIds (vốn đi xuống từ caller); ở đây ta đi lên từ
+  // caller rồi giao với danh sách đơn vị theo dõi của từng khóa.
+  async getKhoaIdsTheoDoi(caller: {
+    vai_tro: AuthenticatedUser['vai_tro'];
+    don_vi_id: string | null;
+  }): Promise<string[]> {
+    if (
+      caller.vai_tro === 'quan_tri' ||
+      caller.vai_tro === 'hoc_vien' ||
+      !caller.don_vi_id
+    ) {
+      return [];
+    }
+    const ancestorIds = await this.collectAncestorIds(caller.don_vi_id);
+    const rows = await this.prisma.khoa_don_vi_theo_doi.findMany({
+      where: { don_vi_id: { in: ancestorIds } },
+      select: { khoa_id: true },
+    });
+    return rows.map((r) => r.khoa_id);
+  }
+
+  // Đi LÊN cây don_vi_cha_id từ donViId (bao gồm chính nó) — an toàn với chu
+  // trình dữ liệu bất thường, giống collectDescendantIds bên dưới.
+  private async collectAncestorIds(donViId: string): Promise<string[]> {
+    const ids: string[] = [donViId];
+    const visited = new Set<string>([donViId]);
+    let current: string | null = donViId;
+    while (current) {
+      const donVi = await this.prisma.don_vi_cong_tac.findUnique({
+        where: { id: current },
+        select: { don_vi_cha_id: true },
+      });
+      const chaId = donVi?.don_vi_cha_id ?? null;
+      if (!chaId || visited.has(chaId)) break;
+      visited.add(chaId);
+      ids.push(chaId);
+      current = chaId;
+    }
+    return ids;
+  }
+
   private async collectDescendantIds(rootId: string): Promise<string[]> {
     const visited = new Set<string>([rootId]);
     let frontier = [rootId];

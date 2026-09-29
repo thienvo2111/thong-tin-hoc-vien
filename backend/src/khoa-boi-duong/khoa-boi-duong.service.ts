@@ -20,6 +20,7 @@ import { CreateGiaiDoanDto } from './dto/create-giai-doan.dto';
 import { CreateLopHocDto } from './dto/create-lop-hoc.dto';
 import { CreateLichHocDto } from './dto/create-lich-hoc.dto';
 import { CreateNhanSuDto } from './dto/create-nhan-su.dto';
+import { ThemDonViTheoDoiDto } from './dto/them-don-vi-theo-doi.dto';
 import { PhanLopHocVienRowDto } from './dto/phan-lop-row.dto';
 import { KetQuaDangKyDto } from './dto/ket-qua-dang-ky.dto';
 import { RowBuildResult } from '../import/import.types';
@@ -106,18 +107,68 @@ export class KhoaBoiDuongService {
   // ---------------------------------------------------------------------
   // POST /khoa-boi-duong, PATCH /khoa-boi-duong/{id}
   // ---------------------------------------------------------------------
+  // T2 (QĐ2, 2026-09-29): quan_tri tạo khóa thay cho đơn vị loại 'khac'
+  // (vd. HCMUE — không thuộc cây đơn vị An Giang, không có tài khoản 'truong'
+  // riêng) hoặc 'truong' bất kỳ; khóa tạo ra được da_duyet NGAY (đơn vị tổ
+  // chức khóa đã "được xác thực" bởi chính Quản trị, không cần quy trình
+  // nộp duyệt/duyệt như Trường tự tạo). Trường tự gọi endpoint này vẫn theo
+  // luồng cũ (trang_thai=nhap, don_vi_to_chuc_id suy từ caller.don_vi_id).
   async taoKhoa(dto: CreateKhoaBoiDuongDto, caller: AuthenticatedUser) {
-    if (!caller.don_vi_id) {
-      throw new ForbiddenAppException(
-        'Tài khoản hiện tại không gắn với đơn vị công tác nào',
-      );
-    }
     this.assertThoiGianHopLe(
       dto.thoi_gian_bat_dau,
       dto.thoi_gian_ket_thuc,
       'khóa',
       true,
     );
+
+    if (caller.vai_tro === 'quan_tri') {
+      if (!dto.don_vi_to_chuc_id) {
+        throw new ValidationException(
+          'Quản trị tạo khóa phải chỉ định đơn vị tổ chức',
+          [{ field: 'don_vi_to_chuc_id', message: 'Bắt buộc' }],
+        );
+      }
+      const donVi = await this.prisma.don_vi_cong_tac.findUnique({
+        where: { id: dto.don_vi_to_chuc_id },
+      });
+      if (!donVi || donVi.trang_thai !== 'active') {
+        throw new ValidationException(
+          'don_vi_to_chuc_id không tồn tại hoặc đã ngừng hoạt động',
+          [{ field: 'don_vi_to_chuc_id', message: 'Không hợp lệ' }],
+        );
+      }
+      if (donVi.loai_don_vi !== 'khac' && donVi.loai_don_vi !== 'truong') {
+        throw new ValidationException(
+          'don_vi_to_chuc_id phải thuộc loại "khac" hoặc "truong"',
+          [{ field: 'don_vi_to_chuc_id', message: 'Sai loại đơn vị' }],
+        );
+      }
+      try {
+        return await this.prisma.khoa_boi_duong.create({
+          data: {
+            ma_khoa: dto.ma_khoa.trim(),
+            ten_khoa: normalizeNfcName(dto.ten_khoa),
+            don_vi_to_chuc_id: donVi.id,
+            dia_diem: dto.dia_diem,
+            thoi_gian_bat_dau: new Date(dto.thoi_gian_bat_dau),
+            thoi_gian_ket_thuc: new Date(dto.thoi_gian_ket_thuc),
+            created_by: caller.id,
+            trang_thai: 'da_duyet',
+            nguoi_duyet_id: caller.id,
+            cap_duyet_thuc_te: 'quan_tri',
+            ngay_duyet: new Date(),
+          },
+        });
+      } catch (e) {
+        throw this.mapUniqueViolation(e, 'Mã khóa đã tồn tại');
+      }
+    }
+
+    if (!caller.don_vi_id) {
+      throw new ForbiddenAppException(
+        'Tài khoản hiện tại không gắn với đơn vị công tác nào',
+      );
+    }
     try {
       return await this.prisma.khoa_boi_duong.create({
         data: {
@@ -317,17 +368,28 @@ export class KhoaBoiDuongService {
     } else {
       const scope = await this.scopeService.getAccessibleDonViIds(caller);
       if (scope !== 'ALL') {
-        if (
-          query.don_vi_to_chuc_id &&
-          !scope.includes(query.don_vi_to_chuc_id)
-        ) {
-          throw new ForbiddenAppException(
-            'Đơn vị tổ chức nằm ngoài phạm vi quyền',
-          );
+        if (query.don_vi_to_chuc_id) {
+          if (!scope.includes(query.don_vi_to_chuc_id)) {
+            throw new ForbiddenAppException(
+              'Đơn vị tổ chức nằm ngoài phạm vi quyền',
+            );
+          }
+          where.don_vi_to_chuc_id = query.don_vi_to_chuc_id;
+        } else {
+          // T2 (QĐ2): mở rộng thêm các khóa mà đơn vị của caller đang "theo
+          // dõi" (là chính đơn vị theo dõi hoặc nằm dưới nó trong cây) —
+          // ngoài phạm vi sở hữu don_vi_to_chuc_id như trước.
+          const theoDoiKhoaIds =
+            await this.scopeService.getKhoaIdsTheoDoi(caller);
+          where.OR =
+            theoDoiKhoaIds.length > 0
+              ? [
+                  { don_vi_to_chuc_id: { in: scope } },
+                  { id: { in: theoDoiKhoaIds } },
+                ]
+              : undefined;
+          if (!where.OR) where.don_vi_to_chuc_id = { in: scope };
         }
-        where.don_vi_to_chuc_id = query.don_vi_to_chuc_id
-          ? query.don_vi_to_chuc_id
-          : { in: scope };
       } else if (query.don_vi_to_chuc_id) {
         where.don_vi_to_chuc_id = query.don_vi_to_chuc_id;
       }
@@ -380,9 +442,15 @@ export class KhoaBoiDuongService {
         khoa.don_vi_to_chuc_id,
       );
       if (!coQuyen) {
-        throw new ForbiddenAppException(
-          'Khóa này nằm ngoài phạm vi quyền của tài khoản hiện tại',
-        );
+        // T2 (QĐ2): chưa sở hữu don_vi_to_chuc_id — vẫn xem được nếu đơn vị
+        // của caller là/nằm dưới một đơn vị đang "theo dõi" khóa này.
+        const theoDoiKhoaIds =
+          await this.scopeService.getKhoaIdsTheoDoi(caller);
+        if (!theoDoiKhoaIds.includes(khoa.id)) {
+          throw new ForbiddenAppException(
+            'Khóa này nằm ngoài phạm vi quyền của tài khoản hiện tại',
+          );
+        }
       }
     }
     return khoa;
@@ -442,6 +510,42 @@ export class KhoaBoiDuongService {
         si_so_toi_da: dto.si_so_toi_da,
       },
     });
+  }
+
+  // ---------------------------------------------------------------------
+  // POST/DELETE /khoa-boi-duong/{id}/don-vi-theo-doi — T2 (QĐ2): chỉ quan_tri
+  // (RolesGuard đã chặn ở controller, không cần assertChuKhoa ở đây — khác
+  // các thao tác "chủ khóa" khác vì Trường không quản lý danh sách này).
+  // ---------------------------------------------------------------------
+  async themDonViTheoDoi(khoaId: string, dto: ThemDonViTheoDoiDto) {
+    await this.getKhoaOrThrow(khoaId);
+    const donVi = await this.prisma.don_vi_cong_tac.findUnique({
+      where: { id: dto.don_vi_id },
+    });
+    if (!donVi) {
+      throw new ValidationException('don_vi_id không tồn tại', [
+        { field: 'don_vi_id', message: 'Không tồn tại' },
+      ]);
+    }
+    try {
+      return await this.prisma.khoa_don_vi_theo_doi.create({
+        data: { khoa_id: khoaId, don_vi_id: dto.don_vi_id },
+      });
+    } catch (e) {
+      throw this.mapUniqueViolation(e, 'Đơn vị này đã theo dõi khóa này');
+    }
+  }
+
+  async xoaDonViTheoDoi(khoaId: string, donViId: string) {
+    const result = await this.prisma.khoa_don_vi_theo_doi.deleteMany({
+      where: { khoa_id: khoaId, don_vi_id: donViId },
+    });
+    if (result.count === 0) {
+      throw new NotFoundAppException(
+        'Không tìm thấy đơn vị theo dõi này trong khóa',
+      );
+    }
+    return { da_xoa: true };
   }
 
   // ---------------------------------------------------------------------

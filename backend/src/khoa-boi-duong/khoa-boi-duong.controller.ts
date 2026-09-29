@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -18,13 +19,16 @@ import { QueryKhoaBoiDuongDto } from './dto/query-khoa-boi-duong.dto';
 import { DuyetKhoaDto } from './dto/duyet-khoa.dto';
 import { CreateGiaiDoanDto } from './dto/create-giai-doan.dto';
 import { CreateLopHocDto } from './dto/create-lop-hoc.dto';
+import { ThemDonViTheoDoiDto } from './dto/them-don-vi-theo-doi.dto';
 
 // Dịch vụ Khóa bồi dưỡng & Lớp học — docs/api-contract.md mục 3.
 @Controller('khoa-boi-duong')
 export class KhoaBoiDuongController {
   constructor(private readonly khoaBoiDuongService: KhoaBoiDuongService) {}
 
-  @Roles('truong')
+  // T2 (QĐ2): quan_tri tạo khóa cho đơn vị loại 'khac'/'truong' (vd. HCMUE),
+  // tự duyệt ngay — xem KhoaBoiDuongService.taoKhoa.
+  @Roles('truong', 'quan_tri')
   @Post()
   taoKhoa(
     @Body() dto: CreateKhoaBoiDuongDto,
@@ -98,5 +102,26 @@ export class KhoaBoiDuongController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.khoaBoiDuongService.themLop(id, dto, user);
+  }
+
+  // T2 (QĐ2): danh sách đơn vị "theo dõi" khóa — chỉ quan_tri quản lý được
+  // (Sở/Phòng/Trường chỉ được XEM khóa qua danh sách này, không tự thêm/bớt
+  // mình vào — xem KhoaBoiDuongService.themDonViTheoDoi/xoaDonViTheoDoi).
+  @Roles('quan_tri')
+  @Post(':id/don-vi-theo-doi')
+  themDonViTheoDoi(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ThemDonViTheoDoiDto,
+  ) {
+    return this.khoaBoiDuongService.themDonViTheoDoi(id, dto);
+  }
+
+  @Roles('quan_tri')
+  @Delete(':id/don-vi-theo-doi/:donViId')
+  xoaDonViTheoDoi(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('donViId', ParseUUIDPipe) donViId: string,
+  ) {
+    return this.khoaBoiDuongService.xoaDonViTheoDoi(id, donViId);
   }
 }

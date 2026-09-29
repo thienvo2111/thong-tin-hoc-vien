@@ -34,6 +34,14 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
   let truong1: { id: string };
   let truong2: { id: string };
   let truongMoCoi: { id: string };
+  // T2 (QĐ2): HCMUE — đơn vị loại 'khac', KHÔNG thuộc cây soGddt/phongVhxh ở
+  // trên (không có don_vi_cha_id). Test "đơn vị không theo dõi/không sở hữu
+  // thì không thấy khóa HCMUE" tái dùng phongKhacAccount/tokenPhongKhac sẵn
+  // có (cũng là 1 cây độc lập, không có don_vi_cha_id) thay vì tạo thêm tài
+  // khoản mới — tránh vượt giới hạn 10 lần đăng nhập/phút/IP (rule T1) vốn đã
+  // ở ngưỡng tối đa trong file test này (7 tài khoản khởi tạo + 3 lần đăng
+  // nhập học viên ở khối "Import phan_lop_hoc_vien" bên dưới = 10).
+  let hcmue: { id: string };
 
   let quanTri: Awaited<ReturnType<typeof taoNguoiDungTest>>;
   let soAccount: Awaited<ReturnType<typeof taoNguoiDungTest>>;
@@ -141,6 +149,14 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         dia_ban_id: xa.id,
       },
     });
+    hcmue = await prisma.don_vi_cong_tac.create({
+      data: {
+        ma_don_vi: `DV-hcmue-kbd-${suf}`,
+        ten_don_vi: `HCMUE KBD ${suf}`,
+        loai_don_vi: 'khac',
+        dia_ban_id: xa.id,
+      },
+    });
 
     quanTri = await taoNguoiDungTest({
       vai_tro: 'quan_tri',
@@ -196,10 +212,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
   afterAll(async () => {
     await prisma.dang_ky_hoc.deleteMany({
       where: {
-        OR: [
-          { khoa_id: { in: khoaIds } },
-          { hoc_vien_id: { in: hocVienIds } },
-        ],
+        OR: [{ khoa_id: { in: khoaIds } }, { hoc_vien_id: { in: hocVienIds } }],
       },
     });
     // Xóa trước khi xóa hoc_vien — nhat_ky_thong_bao.hoc_vien_id FK
@@ -236,7 +249,15 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     await xoaNguoiDungTest(truong2Account.nguoiDung.id);
     await xoaNguoiDungTest(truongMoCoiAccount.nguoiDung.id);
     await xoaDonViTest(
-      [truong1.id, truong2.id, truongMoCoi.id, phongVhxh.id, phongKhac.id, soGddt.id],
+      [
+        truong1.id,
+        truong2.id,
+        truongMoCoi.id,
+        phongVhxh.id,
+        phongKhac.id,
+        soGddt.id,
+        hcmue.id,
+      ],
       [xa.id, tinh.id],
     );
     await prisma.$disconnect();
@@ -301,6 +322,261 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         .set('Authorization', `Bearer ${tokenPhong}`)
         .send(baseKhoaBody())
         .expect(403);
+    });
+  });
+
+  describe('POST /khoa-boi-duong — quan_tri tạo khóa cho đơn vị "khac" (T2, QĐ2)', () => {
+    it('quan_tri thiếu don_vi_to_chuc_id -> 400', async () => {
+      await request(app.getHttpServer())
+        .post('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(baseKhoaBody())
+        .expect(400);
+    });
+
+    it('quan_tri chỉ định đơn vị không tồn tại -> 400', async () => {
+      await request(app.getHttpServer())
+        .post('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(
+          baseKhoaBody({
+            don_vi_to_chuc_id: '00000000-0000-0000-0000-000000000000',
+          }),
+        )
+        .expect(400);
+    });
+
+    it('quan_tri chỉ định đơn vị loại phong_vhxh -> 400 (chỉ khac/truong)', async () => {
+      await request(app.getHttpServer())
+        .post('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(baseKhoaBody({ don_vi_to_chuc_id: phongVhxh.id }))
+        .expect(400);
+    });
+
+    it('quan_tri tạo khóa cho HCMUE (loại "khac") -> 201, da_duyet ngay, ghi nguoi_duyet_id/cap_duyet_thuc_te/ngay_duyet', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(baseKhoaBody({ don_vi_to_chuc_id: hcmue.id }))
+        .expect(201);
+      expect(res.body.don_vi_to_chuc_id).toBe(hcmue.id);
+      expect(res.body.trang_thai).toBe('da_duyet');
+      expect(res.body.nguoi_duyet_id).toBe(quanTri.nguoiDung.id);
+      expect(res.body.cap_duyet_thuc_te).toBe('quan_tri');
+      expect(res.body.ngay_duyet).toBeDefined();
+      khoaIds.push(res.body.id);
+    });
+
+    it('quan_tri tạo khóa cho đơn vị loại "truong" -> 201, da_duyet ngay', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(baseKhoaBody({ don_vi_to_chuc_id: truong1.id }))
+        .expect(201);
+      expect(res.body.trang_thai).toBe('da_duyet');
+      khoaIds.push(res.body.id);
+    });
+  });
+
+  describe('POST/DELETE /khoa-boi-duong/{id}/don-vi-theo-doi (T2, QĐ2)', () => {
+    let khoaHcmueId: string;
+
+    beforeAll(async () => {
+      const res = await request(app.getHttpServer())
+        .post('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(baseKhoaBody({ don_vi_to_chuc_id: hcmue.id }))
+        .expect(201);
+      khoaHcmueId = res.body.id;
+      khoaIds.push(khoaHcmueId);
+    });
+
+    it('truong gọi -> 403 (chỉ quan_tri)', async () => {
+      await request(app.getHttpServer())
+        .post(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi`)
+        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .send({ don_vi_id: soGddt.id })
+        .expect(403);
+    });
+
+    it('so_gddt gọi -> 403 (chỉ quan_tri)', async () => {
+      await request(app.getHttpServer())
+        .post(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi`)
+        .set('Authorization', `Bearer ${tokenSo}`)
+        .send({ don_vi_id: soGddt.id })
+        .expect(403);
+    });
+
+    it('don_vi_id không tồn tại -> 400', async () => {
+      await request(app.getHttpServer())
+        .post(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ don_vi_id: '00000000-0000-0000-0000-000000000000' })
+        .expect(400);
+    });
+
+    it('quan_tri thêm Sở An Giang (soGddt) theo dõi -> 201', async () => {
+      await request(app.getHttpServer())
+        .post(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ don_vi_id: soGddt.id })
+        .expect(201);
+    });
+
+    it('thêm lại cùng đơn vị -> 409 (đã theo dõi)', async () => {
+      await request(app.getHttpServer())
+        .post(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ don_vi_id: soGddt.id })
+        .expect(409);
+    });
+
+    it('DELETE đơn vị theo dõi không tồn tại -> 404', async () => {
+      await request(app.getHttpServer())
+        .delete(
+          `/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi/${phongKhac.id}`,
+        )
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(404);
+    });
+
+    it('DELETE đơn vị theo dõi tồn tại -> 200, da_xoa=true', async () => {
+      const res = await request(app.getHttpServer())
+        .delete(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi/${soGddt.id}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(res.body.da_xoa).toBe(true);
+    });
+  });
+
+  describe('Phạm vi xem khóa qua đơn vị theo dõi (T2, QĐ2 — nghiệm thu)', () => {
+    let khoaHcmueId: string;
+    let hocVienTruong1Id: string;
+    let dangKyHcmueId: string;
+
+    beforeAll(async () => {
+      const suf = uniqueSuffix();
+      const res = await request(app.getHttpServer())
+        .post('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(baseKhoaBody({ don_vi_to_chuc_id: hcmue.id }))
+        .expect(201);
+      khoaHcmueId = res.body.id;
+      khoaIds.push(khoaHcmueId);
+
+      // Sở An Giang theo dõi khóa HCMUE.
+      await request(app.getHttpServer())
+        .post(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ don_vi_id: soGddt.id })
+        .expect(201);
+
+      // Học viên thuộc truong1 (nằm dưới soGddt) ghi danh vào khóa HCMUE —
+      // đơn vị TỔ CHỨC khóa (HCMUE) khác hẳn đơn vị CÔNG TÁC của học viên
+      // (truong1) — đúng bối cảnh T2 (giáo viên An Giang học khóa do HCMUE
+      // tổ chức).
+      const hv = await prisma.hoc_vien.create({
+        data: {
+          ho_ten: 'Học Viên Theo Dõi',
+          so_dinh_danh_ca_nhan: soDinhDanhNgauNhien(),
+          ngay_sinh: 5,
+          thang_sinh: 5,
+          nam_sinh: NAM_HOP_LE,
+          don_vi_cong_tac_id: truong1.id,
+          so_dien_thoai_lien_he: '0900000001',
+          email_lien_he: `theodoi-${suf}@test.local`,
+          trang_thai: 'da_duyet',
+          nguoi_duyet_id: quanTri.nguoiDung.id,
+          cap_duyet_thuc_te: 'quan_tri',
+          ngay_duyet: new Date(),
+        },
+      });
+      hocVienTruong1Id = hv.id;
+      hocVienIds.push(hocVienTruong1Id);
+
+      const dk = await prisma.dang_ky_hoc.create({
+        data: {
+          hoc_vien_id: hocVienTruong1Id,
+          khoa_id: khoaHcmueId,
+          trang_thai: 'da_duyet',
+        },
+      });
+      dangKyHcmueId = dk.id;
+    });
+
+    it('Sở An Giang (đơn vị theo dõi) thấy khóa HCMUE trong GET /khoa-boi-duong', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${tokenSo}`)
+        .expect(200);
+      const ids = res.body.data.map((k: { id: string }) => k.id);
+      expect(ids).toContain(khoaHcmueId);
+    });
+
+    it('Phòng VHXH dưới Sở An Giang cũng thấy khóa HCMUE (nằm dưới đơn vị theo dõi)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${tokenPhong}`)
+        .expect(200);
+      const ids = res.body.data.map((k: { id: string }) => k.id);
+      expect(ids).toContain(khoaHcmueId);
+
+      const chiTiet = await request(app.getHttpServer())
+        .get(`/khoa-boi-duong/${khoaHcmueId}`)
+        .set('Authorization', `Bearer ${tokenPhong}`)
+        .expect(200);
+      expect(chiTiet.body.id).toBe(khoaHcmueId);
+    });
+
+    it('Đơn vị khác cây (không theo dõi, không sở hữu — tái dùng phongKhac) không thấy khóa HCMUE', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${tokenPhongKhac}`)
+        .expect(200);
+      const ids = res.body.data.map((k: { id: string }) => k.id);
+      expect(ids).not.toContain(khoaHcmueId);
+
+      await request(app.getHttpServer())
+        .get(`/khoa-boi-duong/${khoaHcmueId}`)
+        .set('Authorization', `Bearer ${tokenPhongKhac}`)
+        .expect(403);
+    });
+
+    it('dữ liệu học viên vẫn theo phạm vi hồ sơ hiện có: Phòng VHXH KHÔNG tự nhiên có quyền cập nhật kết quả của dang_ky_hoc thuộc khóa HCMUE dù thấy được khóa qua theo dõi', async () => {
+      await request(app.getHttpServer())
+        .patch(`/dang-ky-hoc/${dangKyHcmueId}/ket-qua`)
+        .set('Authorization', `Bearer ${tokenPhong}`)
+        .send({ ket_qua: 'dat' })
+        .expect(403);
+      await request(app.getHttpServer())
+        .patch(`/dang-ky-hoc/${dangKyHcmueId}/ket-qua`)
+        .set('Authorization', `Bearer ${tokenSo}`)
+        .send({ ket_qua: 'dat' })
+        .expect(403);
+    });
+  });
+
+  describe('Rule #18 — đơn vị loại "khac" không được chọn làm đơn vị công tác của học viên', () => {
+    it('POST /hoc-vien với don_vi_cong_tac_id thuộc loại "khac" (HCMUE) -> 400', async () => {
+      const suf = uniqueSuffix();
+      await request(app.getHttpServer())
+        .post('/hoc-vien')
+        .send({
+          ho_ten: 'Học Viên Chọn Sai Đơn Vị',
+          so_dinh_danh_ca_nhan: soDinhDanhNgauNhien(),
+          ngay_sinh: 1,
+          thang_sinh: 1,
+          nam_sinh: NAM_HOP_LE,
+          noi_sinh_id: tinh.id,
+          phuong_xa_id: xa.id,
+          don_vi_cong_tac_id: hcmue.id,
+          so_dien_thoai_lien_he: '0912349000',
+          email_lien_he: `sai-dv-${suf}@test.local`,
+          trinh_do_chuyen_mon: 'dai_hoc',
+          chuyen_mon: ['Sư phạm Lý'],
+        })
+        .expect(400);
     });
   });
 
