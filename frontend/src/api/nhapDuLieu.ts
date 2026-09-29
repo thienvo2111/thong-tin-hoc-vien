@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, apiFetchBlob } from './client';
-import type { ImportChiTiet, LoaiDanhMucImport, NhatKyImportItem, TaoImportResponse } from './types';
+import type { ImportChiTiet, LoaiDanhMucImport, NhatKyImportItem, PaginatedResult, TaoImportResponse } from './types';
 
 // Nhập dữ liệu (Phase 5 redesign) — luồng 2 bước thật của backend (docs/api-contract.md mục 5):
 // POST /import/{loai} (upload + validate, xử lý bất đồng bộ) -> GET /import/{id} (xem preview lỗi/
@@ -75,7 +75,7 @@ export interface LichSuImportParams {
 }
 
 export function layLichSuImport(params: LichSuImportParams = {}) {
-  return apiFetch<{ data: NhatKyImportItem[] }>(`/import${xayQueryString(params)}`);
+  return apiFetch<PaginatedResult<NhatKyImportItem>>(`/import${xayQueryString(params)}`);
 }
 
 export function useLichSuImport(params: LichSuImportParams = {}) {

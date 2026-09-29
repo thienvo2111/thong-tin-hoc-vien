@@ -27,14 +27,25 @@ function renderTrang() {
 }
 
 describe('Admin — Nhập dữ liệu', () => {
-  it('hiện lịch sử nhập dữ liệu thật, đúng nhãn loại + badge trạng thái', async () => {
+  it('hiện lịch sử nhập dữ liệu thật, đúng nhãn loại + ngày giờ + badge trạng thái', async () => {
     renderTrang();
     const bang = await screen.findByRole('table');
     const dongThanhCong = within(bang).getByText('Hồ sơ nhân sự (CSDL MOET)').closest('tr') as HTMLElement;
-    const dongLoi = within(bang).getByText('Phân lớp học viên (MOET)').closest('tr') as HTMLElement;
+    const dongCoLoi = within(bang).getByText('Phân lớp học viên (MOET)').closest('tr') as HTMLElement;
+    // import-3 (mock): trang_thai='loi' cấp file (không đọc được file) nhưng so_dong_loi=0 — ca lỗi
+    // thật đã gặp khiến badge từng hiện nhầm "Thành công" do suy trạng thái chỉ từ so_dong_loi.
+    const dongLoiFile = within(bang).getByText('Danh mục địa danh').closest('tr') as HTMLElement;
+
     // "Thành công" cũng là tên cột (header) — thu hẹp về đúng dòng để tránh trùng chữ với tiêu đề cột.
     expect(within(dongThanhCong).getByText('Thành công')).toBeInTheDocument();
-    expect(within(dongLoi).getByText('Có lỗi')).toBeInTheDocument();
+    // Cột "Thời gian" phải đọc field thoi_gian_import (KHÔNG phải created_at, field không tồn tại
+    // trong response thật) — 2026-09-29T02:12:00.000Z giờ Việt Nam (UTC+7) là 29/09/2026 09:12.
+    expect(within(dongThanhCong).getByText('29/09/2026 09:12')).toBeInTheDocument();
+
+    expect(within(dongCoLoi).getByText('Có lỗi')).toBeInTheDocument();
+
+    expect(within(dongLoiFile).getByText('Lỗi')).toBeInTheDocument();
+    expect(within(dongLoiFile).queryByText('Thành công')).not.toBeInTheDocument();
   });
 
   it('chưa chọn file: nút "Tải lên & kiểm tra" bị vô hiệu hóa', async () => {

@@ -282,7 +282,9 @@ export const handlers = [
 
   http.get('/import/:id/file-loi', () => fileMoPhong()),
 
-  http.get('/import', () => HttpResponse.json({ data: db.danhSachImport })),
+  http.get('/import', () =>
+    HttpResponse.json({ data: db.danhSachImport, total: db.danhSachImport.length, page: 1, page_size: 20 }),
+  ),
 ];
 
 export { loi };

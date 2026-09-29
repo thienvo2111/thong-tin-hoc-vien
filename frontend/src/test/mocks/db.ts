@@ -266,23 +266,50 @@ export function taoBaoCaoVanHanhMau(): BaoCaoRow[] {
   ];
 }
 
-function taoImportChiTietMau(id: string, trangThai: string, soDongLoi: number): ImportChiTiet {
-  return {
-    id,
-    trang_thai: trangThai,
-    tong_so_dong: 10,
-    so_dong_thanh_cong: 10 - soDongLoi,
-    so_dong_loi: soDongLoi,
-    danh_sach_loi: soDongLoi > 0 ? [{ dong: 3, ly_do: 'Mã định danh trùng đã tồn tại' }] : [],
-    danh_sach_canh_bao: [],
-    so_hoc_vien_chua_co_email: 0,
-  };
-}
-
+// Hàng khớp NGUYÊN VĂN response thật GET /import (capture DevTools Network + đối chiếu
+// backend/src/import/import.service.ts#lichSu — trả thẳng bản ghi bảng nhat_ky_import, tên field
+// KHÁC ImportChiTiet: loai_danh_muc/thoi_gian_import, không có danh_sach_loi/danh_sach_canh_bao).
+// import-3 mô phỏng đúng ca lỗi thật đã gặp: trang_thai='loi' (lỗi cấp file, không đọc được) nhưng
+// so_dong_loi=0 — nếu ai đó quay lại suy trạng thái chỉ từ so_dong_loi thì dòng này sẽ hiện sai
+// thành "Thành công", test phải bắt được.
 export function taoDanhSachImportMau(): NhatKyImportItem[] {
   return [
-    { ...taoImportChiTietMau('import-1', 'hoan_thanh', 0), loai: 'ho_so_nhan_su_moet', created_at: '2026-09-29T09:12:00.000Z' },
-    { ...taoImportChiTietMau('import-2', 'hoan_thanh', 2), loai: 'phan_lop_hoc_vien', created_at: '2026-09-28T16:40:00.000Z' },
+    {
+      id: 'import-1',
+      loai_danh_muc: 'ho_so_nhan_su_moet',
+      ten_file_goc: 'ho-so-nhan-su.xlsx',
+      nguoi_import_id: 'nd-1',
+      thoi_gian_import: '2026-09-29T02:12:00.000Z',
+      tong_so_dong: 10,
+      so_dong_thanh_cong: 10,
+      so_dong_loi: 0,
+      file_loi_url: null,
+      trang_thai: 'hoan_thanh',
+    },
+    {
+      id: 'import-2',
+      loai_danh_muc: 'phan_lop_hoc_vien',
+      ten_file_goc: 'phan-lop.xlsx',
+      nguoi_import_id: 'nd-1',
+      thoi_gian_import: '2026-09-28T09:40:00.000Z',
+      tong_so_dong: 10,
+      so_dong_thanh_cong: 8,
+      so_dong_loi: 2,
+      file_loi_url: '/import/import-2/file-loi',
+      trang_thai: 'hoan_thanh',
+    },
+    {
+      id: 'import-3',
+      loai_danh_muc: 'dia_danh',
+      ten_file_goc: 'dia-danh-loi.xlsx',
+      nguoi_import_id: 'nd-1',
+      thoi_gian_import: '2026-09-27T03:08:16.015Z',
+      tong_so_dong: 0,
+      so_dong_thanh_cong: 0,
+      so_dong_loi: 0,
+      file_loi_url: null,
+      trang_thai: 'loi',
+    },
   ];
 }
 

@@ -334,9 +334,19 @@ export interface ImportChiTiet {
   so_hoc_vien_chua_co_email: number;
 }
 
-// GET /import — "Nhật ký import" (api-contract.md mục 5), shape hàng không ghi rõ — improvised, giả
-// định cùng field với ImportChiTiet (đã xác nhận) + loai/created_at để hiển thị danh sách.
-export interface NhatKyImportItem extends ImportChiTiet {
-  loai: LoaiDanhMucImport;
-  created_at: string;
+// GET /import — "Nhật ký import" (api-contract.md mục 5). Hàng là bản ghi thô của bảng nhat_ky_import
+// (backend/src/import/import.service.ts#lichSu trả thẳng kết quả findMany, KHÔNG map qua shape của
+// ImportChiTiet) — xác nhận qua DevTools Network + đối chiếu backend, KHÔNG có danh_sach_loi/
+// danh_sach_canh_bao/so_hoc_vien_chua_co_email (những field đó chỉ có ở GET /import/{id}).
+export interface NhatKyImportItem {
+  id: string;
+  loai_danh_muc: LoaiDanhMucImport;
+  ten_file_goc: string;
+  nguoi_import_id: string;
+  thoi_gian_import: string;
+  tong_so_dong: number;
+  so_dong_thanh_cong: number;
+  so_dong_loi: number;
+  file_loi_url: string | null;
+  trang_thai: string;
 }

@@ -290,11 +290,11 @@ export default function AdminNhapDuLieu() {
                       )}
                       {lichSu.data.data.map((i) => (
                         <Table.Tr key={i.id}>
-                          <Table.Td fw={600}>{nhanLoaiImport(i.loai)}</Table.Td>
+                          <Table.Td fw={600}>{nhanLoaiImport(i.loai_danh_muc)}</Table.Td>
                           <Table.Td>{i.tong_so_dong}</Table.Td>
                           <Table.Td>{i.so_dong_thanh_cong}</Table.Td>
                           <Table.Td>{i.so_dong_loi}</Table.Td>
-                          <Table.Td style={{ whiteSpace: 'nowrap' }}>{dinhDangNgayGio(i.created_at)}</Table.Td>
+                          <Table.Td style={{ whiteSpace: 'nowrap' }}>{dinhDangNgayGio(i.thoi_gian_import)}</Table.Td>
                           <Table.Td>
                             <BadgeTrangThaiImport trangThai={i.trang_thai} soDongLoi={i.so_dong_loi} />
                           </Table.Td>
