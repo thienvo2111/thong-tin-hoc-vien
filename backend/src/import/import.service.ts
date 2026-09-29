@@ -14,6 +14,7 @@ import { CreateMonHocDto } from '../danh-muc/dto/mon-hoc.dto';
 import { HoSoNhanSuMoetRowDto } from '../hoc-vien/dto/import-moet-row.dto';
 import { PhanLopHocVienRowDto } from '../khoa-boi-duong/dto/phan-lop-row.dto';
 import { KetQuaDanhGiaRowDto } from '../khoa-boi-duong/dto/ket-qua-danh-gia-row.dto';
+import { LopVaLichHocRowDto } from '../khoa-boi-duong/dto/lop-va-lich-hoc-row.dto';
 import { TaiKhoanVleRowDto } from './dto/tai-khoan-vle-row.dto';
 import {
   ConflictAppException,
@@ -72,7 +73,7 @@ export class ImportService {
   assertSupported(loai: string): SupportedImportType {
     if (!isSupportedImportType(loai)) {
       throw new ValidationException(
-        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia)`,
+        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc)`,
       );
     }
     return loai;
@@ -126,9 +127,18 @@ export class ImportService {
     const danhSachLoi: { dong: number; ly_do: string }[] = [];
     const danhSachCanhBao: { dong: number; ly_do: string }[] = [];
     const dongHopLe: number[] = [];
+    // T6: phát hiện 2 dòng cùng (lớp, giai đoạn, buổi) trong CÙNG FILE (chỉ
+    // lop_va_lich_hoc dùng — xem KhoaBoiDuongService.resolveLopVaLichHocRow),
+    // reset mỗi lượt gọi taoImport()/xacNhan() (không dùng chung giữa 2 lượt
+    // preview/xác nhận vì mỗi lượt đọc lại toàn bộ file từ đầu).
+    const dupKeys = new Set<string>();
 
     for (const row of rows) {
-      const { dto, error, canhBao } = await this.buildDto(loai, row.values);
+      const { dto, error, canhBao } = await this.buildDto(
+        loai,
+        row.values,
+        dupKeys,
+      );
       if (error || !dto) {
         danhSachLoi.push({
           dong: row.dong,
@@ -250,6 +260,9 @@ export class ImportService {
     // T3 (mo-rong-nls-an-giang.md, QĐ6): chỉ tăng khi commitRow() báo
     // hocVienChuaCoEmail=true (phan_lop_hoc_vien, nhánh gán lop_id thực sự).
     let soHocVienChuaCoEmail = 0;
+    // T6: xem ghi chú dupKeys ở taoImport() — reset riêng cho lượt xác nhận
+    // này (đọc lại file từ đầu).
+    const dupKeys = new Set<string>();
 
     for (const dong of ketQuaCu.dong_hop_le) {
       const values = rowsByDong.get(dong);
@@ -260,7 +273,7 @@ export class ImportService {
         });
         continue;
       }
-      const { dto, error } = await this.buildDto(loai, values);
+      const { dto, error } = await this.buildDto(loai, values, dupKeys);
       if (error || !dto) {
         danhSachLoiMoi.push({
           dong,
@@ -373,7 +386,12 @@ export class ImportService {
         // TÙY CHỌN theo nghĩa từng cột nhưng phải có ÍT NHẤT 1 (dùng chung
         // HocVienResolver, xem getColumnNotes cho ghi chú hiển thị trên file
         // mẫu Excel).
-        return ['so_dinh_danh_ca_nhan', 'ma_dinh_danh_moet', 'ma_khoa', 'ten_lop'];
+        return [
+          'so_dinh_danh_ca_nhan',
+          'ma_dinh_danh_moet',
+          'ma_khoa',
+          'ten_lop',
+        ];
       case 'ho_so_nhan_su_moet':
         // Nguyên văn cột theo docs/api-contract.md mục 2 "Luồng import nhân
         // sự từ CSDL MOET". "Mã đơn vị" thêm ở T4 (mo-rong-nls-an-giang.md) —
@@ -419,6 +437,24 @@ export class ImportService {
           'ma_khoa',
           'loai',
           'muc',
+        ];
+      case 'lop_va_lich_hoc':
+        // T6 (mo-rong-nls-an-giang.md): mỗi dòng = 1 buổi học. ma_diem_hoc
+        // TÙY CHỌN — T10 (điểm học) chưa làm, chưa có bảng nào để lưu, đọc
+        // cột nhưng bỏ qua (xem KhoaBoiDuongService.resolveLopVaLichHocRow),
+        // KHÔNG báo lỗi vì cột lạ.
+        return [
+          'ma_khoa',
+          'ten_lop',
+          'nhom_hoc_vien',
+          'muc_nang_luc',
+          'si_so_toi_da',
+          'giai_doan_thu_tu',
+          'buoi_so',
+          'bat_dau',
+          'ket_thuc',
+          'dia_diem_hoac_link',
+          'ma_diem_hoc',
         ];
     }
   }
@@ -474,6 +510,20 @@ export class ImportService {
         muc: 'Bắt buộc — chỉ nhận "co_ban", "thanh_thao" hoặc "nang_cao". Chạy lại file với giá trị mới sẽ ghi đè giá trị cũ.',
       };
     }
+    if (loai === 'lop_va_lich_hoc') {
+      return {
+        nhom_hoc_vien: 'Tùy chọn — số nguyên từ 1 đến 20.',
+        muc_nang_luc:
+          'Tùy chọn — "co_ban", "thanh_thao" hoặc "nang_cao". Dùng để cảnh báo khi phân lớp nếu khác mức đầu vào của học viên.',
+        si_so_toi_da: 'Tùy chọn — số nguyên dương.',
+        bat_dau: 'Bắt buộc — định dạng "dd/mm/yyyy hh:mm", giờ Việt Nam.',
+        ket_thuc:
+          'Bắt buộc — định dạng "dd/mm/yyyy hh:mm", giờ Việt Nam, phải lớn hơn bat_dau.',
+        dia_diem_hoac_link: 'Tùy chọn — tối đa 500 ký tự.',
+        ma_diem_hoc:
+          'Tùy chọn — CHƯA sử dụng ở phiên bản hiện tại (chờ T10), điền vào sẽ bị bỏ qua.',
+      };
+    }
     return {};
   }
 
@@ -488,6 +538,7 @@ export class ImportService {
   private async buildDto(
     loai: SupportedImportType,
     raw: Record<string, string>,
+    dupKeys?: Set<string>,
   ): Promise<
     RowBuildResult<
       | CreateDiaDanhDto
@@ -497,6 +548,7 @@ export class ImportService {
       | PhanLopHocVienRowDto
       | TaiKhoanVleRowDto
       | KetQuaDanhGiaRowDto
+      | LopVaLichHocRowDto
     >
   > {
     switch (loai) {
@@ -539,6 +591,22 @@ export class ImportService {
         );
         return { dto: resolved.dto, canhBao };
       }
+      case 'lop_va_lich_hoc':
+        return this.khoaBoiDuongService.resolveLopVaLichHocRow(
+          {
+            ma_khoa: raw.ma_khoa,
+            ten_lop: raw.ten_lop,
+            nhom_hoc_vien: raw.nhom_hoc_vien,
+            muc_nang_luc: raw.muc_nang_luc,
+            si_so_toi_da: raw.si_so_toi_da,
+            giai_doan_thu_tu: raw.giai_doan_thu_tu,
+            buoi_so: raw.buoi_so,
+            bat_dau: raw.bat_dau,
+            ket_thuc: raw.ket_thuc,
+            dia_diem_hoac_link: raw.dia_diem_hoac_link,
+          },
+          dupKeys,
+        );
     }
   }
 
@@ -576,7 +644,8 @@ export class ImportService {
       | HoSoNhanSuMoetRowDto
       | PhanLopHocVienRowDto
       | TaiKhoanVleRowDto
-      | KetQuaDanhGiaRowDto,
+      | KetQuaDanhGiaRowDto
+      | LopVaLichHocRowDto,
   ): Promise<string | undefined> {
     try {
       if (loai === 'dia_danh') {
@@ -609,6 +678,9 @@ export class ImportService {
       } else if (loai === 'ket_qua_danh_gia') {
         // Không cần kiểm tra thêm: resolveKetQuaDanhGiaRow() (buildDto) đã
         // tra cứu học viên + khóa + dang_ky_hoc đã tồn tại rồi.
+      } else if (loai === 'lop_va_lich_hoc') {
+        // Không cần kiểm tra thêm: resolveLopVaLichHocRow() (buildDto) đã
+        // tra cứu FK + validate định dạng + trùng lặp trong file rồi.
       } else {
         const d = dto as HoSoNhanSuMoetRowDto;
         await this.hocVienService.checkValidMoetImportRow({
@@ -640,7 +712,8 @@ export class ImportService {
       | HoSoNhanSuMoetRowDto
       | PhanLopHocVienRowDto
       | TaiKhoanVleRowDto
-      | KetQuaDanhGiaRowDto,
+      | KetQuaDanhGiaRowDto
+      | LopVaLichHocRowDto,
     importId: string,
     nguoiImportId: string,
   ): Promise<{ hocVienChuaCoEmail?: boolean }> {
@@ -664,6 +737,10 @@ export class ImportService {
     } else if (loai === 'ket_qua_danh_gia') {
       await this.khoaBoiDuongService.commitKetQuaDanhGia(
         dto as KetQuaDanhGiaRowDto,
+      );
+    } else if (loai === 'lop_va_lich_hoc') {
+      await this.khoaBoiDuongService.commitLopVaLichHoc(
+        dto as LopVaLichHocRowDto,
       );
     } else {
       const d = dto as HoSoNhanSuMoetRowDto;

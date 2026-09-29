@@ -76,7 +76,8 @@ CREATE TYPE loai_danh_muc_import AS ENUM (
     'dia_danh', 'don_vi_cong_tac', 'mon_hoc', 'phan_lop_hoc_vien',
     'ho_so_nhan_su_moet',
     'tai_khoan_vle',  -- T15 (mo-rong-nls-an-giang.md, 2026-09-28) — thêm SAU CÙNG (migration riêng)
-    'ket_qua_danh_gia'  -- T5 (mo-rong-nls-an-giang.md, 2026-09-29) — thêm SAU CÙNG (migration riêng)
+    'ket_qua_danh_gia',  -- T5 (mo-rong-nls-an-giang.md, 2026-09-29) — thêm SAU CÙNG (migration riêng)
+    'lop_va_lich_hoc'  -- T6 (mo-rong-nls-an-giang.md, 2026-09-29) — thêm SAU CÙNG (migration riêng)
 );
 
 -- T5 (mo-rong-nls-an-giang.md, 2026-09-29): mức năng lực đầu vào/đầu ra của
@@ -542,10 +543,16 @@ CREATE TABLE lop_hoc (
     ten_lop             varchar(255) NOT NULL,
     si_so_toi_da        integer,
     trang_thai          trang_thai_active NOT NULL DEFAULT 'active',
+    -- T6 (mo-rong-nls-an-giang.md, 2026-09-29, QĐ3/QĐ4): nhóm học viên (1-20,
+    -- 3 nhóm gối đầu) và mức năng lực mục tiêu của lớp. Nhập qua import
+    -- lop_va_lich_hoc.
+    nhom_hoc_vien       smallint,
+    muc_nang_luc        muc_nang_luc,
 
     CONSTRAINT chk_lop_si_so CHECK (si_so_toi_da IS NULL OR si_so_toi_da > 0),
     -- T3 (mo-rong-nls-an-giang.md): tên lớp phải duy nhất trong cùng 1 khóa.
-    CONSTRAINT uq_lop_ten_trong_khoa UNIQUE (khoa_id, ten_lop)
+    CONSTRAINT uq_lop_ten_trong_khoa UNIQUE (khoa_id, ten_lop),
+    CONSTRAINT chk_lop_hoc_nhom CHECK (nhom_hoc_vien BETWEEN 1 AND 20)
 );
 
 CREATE INDEX idx_lop_khoa ON lop_hoc(khoa_id);
@@ -554,13 +561,19 @@ CREATE TABLE lich_hoc_lop (
     id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     lop_id                  uuid NOT NULL REFERENCES lop_hoc(id) ON DELETE CASCADE,
     giai_doan_id            uuid NOT NULL REFERENCES giai_doan_khoa(id) ON DELETE CASCADE,
+    -- T6 (mo-rong-nls-an-giang.md, 2026-09-29, QĐ3): 1 lớp có NHIỀU buổi
+    -- trong cùng 1 giai đoạn (Zoom nhiều buổi; trực tiếp 3 ngày = 3 buổi).
+    buoi_so                 smallint NOT NULL DEFAULT 1,
     thoi_gian_bat_dau       timestamptz NOT NULL,
     thoi_gian_ket_thuc      timestamptz NOT NULL,
     dia_diem_hoac_link      varchar(500),
     trang_thai              trang_thai_lich_hoc NOT NULL DEFAULT 'chua_dien_ra',
 
-    CONSTRAINT uq_lich_hoc_lop_giai_doan UNIQUE (lop_id, giai_doan_id),
-    CONSTRAINT chk_lich_hoc_thoi_gian CHECK (thoi_gian_ket_thuc > thoi_gian_bat_dau)
+    -- T6: thay uq_lich_hoc_lop_giai_doan (1 lịch/giai đoạn/lớp) bằng ràng
+    -- buộc có thêm buoi_so.
+    CONSTRAINT uq_lich_hoc_lop_giai_doan_buoi UNIQUE (lop_id, giai_doan_id, buoi_so),
+    CONSTRAINT chk_lich_hoc_thoi_gian CHECK (thoi_gian_ket_thuc > thoi_gian_bat_dau),
+    CONSTRAINT chk_lich_hoc_lop_buoi CHECK (buoi_so >= 1)
 );
 
 CREATE INDEX idx_lich_hoc_lop ON lich_hoc_lop(lop_id);

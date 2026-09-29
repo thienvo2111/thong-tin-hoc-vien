@@ -1,8 +1,10 @@
 import {
   IsDateString,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  Min,
   MaxLength,
 } from 'class-validator';
 
@@ -12,6 +14,14 @@ import {
 export class CreateLichHocDto {
   @IsUUID()
   giai_doan_id: string;
+
+  // T6 (mo-rong-nls-an-giang.md, QĐ3): buổi thứ mấy trong giai đoạn — tùy
+  // chọn, mặc định 1 (khớp DEFAULT 1 của cột lich_hoc_lop.buoi_so) để không
+  // phá vỡ lời gọi cũ (1 lịch/giai đoạn/lớp trước khi có T6).
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  buoi_so?: number;
 
   @IsDateString()
   thoi_gian_bat_dau: string;

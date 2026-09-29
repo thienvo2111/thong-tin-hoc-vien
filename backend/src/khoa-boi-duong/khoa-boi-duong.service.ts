@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, khoa_boi_duong, lop_hoc } from '@prisma/client';
+import { Prisma, khoa_boi_duong, lop_hoc, muc_nang_luc } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from '../auth/scope/scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
@@ -24,8 +24,10 @@ import { ThemDonViTheoDoiDto } from './dto/them-don-vi-theo-doi.dto';
 import { PhanLopHocVienRowDto } from './dto/phan-lop-row.dto';
 import { KetQuaDangKyDto } from './dto/ket-qua-dang-ky.dto';
 import { KetQuaDanhGiaRowDto } from './dto/ket-qua-danh-gia-row.dto';
+import { LopVaLichHocRowDto } from './dto/lop-va-lich-hoc-row.dto';
 import { RowBuildResult } from '../import/import.types';
 import { resolveHocVienImportRow } from '../import/util/hoc-vien-resolver.util';
+import { parseVnDateTime } from '../common/utils/vn-datetime.util';
 
 type LopHocVoiKhoa = lop_hoc & { khoa: khoa_boi_duong };
 
@@ -594,6 +596,7 @@ export class KhoaBoiDuongService {
         data: {
           lop_id: lopId,
           giai_doan_id: dto.giai_doan_id,
+          buoi_so: dto.buoi_so ?? 1,
           thoi_gian_bat_dau: new Date(dto.thoi_gian_bat_dau),
           thoi_gian_ket_thuc: new Date(dto.thoi_gian_ket_thuc),
           dia_diem_hoac_link: dto.dia_diem_hoac_link,
@@ -602,8 +605,8 @@ export class KhoaBoiDuongService {
     } catch (e) {
       throw this.mapUniqueViolation(
         e,
-        'Lớp này đã có lịch học cho giai đoạn này',
-        'giai_doan_id',
+        'Lớp này đã có lịch học cho giai đoạn và buổi này',
+        'buoi_so',
       );
     }
   }
@@ -661,7 +664,17 @@ export class KhoaBoiDuongService {
         lop: {
           include: {
             nhan_su: true,
-            lich_hoc: { include: { giai_doan: true } },
+            // T6 (mo-rong-nls-an-giang.md): sắp buổi theo giai đoạn, buổi,
+            // thời gian, địa điểm/link (nghiệm thu T6).
+            lich_hoc: {
+              include: { giai_doan: true },
+              orderBy: [
+                { giai_doan: { thu_tu: 'asc' } },
+                { buoi_so: 'asc' },
+                { thoi_gian_bat_dau: 'asc' },
+                { dia_diem_hoac_link: 'asc' },
+              ],
+            },
           },
         },
       },
@@ -744,6 +757,11 @@ export class KhoaBoiDuongService {
 
     const tenLop = raw.ten_lop?.trim();
     let lopId: string | null = null;
+    // T6 (mo-rong-nls-an-giang.md, QĐ3/QĐ4): lop_hoc.muc_nang_luc khác
+    // dang_ky_hoc.muc_dau_vao (đã có từ T5) -> cảnh báo 🟡, KHÔNG chặn dòng —
+    // chỉ có ý nghĩa khi CẢ 2 đều đã có giá trị (lớp có mức mục tiêu VÀ học
+    // viên đã có kết quả đánh giá đầu vào), nếu không thì không có gì để so.
+    let canhBao: string | undefined;
     if (tenLop) {
       const lop = await this.prisma.lop_hoc.findFirst({
         where: { khoa_id: khoa.id, ten_lop: tenLop },
@@ -754,6 +772,22 @@ export class KhoaBoiDuongService {
         };
       }
       lopId = lop.id;
+
+      if (lop.muc_nang_luc) {
+        const dangKyHienTai = await this.prisma.dang_ky_hoc.findUnique({
+          where: {
+            hoc_vien_id_khoa_id: { hoc_vien_id: hocVien.id, khoa_id: khoa.id },
+          },
+        });
+        if (
+          dangKyHienTai?.muc_dau_vao &&
+          dangKyHienTai.muc_dau_vao !== lop.muc_nang_luc
+        ) {
+          const ma =
+            raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
+          canhBao = `Học viên "${ma}" có mức đầu vào "${dangKyHienTai.muc_dau_vao}" khác mức năng lực "${lop.muc_nang_luc}" của lớp "${tenLop}" — kiểm tra lại phân lớp`;
+        }
+      }
     }
 
     return {
@@ -762,6 +796,7 @@ export class KhoaBoiDuongService {
         khoa_id: khoa.id,
         lop_id: lopId,
       },
+      canhBao,
     };
   }
 
@@ -795,8 +830,9 @@ export class KhoaBoiDuongService {
       // Event dang_ky_hoc_phan_lop CHỈ kích hoạt ở nhánh gán lop_id thực sự
       // (docs/api-contract.md mục 8) — nhánh else dưới đây (chỉ ghi danh,
       // lop_id vẫn NULL) không gọi.
-      const { chuaCoEmail } =
-        await this.thongBaoService.guiDangKyHocPhanLop(dangKy.id);
+      const { chuaCoEmail } = await this.thongBaoService.guiDangKyHocPhanLop(
+        dangKy.id,
+      );
       return { hocVienChuaCoEmail: chuaCoEmail };
     } else {
       // ten_lop trống: chỉ đảm bảo đã ghi danh. Nếu dang_ky_hoc đã tồn tại
@@ -870,7 +906,8 @@ export class KhoaBoiDuongService {
       },
     });
     if (!dangKy) {
-      const ma = raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
+      const ma =
+        raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
       return {
         error: `Học viên "${ma}" chưa được ghi danh vào khóa "${maKhoa}" — phải chạy ghi danh (import phan_lop_hoc_vien, T3) trước`,
       };
@@ -897,6 +934,210 @@ export class KhoaBoiDuongService {
         dto.loai === 'dau_vao'
           ? { muc_dau_vao: dto.muc }
           : { muc_dau_ra: dto.muc },
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Import lop_va_lich_hoc (T6, mo-rong-nls-an-giang.md — gọi từ
+  // ImportService) — mỗi dòng = 1 buổi học. Cột file: ma_khoa, ten_lop,
+  // nhom_hoc_vien (tùy chọn, 1-20), muc_nang_luc (tùy chọn), si_so_toi_da
+  // (tùy chọn), giai_doan_thu_tu, buoi_so, bat_dau, ket_thuc (dd/mm/yyyy
+  // hh:mm giờ VN, quy tắc chung #4), dia_diem_hoac_link (tùy chọn),
+  // ma_diem_hoc (tùy chọn — T10 "điểm học" CHƯA làm, không có bảng nào để
+  // lưu -> đọc cột nhưng BỎ QUA, không báo lỗi vì cột lạ, xem TODO T10).
+  //
+  // Upsert lớp theo (khoa_id, ten_lop) — uq_lop_ten_trong_khoa (T3); upsert
+  // lịch theo (lop_id, giai_doan_id, buoi_so) — uq_lich_hoc_lop_giai_doan_buoi
+  // (T6 migration B). dupKeys: Set dùng CHUNG cho cả 1 lượt import (tạo mới ở
+  // ImportService trước vòng lặp từng dòng) để phát hiện 2 dòng cùng (lớp,
+  // giai đoạn, buổi) TRONG CÙNG FILE — khác voi UNIQUE constraint (chỉ phát
+  // hiện được khi đã commit, không có ý nghĩa ở bước preview vì lớp có thể
+  // chưa tồn tại).
+  // ---------------------------------------------------------------------
+  async resolveLopVaLichHocRow(
+    raw: {
+      ma_khoa?: string;
+      ten_lop?: string;
+      nhom_hoc_vien?: string;
+      muc_nang_luc?: string;
+      si_so_toi_da?: string;
+      giai_doan_thu_tu?: string;
+      buoi_so?: string;
+      bat_dau?: string;
+      ket_thuc?: string;
+      dia_diem_hoac_link?: string;
+    },
+    dupKeys?: Set<string>,
+  ): Promise<RowBuildResult<LopVaLichHocRowDto>> {
+    const maKhoa = raw.ma_khoa?.trim();
+    if (!maKhoa) {
+      return { error: 'Thiếu cột "ma_khoa"' };
+    }
+    const khoa = await this.prisma.khoa_boi_duong.findUnique({
+      where: { ma_khoa: maKhoa },
+    });
+    if (!khoa) {
+      return { error: `Khóa "${maKhoa}" không tồn tại` };
+    }
+
+    const tenLop = raw.ten_lop?.trim();
+    if (!tenLop) {
+      return { error: 'Thiếu cột "ten_lop"' };
+    }
+
+    let nhomHocVien: number | undefined;
+    if (raw.nhom_hoc_vien?.trim()) {
+      nhomHocVien = Number(raw.nhom_hoc_vien.trim());
+      if (
+        !Number.isInteger(nhomHocVien) ||
+        nhomHocVien < 1 ||
+        nhomHocVien > 20
+      ) {
+        return { error: 'Cột "nhom_hoc_vien" phải là số nguyên từ 1 đến 20' };
+      }
+    }
+
+    let mucNangLuc: muc_nang_luc | undefined;
+    if (raw.muc_nang_luc?.trim()) {
+      const m = raw.muc_nang_luc.trim();
+      if (m !== 'co_ban' && m !== 'thanh_thao' && m !== 'nang_cao') {
+        return {
+          error:
+            'Cột "muc_nang_luc" phải là "co_ban", "thanh_thao" hoặc "nang_cao"',
+        };
+      }
+      mucNangLuc = m;
+    }
+
+    let siSoToiDa: number | undefined;
+    if (raw.si_so_toi_da?.trim()) {
+      siSoToiDa = Number(raw.si_so_toi_da.trim());
+      if (!Number.isInteger(siSoToiDa) || siSoToiDa < 1) {
+        return { error: 'Cột "si_so_toi_da" phải là số nguyên dương' };
+      }
+    }
+
+    const giaiDoanThuTuRaw = raw.giai_doan_thu_tu?.trim();
+    if (!giaiDoanThuTuRaw) {
+      return { error: 'Thiếu cột "giai_doan_thu_tu"' };
+    }
+    const giaiDoanThuTu = Number(giaiDoanThuTuRaw);
+    if (!Number.isInteger(giaiDoanThuTu)) {
+      return { error: 'Cột "giai_doan_thu_tu" phải là số nguyên' };
+    }
+    const giaiDoan = await this.prisma.giai_doan_khoa.findUnique({
+      where: { khoa_id_thu_tu: { khoa_id: khoa.id, thu_tu: giaiDoanThuTu } },
+    });
+    if (!giaiDoan) {
+      return {
+        error: `Giai đoạn thứ tự "${giaiDoanThuTu}" không tồn tại trong khóa "${maKhoa}"`,
+      };
+    }
+
+    const buoiSoRaw = raw.buoi_so?.trim();
+    if (!buoiSoRaw) {
+      return { error: 'Thiếu cột "buoi_so"' };
+    }
+    const buoiSo = Number(buoiSoRaw);
+    if (!Number.isInteger(buoiSo) || buoiSo < 1) {
+      return { error: 'Cột "buoi_so" phải là số nguyên >= 1' };
+    }
+
+    const batDau = parseVnDateTime(raw.bat_dau ?? '');
+    if (!batDau) {
+      return {
+        error: 'Cột "bat_dau" sai định dạng — phải là "dd/mm/yyyy hh:mm"',
+      };
+    }
+    const ketThuc = parseVnDateTime(raw.ket_thuc ?? '');
+    if (!ketThuc) {
+      return {
+        error: 'Cột "ket_thuc" sai định dạng — phải là "dd/mm/yyyy hh:mm"',
+      };
+    }
+    if (ketThuc <= batDau) {
+      return {
+        error: 'Cột "ket_thuc" phải lớn hơn "bat_dau" (rule #49)',
+      };
+    }
+
+    const diaDiemHoacLink = raw.dia_diem_hoac_link?.trim() || undefined;
+    if (diaDiemHoacLink && diaDiemHoacLink.length > 500) {
+      return { error: 'Cột "dia_diem_hoac_link" tối đa 500 ký tự' };
+    }
+
+    if (dupKeys) {
+      const key = `${khoa.id}|${tenLop.toLowerCase()}|${giaiDoan.id}|${buoiSo}`;
+      if (dupKeys.has(key)) {
+        return {
+          error: `Dòng trùng (lớp "${tenLop}", giai đoạn thứ tự "${giaiDoanThuTu}", buổi "${buoiSo}") với dòng khác trong cùng file`,
+        };
+      }
+      dupKeys.add(key);
+    }
+
+    return {
+      dto: {
+        khoa_id: khoa.id,
+        ten_lop: normalizeNfcName(tenLop),
+        nhom_hoc_vien: nhomHocVien,
+        muc_nang_luc: mucNangLuc,
+        si_so_toi_da: siSoToiDa,
+        giai_doan_id: giaiDoan.id,
+        buoi_so: buoiSo,
+        thoi_gian_bat_dau: batDau,
+        thoi_gian_ket_thuc: ketThuc,
+        dia_diem_hoac_link: diaDiemHoacLink,
+      },
+    };
+  }
+
+  // Không cần checkValid riêng: resolveLopVaLichHocRow() (buildDto) đã tra
+  // cứu/validate toàn bộ FK + định dạng thời gian + trùng lặp trong file rồi.
+  //
+  // Upsert theo (khoa_id, ten_lop) rồi (lop_id, giai_doan_id, buoi_so) — chạy
+  // lại file sửa giờ 1 buổi chỉ update ĐÚNG buổi đó (nghiệm thu T6), các buổi
+  // khác (khác buoi_so/giai_doan_id) không bị đụng tới.
+  async commitLopVaLichHoc(dto: LopVaLichHocRowDto): Promise<void> {
+    const lop = await this.prisma.lop_hoc.upsert({
+      where: {
+        khoa_id_ten_lop: { khoa_id: dto.khoa_id, ten_lop: dto.ten_lop },
+      },
+      create: {
+        khoa_id: dto.khoa_id,
+        ten_lop: dto.ten_lop,
+        nhom_hoc_vien: dto.nhom_hoc_vien,
+        muc_nang_luc: dto.muc_nang_luc,
+        si_so_toi_da: dto.si_so_toi_da,
+      },
+      update: {
+        nhom_hoc_vien: dto.nhom_hoc_vien,
+        muc_nang_luc: dto.muc_nang_luc,
+        si_so_toi_da: dto.si_so_toi_da,
+      },
+    });
+
+    await this.prisma.lich_hoc_lop.upsert({
+      where: {
+        lop_id_giai_doan_id_buoi_so: {
+          lop_id: lop.id,
+          giai_doan_id: dto.giai_doan_id,
+          buoi_so: dto.buoi_so,
+        },
+      },
+      create: {
+        lop_id: lop.id,
+        giai_doan_id: dto.giai_doan_id,
+        buoi_so: dto.buoi_so,
+        thoi_gian_bat_dau: dto.thoi_gian_bat_dau,
+        thoi_gian_ket_thuc: dto.thoi_gian_ket_thuc,
+        dia_diem_hoac_link: dto.dia_diem_hoac_link,
+      },
+      update: {
+        thoi_gian_bat_dau: dto.thoi_gian_bat_dau,
+        thoi_gian_ket_thuc: dto.thoi_gian_ket_thuc,
+        dia_diem_hoac_link: dto.dia_diem_hoac_link,
+      },
     });
   }
 

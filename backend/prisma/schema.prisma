@@ -129,6 +129,9 @@ enum loai_danh_muc_import {
   // trên — thêm SAU CÙNG, migration riêng (xem migration
   // *_t5_muc_nang_luc_enum).
   ket_qua_danh_gia
+  // T6 (mo-rong-nls-an-giang.md, 2026-09-29): cùng lý do như trên — thêm SAU
+  // CÙNG, migration riêng (xem migration *_t6_loai_danh_muc_import_enum).
+  lop_va_lich_hoc
 }
 
 // T5 (mo-rong-nls-an-giang.md, 2026-09-29): mức năng lực đầu vào/đầu ra của
@@ -574,6 +577,14 @@ model lop_hoc {
   ten_lop      String            @db.VarChar(255)
   si_so_toi_da Int?
   trang_thai   trang_thai_active @default(active)
+  // T6 (mo-rong-nls-an-giang.md, 2026-09-29, QĐ3/QĐ4): nhóm học viên (1-20,
+  // 3 nhóm gối đầu) và mức năng lực mục tiêu của lớp — cả 2 nullable (không
+  // phải lớp nào cũng cần phân nhóm/mức, vd lớp hỗn hợp trình độ). Nhập qua
+  // import lop_va_lich_hoc (T6). chk_lop_hoc_nhom (1-20) không biểu diễn
+  // được bằng Prisma DSL — thêm bằng raw SQL nối vào migration B, cùng cách
+  // làm với các CHECK constraint khác (xem comment đầu file).
+  nhom_hoc_vien Int?         @db.SmallInt
+  muc_nang_luc  muc_nang_luc?
 
   khoa khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
@@ -589,6 +600,11 @@ model lich_hoc_lop {
   id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   lop_id             String              @db.Uuid
   giai_doan_id       String              @db.Uuid
+  // T6 (mo-rong-nls-an-giang.md, 2026-09-29, QĐ3): 1 lớp có NHIỀU buổi trong
+  // cùng 1 giai đoạn (Zoom nhiều buổi; trực tiếp 3 ngày = 3 buổi) — trước đó
+  // uq_lich_hoc_lop_giai_doan chỉ cho 1 lịch/giai đoạn, đã bỏ (migration B),
+  // thay bằng uq_lich_hoc_lop_giai_doan_buoi (lop_id, giai_doan_id, buoi_so).
+  buoi_so            Int                 @default(1) @db.SmallInt
   thoi_gian_bat_dau  DateTime            @db.Timestamptz(6)
   thoi_gian_ket_thuc DateTime            @db.Timestamptz(6)
   dia_diem_hoac_link String?             @db.VarChar(500)
@@ -597,7 +613,7 @@ model lich_hoc_lop {
   lop       lop_hoc        @relation(fields: [lop_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   giai_doan giai_doan_khoa @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@unique([lop_id, giai_doan_id], map: "uq_lich_hoc_lop_giai_doan")
+  @@unique([lop_id, giai_doan_id, buoi_so], map: "uq_lich_hoc_lop_giai_doan_buoi")
   @@index([lop_id], map: "idx_lich_hoc_lop")
   @@index([giai_doan_id], map: "idx_lich_hoc_giai_doan")
 }
