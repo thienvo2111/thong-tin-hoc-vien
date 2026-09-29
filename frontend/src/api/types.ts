@@ -276,3 +276,67 @@ export interface TaoKhoaBoiDuongDto {
   thoi_gian_ket_thuc: string;
   don_vi_to_chuc_id?: string;
 }
+
+// Phase 5 redesign — Trung tâm báo cáo (docs/api-contract.md mục 7 + mục "Đợt xác nhận" mục 2). Hàng
+// dữ liệu của bao-cao/xac-nhan, sua-truong-moet, dieu-kien-danh-gia, van-hanh KHÔNG có shape cụ thể
+// trong api-contract.md (chỉ tong-hop có, xem TongHopDonViRow) — dùng kiểu hàng động, hiển thị đúng
+// key/value thật trả về, không bịa thêm cột. Flag: improvised (wrapper { rows: [...] }, theo đúng quy
+// ước duy nhất đã biết của nhóm bao-cao/* — TongHopResult).
+export type BaoCaoRow = Record<string, unknown>;
+
+export interface BaoCaoRowsResult {
+  rows: BaoCaoRow[];
+}
+
+// GET /dot-xac-nhan — "Danh sách đợt" (api-contract.md mục "Đợt xác nhận & lịch sử thay đổi hồ sơ").
+// Hình dạng response không ghi rõ — improvised, theo đúng quy ước { data: [...] } của các endpoint
+// danh mục dùng chung (mục 4).
+export interface DotXacNhanDanhMuc {
+  id: string;
+  khoa_id: string | null;
+  ten: string;
+  loai: 'kiem_tra_bo_sung' | 'xac_nhan_truoc_danh_gia';
+  mo_luc: string;
+  dong_luc: string;
+}
+
+// Phase 5 redesign — Nhập dữ liệu (docs/api-contract.md mục 5). 8 loại import thật hỗ trợ qua
+// `loai_danh_muc_import` — không bịa thêm/bớt loại nào ngoài danh sách này.
+export type LoaiDanhMucImport =
+  | 'ho_so_nhan_su_moet'
+  | 'phan_lop_hoc_vien'
+  | 'lop_va_lich_hoc'
+  | 'ket_qua_danh_gia'
+  | 'tai_khoan_vle'
+  | 'don_vi_cong_tac'
+  | 'dia_danh'
+  | 'mon_hoc';
+
+export interface TaoImportResponse {
+  import_id: string;
+  trang_thai: string;
+}
+
+export interface ImportLoiDong {
+  dong: number;
+  ly_do: string;
+}
+
+// GET /import/{id} — shape đúng theo api-contract.md mục 5.
+export interface ImportChiTiet {
+  id: string;
+  trang_thai: string;
+  tong_so_dong: number;
+  so_dong_thanh_cong: number;
+  so_dong_loi: number;
+  danh_sach_loi: ImportLoiDong[];
+  danh_sach_canh_bao: ImportLoiDong[];
+  so_hoc_vien_chua_co_email: number;
+}
+
+// GET /import — "Nhật ký import" (api-contract.md mục 5), shape hàng không ghi rõ — improvised, giả
+// định cùng field với ImportChiTiet (đã xác nhận) + loai/created_at để hiển thị danh sách.
+export interface NhatKyImportItem extends ImportChiTiet {
+  loai: LoaiDanhMucImport;
+  created_at: string;
+}

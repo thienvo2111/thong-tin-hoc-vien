@@ -26,6 +26,14 @@ if (!window.ResizeObserver) {
   };
 }
 Element.prototype.scrollIntoView = vi.fn();
+// jsdom không cài URL.createObjectURL/revokeObjectURL — cần cho các nút "Xuất Excel"/"Tải file lỗi"
+// (Phase 5, src/lib/taiFile.ts) dùng Blob + createObjectURL để tải file qua trình duyệt.
+if (!window.URL.createObjectURL) {
+  window.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
+}
+if (!window.URL.revokeObjectURL) {
+  window.URL.revokeObjectURL = vi.fn();
+}
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {

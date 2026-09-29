@@ -1,13 +1,17 @@
 import type {
+  BaoCaoRow,
   DanhGiaDauVao,
   DiaDanh,
   DonViCongTac,
   DotXacNhan,
+  DotXacNhanDanhMuc,
   HocVien,
   HocVienDanhSachItem,
+  ImportChiTiet,
   KhoaBoiDuong,
   KhoaBoiDuongChiTiet,
   MonHoc,
+  NhatKyImportItem,
   TongHopDonViRow,
 } from '@/api/types';
 
@@ -227,6 +231,61 @@ export function taoBaoCaoTongHopDonViMau(): TongHopDonViRow[] {
   ];
 }
 
+// Dữ liệu mẫu cho Trung tâm báo cáo (Phase 5 redesign). Hàng của xác nhận/sửa-trường-MOET/điều-kiện-
+// đánh-giá/vận-hành dùng kiểu chung BaoCaoRow (xem ghi chú improvised trong api/types.ts) — mock chỉ
+// cần vài field minh họa, KHÔNG phải shape chính thức từ backend.
+export function taoDanhSachDotXacNhanMau(): DotXacNhanDanhMuc[] {
+  return [
+    { id: 'dot-1', khoa_id: null, ten: 'Kiểm tra hồ sơ đợt 1', loai: 'kiem_tra_bo_sung', mo_luc: '2026-09-01T00:00:00.000Z', dong_luc: '2026-10-04T16:59:59.000Z' },
+    { id: 'dot-2', khoa_id: null, ten: 'Xác nhận trước đánh giá', loai: 'xac_nhan_truoc_danh_gia', mo_luc: '2026-10-10T00:00:00.000Z', dong_luc: '2026-10-20T16:59:59.000Z' },
+  ];
+}
+
+export function taoBaoCaoXacNhanMau(): BaoCaoRow[] {
+  return [
+    { ho_ten: 'Lê Văn Bình', don_vi: 'THPT Long Xuyên', trang_thai: 'da_xac_nhan' },
+    { ho_ten: 'Phạm Thu Hà', don_vi: 'THPT Long Xuyên', trang_thai: 'chua_dang_nhap' },
+  ];
+}
+
+export function taoBaoCaoSuaTruongMoetMau(): BaoCaoRow[] {
+  return [{ ho_ten: 'Võ Minh Khôi', ma_dinh_danh_moet: '9115131099', don_vi_cu: 'THPT Long Xuyên', don_vi_moi: 'THPT Châu Đốc' }];
+}
+
+export function taoBaoCaoDieuKienDanhGiaMau(): BaoCaoRow[] {
+  return [
+    { ho_ten: 'Võ Minh Khôi', du_dieu_kien: true, ly_do: '', da_xem_vle: true },
+    { ho_ten: 'Lê Văn Bình', du_dieu_kien: false, ly_do: 'Chưa xác nhận hồ sơ ở đợt 2', da_xem_vle: false },
+  ];
+}
+
+export function taoBaoCaoVanHanhMau(): BaoCaoRow[] {
+  return [
+    { ten_lop: 'Lớp 01 – Nhóm cơ bản A', si_so: 30, so_co_email: 28, so_ho_so_day_du: 25 },
+    { ten_lop: 'Tổng', si_so: 30, so_co_email: 28, so_ho_so_day_du: 25 },
+  ];
+}
+
+function taoImportChiTietMau(id: string, trangThai: string, soDongLoi: number): ImportChiTiet {
+  return {
+    id,
+    trang_thai: trangThai,
+    tong_so_dong: 10,
+    so_dong_thanh_cong: 10 - soDongLoi,
+    so_dong_loi: soDongLoi,
+    danh_sach_loi: soDongLoi > 0 ? [{ dong: 3, ly_do: 'Mã định danh trùng đã tồn tại' }] : [],
+    danh_sach_canh_bao: [],
+    so_hoc_vien_chua_co_email: 0,
+  };
+}
+
+export function taoDanhSachImportMau(): NhatKyImportItem[] {
+  return [
+    { ...taoImportChiTietMau('import-1', 'hoan_thanh', 0), loai: 'ho_so_nhan_su_moet', created_at: '2026-09-29T09:12:00.000Z' },
+    { ...taoImportChiTietMau('import-2', 'hoan_thanh', 2), loai: 'phan_lop_hoc_vien', created_at: '2026-09-28T16:40:00.000Z' },
+  ];
+}
+
 export const db = {
   hoSo: taoHoSoMoi(),
   dotXacNhan: taoDotXacNhanDangMoThieu(),
@@ -239,6 +298,13 @@ export const db = {
   baoCaoTongHopDonVi: taoBaoCaoTongHopDonViMau(),
   danhSachKhoa: taoDanhSachKhoaMau(),
   chiTietKhoa: taoChiTietKhoaMau(taoDanhSachKhoaMau()),
+  danhSachDotXacNhan: taoDanhSachDotXacNhanMau(),
+  baoCaoXacNhan: taoBaoCaoXacNhanMau(),
+  baoCaoSuaTruongMoet: taoBaoCaoSuaTruongMoetMau(),
+  baoCaoDieuKienDanhGia: taoBaoCaoDieuKienDanhGiaMau(),
+  baoCaoVanHanh: taoBaoCaoVanHanhMau(),
+  danhSachImport: taoDanhSachImportMau(),
+  chiTietImport: {} as Record<string, ImportChiTiet>,
 };
 
 export function resetDb(): void {
@@ -252,4 +318,11 @@ export function resetDb(): void {
   db.baoCaoTongHopDonVi = taoBaoCaoTongHopDonViMau();
   db.danhSachKhoa = taoDanhSachKhoaMau();
   db.chiTietKhoa = taoChiTietKhoaMau(db.danhSachKhoa);
+  db.danhSachDotXacNhan = taoDanhSachDotXacNhanMau();
+  db.baoCaoXacNhan = taoBaoCaoXacNhanMau();
+  db.baoCaoSuaTruongMoet = taoBaoCaoSuaTruongMoetMau();
+  db.baoCaoDieuKienDanhGia = taoBaoCaoDieuKienDanhGiaMau();
+  db.baoCaoVanHanh = taoBaoCaoVanHanhMau();
+  db.danhSachImport = taoDanhSachImportMau();
+  db.chiTietImport = {};
 }

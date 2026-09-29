@@ -1,6 +1,10 @@
 import { http, HttpResponse } from 'msw';
-import type { KhoaBoiDuong } from '@/api/types';
+import type { ImportChiTiet, KhoaBoiDuong } from '@/api/types';
 import { DIA_DANH, DON_VI, MON_HOC, db } from './db';
+
+function fileMoPhong() {
+  return new HttpResponse('noi-dung-file-mo-phong', { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } });
+}
 
 function loi(status: number, code: string, message: string, extra: Record<string, unknown> = {}) {
   return HttpResponse.json({ error: { code, message, ...extra } }, { status });
@@ -204,6 +208,81 @@ export const handlers = [
     db.danhSachKhoa = db.danhSachKhoa.map((k) => (k.id === id ? { ...k, trang_thai: body.ket_qua } : k));
     return HttpResponse.json(khoa);
   }),
+
+  // --- Trung tâm báo cáo (Phase 5 redesign) ---
+  http.get('/dot-xac-nhan', () => HttpResponse.json({ data: db.danhSachDotXacNhan })),
+
+  http.get('/bao-cao/xuat-excel', () => fileMoPhong()),
+
+  http.get('/bao-cao/xac-nhan', ({ request }) => {
+    const url = new URL(request.url);
+    if (!url.searchParams.get('dot_id')) return loi(400, 'VALIDATION_ERROR', 'Thiếu dot_id');
+    return HttpResponse.json({ rows: db.baoCaoXacNhan });
+  }),
+  http.get('/bao-cao/xac-nhan/xuat-excel', () => fileMoPhong()),
+
+  http.get('/bao-cao/sua-truong-moet', ({ request }) => {
+    const url = new URL(request.url);
+    if (!url.searchParams.get('khoa_id')) return loi(400, 'VALIDATION_ERROR', 'Thiếu khoa_id');
+    return HttpResponse.json({ rows: db.baoCaoSuaTruongMoet });
+  }),
+  http.get('/bao-cao/sua-truong-moet/xuat-excel', () => fileMoPhong()),
+
+  http.get('/bao-cao/xuat-cho-vle', () => fileMoPhong()),
+
+  http.get('/bao-cao/dieu-kien-danh-gia', ({ request }) => {
+    const url = new URL(request.url);
+    if (!url.searchParams.get('khoa_id')) return loi(400, 'VALIDATION_ERROR', 'Thiếu khoa_id');
+    return HttpResponse.json({ rows: db.baoCaoDieuKienDanhGia });
+  }),
+  http.get('/bao-cao/dieu-kien-danh-gia/xuat-excel', () => fileMoPhong()),
+
+  http.get('/bao-cao/van-hanh', () => HttpResponse.json({ rows: db.baoCaoVanHanh })),
+  http.get('/bao-cao/van-hanh/xuat-excel', () => fileMoPhong()),
+
+  // --- Nhập dữ liệu (Phase 5 redesign) ---
+  http.get('/import/mau-excel', () => fileMoPhong()),
+
+  http.post('/import/:loai', () => {
+    const id = `import-moi-${Object.keys(db.chiTietImport).length + 1}`;
+    const chiTiet: ImportChiTiet = {
+      id,
+      trang_thai: 'dang_xu_ly',
+      tong_so_dong: 0,
+      so_dong_thanh_cong: 0,
+      so_dong_loi: 0,
+      danh_sach_loi: [],
+      danh_sach_canh_bao: [],
+      so_hoc_vien_chua_co_email: 0,
+    };
+    db.chiTietImport[id] = chiTiet;
+    // Mô phỏng xử lý bất đồng bộ xong ngay (test không cần chờ polling nhiều vòng).
+    db.chiTietImport[id] = {
+      ...chiTiet,
+      trang_thai: 'hoan_thanh',
+      tong_so_dong: 5,
+      so_dong_thanh_cong: 4,
+      so_dong_loi: 1,
+      danh_sach_loi: [{ dong: 2, ly_do: 'Mã định danh trùng đã tồn tại' }],
+    };
+    return HttpResponse.json({ import_id: id, trang_thai: 'dang_xu_ly' });
+  }),
+
+  http.get('/import/:id', ({ params }) => {
+    const found = db.chiTietImport[params.id as string];
+    if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy lần nhập dữ liệu');
+    return HttpResponse.json(found);
+  }),
+
+  http.post('/import/:id/xac-nhan', ({ params }) => {
+    const found = db.chiTietImport[params.id as string];
+    if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy lần nhập dữ liệu');
+    return HttpResponse.json(found);
+  }),
+
+  http.get('/import/:id/file-loi', () => fileMoPhong()),
+
+  http.get('/import', () => HttpResponse.json({ data: db.danhSachImport })),
 ];
 
 export { loi };

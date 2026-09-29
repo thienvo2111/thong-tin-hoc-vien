@@ -61,3 +61,31 @@ export async function apiFetch<T>(path: string, tuyChon: TuyChon = {}): Promise<
 
   return data as T;
 }
+
+/** Tải file nhị phân (Excel) — dùng cho các endpoint `/xuat-excel`, `/file-loi`, `/mau-excel`.
+ * Khác apiFetch: không set Content-Type, trả về Blob thay vì JSON. */
+export async function apiFetchBlob(path: string): Promise<Blob> {
+  const headers = new Headers();
+  const token = layToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { headers });
+  } catch {
+    throw new ApiError(0, { code: 'NETWORK_ERROR', message: 'Không kết nối được máy chủ. Kiểm tra mạng và thử lại.' });
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      xoaToken();
+      baoPhienHetHan();
+    }
+    const isJson = res.headers.get('content-type')?.includes('application/json');
+    const data = isJson ? await res.json().catch(() => undefined) : undefined;
+    const errBody: ApiErrorBody = data?.error ?? { code: 'INTERNAL', message: 'Đã có lỗi xảy ra, thử lại sau.' };
+    throw new ApiError(res.status, errBody);
+  }
+
+  return res.blob();
+}
