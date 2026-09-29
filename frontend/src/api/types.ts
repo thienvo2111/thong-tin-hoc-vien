@@ -130,6 +130,44 @@ export interface XacNhanResponse {
   email_lien_he: string | null;
 }
 
+// GET /hoc-vien (danh sách quản trị) hỗ trợ phân trang server-side thật (page, page_size)
+// — xác nhận trong backend/src/common/dto/pagination-query.dto.ts + hoc-vien.service.ts#findAll,
+// KHÔNG có trong api-contract.md (chỉ ghi query lọc, không ghi phân trang). Flag: improvised.
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+// Hàng của GET /hoc-vien (danh sách) là bản ghi hoc_vien thô, KHÔNG kèm chuyen_mon hay các *_ten đã
+// join (khác với GET /hoc-vien/toi và GET /hoc-vien/{id} — xem hoc-vien.service.ts#findAll: không
+// include quan hệ nào, chỉ findMany({where, skip, take})). Không bịa thêm field không có ở đây.
+export type HocVienDanhSachItem = Omit<
+  HocVien,
+  'chuyen_mon' | 'noi_sinh_ten' | 'phuong_xa_ten' | 'don_vi_cong_tac_ten' | 'mon_giang_day_ten'
+>;
+
+export type BaoCaoTheo = 'don_vi' | 'dia_ban' | 'khoa';
+
+// GET /bao-cao/tong-hop?theo=don_vi — hình dạng lấy từ backend/src/bao-cao/bao-cao.types.ts
+// (TongHopDonViRow), không ghi chi tiết trong api-contract.md. Flag: improvised. FE hiện chỉ dùng
+// theo=don_vi (Tổng quan) nên chỉ khai báo shape của theo=don_vi, không khai báo theo=dia_ban/khoa.
+export interface TongHopDonViRow {
+  don_vi_id: string;
+  ten_don_vi: string;
+  tong_so: number;
+  theo_trang_thai: Record<string, number>;
+  theo_cap_giang_day: Record<string, number>;
+}
+
+export interface TongHopResult {
+  theo: BaoCaoTheo;
+  tu_ngay: string | null;
+  den_ngay: string | null;
+  rows: TongHopDonViRow[];
+}
+
 export interface DanhGiaDauVaoDuDieuKien {
   du_dieu_kien: true;
   duong_dan: string;

@@ -15,7 +15,7 @@ export const handlers = [
     return HttpResponse.json({
       token: 'token-gia-lap',
       phai_doi_mat_khau: true,
-      nguoi_dung: { id: 'nd-1', ten_dang_nhap: maSach, vai_tro: 'hoc_vien', hoc_vien_id: db.hoSo.id },
+      nguoi_dung: { id: 'nd-1', ten_dang_nhap: maSach, vai_tro: db.nguoiDung.vai_tro, hoc_vien_id: db.hoSo.id },
     });
   }),
 
@@ -23,7 +23,7 @@ export const handlers = [
 
   http.get('/auth/toi', () =>
     HttpResponse.json({
-      nguoi_dung: { id: 'nd-1', ten_dang_nhap: db.hoSo.ma_dinh_danh_moet, vai_tro: 'hoc_vien', hoc_vien_id: db.hoSo.id },
+      nguoi_dung: { id: 'nd-1', ten_dang_nhap: db.hoSo.ma_dinh_danh_moet, vai_tro: db.nguoiDung.vai_tro, hoc_vien_id: db.hoSo.id },
       phai_doi_mat_khau: false,
     }),
   ),
@@ -67,6 +67,43 @@ export const handlers = [
     db.dotXacNhan.da_xac_nhan = true;
     db.dotXacNhan.xac_nhan_luc = xacNhanLuc;
     return HttpResponse.json({ xac_nhan_luc: xacNhanLuc, email_lien_he: db.hoSo.email_lien_he });
+  }),
+
+  // --- Module quản trị (phase 3) ---
+  http.get('/hoc-vien', ({ request }) => {
+    const url = new URL(request.url);
+    const trangThai = url.searchParams.get('trang_thai');
+    const donViId = url.searchParams.get('don_vi_cong_tac_id');
+    const capGiangDay = url.searchParams.get('cap_giang_day');
+    const q = url.searchParams.get('q')?.toLowerCase();
+    const page = Number(url.searchParams.get('page') ?? '1');
+    const pageSize = Number(url.searchParams.get('page_size') ?? '20');
+
+    let items = db.danhSachHocVien;
+    if (trangThai) items = items.filter((h) => h.trang_thai === trangThai);
+    if (donViId) items = items.filter((h) => h.don_vi_cong_tac_id === donViId);
+    if (capGiangDay) items = items.filter((h) => h.cap_giang_day === capGiangDay);
+    if (q) {
+      items = items.filter(
+        (h) => (h.ho_ten ?? '').toLowerCase().includes(q) || (h.so_dinh_danh_ca_nhan ?? '').includes(q),
+      );
+    }
+    const total = items.length;
+    const start = (page - 1) * pageSize;
+    const data = items.slice(start, start + pageSize);
+    return HttpResponse.json({ data, total, page, page_size: pageSize });
+  }),
+
+  http.get('/hoc-vien/:id', ({ params }) => {
+    const found = db.danhSachHocVien.find((h) => h.id === params.id);
+    if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy hồ sơ học viên');
+    return HttpResponse.json({ ...found, chuyen_mon: [], don_vi_cong_tac_ten: 'THPT Long Xuyên' });
+  }),
+
+  http.get('/bao-cao/tong-hop', ({ request }) => {
+    const url = new URL(request.url);
+    const theo = url.searchParams.get('theo') ?? 'don_vi';
+    return HttpResponse.json({ theo, tu_ngay: null, den_ngay: null, rows: db.baoCaoTongHopDonVi });
   }),
 
   http.get('/danh-muc/dia-danh', ({ request }) => {

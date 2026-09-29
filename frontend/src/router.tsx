@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 
 // Mọi route dùng `lazy` (kể cả các layout thuần túy) — router.tsx được main.tsx import không-lazy,
 // nên bất kỳ import tĩnh nào ở đây sẽ vào chunk tải đầu tiên. M0 phải nhẹ (không Mantine form/dates/
@@ -40,6 +40,51 @@ export const router = createBrowserRouter([
               {
                 path: '/toi/danh-gia-dau-vao',
                 lazy: () => import('@/pages/M6/DanhGiaDauVao').then((m) => ({ Component: m.default })),
+              },
+            ],
+          },
+          {
+            // Module admin — mới hoàn toàn (design/redesign-spec.md § 4). Đặt song song với
+            // ProtectedLayout (route học viên) trong cùng nhánh RequireAuth, không đụng route cũ.
+            lazy: () => import('@/auth/RequireAdmin').then((m) => ({ Component: m.RequireAdmin })),
+            children: [
+              {
+                lazy: () => import('@/pages/Admin/AdminLayout').then((m) => ({ Component: m.default })),
+                children: [
+                  { path: '/admin', element: <Navigate to="/admin/tong-quan" replace /> },
+                  {
+                    path: '/admin/tong-quan',
+                    lazy: () => import('@/pages/Admin/AdminTongQuan').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/admin/hoc-vien',
+                    lazy: () => import('@/pages/Admin/AdminDanhSach').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/admin/hoc-vien/:id',
+                    lazy: () => import('@/pages/Admin/AdminHocVienChiTiet').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/admin/khoa-boi-duong',
+                    lazy: () => import('@/pages/Admin/AdminKhoaBoiDuong').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/admin/dot-xac-nhan',
+                    lazy: () => import('@/pages/Admin/AdminDotXacNhan').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/admin/bao-cao',
+                    lazy: () => import('@/pages/Admin/AdminBaoCao').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/admin/nhap-du-lieu',
+                    lazy: () => import('@/pages/Admin/AdminNhapDuLieu').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/admin/nguoi-dung',
+                    lazy: () => import('@/pages/Admin/AdminNguoiDung').then((m) => ({ Component: m.default })),
+                  },
+                ],
               },
             ],
           },

@@ -1,4 +1,13 @@
-import type { DanhGiaDauVao, DiaDanh, DonViCongTac, DotXacNhan, HocVien, MonHoc } from '@/api/types';
+import type {
+  DanhGiaDauVao,
+  DiaDanh,
+  DonViCongTac,
+  DotXacNhan,
+  HocVien,
+  HocVienDanhSachItem,
+  MonHoc,
+  TongHopDonViRow,
+} from '@/api/types';
 
 // "CSDL" giả lập trong bộ nhớ cho MSW — mỗi test có thể sửa trực tiếp rồi resetDb() ở afterEach.
 export const TINH_AN_GIANG: DiaDanh = { id: 'tinh-1', ma: '89', ten: 'An Giang', cap: 'tinh_thanh', parent_id: null, trang_thai: 'active' };
@@ -68,12 +77,101 @@ export function taoDanhGiaDauVaoDuDieuKien(): DanhGiaDauVao {
   };
 }
 
+// Hồ sơ mẫu cho các màn quản trị (AdminTongQuan/AdminDanhSach) — GET /hoc-vien (danh sách) trả bản
+// ghi thô, không kèm chuyen_mon/*_ten (xem ghi chú HocVienDanhSachItem trong api/types.ts).
+export function taoDanhSachHocVienMau(): HocVienDanhSachItem[] {
+  return [
+    {
+      id: 'hv-cho-1',
+      ma_dinh_danh_moet: null,
+      so_dinh_danh_ca_nhan: '079090001234',
+      ho_ten: 'Lê Văn Bình',
+      ngay_sinh: 12,
+      thang_sinh: 5,
+      nam_sinh: 1988,
+      gioi_tinh: 'nam',
+      noi_sinh_id: null,
+      phuong_xa_id: null,
+      don_vi_cong_tac_id: 'dv-1',
+      chuc_vu: 'Giáo viên',
+      so_dien_thoai_lien_he: '0912340001',
+      email_lien_he: 'binh.le@example.edu.vn',
+      trinh_do_chuyen_mon: 'dai_hoc',
+      trinh_do_chuyen_mon_khac: null,
+      cap_giang_day: 'tieu_hoc',
+      mon_giang_day_id: null,
+      nguon_tao: 'tu_dang_ky',
+      trang_thai: 'cho_duyet',
+    },
+    {
+      id: 'hv-cho-2',
+      ma_dinh_danh_moet: null,
+      so_dinh_danh_ca_nhan: '079091007788',
+      ho_ten: 'Phạm Thu Hà',
+      ngay_sinh: 3,
+      thang_sinh: 9,
+      nam_sinh: 1992,
+      gioi_tinh: 'nu',
+      noi_sinh_id: null,
+      phuong_xa_id: null,
+      don_vi_cong_tac_id: 'dv-1',
+      chuc_vu: 'Giáo viên',
+      so_dien_thoai_lien_he: '0912340002',
+      email_lien_he: null,
+      trinh_do_chuyen_mon: 'dai_hoc',
+      trinh_do_chuyen_mon_khac: null,
+      cap_giang_day: 'thcs',
+      mon_giang_day_id: null,
+      nguon_tao: 'tu_dang_ky',
+      trang_thai: 'cho_duyet',
+    },
+    {
+      id: 'hv-duyet-1',
+      ma_dinh_danh_moet: '9115131099',
+      so_dinh_danh_ca_nhan: '079092003345',
+      ho_ten: 'Võ Minh Khôi',
+      ngay_sinh: 20,
+      thang_sinh: 2,
+      nam_sinh: 1985,
+      gioi_tinh: 'nam',
+      noi_sinh_id: null,
+      phuong_xa_id: null,
+      don_vi_cong_tac_id: 'dv-1',
+      chuc_vu: 'Tổ trưởng chuyên môn',
+      so_dien_thoai_lien_he: '0912340003',
+      email_lien_he: 'khoi.vo@example.edu.vn',
+      trinh_do_chuyen_mon: 'thac_si',
+      trinh_do_chuyen_mon_khac: null,
+      cap_giang_day: 'thpt',
+      mon_giang_day_id: null,
+      nguon_tao: 'import_moet',
+      trang_thai: 'da_duyet',
+    },
+  ];
+}
+
+export function taoBaoCaoTongHopDonViMau(): TongHopDonViRow[] {
+  return [
+    {
+      don_vi_id: 'dv-1',
+      ten_don_vi: 'THPT Long Xuyên',
+      tong_so: 3,
+      theo_trang_thai: { nhap: 0, cho_duyet: 2, da_duyet: 1, tu_choi: 0 },
+      theo_cap_giang_day: { tieu_hoc: 1, thcs: 1, thpt: 1 },
+    },
+  ];
+}
+
 export const db = {
   hoSo: taoHoSoMoi(),
   dotXacNhan: taoDotXacNhanDangMoThieu(),
   danhGiaDauVao: taoDanhGiaDauVaoDuDieuKien(),
   soLanDangNhapSai: 0,
   daDangNhap: true,
+  // vai_tro cấu hình được cho test module admin — mặc định 'hoc_vien' để không phá test M0-M6.
+  nguoiDung: { id: 'nd-1', vai_tro: 'hoc_vien' as string },
+  danhSachHocVien: taoDanhSachHocVienMau(),
+  baoCaoTongHopDonVi: taoBaoCaoTongHopDonViMau(),
 };
 
 export function resetDb(): void {
@@ -82,4 +180,7 @@ export function resetDb(): void {
   db.danhGiaDauVao = taoDanhGiaDauVaoDuDieuKien();
   db.soLanDangNhapSai = 0;
   db.daDangNhap = true;
+  db.nguoiDung = { id: 'nd-1', vai_tro: 'hoc_vien' };
+  db.danhSachHocVien = taoDanhSachHocVienMau();
+  db.baoCaoTongHopDonVi = taoBaoCaoTongHopDonViMau();
 }
