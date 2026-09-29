@@ -14,6 +14,11 @@ export interface KetQuaImport {
   // ho_so_nhan_su_moet dùng — SĐT thiếu số 0 đầu đã tự sửa). Optional để
   // không phá các file ket-qua.json đã lưu từ trước khi thêm field này.
   danh_sach_canh_bao?: { dong: number; ly_do: string }[];
+  // T3 (mo-rong-nls-an-giang.md, QĐ6): chỉ phan_lop_hoc_vien ghi giá trị này
+  // (đếm lúc POST /import/{id}/xac-nhan, khi commitPhanLop() thực sự gán
+  // lop_id) — Optional, các loại import khác/preview trước khi xác nhận
+  // không có field này (xemKetQua() mặc định 0).
+  so_hoc_vien_chua_co_email?: number;
 }
 
 function thuMucImport(importId: string): string {

@@ -569,6 +569,7 @@ model lop_hoc {
   nhan_su     lop_hoc_nhan_su[]
   dang_ky_hoc dang_ky_hoc[]
 
+  @@unique([khoa_id, ten_lop], map: "uq_lop_ten_trong_khoa")
   @@index([khoa_id], map: "idx_lop_khoa")
 }
 

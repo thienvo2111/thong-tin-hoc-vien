@@ -196,6 +196,7 @@ export class ImportService {
       thoi_gian_import: nhatKy.thoi_gian_import,
       danh_sach_loi: ketQua?.danh_sach_loi ?? [],
       danh_sach_canh_bao: ketQua?.danh_sach_canh_bao ?? [],
+      so_hoc_vien_chua_co_email: ketQua?.so_hoc_vien_chua_co_email ?? 0,
     };
   }
 
@@ -243,6 +244,9 @@ export class ImportService {
     const danhSachLoiMoi = [...ketQuaCu.danh_sach_loi];
     const danhSachCanhBaoMoi = [...(ketQuaCu.danh_sach_canh_bao ?? [])];
     let soDongThanhCong = 0;
+    // T3 (mo-rong-nls-an-giang.md, QĐ6): chỉ tăng khi commitRow() báo
+    // hocVienChuaCoEmail=true (phan_lop_hoc_vien, nhánh gán lop_id thực sự).
+    let soHocVienChuaCoEmail = 0;
 
     for (const dong of ketQuaCu.dong_hop_le) {
       const values = rowsByDong.get(dong);
@@ -262,7 +266,13 @@ export class ImportService {
         continue;
       }
       try {
-        await this.commitRow(loai, dto, id, nhatKy.nguoi_import_id);
+        const { hocVienChuaCoEmail } = await this.commitRow(
+          loai,
+          dto,
+          id,
+          nhatKy.nguoi_import_id,
+        );
+        if (hocVienChuaCoEmail) soHocVienChuaCoEmail++;
         soDongThanhCong++;
       } catch (e) {
         danhSachLoiMoi.push({ dong, ly_do: toRowErrorMessage(e) });
@@ -273,6 +283,7 @@ export class ImportService {
       danh_sach_loi: danhSachLoiMoi,
       dong_hop_le: [],
       danh_sach_canh_bao: danhSachCanhBaoMoi,
+      so_hoc_vien_chua_co_email: soHocVienChuaCoEmail,
     });
     if (danhSachLoiMoi.length > 0) {
       const buffer = await buildLoiWorkbook(
@@ -354,9 +365,12 @@ export class ImportService {
       case 'phan_lop_hoc_vien':
         // Nguyên văn cột theo docs/api-contract.md mục 5, ghi chú riêng cho
         // phan_lop_hoc_vien. ten_lop TÙY CHỌN (đã sửa 2026-09-25) — để trống
-        // = chỉ ghi danh, có giá trị = ghi danh + phân lớp (xem getColumnNotes
-        // cho ghi chú hiển thị trên file mẫu Excel).
-        return ['so_dinh_danh_ca_nhan', 'ma_khoa', 'ten_lop'];
+        // = chỉ ghi danh, có giá trị = ghi danh + phân lớp. ma_dinh_danh_moet
+        // thêm ở T3 (mo-rong-nls-an-giang.md, QĐ1) — cả 2 mã định danh đều
+        // TÙY CHỌN theo nghĩa từng cột nhưng phải có ÍT NHẤT 1 (dùng chung
+        // HocVienResolver, xem getColumnNotes cho ghi chú hiển thị trên file
+        // mẫu Excel).
+        return ['so_dinh_danh_ca_nhan', 'ma_dinh_danh_moet', 'ma_khoa', 'ten_lop'];
       case 'ho_so_nhan_su_moet':
         // Nguyên văn cột theo docs/api-contract.md mục 2 "Luồng import nhân
         // sự từ CSDL MOET". "Mã đơn vị" thêm ở T4 (mo-rong-nls-an-giang.md) —
@@ -412,6 +426,9 @@ export class ImportService {
   private getColumnNotes(loai: SupportedImportType): Record<string, string> {
     if (loai === 'phan_lop_hoc_vien') {
       return {
+        so_dinh_danh_ca_nhan:
+          'Tùy chọn — phải có ít nhất 1 trong 2 cột so_dinh_danh_ca_nhan/ma_dinh_danh_moet để xác định học viên. Có cả 2 thì phải trỏ cùng 1 hồ sơ.',
+        ma_dinh_danh_moet: 'Tùy chọn — xem ghi chú cột so_dinh_danh_ca_nhan.',
         ten_lop:
           'Tùy chọn — để trống nếu chỉ muốn ghi danh vào khóa, chưa phân lớp. Có thể chạy lại import sau với ten_lop để phân lớp cho học viên đã ghi danh.',
       };
@@ -468,6 +485,7 @@ export class ImportService {
       case 'phan_lop_hoc_vien':
         return this.khoaBoiDuongService.resolvePhanLopRow({
           so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
+          ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
           ma_khoa: raw.ma_khoa,
           ten_lop: raw.ten_lop,
         });
@@ -535,6 +553,9 @@ export class ImportService {
     }
   }
 
+  // Trả về hocVienChuaCoEmail (T3, QĐ6) — chỉ phan_lop_hoc_vien có ý nghĩa
+  // (xem KhoaBoiDuongService.commitPhanLop); các loại khác luôn {} (undefined
+  // ~ không tính), để xacNhan() đếm so_hoc_vien_chua_co_email.
   private async commitRow(
     loai: SupportedImportType,
     dto:
@@ -546,7 +567,7 @@ export class ImportService {
       | TaiKhoanVleRowDto,
     importId: string,
     nguoiImportId: string,
-  ): Promise<void> {
+  ): Promise<{ hocVienChuaCoEmail?: boolean }> {
     if (loai === 'dia_danh') {
       await this.diaDanhService.create(dto as CreateDiaDanhDto, importId);
     } else if (loai === 'don_vi_cong_tac') {
@@ -557,7 +578,11 @@ export class ImportService {
     } else if (loai === 'mon_hoc') {
       await this.monHocService.create(dto as CreateMonHocDto, importId);
     } else if (loai === 'phan_lop_hoc_vien') {
-      await this.khoaBoiDuongService.commitPhanLop(dto as PhanLopHocVienRowDto);
+      const { hocVienChuaCoEmail } =
+        await this.khoaBoiDuongService.commitPhanLop(
+          dto as PhanLopHocVienRowDto,
+        );
+      return { hocVienChuaCoEmail };
     } else if (loai === 'tai_khoan_vle') {
       await this.commitTaiKhoanVle(dto as TaiKhoanVleRowDto, importId);
     } else {
@@ -578,6 +603,7 @@ export class ImportService {
         nguoiImportId,
       );
     }
+    return {};
   }
 
   // T15: upsert theo PK hoc_vien_id — chạy lại file (vd Phòng CNTT gửi file

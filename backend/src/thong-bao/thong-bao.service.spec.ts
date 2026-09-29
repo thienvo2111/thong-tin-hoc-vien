@@ -230,8 +230,9 @@ describe('ThongBaoService', () => {
         khoa: { ten_khoa: 'Khóa A' },
         lop: null,
       });
-      await service.guiDangKyHocPhanLop('dk-1');
+      const res = await service.guiDangKyHocPhanLop('dk-1');
       expect(sendMail).not.toHaveBeenCalled();
+      expect(res).toEqual({ chuaCoEmail: false });
     });
 
     it('có lop -> gửi với nội dung nhân sự/lịch học', async () => {
@@ -253,12 +254,34 @@ describe('ThongBaoService', () => {
           ],
         },
       });
-      await service.guiDangKyHocPhanLop('dk-1');
+      const res = await service.guiDangKyHocPhanLop('dk-1');
       expect(sendMail).toHaveBeenCalledTimes(1);
       expect(sendMail.mock.calls[0][0].html).toContain('GV B');
       expect(prisma.nhat_ky_thong_bao.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ loai_su_kien: 'dang_ky_hoc_phan_lop' }),
       });
+      expect(res).toEqual({ chuaCoEmail: false });
+    });
+
+    // T3 (QĐ6): học viên chưa có email_lien_he -> bỏ qua gửi VÀ không ghi
+    // nhat_ky_thong_bao (không tính là "thất bại") — trả về chuaCoEmail=true
+    // để ImportService đếm so_hoc_vien_chua_co_email.
+    it('không có email_lien_he -> bỏ qua, không ghi nhat_ky_thong_bao, chuaCoEmail=true', async () => {
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        id: 'dk-1',
+        hoc_vien_id: 'hv-1',
+        hoc_vien: { ...hocVienDayDu, email_lien_he: null },
+        khoa: { ten_khoa: 'Khóa A' },
+        lop: {
+          ten_lop: 'Lớp 1',
+          nhan_su: [],
+          lich_hoc: [],
+        },
+      });
+      const res = await service.guiDangKyHocPhanLop('dk-1');
+      expect(sendMail).not.toHaveBeenCalled();
+      expect(prisma.nhat_ky_thong_bao.create).not.toHaveBeenCalled();
+      expect(res).toEqual({ chuaCoEmail: true });
     });
   });
 

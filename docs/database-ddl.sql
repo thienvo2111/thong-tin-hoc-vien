@@ -538,7 +538,9 @@ CREATE TABLE lop_hoc (
     si_so_toi_da        integer,
     trang_thai          trang_thai_active NOT NULL DEFAULT 'active',
 
-    CONSTRAINT chk_lop_si_so CHECK (si_so_toi_da IS NULL OR si_so_toi_da > 0)
+    CONSTRAINT chk_lop_si_so CHECK (si_so_toi_da IS NULL OR si_so_toi_da > 0),
+    -- T3 (mo-rong-nls-an-giang.md): tên lớp phải duy nhất trong cùng 1 khóa.
+    CONSTRAINT uq_lop_ten_trong_khoa UNIQUE (khoa_id, ten_lop)
 );
 
 CREATE INDEX idx_lop_khoa ON lop_hoc(khoa_id);

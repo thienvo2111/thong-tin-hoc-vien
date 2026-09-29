@@ -5,11 +5,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 // quy tắc chung #3) — dùng cho mọi import có cột học viên: nhận
 // so_dinh_danh_ca_nhan và/hoặc ma_dinh_danh_moet; phải có ít nhất 1; nếu có
 // cả 2 thì phải trỏ cùng một hồ sơ, không thì là dòng lỗi. T15 (import
-// tai_khoan_vle) là import ĐẦU TIÊN dùng resolver này ở dạng tổng quát —
-// phan_lop_hoc_vien (khoa-boi-duong.service.ts#resolvePhanLopRow) hiện vẫn
-// chỉ tra theo so_dinh_danh_ca_nhan (hành vi cũ, từ trước khi rule #3 được
-// chốt) — CHƯA retrofit lại để dùng hàm này, vì đó là phạm vi T3 (chưa làm ở
-// lượt này); flagged trong self-review.
+// tai_khoan_vle) dùng resolver này đầu tiên; T3 (khoa-boi-duong.service.ts
+// #resolvePhanLopRow) retrofit phan_lop_hoc_vien sang dùng chung ở đây —
+// trước đó chỉ tra theo so_dinh_danh_ca_nhan, khiến học viên import_moet
+// chưa có CCCD (đa số, xem T4) không ghi danh được (QĐ1).
 export interface HocVienResolverInput {
   so_dinh_danh_ca_nhan?: string;
   ma_dinh_danh_moet?: string;

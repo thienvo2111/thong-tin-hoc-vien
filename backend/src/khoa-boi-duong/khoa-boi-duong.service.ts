@@ -24,6 +24,7 @@ import { ThemDonViTheoDoiDto } from './dto/them-don-vi-theo-doi.dto';
 import { PhanLopHocVienRowDto } from './dto/phan-lop-row.dto';
 import { KetQuaDangKyDto } from './dto/ket-qua-dang-ky.dto';
 import { RowBuildResult } from '../import/import.types';
+import { resolveHocVienImportRow } from '../import/util/hoc-vien-resolver.util';
 
 type LopHocVoiKhoa = lop_hoc & { khoa: khoa_boi_duong };
 
@@ -685,9 +686,10 @@ export class KhoaBoiDuongService {
 
   // ---------------------------------------------------------------------
   // Import phan_lop_hoc_vien (gọi từ ImportService) — cột file:
-  // so_dinh_danh_ca_nhan, ma_khoa, ten_lop (ten_lop TÙY CHỌN). Đây là CƠ CHẾ
-  // DUY NHẤT gán dang_ky_hoc.khoa_id/lop_id — không có ghi danh/tự động nào
-  // khác (đã sửa 2026-09-25, xem docs/api-contract.md mục 5 và
+  // so_dinh_danh_ca_nhan, ma_dinh_danh_moet (cả 2 TÙY CHỌN — T3, xem
+  // resolveHocVienImportRow), ma_khoa, ten_lop (ten_lop TÙY CHỌN). Đây là CƠ
+  // CHẾ DUY NHẤT gán dang_ky_hoc.khoa_id/lop_id — không có ghi danh/tự động
+  // nào khác (đã sửa 2026-09-25, xem docs/api-contract.md mục 5 và
   // validation-checklist.md #45: trước đó có một hook tự tạo dang_ky_hoc khi
   // hồ sơ học viên da_duyet, nhưng không có cơ sở để biết tự động ghi danh
   // vào khóa nào — đã bỏ, không thay bằng suy đoán khác).
@@ -696,27 +698,35 @@ export class KhoaBoiDuongService {
   // giá trị -> ghi danh + phân lớp luôn (lop_id, trang_thai=da_phan_lop). Cho
   // phép chạy import 2 lần: ghi danh trước (ten_lop trống), phân lớp sau
   // (chạy lại với ten_lop có giá trị cho học viên đã ghi danh).
+  //
+  // T3 (QĐ1, mo-rong-nls-an-giang.md): trước đây chỉ nhận
+  // so_dinh_danh_ca_nhan (CCCD) -> học viên import_moet chưa có CCCD (đa số,
+  // xem T4) không ghi danh được. Nay dùng resolveHocVienImportRow (mục 2 quy
+  // tắc #3) để nhận diện qua ma_dinh_danh_moet, gỡ bỏ chặn đó — "hồ sơ đầy
+  // đủ" không còn là điều kiện ghi danh (chuyển sang cổng đánh giá T15 + cấp
+  // chứng nhận T13, xem checklist #36d). Check trang_thai='da_duyet' dưới đây
+  // GIỮ NGUYÊN — đó là trạng thái duyệt hồ sơ (workflow), không phải "đầy đủ
+  // dữ liệu", và với import_moet luôn da_duyet ngay từ lúc import.
   // ---------------------------------------------------------------------
   async resolvePhanLopRow(raw: {
     so_dinh_danh_ca_nhan?: string;
+    ma_dinh_danh_moet?: string;
     ma_khoa?: string;
     ten_lop?: string;
   }): Promise<RowBuildResult<PhanLopHocVienRowDto>> {
-    const sdd = raw.so_dinh_danh_ca_nhan?.trim();
-    if (!sdd) {
-      return { error: 'Thiếu cột "so_dinh_danh_ca_nhan"' };
-    }
-    const hocVien = await this.prisma.hoc_vien.findUnique({
-      where: { so_dinh_danh_ca_nhan: sdd },
+    const resolved = await resolveHocVienImportRow(this.prisma, {
+      so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
+      ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
     });
-    if (!hocVien) {
-      return {
-        error: `Số định danh cá nhân "${sdd}" không tồn tại (chưa có hồ sơ học viên)`,
-      };
+    if (resolved.error || !resolved.hocVien) {
+      return { error: resolved.error ?? 'Không xác định được học viên' };
     }
+    const hocVien = resolved.hocVien;
     if (hocVien.trang_thai !== 'da_duyet') {
+      const ma =
+        raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
       return {
-        error: `Số định danh cá nhân "${sdd}" chưa được duyệt (trang_thai hiện tại: "${hocVien.trang_thai}")`,
+        error: `Học viên "${ma}" chưa được duyệt (trang_thai hiện tại: "${hocVien.trang_thai}")`,
       };
     }
 
@@ -757,7 +767,13 @@ export class KhoaBoiDuongService {
   // Không cần bước checkValid riêng: resolvePhanLopRow() (buildDto) đã tra
   // cứu/validate toàn bộ FK + trạng thái hồ sơ; commitPhanLop() là upsert nên
   // không còn ràng buộc "phải có dang_ky_hoc từ trước" để kiểm tra thêm.
-  async commitPhanLop(dto: PhanLopHocVienRowDto): Promise<void> {
+  //
+  // Trả về hocVienChuaCoEmail để ImportService đếm
+  // so_hoc_vien_chua_co_email (T3, QĐ6) trên GET /import/{id} — chỉ nhánh
+  // gán lop_id thực sự mới có ý nghĩa (nhánh chỉ ghi danh không gửi email).
+  async commitPhanLop(
+    dto: PhanLopHocVienRowDto,
+  ): Promise<{ hocVienChuaCoEmail: boolean }> {
     const where = {
       hoc_vien_id_khoa_id: {
         hoc_vien_id: dto.hoc_vien_id,
@@ -778,7 +794,9 @@ export class KhoaBoiDuongService {
       // Event dang_ky_hoc_phan_lop CHỈ kích hoạt ở nhánh gán lop_id thực sự
       // (docs/api-contract.md mục 8) — nhánh else dưới đây (chỉ ghi danh,
       // lop_id vẫn NULL) không gọi.
-      await this.thongBaoService.guiDangKyHocPhanLop(dangKy.id);
+      const { chuaCoEmail } =
+        await this.thongBaoService.guiDangKyHocPhanLop(dangKy.id);
+      return { hocVienChuaCoEmail: chuaCoEmail };
     } else {
       // ten_lop trống: chỉ đảm bảo đã ghi danh. Nếu dang_ky_hoc đã tồn tại
       // (kể cả đã da_phan_lop), giữ nguyên — không hạ cấp lại trang_thai/lop_id.
@@ -792,6 +810,7 @@ export class KhoaBoiDuongService {
         },
         update: {},
       });
+      return { hocVienChuaCoEmail: false };
     }
   }
 

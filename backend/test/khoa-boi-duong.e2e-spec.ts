@@ -1053,7 +1053,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       // Cố tình KHÔNG duyệt hồ sơ này -> vẫn ở trang_thai=cho_duyet.
     });
 
-    it('GET /import/mau-excel?loai=phan_lop_hoc_vien -> đúng 3 cột', async () => {
+    it('GET /import/mau-excel?loai=phan_lop_hoc_vien -> đúng 4 cột', async () => {
       const res = await request(app.getHttpServer())
         .get('/import/mau-excel?loai=phan_lop_hoc_vien')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
@@ -1064,12 +1064,17 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     it('ten_lop để trống -> chỉ ghi danh (lop_id=null, trang_thai=da_duyet); các dòng lỗi khác (rule #45)', async () => {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('data');
-      sheet.addRow(['so_dinh_danh_ca_nhan', 'ma_khoa', 'ten_lop']);
-      sheet.addRow([sddDaDuyet, maKhoa, '']); // hợp lệ — chỉ ghi danh
-      sheet.addRow(['000000000000', maKhoa, '']); // ĐDCN không tồn tại
-      sheet.addRow([sddChuaDuyet, maKhoa, '']); // hồ sơ chưa được duyệt
-      sheet.addRow([sddDaDuyet, 'KHONG-TON-TAI', '']); // khóa không tồn tại
-      sheet.addRow([sddDaDuyet, maKhoa, 'Lớp không tồn tại']); // lớp không tồn tại trong khóa
+      sheet.addRow([
+        'so_dinh_danh_ca_nhan',
+        'ma_dinh_danh_moet',
+        'ma_khoa',
+        'ten_lop',
+      ]);
+      sheet.addRow([sddDaDuyet, '', maKhoa, '']); // hợp lệ — chỉ ghi danh
+      sheet.addRow(['000000000000', '', maKhoa, '']); // ĐDCN không tồn tại
+      sheet.addRow([sddChuaDuyet, '', maKhoa, '']); // hồ sơ chưa được duyệt
+      sheet.addRow([sddDaDuyet, '', 'KHONG-TON-TAI', '']); // khóa không tồn tại
+      sheet.addRow([sddDaDuyet, '', maKhoa, 'Lớp không tồn tại']); // lớp không tồn tại trong khóa
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
@@ -1144,8 +1149,13 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     it('chạy lại import lần 2 với ten_lop có giá trị -> phân lớp cho học viên đã ghi danh (lop_id, trang_thai=da_phan_lop)', async () => {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('data');
-      sheet.addRow(['so_dinh_danh_ca_nhan', 'ma_khoa', 'ten_lop']);
-      sheet.addRow([sddDaDuyet, maKhoa, tenLop]);
+      sheet.addRow([
+        'so_dinh_danh_ca_nhan',
+        'ma_dinh_danh_moet',
+        'ma_khoa',
+        'ten_lop',
+      ]);
+      sheet.addRow([sddDaDuyet, '', maKhoa, tenLop]);
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
@@ -1223,8 +1233,13 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
 
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('data');
-      sheet.addRow(['so_dinh_danh_ca_nhan', 'ma_khoa', 'ten_lop']);
-      sheet.addRow([sddMoi, maKhoa, tenLop]);
+      sheet.addRow([
+        'so_dinh_danh_ca_nhan',
+        'ma_dinh_danh_moet',
+        'ma_khoa',
+        'ten_lop',
+      ]);
+      sheet.addRow([sddMoi, '', maKhoa, tenLop]);
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
@@ -1256,6 +1271,239 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       });
       expect(thongBaoPhanLop).toHaveLength(1);
     });
+  });
+
+  // T3 (mo-rong-nls-an-giang.md, QĐ1+QĐ6): dùng HocVienResolver (cả 2 mã
+  // định danh tùy chọn, ít nhất 1) thay vì chỉ so_dinh_danh_ca_nhan như
+  // trước — khóa/lớp tạo trực tiếp qua prisma (giống khối "PATCH
+  // /dang-ky-hoc/{id}/ket-qua" dưới đây) để không tốn thêm request đăng nhập
+  // (giới hạn 10 request/phút/IP, xem comment đầu file).
+  describe('T3 — ghi danh/phân lớp qua ma_dinh_danh_moet (QĐ1, QĐ6)', () => {
+    let khoaId: string;
+    let maKhoa: string;
+    let tenLop: string;
+
+    beforeAll(async () => {
+      const suf = uniqueSuffix();
+      const khoa = await prisma.khoa_boi_duong.create({
+        data: {
+          ma_khoa: `K-T3-${suf}`,
+          ten_khoa: 'Khóa T3 MOET',
+          don_vi_to_chuc_id: truong1.id,
+          thoi_gian_bat_dau: new Date('2026-01-01'),
+          thoi_gian_ket_thuc: new Date('2026-01-31'),
+        },
+      });
+      khoaId = khoa.id;
+      maKhoa = khoa.ma_khoa;
+      khoaIds.push(khoaId);
+
+      tenLop = `Lớp T3 ${suf}`;
+      await prisma.lop_hoc.create({
+        data: { khoa_id: khoaId, ten_lop: tenLop },
+      });
+    });
+
+    function hocVienMoetTrucTiep(overrides: Record<string, unknown> = {}) {
+      return {
+        nguon_tao: 'import_moet' as const,
+        // chk_hoc_vien_nguon_tao: nguon_tao='import_moet' đòi
+        // ma_dinh_danh_moet NOT NULL — mặc định 1 giá trị duy nhất (đủ dùng
+        // cho test bulk không cần override), các test khác override rõ.
+        ma_dinh_danh_moet: `MOET-${uniqueSuffix()}`,
+        ho_ten: 'Học Viên MOET',
+        ngay_sinh: 5,
+        thang_sinh: 5,
+        nam_sinh: NAM_HOP_LE,
+        don_vi_cong_tac_id: truong1.id,
+        so_dien_thoai_lien_he: '0912349000',
+        trang_thai: 'da_duyet' as const,
+        nguoi_duyet_id: quanTri.nguoiDung.id,
+        cap_duyet_thuc_te: 'quan_tri' as const,
+        ngay_duyet: new Date(),
+        ...overrides,
+      };
+    }
+
+    it('file chỉ có ma_dinh_danh_moet -> ghi danh thành công cho hồ sơ import_moet có CCCD NULL', async () => {
+      const suf = uniqueSuffix();
+      const maMoet = `MOET-${suf}`;
+      const hv = await prisma.hoc_vien.create({
+        data: hocVienMoetTrucTiep({ ma_dinh_danh_moet: maMoet }),
+      });
+      hocVienIds.push(hv.id);
+      expect(hv.so_dinh_danh_ca_nhan).toBeNull();
+
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('data');
+      sheet.addRow([
+        'so_dinh_danh_ca_nhan',
+        'ma_dinh_danh_moet',
+        'ma_khoa',
+        'ten_lop',
+      ]);
+      sheet.addRow(['', maMoet, maKhoa, '']);
+      const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+      const res = await request(app.getHttpServer())
+        .post('/import/phan_lop_hoc_vien')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .attach('file', buffer, 'phan-lop-moet-1.xlsx')
+        .expect(201);
+      const importId = res.body.import_id;
+      importIds.push(importId);
+
+      const preview = await request(app.getHttpServer())
+        .get(`/import/${importId}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(preview.body.so_dong_thanh_cong).toBe(1);
+      expect(preview.body.so_dong_loi).toBe(0);
+
+      await request(app.getHttpServer())
+        .post(`/import/${importId}/xac-nhan`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(201);
+
+      const dangKy = await prisma.dang_ky_hoc.findUnique({
+        where: { hoc_vien_id_khoa_id: { hoc_vien_id: hv.id, khoa_id: khoaId } },
+      });
+      expect(dangKy).not.toBeNull();
+      expect(dangKy?.lop_id).toBeNull();
+      expect(dangKy?.trang_thai).toBe('da_duyet');
+    });
+
+    it('dòng có cả 2 mã trỏ 2 hồ sơ khác nhau -> dòng lỗi có lý do rõ ràng', async () => {
+      const suf = uniqueSuffix();
+      const sddA = soDinhDanhNgauNhien();
+      const moetB = `MOET-B-${suf}`;
+      const hvA = await prisma.hoc_vien.create({
+        data: hocVienMoetTrucTiep({
+          so_dinh_danh_ca_nhan: sddA,
+          ma_dinh_danh_moet: `MOET-A-${suf}`,
+        }),
+      });
+      const hvB = await prisma.hoc_vien.create({
+        data: hocVienMoetTrucTiep({ ma_dinh_danh_moet: moetB }),
+      });
+      hocVienIds.push(hvA.id, hvB.id);
+
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('data');
+      sheet.addRow([
+        'so_dinh_danh_ca_nhan',
+        'ma_dinh_danh_moet',
+        'ma_khoa',
+        'ten_lop',
+      ]);
+      sheet.addRow([sddA, moetB, maKhoa, '']); // trỏ 2 hồ sơ khác nhau
+      const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+      const res = await request(app.getHttpServer())
+        .post('/import/phan_lop_hoc_vien')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .attach('file', buffer, 'phan-lop-moet-2.xlsx')
+        .expect(201);
+      const importId = res.body.import_id;
+      importIds.push(importId);
+
+      const ketQua = await request(app.getHttpServer())
+        .get(`/import/${importId}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(ketQua.body.so_dong_thanh_cong).toBe(0);
+      expect(ketQua.body.so_dong_loi).toBe(1);
+      expect(ketQua.body.danh_sach_loi[0].ly_do).toContain(
+        'trỏ tới 2 hồ sơ học viên khác nhau',
+      );
+
+      const dangKyA = await prisma.dang_ky_hoc.findUnique({
+        where: {
+          hoc_vien_id_khoa_id: { hoc_vien_id: hvA.id, khoa_id: khoaId },
+        },
+      });
+      expect(dangKyA).toBeNull();
+    });
+
+    it('phân lớp 100 học viên, 60 không có email -> 40 email gửi, 0 dòng that_bai, so_hoc_vien_chua_co_email=60', async () => {
+      const suf = uniqueSuffix();
+      const specs = Array.from({ length: 100 }, (_, i) => ({
+        sdd: soDinhDanhNgauNhien(),
+        coEmail: i < 40,
+      }));
+
+      const created = await Promise.all(
+        specs.map((s, i) =>
+          prisma.hoc_vien.create({
+            data: hocVienMoetTrucTiep({
+              so_dinh_danh_ca_nhan: s.sdd,
+              ho_ten: `HV Bulk ${i}`,
+              email_lien_he: s.coEmail ? `bulk-${i}-${suf}@test.local` : null,
+            }),
+          }),
+        ),
+      );
+      hocVienIds.push(...created.map((h) => h.id));
+
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('data');
+      sheet.addRow([
+        'so_dinh_danh_ca_nhan',
+        'ma_dinh_danh_moet',
+        'ma_khoa',
+        'ten_lop',
+      ]);
+      specs.forEach((s) => sheet.addRow([s.sdd, '', maKhoa, tenLop]));
+      const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+      const res = await request(app.getHttpServer())
+        .post('/import/phan_lop_hoc_vien')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .attach('file', buffer, 'phan-lop-moet-bulk.xlsx')
+        .expect(201);
+      const importId = res.body.import_id;
+      importIds.push(importId);
+
+      const preview = await request(app.getHttpServer())
+        .get(`/import/${importId}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(preview.body.so_dong_thanh_cong).toBe(100);
+      expect(preview.body.so_dong_loi).toBe(0);
+
+      const xacNhan = await request(app.getHttpServer())
+        .post(`/import/${importId}/xac-nhan`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(201);
+      expect(xacNhan.body.so_dong_thanh_cong).toBe(100);
+      expect(xacNhan.body.so_dong_loi).toBe(0);
+
+      const ketQua = await request(app.getHttpServer())
+        .get(`/import/${importId}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(ketQua.body.so_hoc_vien_chua_co_email).toBe(60);
+
+      const hocVienIdsBulk = created.map((h) => h.id);
+      const [thatBai, thanhCong] = await Promise.all([
+        prisma.nhat_ky_thong_bao.count({
+          where: {
+            loai_su_kien: 'dang_ky_hoc_phan_lop',
+            trang_thai: 'that_bai',
+            hoc_vien_id: { in: hocVienIdsBulk },
+          },
+        }),
+        prisma.nhat_ky_thong_bao.count({
+          where: {
+            loai_su_kien: 'dang_ky_hoc_phan_lop',
+            trang_thai: 'thanh_cong',
+            hoc_vien_id: { in: hocVienIdsBulk },
+          },
+        }),
+      ]);
+      expect(thatBai).toBe(0);
+      expect(thanhCong).toBe(40);
+    }, 240000); // connection pool) => cần timeout rộng hơn mức 30s mặc định. // xacNhan()/commitPhanLop() -> mỗi lần ~2-4s (bắt tay SMTP không dùng // khối này đã làm cho 1 email — không mock) tuần tự trong // 40 lần gửi email THẬT qua Ethereal (cùng cách các test khác trong
   });
 
   describe('PATCH /dang-ky-hoc/{id}/ket-qua', () => {

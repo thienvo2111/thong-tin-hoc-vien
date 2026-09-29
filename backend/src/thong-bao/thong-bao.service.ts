@@ -154,7 +154,14 @@ export class ThongBaoService {
 
   // Chỉ gọi khi phan_lop_hoc_vien import gán lop_id thực sự (xem
   // KhoaBoiDuongService.commitPhanLop) — không gọi cho nhánh chỉ ghi danh.
-  async guiDangKyHocPhanLop(dangKyHocId: string): Promise<void> {
+  //
+  // Trả về { chuaCoEmail } (T3, QĐ6) để ImportService đếm
+  // so_hoc_vien_chua_co_email trên GET /import/{id} — bỏ qua gửi VÀ không
+  // ghi nhat_ky_thong_bao cho học viên chưa có email_lien_he (đã đúng hành
+  // vi từ trước qua canhBaoThieuEmail(), chỉ thêm giá trị trả về ở đây).
+  async guiDangKyHocPhanLop(
+    dangKyHocId: string,
+  ): Promise<{ chuaCoEmail: boolean }> {
     const dangKy = await this.prisma.dang_ky_hoc.findUnique({
       where: { id: dangKyHocId },
       include: {
@@ -165,10 +172,10 @@ export class ThongBaoService {
         },
       },
     });
-    if (!dangKy || !dangKy.lop) return;
+    if (!dangKy || !dangKy.lop) return { chuaCoEmail: false };
     if (!dangKy.hoc_vien.email_lien_he) {
       this.canhBaoThieuEmail('dang_ky_hoc_phan_lop', dangKy.hoc_vien_id);
-      return;
+      return { chuaCoEmail: true };
     }
 
     const nhanSuText =
@@ -197,6 +204,7 @@ export class ThongBaoService {
       tieuDe: 'Thông báo phân lớp',
       html,
     });
+    return { chuaCoEmail: false };
   }
 
   async guiDangKyHocKetQua(dangKyHocId: string): Promise<void> {
