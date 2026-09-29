@@ -102,7 +102,7 @@ export const gioiThieu: NoiDungGioiThieu = {
     tieuDe: 'Bắt đầu trong 4 bước',
     buoc: [
       { ten: 'Nhận mã định danh', moTa: 'Nhà trường gửi cho thầy cô mã định danh trên cơ sở dữ liệu ngành.' },
-      { ten: 'Đăng nhập', moTa: 'Đăng nhập bằng mã định danh. Mật khẩu lần đầu là ngày sinh viết liền ngày-tháng-năm, ví dụ 08121983. Hệ thống sẽ yêu cầu đổi mật khẩu mới.' },
+      { ten: 'Đăng nhập', moTa: 'Đăng nhập bằng mã định danh hoặc số CCCD. Mật khẩu lần đầu là ngày sinh viết liền ngày-tháng-năm, ví dụ 08121983. Hệ thống sẽ yêu cầu đổi mật khẩu mới.' },
       { ten: 'Bổ sung và xác nhận hồ sơ', moTa: 'Kiểm tra thông tin, sửa nếu chưa đúng, bổ sung phần còn thiếu, rồi bấm Xác nhận trong thời gian quy định.' },
       { ten: 'Làm bài đánh giá đầu vào', moTa: 'Khi hồ sơ đã đầy đủ và được xác nhận, đường dẫn làm bài sẽ hiện trên trang của thầy cô.' },
     ],

@@ -118,8 +118,8 @@ export default function DangNhap() {
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
               <Stack gap="md">
                 <TextInput
-                  label="Mã định danh"
-                  description="Mã định danh trên CSDL ngành do nhà trường cung cấp"
+                  label="Mã định danh hoặc số CCCD"
+                  description="Mã định danh CSDL ngành do nhà trường cung cấp, hoặc số CCCD nếu Thầy/Cô đã bổ sung vào hồ sơ"
                   inputMode="numeric"
                   autoComplete="username"
                   onPaste={xuLyDan}

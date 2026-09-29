@@ -18,7 +18,7 @@ describe('M1 — Đăng nhập', () => {
     const user = userEvent.setup();
     renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
 
-    await user.type(screen.getByLabelText('Mã định danh'), '9115131060');
+    await user.type(screen.getByLabelText('Mã định danh hoặc số CCCD'), '9115131060');
     await user.type(screen.getByLabelText('Mật khẩu'), '08121983');
     await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
 
@@ -29,7 +29,7 @@ describe('M1 — Đăng nhập', () => {
     const user = userEvent.setup();
     renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
 
-    const oMaDinhDanh = screen.getByLabelText('Mã định danh') as HTMLInputElement;
+    const oMaDinhDanh = screen.getByLabelText('Mã định danh hoặc số CCCD') as HTMLInputElement;
     oMaDinhDanh.focus();
     await user.paste('9115 131060');
     expect(oMaDinhDanh.value).toBe('9115131060');
@@ -44,7 +44,7 @@ describe('M1 — Đăng nhập', () => {
     const user = userEvent.setup();
     renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
 
-    await user.type(screen.getByLabelText('Mã định danh'), 'sai-ma');
+    await user.type(screen.getByLabelText('Mã định danh hoặc số CCCD'), 'sai-ma');
     await user.type(screen.getByLabelText('Mật khẩu'), 'sai-mat-khau');
     await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
 
@@ -58,7 +58,7 @@ describe('M1 — Đăng nhập', () => {
     const user = userEvent.setup();
     renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
 
-    await user.type(screen.getByLabelText('Mã định danh'), '9115131060');
+    await user.type(screen.getByLabelText('Mã định danh hoặc số CCCD'), '9115131060');
     await user.type(screen.getByLabelText('Mật khẩu'), 'sai');
     await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
 
@@ -70,7 +70,7 @@ describe('M1 — Đăng nhập', () => {
     const user = userEvent.setup();
     renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
 
-    await user.type(screen.getByLabelText('Mã định danh'), '9115131060');
+    await user.type(screen.getByLabelText('Mã định danh hoặc số CCCD'), '9115131060');
     await user.type(screen.getByLabelText('Mật khẩu'), '08121983');
     const nutGui = screen.getByRole('button', { name: 'Đăng nhập' });
     await user.click(nutGui);
