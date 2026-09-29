@@ -5,6 +5,8 @@ import type {
   DotXacNhan,
   HocVien,
   HocVienDanhSachItem,
+  KhoaBoiDuong,
+  KhoaBoiDuongChiTiet,
   MonHoc,
   TongHopDonViRow,
 } from '@/api/types';
@@ -150,6 +152,69 @@ export function taoDanhSachHocVienMau(): HocVienDanhSachItem[] {
   ];
 }
 
+// Khóa bồi dưỡng mẫu cho AdminKhoaBoiDuong/AdminKhoaChiTiet (Phase 4 redesign). GET /khoa-boi-duong
+// (danh sách) trả bản ghi thô — chi tiết (giai_doan/lop_hoc) chỉ có ở GET /khoa-boi-duong/{id}, xem
+// taoChiTietKhoaMau bên dưới, khớp khoa-boi-duong.service.ts#findAll/findOne thật.
+export function taoDanhSachKhoaMau(): KhoaBoiDuong[] {
+  return [
+    {
+      id: 'khoa-1',
+      ma_khoa: 'AG-2026-014',
+      ten_khoa: 'Bồi dưỡng NLS – Mức cơ bản',
+      don_vi_to_chuc_id: 'dv-1',
+      dia_diem: null,
+      thoi_gian_bat_dau: '2026-10-05',
+      thoi_gian_ket_thuc: '2026-11-20',
+      trang_thai: 'cho_duyet',
+      nguoi_duyet_id: null,
+      cap_duyet_thuc_te: null,
+      ngay_duyet: null,
+      created_at: '2026-09-20T00:00:00.000Z',
+      updated_at: '2026-09-20T00:00:00.000Z',
+      created_by: 'nd-1',
+    },
+    {
+      id: 'khoa-2',
+      ma_khoa: 'AG-2026-015',
+      ten_khoa: 'Bồi dưỡng NLS – Mức thành thạo',
+      don_vi_to_chuc_id: 'dv-1',
+      dia_diem: null,
+      thoi_gian_bat_dau: '2026-10-12',
+      thoi_gian_ket_thuc: '2026-11-28',
+      trang_thai: 'nhap',
+      nguoi_duyet_id: null,
+      cap_duyet_thuc_te: null,
+      ngay_duyet: null,
+      created_at: '2026-09-21T00:00:00.000Z',
+      updated_at: '2026-09-21T00:00:00.000Z',
+      created_by: 'nd-1',
+    },
+  ];
+}
+
+export function taoChiTietKhoaMau(danhSach: KhoaBoiDuong[]): Record<string, KhoaBoiDuongChiTiet> {
+  const out: Record<string, KhoaBoiDuongChiTiet> = {};
+  out[danhSach[0].id] = {
+    ...danhSach[0],
+    giai_doan: [],
+    lop_hoc: [
+      {
+        id: 'lop-1',
+        khoa_id: danhSach[0].id,
+        ten_lop: 'Lớp 01 – Nhóm cơ bản A',
+        si_so_toi_da: 30,
+        trang_thai: 'active',
+        nhom_hoc_vien: 1,
+        muc_nang_luc: 'co_ban',
+        nhan_su: [{ id: 'ns-1', lop_id: 'lop-1', ho_ten: 'Nguyễn Văn Long', vai_tro: 'giang_vien', so_dien_thoai: null }],
+        lich_hoc: [],
+      },
+    ],
+  };
+  out[danhSach[1].id] = { ...danhSach[1], giai_doan: [], lop_hoc: [] };
+  return out;
+}
+
 export function taoBaoCaoTongHopDonViMau(): TongHopDonViRow[] {
   return [
     {
@@ -172,6 +237,8 @@ export const db = {
   nguoiDung: { id: 'nd-1', vai_tro: 'hoc_vien' as string },
   danhSachHocVien: taoDanhSachHocVienMau(),
   baoCaoTongHopDonVi: taoBaoCaoTongHopDonViMau(),
+  danhSachKhoa: taoDanhSachKhoaMau(),
+  chiTietKhoa: taoChiTietKhoaMau(taoDanhSachKhoaMau()),
 };
 
 export function resetDb(): void {
@@ -183,4 +250,6 @@ export function resetDb(): void {
   db.nguoiDung = { id: 'nd-1', vai_tro: 'hoc_vien' };
   db.danhSachHocVien = taoDanhSachHocVienMau();
   db.baoCaoTongHopDonVi = taoBaoCaoTongHopDonViMau();
+  db.danhSachKhoa = taoDanhSachKhoaMau();
+  db.chiTietKhoa = taoChiTietKhoaMau(db.danhSachKhoa);
 }

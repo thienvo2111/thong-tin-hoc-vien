@@ -193,3 +193,86 @@ export interface DanhGiaDauVaoChuaDu {
 }
 
 export type DanhGiaDauVao = DanhGiaDauVaoDuDieuKien | DanhGiaDauVaoChuaDu;
+
+// Phase 4 redesign — module Khóa bồi dưỡng (Admin), docs/api-contract.md mục 3 + database-ddl.sql
+// (CREATE TABLE khoa_boi_duong/giai_doan_khoa/lop_hoc). GET /khoa-boi-duong trả bản ghi thô (không
+// join tên đơn vị), giống HocVienDanhSachItem — FE tự dựng map id->tên qua GET /danh-muc/don-vi-cong-tac.
+export type TrangThaiKhoa = 'nhap' | 'cho_duyet' | 'da_duyet' | 'tu_choi' | 'dong_dang_ky';
+
+export interface KhoaBoiDuong {
+  id: string;
+  ma_khoa: string;
+  ten_khoa: string;
+  don_vi_to_chuc_id: string;
+  dia_diem: string | null;
+  thoi_gian_bat_dau: string;
+  thoi_gian_ket_thuc: string;
+  trang_thai: TrangThaiKhoa;
+  nguoi_duyet_id: string | null;
+  cap_duyet_thuc_te: string | null;
+  ngay_duyet: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
+export interface GiaiDoanKhoa {
+  id: string;
+  khoa_id: string;
+  thu_tu: number;
+  ten_giai_doan: string;
+  hinh_thuc: string;
+  thoi_gian_bat_dau: string;
+  thoi_gian_ket_thuc: string;
+  trang_thai: string;
+}
+
+export interface NhanSuLop {
+  id: string;
+  lop_id: string;
+  ho_ten: string;
+  vai_tro: string;
+  so_dien_thoai: string | null;
+}
+
+export interface LichHocLop {
+  id: string;
+  lop_id: string;
+  giai_doan_id: string;
+  buoi_so: number;
+  thoi_gian_bat_dau: string;
+  thoi_gian_ket_thuc: string;
+  dia_diem_hoac_link: string | null;
+  giai_doan?: GiaiDoanKhoa;
+}
+
+export interface LopHoc {
+  id: string;
+  khoa_id: string;
+  ten_lop: string;
+  si_so_toi_da: number | null;
+  trang_thai: string;
+  nhom_hoc_vien: number | null;
+  muc_nang_luc: string | null;
+  nhan_su?: NhanSuLop[];
+  lich_hoc?: LichHocLop[];
+}
+
+// GET /khoa-boi-duong/{id} — "Chi tiết khóa kèm giai đoạn + lớp" (api-contract.md mục 3), hình dạng
+// lấy từ backend/src/khoa-boi-duong/khoa-boi-duong.service.ts#findOne (include giai_doan, lop_hoc
+// kèm nhan_su + lich_hoc.giai_doan) chứ không có trong api-contract.md — improvised, đúng theo code.
+export interface KhoaBoiDuongChiTiet extends KhoaBoiDuong {
+  giai_doan: GiaiDoanKhoa[];
+  lop_hoc: LopHoc[];
+}
+
+// Body POST /khoa-boi-duong — backend/src/khoa-boi-duong/dto/create-khoa-boi-duong.dto.ts.
+// don_vi_to_chuc_id: bỏ qua nếu caller là truong (suy ra từ tài khoản), bắt buộc nếu quan_tri.
+export interface TaoKhoaBoiDuongDto {
+  ma_khoa: string;
+  ten_khoa: string;
+  dia_diem?: string;
+  thoi_gian_bat_dau: string;
+  thoi_gian_ket_thuc: string;
+  don_vi_to_chuc_id?: string;
+}

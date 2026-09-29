@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import type { KhoaBoiDuong } from '@/api/types';
 import { DIA_DANH, DON_VI, MON_HOC, db } from './db';
 
 function loi(status: number, code: string, message: string, extra: Record<string, unknown> = {}) {
@@ -118,7 +119,10 @@ export const handlers = [
   http.get('/danh-muc/don-vi-cong-tac', ({ request }) => {
     const url = new URL(request.url);
     const q = url.searchParams.get('q')?.toLowerCase();
-    const data = DON_VI.filter((d) => !q || d.ten_don_vi.toLowerCase().includes(q));
+    const loaiDonVi = url.searchParams.get('loai_don_vi');
+    const data = DON_VI.filter(
+      (d) => (!q || d.ten_don_vi.toLowerCase().includes(q)) && (!loaiDonVi || d.loai_don_vi === loaiDonVi),
+    );
     return HttpResponse.json({ data });
   }),
 
@@ -130,6 +134,76 @@ export const handlers = [
   }),
 
   http.get('/danh-muc/chuyen-mon-dao-tao/goi-y', () => HttpResponse.json({ data: ['Tin học', 'Toán', 'Vật lý'] })),
+
+  // --- Khóa bồi dưỡng (Phase 4 redesign) ---
+  http.get('/khoa-boi-duong', ({ request }) => {
+    const url = new URL(request.url);
+    const trangThai = url.searchParams.get('trang_thai');
+    const donViId = url.searchParams.get('don_vi_to_chuc_id');
+    const q = url.searchParams.get('q')?.toLowerCase();
+    const page = Number(url.searchParams.get('page') ?? '1');
+    const pageSize = Number(url.searchParams.get('page_size') ?? '20');
+
+    let items = db.danhSachKhoa;
+    if (trangThai) items = items.filter((k) => k.trang_thai === trangThai);
+    if (donViId) items = items.filter((k) => k.don_vi_to_chuc_id === donViId);
+    if (q) {
+      items = items.filter((k) => k.ten_khoa.toLowerCase().includes(q) || k.ma_khoa.toLowerCase().includes(q));
+    }
+    const total = items.length;
+    const start = (page - 1) * pageSize;
+    const data = items.slice(start, start + pageSize);
+    return HttpResponse.json({ data, total, page, page_size: pageSize });
+  }),
+
+  http.get('/khoa-boi-duong/:id', ({ params }) => {
+    const found = db.chiTietKhoa[params.id as string];
+    if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
+    return HttpResponse.json(found);
+  }),
+
+  http.post('/khoa-boi-duong', async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    const id = `khoa-moi-${db.danhSachKhoa.length + 1}`;
+    const moi: KhoaBoiDuong = {
+      id,
+      ma_khoa: String(body.ma_khoa ?? ''),
+      ten_khoa: String(body.ten_khoa ?? ''),
+      don_vi_to_chuc_id: String(body.don_vi_to_chuc_id ?? 'dv-1'),
+      dia_diem: (body.dia_diem as string) ?? null,
+      thoi_gian_bat_dau: String(body.thoi_gian_bat_dau ?? ''),
+      thoi_gian_ket_thuc: String(body.thoi_gian_ket_thuc ?? ''),
+      trang_thai: 'nhap',
+      nguoi_duyet_id: null,
+      cap_duyet_thuc_te: null,
+      ngay_duyet: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: 'nd-1',
+    };
+    db.danhSachKhoa = [moi, ...db.danhSachKhoa];
+    db.chiTietKhoa[id] = { ...moi, giai_doan: [], lop_hoc: [] };
+    return HttpResponse.json(moi);
+  }),
+
+  http.post('/khoa-boi-duong/:id/nop-duyet', ({ params }) => {
+    const id = params.id as string;
+    const khoa = db.chiTietKhoa[id];
+    if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
+    khoa.trang_thai = 'cho_duyet';
+    db.danhSachKhoa = db.danhSachKhoa.map((k) => (k.id === id ? { ...k, trang_thai: 'cho_duyet' } : k));
+    return HttpResponse.json(khoa);
+  }),
+
+  http.post('/khoa-boi-duong/:id/duyet', async ({ params, request }) => {
+    const id = params.id as string;
+    const khoa = db.chiTietKhoa[id];
+    if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
+    const body = (await request.json()) as { ket_qua: 'da_duyet' | 'tu_choi' };
+    khoa.trang_thai = body.ket_qua;
+    db.danhSachKhoa = db.danhSachKhoa.map((k) => (k.id === id ? { ...k, trang_thai: body.ket_qua } : k));
+    return HttpResponse.json(khoa);
+  }),
 ];
 
 export { loi };
