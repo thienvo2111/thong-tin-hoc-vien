@@ -10,6 +10,7 @@ import { useToi } from '@/auth/AuthContext';
 import { useHoSoToi } from '@/api/hocVien';
 import { dieuKienMatKhau, taoDoiMatKhauSchema, type DoiMatKhauForm } from '@/schemas/doiMatKhau';
 import { thongDiepLoiChung, loiFieldsThanhMap } from '@/lib/loiApi';
+import { trangChuTheoVaiTro } from '@/lib/trangChuTheoVaiTro';
 import { StatusBanner } from '@/components/StatusBanner';
 
 function ngaySinhDdmmyyyy(ngay?: number | null, thang?: number | null, nam?: number | null): string | undefined {
@@ -35,7 +36,7 @@ function DongCheck({ dat, children }: { dat: boolean; children: string }) {
 
 /** M2 — buộc đổi mật khẩu lần đầu (dac-ta § M2). Không có TopBar (route ngoài ProtectedLayout) nên cần lối "Đăng xuất" riêng. */
 export default function DoiMatKhau() {
-  const { matKhauVuaDung, xacNhanDaDoiMatKhau, dangXuat } = useToi();
+  const { matKhauVuaDung, xacNhanDaDoiMatKhau, dangXuat, nguoiDung } = useToi();
   const { data: hoSo } = useHoSoToi();
   const navigate = useNavigate();
   const [dangDangXuat, setDangDangXuat] = useState(false);
@@ -69,7 +70,7 @@ export default function DoiMatKhau() {
         color: 'green',
         message: 'Đã đổi mật khẩu. Thầy/Cô ghi nhớ mật khẩu mới để đăng nhập lần sau.',
       });
-      navigate('/toi', { replace: true });
+      navigate(trangChuTheoVaiTro(nguoiDung?.vai_tro), { replace: true });
     },
     onError: (err) => {
       const fields = loiFieldsThanhMap(err);

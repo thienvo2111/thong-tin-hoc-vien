@@ -10,6 +10,7 @@ import { dangNhapSchema, type DangNhapForm } from '@/schemas/dangNhap';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { gioiThieu } from '@/content/gioiThieu';
 import { StatusBanner } from '@/components/StatusBanner';
+import { trangChuTheoVaiTro } from '@/lib/trangChuTheoVaiTro';
 import logoHcmue from '@/assets/logo-hcmue.png';
 
 /** Panel giới thiệu — chỉ hiện ở màn hình rộng (>= sm); mobile chỉ hiện form đăng nhập. */
@@ -65,8 +66,8 @@ export default function DangNhap() {
 
   const mutation = useMutation({
     mutationFn: ({ ten_dang_nhap, mat_khau }: DangNhapForm) => dangNhap(ten_dang_nhap, mat_khau),
-    onSuccess: ({ phaiDoiMatKhau }) => {
-      navigate(phaiDoiMatKhau ? '/doi-mat-khau' : '/toi', { replace: true });
+    onSuccess: ({ phaiDoiMatKhau, vaiTro }) => {
+      navigate(phaiDoiMatKhau ? '/doi-mat-khau' : trangChuTheoVaiTro(vaiTro), { replace: true });
     },
   });
 

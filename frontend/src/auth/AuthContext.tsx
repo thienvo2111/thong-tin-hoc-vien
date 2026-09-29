@@ -15,7 +15,7 @@ interface AuthContextValue {
   phaiDoiMatKhau: boolean;
   /** Mật khẩu vừa dùng để đăng nhập — chỉ giữ trong bộ nhớ, dùng để tự điền ô "mật khẩu hiện tại" ở M2. */
   matKhauVuaDung: string | null;
-  dangNhap: (tenDangNhap: string, matKhau: string) => Promise<{ phaiDoiMatKhau: boolean }>;
+  dangNhap: (tenDangNhap: string, matKhau: string) => Promise<{ phaiDoiMatKhau: boolean; vaiTro: string }>;
   dangXuat: () => Promise<void>;
   xacNhanDaDoiMatKhau: () => void;
 }
@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNguoiDung(res.nguoi_dung);
     setPhaiDoiMatKhau(res.phai_doi_mat_khau);
     setMatKhauVuaDung(matKhau);
-    return { phaiDoiMatKhau: res.phai_doi_mat_khau };
+    return { phaiDoiMatKhau: res.phai_doi_mat_khau, vaiTro: res.nguoi_dung.vai_tro };
   }, []);
 
   const dangXuat = useCallback(async () => {

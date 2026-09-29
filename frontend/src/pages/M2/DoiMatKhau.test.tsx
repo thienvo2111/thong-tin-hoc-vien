@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http } from 'msw';
 import { server } from '@/test/mocks/server';
 import { loi } from '@/test/mocks/handlers';
+import { db } from '@/test/mocks/db';
 import { renderVoiRouter } from '@/test/testUtils';
 import DangNhap from '@/pages/M1/DangNhap';
 import DoiMatKhau from './DoiMatKhau';
@@ -12,6 +13,7 @@ const routes = [
   { path: '/dang-nhap', element: <DangNhap /> },
   { path: '/doi-mat-khau', element: <DoiMatKhau /> },
   { path: '/toi', element: <div>Trang của tôi</div> },
+  { path: '/admin/tong-quan', element: <div>Tổng quan quản trị</div> },
 ];
 
 async function dangNhapTruoc(user: ReturnType<typeof userEvent.setup>) {
@@ -95,5 +97,32 @@ describe('M2 — Đổi mật khẩu lần đầu', () => {
 
     await user.click(screen.getByRole('button', { name: 'Đăng xuất' }));
     expect(await screen.findByLabelText('Mã định danh')).toBeInTheDocument();
+  });
+
+  it('vai_tro=quan_tri đổi mật khẩu xong → điều hướng /admin/tong-quan, không phải /toi (hồi quy bug)', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const user = userEvent.setup();
+    renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
+    await dangNhapTruoc(user);
+
+    await user.type(screen.getByLabelText('Mật khẩu mới'), 'MatKhau123');
+    await user.type(screen.getByLabelText('Nhập lại mật khẩu mới'), 'MatKhau123');
+    await user.click(screen.getByRole('button', { name: 'Đổi mật khẩu' }));
+
+    expect(await screen.findByText('Tổng quan quản trị')).toBeInTheDocument();
+    expect(screen.queryByText('Trang của tôi')).not.toBeInTheDocument();
+  });
+
+  it('vai_tro=hoc_vien đổi mật khẩu xong → vẫn điều hướng /toi như cũ (hồi quy bug)', async () => {
+    db.nguoiDung.vai_tro = 'hoc_vien';
+    const user = userEvent.setup();
+    renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
+    await dangNhapTruoc(user);
+
+    await user.type(screen.getByLabelText('Mật khẩu mới'), 'MatKhau123');
+    await user.type(screen.getByLabelText('Nhập lại mật khẩu mới'), 'MatKhau123');
+    await user.click(screen.getByRole('button', { name: 'Đổi mật khẩu' }));
+
+    expect(await screen.findByText('Trang của tôi')).toBeInTheDocument();
   });
 });
