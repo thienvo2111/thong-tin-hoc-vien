@@ -107,6 +107,8 @@ Nhớ đặt `JWT_SECRET` riêng (đủ dài/ngẫu nhiên) trong `backend/.env`
 npm run start:dev
 ```
 
+Swagger UI có tại http://localhost:3000/api sau khi chạy backend.
+
 ### Cấu trúc module backend
 
 7 module NestJS, mỗi module ứng với 1 dịch vụ trong `docs/api-contract.md` — **tất cả đã triển khai đầy đủ** (2026-09-25):
