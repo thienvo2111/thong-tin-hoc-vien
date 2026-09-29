@@ -3,13 +3,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Anchor, Box, Button, Collapse, Container, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Anchor, Box, Button, Collapse, Container, Group, Image, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
 import { ApiError } from '@/api/client';
 import { useToi } from '@/auth/AuthContext';
 import { dangNhapSchema, type DangNhapForm } from '@/schemas/dangNhap';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { gioiThieu } from '@/content/gioiThieu';
 import { StatusBanner } from '@/components/StatusBanner';
+import logoHcmue from '@/assets/logo-hcmue.png';
 
 export default function DangNhap() {
   const { dangNhap } = useToi();
@@ -55,9 +56,12 @@ export default function DangNhap() {
   return (
     <Container size="xs" py="xl">
       <Stack gap="lg">
-        <Title order={1} ta="center" size="h2">
-          {gioiThieu.moDau.tenChuongTrinh}
-        </Title>
+        <Group justify="center" gap="sm" wrap="nowrap">
+          <Image src={logoHcmue} alt="Trường Đại học Sư phạm Thành phố Hồ Chí Minh" h={40} w="auto" fit="contain" />
+          <Title order={1} ta="center" size="h2">
+            {gioiThieu.moDau.tenChuongTrinh}
+          </Title>
+        </Group>
 
         {loiChung && <StatusBanner loai="error">{loiChung}</StatusBanner>}
 

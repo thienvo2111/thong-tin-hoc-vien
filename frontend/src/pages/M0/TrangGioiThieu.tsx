@@ -7,6 +7,7 @@ import {
   Container,
   Divider,
   Group,
+  Image,
   Stack,
   Text,
   Title,
@@ -14,6 +15,7 @@ import {
 import { Link } from 'react-router-dom';
 import { useToi } from '@/auth/AuthContext';
 import { gioiThieu } from '@/content/gioiThieu';
+import logoHcmue from '@/assets/logo-hcmue.png';
 
 // CHỈ bản tối thiểu vòng này: mục 1 (mở đầu), 6 (hướng dẫn nhanh), 7 (FAQ), 8 (liên hệ) — theo cột
 // "Bản tối thiểu" của bảng ưu tiên trong dac-ta-cong-hoc-vien.md. KHÔNG render mục 2/3/5/9 dù `hien`
@@ -44,7 +46,10 @@ export default function TrangGioiThieu() {
       {moDau.hien && (
         <Container size="sm" py="xl">
           <Stack gap="md" ta="center">
-            <Title order={1}>{moDau.tenChuongTrinh}</Title>
+            <Group justify="center" gap="sm" wrap="nowrap">
+              <Image src={logoHcmue} alt="Trường Đại học Sư phạm Thành phố Hồ Chí Minh" h={48} w="auto" fit="contain" />
+              <Title order={1}>{moDau.tenChuongTrinh}</Title>
+            </Group>
             <Text size="lg">{moDau.thongDiep}</Text>
             <Group justify="center" gap="sm" wrap="wrap">
               {/* Không chờ dangTai để tránh nút chính bị ẩn thoáng qua ở lần vẽ đầu (yêu cầu: nút chính
