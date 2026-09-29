@@ -1221,7 +1221,8 @@ export class HocVienService {
   // Import CSDL MOET (gọi từ ImportService — validation-checklist.md #36b-36f)
   // ---------------------------------------------------------------------
   async checkValidMoetImportRow(input: {
-    ma_dinh_danh_moet: string;
+    ma_dinh_danh_moet?: string;
+    so_dinh_danh_ca_nhan?: string;
     ho_ten: string;
     ngay_sinh: number;
     thang_sinh: number;
@@ -1232,16 +1233,38 @@ export class HocVienService {
   }): Promise<void> {
     const loi: FieldMessage[] = [];
 
-    if (!input.ma_dinh_danh_moet) {
-      loi.push({ field: 'ma_dinh_danh_moet', message: 'Bắt buộc nhập' });
-    } else {
-      const trung = await this.prisma.hoc_vien.findUnique({
+    // T4b (2026-09-29): mã CSDL MOET và CCCD không giả định trùng nhau, một
+    // số trường không báo được mã CSDL MOET — chỉ bắt buộc có ÍT NHẤT 1
+    // trong 2 (khớp chk_hoc_vien_nguon_tao đã nới lỏng ở DB).
+    if (!input.ma_dinh_danh_moet && !input.so_dinh_danh_ca_nhan) {
+      loi.push({
+        field: 'ma_dinh_danh_moet',
+        message:
+          'Thiếu cả Mã định danh CSDL MOET và Số định danh cá nhân — phải có ít nhất 1',
+      });
+    }
+
+    if (input.ma_dinh_danh_moet) {
+      const trungMoet = await this.prisma.hoc_vien.findUnique({
         where: { ma_dinh_danh_moet: input.ma_dinh_danh_moet },
       });
-      if (trung) {
+      if (trungMoet) {
         loi.push({
           field: 'ma_dinh_danh_moet',
           message: 'Mã định danh CSDL MOET đã tồn tại (rule #36f)',
+        });
+      }
+    }
+
+    if (input.so_dinh_danh_ca_nhan) {
+      loi.push(...validateSoDinhDanh(input.so_dinh_danh_ca_nhan));
+      const trungSdd = await this.prisma.hoc_vien.findUnique({
+        where: { so_dinh_danh_ca_nhan: input.so_dinh_danh_ca_nhan },
+      });
+      if (trungSdd) {
+        loi.push({
+          field: 'so_dinh_danh_ca_nhan',
+          message: 'Số định danh cá nhân đã tồn tại ở hồ sơ học viên khác',
         });
       }
     }
@@ -1289,7 +1312,8 @@ export class HocVienService {
 
   async createFromMoetImport(
     input: {
-      ma_dinh_danh_moet: string;
+      ma_dinh_danh_moet?: string;
+      so_dinh_danh_ca_nhan?: string;
       ho_ten: string;
       ngay_sinh: number;
       thang_sinh: number;
@@ -1314,6 +1338,9 @@ export class HocVienService {
     const chuyenMonChuan = Array.from(
       new Set(input.chuyen_mon.map((c) => normalizeNfcName(c)).filter(Boolean)),
     );
+    // checkValidMoetImportRow() đã đảm bảo có ít nhất 1 trong 2 — ưu tiên mã
+    // MOET làm ten_dang_nhap khi dòng có cả 2 (T4b, rule #34/#34b).
+    const tenDangNhap = input.ma_dinh_danh_moet ?? input.so_dinh_danh_ca_nhan!;
 
     // Cùng lý do đảo thứ tự như dangKy() — xem comment ở đó (chk_nguoi_dung_scope).
     return this.prisma.$transaction(async (tx) => {
@@ -1321,6 +1348,7 @@ export class HocVienService {
         data: {
           nguon_tao: 'import_moet',
           ma_dinh_danh_moet: input.ma_dinh_danh_moet,
+          so_dinh_danh_ca_nhan: input.so_dinh_danh_ca_nhan,
           ho_ten: hoTenChuan,
           ngay_sinh: input.ngay_sinh,
           thang_sinh: input.thang_sinh,
@@ -1342,7 +1370,7 @@ export class HocVienService {
         data: {
           ho_ten: hoTenChuan,
           email: null,
-          ten_dang_nhap: input.ma_dinh_danh_moet,
+          ten_dang_nhap: tenDangNhap,
           vai_tro: 'hoc_vien',
           don_vi_id: null,
           hoc_vien_id: hocVien.id,

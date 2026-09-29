@@ -281,6 +281,75 @@ describe('moet-excel.util', () => {
       );
     });
 
+    // T4b (2026-09-29): "Mã định danh (CDSL moet)" chuyển thành tùy chọn ở
+    // cấp file — dò dòng tiêu đề giờ neo CHỈ theo "Đơn vị".
+    it('file KHÔNG có cột "Mã định danh" nhưng CÓ "Đơn vị" -> vẫn dò đúng dòng tiêu đề', async () => {
+      const HEADER_KHONG_MA_MOET = [
+        'Đơn vị',
+        'Số định danh cá nhân',
+        'Họ và tên',
+        'Ngày',
+        'Tháng',
+        'Năm',
+        'Chức vụ',
+        'Chuyên môn',
+        'Số điện thoại',
+        'Ghi chú',
+      ];
+      const buffer = await toBuffer([
+        HEADER_KHONG_MA_MOET,
+        [
+          'Trường G',
+          '123456789012',
+          'Ngô Thị K',
+          3,
+          3,
+          1993,
+          '',
+          'Anh',
+          '0988888888',
+          '',
+        ],
+      ]);
+      const rows = await readMoetWorkbookRows(buffer);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].values['Số định danh cá nhân']).toBe('123456789012');
+      expect(rows[0].values['Mã định danh (CDSL moet)']).toBeUndefined();
+    });
+
+    it('file KHÔNG có cột "Số định danh cá nhân" -> vẫn đọc được (chỉ có mã MOET, hành vi cũ)', async () => {
+      const buffer = await toBuffer([
+        SINGLE_TIER_HEADER,
+        [
+          'Trường H',
+          'MOET-009',
+          'Đặng Văn L',
+          4,
+          4,
+          1994,
+          '',
+          'Sinh',
+          '0999999999',
+          '',
+        ],
+      ]);
+      const rows = await readMoetWorkbookRows(buffer);
+      expect(rows[0].values['Mã định danh (CDSL moet)']).toBe('MOET-009');
+      expect(rows[0].values['Số định danh cá nhân']).toBeUndefined();
+    });
+
+    it.each(['Số định danh cá nhân', 'CCCD', 'Số CCCD'])(
+      'nhận diện alias cột CCCD: "%s"',
+      async (tieuDe) => {
+        const buffer = await toBuffer([
+          ['Đơn vị', tieuDe, 'Họ và tên', 'Ngày', 'Tháng', 'Năm', 'Chuyên môn', 'Số điện thoại'],
+          ['Trường I', '123456789013', 'Mai Thị M', 5, 5, 1996, 'Toán', '0900000000'],
+        ]);
+        const rows = await readMoetWorkbookRows(buffer);
+        expect(rows[0].values['Số định danh cá nhân']).toBe('123456789013');
+      },
+    );
+
     it('có "Đơn vị"/"Mã định danh" nhưng thiếu cột bắt buộc khác -> ValidationException', async () => {
       const buffer = await toBuffer([
         ['Đơn vị', 'Mã định danh (CDSL moet)', 'Họ và tên'],

@@ -22,7 +22,7 @@ describe('AuthService', () => {
   let service: AuthService;
   let prisma: {
     nguoi_dung: {
-      findUnique: jest.Mock;
+      findFirst: jest.Mock;
       findUniqueOrThrow: jest.Mock;
       update: jest.Mock;
     };
@@ -61,7 +61,7 @@ describe('AuthService', () => {
     baseUser.khoa_den = null;
     prisma = {
       nguoi_dung: {
-        findUnique: jest.fn(),
+        findFirst: jest.fn(),
         findUniqueOrThrow: jest.fn(),
         update: jest.fn().mockImplementation(({ data }) => ({
           ...baseUser,
@@ -88,14 +88,14 @@ describe('AuthService', () => {
 
   describe('dangNhap', () => {
     it('sai tên đăng nhập (không tồn tại) -> UnauthorizedAppException', async () => {
-      prisma.nguoi_dung.findUnique.mockResolvedValue(null);
+      prisma.nguoi_dung.findFirst.mockResolvedValue(null);
       await expect(
         service.dangNhap({ ten_dang_nhap: 'khong-co', mat_khau: 'x' }),
       ).rejects.toBeInstanceOf(UnauthorizedAppException);
     });
 
     it('tài khoản bị vô hiệu hóa (trang_thai=ngung) -> Unauthorized', async () => {
-      prisma.nguoi_dung.findUnique.mockResolvedValue({
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
         ...baseUser,
         trang_thai: 'ngung',
       });
@@ -108,7 +108,7 @@ describe('AuthService', () => {
     });
 
     it('sai mật khẩu -> Unauthorized', async () => {
-      prisma.nguoi_dung.findUnique.mockResolvedValue(baseUser);
+      prisma.nguoi_dung.findFirst.mockResolvedValue(baseUser);
       await expect(
         service.dangNhap({
           ten_dang_nhap: baseUser.ten_dang_nhap,
@@ -119,7 +119,7 @@ describe('AuthService', () => {
 
     // T1 (bảo mật đăng nhập): xem mo-rong-nls-an-giang.md mục T1.
     it('sai mật khẩu lần thứ 5 (liên tiếp) -> ghi khoa_den = now+15p', async () => {
-      prisma.nguoi_dung.findUnique.mockResolvedValue({
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
         ...baseUser,
         so_lan_dang_nhap_sai: 4,
       });
@@ -141,7 +141,7 @@ describe('AuthService', () => {
     });
 
     it('sai mật khẩu lần 1-4 -> chỉ tăng bộ đếm, KHÔNG đặt khoa_den', async () => {
-      prisma.nguoi_dung.findUnique.mockResolvedValue({
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
         ...baseUser,
         so_lan_dang_nhap_sai: 2,
       });
@@ -160,7 +160,7 @@ describe('AuthService', () => {
 
     it('đang trong thời gian khóa -> 423 ACCOUNT_LOCKED dù mật khẩu ĐÚNG, không gọi bcrypt.compare', async () => {
       const khoaDen = new Date(Date.now() + 5 * 60 * 1000);
-      prisma.nguoi_dung.findUnique.mockResolvedValue({
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
         ...baseUser,
         so_lan_dang_nhap_sai: 5,
         khoa_den: khoaDen,
@@ -179,7 +179,7 @@ describe('AuthService', () => {
 
     it('khoa_den đã hết hạn (đã qua 15 phút) + mật khẩu đúng -> đăng nhập thành công, reset bộ đếm', async () => {
       const khoaDenDaQua = new Date(Date.now() - 1000);
-      prisma.nguoi_dung.findUnique.mockResolvedValue({
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
         ...baseUser,
         so_lan_dang_nhap_sai: 5,
         khoa_den: khoaDenDaQua,
@@ -201,7 +201,7 @@ describe('AuthService', () => {
 
     it('khoa_den đã hết hạn + mật khẩu vẫn sai -> đếm lại từ 1, không cộng dồn số cũ', async () => {
       const khoaDenDaQua = new Date(Date.now() - 1000);
-      prisma.nguoi_dung.findUnique.mockResolvedValue({
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
         ...baseUser,
         so_lan_dang_nhap_sai: 5,
         khoa_den: khoaDenDaQua,
@@ -219,7 +219,7 @@ describe('AuthService', () => {
     });
 
     it('đăng nhập đúng -> cập nhật dang_nhap_lan_cuoi và reset bộ đếm sai', async () => {
-      prisma.nguoi_dung.findUnique.mockResolvedValue({
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
         ...baseUser,
         so_lan_dang_nhap_sai: 3,
       });
@@ -239,7 +239,7 @@ describe('AuthService', () => {
     });
 
     it('đăng nhập đúng -> trả token + nguoi_dung không có mat_khau_hash', async () => {
-      prisma.nguoi_dung.findUnique.mockResolvedValue(baseUser);
+      prisma.nguoi_dung.findFirst.mockResolvedValue(baseUser);
       const res = await service.dangNhap({
         ten_dang_nhap: baseUser.ten_dang_nhap,
         mat_khau: 'MatKhauGoc',
@@ -247,6 +247,49 @@ describe('AuthService', () => {
       expect(res.token).toBe('fake.jwt.token');
       expect(res.nguoi_dung).not.toHaveProperty('mat_khau_hash');
       expect(res.phai_doi_mat_khau).toBe(false);
+    });
+
+    // T4b (2026-09-29): mã CSDL MOET và CCCD không giả định trùng nhau —
+    // đăng nhập phải chấp nhận CẢ ten_dang_nhap gốc LẪN CCCD của hồ sơ học
+    // viên liên kết (kể cả khi tài khoản được tạo bằng mã MOET rồi CCCD mới
+    // bổ sung sau qua PATCH /hoc-vien/toi).
+    it('tra cứu tài khoản khớp theo ten_dang_nhap HOẶC hoc_vien.so_dinh_danh_ca_nhan (1 câu query duy nhất)', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue(baseUser);
+      await service.dangNhap({
+        ten_dang_nhap: '123456789012',
+        mat_khau: 'MatKhauGoc',
+      });
+      expect(prisma.nguoi_dung.findFirst).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { ten_dang_nhap: '123456789012' },
+            { hoc_vien: { so_dinh_danh_ca_nhan: '123456789012' } },
+          ],
+        },
+      });
+    });
+
+    it('đăng nhập bằng CCCD của hồ sơ import_moet tự bổ sung sau -> thành công', async () => {
+      // Tài khoản được tạo bằng mã MOET (ten_dang_nhap khác CCCD) nhưng học
+      // viên đã tự bổ sung CCCD qua PATCH /hoc-vien/toi — findFirst (mock)
+      // trả về đúng tài khoản này khi tra theo CCCD ở nhánh OR thứ 2.
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
+        ...baseUser,
+        ten_dang_nhap: 'MOET00123',
+        hoc_vien_id: 'hv-1',
+      });
+      const res = await service.dangNhap({
+        ten_dang_nhap: '123456789012', // CCCD, KHÔNG phải ten_dang_nhap gốc
+        mat_khau: 'MatKhauGoc',
+      });
+      expect(res.token).toBe('fake.jwt.token');
+    });
+
+    it('sai cả ten_dang_nhap lẫn CCCD -> vẫn 1 thông báo lỗi chung (rule #9/#55)', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue(null);
+      await expect(
+        service.dangNhap({ ten_dang_nhap: 'khong-khop-gi-ca', mat_khau: 'x' }),
+      ).rejects.toBeInstanceOf(UnauthorizedAppException);
     });
   });
 

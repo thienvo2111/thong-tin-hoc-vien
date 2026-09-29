@@ -12,11 +12,24 @@ import {
 // 2) sau khi đã khớp cột "Đơn vị" -> don_vi_cong_tac_id. chuyen_mon_raw giữ
 // nguyên chuỗi gốc (tách theo ";" ở ImportService, không tách ở đây vì
 // class-validator không có decorator tách chuỗi sẵn).
+//
+// T4b (2026-09-29): ma_dinh_danh_moet và so_dinh_danh_ca_nhan đều TÙY CHỌN ở
+// đây (mỗi cột riêng) — điều kiện "phải có ít nhất 1 trong 2" được kiểm tra
+// ở HocVienService.checkValidMoetImportRow (không biểu diễn được bằng
+// decorator đơn lẻ của class-validator).
 export class HoSoNhanSuMoetRowDto {
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(20)
-  ma_dinh_danh_moet: string;
+  ma_dinh_danh_moet?: string;
+
+  // Regex 12 chữ số kiểm tra ở HocVienService.checkValidMoetImportRow
+  // (validateSoDinhDanh dùng chung), không lặp lại ở DTO — theo đúng pattern
+  // CreateHocVienDto.
+  @IsOptional()
+  @IsString()
+  so_dinh_danh_ca_nhan?: string;
 
   @IsString()
   @MinLength(1)

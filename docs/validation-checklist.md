@@ -21,7 +21,8 @@ Ký hiệu: 🔴 lỗi chặn lưu · 🟡 cảnh báo không chặn (chỉ nh�
 | 6 | Bắt buộc **khi `nguon_tao='tu_dang_ky'`**; với `nguon_tao='import_moet'` để trống lúc tạo, bắt buộc khi người dùng tự bổ sung qua `PATCH /hoc-vien/toi`. Luôn đúng **12 chữ số**, không khoảng trắng/ký tự khác khi có giá trị | 🔴 | DB (`CHECK` cho phép NULL, ép định dạng khi có giá trị) + API (bắt buộc có điều kiện theo `nguon_tao`) |
 | 7 | Duy nhất toàn hệ thống (không trùng học viên khác) | 🔴 | DB (`UNIQUE`, cho phép nhiều NULL) + API (kiểm tra trước khi submit qua `GET /hoc-vien/kiem-tra-trung`) |
 | 8 | **Không xác thực với CSDL dân cư quốc gia** ở giai đoạn này (hạng mục tương lai, xem `Main.dc.html` — "Tích hợp tương lai") — Trường/Phòng VHXH/Sở duyệt bằng xác minh thủ công là bước xác thực chính | ghi nhận rủi ro | — |
-| 8b | **Không giả định** Mã định danh CSDL MOET (`ma_dinh_danh_moet`) trùng giá trị với ĐDCN — quan hệ này chưa được xác nhận (2026-09-23, "đang xem xét"). Hai cột tách biệt, không có ràng buộc đồng bộ giữa chúng | ghi nhận rủi ro / quyết định thiết kế | — |
+| 8b | **Xác nhận (2026-09-29)**: Mã định danh CSDL MOET (`ma_dinh_danh_moet`) **KHÔNG** trùng giá trị với CCDCN — 2 cột tách biệt, không có ràng buộc đồng bộ giữa chúng. Một số trường không cung cấp được mã định danh CSDL MOET khi báo danh sách → hồ sơ `import_moet` chỉ bắt buộc có ít nhất 1 trong 2 mã (xem rule #34, #8c) | ghi nhận rủi ro / quyết định thiết kế | — |
+| 8c | Hồ sơ `import_moet` chấp nhận thiếu `ma_dinh_danh_moet` **hoặc** thiếu `so_dinh_danh_ca_nhan`, nhưng không được thiếu cả 2 (T4b, 2026-09-29) | 🔴 | DB (`chk_hoc_vien_nguon_tao`) + API import |
 
 ## Ngày / tháng / năm sinh (`ngay_sinh`, `thang_sinh`, `nam_sinh`)
 
@@ -84,7 +85,8 @@ Ký hiệu: 🔴 lỗi chặn lưu · 🟡 cảnh báo không chặn (chỉ nh�
 | # | Quy tắc | Mức | Nơi thực thi |
 |---|---|---|---|
 | 33 | Tài khoản `nguoi_dung` (vai_tro=`hoc_vien`) tạo tự động cùng lúc với `hoc_vien` (tự đăng ký) hoặc theo lô khi import MOET — không cần cấp trước thủ công trong cả 2 trường hợp | 🔴 (quy trình) | API (transaction, xem `api-contract.md` mục "Luồng đăng ký" / "Luồng import nhân sự từ CSDL MOET") |
-| 34 | `ten_dang_nhap` = `so_dinh_danh_ca_nhan` (tự đăng ký) hoặc `ma_dinh_danh_moet` (import) — gán **1 lần lúc tạo, không tự đổi theo dữ liệu hồ sơ về sau** kể cả khi CCCD được bổ sung muộn. Mật khẩu mặc định = ngày sinh (định dạng thống nhất, ví dụ `ddmmyyyy`) cho cả 2 luồng | 🔴 | DB (`ten_dang_nhap UNIQUE NOT NULL`, tách khỏi `email`) + API |
+| 34 | `ten_dang_nhap` = `so_dinh_danh_ca_nhan` (tự đăng ký) hoặc `ma_dinh_danh_moet` ưu tiên, fallback `so_dinh_danh_ca_nhan` nếu dòng import không có mã MOET (import, T4b 2026-09-29) — gán **1 lần lúc tạo, không tự đổi theo dữ liệu hồ sơ về sau** kể cả khi CCCD được bổ sung muộn. Mật khẩu mặc định = ngày sinh (định dạng thống nhất, ví dụ `ddmmyyyy`) cho cả 2 luồng | 🔴 | DB (`ten_dang_nhap UNIQUE NOT NULL`, tách khỏi `email`) + API |
+| 34b | **T4b (2026-09-29)**: `POST /auth/dang-nhap` chấp nhận `ten_dang_nhap` khớp **1 trong 2** — đúng `nguoi_dung.ten_dang_nhap`, hoặc đúng `hoc_vien.so_dinh_danh_ca_nhan` của hồ sơ liên kết (kể cả khi tài khoản được tạo bằng mã MOET rồi CCCD mới được bổ sung sau — lúc đó đăng nhập được bằng cả 2 giá trị). Không áp dụng cho tài khoản không phải học viên | 🔴 | API (`AuthService.dangNhap`) |
 | 35 | `phai_doi_mat_khau=true` mặc định — chặn thao tác khác cho tới khi đổi mật khẩu | 🔴 | API (middleware kiểm tra cờ này sau đăng nhập) |
 | 36 | Rủi ro đã ghi nhận: không xác thực danh tính khi tự đăng ký (biết ĐDCN người khác là khai được thay) — **quyết định chấp nhận**, dựa vào bước Trường/Phòng VHXH/Sở duyệt làm điểm xác minh chính, không thêm bước xác thực khác | ghi nhận rủi ro | — |
 

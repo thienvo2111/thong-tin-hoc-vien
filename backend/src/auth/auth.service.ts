@@ -45,8 +45,19 @@ export class AuthService {
   ) {}
 
   async dangNhap(dto: DangNhapDto) {
-    const nguoiDung = await this.prisma.nguoi_dung.findUnique({
-      where: { ten_dang_nhap: dto.ten_dang_nhap },
+    // T4b (2026-09-29): mã định danh CSDL MOET và CCCD KHÔNG giả định trùng
+    // nhau — chấp nhận đăng nhập bằng ten_dang_nhap GỐC hoặc bằng CCCD của
+    // hồ sơ học viên liên kết (hoc_vien.so_dinh_danh_ca_nhan), kể cả khi tài
+    // khoản được tạo bằng mã MOET rồi CCCD mới bổ sung sau qua PATCH
+    // /hoc-vien/toi. Không tiết lộ trong response/log việc khớp theo trường
+    // nào — dùng chung 1 thông báo lỗi như trước (rule #9/#34b).
+    const nguoiDung = await this.prisma.nguoi_dung.findFirst({
+      where: {
+        OR: [
+          { ten_dang_nhap: dto.ten_dang_nhap },
+          { hoc_vien: { so_dinh_danh_ca_nhan: dto.ten_dang_nhap } },
+        ],
+      },
     });
 
     // Không tiết lộ "tài khoản không tồn tại" khác với "sai mật khẩu" —

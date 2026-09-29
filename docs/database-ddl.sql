@@ -335,7 +335,12 @@ CREATE TABLE hoc_vien (
     CONSTRAINT chk_hoc_vien_nguon_tao CHECK (
         (nguon_tao = 'tu_dang_ky' AND so_dinh_danh_ca_nhan IS NOT NULL)
         OR
-        (nguon_tao = 'import_moet' AND ma_dinh_danh_moet IS NOT NULL)
+        -- Sửa 2026-09-29: xác nhận mã định danh CSDL ngành và CCCD KHÔNG
+        -- phải lúc nào cũng trùng nhau, và một số trường không cung cấp
+        -- được mã định danh CSDL ngành khi báo danh sách — chấp nhận hồ sơ
+        -- import_moet chỉ có 1 trong 2 mã, miễn có ít nhất 1 cái để định
+        -- danh + dùng làm ten_dang_nhap (xem "Luồng đăng nhập linh hoạt").
+        (nguon_tao = 'import_moet' AND (ma_dinh_danh_moet IS NOT NULL OR so_dinh_danh_ca_nhan IS NOT NULL))
     ),
     CONSTRAINT chk_hoc_vien_ngay_sinh CHECK (ngay_sinh BETWEEN 1 AND 31),
     CONSTRAINT chk_hoc_vien_thang_sinh CHECK (thang_sinh BETWEEN 1 AND 12),

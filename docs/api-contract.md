@@ -128,20 +128,25 @@ Sở luôn được phép duyệt thay Phòng VHXH (escalation trong scope-based
 
 ### Luồng import nhân sự từ CSDL MOET (`POST /import/ho-so-nhan-su-moet`, xem mục 5)
 
-File nhận từ Sở/Bộ theo mẫu: `Đơn vị`, `Mã đơn vị` (tùy chọn, T4 2026-09-28), `Mã định danh (CDSL moet)`, `Họ và tên`, `Ngày`, `Tháng`, `Năm` (3 cột riêng), `Chức vụ`, `Chuyên môn` (có thể nhiều giá trị/dòng, phân tách bằng `;`), `Số điện thoại`, `Ghi chú`.
+File nhận từ Sở/Bộ theo mẫu: `Đơn vị`, `Mã đơn vị` (tùy chọn, T4 2026-09-28), `Mã định danh (CDSL moet)` (tùy chọn — xem T4b 2026-09-29), `Số định danh cá nhân`/CCCD (tùy chọn, T4b 2026-09-29), `Họ và tên`, `Ngày`, `Tháng`, `Năm` (3 cột riêng), `Chức vụ`, `Chuyên môn` (có thể nhiều giá trị/dòng, phân tách bằng `;`), `Số điện thoại`, `Ghi chú`.
+
+**T4b (2026-09-29) — mã định danh CSDL ngành và CCCD KHÔNG phải lúc nào cũng trùng nhau, xác nhận một số trường không cung cấp được mã định danh CSDL ngành khi báo danh sách.** Cả 2 cột `Mã định danh (CDSL moet)` và `Số định danh cá nhân` đều tùy chọn ở cấp file, nhưng **mỗi dòng bắt buộc có ít nhất 1 trong 2** (dòng thiếu cả 2 → lỗi). Dò dòng tiêu đề vẫn neo vào cột `Đơn vị` (luôn bắt buộc) thay vì `Mã định danh`.
 
 **T4 (2026-09-28) — chịu định dạng file thực tế:** parser (`readMoetWorkbookRows`, `backend/src/import/util/moet-excel.util.ts`) tự dò dòng tiêu đề thật (bỏ qua dòng tiêu đề/ghi chú phía trên), nhận tiêu đề gộp ô 2 tầng ("Ngày tháng năm sinh" gộp 3 cột con `Ngày`/`Tháng`/`Năm` ở dòng ngay dưới), khớp tên cột không phân biệt hoa/thường, khoảng trắng thừa, bỏ phần trong ngoặc. Ô số Excel lưu dạng number (mã MOET, SĐT) được đọc về chuỗi không `.0`/ký hiệu khoa học. `Ngày`/`Tháng` dạng `08` hoặc `8` đều hợp lệ (đã hỗ trợ sẵn qua `class-transformer`).
 
 Với mỗi dòng hợp lệ (cùng thứ tự tạo bảng đã sửa như "Luồng đăng ký" ở trên — `hoc_vien` trước `nguoi_dung`):
 1. Nếu có cột `Mã đơn vị` (giá trị khác trống): khớp `don_vi_cong_tac.ma_don_vi` — **ưu tiên hơn** khớp theo tên (cần thiết sau sáp nhập An Giang – Kiên Giang, tên trường dễ trùng giữa 2 tỉnh cũ). Không khớp được → dòng lỗi. Nếu để trống: khớp cột `Đơn vị` với `don_vi_cong_tac.ten_don_vi` (chỉ trong phạm vi quyền của người chạy import). Không khớp được / khớp nhiều hơn 1 → dòng lỗi (thông báo liệt kê `ma_don_vi` của các đơn vị trùng, gợi ý thêm cột `Mã đơn vị`).
 1b. `Số điện thoại` đúng 9 chữ số, bắt đầu bằng `3/5/7/8/9` (thiếu số 0 đầu do Excel lưu dạng number) → tự thêm `0`, ghi **cảnh báo 🟡** vào preview (`GET /import/{id}` trả thêm `danh_sach_canh_bao: [{dong, ly_do}]`, không chặn dòng). Các sai định dạng khác vẫn là dòng lỗi theo rule #20.
-2. `INSERT INTO hoc_vien (nguon_tao='import_moet', ma_dinh_danh_moet, ho_ten, ngay_sinh, thang_sinh, nam_sinh, chuc_vu, don_vi_cong_tac_id, so_dien_thoai_lien_he, ghi_chu, trang_thai='da_duyet', nguoi_duyet_id=<tài khoản đang chạy import>, cap_duyet_thuc_te='quan_tri', ngay_duyet=now(), created_by=NULL)` → lấy `hoc_vien.id`. Mọi field khác (CCCD, nơi sinh, phường xã, email, trình độ, cấp giảng dạy, môn giảng dạy) để `NULL`.
-3. `INSERT INTO nguoi_dung (vai_tro='hoc_vien', ten_dang_nhap=ma_dinh_danh_moet, mat_khau_hash=hash(ngay_sinh dạng ddmmyyyy), phai_doi_mat_khau=true, email=NULL, hoc_vien_id=hoc_vien.id)` → lấy `nguoi_dung.id`.
+2. `INSERT INTO hoc_vien (nguon_tao='import_moet', ma_dinh_danh_moet, so_dinh_danh_ca_nhan, ho_ten, ngay_sinh, thang_sinh, nam_sinh, chuc_vu, don_vi_cong_tac_id, so_dien_thoai_lien_he, ghi_chu, trang_thai='da_duyet', nguoi_duyet_id=<tài khoản đang chạy import>, cap_duyet_thuc_te='quan_tri', ngay_duyet=now(), created_by=NULL)` → lấy `hoc_vien.id`. **T4b**: `ma_dinh_danh_moet`/`so_dinh_danh_ca_nhan` lấy từ cột tương ứng nếu dòng có cung cấp (mỗi dòng có ít nhất 1 trong 2, có thể có cả 2). Mọi field khác chưa có ở luồng này (nơi sinh, phường xã, email, trình độ, cấp giảng dạy, môn giảng dạy) để `NULL`.
+3. `INSERT INTO nguoi_dung (vai_tro='hoc_vien', ten_dang_nhap=(ma_dinh_danh_moet ?? so_dinh_danh_ca_nhan), mat_khau_hash=hash(ngay_sinh dạng ddmmyyyy), phai_doi_mat_khau=true, email=NULL, hoc_vien_id=hoc_vien.id)` → lấy `nguoi_dung.id`. **T4b**: ưu tiên mã MOET làm `ten_dang_nhap` khi dòng có cả 2; chỉ dùng CCCD khi dòng không có mã MOET.
 4. Tách `Chuyên môn` theo `;`, `INSERT` từng giá trị vào `hoc_vien_chuyen_mon`.
 5. `UPDATE hoc_vien SET created_by = nguoi_dung.id WHERE id = hoc_vien.id`.
-6. Dòng lỗi điển hình: `Mã định danh` trùng đã tồn tại (`uq_hoc_vien_ma_moet`), thiếu `Đơn vị`/không khớp, ngày sinh không hợp lệ.
+6. Dòng lỗi điển hình: `Mã định danh`/CCCD trùng đã tồn tại (`uq_hoc_vien_ma_moet`/`uq_hoc_vien_ddcn`), thiếu cả 2 mã, thiếu `Đơn vị`/không khớp, ngày sinh không hợp lệ.
 
-Học viên nhận tài khoản đăng nhập bằng **Mã định danh CSDL MOET + ngày sinh** (không phải CCCD — hệ thống không giả định 2 mã này trùng nhau). Sau khi đăng nhập lần đầu, học viên tự bổ sung CCCD và các thông tin còn thiếu qua `PATCH /hoc-vien/toi` — hồ sơ đã `da_duyet` sẵn nên không cần Trường/Sở/Phòng duyệt lại.
+**T4b (2026-09-29, sửa lại quyết định trước đó) — xác nhận mã định danh CSDL ngành và CCCD KHÔNG giả định trùng nhau, và không phải trường nào cũng cung cấp được mã định danh CSDL ngành.** Vì vậy:
+- Học viên nhận tài khoản đăng nhập bằng **mã định danh CSDL MOET HOẶC CCCD (tùy dòng import có mã nào) + ngày sinh**.
+- `POST /auth/dang-nhap`: `ten_dang_nhap` khớp theo **1 trong 2** — hoặc đúng `nguoi_dung.ten_dang_nhap`, hoặc đúng `hoc_vien.so_dinh_danh_ca_nhan` của hồ sơ liên kết (kể cả khi tài khoản đã tạo bằng mã MOET nhưng học viên đã tự bổ sung CCCD sau đó qua `PATCH /hoc-vien/toi` — lúc đó đăng nhập được bằng CẢ 2 giá trị). Không tiết lộ giá trị nào khớp trong thông báo lỗi (vẫn dùng chung 1 câu lỗi như rule #9).
+- Sau khi đăng nhập lần đầu, học viên tự bổ sung CCCD (nếu import chưa có) và các thông tin còn thiếu qua `PATCH /hoc-vien/toi` — hồ sơ đã `da_duyet` sẵn nên không cần Trường/Sở/Phòng duyệt lại.
 
 ---
 

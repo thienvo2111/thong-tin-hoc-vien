@@ -790,6 +790,60 @@ describe('HocVienService', () => {
         service.checkValidMoetImportRow(baseMoetInput()),
       ).rejects.toBeInstanceOf(ValidationException);
     });
+
+    // T4b (2026-09-29): mã CSDL MOET và CCCD không giả định trùng nhau, một
+    // số trường không báo được mã CSDL MOET -> chỉ cần ÍT NHẤT 1 trong 2.
+    it('chỉ có so_dinh_danh_ca_nhan (không có ma_dinh_danh_moet) -> không throw', async () => {
+      const { ma_dinh_danh_moet: _bo, ...rest } = baseMoetInput();
+      await expect(
+        service.checkValidMoetImportRow({
+          ...rest,
+          so_dinh_danh_ca_nhan: '123456789012',
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    it('thiếu cả ma_dinh_danh_moet lẫn so_dinh_danh_ca_nhan -> ValidationException rõ lý do', async () => {
+      expect.assertions(2);
+      const { ma_dinh_danh_moet: _bo, ...rest } = baseMoetInput();
+      try {
+        await service.checkValidMoetImportRow(rest);
+      } catch (e) {
+        expect(e).toBeInstanceOf(ValidationException);
+        const body = (e as ValidationException).getResponse() as {
+          error: { fields: { field: string; message: string }[] };
+        };
+        expect(body.error.fields).toContainEqual(
+          expect.objectContaining({
+            field: 'ma_dinh_danh_moet',
+            message: expect.stringContaining(
+              'Thiếu cả Mã định danh CSDL MOET và Số định danh cá nhân',
+            ),
+          }),
+        );
+      }
+    });
+
+    it('so_dinh_danh_ca_nhan sai định dạng (không đủ 12 số) -> lỗi', async () => {
+      await expect(
+        service.checkValidMoetImportRow({
+          ...baseMoetInput(),
+          so_dinh_danh_ca_nhan: '123',
+        }),
+      ).rejects.toBeInstanceOf(ValidationException);
+    });
+
+    it('so_dinh_danh_ca_nhan đã tồn tại ở hồ sơ khác -> ValidationException', async () => {
+      prisma.hoc_vien.findUnique.mockImplementation(({ where }) =>
+        where.so_dinh_danh_ca_nhan ? { id: 'khac' } : null,
+      );
+      await expect(
+        service.checkValidMoetImportRow({
+          ...baseMoetInput(),
+          so_dinh_danh_ca_nhan: '123456789012',
+        }),
+      ).rejects.toBeInstanceOf(ValidationException);
+    });
   });
 
   describe('createFromMoetImport — tạo nguoi_dung+hoc_vien da_duyet ngay (#36c)', () => {
@@ -866,6 +920,86 @@ describe('HocVienService', () => {
         ),
       ).rejects.toBeInstanceOf(ValidationException);
       expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    // T4b (2026-09-29): dòng chỉ có CCCD (không có mã MOET) -> tạo hồ sơ
+    // thành công, ten_dang_nhap = CCCD.
+    it('chỉ có so_dinh_danh_ca_nhan (không có ma_dinh_danh_moet) -> ten_dang_nhap = CCCD', async () => {
+      const txNguoiDung = { create: jest.fn(), update: jest.fn() };
+      const txHocVien = { create: jest.fn(), update: jest.fn() };
+      txHocVien.create.mockResolvedValue({ id: 'hv-2' });
+      txNguoiDung.create.mockResolvedValue({
+        id: 'nd-2',
+        ten_dang_nhap: '123456789012',
+      });
+      txHocVien.update.mockResolvedValue({ id: 'hv-2' });
+      prisma.$transaction.mockImplementation(async (cb) =>
+        cb({ nguoi_dung: txNguoiDung, hoc_vien: txHocVien }),
+      );
+
+      await service.createFromMoetImport(
+        {
+          so_dinh_danh_ca_nhan: '123456789012',
+          ho_ten: 'Trần Thị Bình',
+          ngay_sinh: 10,
+          thang_sinh: 3,
+          nam_sinh: namHopLe,
+          so_dien_thoai_lien_he: '0912345678',
+          chuyen_mon: ['Toán'],
+          don_vi_cong_tac_id: 'truong-1',
+        },
+        'quan-tri-1',
+      );
+
+      expect(txHocVien.create.mock.calls[0][0].data).toEqual(
+        expect.objectContaining({
+          ma_dinh_danh_moet: undefined,
+          so_dinh_danh_ca_nhan: '123456789012',
+        }),
+      );
+      expect(txNguoiDung.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ ten_dang_nhap: '123456789012' }),
+        }),
+      );
+    });
+
+    it('có cả 2 mã -> ten_dang_nhap ưu tiên ma_dinh_danh_moet, vẫn lưu so_dinh_danh_ca_nhan', async () => {
+      const txNguoiDung = { create: jest.fn(), update: jest.fn() };
+      const txHocVien = { create: jest.fn(), update: jest.fn() };
+      txHocVien.create.mockResolvedValue({ id: 'hv-3' });
+      txNguoiDung.create.mockResolvedValue({ id: 'nd-3' });
+      txHocVien.update.mockResolvedValue({ id: 'hv-3' });
+      prisma.$transaction.mockImplementation(async (cb) =>
+        cb({ nguoi_dung: txNguoiDung, hoc_vien: txHocVien }),
+      );
+
+      await service.createFromMoetImport(
+        {
+          ma_dinh_danh_moet: 'MOET-002',
+          so_dinh_danh_ca_nhan: '123456789012',
+          ho_ten: 'Trần Thị Bình',
+          ngay_sinh: 10,
+          thang_sinh: 3,
+          nam_sinh: namHopLe,
+          so_dien_thoai_lien_he: '0912345678',
+          chuyen_mon: ['Toán'],
+          don_vi_cong_tac_id: 'truong-1',
+        },
+        'quan-tri-1',
+      );
+
+      expect(txHocVien.create.mock.calls[0][0].data).toEqual(
+        expect.objectContaining({
+          ma_dinh_danh_moet: 'MOET-002',
+          so_dinh_danh_ca_nhan: '123456789012',
+        }),
+      );
+      expect(txNguoiDung.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ ten_dang_nhap: 'MOET-002' }),
+        }),
+      );
     });
   });
 

@@ -396,13 +396,16 @@ export class ImportService {
         // Nguyên văn cột theo docs/api-contract.md mục 2 "Luồng import nhân
         // sự từ CSDL MOET". "Mã đơn vị" thêm ở T4 (mo-rong-nls-an-giang.md) —
         // tùy chọn, chỉ dùng để phân biệt khi 2 trường trùng tên sau sáp
-        // nhập An Giang – Kiên Giang. Đọc file thật qua readMoetWorkbookRows
-        // (không phụ thuộc thứ tự cột trong mảng này) — mảng này chỉ dùng để
-        // sinh file mẫu/file lỗi.
+        // nhập An Giang – Kiên Giang. "Mã định danh (CDSL moet)" và "Số định
+        // danh cá nhân" đều tùy chọn ở cấp file từ T4b (2026-09-29) — mỗi
+        // DÒNG vẫn phải có ít nhất 1 (xem getColumnNotes). Đọc file thật qua
+        // readMoetWorkbookRows (không phụ thuộc thứ tự cột trong mảng này) —
+        // mảng này chỉ dùng để sinh file mẫu/file lỗi.
         return [
           'Đơn vị',
           'Mã đơn vị',
           'Mã định danh (CDSL moet)',
+          'Số định danh cá nhân',
           'Họ và tên',
           'Ngày',
           'Tháng',
@@ -488,6 +491,10 @@ export class ImportService {
       return {
         'Mã đơn vị':
           'Tùy chọn — chỉ cần điền khi tên đơn vị ở cột "Đơn vị" trùng với đơn vị khác trong danh mục (vd cùng địa danh sau sáp nhập). Nếu có giá trị, hệ thống khớp theo mã này thay vì tên.',
+        'Mã định danh (CDSL moet)':
+          'Tùy chọn — phải có ít nhất 1 trong 2 cột "Mã định danh (CDSL moet)"/"Số định danh cá nhân" (T4b, 2026-09-29 — 2 mã không giả định trùng nhau). Có giá trị sẽ ưu tiên dùng làm tên đăng nhập.',
+        'Số định danh cá nhân':
+          'Tùy chọn — xem ghi chú cột "Mã định danh (CDSL moet)". Đúng 12 chữ số khi có giá trị.',
       };
     }
     if (loai === 'tai_khoan_vle') {
@@ -685,6 +692,7 @@ export class ImportService {
         const d = dto as HoSoNhanSuMoetRowDto;
         await this.hocVienService.checkValidMoetImportRow({
           ma_dinh_danh_moet: d.ma_dinh_danh_moet,
+          so_dinh_danh_ca_nhan: d.so_dinh_danh_ca_nhan,
           ho_ten: d.ho_ten,
           ngay_sinh: d.ngay_sinh,
           thang_sinh: d.thang_sinh,
@@ -747,6 +755,7 @@ export class ImportService {
       await this.hocVienService.createFromMoetImport(
         {
           ma_dinh_danh_moet: d.ma_dinh_danh_moet,
+          so_dinh_danh_ca_nhan: d.so_dinh_danh_ca_nhan,
           ho_ten: d.ho_ten,
           ngay_sinh: d.ngay_sinh,
           thang_sinh: d.thang_sinh,
@@ -868,7 +877,8 @@ export class ImportService {
     const { sdt, canhBao } = this.suaSoDienThoaiThieuSo0(raw['Số điện thoại']);
 
     const ketQua = await buildValidatedDto(HoSoNhanSuMoetRowDto, {
-      ma_dinh_danh_moet: raw['Mã định danh (CDSL moet)'],
+      ma_dinh_danh_moet: raw['Mã định danh (CDSL moet)']?.trim() || undefined,
+      so_dinh_danh_ca_nhan: raw['Số định danh cá nhân']?.trim() || undefined,
       ho_ten: raw['Họ và tên'],
       ngay_sinh: raw['Ngày'],
       thang_sinh: raw['Tháng'],

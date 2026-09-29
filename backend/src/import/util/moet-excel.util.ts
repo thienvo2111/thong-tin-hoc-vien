@@ -13,10 +13,13 @@ export interface MoetParsedRow {
   values: Record<string, string>;
 }
 
-// Cột bắt buộc phải khớp được, ngoại trừ 'Mã đơn vị' (tùy chọn, T4).
+// Cột bắt buộc phải khớp được. 'Mã đơn vị' tùy chọn (T4). 'Mã định danh
+// (CDSL moet)' và 'Số định danh cá nhân' tùy chọn ở CẤP FILE từ T4b
+// (2026-09-29 — mã CSDL ngành và CCCD không giả định trùng nhau, một số
+// trường không báo được mã CSDL ngành) — mỗi DÒNG vẫn phải có ít nhất 1
+// trong 2, kiểm tra ở HocVienService.checkValidMoetImportRow.
 const REQUIRED_CANONICAL = [
   'Đơn vị',
-  'Mã định danh (CDSL moet)',
   'Họ và tên',
   'Ngày',
   'Tháng',
@@ -40,6 +43,10 @@ const HEADER_MAP: Record<string, string> = {
   'chuyên môn': 'Chuyên môn',
   'số điện thoại': 'Số điện thoại',
   'ghi chú': 'Ghi chú',
+  // T4b (2026-09-29): alias hợp lý cho cột CCCD, theo pattern các cột khác.
+  'số định danh cá nhân': 'Số định danh cá nhân',
+  cccd: 'Số định danh cá nhân',
+  'số cccd': 'Số định danh cá nhân',
 };
 
 const MAX_HEADER_SCAN_ROWS = 20;
@@ -94,8 +101,10 @@ export async function readMoetWorkbookRows(
   const maxCol = Math.max(sheet.columnCount, MAX_COLUMN_SCAN);
   const maxHeaderRow = Math.min(sheet.rowCount, MAX_HEADER_SCAN_ROWS);
 
-  // 1. Tìm dòng tiêu đề chính: dòng đầu tiên có cả 1 cột khớp "đơn vị" và 1
-  // cột khớp "mã định danh" (bỏ qua các dòng tiêu đề/ghi chú phía trên).
+  // 1. Tìm dòng tiêu đề chính: dòng đầu tiên có 1 cột khớp "đơn vị" (bỏ qua
+  // các dòng tiêu đề/ghi chú phía trên). T4b (2026-09-29): neo CHỈ theo "Đơn
+  // vị" — "Mã định danh" chuyển thành tùy chọn ở cấp file nên không còn
+  // đáng tin cậy để neo dò tiêu đề.
   let headerRowNum = -1;
   const columnMap = new Map<number, string>();
   for (let r = 1; r <= maxHeaderRow; r++) {
@@ -107,10 +116,7 @@ export async function readMoetWorkbookRows(
       if (canonical) candidateMap.set(c, canonical);
     }
     const canonicalValues = new Set(candidateMap.values());
-    if (
-      canonicalValues.has('Đơn vị') &&
-      canonicalValues.has('Mã định danh (CDSL moet)')
-    ) {
+    if (canonicalValues.has('Đơn vị')) {
       headerRowNum = r;
       candidateMap.forEach((v, k) => columnMap.set(k, v));
       break;
@@ -119,7 +125,7 @@ export async function readMoetWorkbookRows(
 
   if (headerRowNum === -1) {
     throw new ValidationException(
-      'Không tìm được dòng tiêu đề chứa cả cột "Đơn vị" và "Mã định danh" trong file — kiểm tra lại mẫu file',
+      'Không tìm được dòng tiêu đề chứa cột "Đơn vị" trong file — kiểm tra lại mẫu file',
     );
   }
 
