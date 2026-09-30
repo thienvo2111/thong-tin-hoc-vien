@@ -127,10 +127,13 @@ export class ImportService {
     const danhSachLoi: { dong: number; ly_do: string }[] = [];
     const danhSachCanhBao: { dong: number; ly_do: string }[] = [];
     const dongHopLe: number[] = [];
-    // T6: phát hiện 2 dòng cùng (lớp, giai đoạn, buổi) trong CÙNG FILE (chỉ
-    // lop_va_lich_hoc dùng — xem KhoaBoiDuongService.resolveLopVaLichHocRow),
-    // reset mỗi lượt gọi taoImport()/xacNhan() (không dùng chung giữa 2 lượt
-    // preview/xác nhận vì mỗi lượt đọc lại toàn bộ file từ đầu).
+    // T6: phát hiện 2 dòng trùng nhau trong CÙNG FILE — lop_va_lich_hoc dùng
+    // key (lớp, giai đoạn, buổi) (xem
+    // KhoaBoiDuongService.resolveLopVaLichHocRow); T4d (2026-09-30):
+    // ho_so_nhan_su_moet dùng key theo ma_dinh_danh_moet/so_dinh_danh_ca_nhan
+    // (xem HocVienService.checkValidMoetImportRow) — reset mỗi lượt gọi
+    // taoImport()/xacNhan() (không dùng chung giữa 2 lượt preview/xác nhận
+    // vì mỗi lượt đọc lại toàn bộ file từ đầu).
     const dupKeys = new Set<string>();
 
     for (const row of rows) {
@@ -147,7 +150,7 @@ export class ImportService {
         continue;
       }
       if (canhBao) danhSachCanhBao.push({ dong: row.dong, ly_do: canhBao });
-      const checkErr = await this.checkValid(loai, dto);
+      const checkErr = await this.checkValid(loai, dto, dupKeys);
       if (checkErr) {
         danhSachLoi.push({ dong: row.dong, ly_do: checkErr });
         continue;
@@ -287,6 +290,7 @@ export class ImportService {
           dto,
           id,
           nhatKy.nguoi_import_id,
+          dupKeys,
         );
         if (hocVienChuaCoEmail) soHocVienChuaCoEmail++;
         soDongThanhCong++;
@@ -654,6 +658,7 @@ export class ImportService {
       | TaiKhoanVleRowDto
       | KetQuaDanhGiaRowDto
       | LopVaLichHocRowDto,
+    dupKeys?: Set<string>,
   ): Promise<string | undefined> {
     try {
       if (loai === 'dia_danh') {
@@ -691,17 +696,20 @@ export class ImportService {
         // tra cứu FK + validate định dạng + trùng lặp trong file rồi.
       } else {
         const d = dto as HoSoNhanSuMoetRowDto;
-        await this.hocVienService.checkValidMoetImportRow({
-          ma_dinh_danh_moet: d.ma_dinh_danh_moet,
-          so_dinh_danh_ca_nhan: d.so_dinh_danh_ca_nhan,
-          ho_ten: d.ho_ten,
-          ngay_sinh: d.ngay_sinh,
-          thang_sinh: d.thang_sinh,
-          nam_sinh: d.nam_sinh,
-          so_dien_thoai_lien_he: d.so_dien_thoai_lien_he,
-          chuyen_mon: this.splitChuyenMon(d.chuyen_mon_raw),
-          don_vi_cong_tac_id: d.don_vi_cong_tac_id,
-        });
+        await this.hocVienService.checkValidMoetImportRow(
+          {
+            ma_dinh_danh_moet: d.ma_dinh_danh_moet,
+            so_dinh_danh_ca_nhan: d.so_dinh_danh_ca_nhan,
+            ho_ten: d.ho_ten,
+            ngay_sinh: d.ngay_sinh,
+            thang_sinh: d.thang_sinh,
+            nam_sinh: d.nam_sinh,
+            so_dien_thoai_lien_he: d.so_dien_thoai_lien_he,
+            chuyen_mon: this.splitChuyenMon(d.chuyen_mon_raw),
+            don_vi_cong_tac_id: d.don_vi_cong_tac_id,
+          },
+          dupKeys,
+        );
       }
       return undefined;
     } catch (e) {
@@ -725,6 +733,7 @@ export class ImportService {
       | LopVaLichHocRowDto,
     importId: string,
     nguoiImportId: string,
+    dupKeys?: Set<string>,
   ): Promise<{ hocVienChuaCoEmail?: boolean }> {
     if (loai === 'dia_danh') {
       await this.diaDanhService.create(dto as CreateDiaDanhDto, importId);
@@ -768,6 +777,7 @@ export class ImportService {
           chuyen_mon: this.splitChuyenMon(d.chuyen_mon_raw),
         },
         nguoiImportId,
+        dupKeys,
       );
     }
     return {};

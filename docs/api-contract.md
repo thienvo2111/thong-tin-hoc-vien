@@ -142,7 +142,7 @@ Với mỗi dòng hợp lệ (cùng thứ tự tạo bảng đã sửa như "Lu�
 3. `INSERT INTO nguoi_dung (vai_tro='hoc_vien', ten_dang_nhap=(ma_dinh_danh_moet ?? so_dinh_danh_ca_nhan), mat_khau_hash=hash(ngay_sinh dạng ddmmyyyy), phai_doi_mat_khau=true, email=NULL, hoc_vien_id=hoc_vien.id)` → lấy `nguoi_dung.id`. **T4b**: ưu tiên mã MOET làm `ten_dang_nhap` khi dòng có cả 2; chỉ dùng CCCD khi dòng không có mã MOET.
 4. Tách `Chuyên môn` theo `;` nếu ô có giá trị (**T4c**: có thể để trống, khi đó `hoc_vien_chuyen_mon` không có dòng nào cho học viên này lúc import), `INSERT` từng giá trị vào `hoc_vien_chuyen_mon`.
 5. `UPDATE hoc_vien SET created_by = nguoi_dung.id WHERE id = hoc_vien.id`.
-6. Dòng lỗi điển hình: `Mã định danh`/CCCD trùng đã tồn tại (`uq_hoc_vien_ma_moet`/`uq_hoc_vien_ddcn`), thiếu cả 2 mã, thiếu `Đơn vị`/không khớp, ngày sinh không hợp lệ.
+6. Dòng lỗi điển hình: `Mã định danh`/CCCD trùng đã tồn tại (`uq_hoc_vien_ma_moet`/`uq_hoc_vien_ddcn`), thiếu cả 2 mã, thiếu `Đơn vị`/không khớp, ngày sinh không hợp lệ. **T4d (2026-09-30)**: cũng báo lỗi nếu `Mã định danh (CDSL moet)`/`Số định danh cá nhân` **trùng với dòng khác trong CÙNG FILE** (không chỉ trùng dữ liệu đã có trong DB) — kiểm tra bằng `dupKeys` (cùng cơ chế `lop_va_lich_hoc` dùng phát hiện trùng lớp/giai đoạn/buổi), báo NGAY ở bước preview (`POST /import/ho-so-nhan-su-moet`) thay vì chỉ lộ ra ở `POST /import/{id}/xac-nhan` sau khi dòng đầu đã ghi vào DB.
 
 **T4b (2026-09-29, sửa lại quyết định trước đó) — xác nhận mã định danh CSDL ngành và CCCD KHÔNG giả định trùng nhau, và không phải trường nào cũng cung cấp được mã định danh CSDL ngành.** Vì vậy:
 - Học viên nhận tài khoản đăng nhập bằng **mã định danh CSDL MOET HOẶC CCCD (tùy dòng import có mã nào) + ngày sinh**.

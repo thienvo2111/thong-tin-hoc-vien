@@ -1220,17 +1220,27 @@ export class HocVienService {
   // ---------------------------------------------------------------------
   // Import CSDL MOET (gọi từ ImportService — validation-checklist.md #36b-36f)
   // ---------------------------------------------------------------------
-  async checkValidMoetImportRow(input: {
-    ma_dinh_danh_moet?: string;
-    so_dinh_danh_ca_nhan?: string;
-    ho_ten: string;
-    ngay_sinh: number;
-    thang_sinh: number;
-    nam_sinh: number;
-    so_dien_thoai_lien_he?: string;
-    chuyen_mon: string[];
-    don_vi_cong_tac_id: string;
-  }): Promise<void> {
+  // T4d (2026-09-30): dupKeys — cùng cơ chế Set<string> dùng bởi
+  // KhoaBoiDuongService.resolveLopVaLichHocRow (phát hiện trùng NỘI BỘ file,
+  // không phải ràng buộc DB) — 1 Set dùng chung cho ma_dinh_danh_moet VÀ
+  // so_dinh_danh_ca_nhan, phân biệt bằng prefix "moet:"/"cccd:". Không có
+  // cơ chế này thì 2 dòng trùng mã trong CÙNG FILE đều "pass" ở bước preview
+  // (DB chưa ghi gì), chỉ lộ ra lỗi mới ở bước xác nhận khi dòng đầu đã
+  // commit — gây bất ngờ cho người dùng (số lỗi tăng sau khi xác nhận).
+  async checkValidMoetImportRow(
+    input: {
+      ma_dinh_danh_moet?: string;
+      so_dinh_danh_ca_nhan?: string;
+      ho_ten: string;
+      ngay_sinh: number;
+      thang_sinh: number;
+      nam_sinh: number;
+      so_dien_thoai_lien_he?: string;
+      chuyen_mon: string[];
+      don_vi_cong_tac_id: string;
+    },
+    dupKeys?: Set<string>,
+  ): Promise<void> {
     const loi: FieldMessage[] = [];
 
     // T4b (2026-09-29): mã CSDL MOET và CCCD không giả định trùng nhau, một
@@ -1245,27 +1255,45 @@ export class HocVienService {
     }
 
     if (input.ma_dinh_danh_moet) {
-      const trungMoet = await this.prisma.hoc_vien.findUnique({
-        where: { ma_dinh_danh_moet: input.ma_dinh_danh_moet },
-      });
-      if (trungMoet) {
+      const moetKey = `moet:${input.ma_dinh_danh_moet}`;
+      if (dupKeys?.has(moetKey)) {
         loi.push({
           field: 'ma_dinh_danh_moet',
-          message: 'Mã định danh CSDL MOET đã tồn tại (rule #36f)',
+          message: 'Mã định danh CSDL MOET bị trùng với dòng khác trong cùng file',
         });
+      } else {
+        const trungMoet = await this.prisma.hoc_vien.findUnique({
+          where: { ma_dinh_danh_moet: input.ma_dinh_danh_moet },
+        });
+        if (trungMoet) {
+          loi.push({
+            field: 'ma_dinh_danh_moet',
+            message: 'Mã định danh CSDL MOET đã tồn tại (rule #36f)',
+          });
+        }
+        dupKeys?.add(moetKey);
       }
     }
 
     if (input.so_dinh_danh_ca_nhan) {
       loi.push(...validateSoDinhDanh(input.so_dinh_danh_ca_nhan));
-      const trungSdd = await this.prisma.hoc_vien.findUnique({
-        where: { so_dinh_danh_ca_nhan: input.so_dinh_danh_ca_nhan },
-      });
-      if (trungSdd) {
+      const cccdKey = `cccd:${input.so_dinh_danh_ca_nhan}`;
+      if (dupKeys?.has(cccdKey)) {
         loi.push({
           field: 'so_dinh_danh_ca_nhan',
-          message: 'Số định danh cá nhân đã tồn tại ở hồ sơ học viên khác',
+          message: 'Số định danh cá nhân bị trùng với dòng khác trong cùng file',
         });
+      } else {
+        const trungSdd = await this.prisma.hoc_vien.findUnique({
+          where: { so_dinh_danh_ca_nhan: input.so_dinh_danh_ca_nhan },
+        });
+        if (trungSdd) {
+          loi.push({
+            field: 'so_dinh_danh_ca_nhan',
+            message: 'Số định danh cá nhân đã tồn tại ở hồ sơ học viên khác',
+          });
+        }
+        dupKeys?.add(cccdKey);
       }
     }
 
@@ -1326,8 +1354,9 @@ export class HocVienService {
       chuyen_mon: string[];
     },
     nguoiImportId: string,
+    dupKeys?: Set<string>,
   ): Promise<hoc_vien> {
-    await this.checkValidMoetImportRow(input);
+    await this.checkValidMoetImportRow(input, dupKeys);
 
     const hoTenChuan = normalizeNfcName(input.ho_ten);
     const matKhau = matKhauMacDinhTuNgaySinh(

@@ -853,6 +853,73 @@ describe('HocVienService', () => {
         }),
       ).rejects.toBeInstanceOf(ValidationException);
     });
+
+    // T4d (2026-09-30): bug thật phát hiện qua kiểm thử tay — 2 dòng trùng mã
+    // TRONG CÙNG FILE đều "pass" ở preview (DB chưa ghi gì), chỉ lộ lỗi mới ở
+    // bước xác nhận sau khi dòng đầu đã commit. dupKeys phải bắt được ngay ở
+    // preview (dùng chung 1 Set cho cả lượt, giống ImportService.taoImport()).
+    describe('dupKeys — phát hiện trùng nội bộ file (T4d)', () => {
+      it('2 dòng cùng ma_dinh_danh_moet, DB chưa có gì -> dòng đầu qua, dòng 2 báo trùng trong file', async () => {
+        const dupKeys = new Set<string>();
+        await expect(
+          service.checkValidMoetImportRow(baseMoetInput(), dupKeys),
+        ).resolves.toBeUndefined();
+
+        expect.assertions(3);
+        try {
+          await service.checkValidMoetImportRow(baseMoetInput(), dupKeys);
+        } catch (e) {
+          expect(e).toBeInstanceOf(ValidationException);
+          const body = (e as ValidationException).getResponse() as {
+            error: { fields: { field: string; message: string }[] };
+          };
+          expect(body.error.fields).toContainEqual(
+            expect.objectContaining({
+              field: 'ma_dinh_danh_moet',
+              message: expect.stringContaining('trùng'),
+            }),
+          );
+        }
+      });
+
+      it('2 dòng cùng so_dinh_danh_ca_nhan, DB chưa có gì -> dòng đầu qua, dòng 2 báo trùng trong file', async () => {
+        const { ma_dinh_danh_moet: _bo, ...rest } = baseMoetInput();
+        const input = { ...rest, so_dinh_danh_ca_nhan: '123456789012' };
+        const dupKeys = new Set<string>();
+        await expect(
+          service.checkValidMoetImportRow(input, dupKeys),
+        ).resolves.toBeUndefined();
+
+        expect.assertions(3);
+        try {
+          await service.checkValidMoetImportRow(input, dupKeys);
+        } catch (e) {
+          expect(e).toBeInstanceOf(ValidationException);
+          const body = (e as ValidationException).getResponse() as {
+            error: { fields: { field: string; message: string }[] };
+          };
+          expect(body.error.fields).toContainEqual(
+            expect.objectContaining({
+              field: 'so_dinh_danh_ca_nhan',
+              message: expect.stringContaining('trùng'),
+            }),
+          );
+        }
+      });
+
+      it('2 dòng khác ma_dinh_danh_moet -> cả 2 đều hợp lệ (hồi quy, không báo trùng sai)', async () => {
+        const dupKeys = new Set<string>();
+        await expect(
+          service.checkValidMoetImportRow(baseMoetInput(), dupKeys),
+        ).resolves.toBeUndefined();
+        await expect(
+          service.checkValidMoetImportRow(
+            { ...baseMoetInput(), ma_dinh_danh_moet: 'MOET-002' },
+            dupKeys,
+          ),
+        ).resolves.toBeUndefined();
+      });
+    });
   });
 
   describe('createFromMoetImport — tạo nguoi_dung+hoc_vien da_duyet ngay (#36c)', () => {
