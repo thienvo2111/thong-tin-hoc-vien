@@ -310,7 +310,40 @@ export function taoDanhSachImportMau(): NhatKyImportItem[] {
       file_loi_url: null,
       trang_thai: 'loi',
     },
+    // import-4 mô phỏng ca đã validate xong nhưng CHƯA bấm "Xác nhận" (người dùng rời trang/refresh
+    // trước khi xác nhận) — trang_thai vẫn 'dang_xu_ly' (backend chỉ chuyển 'hoan_thanh' SAU khi xác
+    // nhận, xem lib/trangThaiImport.ts) nhưng đã có so_dong_thanh_cong > 0 nên còn dữ liệu để xác nhận
+    // lại từ bảng lịch sử, không cần upload lại file — xem taoChiTietImportMau() cho chi tiết khớp id.
+    {
+      id: 'import-4',
+      loai_danh_muc: 'ket_qua_danh_gia',
+      ten_file_goc: 'ket-qua-danh-gia.xlsx',
+      nguoi_import_id: 'nd-1',
+      thoi_gian_import: '2026-09-29T08:00:00.000Z',
+      tong_so_dong: 7,
+      so_dong_thanh_cong: 6,
+      so_dong_loi: 1,
+      file_loi_url: '/import/import-4/file-loi',
+      trang_thai: 'dang_xu_ly',
+    },
   ];
+}
+
+// Chi tiết khớp import-4 ở trên (GET /import/import-4) — pre-seed vì import-4 mô phỏng job từ 1
+// phiên upload TRƯỚC ĐÓ (không phải job vừa tạo qua POST /import/:loai trong test hiện tại).
+export function taoChiTietImportMau(): Record<string, ImportChiTiet> {
+  return {
+    'import-4': {
+      id: 'import-4',
+      trang_thai: 'dang_xu_ly',
+      tong_so_dong: 7,
+      so_dong_thanh_cong: 6,
+      so_dong_loi: 1,
+      danh_sach_loi: [{ dong: 4, ly_do: 'Thiếu điểm đánh giá đầu ra' }],
+      danh_sach_canh_bao: [],
+      so_hoc_vien_chua_co_email: 0,
+    },
+  };
 }
 
 export const db = {
@@ -331,7 +364,7 @@ export const db = {
   baoCaoDieuKienDanhGia: taoBaoCaoDieuKienDanhGiaMau(),
   baoCaoVanHanh: taoBaoCaoVanHanhMau(),
   danhSachImport: taoDanhSachImportMau(),
-  chiTietImport: {} as Record<string, ImportChiTiet>,
+  chiTietImport: taoChiTietImportMau(),
 };
 
 export function resetDb(): void {
@@ -351,5 +384,5 @@ export function resetDb(): void {
   db.baoCaoDieuKienDanhGia = taoBaoCaoDieuKienDanhGiaMau();
   db.baoCaoVanHanh = taoBaoCaoVanHanhMau();
   db.danhSachImport = taoDanhSachImportMau();
-  db.chiTietImport = {};
+  db.chiTietImport = taoChiTietImportMau();
 }

@@ -83,6 +83,51 @@ describe('Admin — Nhập dữ liệu', () => {
     expect(screen.queryByText('Kết quả kiểm tra')).not.toBeInTheDocument();
   });
 
+  it('lịch sử: job đã validate xong nhưng chưa xác nhận (dang_xu_ly, so_dong_thanh_cong>0) hiện nút "Xác nhận →"; job 100% lỗi (so_dong_thanh_cong=0) thì không', async () => {
+    renderTrang();
+    const bang = await screen.findByRole('table');
+    const dongChuaXacNhan = within(bang).getByText('Kết quả đánh giá (đầu vào/đầu ra)').closest('tr') as HTMLElement;
+    const dongLoiFile = within(bang).getByText('Danh mục địa danh').closest('tr') as HTMLElement;
+    const dongDaHoanThanh = within(bang).getByText('Hồ sơ nhân sự (CSDL MOET)').closest('tr') as HTMLElement;
+
+    expect(within(dongChuaXacNhan).getByRole('button', { name: 'Xác nhận →' })).toBeInTheDocument();
+    expect(within(dongLoiFile).queryByRole('button', { name: 'Xác nhận →' })).not.toBeInTheDocument();
+    expect(within(dongDaHoanThanh).queryByRole('button', { name: 'Xác nhận →' })).not.toBeInTheDocument();
+  });
+
+  it('bấm "Xác nhận →" ở 1 job cũ trong lịch sử: mở lại panel xác nhận đúng id đó (không cần upload lại file)', async () => {
+    const user = userEvent.setup();
+    const yeuCauImportChiTiet: string[] = [];
+    server.use(
+      http.get('/import/:id', ({ params }) => {
+        yeuCauImportChiTiet.push(params.id as string);
+        return HttpResponse.json({
+          id: 'import-4',
+          trang_thai: 'dang_xu_ly',
+          tong_so_dong: 7,
+          so_dong_thanh_cong: 6,
+          so_dong_loi: 1,
+          danh_sach_loi: [{ dong: 4, ly_do: 'Thiếu điểm đánh giá đầu ra' }],
+          danh_sach_canh_bao: [],
+          so_hoc_vien_chua_co_email: 0,
+        });
+      }),
+    );
+    renderTrang();
+    const bang = await screen.findByRole('table');
+    const dongChuaXacNhan = within(bang).getByText('Kết quả đánh giá (đầu vào/đầu ra)').closest('tr') as HTMLElement;
+
+    await user.click(within(dongChuaXacNhan).getByRole('button', { name: 'Xác nhận →' }));
+
+    expect(await screen.findByText('Kết quả kiểm tra')).toBeInTheDocument();
+    // Panel phải render preview thật (không kẹt ở "Đang xử lý...") dù trang_thai vẫn 'dang_xu_ly',
+    // vì đã có tong_so_dong > 0 — job đã validate xong, chỉ đang chờ xác nhận.
+    expect(screen.queryByText('Đang xử lý file, vui lòng chờ...')).not.toBeInTheDocument();
+    expect(screen.getByText('Thiếu điểm đánh giá đầu ra')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Xác nhận nạp dữ liệu' })).toBeEnabled();
+    expect(yeuCauImportChiTiet).toContain('import-4');
+  });
+
   it('lỗi API khi tải lịch sử: hiện thông báo lỗi thay vì màn trắng', async () => {
     server.use(http.get('/import', () => HttpResponse.error()));
     renderTrang();

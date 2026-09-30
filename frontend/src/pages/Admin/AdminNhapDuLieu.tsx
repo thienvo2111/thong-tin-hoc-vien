@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
   Alert,
@@ -131,7 +131,11 @@ function PanelXemTruoc({ importId, onXongViec }: { importId: string; onXongViec:
 
       {ketQua.data && (
         <Stack gap="md">
-          {ketQua.data.trang_thai === 'dang_xu_ly' ? (
+          {/* trang_thai='dang_xu_ly' bao gồm CẢ 2 pha: đang validate (chưa có kết quả) LẪN đã validate
+           * xong nhưng chưa bấm "Xác nhận" (mở lại từ Lịch sử) — backend chỉ chuyển sang 'hoan_thanh'
+           * SAU KHI xác nhận, không phải sau khi validate xong. Phân biệt 2 pha bằng tong_so_dong: còn
+           * 0 nghĩa là chưa có kết quả để hiện (còn đang xử lý thật), khác 0 là đã có, hiện preview. */}
+          {ketQua.data.trang_thai === 'dang_xu_ly' && ketQua.data.tong_so_dong === 0 ? (
             <Group gap={8}>
               <Text fz={13}>Đang xử lý file, vui lòng chờ...</Text>
             </Group>
@@ -186,6 +190,7 @@ export default function AdminNhapDuLieu() {
   const [loai, setLoai] = useState<LoaiDanhMucImport>('ho_so_nhan_su_moet');
   const [file, setFile] = useState<File | null>(null);
   const [importId, setImportId] = useState<string | undefined>();
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const upload = useTaiLenImport();
   const lichSu = useLichSuImport();
@@ -218,6 +223,14 @@ export default function AdminNhapDuLieu() {
     setImportId(undefined);
     setFile(null);
     lichSu.refetch();
+  }
+
+  // Mở lại panel xác nhận cho 1 job đã validate xong (trang_thai='dang_xu_ly' + so_dong_thanh_cong>0)
+  // từ bảng lịch sử — dùng thẳng id job cũ, không cần upload lại file (dữ liệu preview đã có sẵn ở
+  // GET /import/{id}, xem PanelXemTruoc).
+  function moLaiXacNhan(id: string) {
+    setImportId(id);
+    requestAnimationFrame(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
 
   return (
@@ -299,18 +312,32 @@ export default function AdminNhapDuLieu() {
                             <BadgeTrangThaiImport trangThai={i.trang_thai} soDongLoi={i.so_dong_loi} />
                           </Table.Td>
                           <Table.Td ta="right">
-                            {i.so_dong_loi > 0 && (
-                              <Text
-                                component="button"
-                                fz={12.5}
-                                fw={700}
-                                c="accent.6"
-                                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-                                onClick={() => taiFileLoiTuLichSu.mutate(i.id)}
-                              >
-                                Xem file lỗi →
-                              </Text>
-                            )}
+                            <Group gap={12} justify="flex-end" wrap="nowrap">
+                              {i.trang_thai === 'dang_xu_ly' && i.so_dong_thanh_cong > 0 && (
+                                <Text
+                                  component="button"
+                                  fz={12.5}
+                                  fw={700}
+                                  c="danger.6"
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                  onClick={() => moLaiXacNhan(i.id)}
+                                >
+                                  Xác nhận →
+                                </Text>
+                              )}
+                              {i.so_dong_loi > 0 && (
+                                <Text
+                                  component="button"
+                                  fz={12.5}
+                                  fw={700}
+                                  c="accent.6"
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                  onClick={() => taiFileLoiTuLichSu.mutate(i.id)}
+                                >
+                                  Xem file lỗi →
+                                </Text>
+                              )}
+                            </Group>
                           </Table.Td>
                         </Table.Tr>
                       ))}
@@ -322,7 +349,11 @@ export default function AdminNhapDuLieu() {
           </Box>
         </Group>
 
-        {importId && <PanelXemTruoc importId={importId} onXongViec={dongXongViec} />}
+        {importId && (
+          <div ref={panelRef}>
+            <PanelXemTruoc importId={importId} onXongViec={dongXongViec} />
+          </div>
+        )}
       </Container>
     </>
   );
