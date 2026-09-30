@@ -45,22 +45,53 @@ describe('M4 — Hồ sơ: xem & sửa', () => {
     expect(screen.queryByRole('button', { name: 'Lưu' })).not.toBeInTheDocument();
   });
 
-  it('đổi nơi sinh (tỉnh/thành) → danh sách phường/xã đổi theo, giá trị phường/xã cũ bị xóa', async () => {
-    db.hoSo.noi_sinh_id = 'tinh-2';
-    db.hoSo.phuong_xa_id = 'phuong-2';
-    db.hoSo.noi_sinh_ten = 'Cần Thơ';
-    db.hoSo.phuong_xa_ten = 'Phường Châu Đốc';
+  it('nơi sinh là ô nhập tự do, gõ được giá trị bất kỳ (không giới hạn theo danh mục)', async () => {
+    const user = userEvent.setup();
+    renderDaDangNhap();
+    const oNoiSinh = await screen.findByLabelText('Nơi sinh');
+    await user.clear(oNoiSinh);
+    await user.type(oNoiSinh, 'Xã Tân Bình, huyện Tân Biên, tỉnh Tây Ninh (cũ)');
+    expect(oNoiSinh).toHaveValue('Xã Tân Bình, huyện Tân Biên, tỉnh Tây Ninh (cũ)');
+  });
+
+  it('đổi cư trú (tỉnh/thành) → danh sách phường/xã đổi theo, giá trị phường/xã cũ bị xóa', async () => {
+    db.hoSo.cu_tru_tinh_id = 'tinh-2';
+    db.hoSo.cu_tru_phuong_xa_id = 'phuong-2';
+    db.hoSo.cu_tru_tinh_ten = 'Cần Thơ';
+    db.hoSo.cu_tru_phuong_xa_ten = 'Phường Châu Đốc';
     const user = userEvent.setup();
     renderDaDangNhap();
 
-    const oPhuongXa = (await screen.findByLabelText(/^Phường\/xã/, { selector: 'input' })) as HTMLInputElement;
+    const oPhuongXa = (await screen.findByLabelText(/^Cư trú \(phường\/xã\)/, { selector: 'input' })) as HTMLInputElement;
     await waitFor(() => expect(oPhuongXa).toHaveValue('Phường Châu Đốc'));
 
-    const oNoiSinh = screen.getByLabelText(/^Nơi sinh/, { selector: 'input' });
-    await user.click(oNoiSinh);
+    const oTinh = screen.getByLabelText(/^Cư trú \(tỉnh\/thành\)/, { selector: 'input' });
+    await user.click(oTinh);
     await user.click(await screen.findByRole('option', { name: 'An Giang' }));
 
     await waitFor(() => expect(oPhuongXa).toHaveValue(''));
+  });
+
+  it('Cư trú (tỉnh/thành và phường/xã) chỉ tải địa danh HIỆN TẠI → gửi kèm ?phien_ban=hien_tai (các Select địa danh khác trên trang, vd lọc "Đơn vị công tác", KHÔNG bị ảnh hưởng)', async () => {
+    db.hoSo.cu_tru_tinh_id = 'tinh-1';
+    db.hoSo.cu_tru_phuong_xa_id = 'phuong-1';
+    db.hoSo.cu_tru_tinh_ten = 'An Giang';
+    db.hoSo.cu_tru_phuong_xa_ten = 'Phường Long Xuyên';
+    const phienBanNhan: (string | null)[] = [];
+    server.use(
+      http.get('/danh-muc/dia-danh', ({ request }) => {
+        const url = new URL(request.url);
+        phienBanNhan.push(url.searchParams.get('phien_ban'));
+        return HttpResponse.json({ data: [] });
+      }),
+    );
+    renderDaDangNhap();
+
+    // Trang còn Select địa danh khác (bộ lọc Tỉnh/thành trong "Đơn vị công tác", qua SelectDonVi) —
+    // cố ý KHÔNG truyền phienBan, nên phải thấy CẢ 2 loại: có 'hien_tai' (Cư trú) và có null (nơi khác).
+    await waitFor(() => expect(phienBanNhan.length).toBeGreaterThan(1));
+    expect(phienBanNhan).toContain('hien_tai');
+    expect(phienBanNhan).toContain(null);
   });
 
   it('nhập CCCD đã có người dùng → báo trùng ngay khi rời ô, không cần bấm Lưu', async () => {
@@ -76,8 +107,7 @@ describe('M4 — Hồ sơ: xem & sửa', () => {
   });
 
   it('chỉ gửi các trường đã đổi khi Lưu (PATCH một phần)', async () => {
-    db.hoSo.noi_sinh_id = 'tinh-1';
-    db.hoSo.phuong_xa_id = 'phuong-1';
+    db.hoSo.noi_sinh = 'Xã Long Xuyên, Tỉnh An Giang (cũ)';
     db.hoSo.so_dinh_danh_ca_nhan = '111111111111';
     db.hoSo.email_lien_he = 'a@vd.vn';
     db.hoSo.trinh_do_chuyen_mon = 'dai_hoc';
@@ -129,6 +159,84 @@ describe('M4 — Hồ sơ: xem & sửa', () => {
 
     await waitFor(() => expect(daGoiThem).toBe(true));
     // Chưa bấm Lưu — nút Lưu (nếu tồn tại) vẫn ở trạng thái không bắt buộc phải bấm cho riêng chuyên môn.
+  });
+
+  it('chưa có email_lien_he → không hiện badge trạng thái email', async () => {
+    db.hoSo.email_lien_he = null;
+    renderDaDangNhap();
+    await screen.findByLabelText('Số CCCD');
+    expect(screen.queryByText('Đã xác minh')).not.toBeInTheDocument();
+    expect(screen.queryByText('Chưa xác minh')).not.toBeInTheDocument();
+  });
+
+  it('có email nhưng chưa xác minh → badge vàng "Chưa xác minh" + nút gửi lại xác minh', async () => {
+    db.hoSo.email_lien_he = 'a@vd.vn';
+    db.hoSo.email_da_xac_minh = false;
+    renderDaDangNhap();
+
+    expect(await screen.findByText('Chưa xác minh')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Gửi lại email xác minh' })).toBeInTheDocument();
+  });
+
+  it('email đã xác minh → badge xanh "Đã xác minh", KHÔNG có nút gửi lại', async () => {
+    db.hoSo.email_lien_he = 'a@vd.vn';
+    db.hoSo.email_da_xac_minh = true;
+    renderDaDangNhap();
+
+    expect(await screen.findByText('Đã xác minh')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Gửi lại email xác minh' })).not.toBeInTheDocument();
+  });
+
+  it('bấm "Gửi lại email xác minh" → gọi API, disable nút sau khi gửi thành công', async () => {
+    db.hoSo.email_lien_he = 'a@vd.vn';
+    db.hoSo.email_da_xac_minh = false;
+    let daGoi = false;
+    server.use(
+      http.post('/hoc-vien/toi/gui-lai-xac-minh-email', () => {
+        daGoi = true;
+        return HttpResponse.json({ da_gui: true });
+      }),
+    );
+    const user = userEvent.setup();
+    renderDaDangNhap();
+
+    const nutGuiLai = await screen.findByRole('button', { name: 'Gửi lại email xác minh' });
+    await user.click(nutGuiLai);
+
+    await waitFor(() => expect(daGoi).toBe(true));
+    expect(await screen.findByText('Đã gửi lại email xác minh, vui lòng kiểm tra hộp thư.')).toBeInTheDocument();
+    await waitFor(() => expect(nutGuiLai).toBeDisabled());
+  });
+
+  it('nhập họ tên toàn ASCII 2+ từ → hiện cảnh báo có thể thiếu dấu tiếng Việt', async () => {
+    const user = userEvent.setup();
+    renderDaDangNhap();
+    const oHoTen = await screen.findByLabelText('Họ và tên');
+    await user.clear(oHoTen);
+    await user.type(oHoTen, 'Nguyen Van An');
+    expect(await screen.findByText(/Họ tên có thể đang thiếu dấu tiếng Việt/)).toBeInTheDocument();
+  });
+
+  it('họ tên có dấu tiếng Việt đầy đủ → không hiện cảnh báo thiếu dấu', async () => {
+    const user = userEvent.setup();
+    renderDaDangNhap();
+    const oHoTen = await screen.findByLabelText('Họ và tên');
+    await user.clear(oHoTen);
+    await user.type(oHoTen, 'Nguyễn Văn An');
+    expect(screen.queryByText(/Họ tên có thể đang thiếu dấu tiếng Việt/)).not.toBeInTheDocument();
+  });
+
+  it('nhập tên có từ cuối là họ phổ biến nhưng từ đầu không phải → hiện cảnh báo đảo ngược, bấm nút gợi ý đổi đúng thứ tự', async () => {
+    const user = userEvent.setup();
+    renderDaDangNhap();
+    const oHoTen = await screen.findByLabelText('Họ và tên');
+    await user.clear(oHoTen);
+    await user.type(oHoTen, 'Văn An Nguyễn');
+    expect(await screen.findByText(/Họ tên có thể bị đảo ngược thứ tự Họ và Tên/)).toBeInTheDocument();
+
+    const nutGoiY = screen.getByRole('button', { name: 'Dùng dạng gợi ý: Nguyễn Văn An' });
+    await user.click(nutGoiY);
+    expect(oHoTen).toHaveValue('Nguyễn Văn An');
   });
 
   it('response có xac_nhan_bi_huy:true → hộp thoại yêu cầu xác nhận lại, có nút Xác nhận lại', async () => {

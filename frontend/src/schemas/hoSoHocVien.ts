@@ -18,7 +18,7 @@ export const cccdSchema = z
 
 export const soDienThoaiSchema = z
   .string()
-  .regex(/^(0\d{9}|\+84\d{9})$/, 'Số điện thoại không đúng định dạng (VD: 0912345678)');
+  .regex(/^0\d{9}$/, 'Số điện thoại phải gồm đúng 10 chữ số, bắt đầu bằng 0 (không khoảng trắng, dấu chấm)');
 
 export const emailSchema = z.string().email('Email không đúng định dạng');
 
@@ -35,8 +35,13 @@ export const hoSoHocVienSchema = z
     nam_sinh: z.coerce.number().int().min(1940).max(NAM_HIEN_TAI),
     gioi_tinh: z.enum(['nam', 'nu', 'khac']).nullable().optional(),
     so_dinh_danh_ca_nhan: cccdSchema,
-    noi_sinh_id: z.string().min(1, 'Vui lòng chọn nơi sinh'),
-    phuong_xa_id: z.string().min(1, 'Vui lòng chọn phường/xã'),
+    // Sửa 2026-09-30: "Nơi sinh" đổi từ Select ràng buộc dia_danh sang ô nhập
+    // tự do (giấy khai sinh có thể ghi theo địa giới hành chính cũ).
+    noi_sinh: z.string().trim().min(1, 'Vui lòng nhập nơi sinh'),
+    // Thêm 2026-09-30: "Cư trú" — tùy chọn, dùng địa giới hành chính hiện tại
+    // (không bắt buộc, backend đã validate khớp tỉnh/phường-xã).
+    cu_tru_tinh_id: z.string().nullable().optional(),
+    cu_tru_phuong_xa_id: z.string().nullable().optional(),
     don_vi_cong_tac_id: z.string().min(1, 'Vui lòng chọn đơn vị công tác'),
     chuc_vu: z.string().trim().optional(),
     so_dien_thoai_lien_he: soDienThoaiSchema,
@@ -80,4 +85,43 @@ export function chuanHoaHoTen(hoTen: string): string {
     .split(' ')
     .map((t) => (t.length > 0 ? t[0].toLocaleUpperCase('vi') + t.slice(1).toLocaleLowerCase('vi') : t))
     .join(' ');
+}
+
+/** Phát hiện họ tên có thể đang gõ thiếu dấu tiếng Việt (🟡 cảnh báo, không chặn). */
+export function canhBaoThieuDau(hoTen: string): boolean {
+  const tu = hoTen.trim().split(/\s+/).filter(Boolean);
+  if (tu.length < 2) return false;
+  return /^[A-Za-z\s]+$/.test(hoTen.trim());
+}
+
+// Danh sách họ phổ biến tiếng Việt (không dấu, viết thường) — dùng để phát hiện khả năng đảo Họ/Tên.
+const HO_PHO_BIEN = new Set([
+  'nguyen', 'tran', 'le', 'pham', 'hoang', 'huynh', 'phan', 'vu', 'vo', 'dang',
+  'bui', 'do', 'ho', 'ngo', 'duong', 'ly', 'dinh', 'doan', 'dao', 'trinh',
+  'truong', 'lam', 'phung', 'mai', 'to', 'ta', 'vuong', 'cao', 'luu', 'chau',
+  'thai', 'chu', 'kieu', 'quach', 'dam', 'ung', 'au', 'la', 'tang', 'diep',
+]);
+
+function boDauChuThuong(tu: string): string {
+  return tu
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/đ/gi, 'd')
+    .toLocaleLowerCase('vi');
+}
+
+/** Phát hiện họ tên có thể bị đảo ngược thứ tự Họ ↔ Tên (🟡 cảnh báo, không chặn). */
+export function canhBaoDaoTen(hoTen: string): boolean {
+  const tu = hoTen.trim().split(/\s+/).filter(Boolean);
+  if (tu.length < 2) return false;
+  const dauLaHo = HO_PHO_BIEN.has(boDauChuThuong(tu[0]));
+  const cuoiLaHo = HO_PHO_BIEN.has(boDauChuThuong(tu[tu.length - 1]));
+  return !dauLaHo && cuoiLaHo;
+}
+
+/** Gợi ý dạng đảo lại thứ tự: đưa từ cuối lên đầu, giữ nguyên thứ tự các từ còn lại. */
+export function guiYDaoTen(hoTen: string): string {
+  const tu = hoTen.trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
+  if (tu.length < 2) return hoTen;
+  return [tu[tu.length - 1], ...tu.slice(0, tu.length - 1)].join(' ');
 }

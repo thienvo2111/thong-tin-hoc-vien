@@ -5,6 +5,7 @@ import { useBlocker, useLocation, useNavigate } from 'react-router-dom';
 import { useDebouncedValue } from '@mantine/hooks';
 import {
   Anchor,
+  Badge,
   Box,
   Button,
   Card,
@@ -22,6 +23,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
+  guiLaiXacMinhEmail,
   kiemTraTrungCccd,
   suaHoSoToi,
   themChuyenMon,
@@ -35,7 +37,10 @@ import { ApiError } from '@/api/client';
 import type { HocVien } from '@/api/types';
 import {
   canhBaoChuaVietHoa,
+  canhBaoDaoTen,
+  canhBaoThieuDau,
   chuanHoaHoTen,
+  guiYDaoTen,
   hoSoHocVienSchema,
   type HoSoHocVienForm,
 } from '@/schemas/hoSoHocVien';
@@ -49,9 +54,12 @@ import { SelectDonVi } from '@/components/SelectDonVi';
 
 const NHOM_TRUONG = {
   ca_nhan: ['ho_ten', 'ngay_sinh', 'thang_sinh', 'nam_sinh', 'so_dinh_danh_ca_nhan'],
-  noi_sinh: ['noi_sinh_id', 'phuong_xa_id'],
-  cong_tac: ['don_vi_cong_tac_id', 'chuc_vu', 'so_dien_thoai_lien_he'],
-  lien_he: ['email_lien_he'],
+  noi_sinh: ['noi_sinh'],
+  // Chỉ để nhóm UI (mục lục) — KHÔNG dùng cho logic "cần bổ sung" (coThieu),
+  // vì Cư trú là trường tùy chọn (sửa 2026-09-30).
+  cu_tru: ['cu_tru_tinh_id', 'cu_tru_phuong_xa_id'],
+  cong_tac: ['don_vi_cong_tac_id', 'chuc_vu'],
+  lien_he: ['so_dien_thoai_lien_he', 'email_lien_he'],
   chuyen_mon: ['trinh_do_chuyen_mon', 'trinh_do_chuyen_mon_khac', 'cap_giang_day', 'mon_giang_day_id', 'chuyen_mon'],
 } as const;
 
@@ -59,7 +67,8 @@ const NHOM_NGAY_SINH = new Set(['ngay_sinh', 'thang_sinh', 'nam_sinh']);
 
 const MUC_LUC = [
   { id: 'section-ca-nhan', nhan: 'Thông tin cá nhân', nhom: NHOM_TRUONG.ca_nhan },
-  { id: 'section-noi-sinh', nhan: 'Nơi sinh & cư trú', nhom: NHOM_TRUONG.noi_sinh },
+  { id: 'section-noi-sinh', nhan: 'Nơi sinh', nhom: NHOM_TRUONG.noi_sinh },
+  { id: 'section-cu-tru', nhan: 'Cư trú', nhom: null },
   { id: 'section-cong-tac', nhan: 'Công tác', nhom: NHOM_TRUONG.cong_tac },
   { id: 'section-lien-he', nhan: 'Liên hệ', nhom: NHOM_TRUONG.lien_he },
   { id: 'section-chuyen-mon', nhan: 'Trình độ & chuyên môn', nhom: NHOM_TRUONG.chuyen_mon },
@@ -73,8 +82,9 @@ function toFormValues(hoSo: HocVien | undefined): HoSoHocVienForm {
     nam_sinh: (hoSo?.nam_sinh ?? undefined) as unknown as number,
     gioi_tinh: hoSo?.gioi_tinh ?? null,
     so_dinh_danh_ca_nhan: hoSo?.so_dinh_danh_ca_nhan ?? '',
-    noi_sinh_id: hoSo?.noi_sinh_id ?? '',
-    phuong_xa_id: hoSo?.phuong_xa_id ?? '',
+    noi_sinh: hoSo?.noi_sinh ?? '',
+    cu_tru_tinh_id: hoSo?.cu_tru_tinh_id ?? null,
+    cu_tru_phuong_xa_id: hoSo?.cu_tru_phuong_xa_id ?? null,
     don_vi_cong_tac_id: hoSo?.don_vi_cong_tac_id ?? '',
     chuc_vu: hoSo?.chuc_vu ?? '',
     so_dien_thoai_lien_he: hoSo?.so_dien_thoai_lien_he ?? '',
@@ -112,10 +122,20 @@ export default function HoSo() {
     return map;
   }, [mucDoDayDu]);
 
-  const coThieu = (truong: readonly string[]) => truong.some((f) => f in thieuMap);
-  /** Lỗi validate (nếu có) được ưu tiên; nếu không, đánh dấu "Cần bổ sung" khi trường nằm trong muc-do-day-du.thieu. */
-  function loiHoacThieu(truong: string, rhfMessage?: string): string | undefined {
-    return rhfMessage ?? (thieuMap[truong] ? 'Cần bổ sung' : undefined);
+  const coThieu = (truong: readonly string[] | null) => !!truong && truong.some((f) => f in thieuMap);
+  // Sửa 2026-09-30: trước đây chỉ dùng thieuMap (dữ liệu server lúc TẢI TRANG,
+  // không phản ánh giá trị hiện tại trong form) khiến dù đã chọn giá trị vẫn
+  // hiện "Cần bổ sung" cho tới khi bấm Lưu. Giờ CHỈ hiện nhãn đó khi giá trị
+  // HIỆN TẠI trong form (giaTriHienTai) thật sự rỗng.
+  function loiHoacThieu(truong: string, rhfMessage: string | undefined, giaTriHienTai: unknown): string | undefined {
+    if (rhfMessage) return rhfMessage;
+    if (!(truong in thieuMap)) return undefined;
+    const rong =
+      giaTriHienTai === null ||
+      giaTriHienTai === undefined ||
+      giaTriHienTai === '' ||
+      (Array.isArray(giaTriHienTai) && giaTriHienTai.length === 0);
+    return rong ? 'Cần bổ sung' : undefined;
   }
 
   // Hồ sơ import_moet thường thiếu nhiều trường cùng lúc (CCCD, nơi sinh...). Nếu validate & chặn Lưu
@@ -211,6 +231,17 @@ export default function HoSo() {
       if (err instanceof ApiError && err.code === 'CONFLICT') {
         setError('so_dinh_danh_ca_nhan', { message: thongDiepLoiChung(err) });
       }
+    },
+  });
+
+  // 2026-09-30: badge trạng thái email + nút gửi lại xác minh (dac-ta § M4 mục Liên hệ).
+  const guiLaiXacMinhMutation = useMutation({
+    mutationFn: guiLaiXacMinhEmail,
+    onSuccess: () => {
+      notifications.show({ color: 'green', message: 'Đã gửi lại email xác minh, vui lòng kiểm tra hộp thư.' });
+    },
+    onError: (err) => {
+      notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
     },
   });
 
@@ -344,7 +375,7 @@ export default function HoSo() {
 
                 <TextInput
                   label="Họ và tên"
-                  error={loiHoacThieu('ho_ten', errors.ho_ten?.message)}
+                  error={loiHoacThieu('ho_ten', errors.ho_ten?.message, hoTenHienTai)}
                   disabled={chiXem}
                   {...register('ho_ten')}
                 />
@@ -362,13 +393,32 @@ export default function HoSo() {
                     </Button>
                   </Group>
                 )}
+                {!chiXem && hoTenHienTai && canhBaoThieuDau(hoTenHienTai) && (
+                  <Text size="sm" c="yellow.8">
+                    🟡 Họ tên có thể đang thiếu dấu tiếng Việt — kiểm tra lại nếu đây không phải tên nước ngoài.
+                  </Text>
+                )}
+                {!chiXem && hoTenHienTai && canhBaoDaoTen(hoTenHienTai) && (
+                  <Group gap="xs" wrap="wrap">
+                    <Text size="sm" c="yellow.8">
+                      🟡 Họ tên có thể bị đảo ngược thứ tự Họ và Tên — kiểm tra lại nếu chưa đúng.
+                    </Text>
+                    <Button
+                      variant="subtle"
+                      size="xs"
+                      onClick={() => setValue('ho_ten', guiYDaoTen(hoTenHienTai), { shouldDirty: true, shouldValidate: true })}
+                    >
+                      Dùng dạng gợi ý: {guiYDaoTen(hoTenHienTai)}
+                    </Button>
+                  </Group>
+                )}
 
                 <Group grow>
                   <TextInput
                     label="Ngày sinh"
                     inputMode="numeric"
                     maxLength={2}
-                    error={loiHoacThieu('ngay_sinh', errors.ngay_sinh?.message)}
+                    error={loiHoacThieu('ngay_sinh', errors.ngay_sinh?.message, watch('ngay_sinh'))}
                     disabled={chiXem}
                     {...register('ngay_sinh')}
                   />
@@ -376,7 +426,7 @@ export default function HoSo() {
                     label="Tháng sinh"
                     inputMode="numeric"
                     maxLength={2}
-                    error={loiHoacThieu('thang_sinh', errors.thang_sinh?.message)}
+                    error={loiHoacThieu('thang_sinh', errors.thang_sinh?.message, watch('thang_sinh'))}
                     disabled={chiXem}
                     {...register('thang_sinh')}
                   />
@@ -384,7 +434,7 @@ export default function HoSo() {
                     label="Năm sinh"
                     inputMode="numeric"
                     maxLength={4}
-                    error={loiHoacThieu('nam_sinh', errors.nam_sinh?.message)}
+                    error={loiHoacThieu('nam_sinh', errors.nam_sinh?.message, watch('nam_sinh'))}
                     disabled={chiXem}
                     {...register('nam_sinh')}
                   />
@@ -409,7 +459,7 @@ export default function HoSo() {
                   label="Số CCCD"
                   inputMode="numeric"
                   maxLength={12}
-                  error={loiHoacThieu('so_dinh_danh_ca_nhan', errors.so_dinh_danh_ca_nhan?.message)}
+                  error={loiHoacThieu('so_dinh_danh_ca_nhan', errors.so_dinh_danh_ca_nhan?.message, watch('so_dinh_danh_ca_nhan'))}
                   disabled={chiXem}
                   {...register('so_dinh_danh_ca_nhan', { onBlur: xuLyBlurCccd })}
                 />
@@ -425,41 +475,59 @@ export default function HoSo() {
               <Stack gap="md">
                 <Group gap={6}>
                   {coThieu(NHOM_TRUONG.noi_sinh) && <ChamThieu />}
-                  <Text fw={600}>Nơi sinh &amp; cư trú</Text>
+                  <Text fw={600}>Nơi sinh</Text>
                 </Group>
 
+                <TextInput
+                  label="Nơi sinh"
+                  placeholder="Ví dụ: Xã ABC, huyện XYZ, tỉnh Hà Tây (cũ)"
+                  description="Ghi theo giấy khai sinh — có thể theo địa giới hành chính cũ, không nhất thiết khớp danh mục tỉnh/thành hiện tại"
+                  error={loiHoacThieu('noi_sinh', errors.noi_sinh?.message, watch('noi_sinh'))}
+                  disabled={chiXem}
+                  {...register('noi_sinh')}
+                />
+              </Stack>
+            </Card>
+
+            <Card id="section-cu-tru" withBorder radius="md">
+              <Stack gap="md">
+                <Text fw={600}>Cư trú</Text>
+                <Text size="xs" c="dimmed">
+                  Tùy chọn — dùng địa giới hành chính hiện tại, không bắt buộc.
+                </Text>
+
                 <Controller
-                  name="noi_sinh_id"
+                  name="cu_tru_tinh_id"
                   control={control}
                   render={({ field }) => (
                     <SelectDiaDanh
-                      label="Nơi sinh (tỉnh/thành)"
+                      label="Cư trú (tỉnh/thành)"
                       cap="tinh_thanh"
+                      phienBan="hien_tai"
                       value={field.value || null}
                       onChange={(id) => {
-                        if (id !== field.value) setValue('phuong_xa_id', '', { shouldDirty: true });
-                        field.onChange(id ?? '');
+                        if (id !== field.value) setValue('cu_tru_phuong_xa_id', null, { shouldDirty: true });
+                        field.onChange(id ?? null);
                       }}
-                      error={loiHoacThieu('noi_sinh_id', errors.noi_sinh_id?.message)}
+                      error={loiHoacThieu('cu_tru_tinh_id', errors.cu_tru_tinh_id?.message, field.value)}
                       disabled={chiXem}
-                      required
                     />
                   )}
                 />
 
                 <Controller
-                  name="phuong_xa_id"
+                  name="cu_tru_phuong_xa_id"
                   control={control}
                   render={({ field }) => (
                     <SelectDiaDanh
-                      label="Phường/xã"
+                      label="Cư trú (phường/xã)"
                       cap="phuong_xa_dac_khu"
-                      parentId={watch('noi_sinh_id') || null}
+                      phienBan="hien_tai"
+                      parentId={watch('cu_tru_tinh_id') || null}
                       value={field.value || null}
-                      onChange={(id) => field.onChange(id ?? '')}
-                      error={loiHoacThieu('phuong_xa_id', errors.phuong_xa_id?.message)}
+                      onChange={(id) => field.onChange(id ?? null)}
+                      error={loiHoacThieu('cu_tru_phuong_xa_id', errors.cu_tru_phuong_xa_id?.message, field.value)}
                       disabled={chiXem}
-                      required
                     />
                   )}
                 />
@@ -481,7 +549,7 @@ export default function HoSo() {
                       label="Đơn vị công tác"
                       nhanBanDau={donViNhanBanDau}
                       onChange={(id) => field.onChange(id ?? '')}
-                      error={loiHoacThieu('don_vi_cong_tac_id', errors.don_vi_cong_tac_id?.message)}
+                      error={loiHoacThieu('don_vi_cong_tac_id', errors.don_vi_cong_tac_id?.message, field.value)}
                       disabled={chiXem}
                       required
                     />
@@ -489,15 +557,6 @@ export default function HoSo() {
                 />
 
                 <TextInput label="Chức vụ" disabled={chiXem} {...register('chuc_vu')} />
-
-                <TextInput
-                  label="Số điện thoại"
-                  inputMode="numeric"
-                  maxLength={10}
-                  error={loiHoacThieu('so_dien_thoai_lien_he', errors.so_dien_thoai_lien_he?.message)}
-                  disabled={chiXem}
-                  {...register('so_dien_thoai_lien_he')}
-                />
               </Stack>
             </Card>
 
@@ -507,14 +566,43 @@ export default function HoSo() {
                   {coThieu(NHOM_TRUONG.lien_he) && <ChamThieu />}
                   <Text fw={600}>Liên hệ</Text>
                 </Group>
+
+                <TextInput
+                  label="Số điện thoại"
+                  inputMode="numeric"
+                  maxLength={10}
+                  description="10 chữ số, bắt đầu bằng 0 — ví dụ: 0912345678"
+                  error={loiHoacThieu('so_dien_thoai_lien_he', errors.so_dien_thoai_lien_he?.message, watch('so_dien_thoai_lien_he'))}
+                  disabled={chiXem}
+                  {...register('so_dien_thoai_lien_he')}
+                />
+
                 <TextInput
                   label="Email"
                   description="Hệ thống gửi bản sao hồ sơ và thông báo lớp học qua email này"
                   type="email"
-                  error={loiHoacThieu('email_lien_he', errors.email_lien_he?.message)}
+                  error={loiHoacThieu('email_lien_he', errors.email_lien_he?.message, watch('email_lien_he'))}
                   disabled={chiXem}
                   {...register('email_lien_he')}
                 />
+                {hoSo?.email_lien_he && (
+                  <Group gap="sm" wrap="wrap">
+                    <Badge color={hoSo.email_da_xac_minh ? 'green' : 'yellow'} variant="light">
+                      {hoSo.email_da_xac_minh ? 'Đã xác minh' : 'Chưa xác minh'}
+                    </Badge>
+                    {!hoSo.email_da_xac_minh && (
+                      <Button
+                        variant="subtle"
+                        size="xs"
+                        onClick={() => guiLaiXacMinhMutation.mutate()}
+                        loading={guiLaiXacMinhMutation.isPending}
+                        disabled={guiLaiXacMinhMutation.isSuccess}
+                      >
+                        Gửi lại email xác minh
+                      </Button>
+                    )}
+                  </Group>
+                )}
               </Stack>
             </Card>
 
@@ -534,7 +622,7 @@ export default function HoSo() {
                       data={TRINH_DO_OPTIONS}
                       value={field.value ?? null}
                       onChange={field.onChange}
-                      error={loiHoacThieu('trinh_do_chuyen_mon', errors.trinh_do_chuyen_mon?.message)}
+                      error={loiHoacThieu('trinh_do_chuyen_mon', errors.trinh_do_chuyen_mon?.message, field.value)}
                       disabled={chiXem}
                       required
                     />
@@ -543,7 +631,7 @@ export default function HoSo() {
                 {trinhDoHienTai === 'khac' && (
                   <TextInput
                     label="Mô tả trình độ"
-                    error={loiHoacThieu('trinh_do_chuyen_mon_khac', errors.trinh_do_chuyen_mon_khac?.message)}
+                    error={loiHoacThieu('trinh_do_chuyen_mon_khac', errors.trinh_do_chuyen_mon_khac?.message, watch('trinh_do_chuyen_mon_khac'))}
                     disabled={chiXem}
                     {...register('trinh_do_chuyen_mon_khac')}
                   />
