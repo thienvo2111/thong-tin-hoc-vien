@@ -215,7 +215,7 @@ function TheBaoCaoXacNhan() {
   const ketQua = useBaoCaoXacNhan(params, modalMo);
   const excel = useTaiExcel();
 
-  const tuyChonDot = (dot.data?.data ?? []).map((d) => ({ value: d.id, label: d.ten }));
+  const tuyChonDot = (dot.data ?? []).map((d) => ({ value: d.id, label: d.ten }));
 
   return (
     <KhungTheBaoCao testId="the-bao-cao-xac-nhan" icon="✅" iconBg="#EAF6F0" title="Báo cáo xác nhận" desc="Danh sách học viên đã/chưa xác nhận thông tin theo từng đợt.">
