@@ -53,12 +53,18 @@ export class HoSoNhanSuMoetRowDto {
   @MaxLength(100)
   chuc_vu?: string;
 
+  // T4c (2026-09-30): danh sách tiếp nhận MOET thực tế có dòng THIẾU cả
+  // chuyên môn lẫn SĐT — TÙY CHỌN ở đây, bổ sung sau qua PATCH /hoc-vien/toi
+  // (chặn ở validateHocVien requireFull=true khi xác nhận, xem
+  // checkValidMoetImportRow ở HocVienService).
+  @IsOptional()
   @IsString()
-  chuyen_mon_raw: string;
+  chuyen_mon_raw?: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  so_dien_thoai_lien_he: string;
+  so_dien_thoai_lien_he?: string;
 
   @IsOptional()
   @IsString()

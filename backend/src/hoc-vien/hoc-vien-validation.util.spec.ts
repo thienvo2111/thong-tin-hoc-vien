@@ -38,6 +38,15 @@ describe('validateHoTen', () => {
     expect(r.canhBao.length).toBeGreaterThan(0);
     expect(r.normalized).toBe('Nguyễn Văn An');
   });
+
+  it('tên dạng Unicode NFD (dấu tổ hợp, vd. gõ trên macOS) -> không lỗi, tự chuẩn hóa về NFC', () => {
+    const nfd = 'Nguyễn Văn An'.normalize('NFD');
+    expect(nfd).not.toBe('Nguyễn Văn An'); // xác nhận input test thực sự là NFD
+    const r = validateHoTen(nfd);
+    expect(r.loi).toHaveLength(0);
+    expect(r.normalized).toBe('Nguyễn Văn An');
+    expect(r.normalized.normalize('NFC')).toBe(r.normalized);
+  });
 });
 
 describe('validateSoDinhDanh', () => {

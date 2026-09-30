@@ -535,8 +535,9 @@ export class ImportService {
   }
 
   // Rule #24/#36e: "Chuyên môn" có thể nhiều giá trị/dòng, phân tách bằng ";".
-  private splitChuyenMon(raw: string): string[] {
-    return raw
+  // T4c: raw có thể undefined (cột trống, dòng import_moet thiếu chuyên môn).
+  private splitChuyenMon(raw?: string): string[] {
+    return (raw ?? '')
       .split(';')
       .map((s) => s.trim())
       .filter(Boolean);
@@ -885,7 +886,10 @@ export class ImportService {
       nam_sinh: raw['Năm'],
       chuc_vu: raw['Chức vụ'] || undefined,
       chuyen_mon_raw: raw['Chuyên môn'],
-      so_dien_thoai_lien_he: sdt,
+      // T4c: cột trống -> '' (suaSoDienThoaiThieuSo0) — đổi undefined để
+      // @IsOptional() ở HoSoNhanSuMoetRowDto bỏ qua @MinLength(1), không báo
+      // lỗi "phải có ít nhất 1 ký tự" cho dòng THIẾU SĐT hợp lệ.
+      so_dien_thoai_lien_he: sdt || undefined,
       ghi_chu: raw['Ghi chú'] || undefined,
       don_vi_cong_tac_id: donViId,
     });

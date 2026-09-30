@@ -361,7 +361,7 @@ model hoc_vien {
 
   don_vi_cong_tac_id String @db.Uuid
 
-  so_dien_thoai_lien_he String  @db.VarChar(20)
+  so_dien_thoai_lien_he String? @db.VarChar(20)
   email_lien_he         String? @db.VarChar(255)
 
   trinh_do_chuyen_mon      trinh_do_chuyen_mon?

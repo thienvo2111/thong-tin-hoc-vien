@@ -774,10 +774,19 @@ describe('HocVienService', () => {
       ).rejects.toBeInstanceOf(ValidationException);
     });
 
-    it('chuyen_mon rỗng sau khi tách -> lỗi', async () => {
+    it('chuyen_mon rỗng sau khi tách -> hợp lệ (T4c, bổ sung sau)', async () => {
       await expect(
         service.checkValidMoetImportRow({ ...baseMoetInput(), chuyen_mon: [] }),
-      ).rejects.toBeInstanceOf(ValidationException);
+      ).resolves.toBeUndefined();
+    });
+
+    it('so_dien_thoai_lien_he thiếu (undefined) -> hợp lệ (T4c, bổ sung sau)', async () => {
+      await expect(
+        service.checkValidMoetImportRow({
+          ...baseMoetInput(),
+          so_dien_thoai_lien_he: undefined,
+        }),
+      ).resolves.toBeUndefined();
     });
 
     it('don_vi_cong_tac không active/không phải truong -> lỗi', async () => {

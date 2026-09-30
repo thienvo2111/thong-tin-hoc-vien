@@ -299,8 +299,14 @@ CREATE TABLE hoc_vien (
     -- Công tác — CÓ trong cả 2 luồng (self: chọn tay; import: khớp theo cột "Đơn vị")
     don_vi_cong_tac_id      uuid NOT NULL REFERENCES don_vi_cong_tac(id),
 
-    -- Liên hệ — SĐT có ở cả 2 luồng; email KHÔNG có trong danh sách MOET
-    so_dien_thoai_lien_he   varchar(20) NOT NULL,
+    -- Liên hệ — SĐT có ở cả 2 luồng; email KHÔNG có trong danh sách MOET.
+    -- Sửa 2026-09-30: SĐT NOT NULL vẫn đúng cho tu_dang_ky (bắt buộc lúc tự
+    -- đăng ký), nhưng import_moet cho phép NULL lúc import — danh sách tiếp
+    -- nhận MOET thực tế có dòng thiếu SĐT; học viên tự bổ sung sau. DB không
+    -- phân biệt được theo nguon_tao ở tầng CHECK constraint đơn giản, nên bỏ
+    -- NOT NULL ở đây, ép buộc "bắt buộc cho tu_dang_ky" chuyển hẳn sang tầng
+    -- API (CreateHocVienDto vẫn @IsString() bắt buộc, không đổi).
+    so_dien_thoai_lien_he   varchar(20),
     email_lien_he           varchar(255),
 
     -- Trình độ & chuyên môn — không có trong danh sách MOET, bổ sung sau

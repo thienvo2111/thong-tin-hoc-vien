@@ -1227,7 +1227,7 @@ export class HocVienService {
     ngay_sinh: number;
     thang_sinh: number;
     nam_sinh: number;
-    so_dien_thoai_lien_he: string;
+    so_dien_thoai_lien_he?: string;
     chuyen_mon: string[];
     don_vi_cong_tac_id: string;
   }): Promise<void> {
@@ -1277,7 +1277,14 @@ export class HocVienService {
         input.nam_sinh,
       ),
     );
-    loi.push(...validateSoDienThoai(input.so_dien_thoai_lien_he));
+    // T4c (2026-09-30): so_dien_thoai_lien_he giờ TÙY CHỌN ở luồng import_moet
+    // (danh sách tiếp nhận MOET thực tế có dòng thiếu cả SĐT lẫn chuyên môn)
+    // — chỉ validate ĐỊNH DẠNG khi CÓ giá trị, không còn bắt buộc phải có.
+    // Bổ sung sau qua PATCH /hoc-vien/toi, chặn khi xác nhận bởi
+    // validateHocVien(requireFull=true) — vẫn coi trường này là bắt buộc.
+    if (input.so_dien_thoai_lien_he) {
+      loi.push(...validateSoDienThoai(input.so_dien_thoai_lien_he));
+    }
 
     const donVi = await this.prisma.don_vi_cong_tac.findUnique({
       where: { id: input.don_vi_cong_tac_id },
@@ -1297,13 +1304,7 @@ export class HocVienService {
       });
     }
 
-    if (input.chuyen_mon.length === 0) {
-      loi.push({
-        field: 'chuyen_mon',
-        message:
-          'Cột "Chuyên môn" phải có ít nhất 1 giá trị (phân tách bằng ";")',
-      });
-    }
+    // T4c: mảng chuyên môn rỗng giờ hợp lệ (bổ sung sau) — bỏ báo lỗi cứng.
 
     if (loi.length > 0) {
       throw new ValidationException('Dòng dữ liệu không hợp lệ', loi);
@@ -1320,7 +1321,7 @@ export class HocVienService {
       nam_sinh: number;
       chuc_vu?: string;
       don_vi_cong_tac_id: string;
-      so_dien_thoai_lien_he: string;
+      so_dien_thoai_lien_he?: string;
       ghi_chu?: string;
       chuyen_mon: string[];
     },

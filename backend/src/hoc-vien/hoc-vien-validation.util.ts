@@ -40,15 +40,17 @@ export function validateHoTen(hoTenRaw: string): {
     });
   }
 
-  if (!HO_TEN_REGEX.test(trimmedCollapsed)) {
-    // Rule #2
+  const normalized = trimmedCollapsed.normalize('NFC'); // Rule #3
+
+  if (!HO_TEN_REGEX.test(normalized)) {
+    // Rule #2 — test trên chuỗi đã NFC: chuỗi NFD hợp lệ (dấu tổ hợp, vd. gõ
+    // trên macOS/một số bộ gõ) có \p{M} (Mark) không khớp \p{L}, nếu test
+    // trước khi chuẩn hóa sẽ bị từ chối oan dù tên hoàn toàn hợp lệ.
     loi.push({
       field: 'ho_ten',
       message: 'Chỉ được chứa chữ cái và khoảng trắng, không số/ký tự đặc biệt',
     });
   }
-
-  const normalized = trimmedCollapsed.normalize('NFC'); // Rule #3
 
   const vietHoa = normalized
     .split(' ')
