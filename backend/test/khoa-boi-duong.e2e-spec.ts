@@ -861,7 +861,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post(`/khoa-boi-duong/${khoaId}/lop`)
         .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send({ ten_lop: 'Lớp A', si_so_toi_da: 30 })
+        .send({ loai_lop: 'truc_tiep', ten_lop: 'Lớp A', si_so_toi_da: 30 })
         .expect(201);
       lopId = res.body.id;
       expect(res.body.khoa_id).toBe(khoaId);
@@ -871,7 +871,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       await request(app.getHttpServer())
         .post(`/khoa-boi-duong/${khoaId}/lop`)
         .set('Authorization', `Bearer ${tokenTruong2}`)
-        .send({ ten_lop: 'Lớp lạ' })
+        .send({ loai_lop: 'truc_tiep', ten_lop: 'Lớp lạ' })
         .expect(403);
     });
 
@@ -979,7 +979,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       const lop = await request(app.getHttpServer())
         .post(`/khoa-boi-duong/${khoaId}/lop`)
         .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send({ ten_lop: tenLop })
+        .send({ loai_lop: 'truc_tiep', ten_lop: tenLop })
         .expect(201);
       lopId = lop.body.id;
 
@@ -1069,12 +1069,15 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         'ma_dinh_danh_moet',
         'ma_khoa',
         'ten_lop',
+        'ten_lop_zoom',
+        'ten_lop_vle',
+        'ten_cum',
       ]);
-      sheet.addRow([sddDaDuyet, '', maKhoa, '']); // hợp lệ — chỉ ghi danh
-      sheet.addRow(['000000000000', '', maKhoa, '']); // ĐDCN không tồn tại
-      sheet.addRow([sddChuaDuyet, '', maKhoa, '']); // hồ sơ chưa được duyệt
-      sheet.addRow([sddDaDuyet, '', 'KHONG-TON-TAI', '']); // khóa không tồn tại
-      sheet.addRow([sddDaDuyet, '', maKhoa, 'Lớp không tồn tại']); // lớp không tồn tại trong khóa
+      sheet.addRow([sddDaDuyet, '', maKhoa, '', '', '', '']); // hợp lệ — chỉ ghi danh
+      sheet.addRow(['000000000000', '', maKhoa, '', '', '', '']); // ĐDCN không tồn tại
+      sheet.addRow([sddChuaDuyet, '', maKhoa, '', '', '', '']); // hồ sơ chưa được duyệt
+      sheet.addRow([sddDaDuyet, '', 'KHONG-TON-TAI', '', '', '', '']); // khóa không tồn tại
+      sheet.addRow([sddDaDuyet, '', maKhoa, 'Lớp không tồn tại', '', '', '']); // lớp không tồn tại trong khóa
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
@@ -1109,10 +1112,13 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         },
       });
       expect(dangKy).not.toBeNull();
-      expect(dangKy?.lop_id).toBeNull();
+      const lopGan = await prisma.dang_ky_hoc_lop.findMany({
+        where: { dang_ky_hoc_id: dangKy!.id },
+      });
+      expect(lopGan).toHaveLength(0);
       expect(dangKy?.trang_thai).toBe('da_duyet');
 
-      // Nhánh chỉ ghi danh (lop_id vẫn NULL) KHÔNG kích hoạt sự kiện
+      // Nhánh chỉ ghi danh (không có dòng dang_ky_hoc_lop nào) KHÔNG kích hoạt sự kiện
       // dang_ky_hoc_phan_lop (docs/api-contract.md mục 8).
       const thongBaoPhanLop = await prisma.nhat_ky_thong_bao.findMany({
         where: {
@@ -1123,7 +1129,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       expect(thongBaoPhanLop).toHaveLength(0);
     });
 
-    it('GET /hoc-vien/toi/khoa-hoc, /ket-qua phản ánh đúng ghi danh (lop=null) vừa import', async () => {
+    it('GET /hoc-vien/toi/khoa-hoc, /ket-qua phản ánh đúng ghi danh (lop_truc_tiep=null) vừa import', async () => {
       const khoaHoc = await request(app.getHttpServer())
         .get('/hoc-vien/toi/khoa-hoc')
         .set('Authorization', `Bearer ${tokenHocVienDaDuyet}`)
@@ -1132,7 +1138,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         (r: { khoa: { id: string } }) => r.khoa.id === khoaId,
       );
       expect(entry).toBeDefined();
-      expect(entry.lop).toBeNull();
+      expect(entry.lop_truc_tiep).toBeNull();
 
       const ketQua = await request(app.getHttpServer())
         .get('/hoc-vien/toi/ket-qua')
@@ -1143,7 +1149,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       );
       expect(entryKq).toBeDefined();
       expect(entryKq.trang_thai).toBe('da_duyet');
-      expect(entryKq.lop).toBeNull();
+      expect(entryKq.lop_truc_tiep).toBeNull();
     });
 
     it('chạy lại import lần 2 với ten_lop có giá trị -> phân lớp cho học viên đã ghi danh (lop_id, trang_thai=da_phan_lop)', async () => {
@@ -1154,8 +1160,11 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         'ma_dinh_danh_moet',
         'ma_khoa',
         'ten_lop',
+        'ten_lop_zoom',
+        'ten_lop_vle',
+        'ten_cum',
       ]);
-      sheet.addRow([sddDaDuyet, '', maKhoa, tenLop]);
+      sheet.addRow([sddDaDuyet, '', maKhoa, tenLop, '', '', '']);
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
@@ -1178,10 +1187,18 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
           },
         },
       });
-      expect(dangKy?.lop_id).toBe(lopId);
       expect(dangKy?.trang_thai).toBe('da_phan_lop');
+      const lopGan = await prisma.dang_ky_hoc_lop.findUnique({
+        where: {
+          dang_ky_hoc_id_loai_lop: {
+            dang_ky_hoc_id: dangKy!.id,
+            loai_lop: 'truc_tiep',
+          },
+        },
+      });
+      expect(lopGan?.lop_id).toBe(lopId);
 
-      // Nhánh gán lop_id thực sự -> kích hoạt sự kiện dang_ky_hoc_phan_lop,
+      // Nhánh gán lớp trực tiếp thực sự -> kích hoạt sự kiện dang_ky_hoc_phan_lop,
       // gửi thật qua Ethereal (không SMTP giả) -> ghi trang_thai=thanh_cong.
       const thongBaoPhanLop = await prisma.nhat_ky_thong_bao.findMany({
         where: {
@@ -1238,8 +1255,11 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         'ma_dinh_danh_moet',
         'ma_khoa',
         'ten_lop',
+        'ten_lop_zoom',
+        'ten_lop_vle',
+        'ten_cum',
       ]);
-      sheet.addRow([sddMoi, '', maKhoa, tenLop]);
+      sheet.addRow([sddMoi, '', maKhoa, tenLop, '', '', '']);
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
@@ -1260,8 +1280,16 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         },
       });
       expect(dangKy).not.toBeNull();
-      expect(dangKy?.lop_id).toBe(lopId);
       expect(dangKy?.trang_thai).toBe('da_phan_lop');
+      const lopGan = await prisma.dang_ky_hoc_lop.findUnique({
+        where: {
+          dang_ky_hoc_id_loai_lop: {
+            dang_ky_hoc_id: dangKy!.id,
+            loai_lop: 'truc_tiep',
+          },
+        },
+      });
+      expect(lopGan?.lop_id).toBe(lopId);
 
       const thongBaoPhanLop = await prisma.nhat_ky_thong_bao.findMany({
         where: {
@@ -1300,7 +1328,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
 
       tenLop = `Lớp T3 ${suf}`;
       await prisma.lop_hoc.create({
-        data: { khoa_id: khoaId, ten_lop: tenLop },
+        data: { khoa_id: khoaId, loai_lop: 'truc_tiep', ten_lop: tenLop },
       });
     });
 
@@ -1341,8 +1369,11 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         'ma_dinh_danh_moet',
         'ma_khoa',
         'ten_lop',
+        'ten_lop_zoom',
+        'ten_lop_vle',
+        'ten_cum',
       ]);
-      sheet.addRow(['', maMoet, maKhoa, '']);
+      sheet.addRow(['', maMoet, maKhoa, '', '', '', '']);
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
@@ -1369,7 +1400,10 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         where: { hoc_vien_id_khoa_id: { hoc_vien_id: hv.id, khoa_id: khoaId } },
       });
       expect(dangKy).not.toBeNull();
-      expect(dangKy?.lop_id).toBeNull();
+      const lopGan = await prisma.dang_ky_hoc_lop.findMany({
+        where: { dang_ky_hoc_id: dangKy!.id },
+      });
+      expect(lopGan).toHaveLength(0);
       expect(dangKy?.trang_thai).toBe('da_duyet');
     });
 
@@ -1395,8 +1429,11 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         'ma_dinh_danh_moet',
         'ma_khoa',
         'ten_lop',
+        'ten_lop_zoom',
+        'ten_lop_vle',
+        'ten_cum',
       ]);
-      sheet.addRow([sddA, moetB, maKhoa, '']); // trỏ 2 hồ sơ khác nhau
+      sheet.addRow([sddA, moetB, maKhoa, '', '', '', '']); // trỏ 2 hồ sơ khác nhau
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
@@ -1452,8 +1489,13 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         'ma_dinh_danh_moet',
         'ma_khoa',
         'ten_lop',
+        'ten_lop_zoom',
+        'ten_lop_vle',
+        'ten_cum',
       ]);
-      specs.forEach((s) => sheet.addRow([s.sdd, '', maKhoa, tenLop]));
+      specs.forEach((s) =>
+        sheet.addRow([s.sdd, '', maKhoa, tenLop, '', '', '']),
+      );
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())

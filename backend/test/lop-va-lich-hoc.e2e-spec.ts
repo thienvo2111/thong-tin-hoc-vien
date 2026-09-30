@@ -16,6 +16,7 @@ const NAM_HOP_LE = new Date().getUTCFullYear() - 20;
 const COLUMNS = [
   'ma_khoa',
   'ten_lop',
+  'loai_lop',
   'nhom_hoc_vien',
   'muc_nang_luc',
   'si_so_toi_da',
@@ -197,6 +198,7 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         rows.push([
           khoa.ma_khoa,
           tenLop(i),
+          'truc_tiep', // loai_lop
           i, // nhom_hoc_vien
           'co_ban',
           30,
@@ -210,6 +212,7 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         rows.push([
           khoa.ma_khoa,
           tenLop(i),
+          'truc_tiep',
           i,
           'co_ban',
           30,
@@ -267,6 +270,7 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         [
           khoa.ma_khoa,
           tenLop1,
+          'truc_tiep',
           1,
           'co_ban',
           30,
@@ -312,6 +316,7 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
       const rowHopLe: (string | number | undefined)[] = [
         khoa.ma_khoa,
         tenLopMoi,
+        'truc_tiep',
         1,
         'co_ban',
         30,
@@ -347,6 +352,7 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         [
           khoa.ma_khoa,
           `Lop-T6-${khoa.ma_khoa}-sai-gio`,
+          'truc_tiep',
           1,
           'co_ban',
           30,
@@ -376,6 +382,7 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         [
           khoa.ma_khoa,
           `Lop-T6-${khoa.ma_khoa}-gd-sai`,
+          'truc_tiep',
           1,
           'co_ban',
           30,
@@ -415,7 +422,7 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
       const lop = await request(app.getHttpServer())
         .post(`/khoa-boi-duong/${khoa.id}/lop`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .send({ ten_lop: 'Lớp buổi' })
+        .send({ loai_lop: 'truc_tiep', ten_lop: 'Lớp buổi' })
         .expect(201);
       lopId = lop.body.id;
     });
@@ -471,7 +478,7 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
       const lop = await request(app.getHttpServer())
         .post(`/khoa-boi-duong/${khoa.id}/lop`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .send({ ten_lop: 'Lớp thứ tự' })
+        .send({ loai_lop: 'truc_tiep', ten_lop: 'Lớp thứ tự' })
         .expect(201);
       const lopId = lop.body.id;
 
@@ -508,12 +515,18 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         .expect(201);
 
       const { hocVien, tenDangNhap } = await taoHocVienMoet(suf);
-      await prisma.dang_ky_hoc.create({
+      const dangKy = await prisma.dang_ky_hoc.create({
         data: {
           hoc_vien_id: hocVien.id,
           khoa_id: khoa.id,
-          lop_id: lopId,
           trang_thai: 'da_phan_lop',
+        },
+      });
+      await prisma.dang_ky_hoc_lop.create({
+        data: {
+          dang_ky_hoc_id: dangKy.id,
+          lop_id: lopId,
+          loai_lop: 'truc_tiep',
         },
       });
       const token = await dangNhap(tenDangNhap, 'x');
@@ -526,7 +539,7 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         (r: { khoa: { id: string } }) => r.khoa.id === khoa.id,
       );
       expect(entry).toBeDefined();
-      const buoiList = entry.lop.lich_hoc as {
+      const buoiList = entry.lop_truc_tiep.lich_hoc as {
         giai_doan: { thu_tu: number };
         buoi_so: number;
       }[];
@@ -559,7 +572,12 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
       // Lớp có mức năng lực mục tiêu KHÁC ("nang_cao").
       const tenLop = `Lop-canhbao-${suf}`;
       await prisma.lop_hoc.create({
-        data: { khoa_id: khoa.id, ten_lop: tenLop, muc_nang_luc: 'nang_cao' },
+        data: {
+          khoa_id: khoa.id,
+          loai_lop: 'truc_tiep',
+          ten_lop: tenLop,
+          muc_nang_luc: 'nang_cao',
+        },
       });
 
       const workbook = new ExcelJS.Workbook();
@@ -569,8 +587,19 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         'ma_dinh_danh_moet',
         'ma_khoa',
         'ten_lop',
+        'ten_lop_zoom',
+        'ten_lop_vle',
+        'ten_cum',
       ]);
-      sheet.addRow([undefined, tenDangNhap, khoa.ma_khoa, tenLop]);
+      sheet.addRow([
+        undefined,
+        tenDangNhap,
+        khoa.ma_khoa,
+        tenLop,
+        '',
+        '',
+        '',
+      ]);
       const bufferPhanLop = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
@@ -603,7 +632,15 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         },
       });
       expect(dangKySau?.trang_thai).toBe('da_phan_lop');
-      expect(dangKySau?.lop_id).not.toBeNull();
+      const lopGan = await prisma.dang_ky_hoc_lop.findUnique({
+        where: {
+          dang_ky_hoc_id_loai_lop: {
+            dang_ky_hoc_id: dangKySau!.id,
+            loai_lop: 'truc_tiep',
+          },
+        },
+      });
+      expect(lopGan).not.toBeNull();
     });
   });
 });

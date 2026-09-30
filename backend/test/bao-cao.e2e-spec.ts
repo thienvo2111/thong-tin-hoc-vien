@@ -419,6 +419,7 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
     lopVanHanh = await prisma.lop_hoc.create({
       data: {
         khoa_id: khoaVanHanh,
+        loai_lop: 'truc_tiep',
         ten_lop: `Lớp Vận Hành ${suf2}`,
         nhom_hoc_vien: 1,
         muc_nang_luc: 'co_ban',
@@ -428,7 +429,6 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
       data: {
         hoc_vien_id: hvVh1.id,
         khoa_id: khoaVanHanh,
-        lop_id: lopVanHanh.id,
         trang_thai: 'da_phan_lop',
         muc_dau_vao: 'co_ban',
       },
@@ -437,10 +437,23 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
       data: {
         hoc_vien_id: hvVhKhac.id,
         khoa_id: khoaVanHanh,
-        lop_id: lopVanHanh.id,
         trang_thai: 'da_phan_lop',
         muc_dau_vao: 'thanh_thao',
       },
+    });
+    await prisma.dang_ky_hoc_lop.createMany({
+      data: [
+        {
+          dang_ky_hoc_id: dkVh1.id,
+          lop_id: lopVanHanh.id,
+          loai_lop: 'truc_tiep',
+        },
+        {
+          dang_ky_hoc_id: dkVhKhac.id,
+          lop_id: lopVanHanh.id,
+          loai_lop: 'truc_tiep',
+        },
+      ],
     });
     dangKyIds.push(dkVh1.id, dkVhKhac.id);
 

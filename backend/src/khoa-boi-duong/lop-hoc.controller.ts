@@ -4,6 +4,7 @@ import {
   Delete,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
 } from '@nestjs/common';
 import { KhoaBoiDuongService } from './khoa-boi-duong.service';
@@ -11,6 +12,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { CreateLichHocDto } from './dto/create-lich-hoc.dto';
+import { UpdateLichHocDto } from './dto/update-lich-hoc.dto';
 import { CreateNhanSuDto } from './dto/create-nhan-su.dto';
 
 // docs/api-contract.md mục 3 — route riêng /lop/{id}/... (không nằm dưới
@@ -27,6 +29,18 @@ export class LopHocController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.khoaBoiDuongService.themLichHoc(id, dto, user);
+  }
+
+  // Thêm 2026-09-30: sửa 1 phần lịch học (buổi) đã tạo.
+  @Roles('truong', 'quan_tri')
+  @Patch(':id/lich-hoc/:lichHocId')
+  capNhatLichHoc(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('lichHocId', ParseUUIDPipe) lichHocId: string,
+    @Body() dto: UpdateLichHocDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.khoaBoiDuongService.capNhatLichHoc(id, lichHocId, dto, user);
   }
 
   @Roles('truong', 'quan_tri')

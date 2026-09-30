@@ -5,6 +5,8 @@ import { KhoaBoiDuongController } from './khoa-boi-duong.controller';
 import { LopHocController } from './lop-hoc.controller';
 import { DangKyHocController } from './dang-ky-hoc.controller';
 import { DangKyHocKetQuaController } from './dang-ky-hoc-ket-qua.controller';
+import { DangKyHocThaoTacController } from './dang-ky-hoc-thao-tac.controller';
+import { HocVienKhoaHocController } from './hoc-vien-khoa-hoc.controller';
 import { KhoaBoiDuongService } from './khoa-boi-duong.service';
 
 // Dịch vụ Khóa bồi dưỡng & Lớp học — xem docs/api-contract.md mục 3. Export
@@ -22,6 +24,8 @@ import { KhoaBoiDuongService } from './khoa-boi-duong.service';
     LopHocController,
     DangKyHocController,
     DangKyHocKetQuaController,
+    DangKyHocThaoTacController,
+    HocVienKhoaHocController,
   ],
   providers: [KhoaBoiDuongService],
   exports: [KhoaBoiDuongService],

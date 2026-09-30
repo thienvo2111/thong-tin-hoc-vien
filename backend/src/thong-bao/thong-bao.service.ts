@@ -159,6 +159,11 @@ export class ThongBaoService {
   // so_hoc_vien_chua_co_email trên GET /import/{id} — bỏ qua gửi VÀ không
   // ghi nhat_ky_thong_bao cho học viên chưa có email_lien_he (đã đúng hành
   // vi từ trước qua canhBaoThieuEmail(), chỉ thêm giá trị trả về ở đây).
+  // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): dang_ky_hoc.lop_id/lop (1 lớp
+  // duy nhất/đăng ký) đã bị xóa, thay bằng dang_ky_hoc_lop (bảng nối, 3 loại
+  // lớp độc lập) — lấy đúng lớp TRỰC TIẾP qua where loai_lop='truc_tiep',
+  // GIỮ NGUYÊN hành vi cũ (email phân lớp chỉ gắn với lớp trực tiếp, chưa mở
+  // rộng sang zoom/vle).
   async guiDangKyHocPhanLop(
     dangKyHocId: string,
   ): Promise<{ chuaCoEmail: boolean }> {
@@ -167,23 +172,35 @@ export class ThongBaoService {
       include: {
         hoc_vien: true,
         khoa: true,
-        lop: {
-          include: { nhan_su: true, lich_hoc: { include: { giai_doan: true } } },
+        dang_ky_hoc_lop: {
+          where: { loai_lop: 'truc_tiep' },
+          include: {
+            lop: {
+              include: {
+                nhan_su: true,
+                lich_hoc: { include: { giai_doan: true } },
+              },
+            },
+          },
         },
       },
     });
-    if (!dangKy || !dangKy.lop) return { chuaCoEmail: false };
+    const lopTrucTiep = dangKy?.dang_ky_hoc_lop[0]?.lop;
+    if (!dangKy || !lopTrucTiep) return { chuaCoEmail: false };
     if (!dangKy.hoc_vien.email_lien_he) {
       this.canhBaoThieuEmail('dang_ky_hoc_phan_lop', dangKy.hoc_vien_id);
       return { chuaCoEmail: true };
     }
 
     const nhanSuText =
-      dangKy.lop.nhan_su
-        .map((n) => `${n.ho_ten} (${n.vai_tro === 'giang_vien' ? 'Giảng viên' : 'Hỗ trợ'})`)
+      lopTrucTiep.nhan_su
+        .map(
+          (n) =>
+            `${n.ho_ten} (${n.vai_tro === 'giang_vien' ? 'Giảng viên' : 'Hỗ trợ'})`,
+        )
         .join(', ') || '(chưa có thông tin)';
     const lichText =
-      dangKy.lop.lich_hoc
+      lopTrucTiep.lich_hoc
         .map(
           (l) =>
             `${l.giai_doan.ten_giai_doan}: ${formatDateVi(l.thoi_gian_bat_dau)} - ${formatDateVi(l.thoi_gian_ket_thuc)}${l.dia_diem_hoac_link ? ` tại ${l.dia_diem_hoac_link}` : ''}`,
@@ -192,7 +209,7 @@ export class ThongBaoService {
 
     const html = `
       <p>Xin chào ${dangKy.hoc_vien.ho_ten},</p>
-      <p>Bạn đã được phân vào lớp "<b>${dangKy.lop.ten_lop}</b>" thuộc khóa bồi dưỡng "<b>${dangKy.khoa.ten_khoa}</b>".</p>
+      <p>Bạn đã được phân vào lớp "<b>${lopTrucTiep.ten_lop}</b>" thuộc khóa bồi dưỡng "<b>${dangKy.khoa.ten_khoa}</b>".</p>
       <p>Giảng viên/nhân sự lớp: ${nhanSuText}</p>
       <p>Lịch học:<br/>${lichText}</p>
     `;
@@ -234,6 +251,67 @@ export class ThongBaoService {
       tieuDe: 'Kết quả khóa bồi dưỡng',
       html,
     });
+  }
+
+  // Thêm 2026-09-30: xác minh email liên hệ & quên/đặt lại mật khẩu (không
+  // thuộc loai_su_kien_thong_bao nào — token tự thân đã là cơ chế theo dõi
+  // duy nhất, không cần thêm dòng nhat_ky_thong_bao). Dùng chung
+  // guiEmailKhongGhiNhatKy() ở dưới, cùng nguyên tắc "email là side effect"
+  // với guiVaGhiNhatKy() — KHÔNG BAO GIỜ throw.
+  async guiXacMinhEmail(
+    email: string,
+    hoTen: string,
+    link: string,
+  ): Promise<void> {
+    const html = `
+      <p>Xin chào ${hoTen},</p>
+      <p>Thầy/Cô vừa cập nhật email liên hệ trên hệ thống Thu thập thông tin học viên. Vui lòng bấm vào liên kết dưới đây để xác minh email này (liên kết có hiệu lực trong 24 giờ):</p>
+      <p><a href="${link}">${link}</a></p>
+      <p>Nếu Thầy/Cô không thực hiện thay đổi này, vui lòng bỏ qua email.</p>
+    `;
+    await this.guiEmailKhongGhiNhatKy(email, 'Xác minh email liên hệ', html);
+  }
+
+  async guiDatLaiMatKhau(
+    email: string,
+    hoTen: string,
+    link: string,
+  ): Promise<void> {
+    const html = `
+      <p>Xin chào ${hoTen},</p>
+      <p>Hệ thống nhận được yêu cầu đặt lại mật khẩu cho tài khoản của Thầy/Cô. Bấm vào liên kết dưới đây để đặt mật khẩu mới (liên kết có hiệu lực trong 30 phút):</p>
+      <p><a href="${link}">${link}</a></p>
+      <p>Nếu Thầy/Cô không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này — mật khẩu hiện tại vẫn giữ nguyên.</p>
+    `;
+    await this.guiEmailKhongGhiNhatKy(email, 'Đặt lại mật khẩu', html);
+  }
+
+  private async guiEmailKhongGhiNhatKy(
+    email: string,
+    tieuDe: string,
+    html: string,
+  ): Promise<void> {
+    try {
+      const { transporter, from } = await getMailTransporter();
+      const info = await transporter.sendMail({
+        from,
+        to: email,
+        subject: tieuDe,
+        html,
+      });
+      const previewUrl = getTestMessageUrl(info);
+      if (previewUrl) {
+        console.log(
+          `[thong-bao] Xem trước email (Ethereal, ${tieuDe} -> ${email}): ${previewUrl}`,
+        );
+      }
+    } catch (e) {
+      const loi =
+        e instanceof Error ? e.message : 'Lỗi không xác định khi gửi email';
+      console.error(
+        `[thong-bao] Gửi email thất bại (${tieuDe} -> ${email}): ${loi}`,
+      );
+    }
   }
 
   // GET /thong-bao/lich-su — cả 2 filter tùy chọn (docs/api-contract.md mục 8).

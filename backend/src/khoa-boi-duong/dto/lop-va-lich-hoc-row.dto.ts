@@ -1,4 +1,5 @@
 import {
+  IsEnum,
   IsIn,
   IsInt,
   IsOptional,
@@ -8,20 +9,26 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { muc_nang_luc } from '@prisma/client';
+import { loai_lop_hoc, muc_nang_luc } from '@prisma/client';
 
 // Dòng đã dựng xong của import lop_va_lich_hoc (T6, mo-rong-nls-an-giang.md)
-// — mỗi dòng = 1 buổi học. Cột file gốc: ma_khoa, ten_lop, nhom_hoc_vien,
-// muc_nang_luc, si_so_toi_da, giai_doan_thu_tu, buoi_so, bat_dau, ket_thuc,
-// dia_diem_hoac_link, ma_diem_hoc (tùy chọn, T10 chưa làm — bị bỏ qua, xem
-// KhoaBoiDuongService.resolveLopVaLichHocRow). Đã được KhoaBoiDuongService
-// tra cứu ra uuid khoa_id/giai_doan_id, giống PhanLopHocVienRowDto.
+// — mỗi dòng = 1 buổi học. Cột file gốc: ma_khoa, ten_lop, loai_lop (tùy
+// chọn, mặc định "truc_tiep" — thêm hệ quả từ QĐ10, 2026-09-30, vì
+// lop_hoc.loai_lop nay bắt buộc NOT NULL, xem
+// KhoaBoiDuongService.resolveLopVaLichHocRow), nhom_hoc_vien, muc_nang_luc,
+// si_so_toi_da, giai_doan_thu_tu, buoi_so, bat_dau, ket_thuc,
+// dia_diem_hoac_link, ma_diem_hoc (tùy chọn, T10 chưa làm — bị bỏ qua). Đã
+// được KhoaBoiDuongService tra cứu ra uuid khoa_id/giai_doan_id, giống
+// PhanLopHocVienRowDto.
 export class LopVaLichHocRowDto {
   @IsUUID()
   khoa_id: string;
 
   @IsString()
   ten_lop: string;
+
+  @IsEnum(loai_lop_hoc)
+  loai_lop: loai_lop_hoc;
 
   @IsOptional()
   @IsInt()

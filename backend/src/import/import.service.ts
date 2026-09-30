@@ -15,6 +15,8 @@ import { HoSoNhanSuMoetRowDto } from '../hoc-vien/dto/import-moet-row.dto';
 import { PhanLopHocVienRowDto } from '../khoa-boi-duong/dto/phan-lop-row.dto';
 import { KetQuaDanhGiaRowDto } from '../khoa-boi-duong/dto/ket-qua-danh-gia-row.dto';
 import { LopVaLichHocRowDto } from '../khoa-boi-duong/dto/lop-va-lich-hoc-row.dto';
+import { DiemDanhRowDto } from '../khoa-boi-duong/dto/diem-danh-row.dto';
+import { KetQuaGiaiDoanRowDto } from '../khoa-boi-duong/dto/ket-qua-giai-doan-row.dto';
 import { TaiKhoanVleRowDto } from './dto/tai-khoan-vle-row.dto';
 import {
   ConflictAppException,
@@ -73,7 +75,7 @@ export class ImportService {
   assertSupported(loai: string): SupportedImportType {
     if (!isSupportedImportType(loai)) {
       throw new ValidationException(
-        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc)`,
+        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc, diem_danh, ket_qua_giai_doan)`,
       );
     }
     return loai;
@@ -385,16 +387,22 @@ export class ImportService {
       case 'phan_lop_hoc_vien':
         // Nguyên văn cột theo docs/api-contract.md mục 5, ghi chú riêng cho
         // phan_lop_hoc_vien. ten_lop TÙY CHỌN (đã sửa 2026-09-25) — để trống
-        // = chỉ ghi danh, có giá trị = ghi danh + phân lớp. ma_dinh_danh_moet
-        // thêm ở T3 (mo-rong-nls-an-giang.md, QĐ1) — cả 2 mã định danh đều
-        // TÙY CHỌN theo nghĩa từng cột nhưng phải có ÍT NHẤT 1 (dùng chung
-        // HocVienResolver, xem getColumnNotes cho ghi chú hiển thị trên file
-        // mẫu Excel).
+        // = chỉ ghi danh, có giá trị = ghi danh + phân lớp trực tiếp.
+        // ma_dinh_danh_moet thêm ở T3 (mo-rong-nls-an-giang.md, QĐ1) — cả 2
+        // mã định danh đều TÙY CHỌN theo nghĩa từng cột nhưng phải có ÍT
+        // NHẤT 1 (dùng chung HocVienResolver). ten_lop_zoom/ten_lop_vle/
+        // ten_cum thêm ở QĐ10 (2026-09-30) — TÙY CHỌN, độc lập với ten_lop và
+        // với nhau (xem KhoaBoiDuongService.resolvePhanLopRow). ten_lop giữ
+        // NGUYÊN tên cột cũ (không đổi thành ten_lop_truc_tiep) để không vỡ
+        // file mẫu/thói quen nhập liệu đang dùng.
         return [
           'so_dinh_danh_ca_nhan',
           'ma_dinh_danh_moet',
           'ma_khoa',
           'ten_lop',
+          'ten_lop_zoom',
+          'ten_lop_vle',
+          'ten_cum',
         ];
       case 'ho_so_nhan_su_moet':
         // Nguyên văn cột theo docs/api-contract.md mục 2 "Luồng import nhân
@@ -449,10 +457,13 @@ export class ImportService {
         // T6 (mo-rong-nls-an-giang.md): mỗi dòng = 1 buổi học. ma_diem_hoc
         // TÙY CHỌN — T10 (điểm học) chưa làm, chưa có bảng nào để lưu, đọc
         // cột nhưng bỏ qua (xem KhoaBoiDuongService.resolveLopVaLichHocRow),
-        // KHÔNG báo lỗi vì cột lạ.
+        // KHÔNG báo lỗi vì cột lạ. loai_lop thêm ở QĐ10 (2026-09-30) — TÙY
+        // CHỌN, mặc định "truc_tiep" nếu để trống (lop_hoc.loai_lop nay bắt
+        // buộc NOT NULL).
         return [
           'ma_khoa',
           'ten_lop',
+          'loai_lop',
           'nhom_hoc_vien',
           'muc_nang_luc',
           'si_so_toi_da',
@@ -462,6 +473,38 @@ export class ImportService {
           'ket_thuc',
           'dia_diem_hoac_link',
           'ma_diem_hoc',
+        ];
+      case 'diem_danh':
+        // T12 (mo-rong-nls-an-giang.md): điểm danh nhập qua IMPORT EXCEL
+        // (không có giao diện chấm tay từng buổi). loai_lop BẮT BUỘC (khác
+        // lop_va_lich_hoc dùng loai_lop tùy chọn) — điểm danh gắn với 1 buổi
+        // cụ thể của 1 lớp cụ thể, không có mặc định an toàn để suy đoán
+        // (xem KhoaBoiDuongService.resolveDiemDanhRow). ghi_chu tùy chọn
+        // NHƯNG bắt buộc khi buổi thuộc lớp khác lớp học viên đang được gán
+        // (học bù).
+        return [
+          'so_dinh_danh_ca_nhan',
+          'ma_dinh_danh_moet',
+          'ma_khoa',
+          'ten_lop',
+          'loai_lop',
+          'giai_doan_thu_tu',
+          'buoi_so',
+          'trang_thai',
+          'nguon',
+          'ghi_chu',
+        ];
+      case 'ket_qua_giai_doan':
+        // T12 (mo-rong-nls-an-giang.md): tiến độ/kết quả theo từng giai đoạn
+        // (vd tiến độ VLE, điểm đánh giá giai đoạn). ty_le_hoan_thanh/diem
+        // đều tùy chọn.
+        return [
+          'so_dinh_danh_ca_nhan',
+          'ma_dinh_danh_moet',
+          'ma_khoa',
+          'giai_doan_thu_tu',
+          'ty_le_hoan_thanh',
+          'diem',
         ];
     }
   }
@@ -488,7 +531,13 @@ export class ImportService {
           'Tùy chọn — phải có ít nhất 1 trong 2 cột so_dinh_danh_ca_nhan/ma_dinh_danh_moet để xác định học viên. Có cả 2 thì phải trỏ cùng 1 hồ sơ.',
         ma_dinh_danh_moet: 'Tùy chọn — xem ghi chú cột so_dinh_danh_ca_nhan.',
         ten_lop:
-          'Tùy chọn — để trống nếu chỉ muốn ghi danh vào khóa, chưa phân lớp. Có thể chạy lại import sau với ten_lop để phân lớp cho học viên đã ghi danh.',
+          'Tùy chọn — tên lớp TRỰC TIẾP. Để trống nếu chỉ muốn ghi danh vào khóa, chưa phân lớp. Có thể chạy lại import sau với ten_lop để phân lớp cho học viên đã ghi danh.',
+        ten_lop_zoom:
+          'Tùy chọn — tên lớp ZOOM, độc lập hoàn toàn với ten_lop (trực tiếp). Để trống nếu học viên không thuộc lớp zoom nào.',
+        ten_lop_vle:
+          'Tùy chọn — tên lớp VLE, độc lập hoàn toàn với ten_lop/ten_lop_zoom. Để trống nếu học viên không thuộc lớp vle nào.',
+        ten_cum:
+          'Tùy chọn — tên cụm học viên (nhóm Zalo hỗ trợ), độc lập với cả 3 cột lớp ở trên. Để trống nếu chưa gán cụm.',
       };
     }
     if (loai === 'ho_so_nhan_su_moet') {
@@ -523,6 +572,8 @@ export class ImportService {
     }
     if (loai === 'lop_va_lich_hoc') {
       return {
+        loai_lop:
+          'Tùy chọn — "truc_tiep", "zoom" hoặc "vle". Mặc định "truc_tiep" nếu để trống.',
         nhom_hoc_vien: 'Tùy chọn — số nguyên từ 1 đến 20.',
         muc_nang_luc:
           'Tùy chọn — "co_ban", "thanh_thao" hoặc "nang_cao". Dùng để cảnh báo khi phân lớp nếu khác mức đầu vào của học viên.',
@@ -533,6 +584,28 @@ export class ImportService {
         dia_diem_hoac_link: 'Tùy chọn — tối đa 500 ký tự.',
         ma_diem_hoc:
           'Tùy chọn — CHƯA sử dụng ở phiên bản hiện tại (chờ T10), điền vào sẽ bị bỏ qua.',
+      };
+    }
+    if (loai === 'diem_danh') {
+      return {
+        so_dinh_danh_ca_nhan:
+          'Tùy chọn — phải có ít nhất 1 trong 2 cột so_dinh_danh_ca_nhan/ma_dinh_danh_moet để xác định học viên. Có cả 2 thì phải trỏ cùng 1 hồ sơ.',
+        ma_dinh_danh_moet: 'Tùy chọn — xem ghi chú cột so_dinh_danh_ca_nhan.',
+        loai_lop:
+          'Bắt buộc — "truc_tiep", "zoom" hoặc "vle". Dùng để xác định đúng lớp khi có nhiều lớp trùng tên khác loại trong cùng khóa.',
+        trang_thai: 'Bắt buộc — chỉ nhận "co_mat", "vang" hoặc "vang_co_phep".',
+        nguon: 'Bắt buộc — chỉ nhận "zoom", "ky_ten", "qr" hoặc "thu_cong".',
+        ghi_chu:
+          'Tùy chọn — BẮT BUỘC nếu buổi điểm danh thuộc lớp KHÁC lớp học viên đang được gán (học bù), thiếu sẽ báo lỗi.',
+      };
+    }
+    if (loai === 'ket_qua_giai_doan') {
+      return {
+        so_dinh_danh_ca_nhan:
+          'Tùy chọn — phải có ít nhất 1 trong 2 cột so_dinh_danh_ca_nhan/ma_dinh_danh_moet để xác định học viên. Có cả 2 thì phải trỏ cùng 1 hồ sơ.',
+        ma_dinh_danh_moet: 'Tùy chọn — xem ghi chú cột so_dinh_danh_ca_nhan.',
+        ty_le_hoan_thanh: 'Tùy chọn — số từ 0 đến 100.',
+        diem: 'Tùy chọn — điểm số.',
       };
     }
     return {};
@@ -561,6 +634,8 @@ export class ImportService {
       | TaiKhoanVleRowDto
       | KetQuaDanhGiaRowDto
       | LopVaLichHocRowDto
+      | DiemDanhRowDto
+      | KetQuaGiaiDoanRowDto
     >
   > {
     switch (loai) {
@@ -579,6 +654,9 @@ export class ImportService {
           ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
           ma_khoa: raw.ma_khoa,
           ten_lop: raw.ten_lop,
+          ten_lop_zoom: raw.ten_lop_zoom,
+          ten_lop_vle: raw.ten_lop_vle,
+          ten_cum: raw.ten_cum,
         });
       case 'ho_so_nhan_su_moet':
         return this.buildHoSoMoetDto(raw);
@@ -608,6 +686,7 @@ export class ImportService {
           {
             ma_khoa: raw.ma_khoa,
             ten_lop: raw.ten_lop,
+            loai_lop: raw.loai_lop,
             nhom_hoc_vien: raw.nhom_hoc_vien,
             muc_nang_luc: raw.muc_nang_luc,
             si_so_toi_da: raw.si_so_toi_da,
@@ -619,6 +698,31 @@ export class ImportService {
           },
           dupKeys,
         );
+      case 'diem_danh':
+        return this.khoaBoiDuongService.resolveDiemDanhRow(
+          {
+            so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
+            ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
+            ma_khoa: raw.ma_khoa,
+            ten_lop: raw.ten_lop,
+            loai_lop: raw.loai_lop,
+            giai_doan_thu_tu: raw.giai_doan_thu_tu,
+            buoi_so: raw.buoi_so,
+            trang_thai: raw.trang_thai,
+            nguon: raw.nguon,
+            ghi_chu: raw.ghi_chu,
+          },
+          dupKeys,
+        );
+      case 'ket_qua_giai_doan':
+        return this.khoaBoiDuongService.resolveKetQuaGiaiDoanRow({
+          so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
+          ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
+          ma_khoa: raw.ma_khoa,
+          giai_doan_thu_tu: raw.giai_doan_thu_tu,
+          ty_le_hoan_thanh: raw.ty_le_hoan_thanh,
+          diem: raw.diem,
+        });
     }
   }
 
@@ -657,7 +761,9 @@ export class ImportService {
       | PhanLopHocVienRowDto
       | TaiKhoanVleRowDto
       | KetQuaDanhGiaRowDto
-      | LopVaLichHocRowDto,
+      | LopVaLichHocRowDto
+      | DiemDanhRowDto
+      | KetQuaGiaiDoanRowDto,
     dupKeys?: Set<string>,
   ): Promise<string | undefined> {
     try {
@@ -694,6 +800,12 @@ export class ImportService {
       } else if (loai === 'lop_va_lich_hoc') {
         // Không cần kiểm tra thêm: resolveLopVaLichHocRow() (buildDto) đã
         // tra cứu FK + validate định dạng + trùng lặp trong file rồi.
+      } else if (loai === 'diem_danh') {
+        // Không cần kiểm tra thêm: resolveDiemDanhRow() (buildDto) đã tra
+        // cứu FK + quy tắc học bù + trùng lặp trong file rồi.
+      } else if (loai === 'ket_qua_giai_doan') {
+        // Không cần kiểm tra thêm: resolveKetQuaGiaiDoanRow() (buildDto) đã
+        // tra cứu FK + phạm vi giá trị rồi.
       } else {
         const d = dto as HoSoNhanSuMoetRowDto;
         await this.hocVienService.checkValidMoetImportRow(
@@ -730,7 +842,9 @@ export class ImportService {
       | PhanLopHocVienRowDto
       | TaiKhoanVleRowDto
       | KetQuaDanhGiaRowDto
-      | LopVaLichHocRowDto,
+      | LopVaLichHocRowDto
+      | DiemDanhRowDto
+      | KetQuaGiaiDoanRowDto,
     importId: string,
     nguoiImportId: string,
     dupKeys?: Set<string>,
@@ -759,6 +873,16 @@ export class ImportService {
     } else if (loai === 'lop_va_lich_hoc') {
       await this.khoaBoiDuongService.commitLopVaLichHoc(
         dto as LopVaLichHocRowDto,
+      );
+    } else if (loai === 'diem_danh') {
+      await this.khoaBoiDuongService.commitDiemDanh(
+        dto as DiemDanhRowDto,
+        importId,
+      );
+    } else if (loai === 'ket_qua_giai_doan') {
+      await this.khoaBoiDuongService.commitKetQuaGiaiDoan(
+        dto as KetQuaGiaiDoanRowDto,
+        importId,
       );
     } else {
       const d = dto as HoSoNhanSuMoetRowDto;

@@ -96,7 +96,9 @@ describe('ThongBaoService', () => {
 
     it('hoc_vien không tồn tại -> không làm gì, không throw', async () => {
       prisma.hoc_vien.findUnique.mockResolvedValue(null);
-      await expect(service.guiHocVienXacNhan('khong-ton-tai')).resolves.toBeUndefined();
+      await expect(
+        service.guiHocVienXacNhan('khong-ton-tai'),
+      ).resolves.toBeUndefined();
       expect(sendMail).not.toHaveBeenCalled();
     });
 
@@ -222,37 +224,42 @@ describe('ThongBaoService', () => {
   });
 
   describe('guiDangKyHocPhanLop', () => {
-    it('lop=null -> bỏ qua (không được gọi cho nhánh chỉ ghi danh)', async () => {
+    it('dang_ky_hoc_lop rỗng (chưa gán lớp trực tiếp) -> bỏ qua (không được gọi cho nhánh chỉ ghi danh)', async () => {
       prisma.dang_ky_hoc.findUnique.mockResolvedValue({
         id: 'dk-1',
         hoc_vien_id: 'hv-1',
         hoc_vien: hocVienDayDu,
         khoa: { ten_khoa: 'Khóa A' },
-        lop: null,
+        dang_ky_hoc_lop: [],
       });
       const res = await service.guiDangKyHocPhanLop('dk-1');
       expect(sendMail).not.toHaveBeenCalled();
       expect(res).toEqual({ chuaCoEmail: false });
     });
 
-    it('có lop -> gửi với nội dung nhân sự/lịch học', async () => {
+    it('có lớp trực tiếp -> gửi với nội dung nhân sự/lịch học', async () => {
       prisma.dang_ky_hoc.findUnique.mockResolvedValue({
         id: 'dk-1',
         hoc_vien_id: 'hv-1',
         hoc_vien: hocVienDayDu,
         khoa: { ten_khoa: 'Khóa A' },
-        lop: {
-          ten_lop: 'Lớp 1',
-          nhan_su: [{ ho_ten: 'GV B', vai_tro: 'giang_vien' }],
-          lich_hoc: [
-            {
-              thoi_gian_bat_dau: new Date('2026-01-02T00:00:00Z'),
-              thoi_gian_ket_thuc: new Date('2026-01-03T00:00:00Z'),
-              dia_diem_hoac_link: 'Hội trường',
-              giai_doan: { ten_giai_doan: 'GĐ 1' },
+        dang_ky_hoc_lop: [
+          {
+            loai_lop: 'truc_tiep',
+            lop: {
+              ten_lop: 'Lớp 1',
+              nhan_su: [{ ho_ten: 'GV B', vai_tro: 'giang_vien' }],
+              lich_hoc: [
+                {
+                  thoi_gian_bat_dau: new Date('2026-01-02T00:00:00Z'),
+                  thoi_gian_ket_thuc: new Date('2026-01-03T00:00:00Z'),
+                  dia_diem_hoac_link: 'Hội trường',
+                  giai_doan: { ten_giai_doan: 'GĐ 1' },
+                },
+              ],
             },
-          ],
-        },
+          },
+        ],
       });
       const res = await service.guiDangKyHocPhanLop('dk-1');
       expect(sendMail).toHaveBeenCalledTimes(1);
@@ -272,11 +279,12 @@ describe('ThongBaoService', () => {
         hoc_vien_id: 'hv-1',
         hoc_vien: { ...hocVienDayDu, email_lien_he: null },
         khoa: { ten_khoa: 'Khóa A' },
-        lop: {
-          ten_lop: 'Lớp 1',
-          nhan_su: [],
-          lich_hoc: [],
-        },
+        dang_ky_hoc_lop: [
+          {
+            loai_lop: 'truc_tiep',
+            lop: { ten_lop: 'Lớp 1', nhan_su: [], lich_hoc: [] },
+          },
+        ],
       });
       const res = await service.guiDangKyHocPhanLop('dk-1');
       expect(sendMail).not.toHaveBeenCalled();

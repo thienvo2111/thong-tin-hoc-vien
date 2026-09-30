@@ -25,6 +25,7 @@
 | QĐ8 | Cổng làm đánh giá theo **cách B**: Phòng CNTT tạo tài khoản VLE cho tất cả; hệ thống chỉ hiện link + tài khoản VLE cho học viên đủ điều kiện. | Thêm T15 |
 | QĐ9 | Không hoàn thiện hồ sơ trước khi đóng đợt 2 → **không được làm đánh giá**, đưa vào danh sách xử lý riêng. | Thêm T15 |
 | QĐ6 | File nguồn không có email/CCCD (đã xác nhận) → ban đầu **không học viên nào có email**. Không gửi email và **không ghi nhật ký thất bại** cho người chưa có email; kết quả import/gửi trả số người bị bỏ qua. Kênh thông báo giai đoạn đầu: Zalo qua lớp trưởng + đơn vị. | Sửa hành vi Dịch vụ Thông báo |
+| QĐ10 | Tách 3 loại "lớp" **độc lập hoàn toàn** với nhau (trực tiếp/zoom/vle — không phải lớp cha chứa lớp con): 1 học viên có thể đồng thời ở 1 lớp trực tiếp, 1 lớp zoom, 1 "lớp" vle mà không liên quan gì nhau về thành viên, gán qua **1 bảng nối** `dang_ky_hoc_lop` (dễ mở rộng loại lớp thứ 4/5 sau này mà không sửa lại schema/API) thay vì thêm 3-4 cột FK riêng trên `dang_ky_hoc`. Thêm **cụm học viên** (`cum_hoc_vien`, nhóm Zalo hỗ trợ theo địa lý) — khái niệm mới, độc lập với cây đơn vị công tác, chứa **học viên trực tiếp** (`dang_ky_hoc.cum_id`), không qua lớp nào. | Xóa `dang_ky_hoc.lop_id`, thêm enum `loai_lop_hoc`, bảng `dang_ky_hoc_lop`/`cum_hoc_vien`, đổi UNIQUE `lop_hoc` |
 
 ## 2. Quy tắc chung cho mọi task
 

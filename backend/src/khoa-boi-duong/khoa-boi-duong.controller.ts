@@ -18,8 +18,12 @@ import { UpdateKhoaBoiDuongDto } from './dto/update-khoa-boi-duong.dto';
 import { QueryKhoaBoiDuongDto } from './dto/query-khoa-boi-duong.dto';
 import { DuyetKhoaDto } from './dto/duyet-khoa.dto';
 import { CreateGiaiDoanDto } from './dto/create-giai-doan.dto';
+import { UpdateGiaiDoanDto } from './dto/update-giai-doan.dto';
 import { CreateLopHocDto } from './dto/create-lop-hoc.dto';
+import { UpdateLopHocDto } from './dto/update-lop-hoc.dto';
 import { ThemDonViTheoDoiDto } from './dto/them-don-vi-theo-doi.dto';
+import { CreateCumHocVienDto } from './dto/create-cum-hoc-vien.dto';
+import { UpdateCumHocVienDto } from './dto/update-cum-hoc-vien.dto';
 
 // Dịch vụ Khóa bồi dưỡng & Lớp học — docs/api-contract.md mục 3.
 @Controller('khoa-boi-duong')
@@ -94,6 +98,18 @@ export class KhoaBoiDuongController {
     return this.khoaBoiDuongService.themGiaiDoan(id, dto, user);
   }
 
+  // Thêm 2026-09-30: sửa 1 phần giai đoạn đã tạo.
+  @Roles('truong', 'quan_tri')
+  @Patch(':id/giai-doan/:giaiDoanId')
+  capNhatGiaiDoan(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('giaiDoanId', ParseUUIDPipe) giaiDoanId: string,
+    @Body() dto: UpdateGiaiDoanDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.khoaBoiDuongService.capNhatGiaiDoan(id, giaiDoanId, dto, user);
+  }
+
   @Roles('truong', 'quan_tri')
   @Post(':id/lop')
   themLop(
@@ -102,6 +118,42 @@ export class KhoaBoiDuongController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.khoaBoiDuongService.themLop(id, dto, user);
+  }
+
+  // Thêm 2026-09-30: sửa 1 phần lớp học đã tạo (vd gõ nhầm tên, sửa sĩ số).
+  @Roles('truong', 'quan_tri')
+  @Patch(':id/lop/:lopId')
+  capNhatLop(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('lopId', ParseUUIDPipe) lopId: string,
+    @Body() dto: UpdateLopHocDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.khoaBoiDuongService.capNhatLop(id, lopId, dto, user);
+  }
+
+  // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): cụm học viên — cùng quyền
+  // thao tác với themLop.
+  @Roles('truong', 'quan_tri')
+  @Post(':id/cum')
+  themCum(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateCumHocVienDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.khoaBoiDuongService.themCum(id, dto, user);
+  }
+
+  // Thêm 2026-09-30: sửa 1 phần cụm học viên đã tạo.
+  @Roles('truong', 'quan_tri')
+  @Patch(':id/cum/:cumId')
+  capNhatCum(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('cumId', ParseUUIDPipe) cumId: string,
+    @Body() dto: UpdateCumHocVienDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.khoaBoiDuongService.capNhatCum(id, cumId, dto, user);
   }
 
   // T2 (QĐ2): danh sách đơn vị "theo dõi" khóa — chỉ quan_tri quản lý được

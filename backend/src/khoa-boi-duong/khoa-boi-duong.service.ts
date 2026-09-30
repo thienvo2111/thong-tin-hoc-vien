@@ -1,5 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, khoa_boi_duong, lop_hoc, muc_nang_luc } from '@prisma/client';
+import {
+  Prisma,
+  khoa_boi_duong,
+  lop_hoc,
+  loai_lop_hoc,
+  muc_nang_luc,
+  trang_thai_diem_danh,
+  nguon_diem_danh,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from '../auth/scope/scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
@@ -17,14 +25,23 @@ import { UpdateKhoaBoiDuongDto } from './dto/update-khoa-boi-duong.dto';
 import { QueryKhoaBoiDuongDto } from './dto/query-khoa-boi-duong.dto';
 import { DuyetKhoaDto } from './dto/duyet-khoa.dto';
 import { CreateGiaiDoanDto } from './dto/create-giai-doan.dto';
+import { UpdateGiaiDoanDto } from './dto/update-giai-doan.dto';
 import { CreateLopHocDto } from './dto/create-lop-hoc.dto';
+import { UpdateLopHocDto } from './dto/update-lop-hoc.dto';
 import { CreateLichHocDto } from './dto/create-lich-hoc.dto';
+import { UpdateLichHocDto } from './dto/update-lich-hoc.dto';
 import { CreateNhanSuDto } from './dto/create-nhan-su.dto';
 import { ThemDonViTheoDoiDto } from './dto/them-don-vi-theo-doi.dto';
+import { CreateCumHocVienDto } from './dto/create-cum-hoc-vien.dto';
+import { UpdateCumHocVienDto } from './dto/update-cum-hoc-vien.dto';
+import { CapNhatLopDangKyDto } from './dto/capnhat-lop-dang-ky.dto';
+import { CapNhatCumDangKyDto } from './dto/capnhat-cum-dang-ky.dto';
 import { PhanLopHocVienRowDto } from './dto/phan-lop-row.dto';
 import { KetQuaDangKyDto } from './dto/ket-qua-dang-ky.dto';
 import { KetQuaDanhGiaRowDto } from './dto/ket-qua-danh-gia-row.dto';
 import { LopVaLichHocRowDto } from './dto/lop-va-lich-hoc-row.dto';
+import { DiemDanhRowDto } from './dto/diem-danh-row.dto';
+import { KetQuaGiaiDoanRowDto } from './dto/ket-qua-giai-doan-row.dto';
 import { RowBuildResult } from '../import/import.types';
 import { resolveHocVienImportRow } from '../import/util/hoc-vien-resolver.util';
 import { parseVnDateTime } from '../common/utils/vn-datetime.util';
@@ -60,6 +77,101 @@ export class KhoaBoiDuongService {
       include: { khoa: true },
     });
     if (!lop) throw new NotFoundAppException('Không tìm thấy lớp học');
+    return lop;
+  }
+
+  // Dùng cho các PATCH .../{id}/... (giai-doan, lop, cum) — kiểm tra con
+  // (giaiDoanId/lopId/cumId) thực sự thuộc đúng khoaId trên URL, không chỉ
+  // tồn tại (tránh 1 tài khoản chủ khóa A sửa nhầm/cố ý con của khóa B bằng
+  // cách truyền khoaId của khóa A + id con của khóa B).
+  private async getGiaiDoanTrongKhoaOrThrow(khoaId: string, giaiDoanId: string) {
+    const giaiDoan = await this.prisma.giai_doan_khoa.findUnique({
+      where: { id: giaiDoanId },
+    });
+    if (!giaiDoan || giaiDoan.khoa_id !== khoaId) {
+      throw new NotFoundAppException('Không tìm thấy giai đoạn trong khóa này');
+    }
+    return giaiDoan;
+  }
+
+  private async getLopTrongKhoaOrThrow(khoaId: string, lopId: string) {
+    const lop = await this.prisma.lop_hoc.findUnique({ where: { id: lopId } });
+    if (!lop || lop.khoa_id !== khoaId) {
+      throw new NotFoundAppException('Không tìm thấy lớp học trong khóa này');
+    }
+    return lop;
+  }
+
+  private async getCumTrongKhoaOrThrow(khoaId: string, cumId: string) {
+    const cum = await this.prisma.cum_hoc_vien.findUnique({
+      where: { id: cumId },
+    });
+    if (!cum || cum.khoa_id !== khoaId) {
+      throw new NotFoundAppException(
+        'Không tìm thấy cụm học viên trong khóa này',
+      );
+    }
+    return cum;
+  }
+
+  private async getLichHocTrongLopOrThrow(lopId: string, lichHocId: string) {
+    const lich = await this.prisma.lich_hoc_lop.findUnique({
+      where: { id: lichHocId },
+    });
+    if (!lich || lich.lop_id !== lopId) {
+      throw new NotFoundAppException('Không tìm thấy lịch học trong lớp này');
+    }
+    return lich;
+  }
+
+  // Rule mới (2026-09-30): PATCH không cho phép body rỗng/không có trường
+  // hợp lệ nào — tránh gọi PATCH "không làm gì cả" (dễ nhầm là đã sửa).
+  // ValidationPipe đã whitelist:true (main.ts) nên dto chỉ còn đúng các
+  // trường khai báo trong DTO, field lạ đã bị strip từ trước khi tới đây.
+  private assertCoTruongSua<T extends object>(dto: T): void {
+    const coTruong = Object.values(dto as Record<string, unknown>).some(
+      (v) => v !== undefined,
+    );
+    if (!coTruong) {
+      throw new ValidationException(
+        'Body rỗng — phải có ít nhất 1 trường hợp lệ để sửa',
+      );
+    }
+  }
+
+  // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): lop_id gán vào dang_ky_hoc_lop
+  // phải (1) thuộc đúng khoa_id của đăng ký học và (2) có lop_hoc.loai_lop
+  // khớp đúng loai_lop truyền vào — kiểm tra ở tầng service, KHÔNG dùng DB
+  // trigger (khác cách làm cũ của chk_dang_ky_lop_thuoc_khoa, đã bỏ cùng cột
+  // dang_ky_hoc.lop_id — xem migration di_chuyen_lop_id_sang_dang_ky_hoc_lop).
+  private async assertLopThuocKhoaVaLoai(
+    lopId: string,
+    khoaId: string,
+    loaiLop: loai_lop_hoc,
+  ): Promise<lop_hoc> {
+    const lop = await this.prisma.lop_hoc.findUnique({ where: { id: lopId } });
+    if (!lop) {
+      throw new ValidationException('lop_id không tồn tại', [
+        { field: 'lop_id', message: 'Không tồn tại' },
+      ]);
+    }
+    if (lop.khoa_id !== khoaId) {
+      throw new ValidationException(
+        'Lớp không thuộc cùng khóa với đăng ký học này',
+        [{ field: 'lop_id', message: 'Phải thuộc cùng khóa bồi dưỡng' }],
+      );
+    }
+    if (lop.loai_lop !== loaiLop) {
+      throw new ValidationException(
+        `Lớp này thuộc loại "${lop.loai_lop}", không khớp loai_lop "${loaiLop}" đã chọn`,
+        [
+          {
+            field: 'loai_lop',
+            message: 'Không khớp loại lớp thực tế của lop_id',
+          },
+        ],
+      );
+    }
     return lop;
   }
 
@@ -430,6 +542,9 @@ export class KhoaBoiDuongService {
             lich_hoc: { include: { giai_doan: true } },
           },
         },
+        // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): trả kèm danh sách cụm
+        // học viên của khóa bên cạnh giai đoạn/lớp đã có.
+        cum_hoc_vien: { orderBy: { ten_cum: 'asc' } },
       },
     });
     if (!khoa) throw new NotFoundAppException('Không tìm thấy khóa bồi dưỡng');
@@ -498,6 +613,59 @@ export class KhoaBoiDuongService {
   }
 
   // ---------------------------------------------------------------------
+  // PATCH /khoa-boi-duong/{id}/giai-doan/{giaiDoanId} — sửa một phần. Thêm
+  // 2026-09-30.
+  // ---------------------------------------------------------------------
+  async capNhatGiaiDoan(
+    khoaId: string,
+    giaiDoanId: string,
+    dto: UpdateGiaiDoanDto,
+    caller: AuthenticatedUser,
+  ) {
+    const khoa = await this.getKhoaOrThrow(khoaId);
+    this.assertChuKhoa(khoa, caller);
+    const giaiDoan = await this.getGiaiDoanTrongKhoaOrThrow(
+      khoaId,
+      giaiDoanId,
+    );
+    this.assertCoTruongSua(dto);
+
+    if (dto.thoi_gian_bat_dau || dto.thoi_gian_ket_thuc) {
+      const batDau =
+        dto.thoi_gian_bat_dau ?? giaiDoan.thoi_gian_bat_dau.toISOString();
+      const ketThuc =
+        dto.thoi_gian_ket_thuc ?? giaiDoan.thoi_gian_ket_thuc.toISOString();
+      this.assertThoiGianHopLe(batDau, ketThuc, 'giai đoạn', true);
+    }
+
+    try {
+      return await this.prisma.giai_doan_khoa.update({
+        where: { id: giaiDoanId },
+        data: {
+          thu_tu: dto.thu_tu,
+          ten_giai_doan: dto.ten_giai_doan
+            ? normalizeNfcName(dto.ten_giai_doan)
+            : undefined,
+          hinh_thuc: dto.hinh_thuc,
+          thoi_gian_bat_dau: dto.thoi_gian_bat_dau
+            ? new Date(dto.thoi_gian_bat_dau)
+            : undefined,
+          thoi_gian_ket_thuc: dto.thoi_gian_ket_thuc
+            ? new Date(dto.thoi_gian_ket_thuc)
+            : undefined,
+          trang_thai: dto.trang_thai,
+        },
+      });
+    } catch (e) {
+      throw this.mapUniqueViolation(
+        e,
+        `Thứ tự ${dto.thu_tu} đã tồn tại trong khóa này`,
+        'thu_tu',
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // POST /khoa-boi-duong/{id}/lop
   // ---------------------------------------------------------------------
   async themLop(
@@ -510,10 +678,127 @@ export class KhoaBoiDuongService {
     return this.prisma.lop_hoc.create({
       data: {
         khoa_id: khoaId,
+        loai_lop: dto.loai_lop,
         ten_lop: normalizeNfcName(dto.ten_lop),
         si_so_toi_da: dto.si_so_toi_da,
       },
     });
+  }
+
+  // ---------------------------------------------------------------------
+  // PATCH /khoa-boi-duong/{id}/lop/{lopId} — sửa một phần. Thêm 2026-09-30.
+  // Đổi loai_lop khi lớp đang có đăng ký (dang_ky_hoc_lop trỏ tới) KHÔNG bị
+  // chặn (quyết định tự chọn — flagged trong self-review: yêu cầu không nói
+  // rõ nên chặn hay cho phép, chọn "cho phép + cảnh báo" giống cách làm hiện
+  // có cho lệch mức năng lực khi import phân lớp, xem resolvePhanLopRow phía
+  // trên) — trả kèm canh_bao trong response, KHÔNG tự động sửa/xóa các dòng
+  // dang_ky_hoc_lop cũ (đổi hộ có thể gây mất dữ liệu ngoài ý muốn).
+  // ---------------------------------------------------------------------
+  async capNhatLop(
+    khoaId: string,
+    lopId: string,
+    dto: UpdateLopHocDto,
+    caller: AuthenticatedUser,
+  ) {
+    const khoa = await this.getKhoaOrThrow(khoaId);
+    this.assertChuKhoa(khoa, caller);
+    const lop = await this.getLopTrongKhoaOrThrow(khoaId, lopId);
+    this.assertCoTruongSua(dto);
+
+    let canhBao: string | undefined;
+    if (dto.loai_lop && dto.loai_lop !== lop.loai_lop) {
+      const soDangKy = await this.prisma.dang_ky_hoc_lop.count({
+        where: { lop_id: lopId },
+      });
+      if (soDangKy > 0) {
+        canhBao = `Lớp này đang có ${soDangKy} đăng ký học gán loại lớp "${lop.loai_lop}" — đổi sang "${dto.loai_lop}" KHÔNG tự động cập nhật các đăng ký đó, cần rà soát/gán lại thủ công qua PATCH /dang-ky-hoc/{id}/lop`;
+      }
+    }
+
+    let updated;
+    try {
+      updated = await this.prisma.lop_hoc.update({
+        where: { id: lopId },
+        data: {
+          loai_lop: dto.loai_lop,
+          ten_lop: dto.ten_lop ? normalizeNfcName(dto.ten_lop) : undefined,
+          si_so_toi_da: dto.si_so_toi_da,
+          nhom_hoc_vien: dto.nhom_hoc_vien,
+          muc_nang_luc: dto.muc_nang_luc,
+          trang_thai: dto.trang_thai,
+        },
+      });
+    } catch (e) {
+      throw this.mapUniqueViolation(
+        e,
+        'Tên lớp đã tồn tại trong loại lớp này của khóa',
+        'ten_lop',
+      );
+    }
+    return canhBao ? { ...updated, canh_bao: canhBao } : updated;
+  }
+
+  // ---------------------------------------------------------------------
+  // POST /khoa-boi-duong/{id}/cum — QĐ10 (mo-rong-nls-an-giang.md,
+  // 2026-09-30): cụm học viên, cùng quyền thao tác với themLop (chủ khóa +
+  // quan_tri).
+  // ---------------------------------------------------------------------
+  async themCum(
+    khoaId: string,
+    dto: CreateCumHocVienDto,
+    caller: AuthenticatedUser,
+  ) {
+    const khoa = await this.getKhoaOrThrow(khoaId);
+    this.assertChuKhoa(khoa, caller);
+    try {
+      return await this.prisma.cum_hoc_vien.create({
+        data: {
+          khoa_id: khoaId,
+          ten_cum: normalizeNfcName(dto.ten_cum),
+          link_zalo: dto.link_zalo,
+          ghi_chu: dto.ghi_chu,
+        },
+      });
+    } catch (e) {
+      throw this.mapUniqueViolation(
+        e,
+        'Tên cụm đã tồn tại trong khóa này',
+        'ten_cum',
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // PATCH /khoa-boi-duong/{id}/cum/{cumId} — sửa một phần. Thêm 2026-09-30.
+  // ---------------------------------------------------------------------
+  async capNhatCum(
+    khoaId: string,
+    cumId: string,
+    dto: UpdateCumHocVienDto,
+    caller: AuthenticatedUser,
+  ) {
+    const khoa = await this.getKhoaOrThrow(khoaId);
+    this.assertChuKhoa(khoa, caller);
+    await this.getCumTrongKhoaOrThrow(khoaId, cumId);
+    this.assertCoTruongSua(dto);
+
+    try {
+      return await this.prisma.cum_hoc_vien.update({
+        where: { id: cumId },
+        data: {
+          ten_cum: dto.ten_cum ? normalizeNfcName(dto.ten_cum) : undefined,
+          link_zalo: dto.link_zalo,
+          ghi_chu: dto.ghi_chu,
+          trang_thai: dto.trang_thai,
+        },
+      });
+    } catch (e) {
+      throw this.mapUniqueViolation(
+        e,
+        'Tên cụm đã tồn tại trong khóa này',
+        'ten_cum',
+      );
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -612,6 +897,53 @@ export class KhoaBoiDuongService {
   }
 
   // ---------------------------------------------------------------------
+  // PATCH /lop/{id}/lich-hoc/{lichHocId} — sửa một phần. Thêm 2026-09-30.
+  // Không cho đổi giai_doan_id (xem comment UpdateLichHocDto).
+  // ---------------------------------------------------------------------
+  async capNhatLichHoc(
+    lopId: string,
+    lichHocId: string,
+    dto: UpdateLichHocDto,
+    caller: AuthenticatedUser,
+  ) {
+    const lop = await this.getLopOrThrow(lopId);
+    this.assertChuKhoa(lop.khoa, caller);
+    const lich = await this.getLichHocTrongLopOrThrow(lopId, lichHocId);
+    this.assertCoTruongSua(dto);
+
+    if (dto.thoi_gian_bat_dau || dto.thoi_gian_ket_thuc) {
+      const batDau =
+        dto.thoi_gian_bat_dau ?? lich.thoi_gian_bat_dau.toISOString();
+      const ketThuc =
+        dto.thoi_gian_ket_thuc ?? lich.thoi_gian_ket_thuc.toISOString();
+      this.assertThoiGianHopLe(batDau, ketThuc, 'lịch học', false);
+    }
+
+    try {
+      return await this.prisma.lich_hoc_lop.update({
+        where: { id: lichHocId },
+        data: {
+          thoi_gian_bat_dau: dto.thoi_gian_bat_dau
+            ? new Date(dto.thoi_gian_bat_dau)
+            : undefined,
+          thoi_gian_ket_thuc: dto.thoi_gian_ket_thuc
+            ? new Date(dto.thoi_gian_ket_thuc)
+            : undefined,
+          dia_diem_hoac_link: dto.dia_diem_hoac_link,
+          buoi_so: dto.buoi_so,
+          trang_thai: dto.trang_thai,
+        },
+      });
+    } catch (e) {
+      throw this.mapUniqueViolation(
+        e,
+        'Lớp này đã có lịch học cho giai đoạn và buổi này',
+        'buoi_so',
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // POST/DELETE /lop/{id}/nhan-su
   // ---------------------------------------------------------------------
   async themNhanSu(
@@ -655,36 +987,157 @@ export class KhoaBoiDuongService {
     return caller.hoc_vien_id;
   }
 
-  async khoaHocCuaToi(caller: AuthenticatedUser) {
-    const hocVienId = this.assertHocVienId(caller);
-    return this.prisma.dang_ky_hoc.findMany({
+  // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): trả riêng 3 loại lớp
+  // (lop_truc_tiep/lop_zoom/lop_vle) + cum thay cho 1 trường "lop" duy nhất
+  // như trước — THAY ĐỔI CẤU TRÚC RESPONSE của endpoint này. Frontend M7
+  // (ThongTinLopHoc.tsx) đang dùng field "lop" cũ sẽ tạm hiển thị
+  // sai/thiếu dữ liệu cho tới khi task frontend riêng cập nhật — dự kiến,
+  // không phải lỗi (xem báo cáo cuối task này).
+  //
+  // Tách riêng phần đọc dữ liệu (dùng chung cho GET /hoc-vien/toi/khoa-hoc
+  // VÀ GET /hoc-vien/{id}/khoa-hoc — thêm 2026-09-30) khỏi phần xác định
+  // hocVienId (từ token đăng nhập hoặc từ param + kiểm tra quyền).
+  private async khoaHocTheoHocVienId(hocVienId: string) {
+    const dangKyList = await this.prisma.dang_ky_hoc.findMany({
       where: { hoc_vien_id: hocVienId },
       include: {
         khoa: true,
-        lop: {
+        cum: true,
+        dang_ky_hoc_lop: {
           include: {
-            nhan_su: true,
-            // T6 (mo-rong-nls-an-giang.md): sắp buổi theo giai đoạn, buổi,
-            // thời gian, địa điểm/link (nghiệm thu T6).
-            lich_hoc: {
-              include: { giai_doan: true },
-              orderBy: [
-                { giai_doan: { thu_tu: 'asc' } },
-                { buoi_so: 'asc' },
-                { thoi_gian_bat_dau: 'asc' },
-                { dia_diem_hoac_link: 'asc' },
-              ],
+            lop: {
+              include: {
+                nhan_su: true,
+                // T6 (mo-rong-nls-an-giang.md): sắp buổi theo giai đoạn,
+                // buổi, thời gian, địa điểm/link (nghiệm thu T6).
+                lich_hoc: {
+                  include: { giai_doan: true },
+                  orderBy: [
+                    { giai_doan: { thu_tu: 'asc' } },
+                    { buoi_so: 'asc' },
+                    { thoi_gian_bat_dau: 'asc' },
+                    { dia_diem_hoac_link: 'asc' },
+                  ],
+                },
+              },
             },
           },
         },
       },
       orderBy: { ngay_dang_ky: 'desc' },
     });
+
+    // T12 (mo-rong-nls-an-giang.md, 2026-09-30): trạng thái điểm danh từng
+    // buổi + tiến độ từng giai đoạn — truy vấn RIÊNG (không lồng vào include
+    // ở trên vì cần lọc theo CHÍNH dang_ky_hoc_id của từng dòng dang_ky_hoc,
+    // Prisma không hỗ trợ tham chiếu field anh em trong nested where) rồi map
+    // thủ công theo cặp (dang_ky_hoc_id, lich_hoc_id)/dang_ky_hoc_id.
+    const dangKyIds = dangKyList.map((dk) => dk.id);
+    const [diemDanhList, ketQuaGiaiDoanList] = dangKyIds.length
+      ? await Promise.all([
+          this.prisma.diem_danh.findMany({
+            where: { dang_ky_hoc_id: { in: dangKyIds } },
+            select: {
+              dang_ky_hoc_id: true,
+              lich_hoc_id: true,
+              trang_thai: true,
+            },
+          }),
+          this.prisma.ket_qua_giai_doan.findMany({
+            where: { dang_ky_hoc_id: { in: dangKyIds } },
+            include: { giai_doan: { select: { ten_giai_doan: true } } },
+          }),
+        ])
+      : [[], []];
+
+    const diemDanhMap = new Map(
+      diemDanhList.map((d) => [
+        `${d.dang_ky_hoc_id}|${d.lich_hoc_id}`,
+        d.trang_thai,
+      ]),
+    );
+    const tienDoTheoDangKy = new Map<
+      string,
+      {
+        giai_doan_id: string;
+        ten_giai_doan: string;
+        ty_le_hoan_thanh: number | null;
+        diem: number | null;
+      }[]
+    >();
+    for (const kq of ketQuaGiaiDoanList) {
+      const list = tienDoTheoDangKy.get(kq.dang_ky_hoc_id) ?? [];
+      list.push({
+        giai_doan_id: kq.giai_doan_id,
+        ten_giai_doan: kq.giai_doan.ten_giai_doan,
+        ty_le_hoan_thanh:
+          kq.ty_le_hoan_thanh == null ? null : Number(kq.ty_le_hoan_thanh),
+        diem: kq.diem == null ? null : Number(kq.diem),
+      });
+      tienDoTheoDangKy.set(kq.dang_ky_hoc_id, list);
+    }
+
+    return dangKyList.map((dk) => {
+      const { dang_ky_hoc_lop, ...rest } = dk;
+      const lopTheoLoai = (loai: loai_lop_hoc) => {
+        const lop = dang_ky_hoc_lop.find((d) => d.loai_lop === loai)?.lop;
+        if (!lop) return null;
+        return {
+          ...lop,
+          lich_hoc: (lop.lich_hoc ?? []).map((buoi) => ({
+            ...buoi,
+            trang_thai_diem_danh:
+              diemDanhMap.get(`${dk.id}|${buoi.id}`) ?? null,
+          })),
+        };
+      };
+      return {
+        ...rest,
+        lop_truc_tiep: lopTheoLoai('truc_tiep'),
+        lop_zoom: lopTheoLoai('zoom'),
+        lop_vle: lopTheoLoai('vle'),
+        tien_do_giai_doan: tienDoTheoDangKy.get(dk.id) ?? [],
+      };
+    });
   }
 
+  async khoaHocCuaToi(caller: AuthenticatedUser) {
+    const hocVienId = this.assertHocVienId(caller);
+    return this.khoaHocTheoHocVienId(hocVienId);
+  }
+
+  // GET /hoc-vien/{id}/khoa-hoc — Thêm 2026-09-30 (QĐ10): admin/Trường/Sở/
+  // Phòng xem lại khóa/lớp của 1 học viên cụ thể (chuẩn bị đổi lớp/cụm qua
+  // PATCH/DELETE /dang-ky-hoc/{id}/lop, PATCH /dang-ky-hoc/{id}/cum ở trên)
+  // — khác GET /hoc-vien/toi/khoa-hoc (chính học viên tự xem). Tái dùng
+  // ĐÚNG cơ chế phân quyền của HocVienService.findOne (canAccessDonVi theo
+  // don_vi_cong_tac_id của hồ sơ), không tự chế logic phân quyền riêng.
+  async khoaHocCuaHocVien(hocVienId: string, caller: AuthenticatedUser) {
+    const hocVien = await this.prisma.hoc_vien.findUnique({
+      where: { id: hocVienId },
+    });
+    if (!hocVien) {
+      throw new NotFoundAppException('Không tìm thấy hồ sơ học viên');
+    }
+    const coQuyen = await this.scopeService.canAccessDonVi(
+      caller,
+      hocVien.don_vi_cong_tac_id,
+    );
+    if (!coQuyen) {
+      throw new ForbiddenAppException(
+        'Hồ sơ này nằm ngoài phạm vi quyền của tài khoản hiện tại',
+      );
+    }
+    return this.khoaHocTheoHocVienId(hocVienId);
+  }
+
+  // QĐ10: hệ quả bắt buộc từ việc bỏ dang_ky_hoc.lop_id — cũng tách
+  // lop_truc_tiep/lop_zoom/lop_vle giống khoaHocCuaToi() ở trên (không nằm
+  // trong 17 yêu cầu gốc của task, nhưng bắt buộc để code compile được sau
+  // khi cột lop_id bị xóa).
   async ketQuaCuaToi(caller: AuthenticatedUser) {
     const hocVienId = this.assertHocVienId(caller);
-    return this.prisma.dang_ky_hoc.findMany({
+    const list = await this.prisma.dang_ky_hoc.findMany({
       where: { hoc_vien_id: hocVienId },
       select: {
         id: true,
@@ -692,9 +1145,128 @@ export class KhoaBoiDuongService {
         ket_qua: true,
         ngay_hoan_thanh: true,
         khoa: { select: { id: true, ma_khoa: true, ten_khoa: true } },
-        lop: { select: { id: true, ten_lop: true } },
+        dang_ky_hoc_lop: {
+          select: {
+            loai_lop: true,
+            lop: { select: { id: true, ten_lop: true } },
+          },
+        },
       },
       orderBy: { ngay_dang_ky: 'desc' },
+    });
+
+    return list.map((dk) => {
+      const { dang_ky_hoc_lop, ...rest } = dk;
+      const lopTheoLoai = (loai: loai_lop_hoc) =>
+        dang_ky_hoc_lop.find((d) => d.loai_lop === loai)?.lop ?? null;
+      return {
+        ...rest,
+        lop_truc_tiep: lopTheoLoai('truc_tiep'),
+        lop_zoom: lopTheoLoai('zoom'),
+        lop_vle: lopTheoLoai('vle'),
+      };
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // PATCH /dang-ky-hoc/{id}/lop, DELETE /dang-ky-hoc/{id}/lop/{loai_lop},
+  // PATCH /dang-ky-hoc/{id}/cum — QĐ10 (mo-rong-nls-an-giang.md,
+  // 2026-09-30): thao tác thủ công từng đăng ký học một (chuẩn bị cho màn
+  // hình admin sửa tay ở task frontend sau). Quyền: Trường (chủ khóa của
+  // dang_ky_hoc.khoa_id) + quan_tri — dùng lại assertChuKhoa() sẵn có.
+  // ---------------------------------------------------------------------
+  private async getDangKyOrThrow(id: string) {
+    const dangKy = await this.prisma.dang_ky_hoc.findUnique({
+      where: { id },
+      include: { khoa: true },
+    });
+    if (!dangKy) throw new NotFoundAppException('Không tìm thấy đăng ký học');
+    return dangKy;
+  }
+
+  async capNhatLopDangKy(
+    id: string,
+    dto: CapNhatLopDangKyDto,
+    caller: AuthenticatedUser,
+  ) {
+    const dangKy = await this.getDangKyOrThrow(id);
+    this.assertChuKhoa(dangKy.khoa, caller);
+    await this.assertLopThuocKhoaVaLoai(
+      dto.lop_id,
+      dangKy.khoa_id,
+      dto.loai_lop,
+    );
+
+    const dangKyLop = await this.prisma.dang_ky_hoc_lop.upsert({
+      where: {
+        dang_ky_hoc_id_loai_lop: {
+          dang_ky_hoc_id: id,
+          loai_lop: dto.loai_lop,
+        },
+      },
+      create: {
+        dang_ky_hoc_id: id,
+        lop_id: dto.lop_id,
+        loai_lop: dto.loai_lop,
+      },
+      update: { lop_id: dto.lop_id },
+    });
+    if (dangKy.trang_thai !== 'da_phan_lop') {
+      await this.prisma.dang_ky_hoc.update({
+        where: { id },
+        data: { trang_thai: 'da_phan_lop' },
+      });
+    }
+    return dangKyLop;
+  }
+
+  async xoaLopDangKy(
+    id: string,
+    loaiLop: loai_lop_hoc,
+    caller: AuthenticatedUser,
+  ) {
+    const dangKy = await this.getDangKyOrThrow(id);
+    this.assertChuKhoa(dangKy.khoa, caller);
+
+    const result = await this.prisma.dang_ky_hoc_lop.deleteMany({
+      where: { dang_ky_hoc_id: id, loai_lop: loaiLop },
+    });
+    if (result.count === 0) {
+      throw new NotFoundAppException(
+        `Đăng ký học này chưa được gán lớp loại "${loaiLop}"`,
+      );
+    }
+    return { da_xoa: true };
+  }
+
+  async capNhatCumDangKy(
+    id: string,
+    dto: CapNhatCumDangKyDto,
+    caller: AuthenticatedUser,
+  ) {
+    const dangKy = await this.getDangKyOrThrow(id);
+    this.assertChuKhoa(dangKy.khoa, caller);
+
+    const cumId = dto.cum_id ?? null;
+    if (cumId) {
+      const cum = await this.prisma.cum_hoc_vien.findUnique({
+        where: { id: cumId },
+      });
+      if (!cum) {
+        throw new ValidationException('cum_id không tồn tại', [
+          { field: 'cum_id', message: 'Không tồn tại' },
+        ]);
+      }
+      if (cum.khoa_id !== dangKy.khoa_id) {
+        throw new ValidationException(
+          'Cụm không thuộc cùng khóa với đăng ký học này',
+          [{ field: 'cum_id', message: 'Phải thuộc cùng khóa bồi dưỡng' }],
+        );
+      }
+    }
+    return this.prisma.dang_ky_hoc.update({
+      where: { id },
+      data: { cum_id: cumId },
     });
   }
 
@@ -727,6 +1299,9 @@ export class KhoaBoiDuongService {
     ma_dinh_danh_moet?: string;
     ma_khoa?: string;
     ten_lop?: string;
+    ten_lop_zoom?: string;
+    ten_lop_vle?: string;
+    ten_cum?: string;
   }): Promise<RowBuildResult<PhanLopHocVienRowDto>> {
     const resolved = await resolveHocVienImportRow(this.prisma, {
       so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
@@ -755,24 +1330,35 @@ export class KhoaBoiDuongService {
       return { error: `Khóa "${maKhoa}" không tồn tại` };
     }
 
-    const tenLop = raw.ten_lop?.trim();
-    let lopId: string | null = null;
-    // T6 (mo-rong-nls-an-giang.md, QĐ3/QĐ4): lop_hoc.muc_nang_luc khác
-    // dang_ky_hoc.muc_dau_vao (đã có từ T5) -> cảnh báo 🟡, KHÔNG chặn dòng —
-    // chỉ có ý nghĩa khi CẢ 2 đều đã có giá trị (lớp có mức mục tiêu VÀ học
-    // viên đã có kết quả đánh giá đầu vào), nếu không thì không có gì để so.
-    let canhBao: string | undefined;
-    if (tenLop) {
-      const lop = await this.prisma.lop_hoc.findFirst({
-        where: { khoa_id: khoa.id, ten_lop: tenLop },
+    const ma =
+      raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
+
+    // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): 3 cột lớp độc lập nhau, mỗi
+    // cột tùy chọn. T6 (QĐ3/QĐ4): lop_hoc.muc_nang_luc khác
+    // dang_ky_hoc.muc_dau_vao -> cảnh báo 🟡, KHÔNG chặn dòng — áp dụng cho
+    // CẢ 3 loại lớp (trước đây chỉ áp dụng cho lớp trực tiếp).
+    const canhBaoList: string[] = [];
+    const resolveLop = async (
+      tenLopRaw: string | undefined,
+      loaiLop: loai_lop_hoc,
+      nhanLoai: string,
+    ): Promise<{ lopId?: string; error?: string }> => {
+      const tenLop = tenLopRaw?.trim();
+      if (!tenLop) return {};
+      const lop = await this.prisma.lop_hoc.findUnique({
+        where: {
+          khoa_id_loai_lop_ten_lop: {
+            khoa_id: khoa.id,
+            loai_lop: loaiLop,
+            ten_lop: tenLop,
+          },
+        },
       });
       if (!lop) {
         return {
-          error: `Lớp "${tenLop}" không tồn tại trong khóa "${maKhoa}"`,
+          error: `Không tìm thấy lớp ${nhanLoai} "${tenLop}" trong khóa "${maKhoa}"`,
         };
       }
-      lopId = lop.id;
-
       if (lop.muc_nang_luc) {
         const dangKyHienTai = await this.prisma.dang_ky_hoc.findUnique({
           where: {
@@ -783,20 +1369,45 @@ export class KhoaBoiDuongService {
           dangKyHienTai?.muc_dau_vao &&
           dangKyHienTai.muc_dau_vao !== lop.muc_nang_luc
         ) {
-          const ma =
-            raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
-          canhBao = `Học viên "${ma}" có mức đầu vào "${dangKyHienTai.muc_dau_vao}" khác mức năng lực "${lop.muc_nang_luc}" của lớp "${tenLop}" — kiểm tra lại phân lớp`;
+          canhBaoList.push(
+            `Học viên "${ma}" có mức đầu vào "${dangKyHienTai.muc_dau_vao}" khác mức năng lực "${lop.muc_nang_luc}" của lớp ${nhanLoai} "${tenLop}" — kiểm tra lại phân lớp`,
+          );
         }
       }
+      return { lopId: lop.id };
+    };
+
+    const tt = await resolveLop(raw.ten_lop, 'truc_tiep', 'trực tiếp');
+    if (tt.error) return { error: tt.error };
+    const zoom = await resolveLop(raw.ten_lop_zoom, 'zoom', 'Zoom');
+    if (zoom.error) return { error: zoom.error };
+    const vle = await resolveLop(raw.ten_lop_vle, 'vle', 'VLE');
+    if (vle.error) return { error: vle.error };
+
+    let cumId: string | undefined;
+    const tenCum = raw.ten_cum?.trim();
+    if (tenCum) {
+      const cum = await this.prisma.cum_hoc_vien.findUnique({
+        where: { khoa_id_ten_cum: { khoa_id: khoa.id, ten_cum: tenCum } },
+      });
+      if (!cum) {
+        return {
+          error: `Không tìm thấy cụm học viên "${tenCum}" trong khóa "${maKhoa}"`,
+        };
+      }
+      cumId = cum.id;
     }
 
     return {
       dto: {
         hoc_vien_id: hocVien.id,
         khoa_id: khoa.id,
-        lop_id: lopId,
+        lop_truc_tiep_id: tt.lopId,
+        lop_zoom_id: zoom.lopId,
+        lop_vle_id: vle.lopId,
+        cum_id: cumId,
       },
-      canhBao,
+      canhBao: canhBaoList.length ? canhBaoList.join('; ') : undefined,
     };
   }
 
@@ -805,8 +1416,9 @@ export class KhoaBoiDuongService {
   // không còn ràng buộc "phải có dang_ky_hoc từ trước" để kiểm tra thêm.
   //
   // Trả về hocVienChuaCoEmail để ImportService đếm
-  // so_hoc_vien_chua_co_email (T3, QĐ6) trên GET /import/{id} — chỉ nhánh
-  // gán lop_id thực sự mới có ý nghĩa (nhánh chỉ ghi danh không gửi email).
+  // so_hoc_vien_chua_co_email (T3, QĐ6) trên GET /import/{id} — CHỈ nhánh
+  // gán lớp TRỰC TIẾP mới có ý nghĩa (giữ nguyên hành vi cũ — email phân lớp
+  // chỉ gắn với lớp trực tiếp, chưa mở rộng sang zoom/vle ở lượt này).
   async commitPhanLop(
     dto: PhanLopHocVienRowDto,
   ): Promise<{ hocVienChuaCoEmail: boolean }> {
@@ -816,39 +1428,62 @@ export class KhoaBoiDuongService {
         khoa_id: dto.khoa_id,
       },
     };
-    if (dto.lop_id) {
-      const dangKy = await this.prisma.dang_ky_hoc.upsert({
-        where,
-        create: {
-          hoc_vien_id: dto.hoc_vien_id,
-          khoa_id: dto.khoa_id,
-          lop_id: dto.lop_id,
-          trang_thai: 'da_phan_lop',
+    // QĐ10: "đã phân lớp" nay tổng quát hóa thành "đã được gán ÍT NHẤT 1
+    // trong 3 loại lớp" (trước đây chỉ có 1 loại lớp duy nhất nên tương
+    // đương). Dòng chỉ ghi danh/chỉ gán cụm (không gán lớp nào) giữ nguyên
+    // hành vi cũ: không hạ cấp trang_thai đã có, mặc định da_duyet nếu tạo mới.
+    const coGanLop = !!(
+      dto.lop_truc_tiep_id ||
+      dto.lop_zoom_id ||
+      dto.lop_vle_id
+    );
+
+    const dangKy = await this.prisma.dang_ky_hoc.upsert({
+      where,
+      create: {
+        hoc_vien_id: dto.hoc_vien_id,
+        khoa_id: dto.khoa_id,
+        trang_thai: coGanLop ? 'da_phan_lop' : 'da_duyet',
+        cum_id: dto.cum_id,
+      },
+      update: {
+        ...(coGanLop ? { trang_thai: 'da_phan_lop' as const } : {}),
+        ...(dto.cum_id !== undefined ? { cum_id: dto.cum_id } : {}),
+      },
+    });
+
+    const ganLop: Array<{ loai: loai_lop_hoc; lopId: string }> = [];
+    if (dto.lop_truc_tiep_id)
+      ganLop.push({ loai: 'truc_tiep', lopId: dto.lop_truc_tiep_id });
+    if (dto.lop_zoom_id) ganLop.push({ loai: 'zoom', lopId: dto.lop_zoom_id });
+    if (dto.lop_vle_id) ganLop.push({ loai: 'vle', lopId: dto.lop_vle_id });
+
+    for (const g of ganLop) {
+      await this.prisma.dang_ky_hoc_lop.upsert({
+        where: {
+          dang_ky_hoc_id_loai_lop: {
+            dang_ky_hoc_id: dangKy.id,
+            loai_lop: g.loai,
+          },
         },
-        update: { lop_id: dto.lop_id, trang_thai: 'da_phan_lop' },
+        create: {
+          dang_ky_hoc_id: dangKy.id,
+          lop_id: g.lopId,
+          loai_lop: g.loai,
+        },
+        update: { lop_id: g.lopId },
       });
-      // Event dang_ky_hoc_phan_lop CHỈ kích hoạt ở nhánh gán lop_id thực sự
-      // (docs/api-contract.md mục 8) — nhánh else dưới đây (chỉ ghi danh,
-      // lop_id vẫn NULL) không gọi.
+    }
+
+    // Event dang_ky_hoc_phan_lop (docs/api-contract.md mục 8) CHỈ kích hoạt
+    // khi dòng này gán lớp TRỰC TIẾP — giữ nguyên trigger cũ.
+    if (dto.lop_truc_tiep_id) {
       const { chuaCoEmail } = await this.thongBaoService.guiDangKyHocPhanLop(
         dangKy.id,
       );
       return { hocVienChuaCoEmail: chuaCoEmail };
-    } else {
-      // ten_lop trống: chỉ đảm bảo đã ghi danh. Nếu dang_ky_hoc đã tồn tại
-      // (kể cả đã da_phan_lop), giữ nguyên — không hạ cấp lại trang_thai/lop_id.
-      await this.prisma.dang_ky_hoc.upsert({
-        where,
-        create: {
-          hoc_vien_id: dto.hoc_vien_id,
-          khoa_id: dto.khoa_id,
-          lop_id: null,
-          trang_thai: 'da_duyet',
-        },
-        update: {},
-      });
-      return { hocVienChuaCoEmail: false };
     }
+    return { hocVienChuaCoEmail: false };
   }
 
   // ---------------------------------------------------------------------
@@ -958,6 +1593,7 @@ export class KhoaBoiDuongService {
     raw: {
       ma_khoa?: string;
       ten_lop?: string;
+      loai_lop?: string;
       nhom_hoc_vien?: string;
       muc_nang_luc?: string;
       si_so_toi_da?: string;
@@ -983,6 +1619,24 @@ export class KhoaBoiDuongService {
     const tenLop = raw.ten_lop?.trim();
     if (!tenLop) {
       return { error: 'Thiếu cột "ten_lop"' };
+    }
+
+    // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): cột mới, tùy chọn — mặc
+    // định "truc_tiep" nếu để trống (hệ quả bắt buộc từ lop_hoc.loai_lop nay
+    // NOT NULL; import này chưa được yêu cầu phân biệt loại lớp trước đó).
+    const loaiLopRaw = raw.loai_lop?.trim();
+    let loaiLop: loai_lop_hoc = 'truc_tiep';
+    if (loaiLopRaw) {
+      if (
+        loaiLopRaw !== 'truc_tiep' &&
+        loaiLopRaw !== 'zoom' &&
+        loaiLopRaw !== 'vle'
+      ) {
+        return {
+          error: 'Cột "loai_lop" phải là "truc_tiep", "zoom" hoặc "vle"',
+        };
+      }
+      loaiLop = loaiLopRaw;
     }
 
     let nhomHocVien: number | undefined;
@@ -1067,7 +1721,7 @@ export class KhoaBoiDuongService {
     }
 
     if (dupKeys) {
-      const key = `${khoa.id}|${tenLop.toLowerCase()}|${giaiDoan.id}|${buoiSo}`;
+      const key = `${khoa.id}|${loaiLop}|${tenLop.toLowerCase()}|${giaiDoan.id}|${buoiSo}`;
       if (dupKeys.has(key)) {
         return {
           error: `Dòng trùng (lớp "${tenLop}", giai đoạn thứ tự "${giaiDoanThuTu}", buổi "${buoiSo}") với dòng khác trong cùng file`,
@@ -1080,6 +1734,7 @@ export class KhoaBoiDuongService {
       dto: {
         khoa_id: khoa.id,
         ten_lop: normalizeNfcName(tenLop),
+        loai_lop: loaiLop,
         nhom_hoc_vien: nhomHocVien,
         muc_nang_luc: mucNangLuc,
         si_so_toi_da: siSoToiDa,
@@ -1101,10 +1756,15 @@ export class KhoaBoiDuongService {
   async commitLopVaLichHoc(dto: LopVaLichHocRowDto): Promise<void> {
     const lop = await this.prisma.lop_hoc.upsert({
       where: {
-        khoa_id_ten_lop: { khoa_id: dto.khoa_id, ten_lop: dto.ten_lop },
+        khoa_id_loai_lop_ten_lop: {
+          khoa_id: dto.khoa_id,
+          loai_lop: dto.loai_lop,
+          ten_lop: dto.ten_lop,
+        },
       },
       create: {
         khoa_id: dto.khoa_id,
+        loai_lop: dto.loai_lop,
         ten_lop: dto.ten_lop,
         nhom_hoc_vien: dto.nhom_hoc_vien,
         muc_nang_luc: dto.muc_nang_luc,
@@ -1137,6 +1797,369 @@ export class KhoaBoiDuongService {
         thoi_gian_bat_dau: dto.thoi_gian_bat_dau,
         thoi_gian_ket_thuc: dto.thoi_gian_ket_thuc,
         dia_diem_hoac_link: dto.dia_diem_hoac_link,
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Import diem_danh (T12, mo-rong-nls-an-giang.md — gọi từ ImportService) —
+  // điểm danh nhập qua IMPORT EXCEL, KHÔNG có giao diện chấm tay từng buổi.
+  // Mỗi dòng = điểm danh của 1 học viên tại 1 buổi cụ thể (lich_hoc_lop) —
+  // xác định buổi qua (khoa_id, loai_lop, ten_lop) -> lớp, rồi (lop_id,
+  // giai_doan_id, buoi_so) -> buổi. loai_lop BẮT BUỘC ở import này (khác
+  // lop_va_lich_hoc không có mặc định an toàn để suy đoán, vì điểm danh phải
+  // khớp ĐÚNG 1 buổi cụ thể).
+  //
+  // Rule 🟡 (mo-rong-nls-an-giang.md mục T12): học viên điểm danh ở buổi của
+  // lớp KHÁC lớp mình đang được gán cho đúng loai_lop đó (học bù) -> cảnh báo
+  // không chặn dòng, NHƯNG bắt buộc có ghi_chu — thiếu ghi_chu trong trường
+  // hợp này là lỗi 🔴 (chặn dòng), theo đúng tinh thần "bắt buộc ghi_chu" của
+  // tài liệu.
+  // ---------------------------------------------------------------------
+  async resolveDiemDanhRow(
+    raw: {
+      so_dinh_danh_ca_nhan?: string;
+      ma_dinh_danh_moet?: string;
+      ma_khoa?: string;
+      ten_lop?: string;
+      loai_lop?: string;
+      giai_doan_thu_tu?: string;
+      buoi_so?: string;
+      trang_thai?: string;
+      nguon?: string;
+      ghi_chu?: string;
+    },
+    dupKeys?: Set<string>,
+  ): Promise<RowBuildResult<DiemDanhRowDto>> {
+    const resolved = await resolveHocVienImportRow(this.prisma, {
+      so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
+      ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
+    });
+    if (resolved.error || !resolved.hocVien) {
+      return { error: resolved.error ?? 'Không xác định được học viên' };
+    }
+    const hocVien = resolved.hocVien;
+    const ma =
+      raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
+
+    const maKhoa = raw.ma_khoa?.trim();
+    if (!maKhoa) {
+      return { error: 'Thiếu cột "ma_khoa"' };
+    }
+    const khoa = await this.prisma.khoa_boi_duong.findUnique({
+      where: { ma_khoa: maKhoa },
+    });
+    if (!khoa) {
+      return { error: `Khóa "${maKhoa}" không tồn tại` };
+    }
+
+    const dangKy = await this.prisma.dang_ky_hoc.findUnique({
+      where: {
+        hoc_vien_id_khoa_id: { hoc_vien_id: hocVien.id, khoa_id: khoa.id },
+      },
+    });
+    if (!dangKy) {
+      return {
+        error: `Học viên "${ma}" chưa được ghi danh vào khóa "${maKhoa}"`,
+      };
+    }
+
+    const tenLop = raw.ten_lop?.trim();
+    if (!tenLop) {
+      return { error: 'Thiếu cột "ten_lop"' };
+    }
+
+    const loaiLopRaw = raw.loai_lop?.trim();
+    if (
+      loaiLopRaw !== 'truc_tiep' &&
+      loaiLopRaw !== 'zoom' &&
+      loaiLopRaw !== 'vle'
+    ) {
+      return {
+        error: 'Cột "loai_lop" phải là "truc_tiep", "zoom" hoặc "vle"',
+      };
+    }
+    const loaiLop: loai_lop_hoc = loaiLopRaw;
+
+    const lop = await this.prisma.lop_hoc.findUnique({
+      where: {
+        khoa_id_loai_lop_ten_lop: {
+          khoa_id: khoa.id,
+          loai_lop: loaiLop,
+          ten_lop: tenLop,
+        },
+      },
+    });
+    if (!lop) {
+      return {
+        error: `Lớp "${tenLop}" (loại "${loaiLopRaw}") không tồn tại trong khóa "${maKhoa}"`,
+      };
+    }
+
+    const giaiDoanThuTuRaw = raw.giai_doan_thu_tu?.trim();
+    if (!giaiDoanThuTuRaw) {
+      return { error: 'Thiếu cột "giai_doan_thu_tu"' };
+    }
+    const giaiDoanThuTu = Number(giaiDoanThuTuRaw);
+    if (!Number.isInteger(giaiDoanThuTu)) {
+      return { error: 'Cột "giai_doan_thu_tu" phải là số nguyên' };
+    }
+    const giaiDoan = await this.prisma.giai_doan_khoa.findUnique({
+      where: { khoa_id_thu_tu: { khoa_id: khoa.id, thu_tu: giaiDoanThuTu } },
+    });
+    if (!giaiDoan) {
+      return {
+        error: `Giai đoạn thứ tự "${giaiDoanThuTu}" không tồn tại trong khóa "${maKhoa}"`,
+      };
+    }
+
+    const buoiSoRaw = raw.buoi_so?.trim();
+    if (!buoiSoRaw) {
+      return { error: 'Thiếu cột "buoi_so"' };
+    }
+    const buoiSo = Number(buoiSoRaw);
+    if (!Number.isInteger(buoiSo) || buoiSo < 1) {
+      return { error: 'Cột "buoi_so" phải là số nguyên >= 1' };
+    }
+
+    const lichHoc = await this.prisma.lich_hoc_lop.findUnique({
+      where: {
+        lop_id_giai_doan_id_buoi_so: {
+          lop_id: lop.id,
+          giai_doan_id: giaiDoan.id,
+          buoi_so: buoiSo,
+        },
+      },
+    });
+    if (!lichHoc) {
+      return {
+        error: `Không tìm thấy buổi học (lớp "${tenLop}", giai đoạn thứ tự "${giaiDoanThuTu}", buổi "${buoiSo}")`,
+      };
+    }
+
+    const trangThaiRaw = raw.trang_thai?.trim();
+    if (
+      trangThaiRaw !== 'co_mat' &&
+      trangThaiRaw !== 'vang' &&
+      trangThaiRaw !== 'vang_co_phep'
+    ) {
+      return {
+        error: 'Cột "trang_thai" phải là "co_mat", "vang" hoặc "vang_co_phep"',
+      };
+    }
+    const trangThai: trang_thai_diem_danh = trangThaiRaw;
+
+    const nguonRaw = raw.nguon?.trim();
+    if (
+      nguonRaw !== 'zoom' &&
+      nguonRaw !== 'ky_ten' &&
+      nguonRaw !== 'qr' &&
+      nguonRaw !== 'thu_cong'
+    ) {
+      return {
+        error: 'Cột "nguon" phải là "zoom", "ky_ten", "qr" hoặc "thu_cong"',
+      };
+    }
+    const nguon: nguon_diem_danh = nguonRaw;
+
+    const ghiChu = raw.ghi_chu?.trim() || undefined;
+
+    // Rule 🟡: buổi thuộc lớp KHÁC lớp học viên đang được gán cho đúng
+    // loai_lop này (học bù, kể cả khi học viên CHƯA được gán lớp nào của
+    // loai_lop này) -> cảnh báo, bắt buộc ghi_chu (thiếu -> lỗi 🔴).
+    const dangKyLop = await this.prisma.dang_ky_hoc_lop.findUnique({
+      where: {
+        dang_ky_hoc_id_loai_lop: {
+          dang_ky_hoc_id: dangKy.id,
+          loai_lop: loaiLop,
+        },
+      },
+    });
+    let canhBao: string | undefined;
+    if (!dangKyLop || dangKyLop.lop_id !== lop.id) {
+      if (!ghiChu) {
+        return {
+          error: `Học viên "${ma}" điểm danh ở buổi của lớp "${tenLop}" khác lớp mình đang được gán (học bù) — bắt buộc nhập ghi_chu`,
+        };
+      }
+      canhBao = `Học viên "${ma}" điểm danh ở buổi của lớp "${tenLop}" khác lớp mình đang được gán (học bù)`;
+    }
+
+    if (dupKeys) {
+      const key = `${dangKy.id}|${lichHoc.id}`;
+      if (dupKeys.has(key)) {
+        return {
+          error: `Dòng trùng (học viên "${ma}", lớp "${tenLop}", buổi "${buoiSo}") với dòng khác trong cùng file`,
+        };
+      }
+      dupKeys.add(key);
+    }
+
+    return {
+      dto: {
+        dang_ky_hoc_id: dangKy.id,
+        lich_hoc_id: lichHoc.id,
+        trang_thai: trangThai,
+        nguon,
+        ghi_chu: ghiChu,
+      },
+      canhBao,
+    };
+  }
+
+  // Không cần checkValid riêng: resolveDiemDanhRow() (buildDto) đã tra cứu/
+  // validate toàn bộ FK + quy tắc học bù rồi.
+  //
+  // Upsert theo (dang_ky_hoc_id, lich_hoc_id) — chạy lại file ghi đè (nghiệm
+  // thu T12), không cộng dồn.
+  async commitDiemDanh(dto: DiemDanhRowDto, importId: string): Promise<void> {
+    await this.prisma.diem_danh.upsert({
+      where: {
+        dang_ky_hoc_id_lich_hoc_id: {
+          dang_ky_hoc_id: dto.dang_ky_hoc_id,
+          lich_hoc_id: dto.lich_hoc_id,
+        },
+      },
+      create: {
+        dang_ky_hoc_id: dto.dang_ky_hoc_id,
+        lich_hoc_id: dto.lich_hoc_id,
+        trang_thai: dto.trang_thai,
+        nguon: dto.nguon,
+        ghi_chu: dto.ghi_chu,
+        nguon_import_id: importId,
+      },
+      update: {
+        trang_thai: dto.trang_thai,
+        nguon: dto.nguon,
+        ghi_chu: dto.ghi_chu,
+        nguon_import_id: importId,
+        cap_nhat_luc: new Date(),
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Import ket_qua_giai_doan (T12, mo-rong-nls-an-giang.md — gọi từ
+  // ImportService) — tiến độ/kết quả theo từng giai đoạn của khóa (vd tiến
+  // độ VLE, điểm đánh giá giai đoạn). dang_ky_hoc PHẢI đã tồn tại (học viên
+  // đã được ghi danh, T3) — cùng quy tắc như resolveKetQuaDanhGiaRow.
+  // ---------------------------------------------------------------------
+  async resolveKetQuaGiaiDoanRow(raw: {
+    so_dinh_danh_ca_nhan?: string;
+    ma_dinh_danh_moet?: string;
+    ma_khoa?: string;
+    giai_doan_thu_tu?: string;
+    ty_le_hoan_thanh?: string;
+    diem?: string;
+  }): Promise<RowBuildResult<KetQuaGiaiDoanRowDto>> {
+    const resolved = await resolveHocVienImportRow(this.prisma, {
+      so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
+      ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
+    });
+    if (resolved.error || !resolved.hocVien) {
+      return { error: resolved.error ?? 'Không xác định được học viên' };
+    }
+    const hocVien = resolved.hocVien;
+    const ma =
+      raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
+
+    const maKhoa = raw.ma_khoa?.trim();
+    if (!maKhoa) {
+      return { error: 'Thiếu cột "ma_khoa"' };
+    }
+    const khoa = await this.prisma.khoa_boi_duong.findUnique({
+      where: { ma_khoa: maKhoa },
+    });
+    if (!khoa) {
+      return { error: `Khóa "${maKhoa}" không tồn tại` };
+    }
+
+    const dangKy = await this.prisma.dang_ky_hoc.findUnique({
+      where: {
+        hoc_vien_id_khoa_id: { hoc_vien_id: hocVien.id, khoa_id: khoa.id },
+      },
+    });
+    if (!dangKy) {
+      return {
+        error: `Học viên "${ma}" chưa được ghi danh vào khóa "${maKhoa}" — phải chạy ghi danh (import phan_lop_hoc_vien, T3) trước`,
+      };
+    }
+
+    const giaiDoanThuTuRaw = raw.giai_doan_thu_tu?.trim();
+    if (!giaiDoanThuTuRaw) {
+      return { error: 'Thiếu cột "giai_doan_thu_tu"' };
+    }
+    const giaiDoanThuTu = Number(giaiDoanThuTuRaw);
+    if (!Number.isInteger(giaiDoanThuTu)) {
+      return { error: 'Cột "giai_doan_thu_tu" phải là số nguyên' };
+    }
+    const giaiDoan = await this.prisma.giai_doan_khoa.findUnique({
+      where: { khoa_id_thu_tu: { khoa_id: khoa.id, thu_tu: giaiDoanThuTu } },
+    });
+    if (!giaiDoan) {
+      return {
+        error: `Giai đoạn thứ tự "${giaiDoanThuTu}" không tồn tại trong khóa "${maKhoa}"`,
+      };
+    }
+
+    let tyLeHoanThanh: number | undefined;
+    if (raw.ty_le_hoan_thanh?.trim()) {
+      tyLeHoanThanh = Number(raw.ty_le_hoan_thanh.trim());
+      if (
+        !Number.isFinite(tyLeHoanThanh) ||
+        tyLeHoanThanh < 0 ||
+        tyLeHoanThanh > 100
+      ) {
+        return { error: 'Cột "ty_le_hoan_thanh" phải là số từ 0 đến 100' };
+      }
+    }
+
+    let diem: number | undefined;
+    if (raw.diem?.trim()) {
+      diem = Number(raw.diem.trim());
+      if (!Number.isFinite(diem)) {
+        return { error: 'Cột "diem" phải là số' };
+      }
+    }
+
+    return {
+      dto: {
+        dang_ky_hoc_id: dangKy.id,
+        giai_doan_id: giaiDoan.id,
+        ty_le_hoan_thanh: tyLeHoanThanh,
+        diem,
+      },
+    };
+  }
+
+  // Không cần checkValid riêng: resolveKetQuaGiaiDoanRow() (buildDto) đã tra
+  // cứu/validate toàn bộ FK + phạm vi giá trị rồi.
+  //
+  // Upsert theo (dang_ky_hoc_id, giai_doan_id) — chạy lại file ghi đè (nghiệm
+  // thu T12).
+  async commitKetQuaGiaiDoan(
+    dto: KetQuaGiaiDoanRowDto,
+    importId: string,
+  ): Promise<void> {
+    await this.prisma.ket_qua_giai_doan.upsert({
+      where: {
+        dang_ky_hoc_id_giai_doan_id: {
+          dang_ky_hoc_id: dto.dang_ky_hoc_id,
+          giai_doan_id: dto.giai_doan_id,
+        },
+      },
+      create: {
+        dang_ky_hoc_id: dto.dang_ky_hoc_id,
+        giai_doan_id: dto.giai_doan_id,
+        ty_le_hoan_thanh: dto.ty_le_hoan_thanh,
+        diem: dto.diem,
+        nguon_import_id: importId,
+      },
+      update: {
+        ty_le_hoan_thanh: dto.ty_le_hoan_thanh,
+        diem: dto.diem,
+        nguon_import_id: importId,
+        cap_nhat_luc: new Date(),
       },
     });
   }
