@@ -22,6 +22,7 @@ Cổng học viên cho khóa Bồi dưỡng năng lực số An Giang (~9.000 gi
 - TanStack Query cho mọi lời gọi API (không tự viết cache).
 - react-hook-form + zod cho form; schema zod **phản ánh đúng** `validation-checklist.md` để báo lỗi ngay khi nhập, nhưng **backend vẫn là nguồn quyết định** — luôn hiển thị lỗi `fields` mà API trả về.
 - Mantine (core, form inputs, notifications, dates) — đủ component cho Select phụ thuộc, Autocomplete, TagsInput.
+- @mantine/charts (đã duyệt 2026-09-30, dùng cho dashboard admin)
 - dayjs (locale `vi`) cho hiển thị ngày giờ.
 
 Không thêm thư viện ngoài danh sách trên nếu chưa hỏi.
