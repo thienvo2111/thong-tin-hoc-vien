@@ -26,8 +26,11 @@ function dongHoSo(hoSo: HocVien): { truong: string; giaTri: string }[] {
     { truong: 'ngay_sinh', giaTri: ngaySinh },
     { truong: 'gioi_tinh', giaTri: nhanTuTuyChon(GIOI_TINH_OPTIONS, hoSo.gioi_tinh) },
     { truong: 'so_dinh_danh_ca_nhan', giaTri: hoSo.so_dinh_danh_ca_nhan ?? '' },
-    { truong: 'noi_sinh_id', giaTri: hoSo.noi_sinh_ten ?? '' },
-    { truong: 'phuong_xa_id', giaTri: hoSo.phuong_xa_ten ?? '' },
+    { truong: 'noi_sinh', giaTri: hoSo.noi_sinh ?? '' },
+    {
+      truong: 'cu_tru',
+      giaTri: [hoSo.cu_tru_phuong_xa_ten, hoSo.cu_tru_tinh_ten].filter(Boolean).join(', '),
+    },
     { truong: 'don_vi_cong_tac_id', giaTri: hoSo.don_vi_cong_tac_ten ?? '' },
     { truong: 'chuc_vu', giaTri: hoSo.chuc_vu ?? '' },
     { truong: 'so_dien_thoai_lien_he', giaTri: hoSo.so_dien_thoai_lien_he ?? '' },
