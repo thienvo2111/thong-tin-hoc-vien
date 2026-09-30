@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import {
   Prisma,
@@ -20,6 +20,10 @@ import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
 import { normalizeNfcName } from '../common/utils/normalize-text.util';
 import { decryptVleMatKhau } from '../common/utils/vle-crypto.util';
+import {
+  layFrontendUrl,
+  taoTokenXacThuc,
+} from '../common/utils/token-xac-thuc.util';
 import { paginate } from '../common/dto/pagination-query.dto';
 import {
   ConflictAppException,
@@ -54,8 +58,9 @@ interface HocVienValidateInput {
   ngay_sinh?: number;
   thang_sinh?: number;
   nam_sinh?: number;
-  noi_sinh_id?: string | null;
-  phuong_xa_id?: string | null;
+  noi_sinh?: string | null;
+  cu_tru_tinh_id?: string | null;
+  cu_tru_phuong_xa_id?: string | null;
   don_vi_cong_tac_id?: string | null;
   so_dien_thoai_lien_he?: string | null;
   email_lien_he?: string | null;
@@ -73,16 +78,23 @@ type HocVienDayDu = hoc_vien & { chuyen_mon: hoc_vien_chuyen_mon[] };
 // hệ nullable (noi_sinh/phuong_xa/mon_giang_day — FK optional trên hoc_vien),
 // riêng don_vi_cong_tac NOT NULL nên luôn có.
 type HocVienDayDuVoiTen = HocVienDayDu & {
-  noi_sinh: dia_danh | null;
+  // Deprecated 2026-09-30: quan hệ FK cũ (đổi tên noi_sinh -> noi_sinh_dia_danh
+  // vì "noi_sinh" giờ là cột text tự do trên hoc_vien) — vẫn include để trả
+  // noi_sinh_ten cho hồ sơ còn dữ liệu cũ, không dùng cho luồng ghi mới.
+  noi_sinh_dia_danh: dia_danh | null;
   phuong_xa: dia_danh | null;
+  cu_tru_tinh: dia_danh | null;
+  cu_tru_phuong_xa: dia_danh | null;
   don_vi_cong_tac: don_vi_cong_tac;
   mon_giang_day: mon_hoc | null;
 };
 
 const INCLUDE_HOC_VIEN_DAY_DU_VOI_TEN = {
   chuyen_mon: true,
-  noi_sinh: true,
+  noi_sinh_dia_danh: true,
   phuong_xa: true,
+  cu_tru_tinh: true,
+  cu_tru_phuong_xa: true,
   don_vi_cong_tac: true,
   mon_giang_day: true,
 } as const;
@@ -160,59 +172,69 @@ export class HocVienService {
       });
     }
 
-    // Rule #13-16: nơi sinh / phường-xã
-    if (input.noi_sinh_id) {
+    // Rule #13 (sửa 2026-09-30): nơi sinh giờ là text tự do — giấy khai sinh
+    // có thể ghi theo địa giới hành chính CŨ, khác địa giới HIỆN TẠI mà
+    // dia_danh đang quản lý, nên không còn ràng buộc FK/định dạng, chỉ còn
+    // kiểm tra BẮT BUỘC (khi requireFull). Thay cho rule #13-16 cũ (FK
+    // noi_sinh_id/phuong_xa_id) — xem docs/validation-checklist.md.
+    if (!input.noi_sinh && opts.requireFull) {
+      loi.push({ field: 'noi_sinh', message: 'Bắt buộc nhập' });
+    }
+
+    // Thêm 2026-09-30: "Cư trú" — TÙY CHỌN, dùng đúng địa giới hành chính
+    // HIỆN TẠI (2 cấp tỉnh/thành -> phường/xã, cùng cách làm CŨ của nơi sinh
+    // ở trên) — không có nhánh requireFull vì cả 2 field đều không bắt buộc.
+    if (input.cu_tru_tinh_id) {
       const diaDanh = await this.prisma.dia_danh.findUnique({
-        where: { id: input.noi_sinh_id },
+        where: { id: input.cu_tru_tinh_id },
       });
       if (!diaDanh) {
-        loi.push({ field: 'noi_sinh_id', message: 'Không tồn tại' });
+        loi.push({ field: 'cu_tru_tinh_id', message: 'Không tồn tại' });
       } else {
         if (diaDanh.cap !== 'tinh_thanh') {
           loi.push({
-            field: 'noi_sinh_id',
+            field: 'cu_tru_tinh_id',
             message: 'Phải là địa danh cấp tỉnh/thành',
           });
         }
         if (diaDanh.trang_thai !== 'active') {
           loi.push({
-            field: 'noi_sinh_id',
+            field: 'cu_tru_tinh_id',
             message: 'Địa danh đã ngừng sử dụng, không thể chọn mới',
           });
         }
       }
-    } else if (opts.requireFull) {
-      loi.push({ field: 'noi_sinh_id', message: 'Bắt buộc chọn' });
     }
 
-    if (input.phuong_xa_id) {
+    if (input.cu_tru_phuong_xa_id) {
       const diaDanh = await this.prisma.dia_danh.findUnique({
-        where: { id: input.phuong_xa_id },
+        where: { id: input.cu_tru_phuong_xa_id },
       });
       if (!diaDanh) {
-        loi.push({ field: 'phuong_xa_id', message: 'Không tồn tại' });
+        loi.push({ field: 'cu_tru_phuong_xa_id', message: 'Không tồn tại' });
       } else {
         if (diaDanh.cap !== 'phuong_xa_dac_khu') {
           loi.push({
-            field: 'phuong_xa_id',
+            field: 'cu_tru_phuong_xa_id',
             message: 'Phải là địa danh cấp phường/xã',
           });
         }
         if (diaDanh.trang_thai !== 'active') {
           loi.push({
-            field: 'phuong_xa_id',
+            field: 'cu_tru_phuong_xa_id',
             message: 'Địa danh đã ngừng sử dụng, không thể chọn mới',
           });
         }
-        if (input.noi_sinh_id && diaDanh.parent_id !== input.noi_sinh_id) {
+        if (
+          input.cu_tru_tinh_id &&
+          diaDanh.parent_id !== input.cu_tru_tinh_id
+        ) {
           loi.push({
-            field: 'phuong_xa_id',
-            message: 'Phải thuộc tỉnh/thành đã chọn ở noi_sinh_id',
+            field: 'cu_tru_phuong_xa_id',
+            message: 'Phải thuộc tỉnh/thành đã chọn ở cu_tru_tinh_id',
           });
         }
       }
-    } else if (opts.requireFull) {
-      loi.push({ field: 'phuong_xa_id', message: 'Bắt buộc chọn' });
     }
 
     // Rule #17-18: đơn vị công tác — luôn bắt buộc (NOT NULL cả 2 luồng)
@@ -364,8 +386,9 @@ export class HocVienService {
     'nam_sinh',
     'gioi_tinh',
     'chuc_vu',
-    'noi_sinh_id',
-    'phuong_xa_id',
+    'noi_sinh',
+    'cu_tru_tinh_id',
+    'cu_tru_phuong_xa_id',
     'don_vi_cong_tac_id',
     'so_dien_thoai_lien_he',
     'email_lien_he',
@@ -413,12 +436,23 @@ export class HocVienService {
   }
 
   private toResponseVoiTen(hocVien: HocVienDayDuVoiTen) {
-    const { noi_sinh, phuong_xa, don_vi_cong_tac, mon_giang_day, ...rest } =
-      hocVien;
+    const {
+      noi_sinh_dia_danh,
+      phuong_xa,
+      cu_tru_tinh,
+      cu_tru_phuong_xa,
+      don_vi_cong_tac,
+      mon_giang_day,
+      ...rest
+    } = hocVien;
     return {
+      // rest đã có sẵn "noi_sinh" (cột text tự do) — không cần resolve tên.
       ...this.toResponse(rest),
-      noi_sinh_ten: noi_sinh?.ten ?? null,
+      // Deprecated: giữ trả về cho hồ sơ còn dữ liệu cũ (xem noi_sinh_dia_danh).
+      noi_sinh_ten: noi_sinh_dia_danh?.ten ?? null,
       phuong_xa_ten: phuong_xa?.ten ?? null,
+      cu_tru_tinh_ten: cu_tru_tinh?.ten ?? null,
+      cu_tru_phuong_xa_ten: cu_tru_phuong_xa?.ten ?? null,
       don_vi_cong_tac_ten: don_vi_cong_tac.ten_don_vi,
       mon_giang_day_ten: mon_giang_day?.ten_mon ?? null,
     };
@@ -498,8 +532,7 @@ export class HocVienService {
             nam_sinh: dto.nam_sinh,
             gioi_tinh: dto.gioi_tinh,
             chuc_vu: dto.chuc_vu,
-            noi_sinh_id: dto.noi_sinh_id,
-            phuong_xa_id: dto.phuong_xa_id,
+            noi_sinh: dto.noi_sinh,
             don_vi_cong_tac_id: dto.don_vi_cong_tac_id,
             so_dien_thoai_lien_he: dto.so_dien_thoai_lien_he,
             email_lien_he: dto.email_lien_he,
@@ -623,8 +656,10 @@ export class HocVienService {
       ngay_sinh: dto.ngay_sinh ?? existing.ngay_sinh,
       thang_sinh: dto.thang_sinh ?? existing.thang_sinh,
       nam_sinh: dto.nam_sinh ?? existing.nam_sinh,
-      noi_sinh_id: dto.noi_sinh_id ?? existing.noi_sinh_id,
-      phuong_xa_id: dto.phuong_xa_id ?? existing.phuong_xa_id,
+      noi_sinh: dto.noi_sinh ?? existing.noi_sinh,
+      cu_tru_tinh_id: dto.cu_tru_tinh_id ?? existing.cu_tru_tinh_id,
+      cu_tru_phuong_xa_id:
+        dto.cu_tru_phuong_xa_id ?? existing.cu_tru_phuong_xa_id,
       don_vi_cong_tac_id: dto.don_vi_cong_tac_id ?? existing.don_vi_cong_tac_id,
       so_dien_thoai_lien_he:
         dto.so_dien_thoai_lien_he ?? existing.so_dien_thoai_lien_he,
@@ -653,6 +688,14 @@ export class HocVienService {
     // chú lại lý do vì đây là điểm dễ nhầm khi thấy ngay_sinh đổi.
     const diffs = ghiLichSu ? this.tinhDiffHoSo(existing, dto, hoTenChuan) : [];
 
+    // Thêm 2026-09-30: đổi email_lien_he (dù qua PATCH /hoc-vien/toi hay
+    // PATCH /hoc-vien/{id} — cả 2 dùng chung suaHoSo) reset email_da_xac_minh
+    // về false và gửi lại email xác minh tới địa chỉ MỚI. dto.email_lien_he
+    // có thể là null (xóa email) — lúc đó chỉ reset cờ, không gửi email nào.
+    const emailMoi = dto.email_lien_he;
+    const doiEmail =
+      emailMoi !== undefined && emailMoi !== existing.email_lien_he;
+
     try {
       const { updated, xacNhanBiHuy } = await this.prisma.$transaction(
         async (tx) => {
@@ -666,11 +709,13 @@ export class HocVienService {
               nam_sinh: merged.nam_sinh,
               gioi_tinh: dto.gioi_tinh,
               chuc_vu: dto.chuc_vu,
-              noi_sinh_id: merged.noi_sinh_id,
-              phuong_xa_id: merged.phuong_xa_id,
+              noi_sinh: merged.noi_sinh,
+              cu_tru_tinh_id: merged.cu_tru_tinh_id,
+              cu_tru_phuong_xa_id: merged.cu_tru_phuong_xa_id,
               don_vi_cong_tac_id: merged.don_vi_cong_tac_id ?? undefined,
               so_dien_thoai_lien_he: merged.so_dien_thoai_lien_he ?? undefined,
               email_lien_he: merged.email_lien_he,
+              email_da_xac_minh: doiEmail ? false : undefined,
               trinh_do_chuyen_mon: merged.trinh_do_chuyen_mon,
               trinh_do_chuyen_mon_khac: merged.trinh_do_chuyen_mon_khac,
               cap_giang_day: merged.cap_giang_day,
@@ -714,6 +759,12 @@ export class HocVienService {
           return { updated, xacNhanBiHuy };
         },
       );
+      // Side effect NGOÀI transaction (giống nguyên tắc "email là side
+      // effect" ở xacNhan()) — gửi thất bại không được rollback việc lưu hồ
+      // sơ đã thành công.
+      if (doiEmail && emailMoi) {
+        await this.taoVaGuiXacMinhEmail(existing.id, emailMoi);
+      }
       return { ...this.toResponse(updated), xac_nhan_bi_huy: xacNhanBiHuy };
     } catch (e) {
       if (
@@ -724,6 +775,73 @@ export class HocVienService {
       }
       throw e;
     }
+  }
+
+  // Thêm 2026-09-30: tạo token_xac_thuc (loai='xac_minh_email', hết hạn sau
+  // 24 giờ) + gửi email chứa link FRONTEND_URL/xac-minh-email?token=... —
+  // dùng chung bởi suaHoSo() (đổi email_lien_he) và guiLaiXacMinhEmail() (gửi
+  // lại theo yêu cầu học viên).
+  private async taoVaGuiXacMinhEmail(
+    hocVienId: string,
+    email: string,
+  ): Promise<void> {
+    const hocVien = await this.prisma.hoc_vien.findUnique({
+      where: { id: hocVienId },
+      select: { ho_ten: true },
+    });
+    const { token, tokenHash } = taoTokenXacThuc();
+    await this.prisma.token_xac_thuc.create({
+      data: {
+        hoc_vien_id: hocVienId,
+        loai: 'xac_minh_email',
+        token_hash: tokenHash,
+        het_han_luc: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+    const link = `${layFrontendUrl()}/xac-minh-email?token=${token}`;
+    await this.thongBaoService.guiXacMinhEmail(
+      email,
+      hocVien?.ho_ten ?? '',
+      link,
+    );
+  }
+
+  // POST /hoc-vien/toi/gui-lai-xac-minh-email — chặn spam đơn giản: không cho
+  // gửi lại nếu còn token xac_minh_email hiệu lực tạo dưới 60 giây trước
+  // (429 RATE_LIMITED, tái dùng cơ chế mã lỗi 429 hiện có thay vì tự chế mới).
+  async guiLaiXacMinhEmail(
+    caller: AuthenticatedUser,
+  ): Promise<{ da_gui: true }> {
+    const hocVien = await this.getHocVienCuaToi(caller);
+    if (!hocVien.email_lien_he) {
+      throw new ValidationException(
+        'Chưa có email liên hệ trong hồ sơ, vui lòng bổ sung trước khi gửi xác minh',
+        [{ field: 'email_lien_he', message: 'Chưa có email liên hệ' }],
+      );
+    }
+    if (hocVien.email_da_xac_minh) {
+      throw new ConflictAppException('Email liên hệ đã được xác minh');
+    }
+
+    const now = new Date();
+    const tokenGanDay = await this.prisma.token_xac_thuc.findFirst({
+      where: {
+        hoc_vien_id: hocVien.id,
+        loai: 'xac_minh_email',
+        da_dung_luc: null,
+        het_han_luc: { gt: now },
+        tao_luc: { gt: new Date(now.getTime() - 60_000) },
+      },
+    });
+    if (tokenGanDay) {
+      throw new HttpException(
+        'Vừa gửi email xác minh, vui lòng đợi ít phút rồi thử lại',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    await this.taoVaGuiXacMinhEmail(hocVien.id, hocVien.email_lien_he);
+    return { da_gui: true };
   }
 
   async themChuyenMon(caller: AuthenticatedUser, dto: ChuyenMonDto) {
@@ -1259,7 +1377,8 @@ export class HocVienService {
       if (dupKeys?.has(moetKey)) {
         loi.push({
           field: 'ma_dinh_danh_moet',
-          message: 'Mã định danh CSDL MOET bị trùng với dòng khác trong cùng file',
+          message:
+            'Mã định danh CSDL MOET bị trùng với dòng khác trong cùng file',
         });
       } else {
         const trungMoet = await this.prisma.hoc_vien.findUnique({
@@ -1281,7 +1400,8 @@ export class HocVienService {
       if (dupKeys?.has(cccdKey)) {
         loi.push({
           field: 'so_dinh_danh_ca_nhan',
-          message: 'Số định danh cá nhân bị trùng với dòng khác trong cùng file',
+          message:
+            'Số định danh cá nhân bị trùng với dòng khác trong cùng file',
         });
       } else {
         const trungSdd = await this.prisma.hoc_vien.findUnique({

@@ -21,8 +21,7 @@ function baseCreateDto() {
     ngay_sinh: 15,
     thang_sinh: 6,
     nam_sinh: namHopLe,
-    noi_sinh_id: 'tinh-1',
-    phuong_xa_id: 'xa-1',
+    noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
     don_vi_cong_tac_id: 'truong-1',
     so_dien_thoai_lien_he: '0912345678',
     email_lien_he: 'an@example.com',
@@ -47,6 +46,7 @@ describe('HocVienService', () => {
     mon_hoc: { findUnique: jest.Mock };
     nguoi_dung: { create: jest.Mock; update: jest.Mock };
     lich_su_thay_doi_ho_so: { createMany: jest.Mock; create: jest.Mock };
+    token_xac_thuc: { findFirst: jest.Mock; create: jest.Mock };
     $transaction: jest.Mock;
   };
   let scopeService: {
@@ -56,6 +56,7 @@ describe('HocVienService', () => {
   let thongBaoService: {
     guiHocVienXacNhan: jest.Mock;
     guiHocVienDuyet: jest.Mock;
+    guiXacMinhEmail: jest.Mock;
   };
   let dotXacNhanService: {
     dotDangMoCuaHocVien: jest.Mock;
@@ -83,6 +84,10 @@ describe('HocVienService', () => {
         createMany: jest.fn().mockResolvedValue({ count: 0 }),
         create: jest.fn(),
       },
+      token_xac_thuc: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn(),
+      },
       $transaction: jest.fn(),
     };
     // Mặc định: $transaction chạy callback ngay với chính prisma mock làm tx
@@ -98,6 +103,7 @@ describe('HocVienService', () => {
     thongBaoService = {
       guiHocVienXacNhan: jest.fn().mockResolvedValue(undefined),
       guiHocVienDuyet: jest.fn().mockResolvedValue(undefined),
+      guiXacMinhEmail: jest.fn().mockResolvedValue(undefined),
     };
     // T14: các test hiện có đều dùng nguon_tao='tu_dang_ky' (không đi qua
     // đợt xác nhận) — mock trả "không có đợt" làm mặc định an toàn, test
@@ -173,7 +179,7 @@ describe('HocVienService', () => {
       );
     });
 
-    it('phuong_xa_id không thuộc noi_sinh_id đã chọn -> lỗi (rule #15)', async () => {
+    it('cu_tru_phuong_xa_id không thuộc cu_tru_tinh_id đã chọn -> lỗi (rule mới thay #15)', async () => {
       prisma.dia_danh.findUnique.mockImplementation(({ where: { id } }) => {
         if (id === 'tinh-1')
           return {
@@ -191,10 +197,30 @@ describe('HocVienService', () => {
           };
         return null;
       });
+      const dto = {
+        ...baseCreateDto(),
+        cu_tru_tinh_id: 'tinh-1',
+        cu_tru_phuong_xa_id: 'xa-1',
+      };
+      const { loi } = await service.validateHocVien(dto, {
+        requireFull: true,
+      });
+      expect(loi.some((l) => l.field === 'cu_tru_phuong_xa_id')).toBe(true);
+    });
+
+    it('không có noi_sinh -> lỗi bắt buộc (thay rule #13-16 FK cũ)', async () => {
+      const dto = { ...baseCreateDto(), noi_sinh: undefined };
+      const { loi } = await service.validateHocVien(dto, {
+        requireFull: true,
+      });
+      expect(loi.some((l) => l.field === 'noi_sinh')).toBe(true);
+    });
+
+    it('cu_tru_tinh_id/cu_tru_phuong_xa_id không gửi (tùy chọn) -> không lỗi', async () => {
       const { loi } = await service.validateHocVien(baseCreateDto(), {
         requireFull: true,
       });
-      expect(loi.some((l) => l.field === 'phuong_xa_id')).toBe(true);
+      expect(loi.some((l) => l.field.startsWith('cu_tru'))).toBe(false);
     });
 
     it('don_vi_cong_tac_id không phải loại truong -> lỗi (rule #18)', async () => {
@@ -531,48 +557,56 @@ describe('HocVienService', () => {
         id: 'hv-1',
         ho_ten: 'Nguyễn Văn An',
         don_vi_cong_tac_id: 'truong-1',
-        noi_sinh_id: 'tinh-1',
-        phuong_xa_id: 'xa-1',
+        noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
+        noi_sinh_id: null,
+        phuong_xa_id: null,
+        cu_tru_tinh_id: 'tinh-1',
+        cu_tru_phuong_xa_id: 'xa-1',
         mon_giang_day_id: 'mon-1',
         chuyen_mon: [],
-        noi_sinh: { id: 'tinh-1', ten: 'An Giang' },
-        phuong_xa: { id: 'xa-1', ten: 'Phường Long Xuyên' },
+        noi_sinh_dia_danh: null,
+        phuong_xa: null,
+        cu_tru_tinh: { id: 'tinh-1', ten: 'An Giang' },
+        cu_tru_phuong_xa: { id: 'xa-1', ten: 'Phường Long Xuyên' },
         don_vi_cong_tac: { id: 'truong-1', ten_don_vi: 'Trường THPT An Giang' },
         mon_giang_day: { id: 'mon-1', ten_mon: 'Toán' },
         ...overrides,
       };
     }
 
-    it('layHoSoCuaToi — đủ cả 4 FK -> response kèm cả 4 *_ten cạnh *_id', async () => {
+    it('layHoSoCuaToi — có noi_sinh (text) + cư trú đủ -> response kèm noi_sinh, cu_tru_*_ten cạnh cu_tru_*_id', async () => {
       prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDuCoTen());
       const res = await service.layHoSoCuaToi({
         hoc_vien_id: 'hv-1',
       } as AuthenticatedUser);
 
       expect(res).toMatchObject({
-        noi_sinh_id: 'tinh-1',
-        noi_sinh_ten: 'An Giang',
-        phuong_xa_id: 'xa-1',
-        phuong_xa_ten: 'Phường Long Xuyên',
+        noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
+        cu_tru_tinh_id: 'tinh-1',
+        cu_tru_tinh_ten: 'An Giang',
+        cu_tru_phuong_xa_id: 'xa-1',
+        cu_tru_phuong_xa_ten: 'Phường Long Xuyên',
         don_vi_cong_tac_id: 'truong-1',
         don_vi_cong_tac_ten: 'Trường THPT An Giang',
         mon_giang_day_id: 'mon-1',
         mon_giang_day_ten: 'Toán',
       });
       // Không lộ nguyên object quan hệ Prisma ra response, chỉ *_ten phẳng.
-      expect(res).not.toHaveProperty('noi_sinh');
+      expect(res).not.toHaveProperty('noi_sinh_dia_danh');
       expect(res).not.toHaveProperty('phuong_xa');
+      expect(res).not.toHaveProperty('cu_tru_tinh');
+      expect(res).not.toHaveProperty('cu_tru_phuong_xa');
       expect(res).not.toHaveProperty('mon_giang_day');
     });
 
-    it('layHoSoCuaToi — hồ sơ import_moet chưa bổ sung (3 FK optional NULL) -> *_ten tương ứng là null, không lỗi', async () => {
+    it('layHoSoCuaToi — chưa có cư trú/môn giảng dạy (optional NULL) -> *_ten tương ứng là null, không lỗi', async () => {
       prisma.hoc_vien.findUnique.mockResolvedValue(
         hocVienDayDuCoTen({
-          noi_sinh_id: null,
-          phuong_xa_id: null,
+          cu_tru_tinh_id: null,
+          cu_tru_phuong_xa_id: null,
           mon_giang_day_id: null,
-          noi_sinh: null,
-          phuong_xa: null,
+          cu_tru_tinh: null,
+          cu_tru_phuong_xa: null,
           mon_giang_day: null,
         }),
       );
@@ -581,10 +615,10 @@ describe('HocVienService', () => {
       } as AuthenticatedUser);
 
       expect(res).toMatchObject({
-        noi_sinh_id: null,
-        noi_sinh_ten: null,
-        phuong_xa_id: null,
-        phuong_xa_ten: null,
+        cu_tru_tinh_id: null,
+        cu_tru_tinh_ten: null,
+        cu_tru_phuong_xa_id: null,
+        cu_tru_phuong_xa_ten: null,
         mon_giang_day_id: null,
         mon_giang_day_ten: null,
         // don_vi_cong_tac_id NOT NULL trên DDL -> luôn có tên đi kèm.
@@ -593,27 +627,28 @@ describe('HocVienService', () => {
       });
     });
 
-    it('findOne — đủ cả 4 FK -> response kèm cả 4 *_ten cạnh *_id', async () => {
+    it('findOne — có noi_sinh (text) + cư trú đủ -> response kèm noi_sinh, cu_tru_*_ten', async () => {
       prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDuCoTen());
       scopeService.canAccessDonVi.mockResolvedValue(true);
       const res = await service.findOne('hv-1', {} as AuthenticatedUser);
 
       expect(res).toMatchObject({
-        noi_sinh_ten: 'An Giang',
-        phuong_xa_ten: 'Phường Long Xuyên',
+        noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
+        cu_tru_tinh_ten: 'An Giang',
+        cu_tru_phuong_xa_ten: 'Phường Long Xuyên',
         don_vi_cong_tac_ten: 'Trường THPT An Giang',
         mon_giang_day_ten: 'Toán',
       });
     });
 
-    it('findOne — 3 FK optional NULL -> *_ten tương ứng là null, không lỗi', async () => {
+    it('findOne — cư trú/môn giảng dạy optional NULL -> *_ten tương ứng là null, không lỗi', async () => {
       prisma.hoc_vien.findUnique.mockResolvedValue(
         hocVienDayDuCoTen({
-          noi_sinh_id: null,
-          phuong_xa_id: null,
+          cu_tru_tinh_id: null,
+          cu_tru_phuong_xa_id: null,
           mon_giang_day_id: null,
-          noi_sinh: null,
-          phuong_xa: null,
+          cu_tru_tinh: null,
+          cu_tru_phuong_xa: null,
           mon_giang_day: null,
         }),
       );
@@ -621,11 +656,24 @@ describe('HocVienService', () => {
       const res = await service.findOne('hv-1', {} as AuthenticatedUser);
 
       expect(res).toMatchObject({
-        noi_sinh_ten: null,
-        phuong_xa_ten: null,
+        cu_tru_tinh_ten: null,
+        cu_tru_phuong_xa_ten: null,
         mon_giang_day_ten: null,
         don_vi_cong_tac_ten: 'Trường THPT An Giang',
       });
+    });
+
+    it('còn dữ liệu noi_sinh_id cũ (deprecated) -> vẫn trả noi_sinh_ten từ quan hệ cũ', async () => {
+      prisma.hoc_vien.findUnique.mockResolvedValue(
+        hocVienDayDuCoTen({
+          noi_sinh_id: 'tinh-1',
+          noi_sinh_dia_danh: { id: 'tinh-1', ten: 'An Giang' },
+        }),
+      );
+      const res = await service.layHoSoCuaToi({
+        hoc_vien_id: 'hv-1',
+      } as AuthenticatedUser);
+      expect(res).toMatchObject({ noi_sinh_ten: 'An Giang' });
     });
   });
 
@@ -658,8 +706,9 @@ describe('HocVienService', () => {
         ngay_sinh: 15,
         thang_sinh: 6,
         nam_sinh: namHopLe,
-        noi_sinh_id: 'tinh-1',
-        phuong_xa_id: 'xa-1',
+        noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
+        cu_tru_tinh_id: null,
+        cu_tru_phuong_xa_id: null,
         don_vi_cong_tac_id: 'truong-1',
         so_dien_thoai_lien_he: '0912345678',
         email_lien_he: 'an@example.com',
@@ -677,8 +726,7 @@ describe('HocVienService', () => {
     it('hồ sơ MOET vừa import (nhiều field NULL) -> day_du=false, liệt kê đủ trường thiếu', async () => {
       const hocVien = baseHocVienDayDu({
         so_dinh_danh_ca_nhan: null,
-        noi_sinh_id: null,
-        phuong_xa_id: null,
+        noi_sinh: null,
         email_lien_he: null,
         trinh_do_chuyen_mon: null,
         chuyen_mon: [],
@@ -689,8 +737,7 @@ describe('HocVienService', () => {
       expect(thieuFields).toEqual(
         expect.arrayContaining([
           'so_dinh_danh_ca_nhan',
-          'noi_sinh_id',
-          'phuong_xa_id',
+          'noi_sinh',
           'email_lien_he',
           'trinh_do_chuyen_mon',
           'chuyen_mon',
@@ -703,7 +750,7 @@ describe('HocVienService', () => {
       expect(res).toEqual({ day_du: true, thieu: [] });
     });
 
-    it('phuong_xa_id không thuộc noi_sinh_id đã chọn -> vẫn day_du=false kèm lý do', async () => {
+    it('cu_tru_phuong_xa_id (tùy chọn, đã điền) không thuộc cu_tru_tinh_id -> vẫn day_du=false kèm lý do', async () => {
       prisma.dia_danh.findUnique.mockImplementation(({ where: { id } }) => {
         if (id === 'tinh-1')
           return {
@@ -721,9 +768,21 @@ describe('HocVienService', () => {
           };
         return null;
       });
-      const res = await service.danhGiaDayDu(baseHocVienDayDu() as never);
+      const res = await service.danhGiaDayDu(
+        baseHocVienDayDu({
+          cu_tru_tinh_id: 'tinh-1',
+          cu_tru_phuong_xa_id: 'xa-1',
+        }) as never,
+      );
       expect(res.day_du).toBe(false);
-      expect(res.thieu.some((t) => t.field === 'phuong_xa_id')).toBe(true);
+      expect(res.thieu.some((t) => t.field === 'cu_tru_phuong_xa_id')).toBe(
+        true,
+      );
+    });
+
+    it('không điền cư trú (tùy chọn, để trống) -> vẫn day_du=true', async () => {
+      const res = await service.danhGiaDayDu(baseHocVienDayDu() as never);
+      expect(res.day_du).toBe(true);
     });
 
     it('cảnh báo (canh_bao) không làm hồ sơ "chưa đầy đủ"', async () => {
@@ -1090,8 +1149,7 @@ describe('HocVienService', () => {
         ngay_sinh: 15,
         thang_sinh: 6,
         nam_sinh: namHopLe,
-        noi_sinh_id: null,
-        phuong_xa_id: null,
+        noi_sinh: null,
         don_vi_cong_tac_id: 'truong-1',
         chuc_vu: 'Giáo viên',
         so_dien_thoai_lien_he: '0912345678',
@@ -1225,8 +1283,7 @@ describe('HocVienService', () => {
           ngay_sinh: 1,
           thang_sinh: 1,
           nam_sinh: namHopLe,
-          noi_sinh_id: 'tinh-1',
-          phuong_xa_id: 'xa-1',
+          noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
           don_vi_cong_tac_id: 'truong-1',
           so_dien_thoai_lien_he: '0912345678',
           email_lien_he: 'a@test.local',
@@ -1246,6 +1303,177 @@ describe('HocVienService', () => {
 
         expect(dotXacNhanService.dotDangMoCuaHocVien).not.toHaveBeenCalled();
         expect(prisma.lich_su_thay_doi_ho_so.createMany).not.toHaveBeenCalled();
+      });
+    });
+
+    // 2026-09-30: đổi email_lien_he (PATCH /hoc-vien/toi) reset
+    // email_da_xac_minh=false + gửi lại email xác minh tới địa chỉ mới.
+    describe('capNhatHoSoCuaToi — đổi email_lien_he (xác minh lại, 2026-09-30)', () => {
+      function hvTuDangKy(overrides: Record<string, unknown> = {}) {
+        return {
+          id: 'hv-tdk-1',
+          nguon_tao: 'tu_dang_ky',
+          trang_thai: 'nhap',
+          ho_ten: 'Học Viên Tự Đăng Ký',
+          so_dinh_danh_ca_nhan: '999999999999',
+          ngay_sinh: 1,
+          thang_sinh: 1,
+          nam_sinh: namHopLe,
+          noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
+          don_vi_cong_tac_id: 'truong-1',
+          so_dien_thoai_lien_he: '0912345678',
+          email_lien_he: 'cu@test.local',
+          email_da_xac_minh: true,
+          trinh_do_chuyen_mon: 'dai_hoc',
+          chuyen_mon: [],
+          ...overrides,
+        };
+      }
+      const callerTuDangKy = { hoc_vien_id: 'hv-tdk-1' } as AuthenticatedUser;
+
+      it('đổi sang email mới -> update email_da_xac_minh=false, tạo token_xac_thuc, gửi email xác minh tới email MỚI', async () => {
+        const hv = hvTuDangKy();
+        prisma.hoc_vien.findUnique.mockResolvedValue(hv);
+        prisma.hoc_vien.update.mockResolvedValue({
+          ...hv,
+          email_lien_he: 'moi@test.local',
+        });
+
+        await service.capNhatHoSoCuaToi(callerTuDangKy, {
+          email_lien_he: 'moi@test.local',
+        });
+
+        expect(prisma.hoc_vien.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              email_lien_he: 'moi@test.local',
+              email_da_xac_minh: false,
+            }),
+          }),
+        );
+        expect(prisma.token_xac_thuc.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              hoc_vien_id: 'hv-tdk-1',
+              loai: 'xac_minh_email',
+            }),
+          }),
+        );
+        expect(thongBaoService.guiXacMinhEmail).toHaveBeenCalledWith(
+          'moi@test.local',
+          expect.any(String),
+          expect.stringContaining('/xac-minh-email?token='),
+        );
+      });
+
+      it('gửi lại email_lien_he y hệt cũ -> KHÔNG reset email_da_xac_minh, không tạo token/gửi email', async () => {
+        const hv = hvTuDangKy();
+        prisma.hoc_vien.findUnique.mockResolvedValue(hv);
+        prisma.hoc_vien.update.mockResolvedValue(hv);
+
+        await service.capNhatHoSoCuaToi(callerTuDangKy, {
+          email_lien_he: 'cu@test.local',
+        });
+
+        expect(prisma.hoc_vien.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ email_da_xac_minh: undefined }),
+          }),
+        );
+        expect(prisma.token_xac_thuc.create).not.toHaveBeenCalled();
+        expect(thongBaoService.guiXacMinhEmail).not.toHaveBeenCalled();
+      });
+
+      it('sửa trường khác (không đụng email_lien_he) -> không reset email_da_xac_minh, không gửi email', async () => {
+        const hv = hvTuDangKy();
+        prisma.hoc_vien.findUnique.mockResolvedValue(hv);
+        prisma.hoc_vien.update.mockResolvedValue({
+          ...hv,
+          so_dien_thoai_lien_he: '0987654321',
+        });
+
+        await service.capNhatHoSoCuaToi(callerTuDangKy, {
+          so_dien_thoai_lien_he: '0987654321',
+        });
+
+        expect(prisma.token_xac_thuc.create).not.toHaveBeenCalled();
+        expect(thongBaoService.guiXacMinhEmail).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('guiLaiXacMinhEmail — POST /hoc-vien/toi/gui-lai-xac-minh-email (2026-09-30)', () => {
+      const callerTuDangKy = { hoc_vien_id: 'hv-tdk-1' } as AuthenticatedUser;
+
+      it('chưa có email_lien_he -> ValidationException', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue({
+          id: 'hv-tdk-1',
+          nguon_tao: 'tu_dang_ky',
+          email_lien_he: null,
+          email_da_xac_minh: false,
+          chuyen_mon: [],
+        });
+        await expect(
+          service.guiLaiXacMinhEmail(callerTuDangKy),
+        ).rejects.toBeInstanceOf(ValidationException);
+        expect(prisma.token_xac_thuc.create).not.toHaveBeenCalled();
+      });
+
+      it('email đã xác minh rồi -> ConflictAppException', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue({
+          id: 'hv-tdk-1',
+          nguon_tao: 'tu_dang_ky',
+          email_lien_he: 'a@test.local',
+          email_da_xac_minh: true,
+          chuyen_mon: [],
+        });
+        await expect(
+          service.guiLaiXacMinhEmail(callerTuDangKy),
+        ).rejects.toBeInstanceOf(ConflictAppException);
+      });
+
+      it('vừa gửi (token còn hiệu lực tạo dưới 60 giây trước) -> 429, không gửi lại', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue({
+          id: 'hv-tdk-1',
+          nguon_tao: 'tu_dang_ky',
+          email_lien_he: 'a@test.local',
+          email_da_xac_minh: false,
+          chuyen_mon: [],
+        });
+        prisma.token_xac_thuc.findFirst.mockResolvedValue({
+          id: 'tok-gan-day',
+        });
+
+        await expect(
+          service.guiLaiXacMinhEmail(callerTuDangKy),
+        ).rejects.toThrow();
+        expect(thongBaoService.guiXacMinhEmail).not.toHaveBeenCalled();
+      });
+
+      it('chưa xác minh, chưa gửi gần đây -> tạo token mới + gửi email', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue({
+          id: 'hv-tdk-1',
+          nguon_tao: 'tu_dang_ky',
+          ho_ten: 'Học Viên Tự Đăng Ký',
+          email_lien_he: 'a@test.local',
+          email_da_xac_minh: false,
+          chuyen_mon: [],
+        });
+
+        const res = await service.guiLaiXacMinhEmail(callerTuDangKy);
+        expect(res).toEqual({ da_gui: true });
+        expect(prisma.token_xac_thuc.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              hoc_vien_id: 'hv-tdk-1',
+              loai: 'xac_minh_email',
+            }),
+          }),
+        );
+        expect(thongBaoService.guiXacMinhEmail).toHaveBeenCalledWith(
+          'a@test.local',
+          'Học Viên Tự Đăng Ký',
+          expect.stringContaining('/xac-minh-email?token='),
+        );
       });
     });
 
@@ -1275,8 +1503,7 @@ describe('HocVienService', () => {
       it('có đợt mở + hồ sơ đầy đủ -> taoXacNhan được gọi, gửi email, KHÔNG đổi trang_thai', async () => {
         const hocVienDayDu = baseImportMoetHocVien({
           so_dinh_danh_ca_nhan: '123456789012',
-          noi_sinh_id: 'tinh-1',
-          phuong_xa_id: 'xa-1',
+          noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
           email_lien_he: 'du@test.local',
           trinh_do_chuyen_mon: 'dai_hoc',
         });

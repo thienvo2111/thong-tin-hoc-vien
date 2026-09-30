@@ -45,11 +45,13 @@ export class CreateHocVienDto {
   @MaxLength(100)
   chuc_vu?: string;
 
-  @IsUUID()
-  noi_sinh_id: string;
-
-  @IsUUID()
-  phuong_xa_id: string;
+  // Thêm 2026-09-30: thay noi_sinh_id/phuong_xa_id (FK dia_danh) bằng 1
+  // trường text tự do — tự đăng ký luôn bắt buộc phải có nơi sinh, xem
+  // HocVienService.validateHocVien.
+  @IsString()
+  @MinLength(1)
+  @MaxLength(500)
+  noi_sinh: string;
 
   @IsUUID()
   don_vi_cong_tac_id: string;

@@ -104,6 +104,13 @@ export class HocVienController {
     return this.hocVienService.kiemTraTruocXacNhan(user);
   }
 
+  // 2026-09-30: gửi lại email xác minh cho email_lien_he hiện tại.
+  @Roles('hoc_vien')
+  @Post('toi/gui-lai-xac-minh-email')
+  guiLaiXacMinhEmail(@CurrentUser() user: AuthenticatedUser) {
+    return this.hocVienService.guiLaiXacMinhEmail(user);
+  }
+
   @Roles('hoc_vien')
   @Post('toi/xac-nhan')
   xacNhan(@CurrentUser() user: AuthenticatedUser) {

@@ -47,6 +47,10 @@ export class UpdateHocVienDto {
   @MaxLength(100)
   chuc_vu?: string;
 
+  // Deprecated 2026-09-30: thay bởi "noi_sinh" (text tự do) — GIỮ NGUYÊN 2
+  // field này trong DTO để tương thích ngược nếu còn nơi nào gọi, nhưng
+  // KHÔNG còn là trọng tâm luồng nghiệp vụ mới (service không còn validate
+  // theo FK cho 2 field này).
   @IsOptional()
   @IsUUID()
   noi_sinh_id?: string;
@@ -54,6 +58,23 @@ export class UpdateHocVienDto {
   @IsOptional()
   @IsUUID()
   phuong_xa_id?: string;
+
+  // Thêm 2026-09-30: nơi sinh dạng text tự do (có thể ghi theo địa giới hành
+  // chính cũ, không còn ràng buộc FK tới dia_danh).
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  noi_sinh?: string;
+
+  // Thêm 2026-09-30: "Cư trú" — tùy chọn, dùng địa giới hành chính HIỆN TẠI
+  // (dia_danh đang có, 2 cấp tỉnh/thành -> phường/xã).
+  @IsOptional()
+  @IsUUID()
+  cu_tru_tinh_id?: string;
+
+  @IsOptional()
+  @IsUUID()
+  cu_tru_phuong_xa_id?: string;
 
   @IsOptional()
   @IsUUID()
