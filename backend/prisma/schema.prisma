@@ -25,6 +25,17 @@ enum cap_dia_danh {
   phuong_xa_dac_khu
 }
 
+// Thêm 2026-09-30: phân biệt xã/phường HIỆN TẠI (sau đợt sáp nhập 2025, 34
+// tỉnh) với mã xã/phường LỊCH SỬ (mã cũ trước sáp nhập, vẫn giữ lại để lưu
+// đúng lịch sử công tác của giáo viên) và các dòng ĐẶC BIỆT (placeholder,
+// không phải địa giới thật — ví dụ "Trường THPT - Khu vực..." của An Giang
+// hay sentinel "Xã chưa xác định (...)").
+enum phien_ban_dia_danh {
+  hien_tai
+  lich_su
+  dac_biet
+}
+
 enum loai_don_vi {
   so_gddt
   phong_vhxh
@@ -132,6 +143,10 @@ enum loai_danh_muc_import {
   // T6 (mo-rong-nls-an-giang.md, 2026-09-29): cùng lý do như trên — thêm SAU
   // CÙNG, migration riêng (xem migration *_t6_loai_danh_muc_import_enum).
   lop_va_lich_hoc
+  // T12 (mo-rong-nls-an-giang.md, 2026-09-30): cùng lý do như trên — thêm SAU
+  // CÙNG, migration riêng (xem migration *_t12_diem_danh_enum).
+  diem_danh
+  ket_qua_giai_doan
 }
 
 // T5 (mo-rong-nls-an-giang.md, 2026-09-29): mức năng lực đầu vào/đầu ra của
@@ -161,6 +176,18 @@ enum trang_thai_gui_thong_bao {
   that_bai
 }
 
+// QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): 3 loại "lớp" ĐỘC LẬP nhau
+// trong cùng 1 khóa (không phải lớp cha chứa lớp con) — 1 học viên có thể
+// đồng thời ở 1 lớp trực tiếp, 1 lớp zoom, 1 "lớp" vle mà không liên quan gì
+// nhau về thành viên. Enum MỚI hoàn toàn nên CREATE TYPE dùng được ngay
+// trong cùng 1 migration với các bảng/cột dùng nó (không bị ràng buộc "ALTER
+// TYPE ADD VALUE khác transaction" như các enum mở rộng ở trên).
+enum loai_lop_hoc {
+  truc_tiep
+  zoom
+  vle
+}
+
 // T14 (mo-rong-nls-an-giang.md, 2026-09-28): tách migration RIÊNG cho enum
 // này trước migration tạo bảng dot_xac_nhan dùng nó (không bắt buộc về mặt kỹ
 // thuật cho CREATE TYPE mới — chỉ ALTER TYPE ... ADD VALUE mới bị Postgres
@@ -169,6 +196,33 @@ enum trang_thai_gui_thong_bao {
 enum loai_dot_xac_nhan {
   kiem_tra_bo_sung
   xac_nhan_truoc_danh_gia
+}
+
+// Xác minh email liên hệ & quên/đặt lại mật khẩu (2026-09-30) — enum MỚI hoàn
+// toàn nên không bị ràng buộc "ALTER TYPE ADD VALUE khác transaction" như các
+// enum mở rộng ở trên — CREATE TYPE + CREATE TABLE dùng nó được trong cùng 1
+// migration.
+enum loai_token_xac_thuc {
+  xac_minh_email
+  dat_lai_mat_khau
+}
+
+// T12 (mo-rong-nls-an-giang.md, 2026-09-30): điểm danh nhập qua IMPORT EXCEL
+// (không có giao diện chấm tay từng buổi) — trạng thái/nguồn của 1 dòng
+// diem_danh. Enum MỚI hoàn toàn nên CREATE TYPE dùng được ngay trong cùng 1
+// migration với ALTER TYPE ADD VALUE của loai_danh_muc_import bên dưới (chỉ
+// ALTER TYPE ADD VALUE trên enum ĐÃ CÓ mới bị ràng buộc "khác transaction").
+enum trang_thai_diem_danh {
+  co_mat
+  vang
+  vang_co_phep
+}
+
+enum nguon_diem_danh {
+  zoom
+  ky_ten
+  qr
+  thu_cong
 }
 
 // =====================================================================
@@ -187,11 +241,13 @@ model nhat_ky_import {
   file_loi_url       String?
   trang_thai         trang_thai_import    @default(dang_xu_ly)
 
-  nguoi_import         nguoi_dung        @relation("nhat_ky_import_nguoi_import", fields: [nguoi_import_id], references: [id], map: "fk_import_nguoi_import", onDelete: NoAction, onUpdate: NoAction)
-  dia_danh_import      dia_danh[]
-  don_vi_import        don_vi_cong_tac[]
-  mon_hoc_import       mon_hoc[]
-  tai_khoan_vle_import tai_khoan_vle[]
+  nguoi_import             nguoi_dung          @relation("nhat_ky_import_nguoi_import", fields: [nguoi_import_id], references: [id], map: "fk_import_nguoi_import", onDelete: NoAction, onUpdate: NoAction)
+  dia_danh_import          dia_danh[]
+  don_vi_import            don_vi_cong_tac[]
+  mon_hoc_import           mon_hoc[]
+  tai_khoan_vle_import     tai_khoan_vle[]
+  diem_danh_import         diem_danh[]
+  ket_qua_giai_doan_import ket_qua_giai_doan[]
 
   @@index([nguoi_import_id], map: "idx_import_nguoi")
   @@index([loai_danh_muc], map: "idx_import_loai")
@@ -204,6 +260,10 @@ model dia_danh {
   cap             cap_dia_danh
   parent_id       String?           @db.Uuid
   trang_thai      trang_thai_active @default(active)
+  // Thêm 2026-09-30: hien_tai (mặc định) / lich_su (mã cũ trước sáp nhập,
+  // giữ để lưu đúng lịch sử công tác) / dac_biet (placeholder, không phải
+  // địa giới thật).
+  phien_ban       phien_ban_dia_danh @default(hien_tai)
   nguon_import_id String?           @db.Uuid
   created_at      DateTime          @default(now()) @db.Timestamptz(6)
   updated_at      DateTime          @default(now()) @db.Timestamptz(6)
@@ -213,9 +273,13 @@ model dia_danh {
 
   nguon_import nhat_ky_import? @relation(fields: [nguon_import_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  don_vi_cong_tac    don_vi_cong_tac[]
-  hoc_vien_noi_sinh  hoc_vien[]        @relation("hoc_vien_noi_sinh")
-  hoc_vien_phuong_xa hoc_vien[]        @relation("hoc_vien_phuong_xa")
+  don_vi_cong_tac           don_vi_cong_tac[]
+  hoc_vien_noi_sinh         hoc_vien[]        @relation("hoc_vien_noi_sinh")
+  hoc_vien_phuong_xa        hoc_vien[]        @relation("hoc_vien_phuong_xa")
+  // Thêm 2026-09-30: "Cư trú" — dùng địa giới hành chính HIỆN TẠI (khác
+  // noi_sinh/phuong_xa ở trên vốn là nơi sinh theo địa giới có thể đã cũ).
+  hoc_vien_cu_tru_tinh      hoc_vien[]        @relation("hoc_vien_cu_tru_tinh")
+  hoc_vien_cu_tru_phuong_xa hoc_vien[]        @relation("hoc_vien_cu_tru_phuong_xa")
 
   @@index([parent_id], map: "idx_dia_danh_parent")
   @@index([cap], map: "idx_dia_danh_cap")
@@ -356,13 +420,34 @@ model hoc_vien {
   gioi_tinh            String? @db.VarChar(20)
   chuc_vu              String? @db.VarChar(100)
 
+  // Deprecated 2026-09-30: thay bởi "noi_sinh" (text tự do, xem bên dưới) —
+  // GIỮ NGUYÊN cột/quan hệ này để không mất dữ liệu cũ, không còn dùng trong
+  // luồng nghiệp vụ mới (validate/DTO/service đã ngừng đọc-ghi qua field này,
+  // trừ dữ liệu lịch sử đã có sẵn trước 2026-09-30).
   noi_sinh_id  String? @db.Uuid
   phuong_xa_id String? @db.Uuid
+
+  // Thêm 2026-09-30: nơi sinh dạng TEXT TỰ DO — giấy khai sinh có thể ghi
+  // theo địa giới hành chính CŨ (thời điểm sinh), khác địa giới HIỆN TẠI mà
+  // dia_danh đang quản lý (chỉ còn 46 tỉnh/thành active) — không còn ràng
+  // buộc FK vì DB không có bộ dữ liệu địa giới cũ để chọn.
+  noi_sinh String? @db.VarChar(500)
+
+  // Thêm 2026-09-30: "Cư trú" — TÙY CHỌN, dùng đúng địa giới hành chính HIỆN
+  // TẠI (dia_danh đang có), khác nơi sinh (có thể ghi theo địa giới cũ).
+  cu_tru_tinh_id      String? @db.Uuid
+  cu_tru_phuong_xa_id String? @db.Uuid
 
   don_vi_cong_tac_id String @db.Uuid
 
   so_dien_thoai_lien_he String? @db.VarChar(20)
   email_lien_he         String? @db.VarChar(255)
+  // Thêm 2026-09-30: xác minh email liên hệ — mặc định false lúc tạo hồ sơ;
+  // đổi email_lien_he (PATCH /hoc-vien/toi hoặc PATCH /hoc-vien/{id}) tự
+  // reset về false và gửi lại email xác minh (xem HocVienService.suaHoSo +
+  // token_xac_thuc). Quên mật khẩu (POST /auth/quen-mat-khau) chỉ gửi link
+  // đặt lại khi cột này = true.
+  email_da_xac_minh     Boolean @default(false)
 
   trinh_do_chuyen_mon      trinh_do_chuyen_mon?
   trinh_do_chuyen_mon_khac String?              @db.VarChar(255)
@@ -382,12 +467,14 @@ model hoc_vien {
   updated_at DateTime @default(now()) @db.Timestamptz(6)
   created_by String?  @db.Uuid
 
-  noi_sinh        dia_danh?       @relation("hoc_vien_noi_sinh", fields: [noi_sinh_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  phuong_xa       dia_danh?       @relation("hoc_vien_phuong_xa", fields: [phuong_xa_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  don_vi_cong_tac don_vi_cong_tac @relation(fields: [don_vi_cong_tac_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  mon_giang_day   mon_hoc?        @relation(fields: [mon_giang_day_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  nguoi_duyet     nguoi_dung?     @relation("hoc_vien_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  created_by_user nguoi_dung?     @relation("hoc_vien_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  noi_sinh_dia_danh dia_danh?       @relation("hoc_vien_noi_sinh", fields: [noi_sinh_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  phuong_xa         dia_danh?       @relation("hoc_vien_phuong_xa", fields: [phuong_xa_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cu_tru_tinh       dia_danh?       @relation("hoc_vien_cu_tru_tinh", fields: [cu_tru_tinh_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cu_tru_phuong_xa  dia_danh?       @relation("hoc_vien_cu_tru_phuong_xa", fields: [cu_tru_phuong_xa_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  don_vi_cong_tac   don_vi_cong_tac @relation(fields: [don_vi_cong_tac_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  mon_giang_day     mon_hoc?        @relation(fields: [mon_giang_day_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nguoi_duyet       nguoi_dung?     @relation("hoc_vien_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  created_by_user   nguoi_dung?     @relation("hoc_vien_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   nguoi_dung_account nguoi_dung?              @relation("nguoi_dung_hoc_vien")
   chuyen_mon         hoc_vien_chuyen_mon[]
@@ -397,11 +484,32 @@ model hoc_vien {
   lich_su_thay_doi   lich_su_thay_doi_ho_so[]
   tai_khoan_vle      tai_khoan_vle?
 
+  token_xac_thuc token_xac_thuc[]
+
   @@index([don_vi_cong_tac_id], map: "idx_hoc_vien_don_vi")
   @@index([trang_thai], map: "idx_hoc_vien_trang_thai")
   @@index([cap_giang_day], map: "idx_hoc_vien_cap_giang_day")
   @@index([phuong_xa_id], map: "idx_hoc_vien_phuong_xa")
   @@index([ma_dinh_danh_moet], map: "idx_hoc_vien_ma_moet")
+}
+
+// Thêm 2026-09-30: token dùng 1 lần cho xác minh email liên hệ & quên/đặt lại
+// mật khẩu — KHÔNG dùng JWT (không thu hồi được sớm, xem token_thu_hoi ở
+// trên cho lý do tương tự với token đăng nhập). token_hash = SHA-256 hex của
+// token gốc (chỉ token gốc nằm trong email gửi đi, DB không bao giờ lưu bản
+// rõ) — tra theo token_hash (UNIQUE) khi xác thực, không cần hoc_vien_id.
+model token_xac_thuc {
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hoc_vien_id String              @db.Uuid
+  loai        loai_token_xac_thuc
+  token_hash  String              @unique(map: "uq_token_xac_thuc_hash") @db.VarChar(64)
+  het_han_luc DateTime            @db.Timestamptz(6)
+  da_dung_luc DateTime?           @db.Timestamptz(6)
+  tao_luc     DateTime            @default(now()) @db.Timestamptz(6)
+
+  hoc_vien hoc_vien @relation(fields: [hoc_vien_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([hoc_vien_id], map: "idx_token_xac_thuc_hoc_vien")
 }
 
 model hoc_vien_chuyen_mon {
@@ -531,6 +639,9 @@ model khoa_boi_duong {
   dang_ky_hoc     dang_ky_hoc[]
   dot_xac_nhan    dot_xac_nhan[]
   don_vi_theo_doi khoa_don_vi_theo_doi[]
+  // QĐ10: cụm học viên (nhóm Zalo hỗ trợ theo địa lý) — độc lập với cây đơn
+  // vị công tác, thuộc trực tiếp về khóa.
+  cum_hoc_vien    cum_hoc_vien[]
 
   @@index([don_vi_to_chuc_id], map: "idx_khoa_don_vi")
   @@index([trang_thai], map: "idx_khoa_trang_thai")
@@ -564,36 +675,70 @@ model giai_doan_khoa {
   thoi_gian_ket_thuc DateTime            @db.Date
   trang_thai         trang_thai_active   @default(active)
 
-  khoa     khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  lich_hoc lich_hoc_lop[]
+  khoa              khoa_boi_duong      @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lich_hoc          lich_hoc_lop[]
+  // T12 (mo-rong-nls-an-giang.md, 2026-09-30): tiến độ/kết quả từng giai
+  // đoạn, nhập qua import ket_qua_giai_doan.
+  ket_qua_giai_doan ket_qua_giai_doan[]
 
   @@unique([khoa_id, thu_tu], map: "uq_giai_doan_thu_tu")
   @@index([khoa_id], map: "idx_giai_doan_khoa")
 }
 
 model lop_hoc {
-  id           String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  khoa_id      String            @db.Uuid
-  ten_lop      String            @db.VarChar(255)
-  si_so_toi_da Int?
-  trang_thai   trang_thai_active @default(active)
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  khoa_id       String            @db.Uuid
+  // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): loại lớp — 3 loại ĐỘC LẬP
+  // nhau (không phải lớp cha/con). Backfill dữ liệu cũ = 'truc_tiep' (an
+  // toàn nhất — dữ liệu trước QĐ10 đều là lớp dùng chung), xem migration
+  // thêm cột này (2 bước: thêm cột nullable, backfill, rồi mới SET NOT NULL).
+  loai_lop      loai_lop_hoc
+  ten_lop       String            @db.VarChar(255)
+  si_so_toi_da  Int?
+  trang_thai    trang_thai_active @default(active)
   // T6 (mo-rong-nls-an-giang.md, 2026-09-29, QĐ3/QĐ4): nhóm học viên (1-20,
   // 3 nhóm gối đầu) và mức năng lực mục tiêu của lớp — cả 2 nullable (không
   // phải lớp nào cũng cần phân nhóm/mức, vd lớp hỗn hợp trình độ). Nhập qua
   // import lop_va_lich_hoc (T6). chk_lop_hoc_nhom (1-20) không biểu diễn
   // được bằng Prisma DSL — thêm bằng raw SQL nối vào migration B, cùng cách
   // làm với các CHECK constraint khác (xem comment đầu file).
-  nhom_hoc_vien Int?         @db.SmallInt
+  nhom_hoc_vien Int?              @db.SmallInt
   muc_nang_luc  muc_nang_luc?
 
   khoa khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  lich_hoc    lich_hoc_lop[]
-  nhan_su     lop_hoc_nhan_su[]
+  lich_hoc        lich_hoc_lop[]
+  nhan_su         lop_hoc_nhan_su[]
+  // QĐ10: thay cho quan hệ dang_ky_hoc[] trực tiếp cũ (dang_ky_hoc.lop_id đã
+  // bị xóa) — nay đi qua bảng nối dang_ky_hoc_lop, vì 1 lớp có thể được gán
+  // cho nhiều đăng ký học thuộc bất kỳ loại lớp nào khớp loai_lop của nó.
+  dang_ky_hoc_lop dang_ky_hoc_lop[]
+
+  // QĐ10: UNIQUE đổi từ (khoa_id, ten_lop) sang (khoa_id, loai_lop, ten_lop)
+  // — cho phép trùng tên lớp GIỮA các loại lớp khác nhau trong cùng khóa
+  // (vd "Lớp 1" vừa có ở trực tiếp vừa có ở zoom).
+  @@unique([khoa_id, loai_lop, ten_lop], map: "uq_lop_ten_trong_khoa")
+  @@index([khoa_id], map: "idx_lop_khoa")
+}
+
+// QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): cụm học viên — nhóm Zalo hỗ
+// trợ theo địa lý, KHÁI NIỆM MỚI hoàn toàn, độc lập với cây đơn vị công tác
+// VÀ độc lập với 3 loại lớp. Chứa HỌC VIÊN TRỰC TIẾP (dang_ky_hoc.cum_id),
+// không qua trung gian lớp nào.
+model cum_hoc_vien {
+  id         String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  khoa_id    String            @db.Uuid
+  ten_cum    String            @db.VarChar(255)
+  link_zalo  String?           @db.VarChar(500)
+  ghi_chu    String?
+  trang_thai trang_thai_active @default(active)
+  created_at DateTime          @default(now()) @db.Timestamptz(6)
+
+  khoa        khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   dang_ky_hoc dang_ky_hoc[]
 
-  @@unique([khoa_id, ten_lop], map: "uq_lop_ten_trong_khoa")
-  @@index([khoa_id], map: "idx_lop_khoa")
+  @@unique([khoa_id, ten_cum], map: "uq_cum_ten_trong_khoa")
+  @@index([khoa_id], map: "idx_cum_khoa")
 }
 
 model lich_hoc_lop {
@@ -612,6 +757,9 @@ model lich_hoc_lop {
 
   lop       lop_hoc        @relation(fields: [lop_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   giai_doan giai_doan_khoa @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  // T12 (mo-rong-nls-an-giang.md, 2026-09-30): điểm danh của học viên tại
+  // buổi này, nhập qua import diem_danh.
+  diem_danh diem_danh[]
 
   @@unique([lop_id, giai_doan_id, buoi_so], map: "uq_lich_hoc_lop_giai_doan_buoi")
   @@index([lop_id], map: "idx_lich_hoc_lop")
@@ -634,7 +782,11 @@ model dang_ky_hoc {
   id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   hoc_vien_id     String             @db.Uuid
   khoa_id         String             @db.Uuid
-  lop_id          String?            @db.Uuid
+  // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): cột lop_id cũ (1 lớp duy
+  // nhất/đăng ký) đã bị XÓA — thay bằng bảng nối dang_ky_hoc_lop (1 đăng ký
+  // có thể có đồng thời tối đa 3 dòng, mỗi loai_lop 1 dòng). Dữ liệu cũ đã
+  // được di chuyển sang dang_ky_hoc_lop (loai_lop='truc_tiep') trước khi cột
+  // này bị xóa — xem migration di_chuyen_lop_id_sang_dang_ky_hoc_lop.
   ngay_dang_ky    DateTime           @default(dbgenerated("CURRENT_DATE")) @db.Date
   trang_thai      trang_thai_dang_ky @default(cho_duyet)
   ket_qua         ket_qua_hoc?
@@ -643,15 +795,96 @@ model dang_ky_hoc {
   // đúng cột theo cột "loai" (dau_vao|dau_ra) của dòng import.
   muc_dau_vao     muc_nang_luc?
   muc_dau_ra      muc_nang_luc?
+  // QĐ10: cụm học viên (nhóm Zalo hỗ trợ) — gán trực tiếp học viên, không
+  // qua lớp nào. NULL = chưa gán cụm.
+  cum_id          String?            @db.Uuid
 
   hoc_vien hoc_vien       @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   khoa     khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  lop      lop_hoc?       @relation(fields: [lop_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cum      cum_hoc_vien?  @relation(fields: [cum_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  dang_ky_hoc_lop   dang_ky_hoc_lop[]
+  // T12 (mo-rong-nls-an-giang.md, 2026-09-30): điểm danh từng buổi + tiến độ
+  // từng giai đoạn của đăng ký học này, nhập qua import diem_danh/
+  // ket_qua_giai_doan.
+  diem_danh         diem_danh[]
+  ket_qua_giai_doan ket_qua_giai_doan[]
 
   @@unique([hoc_vien_id, khoa_id], map: "uq_dang_ky_hoc_vien_khoa")
   @@index([hoc_vien_id], map: "idx_dang_ky_hoc_vien")
   @@index([khoa_id], map: "idx_dang_ky_khoa")
-  @@index([lop_id], map: "idx_dang_ky_lop")
+  @@index([cum_id], map: "idx_dang_ky_cum")
+}
+
+// QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): bảng NỐI thay cho 3-4 cột FK
+// riêng trên dang_ky_hoc — dễ mở rộng thêm loại lớp thứ 4/5 sau này mà không
+// phải sửa lại schema/API. loai_lop trên mỗi dòng là BẢN SAO của
+// lop_hoc.loai_lop tại thời điểm gán (để làm được UNIQUE bên dưới mà không
+// cần trigger) — PHẢI luôn khớp lop_hoc.loai_lop của lop_id tương ứng, kiểm
+// tra ở TẦNG SERVICE khi tạo/sửa (không dùng DB trigger, xem
+// KhoaBoiDuongService.assertLopThuocKhoaVaLoai), không khớp thì từ chối.
+model dang_ky_hoc_lop {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dang_ky_hoc_id String       @db.Uuid
+  lop_id         String       @db.Uuid
+  loai_lop       loai_lop_hoc
+  created_at     DateTime     @default(now()) @db.Timestamptz(6)
+
+  dang_ky_hoc dang_ky_hoc @relation(fields: [dang_ky_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lop         lop_hoc     @relation(fields: [lop_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Mỗi đăng ký chỉ có 1 lớp cho mỗi loại lớp.
+  @@unique([dang_ky_hoc_id, loai_lop], map: "uq_dang_ky_hoc_lop_loai")
+  @@index([lop_id], map: "idx_dang_ky_hoc_lop_lop")
+}
+
+// T12 (mo-rong-nls-an-giang.md, 2026-09-30): điểm danh nhập qua IMPORT EXCEL
+// (không có giao diện chấm tay từng buổi, xem KhoaBoiDuongService.
+// resolveDiemDanhRow/commitDiemDanh, gọi từ ImportService) — mỗi dòng = điểm
+// danh của 1 học viên (dang_ky_hoc) tại 1 buổi học (lich_hoc_lop) cụ thể.
+// UNIQUE (dang_ky_hoc_id, lich_hoc_id) — chạy lại file import ghi đè
+// (upsert), không cộng dồn.
+model diem_danh {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dang_ky_hoc_id  String               @db.Uuid
+  lich_hoc_id     String               @db.Uuid
+  trang_thai      trang_thai_diem_danh
+  nguon           nguon_diem_danh
+  ghi_chu         String?
+  nguon_import_id String?              @db.Uuid
+  cap_nhat_luc    DateTime             @default(now()) @db.Timestamptz(6)
+
+  dang_ky_hoc  dang_ky_hoc     @relation(fields: [dang_ky_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lich_hoc     lich_hoc_lop    @relation(fields: [lich_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  nguon_import nhat_ky_import? @relation(fields: [nguon_import_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([dang_ky_hoc_id, lich_hoc_id], map: "uq_diem_danh")
+  @@index([lich_hoc_id], map: "idx_diem_danh_lich_hoc")
+}
+
+// T12 (mo-rong-nls-an-giang.md, 2026-09-30): kết quả/tiến độ theo từng giai
+// đoạn của khóa (vd tiến độ VLE, điểm đánh giá giai đoạn) — nhập qua import
+// ket_qua_giai_doan (KhoaBoiDuongService.resolveKetQuaGiaiDoanRow/
+// commitKetQuaGiaiDoan). UNIQUE (dang_ky_hoc_id, giai_doan_id) — chạy lại
+// file ghi đè. ty_le_hoan_thanh giới hạn 0-100 — CHECK constraint không
+// biểu diễn được bằng Prisma DSL (xem comment đầu file), thêm bằng raw SQL
+// nối vào migration.
+model ket_qua_giai_doan {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dang_ky_hoc_id   String   @db.Uuid
+  giai_doan_id     String   @db.Uuid
+  ty_le_hoan_thanh Decimal? @db.Decimal(5, 2)
+  diem             Decimal? @db.Decimal(5, 2)
+  ghi_chu          String?
+  nguon_import_id  String?  @db.Uuid
+  cap_nhat_luc     DateTime @default(now()) @db.Timestamptz(6)
+
+  dang_ky_hoc  dang_ky_hoc     @relation(fields: [dang_ky_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  giai_doan    giai_doan_khoa  @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  nguon_import nhat_ky_import? @relation(fields: [nguon_import_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([dang_ky_hoc_id, giai_doan_id], map: "uq_ket_qua_giai_doan")
+  @@index([giai_doan_id], map: "idx_ket_qua_giai_doan_giai_doan")
 }
 
 // =====================================================================
