@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
-import { db } from '@/test/mocks/db';
+import { DON_VI, db } from '@/test/mocks/db';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import AdminKhoaBoiDuong from './AdminKhoaBoiDuong';
@@ -91,6 +91,78 @@ describe('Admin — Danh sách khóa bồi dưỡng', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Tạo khóa' })).toBeDisabled();
+    });
+  });
+
+  it('tạo khóa (Quản trị): đúng 1 đơn vị loại "khác" → tự động điền sẵn đơn vị tổ chức', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    server.use(
+      http.get('/danh-muc/don-vi-cong-tac', ({ request }) => {
+        const loaiDonVi = new URL(request.url).searchParams.get('loai_don_vi');
+        if (loaiDonVi === 'khac') {
+          return HttpResponse.json({
+            data: [
+              {
+                id: 'dv-hcmue',
+                ma_don_vi: 'HCMUE',
+                ten_don_vi: 'Trường Đại học Sư phạm TP.HCM',
+                loai_don_vi: 'khac',
+                phuong_xa_id: null,
+                trang_thai: 'active',
+              },
+            ],
+          });
+        }
+        return HttpResponse.json({ data: DON_VI });
+      }),
+    );
+    const user = userEvent.setup();
+    renderTrang();
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+
+    await user.click(screen.getByRole('button', { name: '+ Tạo khóa mới' }));
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: /^Đơn vị tổ chức/ })).toHaveValue('Trường Đại học Sư phạm TP.HCM');
+    });
+  });
+
+  it('tạo khóa (Quản trị): từ 2 đơn vị loại "khác" trở lên → vẫn để trống đơn vị tổ chức', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    server.use(
+      http.get('/danh-muc/don-vi-cong-tac', ({ request }) => {
+        const loaiDonVi = new URL(request.url).searchParams.get('loai_don_vi');
+        if (loaiDonVi === 'khac') {
+          return HttpResponse.json({
+            data: [
+              {
+                id: 'dv-hcmue',
+                ma_don_vi: 'HCMUE',
+                ten_don_vi: 'Trường Đại học Sư phạm TP.HCM',
+                loai_don_vi: 'khac',
+                phuong_xa_id: null,
+                trang_thai: 'active',
+              },
+              {
+                id: 'dv-khac-2',
+                ma_don_vi: 'DHKHAC',
+                ten_don_vi: 'Trường Đại học khác',
+                loai_don_vi: 'khac',
+                phuong_xa_id: null,
+                trang_thai: 'active',
+              },
+            ],
+          });
+        }
+        return HttpResponse.json({ data: DON_VI });
+      }),
+    );
+    const user = userEvent.setup();
+    renderTrang();
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+
+    await user.click(screen.getByRole('button', { name: '+ Tạo khóa mới' }));
+    await waitFor(() => {
+      expect(screen.getByRole('textbox', { name: /^Đơn vị tổ chức/ })).toHaveValue('');
     });
   });
 });

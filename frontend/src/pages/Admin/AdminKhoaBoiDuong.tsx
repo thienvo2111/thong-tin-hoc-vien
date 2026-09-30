@@ -99,7 +99,10 @@ export default function AdminKhoaBoiDuong() {
   }
 
   function moModalTao() {
-    setForm(FORM_RONG);
+    const donViKhac = (donVi.data ?? []).filter((d) => d.loai_don_vi === 'khac');
+    const donViToChucId =
+      nguoiDung?.vai_tro === 'quan_tri' && donViKhac.length === 1 ? donViKhac[0].id : '';
+    setForm({ ...FORM_RONG, don_vi_to_chuc_id: donViToChucId });
     setLoiField({});
     setModalMoTao(true);
   }

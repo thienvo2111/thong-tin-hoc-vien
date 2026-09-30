@@ -31,10 +31,10 @@ import { dinhDangNgayGio } from '@/lib/ngay';
 import { mauTrangThaiImport, nhanTrangThaiImport } from '@/lib/trangThaiImport';
 import { AdminPageHeader } from './AdminPageHeader';
 
-// 8 loại import THẬT hỗ trợ qua loai_danh_muc_import (docs/api-contract.md mục 5) — không bịa thêm/bớt.
-// Dùng Record<LoaiDanhMucImport, string> (thay vì mảng dò tìm) để TypeScript báo lỗi biên dịch nếu
-// sau này enum LoaiDanhMucImport (src/api/types.ts) có thêm giá trị mà quên bổ sung nhãn ở đây —
-// tránh tái diễn lỗi cột "Loại dữ liệu" bị bỏ trống do thiếu nhãn.
+// 10 loại import THẬT hỗ trợ qua loai_danh_muc_import (docs/api-contract.md mục 5) — không bịa
+// thêm/bớt. Dùng Record<LoaiDanhMucImport, string> (thay vì mảng dò tìm) để TypeScript báo lỗi biên
+// dịch nếu sau này enum LoaiDanhMucImport (src/api/types.ts) có thêm giá trị mà quên bổ sung nhãn ở
+// đây — tránh tái diễn lỗi cột "Loại dữ liệu" bị bỏ trống do thiếu nhãn.
 export const NHAN_LOAI_IMPORT: Record<LoaiDanhMucImport, string> = {
   ho_so_nhan_su_moet: 'Hồ sơ nhân sự (CSDL MOET)',
   phan_lop_hoc_vien: 'Phân lớp học viên (MOET)',
@@ -44,6 +44,8 @@ export const NHAN_LOAI_IMPORT: Record<LoaiDanhMucImport, string> = {
   don_vi_cong_tac: 'Danh mục đơn vị công tác',
   dia_danh: 'Danh mục địa danh',
   mon_hoc: 'Danh mục môn học',
+  diem_danh: 'Điểm danh',
+  ket_qua_giai_doan: 'Kết quả giai đoạn',
 };
 
 const TUY_CHON_LOAI_IMPORT: { value: LoaiDanhMucImport; label: string }[] = Object.entries(NHAN_LOAI_IMPORT).map(
