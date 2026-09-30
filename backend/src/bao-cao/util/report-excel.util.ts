@@ -13,10 +13,17 @@ import {
   TongHopDonViRow,
   TongHopKhoaRow,
   TongHopResult,
+  TongQuanResult,
   VanHanhResult,
   XacNhanRow,
   XuatChoVleRow,
 } from '../bao-cao.types';
+
+const NHAN_LOAI_LOP: Record<string, string> = {
+  truc_tiep: 'Trực tiếp',
+  zoom: 'Zoom',
+  vle: 'VLE',
+};
 
 const NHAN_TRANG_THAI_XAC_NHAN: Record<string, string> = {
   chua_dang_nhap: 'Chưa đăng nhập',
@@ -293,6 +300,62 @@ export async function buildVanHanhWorkbook(
     result.tong.theo_muc_dau_vao[KHONG_XAC_DINH] ?? 0,
   ]);
   sheet.getRow(sheet.rowCount).font = { bold: true };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+// Dashboard "Tổng quan hệ thống" (thêm 2026-09-30) — GET
+// /bao-cao/tong-quan/xuat-excel — 3 sheet: tổng quan, khảo sát, kết quả theo
+// hình thức.
+export async function buildTongQuanWorkbook(
+  result: TongQuanResult,
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+
+  const sheetTongQuan = workbook.addWorksheet('Tổng quan');
+  sheetTongQuan.addRow(['Chỉ số', 'Giá trị']);
+  sheetTongQuan.getRow(1).font = { bold: true };
+  sheetTongQuan.addRow(['Học viên tham gia', result.tong_hoc_vien_tham_gia]);
+  sheetTongQuan.addRow(['Đã đăng nhập', result.da_dang_nhap]);
+  sheetTongQuan.addRow(['Đã chỉnh sửa hồ sơ', result.da_chinh_sua_ho_so]);
+
+  const sheetKhaoSat = workbook.addWorksheet('Khảo sát');
+  sheetKhaoSat.addRow([
+    'Đợt khảo sát',
+    'Đã làm',
+    'Cơ bản',
+    'Thành thạo',
+    'Nâng cao',
+  ]);
+  sheetKhaoSat.getRow(1).font = { bold: true };
+  sheetKhaoSat.addRow([
+    'Đầu vào',
+    result.khao_sat.dau_vao.da_lam,
+    result.khao_sat.dau_vao.co_ban,
+    result.khao_sat.dau_vao.thanh_thao,
+    result.khao_sat.dau_vao.nang_cao,
+  ]);
+  sheetKhaoSat.addRow([
+    'Đầu ra',
+    result.khao_sat.dau_ra.da_lam,
+    result.khao_sat.dau_ra.co_ban,
+    result.khao_sat.dau_ra.thanh_thao,
+    result.khao_sat.dau_ra.nang_cao,
+  ]);
+
+  const sheetKetQua = workbook.addWorksheet('Kết quả theo hình thức');
+  sheetKetQua.addRow(['Hình thức', 'Đang học', 'Đạt', 'Không đạt', 'Vắng']);
+  sheetKetQua.getRow(1).font = { bold: true };
+  for (const row of result.ket_qua_theo_hinh_thuc) {
+    sheetKetQua.addRow([
+      NHAN_LOAI_LOP[row.loai_lop] ?? row.loai_lop,
+      row.dang_hoc,
+      row.dat,
+      row.khong_dat,
+      row.vang,
+    ]);
+  }
 
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);

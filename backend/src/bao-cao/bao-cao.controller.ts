@@ -5,6 +5,7 @@ import {
   buildDieuKienDanhGiaWorkbook,
   buildSuaTruongMoetWorkbook,
   buildTongHopWorkbook,
+  buildTongQuanWorkbook,
   buildVanHanhWorkbook,
   buildXacNhanWorkbook,
   buildXuatChoVleWorkbook,
@@ -16,6 +17,7 @@ import { TongHopQueryDto } from './dto/tong-hop-query.dto';
 import { XacNhanQueryDto } from './dto/xac-nhan-query.dto';
 import { KhoaIdQueryDto } from './dto/khoa-id-query.dto';
 import { VanHanhQueryDto } from './dto/van-hanh-query.dto';
+import { TongQuanQueryDto } from './dto/tong-quan-query.dto';
 
 // Dịch vụ Báo cáo — docs/api-contract.md mục 7. hoc_vien không có phạm vi
 // nghiệp vụ (don_vi) để tổng hợp báo cáo -> không liệt kê trong @Roles(),
@@ -166,6 +168,34 @@ export class BaoCaoController {
         'Content-Type':
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': 'attachment; filename="bao-cao-van-hanh.xlsx"',
+      })
+      .send(buffer);
+  }
+
+  // Dashboard "Tổng quan hệ thống" (thêm 2026-09-30) — @Roles() của class đủ
+  // dùng (Trường/Phòng/Sở/QuảnTrị), phạm vi xử lý trong
+  // BaoCaoService.tongQuan.
+  @Get('tong-quan')
+  tongQuan(
+    @Query() query: TongQuanQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.baoCaoService.tongQuan(query, user);
+  }
+
+  @Get('tong-quan/xuat-excel')
+  async tongQuanXuatExcel(
+    @Query() query: TongQuanQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const result = await this.baoCaoService.tongQuan(query, user);
+    const buffer = await buildTongQuanWorkbook(result);
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="bao-cao-tong-quan.xlsx"',
       })
       .send(buffer);
   }

@@ -11,12 +11,16 @@ import {
 import { TongHopQueryDto } from './dto/tong-hop-query.dto';
 import { XacNhanQueryDto } from './dto/xac-nhan-query.dto';
 import { VanHanhQueryDto } from './dto/van-hanh-query.dto';
+import { TongQuanQueryDto } from './dto/tong-quan-query.dto';
 import {
   CAP_GIANG_DAY,
   CHUA_CO_KET_QUA,
   DieuKienDanhGiaRow,
   KET_QUA_HOC,
+  KhaoSatMucRow,
+  KetQuaTheoHinhThucRow,
   KHONG_XAC_DINH,
+  LOAI_LOP_HOC,
   MUC_NANG_LUC,
   SuaTruongMoetRow,
   TRANG_THAI_DANG_KY,
@@ -25,6 +29,7 @@ import {
   TongHopDonViRow,
   TongHopKhoaRow,
   TongHopResult,
+  TongQuanResult,
   VanHanhResult,
   VanHanhRow,
   VanHanhTong,
@@ -524,6 +529,11 @@ export class BaoCaoService {
         ? undefined
         : { hoc_vien: { don_vi_cong_tac_id: { in: hocVienScope } } };
 
+    // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): lop_hoc.dang_ky_hoc trực
+    // tiếp (qua dang_ky_hoc.lop_id cũ) đã bị xóa — nay đi qua bảng nối
+    // dang_ky_hoc_lop, lọc theo dang_ky_hoc lồng bên trong đúng như trước
+    // (giữ nguyên phạm vi đếm, không cần lọc thêm theo loai_lop vì
+    // dang_ky_hoc_lop.loai_lop luôn khớp lop_hoc.loai_lop của chính lớp này).
     const lops = await this.prisma.lop_hoc.findMany({
       where,
       select: {
@@ -531,11 +541,15 @@ export class BaoCaoService {
         ten_lop: true,
         nhom_hoc_vien: true,
         muc_nang_luc: true,
-        dang_ky_hoc: {
-          where: dangKyHocWhere,
+        dang_ky_hoc_lop: {
+          where: dangKyHocWhere ? { dang_ky_hoc: dangKyHocWhere } : undefined,
           select: {
-            muc_dau_vao: true,
-            hoc_vien: { include: { chuyen_mon: true } },
+            dang_ky_hoc: {
+              select: {
+                muc_dau_vao: true,
+                hoc_vien: { include: { chuyen_mon: true } },
+              },
+            },
           },
         },
       },
@@ -555,7 +569,8 @@ export class BaoCaoService {
         so_ho_so_day_du: 0,
         theo_muc_dau_vao: this.emptyTheoMucDauVao(),
       };
-      for (const dk of lop.dang_ky_hoc) {
+      for (const dkl of lop.dang_ky_hoc_lop) {
+        const dk = dkl.dang_ky_hoc;
         row.si_so += 1;
         if (dk.hoc_vien.email_lien_he) row.so_co_email += 1;
         const { day_du } = await this.hocVienService.danhGiaDayDu(dk.hoc_vien);
@@ -581,6 +596,164 @@ export class BaoCaoService {
       so_co_email: 0,
       so_ho_so_day_du: 0,
       theo_muc_dau_vao: this.emptyTheoMucDauVao(),
+    };
+  }
+
+  // -------------------------------------------------------------------
+  // Dashboard "Tổng quan hệ thống" (thêm 2026-09-30) — GET /bao-cao/tong-quan.
+  // Phạm vi TÁI DÙNG scope hồ sơ (getAccessibleDonViIds), giống tongHop().
+  // tu_ngay/den_ngay lọc theo dang_ky_hoc.ngay_dang_ky (ngày ghi danh — cùng
+  // đơn vị đo với tong_hoc_vien_tham_gia, khác với hocVienWhere() ở trên vốn
+  // lọc theo hoc_vien.created_at cho báo cáo tổng hợp).
+  //
+  // da_dang_nhap/da_chinh_sua_ho_so tính trên tập hoc_vien PHÂN BIỆT rút ra
+  // từ CHÍNH các dòng dang_ky_hoc đã khớp bộ lọc (không lọc lại hoc_vien qua
+  // where riêng) — để % hiển thị ở FE dùng chung mẫu số với KPI "Học viên
+  // tham gia". Improvised (api-contract.md không mô tả dashboard này).
+  // -------------------------------------------------------------------
+  async tongQuan(
+    query: TongQuanQueryDto,
+    user: AuthenticatedUser,
+  ): Promise<TongQuanResult> {
+    const scope = await this.scopeService.getAccessibleDonViIds(user);
+    if (query.don_vi_cong_tac_id) {
+      const coQuyen = await this.scopeService.canAccessDonVi(
+        user,
+        query.don_vi_cong_tac_id,
+      );
+      if (!coQuyen) {
+        throw new ForbiddenAppException(
+          'Đơn vị công tác nằm ngoài phạm vi quyền',
+        );
+      }
+    }
+    if (scope !== 'ALL' && scope.length === 0) {
+      return this.emptyTongQuan();
+    }
+
+    const where = this.tongQuanDangKyHocWhere(scope, query);
+    const dangKyRows = await this.prisma.dang_ky_hoc.findMany({
+      where,
+      select: { hoc_vien_id: true, muc_dau_vao: true, muc_dau_ra: true },
+    });
+    const hocVienIds = Array.from(
+      new Set(dangKyRows.map((r) => r.hoc_vien_id)),
+    );
+
+    const [daDangNhap, hoSoDaSuaRows, dangKyHocLopRows] = await Promise.all([
+      hocVienIds.length === 0
+        ? Promise.resolve(0)
+        : this.prisma.nguoi_dung.count({
+            where: {
+              vai_tro: 'hoc_vien',
+              hoc_vien_id: { in: hocVienIds },
+              dang_nhap_lan_cuoi: { not: null },
+            },
+          }),
+      hocVienIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.lich_su_thay_doi_ho_so.findMany({
+            where: { hoc_vien_id: { in: hocVienIds } },
+            select: { hoc_vien_id: true },
+            distinct: ['hoc_vien_id'],
+          }),
+      this.prisma.dang_ky_hoc_lop.findMany({
+        where: { dang_ky_hoc: where },
+        select: {
+          loai_lop: true,
+          dang_ky_hoc: { select: { ket_qua: true } },
+        },
+      }),
+    ]);
+
+    return {
+      tong_hoc_vien_tham_gia: dangKyRows.length,
+      da_dang_nhap: daDangNhap,
+      da_chinh_sua_ho_so: hoSoDaSuaRows.length,
+      khao_sat: {
+        dau_vao: this.demKhaoSat(dangKyRows.map((r) => r.muc_dau_vao)),
+        dau_ra: this.demKhaoSat(dangKyRows.map((r) => r.muc_dau_ra)),
+      },
+      ket_qua_theo_hinh_thuc: this.demKetQuaTheoHinhThuc(dangKyHocLopRows),
+    };
+  }
+
+  private tongQuanDangKyHocWhere(
+    scope: DonViScope,
+    query: TongQuanQueryDto,
+  ): Prisma.dang_ky_hocWhereInput {
+    const where: Prisma.dang_ky_hocWhereInput = {};
+    const hocVienWhere: Prisma.hoc_vienWhereInput = {};
+    if (scope !== 'ALL') hocVienWhere.don_vi_cong_tac_id = { in: scope };
+    if (query.don_vi_cong_tac_id) {
+      hocVienWhere.don_vi_cong_tac_id = query.don_vi_cong_tac_id;
+    }
+    if (Object.keys(hocVienWhere).length > 0) where.hoc_vien = hocVienWhere;
+    if (query.khoa_id) where.khoa_id = query.khoa_id;
+    if (query.tu_ngay || query.den_ngay) {
+      where.ngay_dang_ky = {};
+      if (query.tu_ngay) where.ngay_dang_ky.gte = new Date(query.tu_ngay);
+      if (query.den_ngay) where.ngay_dang_ky.lte = new Date(query.den_ngay);
+    }
+    return where;
+  }
+
+  private demKhaoSat(gia_tri: (string | null)[]): KhaoSatMucRow {
+    const row: KhaoSatMucRow = {
+      da_lam: 0,
+      co_ban: 0,
+      thanh_thao: 0,
+      nang_cao: 0,
+    };
+    for (const muc of gia_tri) {
+      if (!muc) continue;
+      row.da_lam += 1;
+      if (muc === 'co_ban') row.co_ban += 1;
+      else if (muc === 'thanh_thao') row.thanh_thao += 1;
+      else if (muc === 'nang_cao') row.nang_cao += 1;
+    }
+    return row;
+  }
+
+  private demKetQuaTheoHinhThuc(
+    rows: { loai_lop: string; dang_ky_hoc: { ket_qua: string | null } }[],
+  ): KetQuaTheoHinhThucRow[] {
+    return LOAI_LOP_HOC.map((loai) => {
+      const row: KetQuaTheoHinhThucRow = {
+        loai_lop: loai,
+        dang_hoc: 0,
+        dat: 0,
+        khong_dat: 0,
+        vang: 0,
+      };
+      for (const r of rows) {
+        if (r.loai_lop !== loai) continue;
+        const kq = r.dang_ky_hoc.ket_qua;
+        if (kq === 'dang_hoc') row.dang_hoc += 1;
+        else if (kq === 'dat') row.dat += 1;
+        else if (kq === 'khong_dat') row.khong_dat += 1;
+        else if (kq === 'vang') row.vang += 1;
+      }
+      return row;
+    });
+  }
+
+  private emptyTongQuan(): TongQuanResult {
+    return {
+      tong_hoc_vien_tham_gia: 0,
+      da_dang_nhap: 0,
+      da_chinh_sua_ho_so: 0,
+      khao_sat: {
+        dau_vao: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0 },
+        dau_ra: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0 },
+      },
+      ket_qua_theo_hinh_thuc: LOAI_LOP_HOC.map((loai) => ({
+        loai_lop: loai,
+        dang_hoc: 0,
+        dat: 0,
+        khong_dat: 0,
+        vang: 0,
+      })),
     };
   }
 }

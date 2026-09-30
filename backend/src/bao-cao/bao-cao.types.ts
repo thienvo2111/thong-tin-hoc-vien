@@ -138,3 +138,35 @@ export interface VanHanhResult {
   rows: VanHanhRow[];
   tong: VanHanhTong;
 }
+
+// -----------------------------------------------------------------------
+// Dashboard "Tổng quan hệ thống" (thêm 2026-09-30) — GET /bao-cao/tong-quan.
+// Xem BaoCaoService.tongQuan cho định nghĩa từng số liệu.
+// -----------------------------------------------------------------------
+export const LOAI_LOP_HOC = ['truc_tiep', 'zoom', 'vle'] as const;
+
+export interface KhaoSatMucRow {
+  da_lam: number;
+  co_ban: number;
+  thanh_thao: number;
+  nang_cao: number;
+}
+
+export interface KetQuaTheoHinhThucRow {
+  loai_lop: (typeof LOAI_LOP_HOC)[number];
+  dang_hoc: number;
+  dat: number;
+  khong_dat: number;
+  vang: number;
+}
+
+export interface TongQuanResult {
+  tong_hoc_vien_tham_gia: number;
+  da_dang_nhap: number;
+  da_chinh_sua_ho_so: number;
+  khao_sat: {
+    dau_vao: KhaoSatMucRow;
+    dau_ra: KhaoSatMucRow;
+  };
+  ket_qua_theo_hinh_thuc: KetQuaTheoHinhThucRow[];
+}
