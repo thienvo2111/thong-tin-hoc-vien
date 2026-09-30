@@ -1,17 +1,26 @@
-import { useEffect } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import {
+  ActionIcon,
+  Affix,
   Anchor,
   Box,
+  Burger,
   Button,
   Container,
+  Drawer,
   Group,
   Image,
   Paper,
   SimpleGrid,
   Stack,
+  Tabs,
   Text,
+  Textarea,
+  TextInput,
   Title,
+  Transition,
 } from '@mantine/core';
+import { useWindowScroll } from '@mantine/hooks';
 import { Link } from 'react-router-dom';
 import { useToi } from '@/auth/AuthContext';
 import { gioiThieu } from '@/content/gioiThieu';
@@ -30,21 +39,25 @@ export default function TrangGioiThieu() {
     }
   }, []);
 
-  const { thongBaoNoiBat, moDau, conSo, viSao, loTrinh, noiDung, huongDan, hoiDap, lienHe, donVi } = gioiThieu;
+  const { thongBaoNoiBat, moDau, conSo, viSao, doiTuong, loTrinh, noiDung, huongDan, hoiDap, lienHe, hopTac, donVi } =
+    gioiThieu;
 
   const dangDaXacThuc = !dangTai && daXacThuc;
   const dichCta = dangDaXacThuc ? '/toi' : '/dang-nhap';
 
+  // Nhãn trên thanh menu rút gọn so với tiêu đề đầy đủ của từng khối (tiêu đề dài, dễ vỡ layout menu 1
+  // hàng) — 2 khối viSao + noiDung nằm liền kề nhau nói cùng 1 chủ đề nên gộp còn 1 mục trỏ tới viSao.
   const mucLuc = [
-    noiDung.hien && { href: '#chuong-trinh', label: noiDung.tieuDe },
-    loTrinh.hien && { href: '#lo-trinh', label: loTrinh.tieuDe },
-    viSao.hien && { href: '#vi-sao', label: viSao.tieuDe },
-    huongDan.hien && { href: '#huong-dan', label: huongDan.tieuDe },
-    hoiDap.hien && { href: '#faq', label: hoiDap.tieuDe },
-    lienHe.hien && { href: '#lien-he', label: lienHe.tieuDe },
+    (viSao.hien || noiDung.hien) && { href: viSao.hien ? '#vi-sao' : '#chuong-trinh', label: 'Chương trình' },
+    loTrinh.hien && { href: '#lo-trinh', label: 'Lộ trình học' },
+    doiTuong.hien && { href: '#doi-tuong', label: 'Đối tượng' },
+    huongDan.hien && { href: '#huong-dan', label: 'Hướng dẫn' },
+    hoiDap.hien && { href: '#faq', label: 'Hỏi đáp' },
+    lienHe.hien && { href: '#lien-he', label: 'Liên hệ' },
+    hopTac.hien && { href: '#hop-tac', label: 'Hợp tác' },
   ].filter((m): m is { href: string; label: string } => Boolean(m));
 
-  const hasHeroPanel = noiDung.hien && noiDung.moDun.length > 0;
+  const hasHeroPanel = noiDung.hien && noiDung.danhSachMuc.length > 0;
 
   return (
     <Box>
@@ -64,6 +77,8 @@ export default function TrangGioiThieu() {
 
       {conSo.hien && <DaiThongKe conSo={conSo} />}
 
+      {viSao.hien && <ViSao viSao={viSao} />}
+
       {noiDung.hien && <ChuongTrinh noiDung={noiDung} />}
 
       {loTrinh.hien && (
@@ -79,7 +94,7 @@ export default function TrangGioiThieu() {
         </Box>
       )}
 
-      {viSao.hien && <ViSao viSao={viSao} />}
+      {doiTuong.hien && <DoiTuongSection doiTuong={doiTuong} />}
 
       {huongDan.hien && (
         <Container id="huong-dan" size="lg" py={{ base: 48, sm: 72 }} px={{ base: 'md', sm: 'xl' }}>
@@ -118,8 +133,39 @@ export default function TrangGioiThieu() {
 
       {lienHe.hien && <KhoiLienHe lienHe={lienHe} />}
 
+      {hopTac.hien && <KhoiHopTac hopTac={hopTac} />}
+
       <FooterCongKhai donVi={donVi} />
+
+      <NutVeDauTrang />
     </Box>
+  );
+}
+
+/** Nút nổi "Về đầu trang" — hiện khi cuộn quá 1 màn hình, cuộn mượt về đầu khi bấm. */
+function NutVeDauTrang() {
+  const [scroll, scrollTo] = useWindowScroll();
+
+  return (
+    <Affix position={{ bottom: 20, right: 20 }}>
+      <Transition transition="slide-up" mounted={scroll.y > 400}>
+        {(style) => (
+          <ActionIcon
+            style={style}
+            onClick={() => scrollTo({ y: 0 })}
+            size={44}
+            radius="xl"
+            color="primary"
+            variant="filled"
+            aria-label="Về đầu trang"
+          >
+            <Text fz={18} lh={1}>
+              ↑
+            </Text>
+          </ActionIcon>
+        )}
+      </Transition>
+    </Affix>
   );
 }
 
@@ -136,22 +182,95 @@ function HeaderCongKhai({
   dichCta: string;
   dangDaXacThuc: boolean;
 }) {
+  const [menuMoDt, setMenuMoDt] = useState(false);
+  const nhanCta = dangDaXacThuc ? 'Vào trang của tôi' : 'Đăng nhập';
+
   return (
     <Box component="header" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)' }} py={12} px={{ base: 'md', sm: 'xl' }}>
       <Container size="lg" p={0} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
         <Image src={logoHcmue} alt="Trường Đại học Sư phạm Thành phố Hồ Chí Minh" h={36} w="auto" fit="contain" />
-        <Group gap={26} visibleFrom="sm" style={{ flex: 1 }} justify="center">
-          {mucLuc.map((m) => (
-            <Anchor key={m.href} href={m.href} fz={13.5} fw={600} c="gray.7" underline="never">
-              {m.label}
-            </Anchor>
-          ))}
+
+        <Box
+          visibleFrom="sm"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+          }}
+        >
+          <Group gap={20} wrap="nowrap" style={{ flexShrink: 0 }}>
+            {mucLuc.map((m) => (
+              <MucLucLinkDesktop key={m.href} href={m.href} label={m.label} />
+            ))}
+          </Group>
+        </Box>
+
+        <Group gap="sm" wrap="nowrap">
+          <Button component={Link} to={dichCta} size="sm" visibleFrom="sm">
+            {nhanCta}
+          </Button>
+          <Burger opened={menuMoDt} onClick={() => setMenuMoDt((v) => !v)} hiddenFrom="sm" />
         </Group>
-        <Button component={Link} to={dichCta} size="sm">
-          {dangDaXacThuc ? 'Vào trang của tôi' : 'Đăng nhập'}
-        </Button>
       </Container>
+
+      <Drawer opened={menuMoDt} onClose={() => setMenuMoDt(false)} position="right" hiddenFrom="sm" title="Menu">
+        <Stack gap="xs">
+          {mucLuc.map((m) => (
+            <MucLucLinkDrawer key={m.href} href={m.href} label={m.label} onClick={() => setMenuMoDt(false)} />
+          ))}
+          <Button component={Link} to={dichCta} onClick={() => setMenuMoDt(false)} mt="sm">
+            {nhanCta}
+          </Button>
+        </Stack>
+      </Drawer>
     </Box>
+  );
+}
+
+/** Mục menu ngang (desktop) — đổi màu chữ sang primary khi hover, để biết đang trỏ vào mục nào. */
+function MucLucLinkDesktop({ href, label }: { href: string; label: string }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <Anchor
+      href={href}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      fz={13.5}
+      fw={600}
+      c={hovered ? 'primary.6' : 'gray.7'}
+      underline="never"
+      style={{ whiteSpace: 'nowrap', transition: 'color .15s ease' }}
+    >
+      {label}
+    </Anchor>
+  );
+}
+
+/** Mục menu trong Drawer (mobile) — nền primary nhạt + chữ primary khi hover/chạm. */
+function MucLucLinkDrawer({ href, label, onClick }: { href: string; label: string; onClick: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <Anchor
+      href={href}
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      px="md"
+      py={10}
+      fw={600}
+      c={hovered ? 'primary.7' : 'dark'}
+      style={{
+        borderRadius: 8,
+        textDecoration: 'none',
+        background: hovered ? 'var(--mantine-color-primary-0)' : 'transparent',
+        transition: 'background .15s ease, color .15s ease',
+      }}
+    >
+      {label}
+    </Anchor>
   );
 }
 
@@ -193,7 +312,7 @@ function Hero({
       </svg>
 
       <Container size="lg" style={{ position: 'relative' }} p={0}>
-        <Group align="center" gap={48} wrap="wrap-reverse" justify={hasHeroPanel ? 'space-between' : 'center'}>
+        <Group align="center" gap={48} wrap="wrap" justify={hasHeroPanel ? 'space-between' : 'center'}>
           <Stack gap="lg" maw={hasHeroPanel ? 620 : 680} style={{ flex: '1 1 380px' }}>
             <Title order={1} c="white" fz={{ base: 26, sm: 34, md: 44 }} lh={1.22}>
               {moDau.tenChuongTrinh}
@@ -201,6 +320,26 @@ function Hero({
             <Text c="gray.3" fz={{ base: 14.5, sm: 16.5 }} lh={1.65} maw={540}>
               {moDau.thongDiep}
             </Text>
+            {moDau.chiTietNhanh.length > 0 && (
+              <Group gap={8} wrap="wrap">
+                {moDau.chiTietNhanh.map((ct) => (
+                  <Box
+                    key={ct}
+                    px={12}
+                    py={6}
+                    style={{
+                      borderRadius: 999,
+                      background: 'rgba(255,255,255,.1)',
+                      border: '1px solid rgba(255,255,255,.22)',
+                    }}
+                  >
+                    <Text fz={12.5} fw={600} c="white">
+                      {ct}
+                    </Text>
+                  </Box>
+                ))}
+              </Group>
+            )}
             <Group gap="sm" wrap="wrap">
               <Button component={Link} to={dichCta} size="lg" color="accent">
                 {dangDaXacThuc ? 'Vào trang của tôi' : moDau.nutChinh}
@@ -235,9 +374,9 @@ function Hero({
                 {noiDung.tieuDe}
               </Text>
               <Stack gap="sm">
-                {noiDung.moDun.slice(0, 4).map((m, i) => (
+                {noiDung.danhSachMuc.map((m, i) => (
                   <Group
-                    key={m.ten}
+                    key={m.ma}
                     gap={12}
                     wrap="nowrap"
                     style={{ background: 'rgba(255,255,255,.05)', borderRadius: 12, padding: '10px 12px' }}
@@ -261,13 +400,11 @@ function Hero({
                     </Box>
                     <Box>
                       <Text fz={13} fw={600} c="white">
-                        {m.ten}
+                        Mức {m.ten}
                       </Text>
-                      {m.hinhThuc && (
-                        <Text fz={11.5} c="gray.4">
-                          {m.hinhThuc}
-                        </Text>
-                      )}
+                      <Text fz={11.5} c="gray.4">
+                        {noiDung.tongTietMoiMuc} tiết · {noiDung.tyLeHinhThucMoiMuc}
+                      </Text>
                     </Box>
                   </Group>
                 ))}
@@ -303,46 +440,67 @@ function DaiThongKe({ conSo }: { conSo: typeof gioiThieu.conSo }) {
 }
 
 function ChuongTrinh({ noiDung }: { noiDung: typeof gioiThieu.noiDung }) {
-  const nenSac = ['var(--mantine-color-primary-0)', 'var(--mantine-color-success-0)', 'var(--mantine-color-danger-0)'];
+  const macDinh = noiDung.danhSachMuc.some((m) => m.ma === 'thanh_thao') ? 'thanh_thao' : noiDung.danhSachMuc[0]?.ma;
+  const [mucChon, setMucChon] = useState<string | null>(macDinh ?? null);
+  const muc = noiDung.danhSachMuc.find((m) => m.ma === mucChon) ?? noiDung.danhSachMuc[0];
+
   return (
     <Container id="chuong-trinh" size="lg" py={{ base: 48, sm: 72 }} px={{ base: 'md', sm: 'xl' }}>
-      <Stack gap={40}>
-        <Title order={2} ta="center" fz={{ base: 22, sm: 28 }}>
-          {noiDung.tieuDe}
-        </Title>
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg">
-          {noiDung.moDun.map((m, i) => (
-            <Paper key={m.ten} withBorder radius={16} p="lg">
-              <Box
-                w={44}
-                h={44}
-                mb="sm"
-                style={{
-                  borderRadius: 12,
-                  background: nenSac[i % nenSac.length],
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 800,
-                  color: 'var(--mantine-color-primary-7)',
-                }}
-              >
-                {i + 1}
-              </Box>
-              <Text fw={700} fz={15.5} mb={6}>
+      <Stack gap={32}>
+        <Stack gap={8} ta="center">
+          <Title order={2} fz={{ base: 22, sm: 28 }}>
+            {noiDung.tieuDe}
+          </Title>
+          <Text fz={13.5} c="dimmed" fw={600}>
+            {noiDung.tongTietMoiMuc} tiết mỗi mức ({noiDung.tyLeHinhThucMoiMuc}) · 07 chuyên đề mỗi mức
+          </Text>
+        </Stack>
+
+        <Tabs value={mucChon} onChange={setMucChon} variant="pills" radius="xl">
+          <Tabs.List justify="center">
+            {noiDung.danhSachMuc.map((m) => (
+              <Tabs.Tab key={m.ma} value={m.ma}>
                 {m.ten}
-              </Text>
-              <Text fz={13} c="dimmed" lh={1.55}>
-                {m.moTa}
-              </Text>
-              {m.hinhThuc && (
-                <Text fz={12} c="dimmed" fw={600} mt={8}>
-                  {m.hinhThuc}
-                </Text>
-              )}
-            </Paper>
-          ))}
-        </SimpleGrid>
+              </Tabs.Tab>
+            ))}
+          </Tabs.List>
+        </Tabs>
+
+        {muc && (
+          <Stack gap={24}>
+            <Text fz={13.5} c="dimmed" ta="center" maw={720} mx="auto" lh={1.6}>
+              {muc.doiTuongPhuHop}
+            </Text>
+            <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg">
+              {muc.chuyenDe.map((cd, i) => (
+                <Paper key={cd.ten} withBorder radius={16} p="lg">
+                  <Box
+                    w={44}
+                    h={44}
+                    mb="sm"
+                    style={{
+                      borderRadius: 12,
+                      background: 'var(--mantine-color-primary-0)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      color: 'var(--mantine-color-primary-7)',
+                    }}
+                  >
+                    {i + 1}
+                  </Box>
+                  <Text fw={700} fz={15.5} mb={6}>
+                    {cd.ten}
+                  </Text>
+                  <Text fz={12.5} c="dimmed" lh={1.5}>
+                    {cd.moTa}
+                  </Text>
+                </Paper>
+              ))}
+            </SimpleGrid>
+          </Stack>
+        )}
       </Stack>
     </Container>
   );
@@ -393,38 +551,51 @@ function DanhSachBuocSo({ buoc, mau }: { buoc: { ten: string; moTa: string }[]; 
 function ViSao({ viSao }: { viSao: typeof gioiThieu.viSao }) {
   return (
     <Container id="vi-sao" size="lg" py={{ base: 48, sm: 72 }} px={{ base: 'md', sm: 'xl' }}>
-      <Stack gap={32}>
-        <Stack gap={8} maw={640} mx="auto" ta="center">
-          <Title order={2} fz={{ base: 22, sm: 28 }}>
-            {viSao.tieuDe}
-          </Title>
-          <Text fz={14} c="dimmed" lh={1.6}>
-            {viSao.doanMo}
-          </Text>
-        </Stack>
-        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
-          {viSao.loiIch.map((loi) => (
-            <Paper key={loi} withBorder radius={14} p="md">
+      <Stack gap={8} maw={720} mx="auto" ta="center">
+        <Title order={2} fz={{ base: 22, sm: 28 }}>
+          {viSao.tieuDe}
+        </Title>
+        <Text fz={14} c="dimmed" lh={1.6}>
+          {viSao.doanMo}
+        </Text>
+      </Stack>
+    </Container>
+  );
+}
+
+function DoiTuongSection({ doiTuong }: { doiTuong: typeof gioiThieu.doiTuong }) {
+  return (
+    <Container id="doi-tuong" size="lg" py={{ base: 48, sm: 72 }} px={{ base: 'md', sm: 'xl' }}>
+      <Stack gap={28}>
+        <Title order={2} ta="center" fz={{ base: 22, sm: 28 }}>
+          {doiTuong.tieuDe}
+        </Title>
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg">
+          {doiTuong.nhom.map((n) => (
+            <Paper key={n} withBorder radius={14} p="md" ta="center">
               <Text fz={13.5} lh={1.6}>
-                {loi}
+                {n}
               </Text>
             </Paper>
           ))}
         </SimpleGrid>
-        {viSao.cacMuc.length > 0 && (
-          <SimpleGrid cols={{ base: 1, sm: viSao.cacMuc.length }} spacing="md">
-            {viSao.cacMuc.map((m) => (
-              <Paper key={m.ten} withBorder radius={14} p="md" ta="center">
-                <Text fw={700} fz={14} mb={4}>
-                  {m.ten}
-                </Text>
-                <Text fz={12.5} c="dimmed">
-                  {m.moTa}
-                </Text>
-              </Paper>
+        <Paper
+          radius={14}
+          p="md"
+          bg="warning.0"
+          style={{ border: '1px solid var(--mantine-color-warning-2)' }}
+        >
+          <Text fw={700} fz={13.5} c="warning.7" mb={8}>
+            Điều kiện cấp giấy chứng nhận
+          </Text>
+          <Stack gap={4}>
+            {doiTuong.dieuKienChungNhan.map((d) => (
+              <Text key={d} fz={13} lh={1.6} c="warning.9">
+                {d}
+              </Text>
             ))}
-          </SimpleGrid>
-        )}
+          </Stack>
+        </Paper>
       </Stack>
     </Container>
   );
@@ -463,6 +634,116 @@ function KhoiLienHe({ lienHe }: { lienHe: typeof gioiThieu.lienHe }) {
                 Giờ hỗ trợ: {lienHe.gioHoTro}
               </Text>
             )}
+          </Stack>
+        </Stack>
+      </Container>
+    </Box>
+  );
+}
+
+function KhoiHopTac({ hopTac }: { hopTac: typeof gioiThieu.hopTac }) {
+  const [form, setForm] = useState({
+    tenDonVi: '',
+    nguoiLienHe: '',
+    chucVu: '',
+    soDienThoai: '',
+    email: '',
+    quyMo: '',
+    noiDungTraoDoi: '',
+  });
+  const coEmailHopTac = !laNoiDungCho(hopTac.email);
+  const coHotlineHopTac = !laNoiDungCho(hopTac.hotline);
+
+  const suaTruong =
+    (truong: keyof typeof form) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm((truoc) => ({ ...truoc, [truong]: e.currentTarget.value }));
+
+  const guiYeuCau = () => {
+    if (!coEmailHopTac) return;
+    const tieuDe = encodeURIComponent(`Hợp tác tổ chức bồi dưỡng — ${form.tenDonVi || 'Đơn vị'}`);
+    const noiDungThu = encodeURIComponent(
+      [
+        `Tên đơn vị/Sở-Phòng GD&ĐT: ${form.tenDonVi}`,
+        `Người liên hệ: ${form.nguoiLienHe}`,
+        `Chức vụ: ${form.chucVu}`,
+        `Số điện thoại: ${form.soDienThoai}`,
+        `Email: ${form.email}`,
+        `Quy mô dự kiến: ${form.quyMo}`,
+        `Nội dung trao đổi: ${form.noiDungTraoDoi}`,
+      ].join('\n'),
+    );
+    window.location.href = `mailto:${hopTac.email}?subject=${tieuDe}&body=${noiDungThu}`;
+  };
+
+  return (
+    <Box id="hop-tac" bg="gray.0" py={{ base: 48, sm: 72 }} px={{ base: 'md', sm: 'xl' }}>
+      <Container size="lg" p={0}>
+        <Stack gap={32}>
+          <Stack gap={8} ta="center">
+            <Title order={2} fz={{ base: 22, sm: 28 }}>
+              {hopTac.tieuDe}
+            </Title>
+            <Text fz={14} c="dimmed" lh={1.6} maw={640} mx="auto">
+              {hopTac.moTa}
+            </Text>
+          </Stack>
+          <Stack gap="xl">
+            <Paper withBorder radius={14} p="lg">
+              <Stack gap="sm">
+                <TextInput
+                  label="Tên đơn vị/Sở-Phòng GD&ĐT"
+                  value={form.tenDonVi}
+                  onChange={suaTruong('tenDonVi')}
+                />
+                <TextInput label="Người liên hệ" value={form.nguoiLienHe} onChange={suaTruong('nguoiLienHe')} />
+                <TextInput label="Chức vụ" value={form.chucVu} onChange={suaTruong('chucVu')} />
+                <TextInput label="Số điện thoại" value={form.soDienThoai} onChange={suaTruong('soDienThoai')} />
+                <TextInput label="Email" type="email" value={form.email} onChange={suaTruong('email')} />
+                <TextInput
+                  label="Quy mô dự kiến"
+                  placeholder="Ví dụ: số lượng giáo viên dự kiến tham gia"
+                  value={form.quyMo}
+                  onChange={suaTruong('quyMo')}
+                />
+                <Textarea
+                  label="Nội dung trao đổi"
+                  minRows={3}
+                  value={form.noiDungTraoDoi}
+                  onChange={suaTruong('noiDungTraoDoi')}
+                />
+                <Button onClick={guiYeuCau} disabled={!coEmailHopTac} mt="xs">
+                  Gửi yêu cầu hợp tác
+                </Button>
+              </Stack>
+            </Paper>
+            <Paper withBorder radius={14} p="lg" bg="primary.0">
+              <Stack gap={8}>
+                <Text fw={700} fz={13.5} c="primary.7">
+                  Thông tin liên hệ
+                </Text>
+                <Text fz={12.5} c="dimmed" lh={1.6}>
+                  Kênh liên hệ dành cho đơn vị, Sở/Phòng GD&ĐT muốn triển khai chương trình.
+                </Text>
+                {coHotlineHopTac && (
+                  <Text fz={13.5}>
+                    Hotline:{' '}
+                    <Anchor href={`tel:${hopTac.hotline.replace(/\s+/g, '')}`} underline="always">
+                      {hopTac.hotline}
+                    </Anchor>
+                  </Text>
+                )}
+                {coEmailHopTac && (
+                  <Text fz={13.5}>
+                    Email: <Anchor href={`mailto:${hopTac.email}`}>{hopTac.email}</Anchor>
+                  </Text>
+                )}
+                {!coHotlineHopTac && !coEmailHopTac && (
+                  <Text fz={13} c="dimmed">
+                    Thông tin liên hệ hợp tác đang được cập nhật.
+                  </Text>
+                )}
+              </Stack>
+            </Paper>
           </Stack>
         </Stack>
       </Container>
