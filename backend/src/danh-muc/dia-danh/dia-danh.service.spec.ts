@@ -107,6 +107,28 @@ describe('DiaDanhService', () => {
     });
   });
 
+  describe('findAll — lọc theo phien_ban (thêm 2026-09-30)', () => {
+    it('không truyền phien_ban -> KHÔNG lọc (where.phien_ban không được set)', async () => {
+      prisma.dia_danh.findMany.mockResolvedValueOnce([]);
+      prisma.dia_danh.count.mockResolvedValueOnce(0);
+
+      await service.findAll({});
+
+      const whereArg = prisma.dia_danh.findMany.mock.calls[0][0].where;
+      expect(whereArg.phien_ban).toBeUndefined();
+    });
+
+    it('truyền phien_ban=hien_tai -> lọc where.phien_ban="hien_tai"', async () => {
+      prisma.dia_danh.findMany.mockResolvedValueOnce([]);
+      prisma.dia_danh.count.mockResolvedValueOnce(0);
+
+      await service.findAll({ phien_ban: 'hien_tai' } as never);
+
+      const whereArg = prisma.dia_danh.findMany.mock.calls[0][0].where;
+      expect(whereArg.phien_ban).toBe('hien_tai');
+    });
+  });
+
   describe('update', () => {
     it('id không tồn tại -> ValidationException', async () => {
       prisma.dia_danh.findUnique.mockResolvedValueOnce(null);

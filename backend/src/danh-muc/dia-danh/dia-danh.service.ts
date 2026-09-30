@@ -28,6 +28,7 @@ export class DiaDanhService {
     if (query.cap) where.cap = query.cap;
     if (query.parent_id) where.parent_id = query.parent_id;
     if (query.trang_thai) where.trang_thai = query.trang_thai;
+    if (query.phien_ban) where.phien_ban = query.phien_ban;
     if (query.q) {
       where.ten = { contains: query.q, mode: 'insensitive' };
     }
