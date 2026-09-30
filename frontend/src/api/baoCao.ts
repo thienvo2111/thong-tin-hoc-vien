@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch, apiFetchBlob } from './client';
-import type { BaoCaoRowsResult, BaoCaoTheo, DotXacNhanDanhMuc } from './types';
+import type { BaoCaoRowsResult, BaoCaoTheo, DotXacNhanDanhMuc, TongQuanResult } from './types';
 
 // Trung tâm báo cáo (Phase 5 redesign) — 6 nhóm báo cáo THẬT đang có API (docs/api-contract.md mục 7
 // + mục "Đợt xác nhận"). Mỗi nhóm = 1 hàm xem (GET, trả { rows }) + 1 hàm xuất Excel (GET blob).
@@ -60,7 +60,7 @@ export function taiBaoCaoXacNhanExcel(params: BaoCaoXacNhanParams) {
 }
 
 export function layDanhSachDotXacNhan() {
-  return apiFetch<{ data: DotXacNhanDanhMuc[] }>('/dot-xac-nhan');
+  return apiFetch<DotXacNhanDanhMuc[]>('/dot-xac-nhan');
 }
 
 export function useDanhSachDotXacNhan() {
@@ -109,4 +109,24 @@ export function useBaoCaoVanHanh(params: BaoCaoVanHanhParams, enabled: boolean) 
 
 export function taiBaoCaoVanHanhExcel(params: BaoCaoVanHanhParams) {
   return taiBaoCaoExcel('/bao-cao/van-hanh/xuat-excel', params);
+}
+
+// --- 7. Tổng quan hệ thống (dashboard admin, thêm 2026-09-30) — tất cả query đều tùy chọn ---
+export interface BaoCaoTongQuanParams {
+  khoa_id?: string;
+  don_vi_cong_tac_id?: string;
+  tu_ngay?: string;
+  den_ngay?: string;
+}
+
+export function useBaoCaoTongQuanTrungTam(params: BaoCaoTongQuanParams, enabled = true) {
+  return useQuery({
+    queryKey: ['admin', 'bao-cao', 'tong-quan', params],
+    queryFn: () => apiFetch<TongQuanResult>(`/bao-cao/tong-quan${xayQueryString(params)}`),
+    enabled,
+  });
+}
+
+export function taiBaoCaoTongQuanExcel(params: BaoCaoTongQuanParams) {
+  return taiBaoCaoExcel('/bao-cao/tong-quan/xuat-excel', params);
 }

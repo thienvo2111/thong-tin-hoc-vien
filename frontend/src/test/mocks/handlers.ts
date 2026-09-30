@@ -1,6 +1,16 @@
 import { http, HttpResponse } from 'msw';
-import type { ImportChiTiet, KhoaBoiDuong } from '@/api/types';
+import type { ImportChiTiet, KhoaBoiDuong, LoaiLop } from '@/api/types';
 import { DIA_DANH, DON_VI, MON_HOC, db } from './db';
+
+// QĐ10 (2026-09-30): dang_ky_hoc mẫu nằm rải trong db.khoaHocCuaHocVien (map theo hoc_vien_id) — tìm
+// theo id đăng ký học (không phải hoc_vien_id) để dùng chung cho PATCH/DELETE /dang-ky-hoc/{id}/*.
+function timDangKyTheoId(id: string) {
+  for (const list of Object.values(db.khoaHocCuaHocVien)) {
+    const found = list.find((dk) => dk.id === id);
+    if (found) return found;
+  }
+  return undefined;
+}
 
 function fileMoPhong() {
   return new HttpResponse('noi-dung-file-mo-phong', { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } });
@@ -35,6 +45,27 @@ export const handlers = [
 
   http.post('/auth/doi-mat-khau', () => new HttpResponse(null, { status: 204 })),
 
+  // 2026-09-30: xác minh email liên hệ & quên/đặt lại mật khẩu.
+  http.post('/auth/quen-mat-khau', () => HttpResponse.json({ da_gui: true })),
+
+  http.post('/auth/dat-lai-mat-khau', async ({ request }) => {
+    const body = (await request.json()) as { token: string; mat_khau_moi: string };
+    if (body.token !== 'token-hop-le') {
+      return loi(400, 'VALIDATION_ERROR', 'Liên kết không hợp lệ hoặc đã hết hạn');
+    }
+    return HttpResponse.json({ da_dat_lai: true });
+  }),
+
+  http.post('/auth/xac-minh-email', async ({ request }) => {
+    const body = (await request.json()) as { token: string };
+    if (body.token !== 'token-hop-le') {
+      return loi(400, 'VALIDATION_ERROR', 'Liên kết không hợp lệ hoặc đã hết hạn');
+    }
+    return HttpResponse.json({ da_xac_minh: true });
+  }),
+
+  http.post('/hoc-vien/toi/gui-lai-xac-minh-email', () => HttpResponse.json({ da_gui: true })),
+
   http.get('/hoc-vien/toi', () => HttpResponse.json(db.hoSo)),
 
   http.patch('/hoc-vien/toi', async ({ request }) => {
@@ -66,6 +97,8 @@ export const handlers = [
   http.post('/hoc-vien/toi/kiem-tra-truoc-xac-nhan', () => HttpResponse.json({ loi: [], canh_bao: [] })),
 
   http.get('/hoc-vien/toi/danh-gia-dau-vao', () => HttpResponse.json(db.danhGiaDauVao)),
+
+  http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json(db.khoaHocToi)),
 
   http.post('/hoc-vien/toi/xac-nhan', () => {
     const xacNhanLuc = new Date().toISOString();
@@ -103,6 +136,65 @@ export const handlers = [
     const found = db.danhSachHocVien.find((h) => h.id === params.id);
     if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy hồ sơ học viên');
     return HttpResponse.json({ ...found, chuyen_mon: [], don_vi_cong_tac_ten: 'THPT Long Xuyên' });
+  }),
+
+  // Thêm 2026-09-30 (QĐ10) — admin xem lại khóa/lớp của 1 học viên cụ thể (AdminHocVienChiTiet).
+  http.get('/hoc-vien/:id/khoa-hoc', ({ params }) => {
+    return HttpResponse.json(db.khoaHocCuaHocVien[params.id as string] ?? []);
+  }),
+
+  // Thêm 2026-09-30 (QĐ10) — thao tác thủ công lớp/cụm của 1 đăng ký học (dùng chung ở AdminHocVienChiTiet).
+  http.patch('/dang-ky-hoc/:id/lop', async ({ params, request }) => {
+    const dangKy = timDangKyTheoId(params.id as string);
+    if (!dangKy) return loi(404, 'NOT_FOUND', 'Không tìm thấy đăng ký học');
+    const body = (await request.json()) as { loai_lop: LoaiLop; lop_id: string };
+    const khoa = db.chiTietKhoa[dangKy.khoa_id];
+    const lop = khoa?.lop_hoc.find((l) => l.id === body.lop_id);
+    if (!lop) return loi(400, 'VALIDATION_ERROR', 'lop_id không tồn tại');
+    if (lop.loai_lop !== body.loai_lop) {
+      return loi(400, 'VALIDATION_ERROR', 'Không khớp loại lớp thực tế của lop_id');
+    }
+    const lopToi = {
+      id: lop.id,
+      ten_lop: lop.ten_lop,
+      si_so_toi_da: lop.si_so_toi_da,
+      nhom_hoc_vien: lop.nhom_hoc_vien,
+      muc_nang_luc: lop.muc_nang_luc as never,
+      nhan_su: [],
+      lich_hoc: [],
+    };
+    if (body.loai_lop === 'truc_tiep') dangKy.lop_truc_tiep = lopToi;
+    else if (body.loai_lop === 'zoom') dangKy.lop_zoom = lopToi;
+    else dangKy.lop_vle = lopToi;
+    dangKy.trang_thai = 'da_phan_lop';
+    return HttpResponse.json({ dang_ky_hoc_id: dangKy.id, loai_lop: body.loai_lop, lop_id: body.lop_id });
+  }),
+
+  http.delete('/dang-ky-hoc/:id/lop/:loaiLop', ({ params }) => {
+    const dangKy = timDangKyTheoId(params.id as string);
+    if (!dangKy) return loi(404, 'NOT_FOUND', 'Không tìm thấy đăng ký học');
+    const loaiLop = params.loaiLop as LoaiLop;
+    if (loaiLop === 'truc_tiep') dangKy.lop_truc_tiep = null;
+    else if (loaiLop === 'zoom') dangKy.lop_zoom = null;
+    else dangKy.lop_vle = null;
+    return HttpResponse.json({ da_xoa: true });
+  }),
+
+  http.patch('/dang-ky-hoc/:id/cum', async ({ params, request }) => {
+    const dangKy = timDangKyTheoId(params.id as string);
+    if (!dangKy) return loi(404, 'NOT_FOUND', 'Không tìm thấy đăng ký học');
+    const body = (await request.json()) as { cum_id: string | null };
+    if (body.cum_id === null) {
+      dangKy.cum_id = null;
+      dangKy.cum = null;
+    } else {
+      const khoa = db.chiTietKhoa[dangKy.khoa_id];
+      const cum = khoa?.cum_hoc_vien.find((c) => c.id === body.cum_id);
+      if (!cum) return loi(400, 'VALIDATION_ERROR', 'cum_id không tồn tại');
+      dangKy.cum_id = cum.id;
+      dangKy.cum = cum;
+    }
+    return HttpResponse.json(dangKy);
   }),
 
   http.get('/bao-cao/tong-hop', ({ request }) => {
@@ -186,7 +278,7 @@ export const handlers = [
       created_by: 'nd-1',
     };
     db.danhSachKhoa = [moi, ...db.danhSachKhoa];
-    db.chiTietKhoa[id] = { ...moi, giai_doan: [], lop_hoc: [] };
+    db.chiTietKhoa[id] = { ...moi, giai_doan: [], lop_hoc: [], cum_hoc_vien: [] };
     return HttpResponse.json(moi);
   }),
 
@@ -209,8 +301,294 @@ export const handlers = [
     return HttpResponse.json(khoa);
   }),
 
+  // --- CRUD giai đoạn/lớp/cụm/đơn vị theo dõi (AdminKhoaChiTiet) — docs/api-contract.md mục 3. Mô
+  // phỏng lại đúng ràng buộc unique/404 quan trọng của backend (mapUniqueViolation, getXTrongKhoaOrThrow)
+  // để test được các nhánh lỗi field, không chỉ nhánh thành công. ---
+  http.post('/khoa-boi-duong/:id/giai-doan', async ({ params, request }) => {
+    const khoa = db.chiTietKhoa[params.id as string];
+    if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
+    const body = (await request.json()) as {
+      thu_tu: number;
+      ten_giai_doan: string;
+      hinh_thuc: string;
+      thoi_gian_bat_dau: string;
+      thoi_gian_ket_thuc: string;
+    };
+    if (khoa.giai_doan.some((g) => g.thu_tu === body.thu_tu)) {
+      return loi(409, 'CONFLICT', `Thứ tự ${body.thu_tu} đã tồn tại trong khóa này`, {
+        fields: [{ field: 'thu_tu', message: 'Đã tồn tại' }],
+      });
+    }
+    const moi = {
+      id: `gd-moi-${Object.values(db.chiTietKhoa).reduce((n, k) => n + k.giai_doan.length, 0) + 1}`,
+      khoa_id: khoa.id,
+      thu_tu: body.thu_tu,
+      ten_giai_doan: body.ten_giai_doan,
+      hinh_thuc: body.hinh_thuc as never,
+      thoi_gian_bat_dau: body.thoi_gian_bat_dau,
+      thoi_gian_ket_thuc: body.thoi_gian_ket_thuc,
+      trang_thai: 'active' as const,
+    };
+    khoa.giai_doan = [...khoa.giai_doan, moi].sort((a, b) => a.thu_tu - b.thu_tu);
+    return HttpResponse.json(moi);
+  }),
+
+  http.patch('/khoa-boi-duong/:id/giai-doan/:giaiDoanId', async ({ params, request }) => {
+    const khoa = db.chiTietKhoa[params.id as string];
+    if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
+    const gd = khoa.giai_doan.find((g) => g.id === params.giaiDoanId);
+    if (!gd) return loi(404, 'NOT_FOUND', 'Không tìm thấy giai đoạn');
+    const body = (await request.json()) as Partial<typeof gd>;
+    if (body.thu_tu !== undefined && khoa.giai_doan.some((g) => g.id !== gd.id && g.thu_tu === body.thu_tu)) {
+      return loi(409, 'CONFLICT', `Thứ tự ${body.thu_tu} đã tồn tại trong khóa này`, {
+        fields: [{ field: 'thu_tu', message: 'Đã tồn tại' }],
+      });
+    }
+    Object.assign(gd, body);
+    khoa.giai_doan = [...khoa.giai_doan].sort((a, b) => a.thu_tu - b.thu_tu);
+    return HttpResponse.json(gd);
+  }),
+
+  http.post('/khoa-boi-duong/:id/lop', async ({ params, request }) => {
+    const khoa = db.chiTietKhoa[params.id as string];
+    if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
+    const body = (await request.json()) as { loai_lop: LoaiLop; ten_lop: string; si_so_toi_da?: number };
+    if (khoa.lop_hoc.some((l) => l.loai_lop === body.loai_lop && l.ten_lop === body.ten_lop)) {
+      return loi(409, 'CONFLICT', 'Tên lớp đã tồn tại trong loại lớp này của khóa', {
+        fields: [{ field: 'ten_lop', message: 'Đã tồn tại' }],
+      });
+    }
+    const moi = {
+      id: `lop-moi-${Object.values(db.chiTietKhoa).reduce((n, k) => n + k.lop_hoc.length, 0) + 1}`,
+      khoa_id: khoa.id,
+      loai_lop: body.loai_lop,
+      ten_lop: body.ten_lop,
+      si_so_toi_da: body.si_so_toi_da ?? null,
+      trang_thai: 'active' as const,
+      nhom_hoc_vien: null,
+      muc_nang_luc: null,
+      nhan_su: [],
+      lich_hoc: [],
+    };
+    khoa.lop_hoc = [...khoa.lop_hoc, moi];
+    return HttpResponse.json(moi);
+  }),
+
+  http.patch('/khoa-boi-duong/:id/lop/:lopId', async ({ params, request }) => {
+    const khoa = db.chiTietKhoa[params.id as string];
+    if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
+    const lop = khoa.lop_hoc.find((l) => l.id === params.lopId);
+    if (!lop) return loi(404, 'NOT_FOUND', 'Không tìm thấy lớp học');
+    const body = (await request.json()) as Partial<typeof lop>;
+    if (
+      (body.ten_lop !== undefined || body.loai_lop !== undefined) &&
+      khoa.lop_hoc.some(
+        (l) =>
+          l.id !== lop.id &&
+          l.loai_lop === (body.loai_lop ?? lop.loai_lop) &&
+          l.ten_lop === (body.ten_lop ?? lop.ten_lop),
+      )
+    ) {
+      return loi(409, 'CONFLICT', 'Tên lớp đã tồn tại trong loại lớp này của khóa', {
+        fields: [{ field: 'ten_lop', message: 'Đã tồn tại' }],
+      });
+    }
+    Object.assign(lop, body);
+    return HttpResponse.json(lop);
+  }),
+
+  http.post('/khoa-boi-duong/:id/cum', async ({ params, request }) => {
+    const khoa = db.chiTietKhoa[params.id as string];
+    if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
+    const body = (await request.json()) as { ten_cum: string; link_zalo?: string; ghi_chu?: string };
+    if (khoa.cum_hoc_vien.some((c) => c.ten_cum === body.ten_cum)) {
+      return loi(409, 'CONFLICT', 'Tên cụm đã tồn tại trong khóa này', {
+        fields: [{ field: 'ten_cum', message: 'Đã tồn tại' }],
+      });
+    }
+    const moi = {
+      id: `cum-moi-${Object.values(db.chiTietKhoa).reduce((n, k) => n + k.cum_hoc_vien.length, 0) + 1}`,
+      khoa_id: khoa.id,
+      ten_cum: body.ten_cum,
+      link_zalo: body.link_zalo ?? null,
+      ghi_chu: body.ghi_chu ?? null,
+      trang_thai: 'active' as const,
+      created_at: new Date().toISOString(),
+    };
+    khoa.cum_hoc_vien = [...khoa.cum_hoc_vien, moi];
+    return HttpResponse.json(moi);
+  }),
+
+  http.patch('/khoa-boi-duong/:id/cum/:cumId', async ({ params, request }) => {
+    const khoa = db.chiTietKhoa[params.id as string];
+    if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
+    const cum = khoa.cum_hoc_vien.find((c) => c.id === params.cumId);
+    if (!cum) return loi(404, 'NOT_FOUND', 'Không tìm thấy cụm học viên');
+    const body = (await request.json()) as Partial<typeof cum>;
+    if (body.ten_cum !== undefined && khoa.cum_hoc_vien.some((c) => c.id !== cum.id && c.ten_cum === body.ten_cum)) {
+      return loi(409, 'CONFLICT', 'Tên cụm đã tồn tại trong khóa này', {
+        fields: [{ field: 'ten_cum', message: 'Đã tồn tại' }],
+      });
+    }
+    Object.assign(cum, body);
+    return HttpResponse.json(cum);
+  }),
+
+  http.post('/khoa-boi-duong/:id/don-vi-theo-doi', async ({ params, request }) => {
+    const khoa = db.chiTietKhoa[params.id as string];
+    if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
+    const body = (await request.json()) as { don_vi_id: string };
+    return HttpResponse.json({ id: `kdvtd-${Date.now()}`, khoa_id: khoa.id, don_vi_id: body.don_vi_id });
+  }),
+
+  http.delete('/khoa-boi-duong/:id/don-vi-theo-doi/:donViId', () => HttpResponse.json({ da_xoa: true })),
+
+  // Route riêng /lop/{id}/... (không dưới /khoa-boi-duong) — tìm khoa chứa lop qua toàn bộ chiTietKhoa.
+  http.post('/lop/:id/lich-hoc', async ({ params, request }) => {
+    const lopId = params.id as string;
+    const lop = Object.values(db.chiTietKhoa)
+      .flatMap((k) => k.lop_hoc)
+      .find((l) => l.id === lopId);
+    if (!lop) return loi(404, 'NOT_FOUND', 'Không tìm thấy lớp học');
+    const body = (await request.json()) as {
+      giai_doan_id: string;
+      buoi_so?: number;
+      thoi_gian_bat_dau: string;
+      thoi_gian_ket_thuc: string;
+      dia_diem_hoac_link?: string;
+    };
+    const buoiSo = body.buoi_so ?? 1;
+    if ((lop.lich_hoc ?? []).some((l) => l.giai_doan_id === body.giai_doan_id && l.buoi_so === buoiSo)) {
+      return loi(409, 'CONFLICT', 'Lớp này đã có lịch học cho giai đoạn và buổi này', {
+        fields: [{ field: 'buoi_so', message: 'Đã tồn tại' }],
+      });
+    }
+    const moi = {
+      id: `lh-moi-${Object.values(db.chiTietKhoa).flatMap((k) => k.lop_hoc).reduce((n, l) => n + (l.lich_hoc?.length ?? 0), 0) + 1}`,
+      lop_id: lop.id,
+      giai_doan_id: body.giai_doan_id,
+      buoi_so: buoiSo,
+      thoi_gian_bat_dau: body.thoi_gian_bat_dau,
+      thoi_gian_ket_thuc: body.thoi_gian_ket_thuc,
+      dia_diem_hoac_link: body.dia_diem_hoac_link ?? null,
+      trang_thai: 'chua_dien_ra' as const,
+    };
+    lop.lich_hoc = [...(lop.lich_hoc ?? []), moi];
+    return HttpResponse.json(moi);
+  }),
+
+  http.patch('/lop/:id/lich-hoc/:lichHocId', async ({ params, request }) => {
+    const lop = Object.values(db.chiTietKhoa)
+      .flatMap((k) => k.lop_hoc)
+      .find((l) => l.id === params.id);
+    if (!lop) return loi(404, 'NOT_FOUND', 'Không tìm thấy lớp học');
+    const lich = (lop.lich_hoc ?? []).find((l) => l.id === params.lichHocId);
+    if (!lich) return loi(404, 'NOT_FOUND', 'Không tìm thấy lịch học');
+    const body = (await request.json()) as Partial<typeof lich>;
+    Object.assign(lich, body);
+    return HttpResponse.json(lich);
+  }),
+
+  http.post('/lop/:id/nhan-su', async ({ params, request }) => {
+    const lop = Object.values(db.chiTietKhoa)
+      .flatMap((k) => k.lop_hoc)
+      .find((l) => l.id === params.id);
+    if (!lop) return loi(404, 'NOT_FOUND', 'Không tìm thấy lớp học');
+    const body = (await request.json()) as { ho_ten: string; vai_tro: string; so_dien_thoai?: string };
+    const moi = {
+      id: `ns-moi-${Object.values(db.chiTietKhoa).flatMap((k) => k.lop_hoc).reduce((n, l) => n + (l.nhan_su?.length ?? 0), 0) + 1}`,
+      lop_id: lop.id,
+      ho_ten: body.ho_ten,
+      vai_tro: body.vai_tro as never,
+      so_dien_thoai: body.so_dien_thoai ?? null,
+    };
+    lop.nhan_su = [...(lop.nhan_su ?? []), moi];
+    return HttpResponse.json(moi);
+  }),
+
+  http.delete('/lop/:id/nhan-su/:nhanSuId', ({ params }) => {
+    const lop = Object.values(db.chiTietKhoa)
+      .flatMap((k) => k.lop_hoc)
+      .find((l) => l.id === params.id);
+    if (!lop) return loi(404, 'NOT_FOUND', 'Không tìm thấy lớp học');
+    lop.nhan_su = (lop.nhan_su ?? []).filter((n) => n.id !== params.nhanSuId);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  // --- Đợt xác nhận (quan_tri) — khớp dot-xac-nhan.service.ts thật: GET trả mảng thô (không bọc
+  // { data }), sắp xếp mo_luc desc; POST/PATCH lặp lại đúng rule kiemTraChongCheo() (không được chồng
+  // thời gian trong CÙNG khoa_id, kể cả cùng null, bất kể loại) + dong_luc phải sau mo_luc. ---
+  http.get('/dot-xac-nhan', ({ request }) => {
+    const url = new URL(request.url);
+    const khoaId = url.searchParams.get('khoa_id');
+    let items = db.danhSachDotXacNhan;
+    if (khoaId) items = items.filter((d) => d.khoa_id === khoaId);
+    const sorted = [...items].sort((a, b) => new Date(b.mo_luc).getTime() - new Date(a.mo_luc).getTime());
+    return HttpResponse.json(sorted);
+  }),
+
+  http.post('/dot-xac-nhan', async ({ request }) => {
+    const body = (await request.json()) as {
+      khoa_id?: string;
+      ten: string;
+      loai: 'kiem_tra_bo_sung' | 'xac_nhan_truoc_danh_gia';
+      mo_luc: string;
+      dong_luc: string;
+    };
+    const khoaId = body.khoa_id ?? null;
+    const moLuc = new Date(body.mo_luc);
+    const dongLuc = new Date(body.dong_luc);
+    if (!(dongLuc > moLuc)) {
+      return loi(400, 'VALIDATION_ERROR', 'dong_luc phải sau mo_luc', {
+        fields: [{ field: 'dong_luc', message: 'Phải sau mo_luc' }],
+      });
+    }
+    const chongCheo = db.danhSachDotXacNhan.some(
+      (d) => d.khoa_id === khoaId && new Date(d.mo_luc) < dongLuc && new Date(d.dong_luc) > moLuc,
+    );
+    if (chongCheo) {
+      return loi(409, 'CONFLICT', 'Đợt xác nhận chồng thời gian với đợt khác trong cùng phạm vi (khoa_id)');
+    }
+    const moi = {
+      id: `dot-moi-${db.danhSachDotXacNhan.length + 1}`,
+      khoa_id: khoaId,
+      ten: body.ten,
+      loai: body.loai,
+      mo_luc: body.mo_luc,
+      dong_luc: body.dong_luc,
+      created_by: 'nd-1',
+      created_at: new Date().toISOString(),
+    };
+    db.danhSachDotXacNhan = [moi, ...db.danhSachDotXacNhan];
+    return HttpResponse.json(moi);
+  }),
+
+  http.patch('/dot-xac-nhan/:id', async ({ params, request }) => {
+    const existing = db.danhSachDotXacNhan.find((d) => d.id === params.id);
+    if (!existing) return loi(404, 'NOT_FOUND', 'Không tìm thấy đợt xác nhận');
+    const body = (await request.json()) as { dong_luc: string };
+    const dongLucMoi = new Date(body.dong_luc);
+    if (!(dongLucMoi > new Date(existing.mo_luc))) {
+      return loi(400, 'VALIDATION_ERROR', 'dong_luc phải sau mo_luc', {
+        fields: [{ field: 'dong_luc', message: 'Phải sau mo_luc' }],
+      });
+    }
+    const chongCheo = db.danhSachDotXacNhan.some(
+      (d) =>
+        d.id !== existing.id &&
+        d.khoa_id === existing.khoa_id &&
+        new Date(d.mo_luc) < dongLucMoi &&
+        new Date(d.dong_luc) > new Date(existing.mo_luc),
+    );
+    if (chongCheo) {
+      return loi(409, 'CONFLICT', 'Đợt xác nhận chồng thời gian với đợt khác trong cùng phạm vi (khoa_id)');
+    }
+    existing.dong_luc = body.dong_luc;
+    db.danhSachDotXacNhan = db.danhSachDotXacNhan.map((d) => (d.id === existing.id ? existing : d));
+    return HttpResponse.json(existing);
+  }),
+
   // --- Trung tâm báo cáo (Phase 5 redesign) ---
-  http.get('/dot-xac-nhan', () => HttpResponse.json({ data: db.danhSachDotXacNhan })),
 
   http.get('/bao-cao/xuat-excel', () => fileMoPhong()),
 
@@ -239,6 +617,11 @@ export const handlers = [
 
   http.get('/bao-cao/van-hanh', () => HttpResponse.json({ rows: db.baoCaoVanHanh })),
   http.get('/bao-cao/van-hanh/xuat-excel', () => fileMoPhong()),
+
+  // Dashboard "Tổng quan hệ thống" (thêm 2026-09-30) — không bọc { rows } như các báo cáo khác
+  // (TongQuanResult là 1 object tổng hợp, không phải danh sách hàng).
+  http.get('/bao-cao/tong-quan', () => HttpResponse.json(db.baoCaoTongQuan)),
+  http.get('/bao-cao/tong-quan/xuat-excel', () => fileMoPhong()),
 
   // --- Nhập dữ liệu (Phase 5 redesign) ---
   http.get('/import/mau-excel', () => fileMoPhong()),

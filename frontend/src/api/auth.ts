@@ -1,5 +1,5 @@
 import { apiFetch } from './client';
-import type { DangNhapResponse, ThongTinToi } from './types';
+import type { DaDatLaiResponse, DaGuiResponse, DaXacMinhResponse, DangNhapResponse, ThongTinToi } from './types';
 
 export function dangNhap(ten_dang_nhap: string, mat_khau: string) {
   return apiFetch<DangNhapResponse>('/auth/dang-nhap', {
@@ -21,5 +21,31 @@ export function doiMatKhau(mat_khau_cu: string, mat_khau_moi: string) {
   return apiFetch<void>('/auth/doi-mat-khau', {
     method: 'POST',
     body: JSON.stringify({ mat_khau_cu, mat_khau_moi }),
+  });
+}
+
+// 2026-09-30: quên/đặt lại mật khẩu — luôn trả cùng 1 dạng response thành công
+// bất kể tài khoản có tồn tại/đủ điều kiện hay không (docs/api-contract.md).
+export function quenMatKhau(ten_dang_nhap: string) {
+  return apiFetch<DaGuiResponse>('/auth/quen-mat-khau', {
+    method: 'POST',
+    coXacThuc: false,
+    body: JSON.stringify({ ten_dang_nhap }),
+  });
+}
+
+export function datLaiMatKhau(token: string, mat_khau_moi: string) {
+  return apiFetch<DaDatLaiResponse>('/auth/dat-lai-mat-khau', {
+    method: 'POST',
+    coXacThuc: false,
+    body: JSON.stringify({ token, mat_khau_moi }),
+  });
+}
+
+export function xacMinhEmail(token: string) {
+  return apiFetch<DaXacMinhResponse>('/auth/xac-minh-email', {
+    method: 'POST',
+    coXacThuc: false,
+    body: JSON.stringify({ token }),
   });
 }

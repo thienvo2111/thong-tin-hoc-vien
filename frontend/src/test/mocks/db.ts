@@ -10,9 +10,11 @@ import type {
   ImportChiTiet,
   KhoaBoiDuong,
   KhoaBoiDuongChiTiet,
+  KhoaHocDangKy,
   MonHoc,
   NhatKyImportItem,
   TongHopDonViRow,
+  TongQuanResult,
 } from '@/api/types';
 
 // "CSDL" giả lập trong bộ nhớ cho MSW — mỗi test có thể sửa trực tiếp rồi resetDb() ở afterEach.
@@ -25,6 +27,9 @@ export const DIA_DANH: DiaDanh[] = [TINH_AN_GIANG, TINH_KHAC, PHUONG_1, PHUONG_2
 
 export const DON_VI: DonViCongTac[] = [
   { id: 'dv-1', ma_don_vi: 'THPT01', ten_don_vi: 'THPT Long Xuyên', loai_don_vi: 'truong', phuong_xa_id: 'phuong-1', ten_phuong_xa: 'Phường Long Xuyên', trang_thai: 'active' },
+  // dv-2: đơn vị KHÁC đơn vị tổ chức của khoa-1 (dv-1) — dùng để test "+ Thêm đơn vị theo dõi"
+  // (AdminKhoaChiTiet), vì đơn vị tổ chức chính không nằm trong danh sách chọn để theo dõi thêm.
+  { id: 'dv-2', ma_don_vi: 'THPT02', ten_don_vi: 'THPT Châu Đốc', loai_don_vi: 'truong', phuong_xa_id: 'phuong-2', ten_phuong_xa: 'Phường Châu Đốc', trang_thai: 'active' },
 ];
 
 export const MON_HOC: MonHoc[] = [
@@ -42,13 +47,15 @@ export function taoHoSoMoi(): HocVien {
     thang_sinh: 12,
     nam_sinh: 1983,
     gioi_tinh: null,
-    noi_sinh_id: null,
-    phuong_xa_id: null,
+    noi_sinh: null,
+    cu_tru_tinh_id: null,
+    cu_tru_phuong_xa_id: null,
     don_vi_cong_tac_id: 'dv-1',
     don_vi_cong_tac_ten: 'THPT Long Xuyên — Phường Long Xuyên',
     chuc_vu: 'Giáo viên',
     so_dien_thoai_lien_he: '0912345678',
     email_lien_he: null,
+    email_da_xac_minh: false,
     trinh_do_chuyen_mon: null,
     trinh_do_chuyen_mon_khac: null,
     cap_giang_day: null,
@@ -68,7 +75,7 @@ export function taoDotXacNhanDangMoThieu(): DotXacNhan {
     day_du: false,
     thieu: [
       { field: 'so_dinh_danh_ca_nhan', message: 'Chưa có số CCCD' },
-      { field: 'noi_sinh_id', message: 'Chưa chọn nơi sinh' },
+      { field: 'noi_sinh', message: 'Chưa nhập nơi sinh' },
       { field: 'email_lien_he', message: 'Chưa có email' },
     ],
   };
@@ -102,6 +109,7 @@ export function taoDanhSachHocVienMau(): HocVienDanhSachItem[] {
       chuc_vu: 'Giáo viên',
       so_dien_thoai_lien_he: '0912340001',
       email_lien_he: 'binh.le@example.edu.vn',
+      email_da_xac_minh: false,
       trinh_do_chuyen_mon: 'dai_hoc',
       trinh_do_chuyen_mon_khac: null,
       cap_giang_day: 'tieu_hoc',
@@ -124,6 +132,7 @@ export function taoDanhSachHocVienMau(): HocVienDanhSachItem[] {
       chuc_vu: 'Giáo viên',
       so_dien_thoai_lien_he: '0912340002',
       email_lien_he: null,
+      email_da_xac_minh: false,
       trinh_do_chuyen_mon: 'dai_hoc',
       trinh_do_chuyen_mon_khac: null,
       cap_giang_day: 'thcs',
@@ -146,6 +155,7 @@ export function taoDanhSachHocVienMau(): HocVienDanhSachItem[] {
       chuc_vu: 'Tổ trưởng chuyên môn',
       so_dien_thoai_lien_he: '0912340003',
       email_lien_he: 'khoi.vo@example.edu.vn',
+      email_da_xac_minh: true,
       trinh_do_chuyen_mon: 'thac_si',
       trinh_do_chuyen_mon_khac: null,
       cap_giang_day: 'thpt',
@@ -196,6 +206,8 @@ export function taoDanhSachKhoaMau(): KhoaBoiDuong[] {
   ];
 }
 
+// Sửa 2026-09-30 (QĐ10): mỗi lop_hoc có loai_lop (khoa-1 có đủ 3 loại, dùng cho cả AdminKhoaChiTiet
+// VÀ AdminHocVienChiTiet — Select lọc lop_hoc theo loai_lop ở FE) + cum_hoc_vien của khóa.
 export function taoChiTietKhoaMau(danhSach: KhoaBoiDuong[]): Record<string, KhoaBoiDuongChiTiet> {
   const out: Record<string, KhoaBoiDuongChiTiet> = {};
   out[danhSach[0].id] = {
@@ -205,6 +217,7 @@ export function taoChiTietKhoaMau(danhSach: KhoaBoiDuong[]): Record<string, Khoa
       {
         id: 'lop-1',
         khoa_id: danhSach[0].id,
+        loai_lop: 'truc_tiep',
         ten_lop: 'Lớp 01 – Nhóm cơ bản A',
         si_so_toi_da: 30,
         trang_thai: 'active',
@@ -213,9 +226,44 @@ export function taoChiTietKhoaMau(danhSach: KhoaBoiDuong[]): Record<string, Khoa
         nhan_su: [{ id: 'ns-1', lop_id: 'lop-1', ho_ten: 'Nguyễn Văn Long', vai_tro: 'giang_vien', so_dien_thoai: null }],
         lich_hoc: [],
       },
+      {
+        id: 'lop-2',
+        khoa_id: danhSach[0].id,
+        loai_lop: 'zoom',
+        ten_lop: 'Lớp Zoom 01',
+        si_so_toi_da: 500,
+        trang_thai: 'active',
+        nhom_hoc_vien: null,
+        muc_nang_luc: null,
+        nhan_su: [],
+        lich_hoc: [],
+      },
+      {
+        id: 'lop-3',
+        khoa_id: danhSach[0].id,
+        loai_lop: 'vle',
+        ten_lop: 'Lớp VLE 01',
+        si_so_toi_da: null,
+        trang_thai: 'active',
+        nhom_hoc_vien: null,
+        muc_nang_luc: null,
+        nhan_su: [],
+        lich_hoc: [],
+      },
+    ],
+    cum_hoc_vien: [
+      {
+        id: 'cum-1',
+        khoa_id: danhSach[0].id,
+        ten_cum: 'Cụm Long Xuyên',
+        link_zalo: 'https://zalo.me/g/cum-long-xuyen',
+        ghi_chu: 'Hỗ trợ kỹ thuật trong giờ hành chính',
+        trang_thai: 'active',
+        created_at: '2026-09-01T00:00:00.000Z',
+      },
     ],
   };
-  out[danhSach[1].id] = { ...danhSach[1], giai_doan: [], lop_hoc: [] };
+  out[danhSach[1].id] = { ...danhSach[1], giai_doan: [], lop_hoc: [], cum_hoc_vien: [] };
   return out;
 }
 
@@ -231,13 +279,50 @@ export function taoBaoCaoTongHopDonViMau(): TongHopDonViRow[] {
   ];
 }
 
+// Dashboard "Tổng quan hệ thống" (thêm 2026-09-30) — GET /bao-cao/tong-quan. Số liệu minh họa, khớp
+// TongQuanResult (backend/src/bao-cao/bao-cao.types.ts).
+export function taoBaoCaoTongQuanMau(): TongQuanResult {
+  return {
+    tong_hoc_vien_tham_gia: 10,
+    da_dang_nhap: 7,
+    da_chinh_sua_ho_so: 4,
+    khao_sat: {
+      dau_vao: { da_lam: 8, co_ban: 3, thanh_thao: 3, nang_cao: 2 },
+      dau_ra: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0 },
+    },
+    ket_qua_theo_hinh_thuc: [
+      { loai_lop: 'truc_tiep', dang_hoc: 5, dat: 3, khong_dat: 1, vang: 1 },
+      { loai_lop: 'zoom', dang_hoc: 2, dat: 0, khong_dat: 0, vang: 0 },
+      { loai_lop: 'vle', dang_hoc: 0, dat: 0, khong_dat: 0, vang: 0 },
+    ],
+  };
+}
+
 // Dữ liệu mẫu cho Trung tâm báo cáo (Phase 5 redesign). Hàng của xác nhận/sửa-trường-MOET/điều-kiện-
 // đánh-giá/vận-hành dùng kiểu chung BaoCaoRow (xem ghi chú improvised trong api/types.ts) — mock chỉ
 // cần vài field minh họa, KHÔNG phải shape chính thức từ backend.
 export function taoDanhSachDotXacNhanMau(): DotXacNhanDanhMuc[] {
   return [
-    { id: 'dot-1', khoa_id: null, ten: 'Kiểm tra hồ sơ đợt 1', loai: 'kiem_tra_bo_sung', mo_luc: '2026-09-01T00:00:00.000Z', dong_luc: '2026-10-04T16:59:59.000Z' },
-    { id: 'dot-2', khoa_id: null, ten: 'Xác nhận trước đánh giá', loai: 'xac_nhan_truoc_danh_gia', mo_luc: '2026-10-10T00:00:00.000Z', dong_luc: '2026-10-20T16:59:59.000Z' },
+    {
+      id: 'dot-1',
+      khoa_id: null,
+      ten: 'Kiểm tra hồ sơ đợt 1',
+      loai: 'kiem_tra_bo_sung',
+      mo_luc: '2026-09-01T00:00:00.000Z',
+      dong_luc: '2026-10-04T16:59:59.000Z',
+      created_by: 'nd-1',
+      created_at: '2026-08-25T00:00:00.000Z',
+    },
+    {
+      id: 'dot-2',
+      khoa_id: null,
+      ten: 'Xác nhận trước đánh giá',
+      loai: 'xac_nhan_truoc_danh_gia',
+      mo_luc: '2026-10-10T00:00:00.000Z',
+      dong_luc: '2026-10-20T16:59:59.000Z',
+      created_by: 'nd-1',
+      created_at: '2026-08-25T00:00:00.000Z',
+    },
   ];
 }
 
@@ -346,6 +431,153 @@ export function taoChiTietImportMau(): Record<string, ImportChiTiet> {
   };
 }
 
+// M7 — Thông tin lớp học của học viên (GET /hoc-vien/toi/khoa-hoc). Sửa 2026-09-30 (QĐ10): mẫu này có
+// đủ cả 3 loại lớp (trực tiếp có địa điểm text, Zoom có link http, VLE không có buổi học) + 1 cụm hỗ
+// trợ Zalo, để test đủ nhóm theo giai_doan + nút "Vào học"/"Vào nhóm Zalo" + từng khối lớp riêng.
+export function taoKhoaHocToiMau(): KhoaHocDangKy[] {
+  return [
+    {
+      id: 'dk-1',
+      hoc_vien_id: 'hv-1',
+      khoa_id: 'khoa-1',
+      ngay_dang_ky: '2026-09-01T00:00:00.000Z',
+      trang_thai: 'da_phan_lop',
+      ket_qua: 'dang_hoc',
+      ngay_hoan_thanh: null,
+      muc_dau_vao: 'co_ban',
+      muc_dau_ra: null,
+      cum_id: 'cum-1',
+      khoa: {
+        id: 'khoa-1',
+        ma_khoa: 'AG-2026-014',
+        ten_khoa: 'Bồi dưỡng NLS – Mức cơ bản',
+        dia_diem: null,
+        thoi_gian_bat_dau: '2026-10-05T00:00:00.000Z',
+        thoi_gian_ket_thuc: '2026-11-20T00:00:00.000Z',
+        trang_thai: 'da_duyet',
+      },
+      cum: {
+        id: 'cum-1',
+        khoa_id: 'khoa-1',
+        ten_cum: 'Cụm Long Xuyên',
+        link_zalo: 'https://zalo.me/g/cum-long-xuyen',
+        ghi_chu: 'Hỗ trợ kỹ thuật trong giờ hành chính',
+        trang_thai: 'active',
+        created_at: '2026-09-01T00:00:00.000Z',
+      },
+      lop_truc_tiep: {
+        id: 'lop-1',
+        ten_lop: 'Lớp 01 – Nhóm cơ bản A',
+        si_so_toi_da: 30,
+        nhom_hoc_vien: 1,
+        muc_nang_luc: 'co_ban',
+        nhan_su: [
+          { id: 'ns-1', ho_ten: 'Nguyễn Văn Long', vai_tro: 'Giảng viên', so_dien_thoai: '0909123456' },
+          { id: 'ns-2', ho_ten: 'Trần Thị Mai', vai_tro: 'Trợ giảng', so_dien_thoai: null },
+        ],
+        lich_hoc: [
+          {
+            id: 'lh-1',
+            giai_doan_id: 'gd-1',
+            buoi_so: 1,
+            thoi_gian_bat_dau: '2026-10-05T01:00:00.000Z',
+            thoi_gian_ket_thuc: '2026-10-05T04:00:00.000Z',
+            dia_diem_hoac_link: 'Hội trường A, THPT Long Xuyên',
+            trang_thai: 'ket_thuc',
+            giai_doan: {
+              id: 'gd-1',
+              thu_tu: 1,
+              ten_giai_doan: 'Giai đoạn 1 — Tập trung',
+              hinh_thuc: 'truc_tiep',
+              thoi_gian_bat_dau: '2026-10-05T00:00:00.000Z',
+              thoi_gian_ket_thuc: '2026-10-06T00:00:00.000Z',
+            },
+            trang_thai_diem_danh: 'co_mat',
+          },
+        ],
+      },
+      lop_zoom: {
+        id: 'lop-2',
+        ten_lop: 'Lớp Zoom 01',
+        si_so_toi_da: 500,
+        nhom_hoc_vien: null,
+        muc_nang_luc: null,
+        nhan_su: [{ id: 'ns-3', ho_ten: 'Lê Thị Hồng', vai_tro: 'Giảng viên', so_dien_thoai: null }],
+        lich_hoc: [
+          {
+            id: 'lh-2',
+            giai_doan_id: 'gd-2',
+            buoi_so: 2,
+            thoi_gian_bat_dau: '2026-10-12T01:00:00.000Z',
+            thoi_gian_ket_thuc: '2026-10-12T04:00:00.000Z',
+            dia_diem_hoac_link: 'https://vle.example.edu.vn/lop-1/buoi-2',
+            trang_thai: 'chua_dien_ra',
+            giai_doan: {
+              id: 'gd-2',
+              thu_tu: 2,
+              ten_giai_doan: 'Giai đoạn 2 — Trực tuyến',
+              hinh_thuc: 'truc_tuyen',
+              thoi_gian_bat_dau: '2026-10-12T00:00:00.000Z',
+              thoi_gian_ket_thuc: '2026-10-13T00:00:00.000Z',
+            },
+            // null = chưa được điểm danh cho buổi này (chưa diễn ra).
+            trang_thai_diem_danh: null,
+          },
+        ],
+      },
+      lop_vle: {
+        id: 'lop-3',
+        ten_lop: 'Lớp VLE 01',
+        si_so_toi_da: null,
+        nhom_hoc_vien: null,
+        muc_nang_luc: null,
+        nhan_su: [],
+        lich_hoc: [],
+      },
+      tien_do_giai_doan: [
+        { giai_doan_id: 'gd-1', ten_giai_doan: 'Giai đoạn 1 — Tập trung', ty_le_hoan_thanh: 100, diem: 8.5 },
+        { giai_doan_id: 'gd-2', ten_giai_doan: 'Giai đoạn 2 — Trực tuyến', ty_le_hoan_thanh: 40, diem: null },
+      ],
+    },
+  ];
+}
+
+// GET /hoc-vien/{id}/khoa-hoc (Thêm 2026-09-30, QĐ10) — admin xem lại khóa/lớp của 1 học viên cụ thể
+// (AdminHocVienChiTiet). hv-duyet-1 (đã da_duyet) ghi danh khóa-1 nhưng CHƯA được gán lớp/cụm nào —
+// để test chọn lớp mới + bấm lưu (PATCH /dang-ky-hoc/{id}/lop, /cum).
+export function taoKhoaHocCuaHocVienMau(): Record<string, KhoaHocDangKy[]> {
+  return {
+    'hv-duyet-1': [
+      {
+        id: 'dk-hv-duyet-1',
+        hoc_vien_id: 'hv-duyet-1',
+        khoa_id: 'khoa-1',
+        ngay_dang_ky: '2026-09-25T00:00:00.000Z',
+        trang_thai: 'da_duyet',
+        ket_qua: null,
+        ngay_hoan_thanh: null,
+        muc_dau_vao: null,
+        muc_dau_ra: null,
+        cum_id: null,
+        khoa: {
+          id: 'khoa-1',
+          ma_khoa: 'AG-2026-014',
+          ten_khoa: 'Bồi dưỡng NLS – Mức cơ bản',
+          dia_diem: null,
+          thoi_gian_bat_dau: '2026-10-05',
+          thoi_gian_ket_thuc: '2026-11-20',
+          trang_thai: 'cho_duyet',
+        },
+        cum: null,
+        lop_truc_tiep: null,
+        lop_zoom: null,
+        lop_vle: null,
+        tien_do_giai_doan: [],
+      },
+    ],
+  };
+}
+
 export const db = {
   hoSo: taoHoSoMoi(),
   dotXacNhan: taoDotXacNhanDangMoThieu(),
@@ -356,6 +588,7 @@ export const db = {
   nguoiDung: { id: 'nd-1', vai_tro: 'hoc_vien' as string },
   danhSachHocVien: taoDanhSachHocVienMau(),
   baoCaoTongHopDonVi: taoBaoCaoTongHopDonViMau(),
+  baoCaoTongQuan: taoBaoCaoTongQuanMau(),
   danhSachKhoa: taoDanhSachKhoaMau(),
   chiTietKhoa: taoChiTietKhoaMau(taoDanhSachKhoaMau()),
   danhSachDotXacNhan: taoDanhSachDotXacNhanMau(),
@@ -365,6 +598,8 @@ export const db = {
   baoCaoVanHanh: taoBaoCaoVanHanhMau(),
   danhSachImport: taoDanhSachImportMau(),
   chiTietImport: taoChiTietImportMau(),
+  khoaHocToi: taoKhoaHocToiMau(),
+  khoaHocCuaHocVien: taoKhoaHocCuaHocVienMau(),
 };
 
 export function resetDb(): void {
@@ -376,6 +611,7 @@ export function resetDb(): void {
   db.nguoiDung = { id: 'nd-1', vai_tro: 'hoc_vien' };
   db.danhSachHocVien = taoDanhSachHocVienMau();
   db.baoCaoTongHopDonVi = taoBaoCaoTongHopDonViMau();
+  db.baoCaoTongQuan = taoBaoCaoTongQuanMau();
   db.danhSachKhoa = taoDanhSachKhoaMau();
   db.chiTietKhoa = taoChiTietKhoaMau(db.danhSachKhoa);
   db.danhSachDotXacNhan = taoDanhSachDotXacNhanMau();
@@ -385,4 +621,6 @@ export function resetDb(): void {
   db.baoCaoVanHanh = taoBaoCaoVanHanhMau();
   db.danhSachImport = taoDanhSachImportMau();
   db.chiTietImport = taoChiTietImportMau();
+  db.khoaHocToi = taoKhoaHocToiMau();
+  db.khoaHocCuaHocVien = taoKhoaHocCuaHocVienMau();
 }

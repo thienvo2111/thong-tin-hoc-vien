@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type {
+  DaGuiResponse,
   DanhGiaDauVao,
   DotXacNhan,
   HocVien,
+  KhoaHocDangKy,
   KiemTraTruocXacNhan,
   MucDoDayDu,
   XacNhanResponse,
@@ -55,8 +57,17 @@ export function xacNhanHoSo() {
   return apiFetch<XacNhanResponse>('/hoc-vien/toi/xac-nhan', { method: 'POST' });
 }
 
+// 2026-09-30: gửi lại email xác minh cho email_lien_he hiện tại (M4 — badge trạng thái email).
+export function guiLaiXacMinhEmail() {
+  return apiFetch<DaGuiResponse>('/hoc-vien/toi/gui-lai-xac-minh-email', { method: 'POST' });
+}
+
 export function layDanhGiaDauVao() {
   return apiFetch<DanhGiaDauVao>('/hoc-vien/toi/danh-gia-dau-vao');
+}
+
+export function layKhoaHocToi() {
+  return apiFetch<KhoaHocDangKy[]>('/hoc-vien/toi/khoa-hoc');
 }
 
 export const hoSoToiKey = ['hoc-vien', 'toi'] as const;
@@ -85,4 +96,9 @@ export function useDanhGiaDauVao(enabled = true) {
     gcTime: 0,
     refetchOnReconnect: false,
   });
+}
+
+export const khoaHocToiKey = ['hoc-vien', 'toi', 'khoa-hoc'] as const;
+export function useKhoaHocToi(enabled = true) {
+  return useQuery({ queryKey: khoaHocToiKey, queryFn: layKhoaHocToi, enabled });
 }

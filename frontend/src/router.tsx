@@ -16,6 +16,19 @@ export const router = createBrowserRouter([
         lazy: () => import('@/pages/M1/DangNhap').then((m) => ({ Component: m.default })),
       },
       {
+        // 2026-09-30: quên/đặt lại mật khẩu — công khai, cùng nhánh với /dang-nhap (ngoài RequireAuth).
+        path: '/quen-mat-khau',
+        lazy: () => import('@/pages/M1/QuenMatKhau').then((m) => ({ Component: m.default })),
+      },
+      {
+        path: '/dat-lai-mat-khau',
+        lazy: () => import('@/pages/M1/DatLaiMatKhau').then((m) => ({ Component: m.default })),
+      },
+      {
+        path: '/xac-minh-email',
+        lazy: () => import('@/pages/M1/XacMinhEmail').then((m) => ({ Component: m.default })),
+      },
+      {
         lazy: () => import('@/auth/RequireAuth').then((m) => ({ Component: m.RequireAuth })),
         children: [
           {
@@ -32,6 +45,10 @@ export const router = createBrowserRouter([
               {
                 path: '/toi/ho-so',
                 lazy: () => import('@/pages/M4/HoSo').then((m) => ({ Component: m.default })),
+              },
+              {
+                path: '/toi/lop-hoc',
+                lazy: () => import('@/pages/M7/ThongTinLopHoc').then((m) => ({ Component: m.default })),
               },
               {
                 path: '/toi/xac-nhan',

@@ -39,12 +39,26 @@ export interface HocVien {
   thang_sinh: number | null;
   nam_sinh: number | null;
   gioi_tinh: 'nam' | 'nu' | 'khac' | null;
-  noi_sinh_id: string | null;
-  phuong_xa_id: string | null;
+  // Deprecated (sửa 2026-09-30): thay bởi "noi_sinh" (text tự do, bên dưới) —
+  // giữ nguyên 2 field này trong kiểu để không vỡ chỗ nào còn đọc dữ liệu cũ.
+  noi_sinh_id?: string | null;
+  phuong_xa_id?: string | null;
+  // Thêm 2026-09-30: nơi sinh dạng text tự do — giấy khai sinh có thể ghi
+  // theo địa giới hành chính CŨ, khác địa giới HIỆN TẠI mà dia_danh quản lý.
+  noi_sinh?: string | null;
+  // Thêm 2026-09-30: "Cư trú" — tùy chọn, dùng đúng địa giới hành chính HIỆN
+  // TẠI (dia_danh đang có, 2 cấp tỉnh/thành -> phường/xã).
+  cu_tru_tinh_id?: string | null;
+  cu_tru_phuong_xa_id?: string | null;
+  cu_tru_tinh_ten?: string | null;
+  cu_tru_phuong_xa_ten?: string | null;
   don_vi_cong_tac_id: string | null;
   chuc_vu: string | null;
   so_dien_thoai_lien_he: string | null;
   email_lien_he: string | null;
+  // Thêm 2026-09-30: xác minh email liên hệ (backend hoc_vien.email_da_xac_minh) — đổi email_lien_he
+  // tự reset về false, xem POST /hoc-vien/toi/gui-lai-xac-minh-email + POST /auth/xac-minh-email.
+  email_da_xac_minh: boolean;
   trinh_do_chuyen_mon: TrinhDoChuyenMon | null;
   trinh_do_chuyen_mon_khac: string | null;
   cap_giang_day: CapGiangDay | null;
@@ -130,6 +144,20 @@ export interface XacNhanResponse {
   email_lien_he: string | null;
 }
 
+// Xác minh email liên hệ & quên/đặt lại mật khẩu (2026-09-30, api-contract.md
+// mục cùng tên) — cả 3 response chỉ có đúng 1 field boolean cố định true.
+export interface DaGuiResponse {
+  da_gui: true;
+}
+
+export interface DaDatLaiResponse {
+  da_dat_lai: true;
+}
+
+export interface DaXacMinhResponse {
+  da_xac_minh: true;
+}
+
 // GET /hoc-vien (danh sách quản trị) hỗ trợ phân trang server-side thật (page, page_size)
 // — xác nhận trong backend/src/common/dto/pagination-query.dto.ts + hoc-vien.service.ts#findAll,
 // KHÔNG có trong api-contract.md (chỉ ghi query lọc, không ghi phân trang). Flag: improvised.
@@ -166,6 +194,35 @@ export interface TongHopResult {
   tu_ngay: string | null;
   den_ngay: string | null;
   rows: TongHopDonViRow[];
+}
+
+// GET /bao-cao/tong-quan — dashboard "Tổng quan hệ thống" (thêm 2026-09-30). Shape lấy từ
+// backend/src/bao-cao/bao-cao.types.ts (TongQuanResult) — không mô tả chi tiết trong api-contract.md,
+// flag: improvised. loai_lop dùng lại type LoaiLop khai báo ở dưới (khóa bồi dưỡng).
+export interface KhaoSatMucRow {
+  da_lam: number;
+  co_ban: number;
+  thanh_thao: number;
+  nang_cao: number;
+}
+
+export interface KetQuaTheoHinhThucRow {
+  loai_lop: LoaiLop;
+  dang_hoc: number;
+  dat: number;
+  khong_dat: number;
+  vang: number;
+}
+
+export interface TongQuanResult {
+  tong_hoc_vien_tham_gia: number;
+  da_dang_nhap: number;
+  da_chinh_sua_ho_so: number;
+  khao_sat: {
+    dau_vao: KhaoSatMucRow;
+    dau_ra: KhaoSatMucRow;
+  };
+  ket_qua_theo_hinh_thuc: KetQuaTheoHinhThucRow[];
 }
 
 export interface DanhGiaDauVaoDuDieuKien {
@@ -216,22 +273,30 @@ export interface KhoaBoiDuong {
   created_by: string | null;
 }
 
+// Thêm 2026-09-30 — enum thật của backend (prisma/schema.prisma) dùng cho form CRUD giai đoạn/nhân
+// sự (AdminKhoaChiTiet). trang_thai_active dùng chung cho giai_doan/lop_hoc/cum_hoc_vien (vô hiệu
+// hóa = 'ngung', không xóa cứng).
+export type HinhThucGiaiDoan = 'truc_tiep' | 'truc_tuyen' | 'danh_gia' | 'khac';
+export type VaiTroNhanSuLop = 'giang_vien' | 'ho_tro';
+export type TrangThaiActive = 'active' | 'ngung';
+export type TrangThaiLichHoc = 'chua_dien_ra' | 'dang_dien_ra' | 'ket_thuc';
+
 export interface GiaiDoanKhoa {
   id: string;
   khoa_id: string;
   thu_tu: number;
   ten_giai_doan: string;
-  hinh_thuc: string;
+  hinh_thuc: HinhThucGiaiDoan;
   thoi_gian_bat_dau: string;
   thoi_gian_ket_thuc: string;
-  trang_thai: string;
+  trang_thai: TrangThaiActive;
 }
 
 export interface NhanSuLop {
   id: string;
   lop_id: string;
   ho_ten: string;
-  vai_tro: string;
+  vai_tro: VaiTroNhanSuLop;
   so_dien_thoai: string | null;
 }
 
@@ -243,27 +308,47 @@ export interface LichHocLop {
   thoi_gian_bat_dau: string;
   thoi_gian_ket_thuc: string;
   dia_diem_hoac_link: string | null;
+  trang_thai: TrangThaiLichHoc;
   giai_doan?: GiaiDoanKhoa;
 }
+
+// QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): 3 loại lớp độc lập nhau — xem
+// docs/api-contract.md mục 3 "Lưu ý (QĐ10, 2026-09-30)".
+export type LoaiLop = 'truc_tiep' | 'zoom' | 'vle';
 
 export interface LopHoc {
   id: string;
   khoa_id: string;
+  loai_lop: LoaiLop;
   ten_lop: string;
   si_so_toi_da: number | null;
-  trang_thai: string;
+  trang_thai: TrangThaiActive;
   nhom_hoc_vien: number | null;
-  muc_nang_luc: string | null;
+  muc_nang_luc: MucNangLuc | null;
   nhan_su?: NhanSuLop[];
   lich_hoc?: LichHocLop[];
 }
 
+// cum_hoc_vien (QĐ10) — nhóm Zalo hỗ trợ theo địa lý, độc lập với cây đơn vị công tác VÀ với 3 loại
+// lớp; chứa học viên trực tiếp qua dang_ky_hoc.cum_id (không qua lớp nào).
+export interface CumHocVien {
+  id: string;
+  khoa_id: string;
+  ten_cum: string;
+  link_zalo: string | null;
+  ghi_chu: string | null;
+  trang_thai: TrangThaiActive;
+  created_at: string;
+}
+
 // GET /khoa-boi-duong/{id} — "Chi tiết khóa kèm giai đoạn + lớp" (api-contract.md mục 3), hình dạng
 // lấy từ backend/src/khoa-boi-duong/khoa-boi-duong.service.ts#findOne (include giai_doan, lop_hoc
-// kèm nhan_su + lich_hoc.giai_doan) chứ không có trong api-contract.md — improvised, đúng theo code.
+// kèm nhan_su + lich_hoc.giai_doan, cum_hoc_vien) chứ không có trong api-contract.md — improvised,
+// đúng theo code. Sửa 2026-09-30 (QĐ10): thêm cum_hoc_vien (song song với giai_doan/lop_hoc).
 export interface KhoaBoiDuongChiTiet extends KhoaBoiDuong {
   giai_doan: GiaiDoanKhoa[];
   lop_hoc: LopHoc[];
+  cum_hoc_vien: CumHocVien[];
 }
 
 // Body POST /khoa-boi-duong — backend/src/khoa-boi-duong/dto/create-khoa-boi-duong.dto.ts.
@@ -288,9 +373,9 @@ export interface BaoCaoRowsResult {
   rows: BaoCaoRow[];
 }
 
-// GET /dot-xac-nhan — "Danh sách đợt" (api-contract.md mục "Đợt xác nhận & lịch sử thay đổi hồ sơ").
-// Hình dạng response không ghi rõ — improvised, theo đúng quy ước { data: [...] } của các endpoint
-// danh mục dùng chung (mục 4).
+// GET /dot-xac-nhan (quan_tri) — dot-xac-nhan.controller.ts + dot-xac-nhan.service.ts#layDanhSach: trả
+// THẲNG mảng dot_xac_nhan thô (findMany, không include quan hệ khoa), KHÔNG bọc { data: [...] } — sửa lại
+// 2026-09-30 sau khi đối chiếu trực tiếp service thật (bản trước đó "improvised" đoán sai là có bọc).
 export interface DotXacNhanDanhMuc {
   id: string;
   khoa_id: string | null;
@@ -298,10 +383,13 @@ export interface DotXacNhanDanhMuc {
   loai: 'kiem_tra_bo_sung' | 'xac_nhan_truoc_danh_gia';
   mo_luc: string;
   dong_luc: string;
+  created_by: string | null;
+  created_at: string;
 }
 
-// Phase 5 redesign — Nhập dữ liệu (docs/api-contract.md mục 5). 8 loại import thật hỗ trợ qua
-// `loai_danh_muc_import` — không bịa thêm/bớt loại nào ngoài danh sách này.
+// Phase 5 redesign — Nhập dữ liệu (docs/api-contract.md mục 5). 10 loại import thật hỗ trợ qua
+// `loai_danh_muc_import` (thêm diem_danh/ket_qua_giai_doan ở T12, 2026-09-30) — không bịa thêm/bớt
+// loại nào ngoài danh sách này.
 export type LoaiDanhMucImport =
   | 'ho_so_nhan_su_moet'
   | 'phan_lop_hoc_vien'
@@ -310,7 +398,9 @@ export type LoaiDanhMucImport =
   | 'tai_khoan_vle'
   | 'don_vi_cong_tac'
   | 'dia_danh'
-  | 'mon_hoc';
+  | 'mon_hoc'
+  | 'diem_danh'
+  | 'ket_qua_giai_doan';
 
 export interface TaoImportResponse {
   import_id: string;
@@ -332,6 +422,93 @@ export interface ImportChiTiet {
   danh_sach_loi: ImportLoiDong[];
   danh_sach_canh_bao: ImportLoiDong[];
   so_hoc_vien_chua_co_email: number;
+}
+
+export type MucNangLuc = 'co_ban' | 'thanh_thao' | 'nang_cao';
+
+// GET /hoc-vien/toi/khoa-hoc (M7) — backend/src/khoa-boi-duong/dang-ky-hoc.controller.ts +
+// khoa-boi-duong.service.ts#khoaHocCuaToi: trả thẳng bản ghi dang_ky_hoc (không select riêng nên đủ
+// scalar field) kèm include khoa + lop.nhan_su + lop.lich_hoc.giai_doan. lop_hoc.lich_hoc đã sắp theo
+// giai_doan.thu_tu, buoi_so, thoi_gian_bat_dau, dia_diem_hoac_link ở backend — FE không sort lại.
+export interface GiaiDoanKhoaToi {
+  id: string;
+  thu_tu: number;
+  ten_giai_doan: string;
+  hinh_thuc: 'truc_tiep' | 'truc_tuyen' | 'danh_gia' | 'khac';
+  thoi_gian_bat_dau: string;
+  thoi_gian_ket_thuc: string;
+}
+
+export type TrangThaiDiemDanh = 'co_mat' | 'vang' | 'vang_co_phep';
+
+// Thêm 2026-09-30 (T12) — điểm danh nhập qua IMPORT EXCEL (không có giao diện chấm tay từng buổi).
+export interface LichHocLopToi {
+  id: string;
+  giai_doan_id: string;
+  buoi_so: number;
+  thoi_gian_bat_dau: string;
+  thoi_gian_ket_thuc: string;
+  dia_diem_hoac_link: string | null;
+  trang_thai: 'chua_dien_ra' | 'dang_dien_ra' | 'ket_thuc';
+  giai_doan: GiaiDoanKhoaToi;
+  // null = chưa được điểm danh cho buổi này (KHÔNG suy diễn thành "vắng").
+  trang_thai_diem_danh: TrangThaiDiemDanh | null;
+}
+
+// Thêm 2026-09-30 (T12) — 1 phần tử/giai đoạn, nhập qua import ket_qua_giai_doan.
+export interface TienDoGiaiDoan {
+  giai_doan_id: string;
+  ten_giai_doan: string;
+  ty_le_hoan_thanh: number | null;
+  diem: number | null;
+}
+
+export interface NhanSuLopToi {
+  id: string;
+  ho_ten: string;
+  vai_tro: string;
+  so_dien_thoai: string | null;
+}
+
+export interface LopHocToi {
+  id: string;
+  ten_lop: string;
+  si_so_toi_da: number | null;
+  nhom_hoc_vien: number | null;
+  muc_nang_luc: MucNangLuc | null;
+  nhan_su: NhanSuLopToi[];
+  lich_hoc: LichHocLopToi[];
+}
+
+// Sửa 2026-09-30 (QĐ10) — THAY ĐỔI CẤU TRÚC: trường "lop" (1 lớp duy nhất) đã bị thay bằng 3 trường
+// độc lập lop_truc_tiep/lop_zoom/lop_vle (mỗi trường LopHocToi | null, hệ quả bắt buộc từ việc xóa cột
+// dang_ky_hoc.lop_id — xem khoa-boi-duong.service.ts#khoaHocTheoHocVienId) + cum (cụm hỗ trợ Zalo).
+export interface KhoaHocDangKy {
+  id: string;
+  hoc_vien_id: string;
+  khoa_id: string;
+  ngay_dang_ky: string;
+  trang_thai: 'cho_duyet' | 'da_duyet' | 'tu_choi' | 'da_phan_lop';
+  ket_qua: 'dang_hoc' | 'dat' | 'khong_dat' | 'vang' | null;
+  ngay_hoan_thanh: string | null;
+  muc_dau_vao: MucNangLuc | null;
+  muc_dau_ra: MucNangLuc | null;
+  cum_id: string | null;
+  khoa: {
+    id: string;
+    ma_khoa: string;
+    ten_khoa: string;
+    dia_diem: string | null;
+    thoi_gian_bat_dau: string;
+    thoi_gian_ket_thuc: string;
+    trang_thai: TrangThaiKhoa;
+  };
+  cum: CumHocVien | null;
+  lop_truc_tiep: LopHocToi | null;
+  lop_zoom: LopHocToi | null;
+  lop_vle: LopHocToi | null;
+  // Thêm 2026-09-30 (T12) — mảng rỗng nếu chưa có dữ liệu (import ket_qua_giai_doan).
+  tien_do_giai_doan: TienDoGiaiDoan[];
 }
 
 // GET /import — "Nhật ký import" (api-contract.md mục 5). Hàng là bản ghi thô của bảng nhat_ky_import
