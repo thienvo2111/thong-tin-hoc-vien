@@ -11,6 +11,7 @@ const routes = [
   { path: '/dang-nhap', element: <DangNhap /> },
   { path: '/doi-mat-khau', element: <div>Màn hình đổi mật khẩu</div> },
   { path: '/toi', element: <div>Trang của tôi</div> },
+  { path: '/quen-mat-khau', element: <div>Màn hình quên mật khẩu</div> },
 ];
 
 describe('M1 — Đăng nhập', () => {
@@ -84,5 +85,13 @@ describe('M1 — Đăng nhập', () => {
 
     await user.click(screen.getByRole('button', { name: 'Không biết mã định danh?' }));
     expect(await screen.findByText(/liên hệ bộ phận phụ trách/)).toBeInTheDocument();
+  });
+
+  it('có lối "Quên mật khẩu?" dẫn sang màn quên mật khẩu', async () => {
+    const user = userEvent.setup();
+    renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
+
+    await user.click(screen.getByRole('link', { name: 'Quên mật khẩu?' }));
+    expect(await screen.findByText('Màn hình quên mật khẩu')).toBeInTheDocument();
   });
 });

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Anchor, Box, Button, Collapse, Container, Group, Image, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
 import { ApiError } from '@/api/client';
 import { useToi } from '@/auth/AuthContext';
@@ -138,6 +138,10 @@ export default function DangNhap() {
                     Lần đầu đăng nhập: mật khẩu là ngày sinh dạng ngày-tháng-năm viết liền, ví dụ 08121983.
                   </Text>
                 </Box>
+
+                <Anchor component={Link} to="/quen-mat-khau" size="sm" ta="right">
+                  Quên mật khẩu?
+                </Anchor>
 
                 <Button type="submit" size="lg" loading={mutation.isPending} fullWidth>
                   Đăng nhập
