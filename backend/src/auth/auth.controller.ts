@@ -11,6 +11,9 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { DangNhapDto } from './dto/dang-nhap.dto';
 import { DoiMatKhauDto } from './dto/doi-mat-khau.dto';
+import { QuenMatKhauDto } from './dto/quen-mat-khau.dto';
+import { DatLaiMatKhauDto } from './dto/dat-lai-mat-khau.dto';
+import { XacMinhEmailDto } from './dto/xac-minh-email.dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { AuthenticatedUser } from './interfaces/jwt-payload.interface';
@@ -52,5 +55,30 @@ export class AuthController {
   @Get('toi')
   layThongTinHienTai(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.layThongTinHienTai(user);
+  }
+
+  // 2026-09-30: quên/đặt lại mật khẩu + xác minh email liên hệ. Áp
+  // ThrottlerGuard cho quen-mat-khau giống dang-nhap (10 request/phút/IP) —
+  // cùng cơ chế 429 hiện có, không tự chế giới hạn riêng.
+  @Public()
+  @UseGuards(ThrottlerGuard)
+  @Post('quen-mat-khau')
+  @HttpCode(HttpStatus.OK)
+  quenMatKhau(@Body() dto: QuenMatKhauDto) {
+    return this.authService.quenMatKhau(dto);
+  }
+
+  @Public()
+  @Post('dat-lai-mat-khau')
+  @HttpCode(HttpStatus.OK)
+  datLaiMatKhau(@Body() dto: DatLaiMatKhauDto) {
+    return this.authService.datLaiMatKhau(dto);
+  }
+
+  @Public()
+  @Post('xac-minh-email')
+  @HttpCode(HttpStatus.OK)
+  xacMinhEmail(@Body() dto: XacMinhEmailDto) {
+    return this.authService.xacMinhEmail(dto);
   }
 }

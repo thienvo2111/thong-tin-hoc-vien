@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { ScopeService } from './scope/scope.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { ThongBaoModule } from '../thong-bao/thong-bao.module';
 
 // Dịch vụ Auth & Phân quyền — docs/api-contract.md mục 1.
 // JwtAuthGuard + RolesGuard đăng ký làm guard toàn cục (APP_GUARD) ở đây vì
@@ -15,6 +16,10 @@ import { RolesGuard } from './guards/roles.guard';
 // tự áp guard.
 @Module({
   imports: [
+    // Thêm 2026-09-30: ThongBaoService dùng để gửi email đặt lại mật khẩu
+    // (POST /auth/quen-mat-khau) — không vòng lặp vì ThongBaoModule không
+    // phụ thuộc ngược lại module này (xem ghi chú thong-bao.module.ts).
+    ThongBaoModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

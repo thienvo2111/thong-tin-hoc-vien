@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from './scope/scope.service';
+import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import {
   AccountLockedException,
   UnauthorizedAppException,
@@ -23,18 +24,31 @@ describe('AuthService', () => {
   let prisma: {
     nguoi_dung: {
       findFirst: jest.Mock;
+      findUnique: jest.Mock;
       findUniqueOrThrow: jest.Mock;
       update: jest.Mock;
     };
     token_thu_hoi: {
       create: jest.Mock;
     };
+    token_xac_thuc: {
+      findFirst: jest.Mock;
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+    };
     hoc_vien: {
       findUnique: jest.Mock;
+      update: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
   let jwtService: { signAsync: jest.Mock };
   let scopeService: { getAccessibleDonViIds: jest.Mock };
+  let thongBaoService: {
+    guiDatLaiMatKhau: jest.Mock;
+  };
 
   const baseUser = {
     id: 'user-1',
@@ -62,6 +76,7 @@ describe('AuthService', () => {
     prisma = {
       nguoi_dung: {
         findFirst: jest.fn(),
+        findUnique: jest.fn(),
         findUniqueOrThrow: jest.fn(),
         update: jest.fn().mockImplementation(({ data }) => ({
           ...baseUser,
@@ -71,18 +86,31 @@ describe('AuthService', () => {
       token_thu_hoi: {
         create: jest.fn(),
       },
+      token_xac_thuc: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
       hoc_vien: {
         findUnique: jest.fn(),
+        update: jest.fn(),
       },
+      $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
     };
     jwtService = { signAsync: jest.fn().mockResolvedValue('fake.jwt.token') };
     scopeService = {
       getAccessibleDonViIds: jest.fn().mockResolvedValue(['don-vi-1']),
     };
+    thongBaoService = {
+      guiDatLaiMatKhau: jest.fn().mockResolvedValue(undefined),
+    };
     service = new AuthService(
       prisma as unknown as PrismaService,
       jwtService as never,
       scopeService as unknown as ScopeService,
+      thongBaoService as unknown as ThongBaoService,
     );
   });
 
@@ -266,6 +294,7 @@ describe('AuthService', () => {
             { hoc_vien: { so_dinh_danh_ca_nhan: '123456789012' } },
           ],
         },
+        include: { hoc_vien: true },
       });
     });
 
@@ -441,6 +470,242 @@ describe('AuthService', () => {
         hoc_vien_id: 'hv-1',
       });
       expect(scopeService.getAccessibleDonViIds).not.toHaveBeenCalled();
+    });
+  });
+
+  // 2026-09-30: quên/đặt lại mật khẩu + xác minh email liên hệ.
+  describe('quenMatKhau', () => {
+    const hocVienDaXacMinh = {
+      id: 'hv-1',
+      ho_ten: 'Nguyễn Văn A',
+      email_lien_he: 'a@example.com',
+      email_da_xac_minh: true,
+    };
+
+    it('tài khoản không tồn tại -> vẫn trả da_gui:true, không tạo token', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue(null);
+      const res = await service.quenMatKhau({ ten_dang_nhap: 'khong-co' });
+      expect(res).toEqual({ da_gui: true });
+      expect(prisma.token_xac_thuc.create).not.toHaveBeenCalled();
+    });
+
+    it('tài khoản không phải hoc_vien -> vẫn trả da_gui:true, không tạo token (rule #9/#34b)', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
+        ...baseUser,
+        vai_tro: 'truong',
+      });
+      const res = await service.quenMatKhau({
+        ten_dang_nhap: baseUser.ten_dang_nhap,
+      });
+      expect(res).toEqual({ da_gui: true });
+      expect(prisma.token_xac_thuc.create).not.toHaveBeenCalled();
+    });
+
+    it('hoc_vien nhưng email_lien_he chưa xác minh -> vẫn trả da_gui:true, không tạo token', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
+        ...baseUser,
+        vai_tro: 'hoc_vien',
+        hoc_vien: { ...hocVienDaXacMinh, email_da_xac_minh: false },
+      });
+      const res = await service.quenMatKhau({
+        ten_dang_nhap: baseUser.ten_dang_nhap,
+      });
+      expect(res).toEqual({ da_gui: true });
+      expect(prisma.token_xac_thuc.create).not.toHaveBeenCalled();
+    });
+
+    it('hoc_vien có email đã xác minh -> tạo token + gửi email + vô hiệu token cũ', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
+        ...baseUser,
+        vai_tro: 'hoc_vien',
+        hoc_vien: hocVienDaXacMinh,
+      });
+      const res = await service.quenMatKhau({
+        ten_dang_nhap: baseUser.ten_dang_nhap,
+      });
+      expect(res).toEqual({ da_gui: true });
+      expect(prisma.token_xac_thuc.updateMany).toHaveBeenCalledWith({
+        where: {
+          hoc_vien_id: 'hv-1',
+          loai: 'dat_lai_mat_khau',
+          da_dung_luc: null,
+        },
+        data: { da_dung_luc: expect.any(Date) },
+      });
+      expect(prisma.token_xac_thuc.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            hoc_vien_id: 'hv-1',
+            loai: 'dat_lai_mat_khau',
+          }),
+        }),
+      );
+      expect(thongBaoService.guiDatLaiMatKhau).toHaveBeenCalledWith(
+        'a@example.com',
+        'Nguyễn Văn A',
+        expect.stringContaining('/dat-lai-mat-khau?token='),
+      );
+    });
+
+    it('đã có token còn hiệu lực tạo dưới 60 giây trước -> không tạo token mới (chặn spam)', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
+        ...baseUser,
+        vai_tro: 'hoc_vien',
+        hoc_vien: hocVienDaXacMinh,
+      });
+      prisma.token_xac_thuc.findFirst.mockResolvedValue({ id: 'tok-cu' });
+      const res = await service.quenMatKhau({
+        ten_dang_nhap: baseUser.ten_dang_nhap,
+      });
+      expect(res).toEqual({ da_gui: true });
+      expect(prisma.token_xac_thuc.create).not.toHaveBeenCalled();
+      expect(thongBaoService.guiDatLaiMatKhau).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('datLaiMatKhau', () => {
+    it('token không tồn tại -> ValidationException với thông báo chung', async () => {
+      prisma.token_xac_thuc.findUnique.mockResolvedValue(null);
+      await expect(
+        service.datLaiMatKhau({
+          token: 'khong-ton-tai',
+          mat_khau_moi: 'MoiMoi123',
+        }),
+      ).rejects.toBeInstanceOf(ValidationException);
+    });
+
+    it('token đúng loại nhưng đã hết hạn -> ValidationException', async () => {
+      prisma.token_xac_thuc.findUnique.mockResolvedValue({
+        id: 'tok-1',
+        hoc_vien_id: 'hv-1',
+        loai: 'dat_lai_mat_khau',
+        da_dung_luc: null,
+        het_han_luc: new Date(Date.now() - 1000),
+      });
+      await expect(
+        service.datLaiMatKhau({ token: 'het-han', mat_khau_moi: 'MoiMoi123' }),
+      ).rejects.toBeInstanceOf(ValidationException);
+    });
+
+    it('token đã dùng rồi -> ValidationException', async () => {
+      prisma.token_xac_thuc.findUnique.mockResolvedValue({
+        id: 'tok-1',
+        hoc_vien_id: 'hv-1',
+        loai: 'dat_lai_mat_khau',
+        da_dung_luc: new Date(),
+        het_han_luc: new Date(Date.now() + 1000),
+      });
+      await expect(
+        service.datLaiMatKhau({ token: 'da-dung', mat_khau_moi: 'MoiMoi123' }),
+      ).rejects.toBeInstanceOf(ValidationException);
+    });
+
+    it('token đúng loại xac_minh_email (khác loại yêu cầu) -> ValidationException', async () => {
+      prisma.token_xac_thuc.findUnique.mockResolvedValue({
+        id: 'tok-1',
+        hoc_vien_id: 'hv-1',
+        loai: 'xac_minh_email',
+        da_dung_luc: null,
+        het_han_luc: new Date(Date.now() + 1000),
+      });
+      await expect(
+        service.datLaiMatKhau({ token: 'sai-loai', mat_khau_moi: 'MoiMoi123' }),
+      ).rejects.toBeInstanceOf(ValidationException);
+    });
+
+    it('token hợp lệ + mật khẩu mới không đạt yêu cầu -> ValidationException, không cập nhật', async () => {
+      prisma.token_xac_thuc.findUnique.mockResolvedValue({
+        id: 'tok-1',
+        hoc_vien_id: 'hv-1',
+        loai: 'dat_lai_mat_khau',
+        da_dung_luc: null,
+        het_han_luc: new Date(Date.now() + 1000),
+      });
+      prisma.nguoi_dung.findUnique.mockResolvedValue(baseUser);
+      await expect(
+        service.datLaiMatKhau({ token: 'ok', mat_khau_moi: 'abc' }),
+      ).rejects.toBeInstanceOf(ValidationException);
+      expect(prisma.nguoi_dung.update).not.toHaveBeenCalled();
+    });
+
+    it('token hợp lệ + mật khẩu trùng mật khẩu hiện tại (bcrypt.compare, không cần biết chữ rõ) -> ValidationException', async () => {
+      prisma.token_xac_thuc.findUnique.mockResolvedValue({
+        id: 'tok-1',
+        hoc_vien_id: 'hv-1',
+        loai: 'dat_lai_mat_khau',
+        da_dung_luc: null,
+        het_han_luc: new Date(Date.now() + 1000),
+      });
+      // Mật khẩu hiện tại là "MoiMoi123" (khác baseUser.mat_khau_hash gốc) —
+      // cô lập đúng nhánh "khác mật khẩu cũ" (kiểm bằng bcrypt.compare vì
+      // không có mật khẩu cũ dạng chữ rõ ở luồng quên mật khẩu).
+      prisma.nguoi_dung.findUnique.mockResolvedValue({
+        ...baseUser,
+        mat_khau_hash: await bcrypt.hash('MoiMoi123', 4),
+      });
+      await expect(
+        service.datLaiMatKhau({ token: 'ok', mat_khau_moi: 'MoiMoi123' }),
+      ).rejects.toBeInstanceOf(ValidationException);
+    });
+
+    it('token hợp lệ + mật khẩu mới hợp lệ -> cập nhật mat_khau_hash, phai_doi_mat_khau=false, vô hiệu token', async () => {
+      prisma.token_xac_thuc.findUnique.mockResolvedValue({
+        id: 'tok-1',
+        hoc_vien_id: 'hv-1',
+        loai: 'dat_lai_mat_khau',
+        da_dung_luc: null,
+        het_han_luc: new Date(Date.now() + 1000),
+      });
+      prisma.nguoi_dung.findUnique.mockResolvedValue(baseUser);
+
+      const res = await service.datLaiMatKhau({
+        token: 'ok',
+        mat_khau_moi: 'MoiMoi123',
+      });
+      expect(res).toEqual({ da_dat_lai: true });
+      expect(prisma.nguoi_dung.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: baseUser.id },
+          data: expect.objectContaining({ phai_doi_mat_khau: false }),
+        }),
+      );
+      expect(prisma.token_xac_thuc.updateMany).toHaveBeenCalledWith({
+        where: {
+          hoc_vien_id: 'hv-1',
+          loai: 'dat_lai_mat_khau',
+          da_dung_luc: null,
+        },
+        data: { da_dung_luc: expect.any(Date) },
+      });
+    });
+  });
+
+  describe('xacMinhEmail', () => {
+    it('token không tồn tại -> ValidationException', async () => {
+      prisma.token_xac_thuc.findUnique.mockResolvedValue(null);
+      await expect(
+        service.xacMinhEmail({ token: 'khong-ton-tai' }),
+      ).rejects.toBeInstanceOf(ValidationException);
+    });
+
+    it('token hợp lệ -> set hoc_vien.email_da_xac_minh=true + đánh dấu token đã dùng', async () => {
+      prisma.token_xac_thuc.findUnique.mockResolvedValue({
+        id: 'tok-1',
+        hoc_vien_id: 'hv-1',
+        loai: 'xac_minh_email',
+        da_dung_luc: null,
+        het_han_luc: new Date(Date.now() + 1000),
+      });
+      const res = await service.xacMinhEmail({ token: 'ok' });
+      expect(res).toEqual({ da_xac_minh: true });
+      expect(prisma.hoc_vien.update).toHaveBeenCalledWith({
+        where: { id: 'hv-1' },
+        data: { email_da_xac_minh: true },
+      });
+      expect(prisma.token_xac_thuc.update).toHaveBeenCalledWith({
+        where: { id: 'tok-1' },
+        data: { da_dung_luc: expect.any(Date) },
+      });
     });
   });
 });
