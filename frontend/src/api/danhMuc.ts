@@ -1,19 +1,21 @@
 import { apiFetch } from './client';
 import type { DiaDanh, DonViCongTac, MonHoc } from './types';
 
-export function layDiaDanh(params: { cap: string; parent_id?: string; q?: string; trang_thai?: string }) {
+export function layDiaDanh(params: { cap: string; parent_id?: string; q?: string; trang_thai?: string; phien_ban?: string }) {
   const qs = new URLSearchParams();
   qs.set('cap', params.cap);
   if (params.parent_id) qs.set('parent_id', params.parent_id);
   if (params.q) qs.set('q', params.q);
   qs.set('trang_thai', params.trang_thai ?? 'active');
+  if (params.phien_ban) qs.set('phien_ban', params.phien_ban);
   return apiFetch<{ data: DiaDanh[] }>(`/danh-muc/dia-danh?${qs.toString()}`);
 }
 
-export function layDonViCongTac(params: { q?: string; loai_don_vi?: string }) {
+export function layDonViCongTac(params: { q?: string; loai_don_vi?: string; dia_ban_id?: string }) {
   const qs = new URLSearchParams();
   qs.set('loai_don_vi', params.loai_don_vi ?? 'truong');
   if (params.q) qs.set('q', params.q);
+  if (params.dia_ban_id) qs.set('dia_ban_id', params.dia_ban_id);
   return apiFetch<{ data: DonViCongTac[] }>(`/danh-muc/don-vi-cong-tac?${qs.toString()}`);
 }
 

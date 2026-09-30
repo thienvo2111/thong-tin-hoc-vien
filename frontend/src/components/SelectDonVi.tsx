@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { Autocomplete, Loader } from '@mantine/core';
+import { useRef, useState } from 'react';
+import { Autocomplete, Loader, Stack, Text } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
 import { layDonViCongTac } from '@/api/danhMuc';
+import { SelectDiaDanh } from '@/components/SelectDiaDanh';
 import type { DonViCongTac } from '@/api/types';
 
 interface Props {
@@ -19,15 +20,25 @@ function nhanDonVi(d: DonViCongTac): string {
   return d.ten_phuong_xa ? `${d.ten_don_vi} — ${d.ten_phuong_xa}` : d.ten_don_vi;
 }
 
-/** Autocomplete debounce 300ms, gõ ≥ 2 ký tự — dac-ta-cong-hoc-vien.md § M4 mục 3. */
+/**
+ * Autocomplete debounce 300ms, gõ ≥ 2 ký tự — dac-ta-cong-hoc-vien.md § M4 mục 3. Có thêm 2 Select
+ * địa giới (tỉnh/thành → phường/xã) tùy chọn ở trên để thu hẹp phạm vi tìm kiếm qua dia_ban_id —
+ * giá trị 2 Select này CHỈ để lọc, không phải giá trị gửi lên server (server chỉ cần don_vi_cong_tac_id).
+ */
 export function SelectDonVi({ label, nhanBanDau, onChange, error, required, disabled }: Props) {
   const [text, setText] = useState(nhanBanDau ?? '');
   const [debounced] = useDebouncedValue(text, 300);
   const duDieuKienTimKiem = debounced.trim().length >= 2;
 
+  const [tinhId, setTinhId] = useState<string | null>(null);
+  const [phuongXaId, setPhuongXaId] = useState<string | null>(null);
+  // Mantine Autocomplete gọi onOptionSubmit RỒI gọi lại onChange với cùng nhãn ngay sau đó (đồng bộ
+  // hóa value nội bộ) — nếu không lọc phát onChange "ăn theo" này ra, nó sẽ ghi đè id vừa chọn về null.
+  const nhanVuaChonRef = useRef<string | null>(null);
+
   const { data, isFetching } = useQuery({
-    queryKey: ['danh-muc', 'don-vi-cong-tac', debounced],
-    queryFn: () => layDonViCongTac({ q: debounced.trim() }),
+    queryKey: ['danh-muc', 'don-vi-cong-tac', debounced, phuongXaId],
+    queryFn: () => layDonViCongTac({ q: debounced.trim(), dia_ban_id: phuongXaId ?? undefined }),
     enabled: duDieuKienTimKiem && !disabled,
   });
 
@@ -35,25 +46,54 @@ export function SelectDonVi({ label, nhanBanDau, onChange, error, required, disa
   const options = danhSach.map(nhanDonVi);
 
   return (
-    <Autocomplete
-      label={label}
-      placeholder="Gõ tên trường (ít nhất 2 ký tự)"
-      data={options}
-      value={text}
-      onChange={(v) => {
-        setText(v);
-        onChange(null, null);
-      }}
-      onOptionSubmit={(submitted) => {
-        const found = danhSach.find((d) => nhanDonVi(d) === submitted);
-        setText(submitted);
-        onChange(found?.id ?? null, submitted);
-      }}
-      rightSection={isFetching ? <Loader size="xs" /> : null}
-      error={error}
-      required={required}
-      disabled={disabled}
-      comboboxProps={{ withinPortal: true }}
-    />
+    <Stack gap="xs">
+      <SelectDiaDanh
+        label="Tỉnh/thành"
+        cap="tinh_thanh"
+        value={tinhId}
+        onChange={(id) => {
+          setTinhId(id);
+          setPhuongXaId(null);
+        }}
+        disabled={disabled}
+      />
+      <SelectDiaDanh
+        label="Phường/xã"
+        cap="phuong_xa_dac_khu"
+        parentId={tinhId}
+        value={phuongXaId}
+        onChange={setPhuongXaId}
+        disabled={disabled}
+      />
+      <Text size="xs" c="dimmed">
+        Chọn Tỉnh/thành và Phường/xã để thu hẹp danh sách kết quả (không bắt buộc).
+      </Text>
+      <Autocomplete
+        label={label}
+        placeholder="Gõ tên trường (ít nhất 2 ký tự)"
+        data={options}
+        value={text}
+        onChange={(v) => {
+          setText(v);
+          if (v === nhanVuaChonRef.current) {
+            nhanVuaChonRef.current = null;
+            return;
+          }
+          nhanVuaChonRef.current = null;
+          onChange(null, null);
+        }}
+        onOptionSubmit={(submitted) => {
+          const found = danhSach.find((d) => nhanDonVi(d) === submitted);
+          setText(submitted);
+          nhanVuaChonRef.current = submitted;
+          onChange(found?.id ?? null, submitted);
+        }}
+        rightSection={isFetching ? <Loader size="xs" /> : null}
+        error={error}
+        required={required}
+        disabled={disabled}
+        comboboxProps={{ withinPortal: true }}
+      />
+    </Stack>
   );
 }
