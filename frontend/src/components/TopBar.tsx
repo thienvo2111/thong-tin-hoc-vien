@@ -8,6 +8,7 @@ import logoHcmue from '@/assets/logo-hcmue.png';
 const MUC_MENU = [
   { toi: '/toi', nhan: 'Trang chủ' },
   { toi: '/toi/ho-so', nhan: 'Hồ sơ' },
+  { toi: '/toi/lop-hoc', nhan: 'Lớp học' },
   { toi: '/toi/xac-nhan', nhan: 'Xác nhận' },
   { toi: '/toi/danh-gia-dau-vao', nhan: 'Đánh giá đầu vào' },
 ];

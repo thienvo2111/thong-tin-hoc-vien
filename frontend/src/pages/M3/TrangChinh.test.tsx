@@ -79,4 +79,10 @@ describe('M3 — Trang chính', () => {
     renderDaDangNhap();
     expect(await screen.findByText('Hiện không trong thời gian chỉnh sửa hồ sơ')).toBeInTheDocument();
   });
+
+  it('luôn hiện menu 2 mục: Cập nhật hồ sơ và Thông tin lớp học', async () => {
+    renderDaDangNhap();
+    expect(await screen.findByRole('link', { name: /Cập nhật hồ sơ/ })).toHaveAttribute('href', '/toi/ho-so');
+    expect(screen.getByRole('link', { name: /Thông tin lớp học/ })).toHaveAttribute('href', '/toi/lop-hoc');
+  });
 });

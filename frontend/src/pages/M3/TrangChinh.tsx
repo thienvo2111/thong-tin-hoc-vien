@@ -1,4 +1,4 @@
-import { Box, Button, Center, Container, List, Loader, Stack, Stepper, Text, Title } from '@mantine/core';
+import { Box, Button, Card, Center, Container, Group, List, Loader, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { Link } from 'react-router-dom';
 import { useDotXacNhan } from '@/api/hocVien';
 import { dinhDangNgayGio } from '@/lib/ngay';
@@ -7,16 +7,10 @@ import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
 import { CountdownTimer } from '@/components/CountdownTimer';
 
-const CAC_BUOC = ['Hồ sơ', 'Xác nhận thông tin', 'Đánh giá đầu vào', 'Hoàn tất'];
-
-/** Suy ra bước hiện tại (0-3) từ đúng các trường đã dùng để chọn banner bên dưới — không thêm dữ liệu mới. */
-function tinhBuocHienTai(data: NonNullable<ReturnType<typeof useDotXacNhan>['data']>): number {
-  const { dot, da_xac_nhan, day_du } = data;
-  if (dot && !day_du) return 0;
-  if (dot && day_du && !da_xac_nhan) return 1;
-  if (dot && day_du && da_xac_nhan) return 2;
-  return 0;
-}
+const MUC_MENU_CHINH = [
+  { toi: '/toi/ho-so', bieuTuong: '📄', tieuDe: 'Cập nhật hồ sơ', moTa: 'Xem và chỉnh sửa thông tin cá nhân' },
+  { toi: '/toi/lop-hoc', bieuTuong: '🏫', tieuDe: 'Thông tin lớp học', moTa: 'Lịch học, địa điểm, kết quả đánh giá đầu vào' },
+];
 
 /** M3 — trang chính, khối trạng thái theo bảng trong dac-ta-cong-hoc-vien.md § M3. */
 export default function TrangChinh() {
@@ -50,24 +44,48 @@ export default function TrangChinh() {
 
         {data && (
           <>
-            <Box visibleFrom="xs" p="lg" style={{ borderRadius: 14, border: '1px solid var(--mantine-color-gray-3)', background: 'var(--mantine-color-white)' }}>
-              <Stepper active={tinhBuocHienTai(data)} size="sm" iconSize={32}>
-                {CAC_BUOC.map((buoc) => (
-                  <Stepper.Step key={buoc} label={buoc} />
-                ))}
-              </Stepper>
-            </Box>
-
             <Stack gap="sm">
               <Text fw={700} size="sm">
                 Việc cần làm
               </Text>
               <KhoiTrangThai data={data} />
             </Stack>
+
+            <MenuChinh />
           </>
         )}
       </Stack>
     </Container>
+  );
+}
+
+function MenuChinh() {
+  return (
+    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+      {MUC_MENU_CHINH.map((m) => (
+        <Card
+          key={m.toi}
+          component={Link}
+          to={m.toi}
+          padding="lg"
+          radius="md"
+          withBorder
+          style={{ textDecoration: 'none' }}
+        >
+          <Group gap="md" wrap="nowrap" align="flex-start">
+            <Text fz={28} lh={1}>
+              {m.bieuTuong}
+            </Text>
+            <Box>
+              <Text fw={700}>{m.tieuDe}</Text>
+              <Text size="sm" c="dimmed">
+                {m.moTa}
+              </Text>
+            </Box>
+          </Group>
+        </Card>
+      ))}
+    </SimpleGrid>
   );
 }
 
