@@ -57,6 +57,7 @@ import type {
 import { useToi } from '@/auth/AuthContext';
 import { thongDiepLoiChung, loiFieldsThanhMap } from '@/lib/loiApi';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
+import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { KhoaTrangThaiBadge } from '@/components/KhoaTrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
 
@@ -1606,6 +1607,7 @@ export default function AdminKhoaChiTiet() {
             label="Đơn vị"
             required
             searchable
+            filter={locTiengViet}
             data={tuyChonDonViThem}
             value={donViChonThem || null}
             onChange={(v) => setDonViChonThem(v ?? '')}

@@ -7,6 +7,7 @@ import { layDonViCongTacPhanTrang, useSuaDiaBanDonViCongTac } from '@/api/danhMu
 import type { DonViCongTac } from '@/api/types';
 import { SelectDiaDanh } from '@/components/SelectDiaDanh';
 import { thongDiepLoiChung } from '@/lib/loiApi';
+import { chuanHoaNfc } from '@/lib/nfc';
 import { AdminPageHeader } from './AdminPageHeader';
 
 const KICH_THUOC_TRANG = 20;
@@ -29,7 +30,7 @@ export default function AdminDanhMucTruong() {
     () => ({
       loai_don_vi: 'truong',
       tinh_id: tinhId ?? undefined,
-      q: qDebounced.trim() || undefined,
+      q: qDebounced.trim() ? chuanHoaNfc(qDebounced.trim()) : undefined,
       page,
       page_size: KICH_THUOC_TRANG,
     }),

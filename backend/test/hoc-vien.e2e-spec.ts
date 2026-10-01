@@ -80,7 +80,10 @@ describe('Hồ sơ Học viên (e2e)', () => {
   }
 
   beforeAll(async () => {
-    app = await createTestApp();
+    // File này gọi /auth/dang-nhap >10 lần (T9 unaccent thêm 2 lần nữa) cho
+    // các test không liên quan rate limit — nới giới hạn như các file khác
+    // (xem test/utils/test-app.ts).
+    app = await createTestApp({ raiseThrottlerLimit: true });
     const suf = uniqueSuffix();
 
     tinh = await prisma.dia_danh.create({
@@ -602,6 +605,46 @@ describe('Hồ sơ Học viên (e2e)', () => {
         .get('/hoc-vien')
         .set('Authorization', `Bearer ${tokenHv}`)
         .expect(403);
+    });
+  });
+
+  describe('GET /hoc-vien — q tìm theo tên không dấu (unaccent, 2026-10-01)', () => {
+    it('q="can dang" (không dấu) tìm được hồ sơ "... Cần Đăng ..."', async () => {
+      // ho_ten chỉ được chứa chữ cái + khoảng trắng (HO_TEN_REGEX) nên không
+      // ghép thẳng uniqueSuffix() (chứa chữ số hex) vào tên — đổi mỗi nibble
+      // hex thành 1 chữ cái A-P để vẫn duy nhất mà hợp lệ.
+      const tenSuf = uniqueSuffix()
+        .split('')
+        .map((c) => String.fromCharCode(65 + parseInt(c, 16)))
+        .join('');
+      const body = baseDangKyBody({ ho_ten: `Nguyễn Thị Cần Đăng ${tenSuf}` });
+      const res = await request(app.getHttpServer())
+        .post('/hoc-vien')
+        .send(body)
+        .expect(201);
+      hocVienIds.push(res.body.hoc_vien_id);
+      const nd = await prisma.nguoi_dung.findUnique({
+        where: { ten_dang_nhap: body.so_dinh_danh_ca_nhan as string },
+      });
+      if (nd) nguoiDungHocVienIds.push(nd.id);
+
+      const tokenQuanTri = await dangNhap(quanTri.ten_dang_nhap, 'MatKhau123');
+      const found = await request(app.getHttpServer())
+        .get(`/hoc-vien?q=${encodeURIComponent(`can dang ${tenSuf}`)}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(found.body.data.map((h: { id: string }) => h.id)).toContain(
+        res.body.hoc_vien_id,
+      );
+    });
+
+    it('q chứa ký tự % hoặc _ -> không làm vỡ truy vấn (200, không khớp gì)', async () => {
+      const tokenQuanTri = await dangNhap(quanTri.ten_dang_nhap, 'MatKhau123');
+      const res = await request(app.getHttpServer())
+        .get(`/hoc-vien?q=${encodeURIComponent(`${uniqueSuffix()}%_test`)}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(res.body.data).toEqual([]);
     });
   });
 

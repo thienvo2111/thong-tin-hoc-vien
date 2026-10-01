@@ -84,4 +84,56 @@ describe('SelectDiaDanh', () => {
 
     expect(await screen.findByRole('option', { name: xaThu230 })).toBeInTheDocument();
   });
+
+  it('gõ không dấu ("cho moi") vẫn thấy "Xã Chợ Mới" trong dropdown', async () => {
+    server.use(
+      http.get('/danh-muc/dia-danh', () =>
+        HttpResponse.json({
+          data: [
+            { id: 'xa-1', ma: 'XA1', ten: 'Xã Chợ Mới', cap: 'phuong_xa_dac_khu', parent_id: 'tinh-1', trang_thai: 'active' },
+            { id: 'xa-2', ma: 'XA2', ten: 'Xã Long Xuyên', cap: 'phuong_xa_dac_khu', parent_id: 'tinh-1', trang_thai: 'active' },
+          ],
+        }),
+      ),
+    );
+
+    function BaoXa() {
+      const [id, setId] = useState<string | null>(null);
+      return <SelectDiaDanh label="Phường/xã" cap="phuong_xa_dac_khu" parentId="tinh-1" value={id} onChange={setId} />;
+    }
+
+    const user = userEvent.setup();
+    renderTrang(<BaoXa />);
+
+    const oXa = screen.getByLabelText('Phường/xã', { selector: 'input' });
+    await user.click(oXa);
+    await user.type(oXa, 'cho moi');
+
+    expect(await screen.findByRole('option', { name: 'Xã Chợ Mới' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Xã Long Xuyên' })).not.toBeInTheDocument();
+  });
+
+  it('gõ chuỗi NFD của "Chợ" (bộ gõ tiếng Việt) vẫn thấy "Xã Chợ Mới" trong dropdown', async () => {
+    server.use(
+      http.get('/danh-muc/dia-danh', () =>
+        HttpResponse.json({
+          data: [{ id: 'xa-1', ma: 'XA1', ten: 'Xã Chợ Mới', cap: 'phuong_xa_dac_khu', parent_id: 'tinh-1', trang_thai: 'active' }],
+        }),
+      ),
+    );
+
+    function BaoXa() {
+      const [id, setId] = useState<string | null>(null);
+      return <SelectDiaDanh label="Phường/xã" cap="phuong_xa_dac_khu" parentId="tinh-1" value={id} onChange={setId} />;
+    }
+
+    const user = userEvent.setup();
+    renderTrang(<BaoXa />);
+
+    const oXa = screen.getByLabelText('Phường/xã', { selector: 'input' });
+    await user.click(oXa);
+    await user.type(oXa, 'Chợ'.normalize('NFD'));
+
+    expect(await screen.findByRole('option', { name: 'Xã Chợ Mới' })).toBeInTheDocument();
+  });
 });

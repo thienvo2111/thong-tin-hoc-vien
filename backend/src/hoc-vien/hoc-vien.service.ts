@@ -19,6 +19,7 @@ import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
 import { normalizeNfcName } from '../common/utils/normalize-text.util';
+import { dieuKienKhongDau } from '../common/utils/tim-kiem-khong-dau.util';
 import { decryptVleMatKhau } from '../common/utils/vle-crypto.util';
 import {
   layFrontendUrl,
@@ -1172,8 +1173,18 @@ export class HocVienService {
     if (query.cap_giang_day) where.cap_giang_day = query.cap_giang_day;
     if (query.nguon_tao) where.nguon_tao = query.nguon_tao;
     if (query.q) {
+      // ho_ten tìm không phân biệt dấu/hoa-thường (unaccent) — CCCD/mã MOET giữ nguyên khớp chính
+      // xác theo chuỗi con như trước (không áp dụng unaccent cho số/mã định danh).
+      const dk = dieuKienKhongDau(Prisma.sql`ho_ten`, query.q);
+      const idsTheoTen = dk
+        ? (
+            await this.prisma.$queryRaw<{ id: string }[]>(
+              Prisma.sql`SELECT id FROM "hoc_vien" WHERE ${dk}`,
+            )
+          ).map((r) => r.id)
+        : [];
       where.OR = [
-        { ho_ten: { contains: query.q, mode: 'insensitive' } },
+        { id: { in: idsTheoTen } },
         { so_dinh_danh_ca_nhan: { contains: query.q } },
         { ma_dinh_danh_moet: { contains: query.q, mode: 'insensitive' } },
       ];

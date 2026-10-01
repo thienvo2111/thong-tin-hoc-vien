@@ -50,6 +50,7 @@ describe('HocVienService', () => {
     lich_su_thay_doi_ho_so: { createMany: jest.Mock; create: jest.Mock };
     token_xac_thuc: { findFirst: jest.Mock; create: jest.Mock };
     $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
   };
   let scopeService: {
     getAccessibleDonViIds: jest.Mock;
@@ -91,6 +92,7 @@ describe('HocVienService', () => {
         create: jest.fn(),
       },
       $transaction: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     // Mặc định: $transaction chạy callback ngay với chính prisma mock làm tx
     // (đủ cho các test duyet() vốn assert trực tiếp trên prisma.hoc_vien.update).
@@ -531,6 +533,42 @@ describe('HocVienService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('findAll — q tìm không dấu (unaccent) trên ho_ten', () => {
+    const callerAll = {} as AuthenticatedUser;
+
+    beforeEach(() => {
+      scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
+      prisma.hoc_vien.findMany.mockResolvedValue([]);
+      prisma.hoc_vien.count.mockResolvedValue(0);
+    });
+
+    it('q="can dang" (không dấu) -> gọi $queryRaw rồi lọc where.OR gồm id khớp tên + CCCD/MOET nguyên dấu', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'hv-can-dang' }]);
+
+      await service.findAll({ q: 'can dang' } as never, callerAll);
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      const whereArg = prisma.hoc_vien.findMany.mock.calls[0][0].where;
+      expect(whereArg.OR[0]).toEqual({ id: { in: ['hv-can-dang'] } });
+      expect(whereArg.OR[1]).toEqual({
+        so_dinh_danh_ca_nhan: { contains: 'can dang' },
+      });
+    });
+
+    it('q chứa ký tự % hoặc _ -> không làm vỡ truy vấn', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([]);
+
+      await expect(
+        service.findAll({ q: '100%_test' } as never, callerAll),
+      ).resolves.toBeDefined();
+    });
+
+    it('không truyền q -> KHÔNG gọi $queryRaw', async () => {
+      await service.findAll({} as never, callerAll);
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
   });
 

@@ -4,6 +4,8 @@ import { useDebouncedValue } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
 import { layDonViCongTac, layDonViCongTacTheoId } from '@/api/danhMuc';
 import { SelectDiaDanh } from '@/components/SelectDiaDanh';
+import { chuanHoaNfc } from '@/lib/nfc';
+import { locTiengViet } from '@/lib/timKiemTiengViet';
 import type { DonViCongTac } from '@/api/types';
 
 interface Props {
@@ -60,7 +62,7 @@ export function SelectDonVi({ label, nhanBanDau, idBanDau, onChange, error, requ
 
   const { data, isFetching } = useQuery({
     queryKey: ['danh-muc', 'don-vi-cong-tac', debounced, phuongXaId],
-    queryFn: () => layDonViCongTac({ q: debounced.trim(), dia_ban_id: phuongXaId ?? undefined }),
+    queryFn: () => layDonViCongTac({ q: chuanHoaNfc(debounced.trim()), dia_ban_id: phuongXaId ?? undefined }),
     enabled: duDieuKienTimKiem && !disabled,
   });
 
@@ -113,6 +115,7 @@ export function SelectDonVi({ label, nhanBanDau, idBanDau, onChange, error, requ
           onChange(found?.id ?? null, submitted);
         }}
         rightSection={isFetching ? <Loader size="xs" /> : null}
+        filter={locTiengViet}
         error={error}
         required={required}
         disabled={disabled}

@@ -21,6 +21,7 @@ import type { DotXacNhan, LoaiDotXacNhan } from '@/api/dotXacNhan';
 import { useDanhSachKhoa } from '@/api/khoaBoiDuong';
 import { thongDiepLoiChung, loiFieldsThanhMap } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
+import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { AdminPageHeader } from './AdminPageHeader';
 
 const TUY_CHON_LOAI: { value: LoaiDotXacNhan; label: string }[] = [
@@ -187,6 +188,7 @@ export default function AdminDotXacNhan() {
               onChange={(v) => setKhoaLoc(v ?? '')}
               allowDeselect={false}
               searchable
+              filter={locTiengViet}
               w={260}
             />
           </Group>
@@ -286,6 +288,7 @@ export default function AdminDotXacNhan() {
             value={form.khoa_id}
             error={loiField.khoa_id}
             searchable
+            filter={locTiengViet}
             onChange={(v) => setForm((f) => ({ ...f, khoa_id: v ?? '' }))}
           />
           <Group grow>

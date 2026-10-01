@@ -67,7 +67,7 @@ Thao tác Quản trị lên tài khoản **người khác** (khác `/auth/*`, lu
 | POST | `/hoc-vien/toi/kiem-tra-truoc-xac-nhan` | Dry-run validate toàn bộ hồ sơ, trả danh sách lỗi (chặn) + cảnh báo (không chặn) — dùng cho màn `XacNhanThongTin.dc.html` | Học viên |
 | POST | `/hoc-vien/toi/gui-lai-xac-minh-email` | **Thêm 2026-09-30**: gửi lại email xác minh cho `email_lien_he` hiện tại → `{ da_gui: true }`. Chưa có `email_lien_he` → `400 VALIDATION_ERROR`; đã `email_da_xac_minh=true` → `409 CONFLICT`; vừa gửi trong 60 giây gần nhất (chặn spam) → `429 RATE_LIMITED`. Xem mục "Xác minh email liên hệ & quên/đặt lại mật khẩu" bên dưới | Học viên |
 | POST | `/hoc-vien/toi/xac-nhan` | `tu_dang_ky`: chuyển `nhap` → `cho_duyet` (không đổi). `import_moet` **(T14 — thay đổi hành vi, trước đây chỉ resend email)**: bắt buộc có đợt đang mở (không thì `403 DOT_XAC_NHAN_DONG`) và hồ sơ đầy đủ (T9, không thì `400 VALIDATION_ERROR` kèm `fields`=danh sách thiếu) → tạo `xac_nhan_ho_so` (bản chụp hồ sơ). **Side effect** (cả 2 luồng): gọi Dịch vụ Thông báo gửi email bản sao dữ liệu, set `email_ban_sao_da_gui_at` | Học viên |
-| GET | `/hoc-vien` | Danh sách hồ sơ trong phạm vi quyền (query: `trang_thai`, `don_vi_cong_tac_id`, `cap_giang_day`, `nguon_tao`, `q` tìm theo tên/ĐDCN/Mã MOET, `day_du` — T1/T9 2026-09-28, xem mục "Hồ sơ đầy đủ" bên dưới) | Trường, Phòng VHXH, Sở, QuảnTrị |
+| GET | `/hoc-vien` | Danh sách hồ sơ trong phạm vi quyền (query: `trang_thai`, `don_vi_cong_tac_id`, `cap_giang_day`, `nguon_tao`, `q` tìm theo tên/ĐDCN/Mã MOET, `day_du` — T1/T9 2026-09-28, xem mục "Hồ sơ đầy đủ" bên dưới). **Thêm 2026-10-01**: phần `q` khớp theo tên (`ho_ten`) tìm không phân biệt dấu/hoa-thường (unaccent); khớp theo ĐDCN/Mã MOET vẫn là chuỗi con chính xác như trước | Trường, Phòng VHXH, Sở, QuảnTrị |
 | GET | `/hoc-vien/{id}` | Chi tiết 1 hồ sơ (phải trong phạm vi quyền) | Trường, Phòng VHXH, Sở, QuảnTrị |
 | PATCH | `/hoc-vien/{id}` | **Thêm T14 (2026-09-28)**: Quản trị sửa hồ sơ `import_moet` NGOÀI thời gian đợt (học viên lúc đó chỉ xem) — cùng field/hành vi ghi lịch sử như `PATCH /hoc-vien/toi` (`vai_tro_nguoi_sua='quan_tri'`), nhưng **không** bị chặn bởi đợt đang mở | QuảnTrị |
 | POST | `/hoc-vien/{id}/duyet` | `{ ket_qua: "da_duyet" \| "tu_choi", ly_do? }`. Đơn vị duyệt xác định theo `cap_giang_day` của hồ sơ (xem bảng routing dưới). Chỉ áp dụng hồ sơ `nguon_tao='tu_dang_ky'` — hồ sơ `import_moet` bỏ qua bước này | Trường (nếu được phân công xác minh nội bộ), Phòng VHXH, Sở |
@@ -218,9 +218,9 @@ Với mỗi dòng hợp lệ (cùng thứ tự tạo bảng đã sửa như "Lu�
 
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
-| GET | `/danh-muc/dia-danh` | `?cap=&parent_id=&q=&trang_thai=&phien_ban=` | Mọi vai trò đã đăng nhập |
+| GET | `/danh-muc/dia-danh` | `?cap=&parent_id=&q=&trang_thai=&phien_ban=`. **Thêm 2026-10-01**: `q` tìm không phân biệt dấu/hoa-thường (unaccent) | Mọi vai trò đã đăng nhập |
 | POST / PATCH | `/danh-muc/dia-danh(/{id})` | Sửa/thêm thủ công (ngoài import) | QuảnTrị |
-| GET | `/danh-muc/don-vi-cong-tac` | `?loai_don_vi=&dia_ban_id=&q=` (autocomplete dùng `q`). **Thêm 2026-10-01**: query `tinh_id` (lọc theo tỉnh — join qua `dia_ban.parent_id`, AND với `dia_ban_id` nếu truyền cả hai); mỗi item trả về kèm 3 field mới `dia_ban_ten`, `tinh_id`, `tinh_ten` (null nếu phường/xã không có parent) bên cạnh các field gốc | Mọi vai trò đã đăng nhập |
+| GET | `/danh-muc/don-vi-cong-tac` | `?loai_don_vi=&dia_ban_id=&q=` (autocomplete dùng `q`). **Thêm 2026-10-01**: query `tinh_id` (lọc theo tỉnh — join qua `dia_ban.parent_id`, AND với `dia_ban_id` nếu truyền cả hai); mỗi item trả về kèm 3 field mới `dia_ban_ten`, `tinh_id`, `tinh_ten` (null nếu phường/xã không có parent) bên cạnh các field gốc. `q` tìm không phân biệt dấu/hoa-thường (unaccent) | Mọi vai trò đã đăng nhập |
 | POST / PATCH | `/danh-muc/don-vi-cong-tac(/{id})` | Sửa/thêm thủ công | QuảnTrị |
 | GET | `/danh-muc/mon-hoc?cap_hoc=` | Lọc theo cấp học — dùng cho dropdown phụ thuộc "Môn giảng dạy" | Mọi vai trò đã đăng nhập |
 | POST / PATCH | `/danh-muc/mon-hoc(/{id})` | Sửa/thêm thủ công | QuảnTrị |

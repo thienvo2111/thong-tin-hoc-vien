@@ -21,6 +21,8 @@ import { useDanhSachKhoa, useDonViChoKhoa, useTaoKhoa } from '@/api/khoaBoiDuong
 import { useToi } from '@/auth/AuthContext';
 import { thongDiepLoiChung, loiFieldsThanhMap } from '@/lib/loiApi';
 import { dinhDangNgay } from '@/lib/ngay';
+import { chuanHoaNfc } from '@/lib/nfc';
+import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { KhoaTrangThaiBadge } from '@/components/KhoaTrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
 
@@ -72,7 +74,7 @@ export default function AdminKhoaBoiDuong() {
 
   const params = useMemo(
     () => ({
-      q: qDebounced.trim() || undefined,
+      q: qDebounced.trim() ? chuanHoaNfc(qDebounced.trim()) : undefined,
       trang_thai: (trangThai || undefined) as never,
       don_vi_to_chuc_id: donViId || undefined,
       page,
@@ -177,6 +179,7 @@ export default function AdminKhoaBoiDuong() {
               onChange={(v) => datBoLoc(setDonViId)(v ?? '')}
               allowDeselect={false}
               searchable
+              filter={locTiengViet}
               w={220}
             />
             <Text fz={12.5} c="dimmed" ml="auto">
@@ -308,6 +311,7 @@ export default function AdminKhoaBoiDuong() {
                 description="Bắt buộc khi tạo khóa với tài khoản Quản trị hệ thống"
                 required
                 searchable
+                filter={locTiengViet}
                 data={(donVi.data ?? []).map((d) => ({ value: d.id, label: d.ten_don_vi }))}
                 value={form.don_vi_to_chuc_id || null}
                 error={loiField.don_vi_to_chuc_id}

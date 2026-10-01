@@ -15,6 +15,7 @@ describe('DiaDanhService', () => {
       findMany: jest.Mock;
       count: jest.Mock;
     };
+    $queryRaw: jest.Mock;
   };
 
   beforeEach(() => {
@@ -26,6 +27,7 @@ describe('DiaDanhService', () => {
         findMany: jest.fn(),
         count: jest.fn(),
       },
+      $queryRaw: jest.fn(),
     };
     service = new DiaDanhService(prisma as unknown as PrismaService);
   });
@@ -126,6 +128,42 @@ describe('DiaDanhService', () => {
 
       const whereArg = prisma.dia_danh.findMany.mock.calls[0][0].where;
       expect(whereArg.phien_ban).toBe('hien_tai');
+    });
+  });
+
+  describe('findAll — q tìm không dấu (unaccent)', () => {
+    it('q="can dang" (không dấu) -> lọc where.id theo kết quả $queryRaw unaccent', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'xa-can-dang' }]);
+      prisma.dia_danh.findMany.mockResolvedValueOnce([]);
+      prisma.dia_danh.count.mockResolvedValueOnce(0);
+
+      await service.findAll({ q: 'can dang' } as never);
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      const whereArg = prisma.dia_danh.findMany.mock.calls[0][0].where;
+      expect(whereArg.id).toEqual({ in: ['xa-can-dang'] });
+    });
+
+    it('q chứa ký tự % hoặc _ -> không làm vỡ truy vấn (được escape trước khi LIKE)', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([]);
+      prisma.dia_danh.findMany.mockResolvedValueOnce([]);
+      prisma.dia_danh.count.mockResolvedValueOnce(0);
+
+      await expect(
+        service.findAll({ q: '100%_test' } as never),
+      ).resolves.toBeDefined();
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it('không truyền q -> KHÔNG gọi $queryRaw, không lọc theo id', async () => {
+      prisma.dia_danh.findMany.mockResolvedValueOnce([]);
+      prisma.dia_danh.count.mockResolvedValueOnce(0);
+
+      await service.findAll({});
+
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+      const whereArg = prisma.dia_danh.findMany.mock.calls[0][0].where;
+      expect(whereArg.id).toBeUndefined();
     });
   });
 

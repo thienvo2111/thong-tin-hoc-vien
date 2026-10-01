@@ -105,6 +105,32 @@ describe('Danh mục (e2e)', () => {
       expect(res.body).toHaveProperty('data');
       expect(res.body).toHaveProperty('total');
     });
+
+    it('q không dấu ("can dang") tìm được "Xã Cần Đăng ..." (unaccent, 2026-10-01)', async () => {
+      const suf = uniqueSuffix();
+      const created = await request(app.getHttpServer())
+        .post('/danh-muc/dia-danh')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ ma: `xcd-${suf}`, ten: `Xã Cần Đăng ${suf}`, cap: 'tinh_thanh' })
+        .expect(201);
+      createdDiaDanhIds.push(created.body.id);
+
+      const res = await request(app.getHttpServer())
+        .get(`/danh-muc/dia-danh?q=${encodeURIComponent(`can dang ${suf}`)}`)
+        .set('Authorization', `Bearer ${tokenTruong}`)
+        .expect(200);
+      expect(res.body.data.map((d: { id: string }) => d.id)).toContain(
+        created.body.id,
+      );
+    });
+
+    it('q chứa ký tự % hoặc _ -> không làm vỡ truy vấn (200, không khớp gì)', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/danh-muc/dia-danh?q=${encodeURIComponent(`${uniqueSuffix()}%_test`)}`)
+        .set('Authorization', `Bearer ${tokenTruong}`)
+        .expect(200);
+      expect(res.body.data).toEqual([]);
+    });
   });
 
   describe('POST /danh-muc/dia-danh', () => {
@@ -195,6 +221,43 @@ describe('Danh mục (e2e)', () => {
         .send({ don_vi_cha_id: created.body.id })
         .expect(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('GET /danh-muc/don-vi-cong-tac', () => {
+    it('q không dấu ("can dang") tìm được "Trường THPT Cần Đăng ..." (unaccent, 2026-10-01)', async () => {
+      const suf = uniqueSuffix();
+      const created = await request(app.getHttpServer())
+        .post('/danh-muc/don-vi-cong-tac')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({
+          ma_don_vi: `dvcd-${suf}`,
+          ten_don_vi: `Trường THPT Cần Đăng ${suf}`,
+          loai_don_vi: 'truong',
+          dia_ban_id: donViFixture.diaDanhXa.id,
+        })
+        .expect(201);
+      createdDonViIds.push(created.body.id);
+
+      const res = await request(app.getHttpServer())
+        .get(
+          `/danh-muc/don-vi-cong-tac?q=${encodeURIComponent(`can dang ${suf}`)}`,
+        )
+        .set('Authorization', `Bearer ${tokenTruong}`)
+        .expect(200);
+      expect(res.body.data.map((d: { id: string }) => d.id)).toContain(
+        created.body.id,
+      );
+    });
+
+    it('q chứa ký tự % hoặc _ -> không làm vỡ truy vấn (200, không khớp gì)', async () => {
+      const res = await request(app.getHttpServer())
+        .get(
+          `/danh-muc/don-vi-cong-tac?q=${encodeURIComponent(`${uniqueSuffix()}%_test`)}`,
+        )
+        .set('Authorization', `Bearer ${tokenTruong}`)
+        .expect(200);
+      expect(res.body.data).toEqual([]);
     });
   });
 

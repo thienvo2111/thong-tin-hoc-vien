@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Select } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
 import { layDiaDanh } from '@/api/danhMuc';
+import { locTiengViet } from '@/lib/timKiemTiengViet';
 
 interface Props {
   label: string;
@@ -46,6 +47,7 @@ export function SelectDiaDanh({ label, placeholder, cap, parentId, value, onChan
       value={value}
       onChange={onChange}
       searchable
+      filter={locTiengViet}
       nothingFoundMessage={isLoading ? 'Đang tải…' : 'Không tìm thấy'}
       error={error}
       required={required}

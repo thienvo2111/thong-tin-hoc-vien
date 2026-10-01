@@ -13,7 +13,10 @@ describe('DonViCongTacService', () => {
       findUnique: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
     };
+    $queryRaw: jest.Mock;
   };
 
   beforeEach(() => {
@@ -23,7 +26,10 @@ describe('DonViCongTacService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        findMany: jest.fn(),
+        count: jest.fn(),
       },
+      $queryRaw: jest.fn(),
     };
     service = new DonViCongTacService(prisma as unknown as PrismaService);
   });
@@ -106,5 +112,40 @@ describe('DonViCongTacService', () => {
         data: expect.objectContaining({ ten_don_vi: 'Trường Test' }),
       }),
     );
+  });
+
+  describe('findAll — q tìm không dấu (unaccent)', () => {
+    it('q="can dang" (không dấu) -> tìm được "Trường THPT Cần Đăng" qua $queryRaw', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'truong-can-dang' }]);
+      prisma.don_vi_cong_tac.findMany.mockResolvedValueOnce([]);
+      prisma.don_vi_cong_tac.count.mockResolvedValueOnce(0);
+
+      await service.findAll({ q: 'can dang' } as never);
+
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      const whereArg = prisma.don_vi_cong_tac.findMany.mock.calls[0][0].where;
+      expect(whereArg.id).toEqual({ in: ['truong-can-dang'] });
+    });
+
+    it('q chứa ký tự % hoặc _ -> không làm vỡ truy vấn', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([]);
+      prisma.don_vi_cong_tac.findMany.mockResolvedValueOnce([]);
+      prisma.don_vi_cong_tac.count.mockResolvedValueOnce(0);
+
+      await expect(
+        service.findAll({ q: '100%_test' } as never),
+      ).resolves.toBeDefined();
+    });
+
+    it('truyền cả id và q -> where.id gộp cả equals (id) lẫn in (kết quả q)', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([{ id: 'dv-1' }]);
+      prisma.don_vi_cong_tac.findMany.mockResolvedValueOnce([]);
+      prisma.don_vi_cong_tac.count.mockResolvedValueOnce(0);
+
+      await service.findAll({ id: 'dv-1', q: 'test' } as never);
+
+      const whereArg = prisma.don_vi_cong_tac.findMany.mock.calls[0][0].where;
+      expect(whereArg.id).toEqual({ equals: 'dv-1', in: ['dv-1'] });
+    });
   });
 });

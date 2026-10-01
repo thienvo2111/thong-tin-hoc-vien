@@ -35,6 +35,7 @@ import { useDanhSachKhoa } from '@/api/khoaBoiDuong';
 import type { BaoCaoRow, BaoCaoTheo } from '@/api/types';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { taiFileTuBlob } from '@/lib/taiFile';
+import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { AdminPageHeader } from './AdminPageHeader';
 
 const TUY_CHON_THEO: { value: BaoCaoTheo; label: string }[] = [
@@ -282,6 +283,7 @@ function TheBaoCaoSuaTruongMoet() {
         required
         size="xs"
         searchable
+        filter={locTiengViet}
         data={tuyChon}
         value={khoaId || null}
         onChange={(v) => setKhoaId(v ?? '')}
@@ -331,6 +333,7 @@ function TheBaoCaoXuatChoVle() {
         required
         size="xs"
         searchable
+        filter={locTiengViet}
         data={tuyChon}
         value={khoaId || null}
         onChange={(v) => setKhoaId(v ?? '')}
@@ -373,6 +376,7 @@ function TheBaoCaoDieuKienDanhGia() {
         required
         size="xs"
         searchable
+        filter={locTiengViet}
         data={tuyChon}
         value={khoaId || null}
         onChange={(v) => setKhoaId(v ?? '')}
@@ -425,6 +429,7 @@ function TheBaoCaoVanHanh() {
         placeholder="Tất cả khóa"
         size="xs"
         searchable
+        filter={locTiengViet}
         clearable
         data={tuyChon}
         value={khoaId || null}

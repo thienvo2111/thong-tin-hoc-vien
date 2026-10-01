@@ -26,6 +26,7 @@ import type { KhaoSatMucRow, KetQuaTheoHinhThucRow, LoaiLop } from '@/api/types'
 import { SelectDonVi } from '@/components/SelectDonVi';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { taiFileTuBlob } from '@/lib/taiFile';
+import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { TrangThaiBadge } from '@/components/TrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
 
@@ -209,6 +210,7 @@ function KhoiTongQuanMoRong() {
               placeholder="Tất cả khóa"
               size="xs"
               searchable
+              filter={locTiengViet}
               clearable
               w={240}
               data={tuyChonKhoa}

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, don_vi_cong_tac } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeNfcName } from '../../common/utils/normalize-text.util';
+import { dieuKienKhongDau } from '../../common/utils/tim-kiem-khong-dau.util';
 import {
   ConflictAppException,
   ValidationException,
@@ -23,14 +24,25 @@ export class DonViCongTacService {
     const page = query.page ?? 1;
     const pageSize = query.page_size ?? 20;
     const where: Prisma.don_vi_cong_tacWhereInput = {};
-    if (query.id) where.id = query.id;
     if (query.loai_don_vi) where.loai_don_vi = query.loai_don_vi;
     if (query.dia_ban_id) where.dia_ban_id = query.dia_ban_id;
     if (query.tinh_id) where.dia_ban = { parent_id: query.tinh_id };
     if (query.trang_thai) where.trang_thai = query.trang_thai;
+
+    // id và q cùng lọc trên cột id (q tìm không dấu -> id khớp) nên gộp vào 1 StringFilter thay vì
+    // 2 lần gán đè nhau.
+    const idFilter: Prisma.StringFilter<'don_vi_cong_tac'> = {};
+    if (query.id) idFilter.equals = query.id;
     if (query.q) {
-      where.ten_don_vi = { contains: query.q, mode: 'insensitive' };
+      const dk = dieuKienKhongDau(Prisma.sql`ten_don_vi`, query.q);
+      const rows = dk
+        ? await this.prisma.$queryRaw<
+            { id: string }[]
+          >(Prisma.sql`SELECT id FROM "don_vi_cong_tac" WHERE ${dk}`)
+        : [];
+      idFilter.in = rows.map((r) => r.id);
     }
+    if (Object.keys(idFilter).length > 0) where.id = idFilter;
 
     const [data, total] = await Promise.all([
       this.prisma.don_vi_cong_tac.findMany({

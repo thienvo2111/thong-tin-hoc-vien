@@ -6,6 +6,8 @@ import { useDebouncedValue } from '@mantine/hooks';
 import { useDanhSachHocVien } from '@/api/admin';
 import { layDonViCongTac } from '@/api/danhMuc';
 import { thongDiepLoiChung } from '@/lib/loiApi';
+import { chuanHoaNfc } from '@/lib/nfc';
+import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { TrangThaiBadge } from '@/components/TrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
 
@@ -44,7 +46,7 @@ export default function AdminDanhSach() {
 
   const params = useMemo(
     () => ({
-      q: qDebounced.trim() || undefined,
+      q: qDebounced.trim() ? chuanHoaNfc(qDebounced.trim()) : undefined,
       trang_thai: trangThai || undefined,
       don_vi_cong_tac_id: donViId || undefined,
       cap_giang_day: capGiangDay || undefined,
@@ -99,6 +101,7 @@ export default function AdminDanhSach() {
               onChange={(v) => datBoLoc(setDonViId)(v ?? '')}
               allowDeselect={false}
               searchable
+              filter={locTiengViet}
               w={220}
             />
             <Select

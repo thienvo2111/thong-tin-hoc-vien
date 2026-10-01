@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, dia_danh } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeNfcName } from '../../common/utils/normalize-text.util';
+import { dieuKienKhongDau } from '../../common/utils/tim-kiem-khong-dau.util';
 import {
   ConflictAppException,
   ValidationException,
@@ -30,7 +31,14 @@ export class DiaDanhService {
     if (query.trang_thai) where.trang_thai = query.trang_thai;
     if (query.phien_ban) where.phien_ban = query.phien_ban;
     if (query.q) {
-      where.ten = { contains: query.q, mode: 'insensitive' };
+      // Tìm không phân biệt dấu/hoa-thường (unaccent) — xem tim-kiem-khong-dau.util.ts.
+      const dk = dieuKienKhongDau(Prisma.sql`ten`, query.q);
+      const rows = dk
+        ? await this.prisma.$queryRaw<
+            { id: string }[]
+          >(Prisma.sql`SELECT id FROM "dia_danh" WHERE ${dk}`)
+        : [];
+      where.id = { in: rows.map((r) => r.id) };
     }
 
     const [data, total] = await Promise.all([
