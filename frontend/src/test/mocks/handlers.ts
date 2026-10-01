@@ -214,6 +214,7 @@ export const handlers = [
 
   http.get('/danh-muc/don-vi-cong-tac', ({ request }) => {
     const url = new URL(request.url);
+    const id = url.searchParams.get('id');
     const q = url.searchParams.get('q')?.toLowerCase();
     const loaiDonVi = url.searchParams.get('loai_don_vi');
     const diaBanId = url.searchParams.get('dia_ban_id');
@@ -223,6 +224,7 @@ export const handlers = [
 
     const items = DON_VI.filter(
       (d) =>
+        (!id || d.id === id) &&
         (!q || d.ten_don_vi.toLowerCase().includes(q)) &&
         (!loaiDonVi || d.loai_don_vi === loaiDonVi) &&
         (!diaBanId || d.dia_ban_id === diaBanId) &&
