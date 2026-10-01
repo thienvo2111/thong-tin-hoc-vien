@@ -7,6 +7,8 @@ import { MonHocController } from './mon-hoc/mon-hoc.controller';
 import { MonHocService } from './mon-hoc/mon-hoc.service';
 import { ChuyenMonDaoTaoController } from './chuyen-mon-dao-tao/chuyen-mon-dao-tao.controller';
 import { ChuyenMonDaoTaoService } from './chuyen-mon-dao-tao/chuyen-mon-dao-tao.service';
+import { LoaiVanDeHoTroController } from './loai-van-de-ho-tro/loai-van-de-ho-tro.controller';
+import { LoaiVanDeHoTroService } from './loai-van-de-ho-tro/loai-van-de-ho-tro.service';
 
 // Dịch vụ Danh mục dùng chung — docs/api-contract.md mục 4.
 // Services export ra để ImportModule tái dùng đúng 1 bộ quy tắc validate
@@ -17,13 +19,20 @@ import { ChuyenMonDaoTaoService } from './chuyen-mon-dao-tao/chuyen-mon-dao-tao.
     DonViCongTacController,
     MonHocController,
     ChuyenMonDaoTaoController,
+    LoaiVanDeHoTroController,
   ],
   providers: [
     DiaDanhService,
     DonViCongTacService,
     MonHocService,
     ChuyenMonDaoTaoService,
+    LoaiVanDeHoTroService,
   ],
-  exports: [DiaDanhService, DonViCongTacService, MonHocService],
+  exports: [
+    DiaDanhService,
+    DonViCongTacService,
+    MonHocService,
+    LoaiVanDeHoTroService,
+  ],
 })
 export class DanhMucModule {}
