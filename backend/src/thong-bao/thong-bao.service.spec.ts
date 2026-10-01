@@ -1,4 +1,5 @@
 import { ThongBaoService } from './thong-bao.service';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import * as mailerUtil from './util/mailer.util';
 
@@ -126,9 +127,9 @@ describe('ThongBaoService', () => {
     it('tu_choi kèm ly_do -> nội dung HTML enqueue chứa lý do', async () => {
       prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDu);
       await service.guiHocVienDuyet('hv-1', 'tu_choi', 'Thiếu giấy tờ');
-      expect(prisma.hang_doi_email.create.mock.calls[0][0].data.noi_dung_html).toContain(
-        'Thiếu giấy tờ',
-      );
+      expect(
+        prisma.hang_doi_email.create.mock.calls[0][0].data.noi_dung_html,
+      ).toContain('Thiếu giấy tờ');
       expect(prisma.hang_doi_email.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ loai_su_kien: 'hoc_vien_duyet' }),
       });
@@ -234,37 +235,91 @@ describe('ThongBaoService', () => {
       expect(res).toEqual({ chuaCoEmail: false });
     });
 
-    it('có lớp trực tiếp -> enqueue với nội dung nhân sự/lịch học', async () => {
+    const giaiDoanKhoa = [
+      {
+        id: 'gd-1',
+        thu_tu: 1,
+        ten_giai_doan: 'GĐ 1',
+        hinh_thuc: 'truc_tiep',
+        thoi_gian_bat_dau: new Date('2026-01-02T00:00:00Z'),
+        thoi_gian_ket_thuc: new Date('2026-01-03T00:00:00Z'),
+      },
+      {
+        id: 'gd-2',
+        thu_tu: 2,
+        ten_giai_doan: 'GĐ 2 chưa có lịch',
+        hinh_thuc: 'truc_tuyen',
+        thoi_gian_bat_dau: new Date('2026-02-01T00:00:00Z'),
+        thoi_gian_ket_thuc: new Date('2026-02-28T00:00:00Z'),
+      },
+    ];
+    const lopTrucTiep = {
+      loai_lop: 'truc_tiep',
+      lop: {
+        ten_lop: 'Lớp 1',
+        nhan_su: [
+          { ho_ten: 'GV B', vai_tro: 'giang_vien', so_dien_thoai: null },
+        ],
+        lich_hoc: [
+          {
+            giai_doan_id: 'gd-1',
+            buoi_so: 1,
+            thoi_gian_bat_dau: new Date('2026-01-02T00:30:00Z'),
+            thoi_gian_ket_thuc: new Date('2026-01-02T04:00:00Z'),
+            dia_diem_hoac_link: 'Hội trường',
+          },
+        ],
+      },
+    };
+    const lopZoom = {
+      loai_lop: 'zoom',
+      lop: {
+        ten_lop: 'Zoom 3',
+        nhan_su: [],
+        lich_hoc: [
+          {
+            giai_doan_id: 'gd-1',
+            buoi_so: 2,
+            thoi_gian_bat_dau: new Date('2026-01-02T12:00:00Z'),
+            thoi_gian_ket_thuc: new Date('2026-01-02T14:00:00Z'),
+            dia_diem_hoac_link: 'https://zoom.us/j/123',
+          },
+        ],
+      },
+    };
+
+    it('có lớp trực tiếp -> enqueue lịch học MỌI lớp, gom theo giai đoạn', async () => {
       prisma.dang_ky_hoc.findUnique.mockResolvedValue({
         id: 'dk-1',
         hoc_vien_id: 'hv-1',
         hoc_vien: hocVienDayDu,
-        khoa: { ten_khoa: 'Khóa A' },
-        dang_ky_hoc_lop: [
-          {
-            loai_lop: 'truc_tiep',
-            lop: {
-              ten_lop: 'Lớp 1',
-              nhan_su: [{ ho_ten: 'GV B', vai_tro: 'giang_vien' }],
-              lich_hoc: [
-                {
-                  thoi_gian_bat_dau: new Date('2026-01-02T00:00:00Z'),
-                  thoi_gian_ket_thuc: new Date('2026-01-03T00:00:00Z'),
-                  dia_diem_hoac_link: 'Hội trường',
-                  giai_doan: { ten_giai_doan: 'GĐ 1' },
-                },
-              ],
-            },
-          },
-        ],
+        khoa: { ten_khoa: 'Khóa A', ma_khoa: 'KA', giai_doan: giaiDoanKhoa },
+        dang_ky_hoc_lop: [lopZoom, lopTrucTiep],
       });
       const res = await service.guiDangKyHocPhanLop('dk-1');
-      expect(prisma.hang_doi_email.create.mock.calls[0][0].data.noi_dung_html).toContain(
-        'GV B',
-      );
-      expect(prisma.hang_doi_email.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ loai_su_kien: 'dang_ky_hoc_phan_lop' }),
+      const data = prisma.hang_doi_email.create.mock.calls[0][0].data;
+      expect(data.loai_su_kien).toBe('dang_ky_hoc_phan_lop');
+      expect(data.tieu_de).toBe('[BDNLS] Lịch học khóa Khóa A');
+      expect(data.noi_dung_html).toContain('GV B');
+      expect(data.noi_dung_html).toContain('Lớp 1');
+      expect(data.noi_dung_html).toContain('Zoom 3');
+      expect(data.noi_dung_html).toContain('https://zoom.us/j/123');
+      // 00:30Z = 07:30 giờ Việt Nam
+      expect(data.noi_dung_html).toContain('07:30 – 11:00');
+      expect(data.noi_dung_html).toContain('GĐ 2 chưa có lịch');
+      expect(res).toEqual({ chuaCoEmail: false });
+    });
+
+    it('chỉ có lớp Zoom, không có lớp trực tiếp -> KHÔNG gửi (giữ điều kiện cũ)', async () => {
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        id: 'dk-1',
+        hoc_vien_id: 'hv-1',
+        hoc_vien: hocVienDayDu,
+        khoa: { ten_khoa: 'Khóa A', ma_khoa: 'KA', giai_doan: giaiDoanKhoa },
+        dang_ky_hoc_lop: [lopZoom],
       });
+      const res = await service.guiDangKyHocPhanLop('dk-1');
+      expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
       expect(res).toEqual({ chuaCoEmail: false });
     });
 
@@ -297,14 +352,26 @@ describe('ThongBaoService', () => {
         id: 'dk-1',
         hoc_vien_id: 'hv-1',
         hoc_vien: hocVienDayDu,
-        khoa: { ten_khoa: 'Khóa A' },
+        khoa: { ten_khoa: 'Khóa A', ma_khoa: 'KA' },
         ket_qua: 'dat',
         ngay_hoan_thanh: new Date('2026-01-31T00:00:00Z'),
+        muc_dau_vao: 'co_ban',
+        muc_dau_ra: 'thanh_thao',
+        ket_qua_giai_doan: [
+          {
+            ty_le_hoan_thanh: new Prisma.Decimal('87.5'),
+            diem: null,
+            giai_doan: { thu_tu: 1, ten_giai_doan: 'GĐ 1' },
+          },
+        ],
       });
       await service.guiDangKyHocKetQua('dk-1');
-      expect(prisma.hang_doi_email.create.mock.calls[0][0].data.noi_dung_html).toContain(
-        'Đạt',
-      );
+      const html =
+        prisma.hang_doi_email.create.mock.calls[0][0].data.noi_dung_html;
+      expect(html).toContain('Đạt');
+      expect(html).toContain('31/01/2026');
+      expect(html).toContain('Thành thạo');
+      expect(html).toContain('Hoàn thành 87,5%');
       expect(prisma.hang_doi_email.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ loai_su_kien: 'dang_ky_hoc_ket_qua' }),
       });

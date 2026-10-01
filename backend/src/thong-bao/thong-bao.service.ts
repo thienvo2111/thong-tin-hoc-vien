@@ -1,23 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import {
   Prisma,
-  ket_qua_hoc,
   loai_su_kien_thong_bao,
   trang_thai_gui_thong_bao,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate } from '../common/dto/pagination-query.dto';
 import { getMailTransporter, getTestMessageUrl } from './util/mailer.util';
-import { formatDateVi } from './util/format-date-vi.util';
+import { layFrontendUrl } from '../common/utils/token-xac-thuc.util';
 import { bienNgayVietNam } from './util/gio-viet-nam.util';
 import { LichSuThongBaoQueryDto } from './dto/lich-su-thong-bao-query.dto';
-
-const KET_QUA_HOC_LABEL: Record<ket_qua_hoc, string> = {
-  dang_hoc: 'Đang học',
-  dat: 'Đạt',
-  khong_dat: 'Không đạt',
-  vang: 'Vắng',
-};
+import {
+  bangThongTin,
+  boCucEmail,
+  doanVan,
+  e,
+  khoiNoiBat,
+  nutBam,
+} from './mau-email/bo-cuc';
+import {
+  mauDatLaiMatKhau,
+  mauKetQuaHocTap,
+  mauLichHoc,
+} from './mau-email/mau-email';
 
 const EMAIL_DAILY_LIMIT_MAC_DINH = 2000;
 
@@ -58,6 +63,11 @@ function layGioiHanHangNgay(): number {
 // thong_bao thất bại) đều bị nuốt và log ra console, để nghiệp vụ gọi vào
 // (vd. hồ sơ duyệt) không bao giờ bị rollback chỉ vì email lỗi.
 //
+// 2026-10-01: mọi email bọc trong khung HTML chung mau-email/bo-cuc.ts (nhận
+// diện HCMUE, chân trang liên hệ boiduongnls@hcmue.edu.vn), dữ liệu động luôn
+// qua e() để escape. 3 mẫu chính (đặt lại mật khẩu/lịch học/kết quả) nằm ở
+// mau-email/mau-email.ts.
+//
 // PROVISIONAL: nội dung/tiêu đề email dưới đây do tự soạn — api-contract.md
 // không định nghĩa nguyên văn nội dung từng loại thông báo, chỉ định nghĩa
 // người nhận + ý nghĩa chung (cột "Nội dung" ở mục 8). Flagged trong
@@ -81,17 +91,31 @@ export class ThongBaoService {
     const chuyenMonText =
       hocVien.chuyen_mon.map((c) => c.chuyen_mon).join(', ') ||
       '(chưa khai báo)';
-    const html = `
-      <p>Xin chào ${hocVien.ho_ten},</p>
-      <p>Đây là bản sao dữ liệu bạn vừa khai báo/xác nhận trên hệ thống Thu thập thông tin học viên:</p>
-      <ul>
-        <li>Họ và tên: ${hocVien.ho_ten}</li>
-        <li>Ngày sinh: ${hocVien.ngay_sinh}/${hocVien.thang_sinh}/${hocVien.nam_sinh}</li>
-        <li>Số điện thoại liên hệ: ${hocVien.so_dien_thoai_lien_he}</li>
-        <li>Chuyên môn: ${chuyenMonText}</li>
-      </ul>
-      <p>Nếu có sai sót, vui lòng đăng nhập lại hệ thống để sửa trước khi hồ sơ được duyệt.</p>
-    `;
+    const html = boCucEmail({
+      xemTruoc: 'Bản sao thông tin Thầy/Cô vừa khai báo/xác nhận.',
+      nhan: 'HỒ SƠ HỌC VIÊN',
+      tieuDe: 'Xác nhận thông tin đã khai báo',
+      noiDung: [
+        doanVan(`Kính gửi Thầy/Cô <b>${e(hocVien.ho_ten)}</b>,`),
+        doanVan(
+          'Hệ thống đã ghi nhận thông tin Thầy/Cô vừa khai báo/xác nhận như sau:',
+        ),
+        bangThongTin([
+          ['Họ và tên', e(hocVien.ho_ten)],
+          [
+            'Ngày sinh',
+            e(`${hocVien.ngay_sinh}/${hocVien.thang_sinh}/${hocVien.nam_sinh}`),
+          ],
+          ['Số điện thoại liên hệ', e(hocVien.so_dien_thoai_lien_he)],
+          ['Chuyên môn', e(chuyenMonText)],
+        ]),
+        khoiNoiBat(
+          'canh_bao',
+          'Nếu có sai sót, vui lòng đăng nhập Cổng thông tin để sửa trước khi hồ sơ được duyệt.',
+        ),
+        nutBam('Xem hồ sơ của tôi', `${layFrontendUrl()}/toi/ho-so`),
+      ].join(''),
+    });
 
     await this.themVaoHangDoiEmail({
       loaiSuKien: 'hoc_vien_xac_nhan',
@@ -116,13 +140,29 @@ export class ThongBaoService {
       return;
     }
 
-    const ketQuaText =
-      ketQua === 'da_duyet' ? 'đã được <b>DUYỆT</b>' : 'đã bị <b>TỪ CHỐI</b>';
-    const html = `
-      <p>Xin chào ${hocVien.ho_ten},</p>
-      <p>Hồ sơ của bạn ${ketQuaText}.</p>
-      ${ketQua === 'tu_choi' && lyDo ? `<p>Lý do: ${lyDo}</p>` : ''}
-    `;
+    const daDuyet = ketQua === 'da_duyet';
+    const html = boCucEmail({
+      xemTruoc: daDuyet
+        ? 'Hồ sơ của Thầy/Cô đã được duyệt.'
+        : 'Hồ sơ của Thầy/Cô chưa được duyệt.',
+      nhan: 'HỒ SƠ HỌC VIÊN',
+      tieuDe: 'Kết quả duyệt hồ sơ',
+      noiDung: [
+        doanVan(`Kính gửi Thầy/Cô <b>${e(hocVien.ho_ten)}</b>,`),
+        daDuyet
+          ? khoiNoiBat('thanh_cong', 'Hồ sơ của Thầy/Cô đã được <b>DUYỆT</b>.')
+          : khoiNoiBat(
+              'loi',
+              `Hồ sơ của Thầy/Cô đã bị <b>TỪ CHỐI</b>.${lyDo ? `<br>Lý do: ${e(lyDo)}` : ''}`,
+            ),
+        daDuyet
+          ? ''
+          : doanVan(
+              'Vui lòng đăng nhập Cổng thông tin để cập nhật lại hồ sơ theo góp ý.',
+            ),
+        nutBam('Xem hồ sơ của tôi', `${layFrontendUrl()}/toi/ho-so`),
+      ].join(''),
+    });
 
     await this.themVaoHangDoiEmail({
       loaiSuKien: 'hoc_vien_duyet',
@@ -163,11 +203,23 @@ export class ThongBaoService {
       return;
     }
 
-    const ketQuaText =
-      ketQua === 'da_duyet' ? 'đã được <b>DUYỆT</b>' : 'đã bị <b>TỪ CHỐI</b>';
-    const html = `
-      <p>Khóa bồi dưỡng "<b>${khoa.ten_khoa}</b>" (mã ${khoa.ma_khoa}) ${ketQuaText}.</p>
-    `;
+    const daDuyet = ketQua === 'da_duyet';
+    const html = boCucEmail({
+      xemTruoc: `Khóa ${khoa.ten_khoa} ${daDuyet ? 'đã được duyệt' : 'bị từ chối'}.`,
+      nhan: 'KHÓA BỒI DƯỠNG',
+      tieuDe: 'Kết quả duyệt khóa bồi dưỡng',
+      noiDung: [
+        doanVan('Kính gửi Quý Đơn vị,'),
+        khoiNoiBat(
+          daDuyet ? 'thanh_cong' : 'loi',
+          `Khóa bồi dưỡng <b>${e(khoa.ten_khoa)}</b> (mã ${e(khoa.ma_khoa)}) ${daDuyet ? 'đã được <b>DUYỆT</b>' : 'đã bị <b>TỪ CHỐI</b>'}.`,
+        ),
+        nutBam(
+          'Xem khóa bồi dưỡng',
+          `${layFrontendUrl()}/admin/khoa-boi-duong/${khoa.id}`,
+        ),
+      ].join(''),
+    });
 
     await this.themVaoHangDoiEmail({
       loaiSuKien: 'khoa_boi_duong_duyet',
@@ -183,13 +235,11 @@ export class ThongBaoService {
   //
   // Trả về { chuaCoEmail } (T3, QĐ6) để ImportService đếm
   // so_hoc_vien_chua_co_email trên GET /import/{id} — bỏ qua gửi VÀ không
-  // ghi nhat_ky_thong_bao cho học viên chưa có email_lien_he (đã đúng hành
-  // vi từ trước qua canhBaoThieuEmail(), chỉ thêm giá trị trả về ở đây).
-  // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): dang_ky_hoc.lop_id/lop (1 lớp
-  // duy nhất/đăng ký) đã bị xóa, thay bằng dang_ky_hoc_lop (bảng nối, 3 loại
-  // lớp độc lập) — lấy đúng lớp TRỰC TIẾP qua where loai_lop='truc_tiep',
-  // GIỮ NGUYÊN hành vi cũ (email phân lớp chỉ gắn với lớp trực tiếp, chưa mở
-  // rộng sang zoom/vle).
+  // ghi nhat_ky_thong_bao cho học viên chưa có email_lien_he.
+  // QĐ10: điều kiện GỬI vẫn giữ nguyên (phải có lớp TRỰC TIẾP), nhưng từ
+  // 2026-10-01 NỘI DUNG liệt kê lịch học mọi lớp của đăng ký (trực tiếp/Zoom/
+  // VLE) gom theo giai đoạn của khóa — giai đoạn chưa có buổi nào vẫn hiện để
+  // học viên thấy đủ lộ trình (mau-email.ts → mauLichHoc).
   async guiDangKyHocPhanLop(
     dangKyHocId: string,
   ): Promise<{ chuaCoEmail: boolean }> {
@@ -197,54 +247,75 @@ export class ThongBaoService {
       where: { id: dangKyHocId },
       include: {
         hoc_vien: true,
-        khoa: true,
-        dang_ky_hoc_lop: {
-          where: { loai_lop: 'truc_tiep' },
+        khoa: {
           include: {
-            lop: {
-              include: {
-                nhan_su: true,
-                lich_hoc: { include: { giai_doan: true } },
-              },
+            giai_doan: {
+              where: { trang_thai: 'active' },
+              orderBy: { thu_tu: 'asc' },
             },
+          },
+        },
+        dang_ky_hoc_lop: {
+          include: {
+            lop: { include: { nhan_su: true, lich_hoc: true } },
           },
         },
       },
     });
-    const lopTrucTiep = dangKy?.dang_ky_hoc_lop[0]?.lop;
-    if (!dangKy || !lopTrucTiep) return { chuaCoEmail: false };
+    if (!dangKy) return { chuaCoEmail: false };
+    const coLopTrucTiep = dangKy.dang_ky_hoc_lop.some(
+      (d) => d.loai_lop === 'truc_tiep',
+    );
+    if (!coLopTrucTiep) return { chuaCoEmail: false };
     if (!dangKy.hoc_vien.email_lien_he) {
       this.canhBaoThieuEmail('dang_ky_hoc_phan_lop', dangKy.hoc_vien_id);
       return { chuaCoEmail: true };
     }
 
-    const nhanSuText =
-      lopTrucTiep.nhan_su
-        .map(
-          (n) =>
-            `${n.ho_ten} (${n.vai_tro === 'giang_vien' ? 'Giảng viên' : 'Hỗ trợ'})`,
-        )
-        .join(', ') || '(chưa có thông tin)';
-    const lichText =
-      lopTrucTiep.lich_hoc
-        .map(
-          (l) =>
-            `${l.giai_doan.ten_giai_doan}: ${formatDateVi(l.thoi_gian_bat_dau)} - ${formatDateVi(l.thoi_gian_ket_thuc)}${l.dia_diem_hoac_link ? ` tại ${l.dia_diem_hoac_link}` : ''}`,
-        )
-        .join('<br/>') || '(chưa có lịch học)';
+    const thuTuLop: Record<string, number> = { truc_tiep: 0, zoom: 1, vle: 2 };
+    const dsLop = [...dangKy.dang_ky_hoc_lop].sort(
+      (a, b) => thuTuLop[a.loai_lop] - thuTuLop[b.loai_lop],
+    );
+    const buoiHoc = dsLop.flatMap((d) =>
+      d.lop.lich_hoc.map((l) => ({
+        giaiDoanId: l.giai_doan_id,
+        loaiLop: d.loai_lop,
+        buoiSo: l.buoi_so,
+        batDau: l.thoi_gian_bat_dau,
+        ketThuc: l.thoi_gian_ket_thuc,
+        diaDiemHoacLink: l.dia_diem_hoac_link,
+      })),
+    );
 
-    const html = `
-      <p>Xin chào ${dangKy.hoc_vien.ho_ten},</p>
-      <p>Bạn đã được phân vào lớp "<b>${lopTrucTiep.ten_lop}</b>" thuộc khóa bồi dưỡng "<b>${dangKy.khoa.ten_khoa}</b>".</p>
-      <p>Giảng viên/nhân sự lớp: ${nhanSuText}</p>
-      <p>Lịch học:<br/>${lichText}</p>
-    `;
+    const { tieuDe, html } = mauLichHoc({
+      hoTen: dangKy.hoc_vien.ho_ten,
+      tenKhoa: dangKy.khoa.ten_khoa,
+      maKhoa: dangKy.khoa.ma_khoa,
+      lop: dsLop.map((d) => ({
+        loaiLop: d.loai_lop,
+        tenLop: d.lop.ten_lop,
+        nhanSu: d.lop.nhan_su.map((n) => ({
+          hoTen: n.ho_ten,
+          vaiTro: n.vai_tro,
+          soDienThoai: n.so_dien_thoai,
+        })),
+      })),
+      giaiDoan: dangKy.khoa.giai_doan.map((g) => ({
+        thuTu: g.thu_tu,
+        ten: g.ten_giai_doan,
+        hinhThuc: g.hinh_thuc,
+        tuNgay: g.thoi_gian_bat_dau,
+        denNgay: g.thoi_gian_ket_thuc,
+        buoi: buoiHoc.filter((b) => b.giaiDoanId === g.id),
+      })),
+      linkLopHoc: `${layFrontendUrl()}/toi/lop-hoc`,
+    });
 
     await this.themVaoHangDoiEmail({
       loaiSuKien: 'dang_ky_hoc_phan_lop',
       hocVienId: dangKy.hoc_vien_id,
       email: dangKy.hoc_vien.email_lien_he,
-      tieuDe: 'Thông báo phân lớp',
+      tieuDe,
       html,
     });
     return { chuaCoEmail: false };
@@ -253,7 +324,11 @@ export class ThongBaoService {
   async guiDangKyHocKetQua(dangKyHocId: string): Promise<void> {
     const dangKy = await this.prisma.dang_ky_hoc.findUnique({
       where: { id: dangKyHocId },
-      include: { hoc_vien: true, khoa: true },
+      include: {
+        hoc_vien: true,
+        khoa: true,
+        ket_qua_giai_doan: { include: { giai_doan: true } },
+      },
     });
     if (!dangKy) return;
     if (!dangKy.hoc_vien.email_lien_he) {
@@ -261,20 +336,30 @@ export class ThongBaoService {
       return;
     }
 
-    const ketQuaText = dangKy.ket_qua
-      ? KET_QUA_HOC_LABEL[dangKy.ket_qua]
-      : '(chưa có)';
-    const html = `
-      <p>Xin chào ${dangKy.hoc_vien.ho_ten},</p>
-      <p>Kết quả khóa bồi dưỡng "<b>${dangKy.khoa.ten_khoa}</b>": <b>${ketQuaText}</b>.</p>
-      ${dangKy.ngay_hoan_thanh ? `<p>Ngày hoàn thành: ${formatDateVi(dangKy.ngay_hoan_thanh)}</p>` : ''}
-    `;
+    const soHoacNull = (d: Prisma.Decimal | null) =>
+      d === null ? null : Number(d);
+    const { tieuDe, html } = mauKetQuaHocTap({
+      hoTen: dangKy.hoc_vien.ho_ten,
+      tenKhoa: dangKy.khoa.ten_khoa,
+      maKhoa: dangKy.khoa.ma_khoa,
+      ketQua: dangKy.ket_qua,
+      ngayHoanThanh: dangKy.ngay_hoan_thanh,
+      mucDauVao: dangKy.muc_dau_vao,
+      mucDauRa: dangKy.muc_dau_ra,
+      giaiDoan: dangKy.ket_qua_giai_doan.map((k) => ({
+        thuTu: k.giai_doan.thu_tu,
+        ten: k.giai_doan.ten_giai_doan,
+        tyLeHoanThanh: soHoacNull(k.ty_le_hoan_thanh),
+        diem: soHoacNull(k.diem),
+      })),
+      linkCongThongTin: `${layFrontendUrl()}/toi/lop-hoc`,
+    });
 
     await this.themVaoHangDoiEmail({
       loaiSuKien: 'dang_ky_hoc_ket_qua',
       hocVienId: dangKy.hoc_vien_id,
       email: dangKy.hoc_vien.email_lien_he,
-      tieuDe: 'Kết quả khóa bồi dưỡng',
+      tieuDe,
       html,
     });
   }
@@ -293,13 +378,20 @@ export class ThongBaoService {
       return;
     }
 
-    const html = `
-      <p>Xin chào ${yeuCau.hoc_vien.ho_ten},</p>
-      <p>Yêu cầu hỗ trợ của bạn đã được trả lời:</p>
-      <p><b>Câu hỏi:</b> ${yeuCau.noi_dung_hoi}</p>
-      <p><b>Trả lời:</b> ${yeuCau.noi_dung_tra_loi}</p>
-      <p>Đăng nhập hệ thống, vào mục "Yêu cầu hỗ trợ" để xem chi tiết.</p>
-    `;
+    const html = boCucEmail({
+      xemTruoc: 'Ban Tổ chức đã trả lời yêu cầu hỗ trợ của Thầy/Cô.',
+      nhan: 'HỖ TRỢ HỌC VIÊN',
+      tieuDe: 'Yêu cầu hỗ trợ đã được trả lời',
+      noiDung: [
+        doanVan(`Kính gửi Thầy/Cô <b>${e(yeuCau.hoc_vien.ho_ten)}</b>,`),
+        doanVan('Yêu cầu hỗ trợ của Thầy/Cô đã được Ban Tổ chức trả lời:'),
+        bangThongTin([
+          ['Câu hỏi', e(yeuCau.noi_dung_hoi)],
+          ['Trả lời', e(yeuCau.noi_dung_tra_loi)],
+        ]),
+        nutBam('Xem yêu cầu hỗ trợ', `${layFrontendUrl()}/toi/yeu-cau-ho-tro`),
+      ].join(''),
+    });
 
     await this.themVaoHangDoiEmail({
       loaiSuKien: 'yeu_cau_ho_tro_tra_loi',
@@ -321,12 +413,22 @@ export class ThongBaoService {
     link: string,
     hocVienId: string,
   ): Promise<void> {
-    const html = `
-      <p>Xin chào ${hoTen},</p>
-      <p>Thầy/Cô vừa cập nhật email liên hệ trên hệ thống Thu thập thông tin học viên. Vui lòng bấm vào liên kết dưới đây để xác minh email này (liên kết có hiệu lực trong 24 giờ):</p>
-      <p><a href="${link}">${link}</a></p>
-      <p>Nếu Thầy/Cô không thực hiện thay đổi này, vui lòng bỏ qua email.</p>
-    `;
+    const html = boCucEmail({
+      xemTruoc: 'Xác minh email liên hệ — liên kết có hiệu lực trong 24 giờ.',
+      nhan: 'BẢO MẬT TÀI KHOẢN',
+      tieuDe: 'Xác minh email liên hệ',
+      noiDung: [
+        doanVan(`Kính gửi Thầy/Cô <b>${e(hoTen)}</b>,`),
+        doanVan(
+          'Thầy/Cô vừa cập nhật email liên hệ trên Cổng thông tin Bồi dưỡng Năng lực số. Vui lòng bấm nút bên dưới để xác minh email này:',
+        ),
+        nutBam('Xác minh email', link),
+        khoiNoiBat(
+          'canh_bao',
+          'Liên kết có hiệu lực trong <b>24 giờ</b>. Nếu Thầy/Cô không thực hiện thay đổi này, vui lòng bỏ qua email.',
+        ),
+      ].join(''),
+    });
     await this.guiNgayVaGhiNhatKy({
       loaiSuKien: 'email_xac_minh',
       hocVienId,
@@ -342,17 +444,16 @@ export class ThongBaoService {
     link: string,
     hocVienId: string,
   ): Promise<void> {
-    const html = `
-      <p>Xin chào ${hoTen},</p>
-      <p>Hệ thống nhận được yêu cầu đặt lại mật khẩu cho tài khoản của Thầy/Cô. Bấm vào liên kết dưới đây để đặt mật khẩu mới (liên kết có hiệu lực trong 30 phút):</p>
-      <p><a href="${link}">${link}</a></p>
-      <p>Nếu Thầy/Cô không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này — mật khẩu hiện tại vẫn giữ nguyên.</p>
-    `;
+    const { tieuDe, html } = mauDatLaiMatKhau({
+      hoTen,
+      link,
+      thoiHanPhut: 30,
+    });
     await this.guiNgayVaGhiNhatKy({
       loaiSuKien: 'dat_lai_mat_khau',
       hocVienId,
       email,
-      tieuDe: 'Đặt lại mật khẩu',
+      tieuDe,
       html,
     });
   }
