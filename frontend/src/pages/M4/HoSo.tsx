@@ -472,7 +472,7 @@ export default function HoSo() {
                 />
 
                 <Text size="xs" c="dimmed">
-                  Thầy/Cô vui lòng cung cấp thông tin chính xác — thông tin này sẽ in trên giấy chứng nhận.
+                  Thầy/Cô vui lòng cung cấp thông tin chính xác.
                 </Text>
               </Stack>
             </Card>
