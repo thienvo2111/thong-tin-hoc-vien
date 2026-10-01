@@ -1,6 +1,7 @@
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { getOptionsToken } from '@nestjs/throttler';
+import { SchedulerRegistry } from '@nestjs/schedule';
 import { AppModule } from '../../src/app.module';
 import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
 import { validationExceptionFactory } from '../../src/common/pipes/validation-exception-factory';
@@ -39,5 +40,17 @@ export async function createTestApp(
   );
   app.useGlobalFilters(new HttpExceptionFilter());
   await app.init();
+
+  // AppModule co ScheduleModule.forRoot() thiet (@Cron EVERY_MINUTE cua
+  // HangDoiEmailProcessor) nen cron THAT van chay nen trong luc test. Neu
+  // cron that fire dung luc test cung goi drainHangDoi()/drainHangDoiToanBo()
+  // thu cong thi cung 1 dong hang_doi_email bi xu ly 2 lan -> lan 2 ném
+  // P2025 (not found) trong ghiKetQua. Dung het cron da dang ky de hang_doi_email
+  // CHI duoc xu ly khi test chu dong goi processor.xuLyHangDoi().
+  const schedulerRegistry = app.get(SchedulerRegistry, { strict: false });
+  for (const job of schedulerRegistry.getCronJobs().values()) {
+    job.stop();
+  }
+
   return app;
 }
