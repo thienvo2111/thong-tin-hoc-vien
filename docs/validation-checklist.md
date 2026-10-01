@@ -44,14 +44,14 @@ Ký hiệu: 🔴 lỗi chặn lưu · 🟡 cảnh báo không chặn (chỉ nh�
 | 15 | ~~`phuong_xa_id` phải có `cap = 'phuong_xa_dac_khu'` **và** `parent_id` (sau khi truy ngược) khớp `noi_sinh_id` đã chọn~~ | 🔴 | ~~API~~ |
 | 16 | ~~Danh mục có thể `trang_thai='ngung'` (do sáp nhập địa giới) — bản ghi cũ vẫn hiển thị đúng cho hồ sơ lịch sử, nhưng **không cho chọn mới**~~ | 🔴 (khi tạo mới) | ~~API~~ |
 
-## Nơi sinh (text tự do) & Cư trú (`noi_sinh`, `cu_tru_tinh_id`/`cu_tru_phuong_xa_id` → `dia_danh`) — **thêm 2026-09-30, thay thế mục trên**
+## Nơi sinh (text tự do, 3 trường) & Cư trú (`noi_sinh_tinh/huyen/xa`, `cu_tru_tinh_id`/`cu_tru_phuong_xa_id` → `dia_danh`) — **sửa 2026-10-01 (T17), thay thế mục trên**
 
 | # | Quy tắc | Mức | Nơi thực thi |
 |---|---|---|---|
-| 13b | `noi_sinh` (string, tối đa 500 ký tự) — Ô NHẬP TỰ DO, không còn FK tới `dia_danh` (địa giới có thể đã cũ, DB không có dữ liệu để đối chiếu). Bắt buộc **khi `nguon_tao='tu_dang_ky'`**; với `import_moet` để trống lúc tạo, bắt buộc khi người dùng tự bổ sung (tính vào "Hồ sơ đầy đủ" — T9) | 🔴 | API (`IsString`/`MaxLength` ở DTO + kiểm tra bắt buộc ở `validateHocVien`) |
+| 13b | `noi_sinh_tinh`/`noi_sinh_huyen`/`noi_sinh_xa` (string, tối đa 255 ký tự mỗi trường) — 3 Ô NHẬP TỰ DO riêng biệt, không FK tới `dia_danh` (địa giới có thể đã cũ, DB không có dữ liệu để đối chiếu). **Sửa 2026-10-01**: HOÀN TOÀN TÙY CHỌN cho mọi `nguon_tao` — để trống cả 3 vẫn lưu được, **KHÔNG tính vào "Hồ sơ đầy đủ"** (trước đó `noi_sinh` 1 ô còn bắt buộc + tính vào đầy đủ ở `tu_dang_ky` — đã bỏ) | — (tùy chọn) | API (`IsOptional`/`MaxLength` ở DTO) |
 | 14b | `cu_tru_tinh_id`/`cu_tru_phuong_xa_id` — **TÙY CHỌN** (không tính vào "Hồ sơ đầy đủ"), dùng đúng địa giới hành chính HIỆN TẠI của `dia_danh`. Nếu có gửi giá trị: `cu_tru_tinh_id` phải `cap='tinh_thanh'`, `cu_tru_phuong_xa_id` phải `cap='phuong_xa_dac_khu'` **và** `parent_id` khớp `cu_tru_tinh_id` (nếu cả 2 cùng gửi) | 🔴 (nếu gửi sai) | API |
 | 15b | Danh mục có thể `trang_thai='ngung'` (do sáp nhập địa giới) — bản ghi cũ vẫn hiển thị đúng cho hồ sơ lịch sử, nhưng **không cho chọn mới** `cu_tru_tinh_id`/`cu_tru_phuong_xa_id` | 🔴 (khi chọn mới) | API |
-| 16b | Dữ liệu `noi_sinh_id`/`phuong_xa_id` cũ (nếu có) đã được migrate 1 lần sang `noi_sinh` dạng text (`"{phường/xã}, {tỉnh/thành}"` hoặc chỉ tỉnh/thành nếu thiếu phường/xã) lúc thêm cột — xem migration `20260930080000_t16_hoc_vien_noi_sinh_cu_tru` | — | Migration (chạy 1 lần) |
+| 16b | Dữ liệu `noi_sinh_id`/`phuong_xa_id` cũ (nếu có) đã được migrate 1 lần sang `noi_sinh` dạng text lúc thêm cột (migration `20260930080000_t16_hoc_vien_noi_sinh_cu_tru`). **T17 (2026-10-01)**: cột `noi_sinh` (1 ô) sau đó tách thành `noi_sinh_tinh`/`noi_sinh_huyen`/`noi_sinh_xa` — xem migration mới cho cách xử lý dữ liệu `noi_sinh` đã có (giữ nguyên trong 1 trong 3 cột mới hay bỏ, tùy đã có dữ liệu thật hay chưa tại thời điểm migrate) | — | Migration (chạy 1 lần) |
 | 17b | UI "Cư trú" (M4 `HoSo.tsx`) gọi `SelectDiaDanh` với `phienBan="hien_tai"` cho cả `cu_tru_tinh_id`/`cu_tru_phuong_xa_id` — chỉ liệt kê xã/phường HIỆN TẠI, loại bỏ mã lịch sử và các dòng đặc biệt (xem mục `dia_danh.phien_ban` bên dưới) | 🟡 (UX, API vẫn chấp nhận bất kỳ `dia_danh` hợp lệ nếu gửi thẳng id) | Frontend |
 
 ## `dia_danh.phien_ban` — thêm 2026-09-30 (phân biệt xã/phường theo đợt sáp nhập hành chính 2025)

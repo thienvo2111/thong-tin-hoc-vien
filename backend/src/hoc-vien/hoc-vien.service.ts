@@ -58,7 +58,9 @@ interface HocVienValidateInput {
   ngay_sinh?: number;
   thang_sinh?: number;
   nam_sinh?: number;
-  noi_sinh?: string | null;
+  noi_sinh_tinh?: string | null;
+  noi_sinh_huyen?: string | null;
+  noi_sinh_xa?: string | null;
   cu_tru_tinh_id?: string | null;
   cu_tru_phuong_xa_id?: string | null;
   don_vi_cong_tac_id?: string | null;
@@ -172,14 +174,11 @@ export class HocVienService {
       });
     }
 
-    // Rule #13 (sửa 2026-09-30): nơi sinh giờ là text tự do — giấy khai sinh
-    // có thể ghi theo địa giới hành chính CŨ, khác địa giới HIỆN TẠI mà
-    // dia_danh đang quản lý, nên không còn ràng buộc FK/định dạng, chỉ còn
-    // kiểm tra BẮT BUỘC (khi requireFull). Thay cho rule #13-16 cũ (FK
-    // noi_sinh_id/phuong_xa_id) — xem docs/validation-checklist.md.
-    if (!input.noi_sinh && opts.requireFull) {
-      loi.push({ field: 'noi_sinh', message: 'Bắt buộc nhập' });
-    }
+    // Rule #13b (T17, 2026-10-01): nơi sinh (noi_sinh_tinh/huyen/xa) là text
+    // tự do, HOÀN TOÀN TÙY CHỌN cho mọi nguon_tao — không tính vào "Hồ sơ đầy
+    // đủ" (trước đó cột "noi_sinh" 1 ô còn bắt buộc khi requireFull, đã bỏ
+    // theo quyết định nghiệp vụ mới — xem docs/validation-checklist.md #13b).
+    // Không còn gì để kiểm tra ở đây ngoài @MaxLength đã có ở DTO.
 
     // Thêm 2026-09-30: "Cư trú" — TÙY CHỌN, dùng đúng địa giới hành chính
     // HIỆN TẠI (2 cấp tỉnh/thành -> phường/xã, cùng cách làm CŨ của nơi sinh
@@ -386,7 +385,9 @@ export class HocVienService {
     'nam_sinh',
     'gioi_tinh',
     'chuc_vu',
-    'noi_sinh',
+    'noi_sinh_tinh',
+    'noi_sinh_huyen',
+    'noi_sinh_xa',
     'cu_tru_tinh_id',
     'cu_tru_phuong_xa_id',
     'don_vi_cong_tac_id',
@@ -446,7 +447,8 @@ export class HocVienService {
       ...rest
     } = hocVien;
     return {
-      // rest đã có sẵn "noi_sinh" (cột text tự do) — không cần resolve tên.
+      // rest đã có sẵn noi_sinh_tinh/huyen/xa (text tự do) — không cần
+      // resolve tên.
       ...this.toResponse(rest),
       // Deprecated: giữ trả về cho hồ sơ còn dữ liệu cũ (xem noi_sinh_dia_danh).
       noi_sinh_ten: noi_sinh_dia_danh?.ten ?? null,
@@ -532,7 +534,9 @@ export class HocVienService {
             nam_sinh: dto.nam_sinh,
             gioi_tinh: dto.gioi_tinh,
             chuc_vu: dto.chuc_vu,
-            noi_sinh: dto.noi_sinh,
+            noi_sinh_tinh: dto.noi_sinh_tinh,
+            noi_sinh_huyen: dto.noi_sinh_huyen,
+            noi_sinh_xa: dto.noi_sinh_xa,
             don_vi_cong_tac_id: dto.don_vi_cong_tac_id,
             so_dien_thoai_lien_he: dto.so_dien_thoai_lien_he,
             email_lien_he: dto.email_lien_he,
@@ -656,7 +660,9 @@ export class HocVienService {
       ngay_sinh: dto.ngay_sinh ?? existing.ngay_sinh,
       thang_sinh: dto.thang_sinh ?? existing.thang_sinh,
       nam_sinh: dto.nam_sinh ?? existing.nam_sinh,
-      noi_sinh: dto.noi_sinh ?? existing.noi_sinh,
+      noi_sinh_tinh: dto.noi_sinh_tinh ?? existing.noi_sinh_tinh,
+      noi_sinh_huyen: dto.noi_sinh_huyen ?? existing.noi_sinh_huyen,
+      noi_sinh_xa: dto.noi_sinh_xa ?? existing.noi_sinh_xa,
       cu_tru_tinh_id: dto.cu_tru_tinh_id ?? existing.cu_tru_tinh_id,
       cu_tru_phuong_xa_id:
         dto.cu_tru_phuong_xa_id ?? existing.cu_tru_phuong_xa_id,
@@ -709,7 +715,9 @@ export class HocVienService {
               nam_sinh: merged.nam_sinh,
               gioi_tinh: dto.gioi_tinh,
               chuc_vu: dto.chuc_vu,
-              noi_sinh: merged.noi_sinh,
+              noi_sinh_tinh: merged.noi_sinh_tinh,
+              noi_sinh_huyen: merged.noi_sinh_huyen,
+              noi_sinh_xa: merged.noi_sinh_xa,
               cu_tru_tinh_id: merged.cu_tru_tinh_id,
               cu_tru_phuong_xa_id: merged.cu_tru_phuong_xa_id,
               don_vi_cong_tac_id: merged.don_vi_cong_tac_id ?? undefined,

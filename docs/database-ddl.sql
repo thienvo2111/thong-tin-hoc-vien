@@ -291,10 +291,29 @@ CREATE TABLE hoc_vien (
     gioi_tinh               varchar(20),
     chuc_vu                 varchar(100),       -- vd: TTCM, Giáo viên, Nhân viên — tự do (từ import)
 
-    -- Nơi sinh / cư trú (danh mục dùng chung) — không có trong danh sách
-    -- tiếp nhận MOET, học viên import tự bổ sung sau
+    -- Nơi sinh / cư trú — không có trong danh sách tiếp nhận MOET, học viên
+    -- tự bổ sung sau. LƯU Ý: phần dưới đây đã được cập nhật qua Prisma trực
+    -- tiếp (2026-09-30, 2026-10-01) nhanh hơn file DDL tham khảo này — xem
+    -- backend/prisma/schema.prisma làm nguồn chân lý runtime nếu có lệch.
+    --
+    -- Deprecated (giữ để không mất dữ liệu cũ, KHÔNG dùng trong luồng mới,
+    -- thay bởi noi_sinh_tinh/huyen/xa bên dưới):
     noi_sinh_id             uuid REFERENCES dia_danh(id),      -- cấp tinh_thanh
     phuong_xa_id            uuid REFERENCES dia_danh(id),      -- cấp phuong_xa_dac_khu
+
+    -- T17 (2026-10-01): nơi sinh dạng TEXT TỰ DO, tách 3 trường — giấy khai
+    -- sinh có thể ghi theo địa giới hành chính CŨ, khác địa giới HIỆN TẠI mà
+    -- dia_danh quản lý — không ràng buộc FK. Hoàn toàn TÙY CHỌN (không tính
+    -- vào "Hồ sơ đầy đủ"). Thay thế cột "noi_sinh" (text 500 ký tự, 1 ô duy
+    -- nhất, thêm 2026-09-30 rồi tách ngay hôm sau theo yêu cầu thực tế).
+    noi_sinh_tinh           varchar(255),
+    noi_sinh_huyen          varchar(255),
+    noi_sinh_xa             varchar(255),
+
+    -- Cư trú (2026-09-30) — TÙY CHỌN, dùng đúng địa giới hành chính HIỆN TẠI
+    -- (FK dia_danh, khác nơi sinh có thể ghi theo địa giới cũ):
+    cu_tru_tinh_id          uuid REFERENCES dia_danh(id),      -- cấp tinh_thanh
+    cu_tru_phuong_xa_id     uuid REFERENCES dia_danh(id),      -- cấp phuong_xa_dac_khu
 
     -- Công tác — CÓ trong cả 2 luồng (self: chọn tay; import: khớp theo cột "Đơn vị")
     don_vi_cong_tac_id      uuid NOT NULL REFERENCES don_vi_cong_tac(id),

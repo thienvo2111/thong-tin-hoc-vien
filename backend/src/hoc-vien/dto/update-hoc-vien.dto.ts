@@ -59,12 +59,23 @@ export class UpdateHocVienDto {
   @IsUUID()
   phuong_xa_id?: string;
 
-  // Thêm 2026-09-30: nơi sinh dạng text tự do (có thể ghi theo địa giới hành
-  // chính cũ, không còn ràng buộc FK tới dia_danh).
+  // T17 (2026-10-01): tách "noi_sinh" (1 ô, thêm 2026-09-30) thành 3 trường
+  // Tỉnh/Huyện/Xã riêng biệt — vẫn text tự do, không ràng buộc FK tới
+  // dia_danh, hoàn toàn tùy chọn.
   @IsOptional()
   @IsString()
-  @MaxLength(500)
-  noi_sinh?: string;
+  @MaxLength(255)
+  noi_sinh_tinh?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  noi_sinh_huyen?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  noi_sinh_xa?: string;
 
   // Thêm 2026-09-30: "Cư trú" — tùy chọn, dùng địa giới hành chính HIỆN TẠI
   // (dia_danh đang có, 2 cấp tỉnh/thành -> phường/xã).

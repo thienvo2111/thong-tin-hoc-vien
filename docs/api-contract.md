@@ -76,17 +76,22 @@ Thao tác Quản trị lên tài khoản **người khác** (khác `/auth/*`, lu
 | GET | `/hoc-vien/toi/dot-xac-nhan` | **Thêm T14**: `{ dot: {id, ten, loai, mo_luc, dong_luc} \| null, dang_mo: boolean, da_xac_nhan: boolean, day_du: boolean, thieu: [...] }`. `dot` = đợt đang mở nếu có, hoặc đợt sắp mở gần nhất nếu hiện không có đợt nào mở (`dang_mo=false` phân biệt 2 trường hợp). `tu_dang_ky` luôn trả `dot: null` (không áp dụng khái niệm đợt) | Học viên |
 | GET | `/hoc-vien/toi/danh-gia-dau-vao` | **Thêm T15 (2026-09-28)**: cổng điều kiện làm đánh giá đầu vào — xem mục "Cổng điều kiện làm đánh giá đầu vào & tài khoản VLE" bên dưới | Học viên |
 
-### Nơi sinh & Cư trú (sửa 2026-09-30)
+### Nơi sinh & Cư trú (sửa 2026-09-30, T16; tách 3 trường 2026-10-01, T17)
 
 Quyết định nghiệp vụ chốt 2026-09-30: giấy khai sinh có thể ghi nơi sinh theo địa giới hành chính **CŨ** (thời điểm sinh), khác địa giới **HIỆN TẠI** mà `dia_danh` đang quản lý (chỉ còn 46 tỉnh/thành `active`) — DB không có bộ dữ liệu địa giới cũ để chọn.
 
-- **`noi_sinh`** (string, tối đa 500 ký tự): ô nhập TỰ DO, KHÔNG còn là FK tới `dia_danh`. Bắt buộc ở `tu_dang_ky` (`POST /hoc-vien`, `PATCH /hoc-vien/toi` khi hồ sơ chưa đầy đủ), không ràng buộc định dạng/địa giới.
-- **`cu_tru_tinh_id`/`cu_tru_phuong_xa_id`** (uuid, **tùy chọn**, mới thêm): "Cư trú" — dùng đúng địa giới hành chính HIỆN TẠI (`dia_danh`, cấp `tinh_thanh` → `phuong_xa_dac_khu`, `cu_tru_phuong_xa_id.parent_id` phải khớp `cu_tru_tinh_id` nếu cả 2 cùng gửi). KHÔNG bắt buộc, KHÔNG tính vào "Hồ sơ đầy đủ" — nhưng nếu gửi kèm giá trị sai (không tồn tại/không đúng cấp/không khớp tỉnh) vẫn báo lỗi `VALIDATION_ERROR`.
-- **Deprecated (giữ để không mất dữ liệu cũ, KHÔNG dùng trong luồng mới)**: `noi_sinh_id`/`phuong_xa_id` (FK `dia_danh`, thay bởi `noi_sinh` ở trên — xem rule #13-16 cũ trong `validation-checklist.md`, đã bị **thay thế** bởi rule mới). Response `GET /hoc-vien/toi`/`{id}` vẫn trả `noi_sinh_ten`/`phuong_xa_ten` nếu hồ sơ còn dữ liệu cũ (đã migrate 1 lần sang `noi_sinh` text lúc thêm cột, xem migration `20260930080000_t16_hoc_vien_noi_sinh_cu_tru`).
+**T17 (2026-10-01) — tách `noi_sinh` (1 ô text tự do) thành 3 trường riêng biệt**, vẫn là text tự do (không FK `dia_danh`, cùng lý do địa giới cũ ở trên):
+- **`noi_sinh_tinh`** (string, tối đa 255 ký tự, **tùy chọn**): Tỉnh/Thành nơi sinh.
+- **`noi_sinh_huyen`** (string, tối đa 255 ký tự, **tùy chọn**): Quận/Huyện nơi sinh.
+- **`noi_sinh_xa`** (string, tối đa 255 ký tự, **tùy chọn**): Phường/Xã nơi sinh.
+- Cả 3 **hoàn toàn tùy chọn** — để trống cả 3 vẫn lưu được (`PATCH`/`POST` không chặn), **KHÔNG tính vào "Hồ sơ đầy đủ"** (sửa quyết định 2026-09-30 — trước đó `noi_sinh` còn bắt buộc ở `tu_dang_ky`, giờ bỏ hẳn khỏi điều kiện đầy đủ, xử lý giống `cu_tru_*` bên dưới).
+- Thay thế hoàn toàn `noi_sinh` (cột text 500 ký tự, thêm 2026-09-30 — xem `database-ddl.sql` về việc cột này được giữ lại deprecated hay xóa hẳn tùy dữ liệu đã có lúc migrate).
+- **`cu_tru_tinh_id`/`cu_tru_phuong_xa_id`** (uuid, **tùy chọn**, không đổi): "Cư trú" — dùng đúng địa giới hành chính HIỆN TẠI (`dia_danh`, cấp `tinh_thanh` → `phuong_xa_dac_khu`, `cu_tru_phuong_xa_id.parent_id` phải khớp `cu_tru_tinh_id` nếu cả 2 cùng gửi). KHÔNG bắt buộc, KHÔNG tính vào "Hồ sơ đầy đủ" — nhưng nếu gửi kèm giá trị sai (không tồn tại/không đúng cấp/không khớp tỉnh) vẫn báo lỗi `VALIDATION_ERROR`.
+- **Deprecated (giữ để không mất dữ liệu cũ, KHÔNG dùng trong luồng mới)**: `noi_sinh_id`/`phuong_xa_id` (FK `dia_danh`, thay bởi `noi_sinh` rồi `noi_sinh_tinh/huyen/xa` — xem rule #13-16 cũ trong `validation-checklist.md`, đã bị **thay thế** bởi rule mới). Response `GET /hoc-vien/toi`/`{id}` vẫn trả `noi_sinh_ten`/`phuong_xa_ten` nếu hồ sơ còn dữ liệu cũ nhất (từ FK, chưa từng migrate).
 
 ### Hồ sơ đầy đủ (T9, 2026-09-28)
 
-"Đầy đủ" = qua **toàn bộ** quy tắc của luồng `tu_dang_ky` trong `validation-checklist.md` (không chỉ "không NULL"): họ tên hợp lệ, CCCD 12 số không trùng, ngày sinh hợp lệ, có nơi sinh (`noi_sinh`, text tự do, **sửa 2026-09-30** — không còn kiểm tra phường/xã khớp nơi sinh vì đã bỏ FK), đơn vị `active` loại `truong`, SĐT + email hợp lệ, trình độ, ≥1 chuyên môn. `cu_tru_tinh_id`/`cu_tru_phuong_xa_id` (tùy chọn) KHÔNG tính vào "đầy đủ". Cảnh báo 🟡 **không** làm hồ sơ "chưa đầy đủ". Tính động qua `HocVienService.danhGiaDayDu()` (tái dùng đúng bộ quy tắc của `validateHocVien`/Dịch vụ Kiểm tra dữ liệu) — **không lưu cột tính sẵn**, luôn tính lại từ dữ liệu hiện tại. `GET /hoc-vien?day_du=false` lọc theo giá trị tính động này ở tầng ứng dụng (không phải điều kiện `WHERE` trên DB) — chấp nhận đánh đổi hiệu năng ở quy mô hiện tại (~9.000 hồ sơ).
+"Đầy đủ" = qua **toàn bộ** quy tắc của luồng `tu_dang_ky` trong `validation-checklist.md` (không chỉ "không NULL"): họ tên hợp lệ, CCCD 12 số không trùng, ngày sinh hợp lệ, đơn vị `active` loại `truong`, SĐT + email hợp lệ, trình độ, ≥1 chuyên môn. **Sửa 2026-10-01 (T17)**: `noi_sinh_tinh`/`noi_sinh_huyen`/`noi_sinh_xa` (như `cu_tru_tinh_id`/`cu_tru_phuong_xa_id`) KHÔNG tính vào "đầy đủ" — hoàn toàn tùy chọn. Cảnh báo 🟡 **không** làm hồ sơ "chưa đầy đủ". Tính động qua `HocVienService.danhGiaDayDu()` (tái dùng đúng bộ quy tắc của `validateHocVien`/Dịch vụ Kiểm tra dữ liệu) — **không lưu cột tính sẵn**, luôn tính lại từ dữ liệu hiện tại. `GET /hoc-vien?day_du=false` lọc theo giá trị tính động này ở tầng ứng dụng (không phải điều kiện `WHERE` trên DB) — chấp nhận đánh đổi hiệu năng ở quy mô hiện tại (~9.000 hồ sơ).
 
 ### Đợt xác nhận & lịch sử thay đổi hồ sơ (T14, 2026-09-28)
 

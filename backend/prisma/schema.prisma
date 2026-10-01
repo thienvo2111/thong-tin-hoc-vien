@@ -427,11 +427,15 @@ model hoc_vien {
   noi_sinh_id  String? @db.Uuid
   phuong_xa_id String? @db.Uuid
 
-  // Thêm 2026-09-30: nơi sinh dạng TEXT TỰ DO — giấy khai sinh có thể ghi
-  // theo địa giới hành chính CŨ (thời điểm sinh), khác địa giới HIỆN TẠI mà
-  // dia_danh đang quản lý (chỉ còn 46 tỉnh/thành active) — không còn ràng
-  // buộc FK vì DB không có bộ dữ liệu địa giới cũ để chọn.
-  noi_sinh String? @db.VarChar(500)
+  // T17 (2026-10-01): tách "noi_sinh" (1 ô text tự do, thêm 2026-09-30) thành
+  // 3 trường Tỉnh/Huyện/Xã riêng biệt theo yêu cầu thực tế — vẫn TEXT TỰ DO,
+  // không FK (giấy khai sinh có thể ghi theo địa giới hành chính CŨ, khác
+  // địa giới HIỆN TẠI mà dia_danh quản lý). Cột "noi_sinh" cũ đã bị xoá —
+  // tại thời điểm tách chỉ có 21/7654 hồ sơ có dữ liệu, toàn bộ là dữ liệu
+  // test (xem báo cáo T17), không cần giữ deprecated.
+  noi_sinh_tinh  String? @db.VarChar(255)
+  noi_sinh_huyen String? @db.VarChar(255)
+  noi_sinh_xa    String? @db.VarChar(255)
 
   // Thêm 2026-09-30: "Cư trú" — TÙY CHỌN, dùng đúng địa giới hành chính HIỆN
   // TẠI (dia_danh đang có), khác nơi sinh (có thể ghi theo địa giới cũ).

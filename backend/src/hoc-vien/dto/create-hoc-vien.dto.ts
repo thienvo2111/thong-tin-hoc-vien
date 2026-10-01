@@ -14,9 +14,10 @@ import {
 
 // Body của POST /hoc-vien (tự đăng ký, nguon_tao='tu_dang_ky') — theo
 // docs/api-contract.md mục 2 + docs/validation-checklist.md #1-26b. Field
-// nào bắt buộc-có-điều-kiện theo nguon_tao (CCCD, nơi sinh, phường xã, email,
-// trình độ, chuyên môn) đều bắt buộc ở DTO này vì luồng tự đăng ký luôn có
-// đủ — điều kiện chỉ áp dụng khi PATCH hồ sơ import_moet, xem UpdateHocVienDto.
+// nào bắt buộc-có-điều-kiện theo nguon_tao (CCCD, email, trình độ, chuyên
+// môn) đều bắt buộc ở DTO này vì luồng tự đăng ký luôn có đủ — điều kiện chỉ
+// áp dụng khi PATCH hồ sơ import_moet, xem UpdateHocVienDto. Riêng nơi sinh
+// (noi_sinh_tinh/huyen/xa) HOÀN TOÀN TÙY CHỌN cho mọi nguon_tao (T17).
 export class CreateHocVienDto {
   @IsString()
   @MinLength(1)
@@ -45,13 +46,24 @@ export class CreateHocVienDto {
   @MaxLength(100)
   chuc_vu?: string;
 
-  // Thêm 2026-09-30: thay noi_sinh_id/phuong_xa_id (FK dia_danh) bằng 1
-  // trường text tự do — tự đăng ký luôn bắt buộc phải có nơi sinh, xem
-  // HocVienService.validateHocVien.
+  // T17 (2026-10-01): tách "noi_sinh" (1 ô, thêm 2026-09-30) thành 3 trường
+  // Tỉnh/Huyện/Xã riêng biệt — HOÀN TOÀN TÙY CHỌN cho mọi nguon_tao (không
+  // còn bắt buộc như "noi_sinh" cũ, không tính vào "Hồ sơ đầy đủ" — xem
+  // HocVienService.validateHocVien).
+  @IsOptional()
   @IsString()
-  @MinLength(1)
-  @MaxLength(500)
-  noi_sinh: string;
+  @MaxLength(255)
+  noi_sinh_tinh?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  noi_sinh_huyen?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  noi_sinh_xa?: string;
 
   @IsUUID()
   don_vi_cong_tac_id: string;

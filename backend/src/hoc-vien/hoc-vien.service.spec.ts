@@ -21,7 +21,9 @@ function baseCreateDto() {
     ngay_sinh: 15,
     thang_sinh: 6,
     nam_sinh: namHopLe,
-    noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
+    noi_sinh_tinh: 'Tỉnh An Giang (cũ)',
+    noi_sinh_huyen: 'Huyện Châu Thành (cũ)',
+    noi_sinh_xa: 'Xã Long Xuyên (cũ)',
     don_vi_cong_tac_id: 'truong-1',
     so_dien_thoai_lien_he: '0912345678',
     email_lien_he: 'an@example.com',
@@ -208,12 +210,17 @@ describe('HocVienService', () => {
       expect(loi.some((l) => l.field === 'cu_tru_phuong_xa_id')).toBe(true);
     });
 
-    it('không có noi_sinh -> lỗi bắt buộc (thay rule #13-16 FK cũ)', async () => {
-      const dto = { ...baseCreateDto(), noi_sinh: undefined };
+    it('không có noi_sinh_tinh/huyen/xa -> không lỗi (T17: tùy chọn, không tính vào đầy đủ)', async () => {
+      const dto = {
+        ...baseCreateDto(),
+        noi_sinh_tinh: undefined,
+        noi_sinh_huyen: undefined,
+        noi_sinh_xa: undefined,
+      };
       const { loi } = await service.validateHocVien(dto, {
         requireFull: true,
       });
-      expect(loi.some((l) => l.field === 'noi_sinh')).toBe(true);
+      expect(loi.some((l) => l.field.startsWith('noi_sinh'))).toBe(false);
     });
 
     it('cu_tru_tinh_id/cu_tru_phuong_xa_id không gửi (tùy chọn) -> không lỗi', async () => {
@@ -557,7 +564,9 @@ describe('HocVienService', () => {
         id: 'hv-1',
         ho_ten: 'Nguyễn Văn An',
         don_vi_cong_tac_id: 'truong-1',
-        noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
+        noi_sinh_tinh: 'Tỉnh An Giang (cũ)',
+        noi_sinh_huyen: 'Huyện Châu Thành (cũ)',
+        noi_sinh_xa: 'Xã Long Xuyên (cũ)',
         noi_sinh_id: null,
         phuong_xa_id: null,
         cu_tru_tinh_id: 'tinh-1',
@@ -574,14 +583,16 @@ describe('HocVienService', () => {
       };
     }
 
-    it('layHoSoCuaToi — có noi_sinh (text) + cư trú đủ -> response kèm noi_sinh, cu_tru_*_ten cạnh cu_tru_*_id', async () => {
+    it('layHoSoCuaToi — có noi_sinh_tinh/huyen/xa (text) + cư trú đủ -> response kèm noi_sinh_tinh/huyen/xa, cu_tru_*_ten cạnh cu_tru_*_id', async () => {
       prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDuCoTen());
       const res = await service.layHoSoCuaToi({
         hoc_vien_id: 'hv-1',
       } as AuthenticatedUser);
 
       expect(res).toMatchObject({
-        noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
+        noi_sinh_tinh: 'Tỉnh An Giang (cũ)',
+        noi_sinh_huyen: 'Huyện Châu Thành (cũ)',
+        noi_sinh_xa: 'Xã Long Xuyên (cũ)',
         cu_tru_tinh_id: 'tinh-1',
         cu_tru_tinh_ten: 'An Giang',
         cu_tru_phuong_xa_id: 'xa-1',
@@ -627,13 +638,15 @@ describe('HocVienService', () => {
       });
     });
 
-    it('findOne — có noi_sinh (text) + cư trú đủ -> response kèm noi_sinh, cu_tru_*_ten', async () => {
+    it('findOne — có noi_sinh_tinh/huyen/xa (text) + cư trú đủ -> response kèm noi_sinh_tinh/huyen/xa, cu_tru_*_ten', async () => {
       prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDuCoTen());
       scopeService.canAccessDonVi.mockResolvedValue(true);
       const res = await service.findOne('hv-1', {} as AuthenticatedUser);
 
       expect(res).toMatchObject({
-        noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
+        noi_sinh_tinh: 'Tỉnh An Giang (cũ)',
+        noi_sinh_huyen: 'Huyện Châu Thành (cũ)',
+        noi_sinh_xa: 'Xã Long Xuyên (cũ)',
         cu_tru_tinh_ten: 'An Giang',
         cu_tru_phuong_xa_ten: 'Phường Long Xuyên',
         don_vi_cong_tac_ten: 'Trường THPT An Giang',
@@ -706,7 +719,9 @@ describe('HocVienService', () => {
         ngay_sinh: 15,
         thang_sinh: 6,
         nam_sinh: namHopLe,
-        noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
+        noi_sinh_tinh: 'Tỉnh An Giang (cũ)',
+        noi_sinh_huyen: 'Huyện Châu Thành (cũ)',
+        noi_sinh_xa: 'Xã Long Xuyên (cũ)',
         cu_tru_tinh_id: null,
         cu_tru_phuong_xa_id: null,
         don_vi_cong_tac_id: 'truong-1',
@@ -726,7 +741,6 @@ describe('HocVienService', () => {
     it('hồ sơ MOET vừa import (nhiều field NULL) -> day_du=false, liệt kê đủ trường thiếu', async () => {
       const hocVien = baseHocVienDayDu({
         so_dinh_danh_ca_nhan: null,
-        noi_sinh: null,
         email_lien_he: null,
         trinh_do_chuyen_mon: null,
         chuyen_mon: [],
@@ -737,12 +751,22 @@ describe('HocVienService', () => {
       expect(thieuFields).toEqual(
         expect.arrayContaining([
           'so_dinh_danh_ca_nhan',
-          'noi_sinh',
           'email_lien_he',
           'trinh_do_chuyen_mon',
           'chuyen_mon',
         ]),
       );
+    });
+
+    it('T17: thiếu cả noi_sinh_tinh/huyen/xa nhưng đủ mọi field khác -> vẫn day_du=true (nơi sinh không còn tính vào đầy đủ)', async () => {
+      const res = await service.danhGiaDayDu(
+        baseHocVienDayDu({
+          noi_sinh_tinh: null,
+          noi_sinh_huyen: null,
+          noi_sinh_xa: null,
+        }) as never,
+      );
+      expect(res).toEqual({ day_du: true, thieu: [] });
     });
 
     it('bổ sung đủ mọi trường -> day_du=true', async () => {
@@ -1149,7 +1173,9 @@ describe('HocVienService', () => {
         ngay_sinh: 15,
         thang_sinh: 6,
         nam_sinh: namHopLe,
-        noi_sinh: null,
+        noi_sinh_tinh: null,
+        noi_sinh_huyen: null,
+        noi_sinh_xa: null,
         don_vi_cong_tac_id: 'truong-1',
         chuc_vu: 'Giáo viên',
         so_dien_thoai_lien_he: '0912345678',
@@ -1283,7 +1309,9 @@ describe('HocVienService', () => {
           ngay_sinh: 1,
           thang_sinh: 1,
           nam_sinh: namHopLe,
-          noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
+          noi_sinh_tinh: 'Tỉnh An Giang (cũ)',
+          noi_sinh_huyen: 'Huyện Châu Thành (cũ)',
+          noi_sinh_xa: 'Xã Long Xuyên (cũ)',
           don_vi_cong_tac_id: 'truong-1',
           so_dien_thoai_lien_he: '0912345678',
           email_lien_he: 'a@test.local',
@@ -1319,7 +1347,9 @@ describe('HocVienService', () => {
           ngay_sinh: 1,
           thang_sinh: 1,
           nam_sinh: namHopLe,
-          noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
+          noi_sinh_tinh: 'Tỉnh An Giang (cũ)',
+          noi_sinh_huyen: 'Huyện Châu Thành (cũ)',
+          noi_sinh_xa: 'Xã Long Xuyên (cũ)',
           don_vi_cong_tac_id: 'truong-1',
           so_dien_thoai_lien_he: '0912345678',
           email_lien_he: 'cu@test.local',
@@ -1503,7 +1533,9 @@ describe('HocVienService', () => {
       it('có đợt mở + hồ sơ đầy đủ -> taoXacNhan được gọi, gửi email, KHÔNG đổi trang_thai', async () => {
         const hocVienDayDu = baseImportMoetHocVien({
           so_dinh_danh_ca_nhan: '123456789012',
-          noi_sinh: 'Xã Long Xuyên, Tỉnh An Giang (cũ)',
+          noi_sinh_tinh: 'Tỉnh An Giang (cũ)',
+          noi_sinh_huyen: 'Huyện Châu Thành (cũ)',
+          noi_sinh_xa: 'Xã Long Xuyên (cũ)',
           email_lien_he: 'du@test.local',
           trinh_do_chuyen_mon: 'dai_hoc',
         });
