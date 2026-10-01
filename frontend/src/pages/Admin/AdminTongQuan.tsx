@@ -307,7 +307,10 @@ export default function AdminTongQuan() {
   const tongHopDonVi = useBaoCaoTongHop('don_vi');
   // Danh mục đơn vị (không scope theo quyền) — chỉ dùng để tra tên hiển thị trong bảng chờ duyệt,
   // KHÔNG dùng để tính KPI (KPI "Đơn vị tham gia" dùng bao-cao/tong-hop vì có scope theo quyền caller).
-  const donViDanhMuc = useQuery({ queryKey: ['danh-muc', 'don-vi-cong-tac', 'all'], queryFn: () => layDonViCongTac({}) });
+  const donViDanhMuc = useQuery({
+    queryKey: ['danh-muc', 'don-vi-cong-tac', 'all'],
+    queryFn: () => layDonViCongTac({ page_size: 200 }),
+  });
 
   const donViMap = new Map((donViDanhMuc.data?.data ?? []).map((d) => [d.id, d.ten_don_vi]));
 

@@ -55,7 +55,10 @@ export default function AdminDanhSach() {
   );
 
   const { data, isLoading, isError, error, isFetching } = useDanhSachHocVien(params);
-  const donVi = useQuery({ queryKey: ['danh-muc', 'don-vi-cong-tac', 'all'], queryFn: () => layDonViCongTac({}) });
+  const donVi = useQuery({
+    queryKey: ['danh-muc', 'don-vi-cong-tac', 'all'],
+    queryFn: () => layDonViCongTac({ page_size: 200 }),
+  });
   const donViMap = new Map((donVi.data?.data ?? []).map((d) => [d.id, d.ten_don_vi]));
   const tuyChonDonVi = [
     { value: '', label: 'Tất cả đơn vị' },

@@ -12,11 +12,12 @@ export function layDiaDanh(params: { cap: string; parent_id?: string; q?: string
   return apiFetch<{ data: DiaDanh[] }>(`/danh-muc/dia-danh?${qs.toString()}`);
 }
 
-export function layDonViCongTac(params: { q?: string; loai_don_vi?: string; dia_ban_id?: string }) {
+export function layDonViCongTac(params: { q?: string; loai_don_vi?: string; dia_ban_id?: string; page_size?: number }) {
   const qs = new URLSearchParams();
   qs.set('loai_don_vi', params.loai_don_vi ?? 'truong');
   if (params.q) qs.set('q', params.q);
   if (params.dia_ban_id) qs.set('dia_ban_id', params.dia_ban_id);
+  if (params.page_size) qs.set('page_size', String(params.page_size));
   return apiFetch<{ data: DonViCongTac[] }>(`/danh-muc/don-vi-cong-tac?${qs.toString()}`);
 }
 

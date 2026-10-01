@@ -24,13 +24,16 @@ import type {
 // don_vi_to_chuc_id của khóa có thể là đơn vị loại 'truong' hoặc 'khac' (T2, QĐ2 — vd. HCMUE không
 // thuộc cây đơn vị An Giang). layDonViCongTac() mặc định chỉ lọc loai_don_vi='truong' (dùng cho màn
 // học viên) nên ở đây gộp cả 2 loại để map id->tên không bị thiếu đơn vị 'khac'.
+// page_size: 200 (tối đa backend cho phép, xem PaginationQueryDto) — hook này lấy TOÀN BỘ danh sách
+// để xây dropdown/map id->tên, không phải search phân trang, nếu không đơn vị xếp sau trang 1 (vd.
+// HCMUE) sẽ bị rớt khỏi danh sách mặc định 20 dòng/trang.
 export function useDonViChoKhoa() {
   return useQuery({
     queryKey: ['danh-muc', 'don-vi-cong-tac', 'khoa-boi-duong'],
     queryFn: async () => {
       const [truong, khac] = await Promise.all([
-        layDonViCongTac({ loai_don_vi: 'truong' }),
-        layDonViCongTac({ loai_don_vi: 'khac' }),
+        layDonViCongTac({ loai_don_vi: 'truong', page_size: 200 }),
+        layDonViCongTac({ loai_don_vi: 'khac', page_size: 200 }),
       ]);
       return [...truong.data, ...khac.data];
     },
