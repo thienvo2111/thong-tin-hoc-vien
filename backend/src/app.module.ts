@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -14,10 +15,14 @@ import { ThongBaoModule } from './thong-bao/thong-bao.module';
 import { ValidateModule } from './validate/validate.module';
 import { NguoiDungModule } from './nguoi-dung/nguoi-dung.module';
 import { DotXacNhanModule } from './dot-xac-nhan/dot-xac-nhan.module';
+import { YeuCauHoTroModule } from './yeu-cau-ho-tro/yeu-cau-ho-tro.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // M9 (2026-10-01): cần cho @Cron() ở HangDoiEmailProcessor (thong-bao
+    // module) — drain hang_doi_email mỗi phút, xem comment đầu file đó.
+    ScheduleModule.forRoot(),
     // T1 (mo-rong-nls-an-giang.md): 10 request/phút/IP. Module này là
     // @Global() nên ThrottlerGuard dùng được ở bất kỳ controller nào chỉ cần
     // @UseGuards(ThrottlerGuard) — KHÔNG đăng ký làm APP_GUARD toàn cục, chỉ
@@ -35,6 +40,7 @@ import { DotXacNhanModule } from './dot-xac-nhan/dot-xac-nhan.module';
     ValidateModule,
     NguoiDungModule,
     DotXacNhanModule,
+    YeuCauHoTroModule,
   ],
   controllers: [AppController],
   providers: [AppService],
