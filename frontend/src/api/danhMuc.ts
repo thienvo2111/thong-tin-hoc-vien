@@ -2,14 +2,33 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type { DiaDanh, DonViCongTac, LoaiVanDeHoTro, MonHoc, PaginatedResult } from './types';
 
-export function layDiaDanh(params: { cap: string; parent_id?: string; q?: string; trang_thai?: string; phien_ban?: string }) {
-  const qs = new URLSearchParams();
-  qs.set('cap', params.cap);
-  if (params.parent_id) qs.set('parent_id', params.parent_id);
-  if (params.q) qs.set('q', params.q);
-  qs.set('trang_thai', params.trang_thai ?? 'active');
-  if (params.phien_ban) qs.set('phien_ban', params.phien_ban);
-  return apiFetch<{ data: DiaDanh[] }>(`/danh-muc/dia-danh?${qs.toString()}`);
+// Backend phân trang server-side (mặc định page_size=20, tối đa 200 — PaginationQueryDto @Max(200)),
+// trong khi SelectDiaDanh cần TOÀN BỘ danh sách để tự lọc phía client (searchable Select). Một số
+// tỉnh/thành có > 200 xã nên 1 trang page_size=200 không đủ (bug: chỉ lấy 20 dòng đầu A-Z trước khi
+// sửa) — gọi lặp page=1,2,... cho đến khi gộp đủ `total`, có giới hạn an toàn MAX_PAGES tránh lặp vô
+// hạn nếu backend trả total sai. Giữ nguyên chữ ký trả về { data } như cũ để không vỡ chỗ gọi.
+const DIA_DANH_PAGE_SIZE = 200;
+const DIA_DANH_MAX_PAGES = 50;
+
+export async function layDiaDanh(params: { cap: string; parent_id?: string; q?: string; trang_thai?: string; phien_ban?: string }) {
+  let all: DiaDanh[] = [];
+  let total = Infinity;
+  for (let page = 1; page <= DIA_DANH_MAX_PAGES && all.length < total; page++) {
+    const qs = new URLSearchParams();
+    qs.set('cap', params.cap);
+    if (params.parent_id) qs.set('parent_id', params.parent_id);
+    if (params.q) qs.set('q', params.q);
+    qs.set('trang_thai', params.trang_thai ?? 'active');
+    if (params.phien_ban) qs.set('phien_ban', params.phien_ban);
+    qs.set('page', String(page));
+    qs.set('page_size', String(DIA_DANH_PAGE_SIZE));
+    const ket_qua = await apiFetch<{ data: DiaDanh[]; total?: number }>(`/danh-muc/dia-danh?${qs.toString()}`);
+    all = all.concat(ket_qua.data);
+    // Mock/response không kèm `total` (vd test cũ trả thẳng { data }) -> không có cơ sở lặp tiếp, dừng sau trang đầu.
+    if (typeof ket_qua.total !== 'number') break;
+    total = ket_qua.total;
+  }
+  return { data: all };
 }
 
 export function layDonViCongTac(params: { q?: string; loai_don_vi?: string; dia_ban_id?: string; page_size?: number }) {

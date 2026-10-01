@@ -208,8 +208,11 @@ export const handlers = [
     const cap = url.searchParams.get('cap');
     const parentId = url.searchParams.get('parent_id');
     const q = url.searchParams.get('q')?.toLowerCase();
-    const data = DIA_DANH.filter((d) => d.cap === cap && (!parentId || d.parent_id === parentId) && (!q || d.ten.toLowerCase().includes(q)));
-    return HttpResponse.json({ data });
+    const page = Number(url.searchParams.get('page') ?? '1');
+    const pageSize = Number(url.searchParams.get('page_size') ?? '20');
+    const filtered = DIA_DANH.filter((d) => d.cap === cap && (!parentId || d.parent_id === parentId) && (!q || d.ten.toLowerCase().includes(q)));
+    const data = filtered.slice((page - 1) * pageSize, page * pageSize);
+    return HttpResponse.json({ data, total: filtered.length, page, page_size: pageSize });
   }),
 
   http.get('/danh-muc/don-vi-cong-tac', ({ request }) => {
