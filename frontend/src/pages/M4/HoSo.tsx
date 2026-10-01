@@ -472,8 +472,7 @@ export default function HoSo() {
                 />
 
                 <Text size="xs" c="dimmed">
-                  Thông tin lấy từ danh sách của ngành. Nếu chưa đúng, Thầy/Cô sửa lại cho chính xác — thông tin này sẽ
-                  in trên giấy chứng nhận.
+                  Thầy/Cô vui lòng cung cấp thông tin chính xác — thông tin này sẽ in trên giấy chứng nhận.
                 </Text>
               </Stack>
             </Card>
