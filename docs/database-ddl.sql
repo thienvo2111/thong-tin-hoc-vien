@@ -86,15 +86,27 @@ CREATE TYPE muc_nang_luc AS ENUM ('co_ban', 'thanh_thao', 'nang_cao');
 
 CREATE TYPE trang_thai_import AS ENUM ('dang_xu_ly', 'hoan_thanh', 'loi');
 
+-- M9 (2026-10-01): thêm 'email_xac_minh'/'dat_lai_mat_khau' (ALTER TYPE ADD
+-- VALUE trong migration riêng, chạy trước migration dùng giá trị mới — xem
+-- schema.prisma) để 2 sự kiện này (làn "ưu tiên cao", gửi ngay không qua
+-- hàng đợi) cũng ghi nhat_ky_thong_bao, phục vụ đếm hạn mức/ngày EMAIL_DAILY_
+-- LIMIT (PHẦN 4 dưới). Danh sách dưới đây CHƯA phản ánh 'yeu_cau_ho_tro_tra_loi'
+-- (M8) — xem CONTEXT.md ghi chú lệch pha đã biết.
 CREATE TYPE loai_su_kien_thong_bao AS ENUM (
     'hoc_vien_xac_nhan',      -- gửi bản sao dữ liệu sau khi học viên xác nhận
     'hoc_vien_duyet',         -- kết quả duyệt hồ sơ (đã duyệt/từ chối)
     'khoa_boi_duong_duyet',   -- kết quả duyệt khóa bồi dưỡng
     'dang_ky_hoc_phan_lop',   -- thông báo lớp/lịch học sau khi được phân lớp
-    'dang_ky_hoc_ket_qua'     -- thông báo kết quả khóa học
+    'dang_ky_hoc_ket_qua',    -- thông báo kết quả khóa học
+    'email_xac_minh',         -- M9: xác minh email liên hệ (làn ưu tiên cao)
+    'dat_lai_mat_khau'        -- M9: đặt lại mật khẩu (làn ưu tiên cao)
 );
 
 CREATE TYPE trang_thai_gui_thong_bao AS ENUM ('thanh_cong', 'that_bai');
+
+-- M9 (2026-10-01): trạng thái 1 dòng hang_doi_email (PHẦN 4 dưới) — khác
+-- trang_thai_gui_thong_bao vì hàng đợi cần phân biệt "đang chờ" (cho_gui).
+CREATE TYPE trang_thai_hang_doi_email AS ENUM ('cho_gui', 'thanh_cong', 'that_bai');
 
 -- T14 (mo-rong-nls-an-giang.md, 2026-09-28): đợt xác nhận cho hồ sơ
 -- import_moet — xem PHẦN 2b bên dưới.
@@ -688,6 +700,29 @@ CREATE TABLE nhat_ky_thong_bao (
 CREATE INDEX idx_thong_bao_hoc_vien ON nhat_ky_thong_bao(hoc_vien_id);
 CREATE INDEX idx_thong_bao_loai_su_kien ON nhat_ky_thong_bao(loai_su_kien);
 CREATE INDEX idx_thong_bao_gui_luc ON nhat_ky_thong_bao(gui_luc);
+
+-- M9 (2026-10-01): hàng đợi gửi email hàng loạt (5 sự kiện làn "hàng loạt" —
+-- xem api-contract.md mục 8) — HangDoiEmailProcessor (cron mỗi phút) rút tối
+-- đa 20 dòng cho_gui/lượt theo FIFO (created_at tăng dần), giới hạn thêm bởi
+-- EMAIL_DAILY_LIMIT/ngày (giờ Việt Nam) để không vượt hạn mức SMTP của
+-- Google Workspace. Làn "ưu tiên cao" (email_xac_minh/dat_lai_mat_khau)
+-- KHÔNG đi qua bảng này.
+CREATE TABLE hang_doi_email (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    loai_su_kien        loai_su_kien_thong_bao NOT NULL,
+    hoc_vien_id         uuid REFERENCES hoc_vien(id),
+    email_nguoi_nhan    varchar(255) NOT NULL,
+    tieu_de             varchar(255) NOT NULL,
+    noi_dung_html       text NOT NULL,
+    trang_thai          trang_thai_hang_doi_email NOT NULL DEFAULT 'cho_gui',
+    so_lan_thu          integer NOT NULL DEFAULT 0,
+    loi                 text,   -- lỗi lần thử gần nhất
+    created_at          timestamptz NOT NULL DEFAULT now(),
+    gui_luc             timestamptz   -- chỉ set khi thành công hoặc thất bại hẳn (so_lan_thu >= 3)
+);
+
+CREATE INDEX idx_hang_doi_email_trang_thai_created_at ON hang_doi_email(trang_thai, created_at);
+CREATE INDEX idx_hang_doi_email_hoc_vien ON hang_doi_email(hoc_vien_id);
 
 
 -- =====================================================================

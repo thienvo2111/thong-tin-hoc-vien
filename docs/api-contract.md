@@ -291,16 +291,24 @@ Chi tiết quy tắc: [`validation-checklist.md`](validation-checklist.md). Endp
 
 ## 8. Dịch vụ Thông báo
 
-Nội bộ, không có endpoint public cho FE trừ 1 mục xem lịch sử. Mỗi lần **thực sự gửi** (kể cả thất bại) ghi 1 dòng vào `nhat_ky_thong_bao` (`database-ddl.sql` PHẦN 4, thêm 2026-09-25 — bản trước có endpoint `lich-su` nhưng không có bảng nào để đọc) — **ngoại lệ (QĐ6, T3 2026-09-29)**: học viên chưa có `email_lien_he` → bỏ qua hoàn toàn (không gửi, không ghi dòng nào, chỉ log cảnh báo nội bộ), khác với thất bại gửi SMTP (vẫn ghi `trang_thai='that_bai'`). Sự kiện kích hoạt gửi email — cột "Sự kiện" khớp trực tiếp với enum `loai_su_kien_thong_bao`:
+Nội bộ, không có endpoint public cho FE trừ 2 mục xem lịch sử/hàng đợi. Mỗi lần **thực sự gửi** (kể cả thất bại) ghi 1 dòng vào `nhat_ky_thong_bao` (`database-ddl.sql` PHẦN 4, thêm 2026-09-25 — bản trước có endpoint `lich-su` nhưng không có bảng nào để đọc) — **ngoại lệ (QĐ6, T3 2026-09-29)**: học viên chưa có `email_lien_he` → bỏ qua hoàn toàn (không gửi, không ghi dòng nào, chỉ log cảnh báo nội bộ), khác với thất bại gửi SMTP (vẫn ghi `trang_thai='that_bai'`). Sự kiện kích hoạt gửi email — cột "Sự kiện" khớp trực tiếp với enum `loai_su_kien_thong_bao`:
 
-| Sự kiện | Người nhận | Nội dung |
-|---|---|---|
-| `hoc_vien_xac_nhan` | Học viên | Bản sao toàn bộ dữ liệu vừa khai báo |
-| `hoc_vien_duyet` | Học viên | Kết quả duyệt hồ sơ (đã duyệt / từ chối + lý do) |
-| `khoa_boi_duong_duyet` | Trường (tài khoản đã tạo khóa) | Kết quả duyệt khóa — `nhat_ky_thong_bao.hoc_vien_id` để `NULL` cho loại sự kiện này, người nhận không phải học viên |
-| `dang_ky_hoc_phan_lop` | Học viên | Thông báo lớp, lịch học, giảng viên — kích hoạt khi import `phan_lop_hoc_vien` gán `lop_id` (không kích hoạt ở nhánh chỉ ghi danh, `lop_id` vẫn NULL) |
-| `dang_ky_hoc_ket_qua` | Học viên | Kết quả khóa học — kích hoạt bởi `PATCH /dang-ky-hoc/{id}/ket-qua` (mục 3) |
+**M9 (2026-10-01) — 2 LÀN gửi, tách theo mức độ nhạy cảm thời gian** (tài khoản gửi thật: Google Workspace `boiduongnls@hcmue.edu.vn`, hạn mức SMTP thông thường ~2000 email/ngày — quy mô ~8000 học viên nên 1 đợt phân lớp hàng loạt có thể vượt xa hạn mức này nếu gửi dồn dập):
+
+- **Ưu tiên cao** (`email_xac_minh`, `dat_lai_mat_khau`) — bảo mật quan trọng hơn hạn mức: gửi **NGAY**, không qua hàng đợi, không bị chặn bởi hạn mức/ngày dù đã hết.
+- **Hàng loạt** (`hoc_vien_xac_nhan`, `hoc_vien_duyet`, `khoa_boi_duong_duyet`, `dang_ky_hoc_phan_lop`, `dang_ky_hoc_ket_qua`) — chỉ **insert vào hàng đợi** (`hang_doi_email`, trạng thái `cho_gui`), trả về ngay; một cron job (`HangDoiEmailProcessor`, mỗi phút) rút tối đa `min(hạn mức còn lại hôm nay, 20)` dòng/lượt theo FIFO (`created_at` tăng dần) để gửi thật — tự trải việc gửi qua nhiều ngày khi vượt hạn mức, tránh bị Google tạm khóa/quarantine tài khoản. Hạn mức/ngày đọc từ biến môi trường `EMAIL_DAILY_LIMIT` (mặc định 2000), tính theo số dòng `nhat_ky_thong_bao.trang_thai='thanh_cong'` có `gui_luc` rơi vào "hôm nay" theo giờ Việt Nam (UTC+7) — **đếm cả 2 làn** (làn ưu tiên cao từ M9 cũng ghi `nhat_ky_thong_bao`, trước đây không ghi) để không đếm thiếu. 1 dòng hàng đợi gửi lỗi được thử lại tối đa 3 lần (tăng `so_lan_thu`, giữ `cho_gui`); lỗi lần thứ 3 thì chuyển `that_bai` + ghi `nhat_ky_thong_bao` (`trang_thai='that_bai'`).
+
+| Sự kiện | Làn | Người nhận | Nội dung |
+|---|---|---|---|
+| `hoc_vien_xac_nhan` | Hàng loạt | Học viên | Bản sao toàn bộ dữ liệu vừa khai báo |
+| `hoc_vien_duyet` | Hàng loạt | Học viên | Kết quả duyệt hồ sơ (đã duyệt / từ chối + lý do) |
+| `khoa_boi_duong_duyet` | Hàng loạt | Trường (tài khoản đã tạo khóa) | Kết quả duyệt khóa — `nhat_ky_thong_bao.hoc_vien_id` để `NULL` cho loại sự kiện này, người nhận không phải học viên |
+| `dang_ky_hoc_phan_lop` | Hàng loạt | Học viên | Thông báo lớp, lịch học, giảng viên — kích hoạt khi import `phan_lop_hoc_vien` gán `lop_id` (không kích hoạt ở nhánh chỉ ghi danh, `lop_id` vẫn NULL) |
+| `dang_ky_hoc_ket_qua` | Hàng loạt | Học viên | Kết quả khóa học — kích hoạt bởi `PATCH /dang-ky-hoc/{id}/ket-qua` (mục 3) |
+| `email_xac_minh` | Ưu tiên cao | Học viên (email vừa cập nhật) | Link xác minh email liên hệ, hiệu lực 24 giờ |
+| `dat_lai_mat_khau` | Ưu tiên cao | Học viên (qua tài khoản `nguoi_dung`) | Link đặt lại mật khẩu, hiệu lực 30 phút |
 
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
 | GET | `/thong-bao/lich-su?hoc_vien_id=&loai_su_kien=` | Lịch sử gửi cho 1 hồ sơ (đối chiếu khi học viên báo không nhận được), lọc thêm theo loại sự kiện nếu cần | QuảnTrị |
+| GET | `/thong-bao/hang-doi` | **Thêm M9**: đếm `hang_doi_email` theo từng `trang_thai` (`cho_gui`/`thanh_cong`/`that_bai`) + số email đã gửi thành công hôm nay (giờ Việt Nam) + hạn mức còn lại | QuảnTrị |
