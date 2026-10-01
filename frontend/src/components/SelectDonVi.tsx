@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Autocomplete, Loader, Stack, Text } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
-import { layDonViCongTac } from '@/api/danhMuc';
+import { layDonViCongTac, layDonViCongTacTheoId } from '@/api/danhMuc';
 import { SelectDiaDanh } from '@/components/SelectDiaDanh';
 import type { DonViCongTac } from '@/api/types';
 
@@ -10,6 +10,11 @@ interface Props {
   label: string;
   /** Nhãn hiển thị ban đầu khi hồ sơ đã có đơn vị công tác (đến từ HocVien.don_vi_cong_tac_ten). */
   nhanBanDau?: string | null;
+  /**
+   * id đơn vị công tác hiện tại của hồ sơ (nếu có) — dùng để tự động điền sẵn 2 Select địa giới
+   * (Tỉnh/thành, Phường/xã) theo địa bàn của đơn vị đó, tránh bắt người dùng tự chọn lại từ đầu.
+   */
+  idBanDau?: string | null;
   onChange: (id: string | null, nhan: string | null) => void;
   error?: string;
   required?: boolean;
@@ -25,7 +30,7 @@ function nhanDonVi(d: DonViCongTac): string {
  * địa giới (tỉnh/thành → phường/xã) tùy chọn ở trên để thu hẹp phạm vi tìm kiếm qua dia_ban_id —
  * giá trị 2 Select này CHỈ để lọc, không phải giá trị gửi lên server (server chỉ cần don_vi_cong_tac_id).
  */
-export function SelectDonVi({ label, nhanBanDau, onChange, error, required, disabled }: Props) {
+export function SelectDonVi({ label, nhanBanDau, idBanDau, onChange, error, required, disabled }: Props) {
   const [text, setText] = useState(nhanBanDau ?? '');
   const [debounced] = useDebouncedValue(text, 300);
   const duDieuKienTimKiem = debounced.trim().length >= 2;
@@ -35,6 +40,23 @@ export function SelectDonVi({ label, nhanBanDau, onChange, error, required, disa
   // Mantine Autocomplete gọi onOptionSubmit RỒI gọi lại onChange với cùng nhãn ngay sau đó (đồng bộ
   // hóa value nội bộ) — nếu không lọc phát onChange "ăn theo" này ra, nó sẽ ghi đè id vừa chọn về null.
   const nhanVuaChonRef = useRef<string | null>(null);
+
+  // Chỉ tự động điền sẵn 2 ô địa giới MỘT LẦN (khi hồ sơ đã có sẵn don_vi_cong_tac_id) — không lặp lại
+  // nếu sau đó người dùng tự xóa/đổi Tỉnh/thành, tránh ghi đè lựa chọn thủ công của người dùng.
+  const daTuDongDienRef = useRef(false);
+  const { data: donViBanDau } = useQuery({
+    queryKey: ['danh-muc', 'don-vi-cong-tac', 'theo-id', idBanDau],
+    queryFn: () => layDonViCongTacTheoId(idBanDau as string),
+    enabled: !!idBanDau && tinhId === null && !disabled && !daTuDongDienRef.current,
+  });
+
+  useEffect(() => {
+    if (donViBanDau && !daTuDongDienRef.current) {
+      daTuDongDienRef.current = true;
+      setTinhId(donViBanDau.tinh_id ?? null);
+      setPhuongXaId(donViBanDau.dia_ban_id ?? null);
+    }
+  }, [donViBanDau]);
 
   const { data, isFetching } = useQuery({
     queryKey: ['danh-muc', 'don-vi-cong-tac', debounced, phuongXaId],
@@ -50,6 +72,7 @@ export function SelectDonVi({ label, nhanBanDau, onChange, error, required, disa
       <SelectDiaDanh
         label="Tỉnh/thành"
         cap="tinh_thanh"
+        phienBan="hien_tai"
         value={tinhId}
         onChange={(id) => {
           setTinhId(id);
@@ -60,6 +83,7 @@ export function SelectDonVi({ label, nhanBanDau, onChange, error, required, disa
       <SelectDiaDanh
         label="Phường/xã"
         cap="phuong_xa_dac_khu"
+        phienBan="hien_tai"
         parentId={tinhId}
         value={phuongXaId}
         onChange={setPhuongXaId}

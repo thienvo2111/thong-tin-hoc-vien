@@ -23,6 +23,7 @@ export class DonViCongTacService {
     const page = query.page ?? 1;
     const pageSize = query.page_size ?? 20;
     const where: Prisma.don_vi_cong_tacWhereInput = {};
+    if (query.id) where.id = query.id;
     if (query.loai_don_vi) where.loai_don_vi = query.loai_don_vi;
     if (query.dia_ban_id) where.dia_ban_id = query.dia_ban_id;
     if (query.tinh_id) where.dia_ban = { parent_id: query.tinh_id };

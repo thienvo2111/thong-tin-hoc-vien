@@ -64,6 +64,10 @@ export class UpdateDonViCongTacDto {
 
 export class QueryDonViCongTacDto extends PaginationQueryDto {
   @IsOptional()
+  @IsUUID()
+  id?: string;
+
+  @IsOptional()
   @IsEnum(loai_don_vi)
   loai_don_vi?: loai_don_vi;
 

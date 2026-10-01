@@ -7,11 +7,16 @@ import { server } from '@/test/mocks/server';
 import { renderTrang } from '@/test/testUtils';
 import { SelectDonVi } from './SelectDonVi';
 
-function Bao({ disabled }: { disabled?: boolean }) {
+function Bao({ disabled, idBanDau }: { disabled?: boolean; idBanDau?: string | null }) {
   const [id, setId] = useState<string | null>(null);
   return (
     <div>
-      <SelectDonVi label="Đơn vị công tác" onChange={(donViId) => setId(donViId)} disabled={disabled} />
+      <SelectDonVi
+        label="Đơn vị công tác"
+        idBanDau={idBanDau}
+        onChange={(donViId) => setId(donViId)}
+        disabled={disabled}
+      />
       <div data-testid="gia-tri">{id ?? ''}</div>
     </div>
   );
@@ -85,5 +90,17 @@ describe('SelectDonVi', () => {
     expect(screen.getByLabelText('Tỉnh/thành', { selector: 'input' })).toBeDisabled();
     expect(screen.getByLabelText('Phường/xã', { selector: 'input' })).toBeDisabled();
     expect(screen.getByPlaceholderText('Gõ tên trường (ít nhất 2 ký tự)')).toBeDisabled();
+  });
+
+  it('idBanDau: tự động điền sẵn Tỉnh/thành + Phường/xã theo địa bàn của đơn vị đã có sẵn', async () => {
+    renderTrang(<Bao idBanDau="dv-1" />);
+
+    const oTinh = screen.getByLabelText('Tỉnh/thành', { selector: 'input' });
+    const oPhuong = screen.getByLabelText('Phường/xã', { selector: 'input' });
+
+    await waitFor(() => expect(oTinh).toHaveValue('An Giang'));
+    await waitFor(() => expect(oPhuong).toHaveValue('Phường Long Xuyên'));
+    // Chỉ điền sẵn 2 ô filter — KHÔNG tự chọn luôn đơn vị công tác (không ép người dùng phải dùng lại).
+    expect(screen.getByTestId('gia-tri')).toHaveTextContent('');
   });
 });

@@ -21,6 +21,15 @@ export function layDonViCongTac(params: { q?: string; loai_don_vi?: string; dia_
   return apiFetch<{ data: DonViCongTac[] }>(`/danh-muc/don-vi-cong-tac?${qs.toString()}`);
 }
 
+// Thêm (SelectDonVi B) — tra 1 đơn vị công tác theo id để tự động điền sẵn Tỉnh/thành + Phường/xã
+// của hồ sơ đã có sẵn don_vi_cong_tac_id (vd khi sửa hồ sơ), tránh bắt người dùng chọn lại từ đầu.
+export async function layDonViCongTacTheoId(id: string): Promise<DonViCongTac | null> {
+  const ket_qua = await apiFetch<{ data: DonViCongTac[] }>(
+    `/danh-muc/don-vi-cong-tac?id=${encodeURIComponent(id)}&page_size=1`,
+  );
+  return ket_qua.data[0] ?? null;
+}
+
 export interface DonViCongTacPhanTrangParams {
   loai_don_vi?: string;
   dia_ban_id?: string;

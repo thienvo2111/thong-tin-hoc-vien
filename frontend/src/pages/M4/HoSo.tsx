@@ -559,6 +559,7 @@ export default function HoSo() {
                     <SelectDonVi
                       label="Đơn vị công tác"
                       nhanBanDau={donViNhanBanDau}
+                      idBanDau={hoSo?.don_vi_cong_tac_id ?? null}
                       onChange={(id) => field.onChange(id ?? '')}
                       error={loiHoacThieu('don_vi_cong_tac_id', errors.don_vi_cong_tac_id?.message, field.value)}
                       disabled={chiXem}
