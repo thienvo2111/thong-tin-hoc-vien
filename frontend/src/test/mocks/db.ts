@@ -479,8 +479,8 @@ export function taoKhoaHocToiMau(): KhoaHocDangKy[] {
         nhom_hoc_vien: 1,
         muc_nang_luc: 'co_ban',
         nhan_su: [
-          { id: 'ns-1', ho_ten: 'Nguyễn Văn Long', vai_tro: 'Giảng viên', so_dien_thoai: '0909123456' },
-          { id: 'ns-2', ho_ten: 'Trần Thị Mai', vai_tro: 'Trợ giảng', so_dien_thoai: null },
+          { id: 'ns-1', ho_ten: 'Nguyễn Văn Long', vai_tro: 'giang_vien', so_dien_thoai: '0909123456' },
+          { id: 'ns-2', ho_ten: 'Trần Thị Mai', vai_tro: 'ho_tro', so_dien_thoai: null },
         ],
         lich_hoc: [
           {
@@ -509,7 +509,7 @@ export function taoKhoaHocToiMau(): KhoaHocDangKy[] {
         si_so_toi_da: 500,
         nhom_hoc_vien: null,
         muc_nang_luc: null,
-        nhan_su: [{ id: 'ns-3', ho_ten: 'Lê Thị Hồng', vai_tro: 'Giảng viên', so_dien_thoai: null }],
+        nhan_su: [{ id: 'ns-3', ho_ten: 'Lê Thị Hồng', vai_tro: 'giang_vien', so_dien_thoai: null }],
         lich_hoc: [
           {
             id: 'lh-2',

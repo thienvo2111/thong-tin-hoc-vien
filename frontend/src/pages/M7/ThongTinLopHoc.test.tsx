@@ -65,7 +65,7 @@ describe('M7 — Thông tin lớp học', () => {
     expect(screen.getByText('Lớp trực tiếp')).toBeInTheDocument();
     expect(screen.getByText('Lớp 01 – Nhóm cơ bản A')).toBeInTheDocument();
     expect(screen.getByText(/Giảng viên: Nguyễn Văn Long — 0909123456/)).toBeInTheDocument();
-    expect(screen.getByText(/Trợ giảng: Trần Thị Mai/)).toBeInTheDocument();
+    expect(screen.getByText(/Hỗ trợ: Trần Thị Mai/)).toBeInTheDocument();
     // T12: "Giai đoạn 1 — Tập trung" giờ xuất hiện 2 nơi (tiêu đề nhóm buổi học + khối "Tiến độ học
     // tập" bên dưới) -> getAllByText thay vì getByText.
     expect(screen.getAllByText('Giai đoạn 1 — Tập trung').length).toBeGreaterThan(0);

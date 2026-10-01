@@ -8,6 +8,7 @@ import type {
   MucNangLuc,
   TienDoGiaiDoan,
   TrangThaiDiemDanh,
+  VaiTroNhanSuLop,
 } from '@/api/types';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { thongDiepLoiChung } from '@/lib/loiApi';
@@ -35,6 +36,11 @@ const MAU_DIEM_DANH: Record<TrangThaiDiemDanh, string> = {
   co_mat: 'green',
   vang: 'red',
   vang_co_phep: 'yellow',
+};
+
+const NHAN_VAI_TRO_NHAN_SU: Record<VaiTroNhanSuLop, string> = {
+  giang_vien: 'Giảng viên',
+  ho_tro: 'Hỗ trợ',
 };
 
 const NHAN_HINH_THUC: Record<string, string> = {
@@ -193,7 +199,7 @@ function KhoiLop({ tieuDe, lop }: { tieuDe: string; lop: LopHocToi }) {
           <Stack gap={4}>
             {lop.nhan_su.map((ns) => (
               <Text size="sm" key={ns.id}>
-                {ns.vai_tro}: {ns.ho_ten}
+                {NHAN_VAI_TRO_NHAN_SU[ns.vai_tro] ?? ns.vai_tro}: {ns.ho_ten}
                 {ns.so_dien_thoai ? ` — ${ns.so_dien_thoai}` : ''}
               </Text>
             ))}

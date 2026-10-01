@@ -41,6 +41,7 @@ import { KetQuaDangKyDto } from './dto/ket-qua-dang-ky.dto';
 import { KetQuaDanhGiaRowDto } from './dto/ket-qua-danh-gia-row.dto';
 import { LopVaLichHocRowDto } from './dto/lop-va-lich-hoc-row.dto';
 import { NhanSuLopRowDto } from './dto/nhan-su-lop-row.dto';
+import { canhBaoBuoiHocGiaiDoan } from './util/canh-bao-buoi-hoc.util';
 import { DiemDanhRowDto } from './dto/diem-danh-row.dto';
 import { KetQuaGiaiDoanRowDto } from './dto/ket-qua-giai-doan-row.dto';
 import { RowBuildResult } from '../import/import.types';
@@ -1745,6 +1746,11 @@ export class KhoaBoiDuongService {
         thoi_gian_ket_thuc: ketThuc,
         dia_diem_hoac_link: diaDiemHoacLink,
       },
+      canhBao: canhBaoBuoiHocGiaiDoan(
+        loaiLop,
+        { bat_dau: batDau, ket_thuc: ketThuc },
+        giaiDoan,
+      ),
     };
   }
 

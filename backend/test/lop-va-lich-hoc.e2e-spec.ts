@@ -598,15 +598,7 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         'ten_lop_vle',
         'ten_cum',
       ]);
-      sheet.addRow([
-        undefined,
-        tenDangNhap,
-        khoa.ma_khoa,
-        tenLop,
-        '',
-        '',
-        '',
-      ]);
+      sheet.addRow([undefined, tenDangNhap, khoa.ma_khoa, tenLop, '', '', '']);
       const bufferPhanLop = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
@@ -648,6 +640,68 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         },
       });
       expect(lopGan).not.toBeNull();
+    });
+  });
+
+  describe('Cảnh báo 🟡 giai_doan_thu_tu nghi nhập nhầm (không chặn dòng)', () => {
+    it('lớp trực tiếp gắn vào giai đoạn trực tuyến -> cảnh báo nhưng vẫn hợp lệ; lớp zoom cùng giai đoạn -> không cảnh báo', async () => {
+      const khoa = await taoKhoa();
+      const giaiDoan = await taoGiaiDoan(khoa.id, 1); // hinh_thuc truc_tuyen
+      const dong = (
+        ten: string,
+        loai: string,
+      ): (string | number | undefined)[] => [
+        khoa.ma_khoa,
+        ten,
+        loai,
+        undefined,
+        undefined,
+        50,
+        giaiDoan.thu_tu,
+        1,
+        '10/10/2026 08:00',
+        '10/10/2026 11:00',
+        undefined,
+        undefined,
+      ];
+      const res = await request(app.getHttpServer())
+        .post('/import/lop_va_lich_hoc')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .attach(
+          'file',
+          await buildXlsx([
+            dong('Lớp TT cảnh báo', 'truc_tiep'),
+            dong('Lớp zoom ok', 'zoom'),
+          ]),
+          'canh-bao-gd.xlsx',
+        )
+        .expect(201);
+      importIds.push(res.body.import_id);
+
+      const ketQua = await request(app.getHttpServer())
+        .get(`/import/${res.body.import_id}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(ketQua.body.so_dong_loi).toBe(0);
+      expect(ketQua.body.so_dong_thanh_cong).toBe(2);
+      expect(ketQua.body.danh_sach_canh_bao).toEqual([
+        {
+          dong: 2,
+          ly_do: expect.stringContaining(
+            'lớp trực tiếp nhưng giai đoạn là trực tuyến',
+          ),
+        },
+      ]);
+
+      await request(app.getHttpServer())
+        .post(`/import/${res.body.import_id}/xac-nhan`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(201);
+      expect(
+        await prisma.lich_hoc_lop.count({
+          where: { giai_doan_id: giaiDoan.id },
+        }),
+      ).toBe(2);
     });
   });
 });

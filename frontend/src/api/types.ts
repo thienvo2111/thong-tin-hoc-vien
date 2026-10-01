@@ -473,7 +473,7 @@ export interface TienDoGiaiDoan {
 export interface NhanSuLopToi {
   id: string;
   ho_ten: string;
-  vai_tro: string;
+  vai_tro: VaiTroNhanSuLop;
   so_dien_thoai: string | null;
 }
 
