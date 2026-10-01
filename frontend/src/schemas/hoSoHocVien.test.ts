@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canhBaoDaoTen,
   canhBaoThieuDau,
+  goiYEmailDomain,
   guiYDaoTen,
   soDienThoaiSchema,
 } from './hoSoHocVien';
@@ -75,5 +76,40 @@ describe('guiYDaoTen', () => {
 
   it('tên 1 từ → giữ nguyên', () => {
     expect(guiYDaoTen('Nguyễn')).toBe('Nguyễn');
+  });
+});
+
+describe('goiYEmailDomain', () => {
+  it('domain gõ nhầm gần đúng (thiếu 1 ký tự) → gợi ý domain phổ biến đúng', () => {
+    expect(goiYEmailDomain('abc@gmai.com')).toBe('gmail.com');
+  });
+
+  it('domain đã khớp đúng domain phổ biến → không cảnh báo', () => {
+    expect(goiYEmailDomain('abc@gmail.com')).toBeNull();
+  });
+
+  it('domain gõ nhầm kiểu đảo chữ cái → vẫn gợi ý đúng (khoảng cách 2)', () => {
+    expect(goiYEmailDomain('abc@gmial.com')).toBe('gmail.com');
+    expect(goiYEmailDomain('abc@hotmial.com')).toBe('hotmail.com');
+  });
+
+  it('domain thừa 1 ký tự so với domain phổ biến → vẫn gợi ý đúng', () => {
+    expect(goiYEmailDomain('abc@yahooo.com')).toBe('yahoo.com');
+  });
+
+  it('domain thiếu 1 ký tự khác → vẫn gợi ý đúng', () => {
+    expect(goiYEmailDomain('abc@outlok.com')).toBe('outlook.com');
+  });
+
+  it('domain tổ chức/trường riêng hợp lệ (*.edu.vn) → không cảnh báo, kể cả khi xa mọi domain phổ biến', () => {
+    expect(goiYEmailDomain('abc@truonghocXYZ.edu.vn')).toBeNull();
+  });
+
+  it('domain lạ không gần domain phổ biến nào (khoảng cách > 2) → không cảnh báo', () => {
+    expect(goiYEmailDomain('abc@congty-rieng.vn')).toBeNull();
+  });
+
+  it('chuỗi không có "@" → không cảnh báo', () => {
+    expect(goiYEmailDomain('khong-phai-email')).toBeNull();
   });
 });

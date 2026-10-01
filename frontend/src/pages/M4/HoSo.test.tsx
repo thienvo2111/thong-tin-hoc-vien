@@ -94,7 +94,7 @@ describe('M4 — Hồ sơ: xem & sửa', () => {
     await waitFor(() => expect(oPhuongXa).toHaveValue(''));
   });
 
-  it('Cư trú (tỉnh/thành và phường/xã) chỉ tải địa danh HIỆN TẠI → gửi kèm ?phien_ban=hien_tai (các Select địa danh khác trên trang, vd lọc "Đơn vị công tác", KHÔNG bị ảnh hưởng)', async () => {
+  it('Cư trú (tỉnh/thành và phường/xã) chỉ tải địa danh HIỆN TẠI → gửi kèm ?phien_ban=hien_tai (Select địa danh phụ trong "Đơn vị công tác" (SelectDonVi) cũng vậy — tránh nhầm địa danh lịch sử trùng tên, xem SelectDonVi.tsx)', async () => {
     db.hoSo.cu_tru_tinh_id = 'tinh-1';
     db.hoSo.cu_tru_phuong_xa_id = 'phuong-1';
     db.hoSo.cu_tru_tinh_ten = 'An Giang';
@@ -109,11 +109,47 @@ describe('M4 — Hồ sơ: xem & sửa', () => {
     );
     renderDaDangNhap();
 
-    // Trang còn Select địa danh khác (bộ lọc Tỉnh/thành trong "Đơn vị công tác", qua SelectDonVi) —
-    // cố ý KHÔNG truyền phienBan, nên phải thấy CẢ 2 loại: có 'hien_tai' (Cư trú) và có null (nơi khác).
+    // Cư trú VÀ bộ lọc Tỉnh/thành+Phường/xã trong "Đơn vị công tác" (SelectDonVi) đều phải lọc
+    // phien_ban=hien_tai — không còn request nào thiếu phien_ban cho 2 cấp này.
     await waitFor(() => expect(phienBanNhan.length).toBeGreaterThan(1));
-    expect(phienBanNhan).toContain('hien_tai');
-    expect(phienBanNhan).toContain(null);
+    expect(phienBanNhan.every((v) => v === 'hien_tai')).toBe(true);
+  });
+
+  it('nhập SĐT sai định dạng rồi rời ô (blur) → lỗi hiện ngay, không cần bấm Lưu trước', async () => {
+    const user = userEvent.setup();
+    renderDaDangNhap();
+
+    const oSdt = await screen.findByLabelText('Số điện thoại');
+    await user.clear(oSdt);
+    await user.type(oSdt, '123');
+    await user.tab();
+
+    expect(await screen.findByText(/Số điện thoại phải gồm đúng 10 chữ số/)).toBeInTheDocument();
+  });
+
+  it('email domain có khả năng gõ nhầm (gmai.com) → hiện cảnh báo gợi ý, bấm nút để đổi đúng domain', async () => {
+    const user = userEvent.setup();
+    renderDaDangNhap();
+
+    const oEmail = await screen.findByLabelText('Email');
+    await user.clear(oEmail);
+    await user.type(oEmail, 'abc@gmai.com');
+
+    expect(await screen.findByText('🟡 Có phải Thầy/Cô muốn nhập "abc@gmail.com"?')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Dùng gợi ý này' }));
+    expect(oEmail).toHaveValue('abc@gmail.com');
+  });
+
+  it('email domain đã đúng (gmail.com) → không hiện cảnh báo gợi ý domain', async () => {
+    const user = userEvent.setup();
+    renderDaDangNhap();
+
+    const oEmail = await screen.findByLabelText('Email');
+    await user.clear(oEmail);
+    await user.type(oEmail, 'abc@gmail.com');
+
+    expect(screen.queryByText(/Có phải Thầy\/Cô muốn nhập/)).not.toBeInTheDocument();
   });
 
   it('nhập CCCD đã có người dùng → báo trùng ngay khi rời ô, không cần bấm Lưu', async () => {

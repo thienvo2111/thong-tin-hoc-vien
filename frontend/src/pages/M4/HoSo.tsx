@@ -40,6 +40,7 @@ import {
   canhBaoDaoTen,
   canhBaoThieuDau,
   chuanHoaHoTen,
+  goiYEmailDomain,
   guiYDaoTen,
   hoSoHocVienSchema,
   type HoSoHocVienForm,
@@ -177,6 +178,8 @@ export default function HoSo() {
     resolver,
     values: toFormValues(hoSo),
     resetOptions: { keepDirtyValues: true },
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
   });
   dirtyFieldsRef.current = dirtyFields as Record<string, unknown>;
 
@@ -197,6 +200,9 @@ export default function HoSo() {
   const hoTenHienTai = watch('ho_ten');
   const capGiangDayHienTai = watch('cap_giang_day');
   const trinhDoHienTai = watch('trinh_do_chuyen_mon');
+  const emailHienTai = watch('email_lien_he');
+  // Chỉ gợi ý khi email đã hợp lệ về cú pháp (không còn lỗi đỏ từ zod) — tránh chồng cảnh báo.
+  const goiYDomainEmail = !errors.email_lien_he && emailHienTai ? goiYEmailDomain(emailHienTai) : null;
 
   const monHocQuery = useQuery({
     queryKey: ['danh-muc', 'mon-hoc', capGiangDayHienTai],
@@ -597,6 +603,26 @@ export default function HoSo() {
                   disabled={chiXem}
                   {...register('email_lien_he')}
                 />
+                {!chiXem && goiYDomainEmail && (
+                  <Group gap="xs" wrap="wrap">
+                    <Text size="sm" c="yellow.8">
+                      🟡 Có phải Thầy/Cô muốn nhập "{emailHienTai.slice(0, emailHienTai.lastIndexOf('@'))}@{goiYDomainEmail}"?
+                    </Text>
+                    <Button
+                      variant="subtle"
+                      size="xs"
+                      onClick={() =>
+                        setValue(
+                          'email_lien_he',
+                          `${emailHienTai.slice(0, emailHienTai.lastIndexOf('@'))}@${goiYDomainEmail}`,
+                          { shouldDirty: true, shouldValidate: true },
+                        )
+                      }
+                    >
+                      Dùng gợi ý này
+                    </Button>
+                  </Group>
+                )}
                 {hoSo?.email_lien_he && (
                   <Group gap="sm" wrap="wrap">
                     <Badge color={hoSo.email_da_xac_minh ? 'green' : 'yellow'} variant="light">

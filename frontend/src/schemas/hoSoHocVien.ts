@@ -127,3 +127,46 @@ export function guiYDaoTen(hoTen: string): string {
   if (tu.length < 2) return hoTen;
   return [tu[tu.length - 1], ...tu.slice(0, tu.length - 1)].join(' ');
 }
+
+// Domain email phổ biến tại Việt Nam — dùng để phát hiện khả năng gõ nhầm (#email — 🟡 cảnh báo, không chặn).
+const DOMAIN_EMAIL_PHO_BIEN = ['gmail.com', 'yahoo.com', 'yahoo.com.vn', 'hotmail.com', 'outlook.com', 'icloud.com'];
+
+function khoangCachLevenshtein(a: string, b: string): number {
+  const dp: number[][] = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const chiPhiSua = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + chiPhiSua);
+    }
+  }
+  return dp[a.length][b.length];
+}
+
+/**
+ * Gợi ý domain đúng nếu email có khả năng gõ nhầm domain phổ biến (vd. gmai.com → gmail.com).
+ * Trả về null khi domain đã khớp đúng domain phổ biến, hoặc khi domain cách xa (> 2) mọi domain
+ * phổ biến — trường hợp đó nhiều khả năng là email tổ chức/cơ quan hợp lệ, không nên báo sai.
+ * Domain *.edu.vn (email cơ quan giáo dục) luôn trả null — chỉ kiểm tra đúng đuôi, không so gần đúng,
+ * vì tiền tố (tên trường/sở) là tùy ý và sẽ luôn "xa" các domain phổ biến ở trên.
+ */
+export function goiYEmailDomain(email: string): string | null {
+  const viTriA = email.lastIndexOf('@');
+  if (viTriA === -1) return null;
+  const domain = email.slice(viTriA + 1).trim().toLocaleLowerCase('vi');
+  if (!domain) return null;
+  if (domain === 'edu.vn' || domain.endsWith('.edu.vn')) return null;
+
+  let ganNhat: string | null = null;
+  let khoangCachNhoNhat = Infinity;
+  for (const ungVien of DOMAIN_EMAIL_PHO_BIEN) {
+    if (domain === ungVien) return null;
+    const kc = khoangCachLevenshtein(domain, ungVien);
+    if (kc < khoangCachNhoNhat) {
+      khoangCachNhoNhat = kc;
+      ganNhat = ungVien;
+    }
+  }
+  return ganNhat && khoangCachNhoNhat <= 2 ? ganNhat : null;
+}
