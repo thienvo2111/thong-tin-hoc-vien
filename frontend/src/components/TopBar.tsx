@@ -11,6 +11,7 @@ const MUC_MENU = [
   { toi: '/toi/lop-hoc', nhan: 'Lớp học' },
   { toi: '/toi/xac-nhan', nhan: 'Xác nhận' },
   { toi: '/toi/danh-gia-dau-vao', nhan: 'Đánh giá đầu vào' },
+  { toi: '/toi/yeu-cau-ho-tro', nhan: 'Hỗ trợ' },
 ];
 
 /** Thanh trên mọi màn hình sau đăng nhập — menu điều hướng, tên học viên, Đăng xuất, liên hệ hỗ trợ (dac-ta § "Route"). */
