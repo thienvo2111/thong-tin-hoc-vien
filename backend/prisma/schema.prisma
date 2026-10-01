@@ -169,9 +169,31 @@ enum loai_su_kien_thong_bao {
   khoa_boi_duong_duyet
   dang_ky_hoc_phan_lop
   dang_ky_hoc_ket_qua
+  // M8 (2026-10-01): thêm SAU CÙNG — Postgres yêu cầu ALTER TYPE ... ADD
+  // VALUE nằm trong migration RIÊNG, chạy trước migration nào dùng giá trị
+  // mới (cùng lý do với tai_khoan_vle/ket_qua_danh_gia ở loai_danh_muc_import).
+  yeu_cau_ho_tro_tra_loi
+  // M9 (2026-10-01, hàng đợi email): guiXacMinhEmail/guiDatLaiMatKhau trước
+  // đây KHÔNG ghi nhat_ky_thong_bao (dùng guiEmailKhongGhiNhatKy riêng) — nay
+  // ghi chung guiVaGhiNhatKy() như các sự kiện khác để hạn mức/ngày
+  // (EMAIL_DAILY_LIMIT) đếm được TOÀN BỘ email gửi qua tài khoản, kể cả làn
+  // ưu tiên cao gửi ngay không qua hàng đợi. Cùng ràng buộc ALTER TYPE ADD
+  // VALUE migration riêng như trên.
+  email_xac_minh
+  dat_lai_mat_khau
 }
 
 enum trang_thai_gui_thong_bao {
+  thanh_cong
+  that_bai
+}
+
+// M9 (2026-10-01): trạng thái 1 dòng hang_doi_email — khác trang_thai_gui_
+// thong_bao (chỉ 2 giá trị, dùng cho nhat_ky_thong_bao) vì hàng đợi cần phân
+// biệt "đang chờ" (cho_gui) với kết quả cuối cùng. Enum MỚI hoàn toàn nên
+// CREATE TYPE dùng được ngay trong migration tạo bảng hang_doi_email.
+enum trang_thai_hang_doi_email {
+  cho_gui
   thanh_cong
   that_bai
 }
@@ -223,6 +245,21 @@ enum nguon_diem_danh {
   ky_ten
   qr
   thu_cong
+}
+
+// M8 (2026-10-01): Yêu cầu hỗ trợ — ticket 1 câu hỏi/1 câu trả lời của
+// hoc_vien, không phải chat real-time. Enum MỚI hoàn toàn nên CREATE TYPE
+// dùng ngay trong migration tạo bảng (không bị ràng buộc "ALTER TYPE khác
+// transaction" như enum MỞ RỘNG ở trên).
+enum trang_thai_yeu_cau_ho_tro {
+  cho_xu_ly
+  da_phan_hoi
+  da_dong
+}
+
+enum danh_gia_yeu_cau_ho_tro {
+  hai_long
+  chua_hai_long
 }
 
 // =====================================================================
@@ -367,6 +404,7 @@ model nguoi_dung {
   nhat_ky_dat_lai_mat_khau_thuc_hien nhat_ky_dat_lai_mat_khau[] @relation("nhat_ky_dlmk_thuc_hien_boi")
   dot_xac_nhan_created_by            dot_xac_nhan[]             @relation("dot_xac_nhan_created_by")
   lich_su_thay_doi_thuc_hien         lich_su_thay_doi_ho_so[]   @relation("lich_su_thay_doi_nguoi_sua")
+  yeu_cau_ho_tro_tra_loi_boi         yeu_cau_ho_tro[]           @relation("yeu_cau_ho_tro_tra_loi_boi")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -484,7 +522,9 @@ model hoc_vien {
   chuyen_mon         hoc_vien_chuyen_mon[]
   dang_ky_hoc        dang_ky_hoc[]
   nhat_ky_thong_bao  nhat_ky_thong_bao[]
+  hang_doi_email     hang_doi_email[]
   xac_nhan_ho_so     xac_nhan_ho_so[]
+  yeu_cau_ho_tro     yeu_cau_ho_tro[]
   lich_su_thay_doi   lich_su_thay_doi_ho_so[]
   tai_khoan_vle      tai_khoan_vle?
 
@@ -914,4 +954,69 @@ model nhat_ky_thong_bao {
   @@index([hoc_vien_id], map: "idx_thong_bao_hoc_vien")
   @@index([loai_su_kien], map: "idx_thong_bao_loai_su_kien")
   @@index([gui_luc], map: "idx_thong_bao_gui_luc")
+}
+
+// M9 (2026-10-01): hàng đợi gửi email hàng loạt (5 sự kiện làn "hàng loạt" —
+// xem comment đầu thong-bao.service.ts) — HangDoiEmailProcessor (cron mỗi
+// phút) rút tối đa 20 dòng cho_gui/lượt theo FIFO (created_at tăng dần),
+// giới hạn thêm bởi EMAIL_DAILY_LIMIT/ngày (giờ Việt Nam) để không vượt hạn
+// mức SMTP của Google Workspace. Làn "ưu tiên cao" (guiXacMinhEmail/
+// guiDatLaiMatKhau) KHÔNG đi qua bảng này — gửi ngay, chỉ ghi nhat_ky_
+// thong_bao để tính vào hạn mức.
+model hang_doi_email {
+  id               String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  loai_su_kien     loai_su_kien_thong_bao
+  hoc_vien_id      String?                   @db.Uuid
+  email_nguoi_nhan String                    @db.VarChar(255)
+  tieu_de          String                    @db.VarChar(255)
+  noi_dung_html    String                    @db.Text
+  trang_thai       trang_thai_hang_doi_email @default(cho_gui)
+  so_lan_thu       Int                       @default(0)
+  loi              String?
+  created_at       DateTime                  @default(now()) @db.Timestamptz(6)
+  gui_luc          DateTime?                 @db.Timestamptz(6)
+
+  hoc_vien hoc_vien? @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([trang_thai, created_at], map: "idx_hang_doi_email_trang_thai_created_at")
+  @@index([hoc_vien_id], map: "idx_hang_doi_email_hoc_vien")
+}
+
+// =====================================================================
+// PHẦN 5 — YÊU CẦU HỖ TRỢ (M8)
+// =====================================================================
+
+model loai_van_de_ho_tro {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ten             String            @db.VarChar(255)
+  noi_dung_goi_y  String            @db.Text
+  trang_thai      trang_thai_active @default(active)
+  created_at      DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime          @default(now()) @db.Timestamptz(6)
+
+  yeu_cau yeu_cau_ho_tro[]
+
+  @@unique([ten], map: "uq_loai_van_de_ho_tro_ten")
+}
+
+model yeu_cau_ho_tro {
+  id                 String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hoc_vien_id        String                     @db.Uuid
+  loai_van_de_id     String                     @db.Uuid
+  noi_dung_hoi       String                     @db.Text
+  noi_dung_tra_loi   String?                    @db.Text
+  trang_thai         trang_thai_yeu_cau_ho_tro  @default(cho_xu_ly)
+  danh_gia           danh_gia_yeu_cau_ho_tro?
+  tra_loi_boi        String?                    @db.Uuid
+  thoi_gian_tao      DateTime                   @default(now()) @db.Timestamptz(6)
+  thoi_gian_phan_hoi DateTime?                  @db.Timestamptz(6)
+  thoi_gian_dong     DateTime?                  @db.Timestamptz(6)
+
+  hoc_vien         hoc_vien            @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  loai_van_de      loai_van_de_ho_tro  @relation(fields: [loai_van_de_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tra_loi_boi_user nguoi_dung?         @relation("yeu_cau_ho_tro_tra_loi_boi", fields: [tra_loi_boi], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([trang_thai], map: "idx_yeu_cau_ho_tro_trang_thai")
+  @@index([hoc_vien_id], map: "idx_yeu_cau_ho_tro_hoc_vien")
+  @@index([loai_van_de_id, trang_thai], map: "idx_yeu_cau_ho_tro_loai_trang_thai")
 }

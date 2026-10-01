@@ -16,7 +16,23 @@ function sinhMatKhauNgauNhien(): string {
   return crypto.randomBytes(12).toString('base64url');
 }
 
+async function seedLoaiVanDeHoTro() {
+  // M8 (2026-10-01): dòng danh mục mẫu để dev/test có sẵn ít nhất 1 loại vấn
+  // đề khi thử tính năng "Yêu cầu hỗ trợ" — upsert để chạy lại seed không lỗi.
+  await prisma.loai_van_de_ho_tro.upsert({
+    where: { ten: 'Quên mật khẩu' },
+    update: {},
+    create: {
+      ten: 'Quên mật khẩu',
+      noi_dung_goi_y:
+        'Thầy/Cô liên hệ số hỗ trợ để được xác minh và đặt lại mật khẩu về ngày sinh.',
+    },
+  });
+}
+
 async function main() {
+  await seedLoaiVanDeHoTro();
+
   const tenDangNhap =
     process.env.SEED_QUAN_TRI_TEN_DANG_NHAP ?? 'quantri@thongtinhocvien.local';
   const email = process.env.SEED_QUAN_TRI_EMAIL ?? tenDangNhap;
