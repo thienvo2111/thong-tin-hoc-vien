@@ -1,9 +1,23 @@
 import * as ExcelJS from 'exceljs';
 import { ValidationException } from '../../common/exceptions/app.exceptions';
+import { cellToPlainText } from './moet-excel.util';
 
 export interface ParsedRow {
   dong: number; // số dòng trên file Excel thực tế (tính cả dòng header) để báo lỗi đúng vị trí người dùng nhìn thấy
   values: Record<string, string>;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+// Quy giá trị ô Excel về chuỗi: hyperlink/rich text/công thức lấy phần hiển
+// thị (cellToPlainText); ô ngày -> "dd/mm/yyyy hh:mm" (khớp parseVnDateTime).
+// exceljs đọc ngày Excel như UTC nên giờ hiển thị trong Excel = thành phần
+// UTC — không cộng/trừ 7 giờ.
+export function cellToImportText(raw: unknown): string {
+  if (raw instanceof Date) {
+    return `${pad2(raw.getUTCDate())}/${pad2(raw.getUTCMonth() + 1)}/${raw.getUTCFullYear()} ${pad2(raw.getUTCHours())}:${pad2(raw.getUTCMinutes())}`;
+  }
+  return cellToPlainText(raw).trim();
 }
 
 // Đọc worksheet đầu tiên: dòng 1 = header (khớp columns truyền vào, không
@@ -42,11 +56,7 @@ export async function readWorkbookRows(
     if (rowNumber === 1) return;
     const values: Record<string, string> = {};
     expectedColumns.forEach((col, i) => {
-      const cell = row.getCell(i + 1);
-      values[col] =
-        cell.value === null || cell.value === undefined
-          ? ''
-          : String(cell.value).trim();
+      values[col] = cellToImportText(row.getCell(i + 1).value);
     });
     const isBlankRow = Object.values(values).every((v) => v === '');
     if (!isBlankRow) {
@@ -68,6 +78,11 @@ export async function buildTemplateWorkbook(
   const sheet = workbook.addWorksheet('Mau');
   sheet.addRow(columns);
   sheet.getRow(1).font = { bold: true };
+  // Định dạng Text cho mọi cột: Excel không cắt số 0 đầu (CCCD "089...", mã
+  // địa danh "01") và không tự đổi "dd/mm/yyyy hh:mm" thành ô ngày.
+  columns.forEach((_, i) => {
+    sheet.getColumn(i + 1).numFmt = '@';
+  });
   if (columnNotes) {
     columns.forEach((col, i) => {
       const note = columnNotes[col];

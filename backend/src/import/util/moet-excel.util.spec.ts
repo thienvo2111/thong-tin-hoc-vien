@@ -43,6 +43,27 @@ describe('moet-excel.util', () => {
     it('formula result -> lấy result', () => {
       expect(cellToPlainText({ formula: '=A1', result: 42 })).toBe('42');
     });
+
+    it('hyperlink -> text hiển thị (cả khi text là rich text)', () => {
+      expect(cellToPlainText({ text: 'abc', hyperlink: 'http://x' })).toBe(
+        'abc',
+      );
+      expect(
+        cellToPlainText({
+          text: { richText: [{ text: 'a' }, { text: 'b' }] },
+          hyperlink: 'http://x',
+        }),
+      ).toBe('ab');
+    });
+
+    it('ô lỗi Excel -> rỗng', () => {
+      expect(cellToPlainText({ error: '#N/A' })).toBe('');
+    });
+
+    it('Date giữ nguyên hành vi cũ (ISO)', () => {
+      const d = new Date(Date.UTC(2026, 0, 1));
+      expect(cellToPlainText(d)).toBe(d.toISOString());
+    });
   });
 
   describe('readMoetWorkbookRows', () => {

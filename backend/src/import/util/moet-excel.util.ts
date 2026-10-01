@@ -71,15 +71,22 @@ export function cellToPlainText(raw: unknown): string {
   if (raw instanceof Date) return raw.toISOString();
   if (typeof raw === 'object') {
     const obj = raw as {
-      text?: string;
+      text?: unknown;
       result?: unknown;
+      error?: string;
       richText?: { text: string }[];
     };
     if (Array.isArray(obj.richText)) {
       return obj.richText.map((r) => r.text).join('');
     }
     if ('result' in obj) return cellToPlainText(obj.result);
+    // Ô lỗi Excel (#N/A, #REF!...) -> coi như trống.
+    if ('error' in obj) return '';
     if (typeof obj.text === 'string') return obj.text;
+    // Hyperlink có text dạng rich text: { text: { richText }, hyperlink }.
+    if (obj.text && typeof obj.text === 'object') {
+      return cellToPlainText(obj.text);
+    }
   }
   return String(raw).trim();
 }
