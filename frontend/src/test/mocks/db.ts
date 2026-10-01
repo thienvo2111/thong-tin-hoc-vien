@@ -11,10 +11,12 @@ import type {
   KhoaBoiDuong,
   KhoaBoiDuongChiTiet,
   KhoaHocDangKy,
+  LoaiVanDeHoTro,
   MonHoc,
   NhatKyImportItem,
   TongHopDonViRow,
   TongQuanResult,
+  YeuCauHoTro,
 } from '@/api/types';
 
 // "CSDL" giả lập trong bộ nhớ cho MSW — mỗi test có thể sửa trực tiếp rồi resetDb() ở afterEach.
@@ -35,6 +37,13 @@ export const DON_VI: DonViCongTac[] = [
 export const MON_HOC: MonHoc[] = [
   { id: 'mh-1', ten_mon: 'Tin học', cap_hoc: 'thpt' },
   { id: 'mh-2', ten_mon: 'Toán', cap_hoc: 'thpt' },
+];
+
+// M8 (2026-10-01): Yêu cầu hỗ trợ — danh mục loai_van_de_ho_tro, đọc để chọn khi tạo ticket (FAQ
+// hiển thị trước khi gửi, xem noi_dung_goi_y).
+export const LOAI_VAN_DE_HO_TRO: LoaiVanDeHoTro[] = [
+  { id: 'lvd-1', ten: 'Quên mật khẩu', noi_dung_goi_y: 'Liên hệ số hỗ trợ để đặt lại mật khẩu.', trang_thai: 'active' },
+  { id: 'lvd-2', ten: 'Mã định danh/CCCD', noi_dung_goi_y: 'Mã định danh là số CCCD 12 số của Thầy/Cô.', trang_thai: 'active' },
 ];
 
 export function taoHoSoMoi(): HocVien {
@@ -576,6 +585,12 @@ export function taoKhoaHocCuaHocVienMau(): Record<string, KhoaHocDangKy[]> {
   };
 }
 
+// M8 (2026-10-01) — ticket "Yêu cầu hỗ trợ" của học viên (hv-1, cùng db.hoSo.id). Bắt đầu rỗng: tạo
+// qua POST /yeu-cau-ho-tro/toi trong lúc test (xem handler trong handlers.ts).
+export function taoDanhSachYeuCauHoTroMau(): YeuCauHoTro[] {
+  return [];
+}
+
 export const db = {
   hoSo: taoHoSoMoi(),
   dotXacNhan: taoDotXacNhanDangMoThieu(),
@@ -598,6 +613,7 @@ export const db = {
   chiTietImport: taoChiTietImportMau(),
   khoaHocToi: taoKhoaHocToiMau(),
   khoaHocCuaHocVien: taoKhoaHocCuaHocVienMau(),
+  danhSachYeuCauHoTro: taoDanhSachYeuCauHoTroMau(),
 };
 
 export function resetDb(): void {
@@ -621,4 +637,5 @@ export function resetDb(): void {
   db.chiTietImport = taoChiTietImportMau();
   db.khoaHocToi = taoKhoaHocToiMau();
   db.khoaHocCuaHocVien = taoKhoaHocCuaHocVienMau();
+  db.danhSachYeuCauHoTro = taoDanhSachYeuCauHoTroMau();
 }

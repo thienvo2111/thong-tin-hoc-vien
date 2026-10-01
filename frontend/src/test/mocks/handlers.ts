@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
-import type { ImportChiTiet, KhoaBoiDuong, LoaiLop } from '@/api/types';
-import { DIA_DANH, DON_VI, MON_HOC, db } from './db';
+import type { ImportChiTiet, KhoaBoiDuong, LoaiLop, YeuCauHoTro } from '@/api/types';
+import { DIA_DANH, DON_VI, LOAI_VAN_DE_HO_TRO, MON_HOC, db } from './db';
 
 // QĐ10 (2026-09-30): dang_ky_hoc mẫu nằm rải trong db.khoaHocCuaHocVien (map theo hoc_vien_id) — tìm
 // theo id đăng ký học (không phải hoc_vien_id) để dùng chung cho PATCH/DELETE /dang-ky-hoc/{id}/*.
@@ -694,6 +694,34 @@ export const handlers = [
   http.get('/import', () =>
     HttpResponse.json({ data: db.danhSachImport, total: db.danhSachImport.length, page: 1, page_size: 20 }),
   ),
+
+  // --- Yêu cầu hỗ trợ (M8) ---
+  http.get('/danh-muc/loai-van-de-ho-tro', () =>
+    HttpResponse.json({ data: LOAI_VAN_DE_HO_TRO, total: LOAI_VAN_DE_HO_TRO.length, page: 1, page_size: 100 }),
+  ),
+
+  http.post('/yeu-cau-ho-tro/toi', async ({ request }) => {
+    const body = (await request.json()) as { loai_van_de_id: string; noi_dung_hoi: string };
+    const loaiVanDe = LOAI_VAN_DE_HO_TRO.find((l) => l.id === body.loai_van_de_id);
+    const moi: YeuCauHoTro = {
+      id: `yc-${db.danhSachYeuCauHoTro.length + 1}`,
+      hoc_vien_id: db.hoSo.id,
+      loai_van_de_id: body.loai_van_de_id,
+      loai_van_de_ten: loaiVanDe?.ten ?? '',
+      noi_dung_hoi: body.noi_dung_hoi,
+      noi_dung_tra_loi: null,
+      trang_thai: 'cho_xu_ly',
+      danh_gia: null,
+      da_dong_hieu_luc: false,
+      thoi_gian_tao: new Date().toISOString(),
+      thoi_gian_phan_hoi: null,
+      thoi_gian_dong: null,
+    };
+    db.danhSachYeuCauHoTro = [moi, ...db.danhSachYeuCauHoTro];
+    return HttpResponse.json(moi, { status: 201 });
+  }),
+
+  http.get('/yeu-cau-ho-tro/toi', () => HttpResponse.json(db.danhSachYeuCauHoTro)),
 ];
 
 export { loi };
