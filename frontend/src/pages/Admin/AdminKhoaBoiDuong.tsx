@@ -91,6 +91,11 @@ export default function AdminKhoaBoiDuong() {
 
   const taoKhoa = useTaoKhoa();
 
+  const donViKhac = useMemo(
+    () => (donVi.data ?? []).filter((d) => d.loai_don_vi === 'khac'),
+    [donVi.data],
+  );
+
   function datBoLoc<T>(setter: (v: T) => void) {
     return (v: T) => {
       setter(v);
@@ -99,7 +104,6 @@ export default function AdminKhoaBoiDuong() {
   }
 
   function moModalTao() {
-    const donViKhac = (donVi.data ?? []).filter((d) => d.loai_don_vi === 'khac');
     const donViToChucId =
       nguoiDung?.vai_tro === 'quan_tri' && donViKhac.length === 1 ? donViKhac[0].id : '';
     setForm({ ...FORM_RONG, don_vi_to_chuc_id: donViToChucId });
@@ -295,18 +299,21 @@ export default function AdminKhoaBoiDuong() {
               onChange={(e) => setForm((f) => ({ ...f, thoi_gian_ket_thuc: e.currentTarget.value }))}
             />
           </Group>
-          {nguoiDung?.vai_tro === 'quan_tri' && (
-            <Select
-              label="Đơn vị tổ chức"
-              description="Bắt buộc khi tạo khóa với tài khoản Quản trị hệ thống"
-              required
-              searchable
-              data={(donVi.data ?? []).map((d) => ({ value: d.id, label: d.ten_don_vi }))}
-              value={form.don_vi_to_chuc_id || null}
-              error={loiField.don_vi_to_chuc_id}
-              onChange={(v) => setForm((f) => ({ ...f, don_vi_to_chuc_id: v ?? '' }))}
-            />
-          )}
+          {nguoiDung?.vai_tro === 'quan_tri' &&
+            (donViKhac.length === 1 ? (
+              <TextInput label="Đơn vị tổ chức" value={donViKhac[0].ten_don_vi} readOnly disabled />
+            ) : (
+              <Select
+                label="Đơn vị tổ chức"
+                description="Bắt buộc khi tạo khóa với tài khoản Quản trị hệ thống"
+                required
+                searchable
+                data={(donVi.data ?? []).map((d) => ({ value: d.id, label: d.ten_don_vi }))}
+                value={form.don_vi_to_chuc_id || null}
+                error={loiField.don_vi_to_chuc_id}
+                onChange={(v) => setForm((f) => ({ ...f, don_vi_to_chuc_id: v ?? '' }))}
+              />
+            ))}
 
           <Button mt="sm" loading={taoKhoa.isPending} disabled={!formHopLe} onClick={xuLyTao} fullWidth>
             Tạo khóa
