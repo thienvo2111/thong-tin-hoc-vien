@@ -18,6 +18,7 @@ import { DonutChart, BarChart } from '@mantine/charts';
 import { notifications } from '@mantine/notifications';
 import { Link } from 'react-router-dom';
 import { useBaoCaoTongHop, useDanhSachHocVien } from '@/api/admin';
+import { useDanhSachYeuCauHoTroQuanTri } from '@/api/yeuCauHoTro';
 import { taiBaoCaoTongQuanExcel, useBaoCaoTongQuanTrungTam, type BaoCaoTongQuanParams } from '@/api/baoCao';
 import { useDanhSachKhoa } from '@/api/khoaBoiDuong';
 import { layDonViCongTac } from '@/api/danhMuc';
@@ -304,6 +305,7 @@ function KhoiTongQuanMoRong() {
 export default function AdminTongQuan() {
   const tongHocVien = useDanhSachHocVien({ page_size: 1 });
   const choDuyet = useDanhSachHocVien({ trang_thai: 'cho_duyet', page_size: SO_DONG_CHO_DUYET });
+  const ticketChoXuLy = useDanhSachYeuCauHoTroQuanTri({ trang_thai: 'cho_xu_ly' });
   const tongHopDonVi = useBaoCaoTongHop('don_vi');
   // Danh mục đơn vị (không scope theo quyền) — chỉ dùng để tra tên hiển thị trong bảng chờ duyệt,
   // KHÔNG dùng để tính KPI (KPI "Đơn vị tham gia" dùng bao-cao/tong-hop vì có scope theo quyền caller).
@@ -417,6 +419,24 @@ export default function AdminTongQuan() {
                   </Group>
                 ))}
               </Stack>
+            )}
+          </Paper>
+
+          <Paper withBorder radius={14} p="md">
+            <Group justify="space-between">
+              <Text fz={14.5} fw={700}>
+                Yêu cầu hỗ trợ chờ xử lý
+              </Text>
+              <Text component={Link} to="/admin/yeu-cau-ho-tro" fz={12.5} fw={600}>
+                Xem danh sách →
+              </Text>
+            </Group>
+            {ticketChoXuLy.isLoading ? (
+              <Skeleton height={26} width={60} mt={6} />
+            ) : (
+              <Text fz={26} fw={800} mt={6}>
+                {(ticketChoXuLy.data?.total ?? 0).toLocaleString('vi-VN')}
+              </Text>
             )}
           </Paper>
 

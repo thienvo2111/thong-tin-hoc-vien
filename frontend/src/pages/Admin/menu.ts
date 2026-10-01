@@ -16,6 +16,7 @@ export const MENU_ADMIN: MucMenuAdmin[] = [
   { to: '/admin/dot-xac-nhan', nhan: 'Đợt xác nhận', icon: '🗓️' },
   { to: '/admin/bao-cao', nhan: 'Báo cáo', icon: '📈' },
   { to: '/admin/nhap-du-lieu', nhan: 'Nhập dữ liệu', icon: '⇪' },
+  { to: '/admin/yeu-cau-ho-tro', nhan: 'Yêu cầu hỗ trợ', icon: '💬' },
   { to: '/admin/danh-muc-truong', nhan: 'Danh mục trường', icon: '🏫' },
   { to: '/admin/nguoi-dung', nhan: 'Người dùng', icon: '🔑', sapRaMat: true },
 ];
