@@ -533,3 +533,33 @@ export interface NhatKyImportItem {
   file_loi_url: string | null;
   trang_thai: string;
 }
+
+// M8 (2026-10-01): Yêu cầu hỗ trợ.
+export interface LoaiVanDeHoTro {
+  id: string;
+  ten: string;
+  noi_dung_goi_y: string;
+  trang_thai: 'active' | 'ngung';
+}
+
+export type TrangThaiYeuCauHoTro = 'cho_xu_ly' | 'da_phan_hoi' | 'da_dong';
+export type DanhGiaYeuCauHoTro = 'hai_long' | 'chua_hai_long';
+
+export interface YeuCauHoTro {
+  id: string;
+  hoc_vien_id: string;
+  loai_van_de_id: string;
+  loai_van_de_ten: string;
+  noi_dung_hoi: string;
+  noi_dung_tra_loi: string | null;
+  trang_thai: TrangThaiYeuCauHoTro;
+  danh_gia: DanhGiaYeuCauHoTro | null;
+  da_dong_hieu_luc: boolean;
+  thoi_gian_tao: string;
+  thoi_gian_phan_hoi: string | null;
+  thoi_gian_dong: string | null;
+}
+
+export interface YeuCauHoTroQuanTri extends YeuCauHoTro {
+  hoi_lai: boolean;
+}

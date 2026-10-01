@@ -1,6 +1,6 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { DiaDanh, DonViCongTac, MonHoc, PaginatedResult } from './types';
+import type { DiaDanh, DonViCongTac, LoaiVanDeHoTro, MonHoc, PaginatedResult } from './types';
 
 export function layDiaDanh(params: { cap: string; parent_id?: string; q?: string; trang_thai?: string; phien_ban?: string }) {
   const qs = new URLSearchParams();
@@ -73,4 +73,16 @@ export function layMonHoc(cap_hoc: string) {
 export function goiYChuyenMon(q: string) {
   const qs = new URLSearchParams({ q });
   return apiFetch<{ data: string[] }>(`/danh-muc/chuyen-mon-dao-tao/goi-y?${qs.toString()}`);
+}
+
+// M8 (2026-10-01): Yêu cầu hỗ trợ — học viên đọc để chọn loại vấn đề khi tạo ticket.
+export function layDanhSachLoaiVanDeHoTro() {
+  return apiFetch<PaginatedResult<LoaiVanDeHoTro>>('/danh-muc/loai-van-de-ho-tro?page_size=100');
+}
+
+export function useLoaiVanDeHoTro() {
+  return useQuery({
+    queryKey: ['danh-muc', 'loai-van-de-ho-tro'],
+    queryFn: layDanhSachLoaiVanDeHoTro,
+  });
 }
