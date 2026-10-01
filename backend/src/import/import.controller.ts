@@ -18,6 +18,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { LichSuImportQueryDto } from './dto/lich-su-import-query.dto';
 import { MauExcelQueryDto } from './dto/mau-excel-query.dto';
+import { TaoImportQueryDto } from './dto/tao-import-query.dto';
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB — giới hạn hợp lý tự thêm, không có trong spec
 
@@ -52,8 +53,9 @@ export class ImportController {
     @Param('loai') loai: string,
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: AuthenticatedUser,
+    @Query() query: TaoImportQueryDto,
   ) {
-    return this.importService.taoImport(loai, file, user.id);
+    return this.importService.taoImport(loai, file, user.id, query.ma_khoa);
   }
 
   @Get()

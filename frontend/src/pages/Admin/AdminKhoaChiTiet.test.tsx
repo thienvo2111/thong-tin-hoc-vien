@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
@@ -234,5 +234,88 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     await user.click(await screen.findByRole('button', { name: 'Xác nhận' }));
 
     expect(await screen.findByText('Chưa thêm đơn vị theo dõi nào trong phiên này.')).toBeInTheDocument();
+  });
+});
+
+describe('Admin — Chi tiết khóa: Import Excel trong tab Lớp học', () => {
+  // Ghi lại URL rồi trả undefined để MSW chạy tiếp handler mặc định (handlers.ts).
+  function ghiLaiUrl(method: 'get' | 'post', path: string, urls: string[]) {
+    server.use(
+      http[method](path, ({ request }) => {
+        urls.push(request.url);
+        return undefined;
+      }),
+    );
+  }
+
+  async function moModalVaTaiLen(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: '⇪ Import Excel' }));
+    const modal = await screen.findByRole('dialog', { name: 'Import lớp học từ Excel' });
+    const oFile = modal.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(oFile, new File(['x'], 'lop.xlsx'));
+    await user.click(within(modal).getByRole('button', { name: 'Tải lên & kiểm tra' }));
+    return modal;
+  }
+
+  it('vai_tro=truong → không hiện nút Import Excel (API import chỉ dành cho quan_tri)', async () => {
+    db.nguoiDung.vai_tro = 'truong';
+    renderTrang('khoa-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+    expect(screen.getByRole('button', { name: '+ Tạo lớp mới' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '⇪ Import Excel' })).not.toBeInTheDocument();
+  });
+
+  it('quan_tri: tải lên lớp & lịch học gửi kèm ?ma_khoa của khóa đang xem, hiện kết quả kiểm tra', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const urls: string[] = [];
+    ghiLaiUrl('post', '/import/:loai', urls);
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+
+    await moModalVaTaiLen(user);
+
+    expect(await screen.findByText('Kết quả kiểm tra')).toBeInTheDocument();
+    expect(urls).toHaveLength(1);
+    const url = new URL(urls[0]);
+    expect(url.pathname).toBe('/import/lop_va_lich_hoc');
+    expect(url.searchParams.get('ma_khoa')).toBe('AG-2026-014');
+  });
+
+  it('quan_tri: chọn "Nhân sự lớp" → gửi tới /import/nhan_su_lop?ma_khoa=...', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const urls: string[] = [];
+    ghiLaiUrl('post', '/import/:loai', urls);
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+
+    await user.click(screen.getByRole('button', { name: '⇪ Import Excel' }));
+    const modal = await screen.findByRole('dialog', { name: 'Import lớp học từ Excel' });
+    await user.click(within(modal).getByText('Nhân sự lớp'));
+    expect(within(modal).getByText(/Lớp phải được tạo trước/)).toBeInTheDocument();
+    await user.upload(modal.querySelector('input[type="file"]') as HTMLInputElement, new File(['x'], 'ns.xlsx'));
+    await user.click(within(modal).getByRole('button', { name: 'Tải lên & kiểm tra' }));
+
+    await screen.findByText('Kết quả kiểm tra');
+    const url = new URL(urls[0]);
+    expect(url.pathname).toBe('/import/nhan_su_lop');
+    expect(url.searchParams.get('ma_khoa')).toBe('AG-2026-014');
+  });
+
+  it('quan_tri: xác nhận nạp → đóng modal và tải lại chi tiết khóa', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const urlsChiTiet: string[] = [];
+    ghiLaiUrl('get', '/khoa-boi-duong/:id', urlsChiTiet);
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+    const soLanTruoc = urlsChiTiet.length;
+
+    await moModalVaTaiLen(user);
+    await user.click(await screen.findByRole('button', { name: 'Xác nhận nạp dữ liệu' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Import lớp học từ Excel' })).not.toBeInTheDocument());
+    await waitFor(() => expect(urlsChiTiet.length).toBeGreaterThan(soLanTruoc));
   });
 });

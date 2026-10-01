@@ -19,15 +19,21 @@ export function taiMauExcel(loai: LoaiDanhMucImport) {
   return apiFetchBlob(`/import/mau-excel?loai=${loai}`);
 }
 
-function taiLenImport(loai: LoaiDanhMucImport, file: File) {
+/** maKhoa (tùy chọn): import từ trang chi tiết khóa — dòng để trống ma_khoa được gán khóa này, dòng
+ * ghi khóa khác bị backend báo lỗi. */
+export function taiLenImport(loai: LoaiDanhMucImport, file: File, maKhoa?: string) {
   const form = new FormData();
   form.append('file', file);
-  return apiFetch<TaoImportResponse>(`/import/${loai}`, { method: 'POST', body: form });
+  return apiFetch<TaoImportResponse>(`/import/${loai}${xayQueryString({ ma_khoa: maKhoa })}`, {
+    method: 'POST',
+    body: form,
+  });
 }
 
 export function useTaiLenImport() {
   return useMutation({
-    mutationFn: ({ loai, file }: { loai: LoaiDanhMucImport; file: File }) => taiLenImport(loai, file),
+    mutationFn: ({ loai, file, maKhoa }: { loai: LoaiDanhMucImport; file: File; maKhoa?: string }) =>
+      taiLenImport(loai, file, maKhoa),
   });
 }
 

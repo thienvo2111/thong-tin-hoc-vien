@@ -15,6 +15,7 @@ export const SUPPORTED_IMPORT_TYPES = [
   'lop_va_lich_hoc',
   'diem_danh',
   'ket_qua_giai_doan',
+  'nhan_su_lop',
 ] as const satisfies readonly loai_danh_muc_import[];
 
 export type SupportedImportType = (typeof SUPPORTED_IMPORT_TYPES)[number];

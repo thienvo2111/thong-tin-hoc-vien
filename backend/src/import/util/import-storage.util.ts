@@ -19,6 +19,9 @@ export interface KetQuaImport {
   // lop_id) — Optional, các loại import khác/preview trước khi xác nhận
   // không có field này (xemKetQua() mặc định 0).
   so_hoc_vien_chua_co_email?: number;
+  // POST /import/{loai}?ma_khoa= — khóa mặc định cho dòng để trống ma_khoa,
+  // lưu lại để xacNhan() áp dụng đúng quy tắc khi đọc lại file gốc.
+  ma_khoa_mac_dinh?: string;
 }
 
 function thuMucImport(importId: string): string {

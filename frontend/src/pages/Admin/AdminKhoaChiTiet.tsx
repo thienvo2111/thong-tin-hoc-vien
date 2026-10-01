@@ -60,6 +60,7 @@ import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { KhoaTrangThaiBadge } from '@/components/KhoaTrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
+import { ModalImportLopHoc } from './ModalImportLopHoc';
 
 // Trường (chủ khóa) + QuảnTrị — đúng cột "Ai gọi" cho nộp duyệt VÀ toàn bộ CRUD giai đoạn/lớp/cụm/
 // buổi học/nhân sự (docs/api-contract.md mục 3) — cùng 1 tập vai trò nên dùng chung 1 hằng số.
@@ -259,6 +260,7 @@ export default function AdminKhoaChiTiet() {
   const [loiSuaLop, setLoiSuaLop] = useState<Record<string, string>>({});
 
   const [lopMoRong, setLopMoRong] = useState<Set<string>>(new Set());
+  const [modalImport, setModalImport] = useState(false);
 
   function moModalTaoLop() {
     setFormTaoLop(FORM_TAO_LOP_RONG);
@@ -807,6 +809,12 @@ export default function AdminKhoaChiTiet() {
                 <Stack gap="sm">
                   {coQuyenQuanLy && (
                     <Group justify="flex-end">
+                      {/* /import chỉ QuảnTrị gọi được — Trường không thấy nút này. */}
+                      {vaiTro === 'quan_tri' && (
+                        <Button variant="default" onClick={() => setModalImport(true)}>
+                          ⇪ Import Excel
+                        </Button>
+                      )}
                       <Button color="accent" onClick={moModalTaoLop}>
                         + Tạo lớp mới
                       </Button>
@@ -1221,6 +1229,15 @@ export default function AdminKhoaChiTiet() {
           </Button>
         </Stack>
       </Modal>
+
+      {khoa && (
+        <ModalImportLopHoc
+          opened={modalImport}
+          onClose={() => setModalImport(false)}
+          khoaId={khoaId}
+          maKhoa={khoa.ma_khoa}
+        />
+      )}
 
       {/* ================= Modal: Tạo lớp ================= */}
       <Modal opened={modalTaoLop} onClose={() => setModalTaoLop(false)} title="Tạo lớp mới" centered>

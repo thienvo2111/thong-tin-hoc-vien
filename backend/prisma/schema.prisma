@@ -147,6 +147,9 @@ enum loai_danh_muc_import {
   // CÙNG, migration riêng (xem migration *_t12_diem_danh_enum).
   diem_danh
   ket_qua_giai_doan
+  // Import nhân sự lớp (giảng viên/hỗ trợ) — cùng lý do như trên: thêm SAU
+  // CÙNG, migration riêng (xem migration *_nhan_su_lop_import_enum).
+  nhan_su_lop
 }
 
 // T5 (mo-rong-nls-an-giang.md, 2026-09-29): mức năng lực đầu vào/đầu ra của

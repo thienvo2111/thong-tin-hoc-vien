@@ -15,6 +15,7 @@ import { HoSoNhanSuMoetRowDto } from '../hoc-vien/dto/import-moet-row.dto';
 import { PhanLopHocVienRowDto } from '../khoa-boi-duong/dto/phan-lop-row.dto';
 import { KetQuaDanhGiaRowDto } from '../khoa-boi-duong/dto/ket-qua-danh-gia-row.dto';
 import { LopVaLichHocRowDto } from '../khoa-boi-duong/dto/lop-va-lich-hoc-row.dto';
+import { NhanSuLopRowDto } from '../khoa-boi-duong/dto/nhan-su-lop-row.dto';
 import { DiemDanhRowDto } from '../khoa-boi-duong/dto/diem-danh-row.dto';
 import { KetQuaGiaiDoanRowDto } from '../khoa-boi-duong/dto/ket-qua-giai-doan-row.dto';
 import { TaiKhoanVleRowDto } from './dto/tai-khoan-vle-row.dto';
@@ -75,7 +76,7 @@ export class ImportService {
   assertSupported(loai: string): SupportedImportType {
     if (!isSupportedImportType(loai)) {
       throw new ValidationException(
-        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc, diem_danh, ket_qua_giai_doan)`,
+        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc, diem_danh, ket_qua_giai_doan, nhan_su_lop)`,
       );
     }
     return loai;
@@ -97,6 +98,7 @@ export class ImportService {
     loaiRaw: string,
     file: Express.Multer.File | undefined,
     nguoiImportId: string,
+    maKhoaMacDinh?: string,
   ) {
     const loai = this.assertSupported(loaiRaw);
     if (!file || !file.buffer?.length) {
@@ -105,6 +107,7 @@ export class ImportService {
       ]);
     }
     const columns = this.getColumns(loai);
+    const maKhoa = await this.kiemTraMaKhoaMacDinh(columns, maKhoaMacDinh);
 
     let rows: Awaited<ReturnType<typeof readWorkbookRows>>;
     try {
@@ -139,9 +142,14 @@ export class ImportService {
     const dupKeys = new Set<string>();
 
     for (const row of rows) {
+      const apDung = this.apDungMaKhoaMacDinh(row.values, maKhoa);
+      if ('error' in apDung) {
+        danhSachLoi.push({ dong: row.dong, ly_do: apDung.error });
+        continue;
+      }
       const { dto, error, canhBao } = await this.buildDto(
         loai,
-        row.values,
+        apDung.values,
         dupKeys,
       );
       if (error || !dto) {
@@ -165,6 +173,7 @@ export class ImportService {
       danh_sach_loi: danhSachLoi,
       dong_hop_le: dongHopLe,
       danh_sach_canh_bao: danhSachCanhBao,
+      ma_khoa_mac_dinh: maKhoa,
     });
     if (danhSachLoi.length > 0) {
       const rowsByDong = new Map(rows.map((r) => [r.dong, r.values]));
@@ -278,7 +287,15 @@ export class ImportService {
         });
         continue;
       }
-      const { dto, error } = await this.buildDto(loai, values, dupKeys);
+      const apDung = this.apDungMaKhoaMacDinh(
+        values,
+        ketQuaCu.ma_khoa_mac_dinh,
+      );
+      if ('error' in apDung) {
+        danhSachLoiMoi.push({ dong, ly_do: apDung.error });
+        continue;
+      }
+      const { dto, error } = await this.buildDto(loai, apDung.values, dupKeys);
       if (error || !dto) {
         danhSachLoiMoi.push({
           dong,
@@ -506,7 +523,60 @@ export class ImportService {
           'ty_le_hoan_thanh',
           'diem',
         ];
+      case 'nhan_su_lop':
+        // Mỗi dòng = 1 nhân sự (giảng viên/hỗ trợ) của 1 lớp ĐÃ TỒN TẠI (xem
+        // KhoaBoiDuongService.resolveNhanSuLopRow).
+        return [
+          'ma_khoa',
+          'ten_lop',
+          'loai_lop',
+          'ho_ten',
+          'vai_tro',
+          'so_dien_thoai',
+        ];
     }
+  }
+
+  // ?ma_khoa= (import từ trang chi tiết khóa): chỉ hợp lệ với loại có cột
+  // ma_khoa, và khóa phải tồn tại — báo lỗi cả lượt ngay, không để mọi dòng
+  // cùng lỗi "Khóa không tồn tại".
+  private async kiemTraMaKhoaMacDinh(
+    columns: string[],
+    maKhoaRaw?: string,
+  ): Promise<string | undefined> {
+    const maKhoa = maKhoaRaw?.trim();
+    if (!maKhoa) return undefined;
+    if (!columns.includes('ma_khoa')) {
+      throw new ValidationException(
+        'Loại import này không có cột "ma_khoa", không dùng được tham số ma_khoa',
+        [{ field: 'ma_khoa', message: 'Không áp dụng cho loại import này' }],
+      );
+    }
+    const khoa = await this.prisma.khoa_boi_duong.findUnique({
+      where: { ma_khoa: maKhoa },
+    });
+    if (!khoa) {
+      throw new NotFoundAppException(`Khóa "${maKhoa}" không tồn tại`);
+    }
+    return maKhoa;
+  }
+
+  // Dòng để trống ma_khoa -> gán khóa mặc định; dòng ghi khóa KHÁC -> lỗi
+  // dòng (chặn import nhầm sang khóa khác từ trang chi tiết khóa). Không có
+  // khóa mặc định -> giữ nguyên hành vi cũ.
+  private apDungMaKhoaMacDinh(
+    values: Record<string, string>,
+    maKhoa?: string,
+  ): { values: Record<string, string> } | { error: string } {
+    if (!maKhoa) return { values };
+    const maTrongDong = values.ma_khoa?.trim();
+    if (!maTrongDong) return { values: { ...values, ma_khoa: maKhoa } };
+    if (maTrongDong !== maKhoa) {
+      return {
+        error: `Dòng thuộc khóa "${maTrongDong}", khác khóa đang import "${maKhoa}"`,
+      };
+    }
+    return { values };
   }
 
   // T15: "không bao giờ trả mật khẩu... trong file lỗi import" — file lỗi
@@ -572,6 +642,8 @@ export class ImportService {
     }
     if (loai === 'lop_va_lich_hoc') {
       return {
+        ma_khoa:
+          'Bắt buộc — có thể để trống khi import từ trang chi tiết khóa (hệ thống tự gán khóa đang xem).',
         loai_lop:
           'Tùy chọn — "truc_tiep", "zoom" hoặc "vle". Mặc định "truc_tiep" nếu để trống.',
         nhom_hoc_vien: 'Tùy chọn — số nguyên từ 1 đến 20.',
@@ -608,6 +680,21 @@ export class ImportService {
         diem: 'Tùy chọn — điểm số.',
       };
     }
+    if (loai === 'nhan_su_lop') {
+      return {
+        ma_khoa:
+          'Bắt buộc — có thể để trống khi import từ trang chi tiết khóa (hệ thống tự gán khóa đang xem).',
+        ten_lop:
+          'Bắt buộc — lớp phải đã tồn tại (tạo qua import lop_va_lich_hoc hoặc giao diện trước).',
+        loai_lop:
+          'Bắt buộc — "truc_tiep", "zoom" hoặc "vle". Dùng để xác định đúng lớp khi có nhiều lớp trùng tên khác loại.',
+        ho_ten:
+          'Bắt buộc — chạy lại file cùng họ tên trong cùng lớp sẽ cập nhật vai trò/SĐT, không tạo trùng.',
+        vai_tro: 'Bắt buộc — chỉ nhận "giang_vien" hoặc "ho_tro".',
+        so_dien_thoai:
+          'Tùy chọn — tối đa 20 ký tự. Để trống khi chạy lại file sẽ giữ nguyên số cũ.',
+      };
+    }
     return {};
   }
 
@@ -636,6 +723,7 @@ export class ImportService {
       | LopVaLichHocRowDto
       | DiemDanhRowDto
       | KetQuaGiaiDoanRowDto
+      | NhanSuLopRowDto
     >
   > {
     switch (loai) {
@@ -723,6 +811,18 @@ export class ImportService {
           ty_le_hoan_thanh: raw.ty_le_hoan_thanh,
           diem: raw.diem,
         });
+      case 'nhan_su_lop':
+        return this.khoaBoiDuongService.resolveNhanSuLopRow(
+          {
+            ma_khoa: raw.ma_khoa,
+            ten_lop: raw.ten_lop,
+            loai_lop: raw.loai_lop,
+            ho_ten: raw.ho_ten,
+            vai_tro: raw.vai_tro,
+            so_dien_thoai: raw.so_dien_thoai,
+          },
+          dupKeys,
+        );
     }
   }
 
@@ -763,7 +863,8 @@ export class ImportService {
       | KetQuaDanhGiaRowDto
       | LopVaLichHocRowDto
       | DiemDanhRowDto
-      | KetQuaGiaiDoanRowDto,
+      | KetQuaGiaiDoanRowDto
+      | NhanSuLopRowDto,
     dupKeys?: Set<string>,
   ): Promise<string | undefined> {
     try {
@@ -806,6 +907,9 @@ export class ImportService {
       } else if (loai === 'ket_qua_giai_doan') {
         // Không cần kiểm tra thêm: resolveKetQuaGiaiDoanRow() (buildDto) đã
         // tra cứu FK + phạm vi giá trị rồi.
+      } else if (loai === 'nhan_su_lop') {
+        // Không cần kiểm tra thêm: resolveNhanSuLopRow() (buildDto) đã tra
+        // cứu lớp + validate + trùng lặp trong file rồi.
       } else {
         const d = dto as HoSoNhanSuMoetRowDto;
         await this.hocVienService.checkValidMoetImportRow(
@@ -844,7 +948,8 @@ export class ImportService {
       | KetQuaDanhGiaRowDto
       | LopVaLichHocRowDto
       | DiemDanhRowDto
-      | KetQuaGiaiDoanRowDto,
+      | KetQuaGiaiDoanRowDto
+      | NhanSuLopRowDto,
     importId: string,
     nguoiImportId: string,
     dupKeys?: Set<string>,
@@ -884,6 +989,8 @@ export class ImportService {
         dto as KetQuaGiaiDoanRowDto,
         importId,
       );
+    } else if (loai === 'nhan_su_lop') {
+      await this.khoaBoiDuongService.commitNhanSuLop(dto as NhanSuLopRowDto);
     } else {
       const d = dto as HoSoNhanSuMoetRowDto;
       await this.hocVienService.createFromMoetImport(

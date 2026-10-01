@@ -40,6 +40,7 @@ import { PhanLopHocVienRowDto } from './dto/phan-lop-row.dto';
 import { KetQuaDangKyDto } from './dto/ket-qua-dang-ky.dto';
 import { KetQuaDanhGiaRowDto } from './dto/ket-qua-danh-gia-row.dto';
 import { LopVaLichHocRowDto } from './dto/lop-va-lich-hoc-row.dto';
+import { NhanSuLopRowDto } from './dto/nhan-su-lop-row.dto';
 import { DiemDanhRowDto } from './dto/diem-danh-row.dto';
 import { KetQuaGiaiDoanRowDto } from './dto/ket-qua-giai-doan-row.dto';
 import { RowBuildResult } from '../import/import.types';
@@ -84,7 +85,10 @@ export class KhoaBoiDuongService {
   // (giaiDoanId/lopId/cumId) thực sự thuộc đúng khoaId trên URL, không chỉ
   // tồn tại (tránh 1 tài khoản chủ khóa A sửa nhầm/cố ý con của khóa B bằng
   // cách truyền khoaId của khóa A + id con của khóa B).
-  private async getGiaiDoanTrongKhoaOrThrow(khoaId: string, giaiDoanId: string) {
+  private async getGiaiDoanTrongKhoaOrThrow(
+    khoaId: string,
+    giaiDoanId: string,
+  ) {
     const giaiDoan = await this.prisma.giai_doan_khoa.findUnique({
       where: { id: giaiDoanId },
     });
@@ -624,10 +628,7 @@ export class KhoaBoiDuongService {
   ) {
     const khoa = await this.getKhoaOrThrow(khoaId);
     this.assertChuKhoa(khoa, caller);
-    const giaiDoan = await this.getGiaiDoanTrongKhoaOrThrow(
-      khoaId,
-      giaiDoanId,
-    );
+    const giaiDoan = await this.getGiaiDoanTrongKhoaOrThrow(khoaId, giaiDoanId);
     this.assertCoTruongSua(dto);
 
     if (dto.thoi_gian_bat_dau || dto.thoi_gian_ket_thuc) {
@@ -1797,6 +1798,134 @@ export class KhoaBoiDuongService {
         thoi_gian_bat_dau: dto.thoi_gian_bat_dau,
         thoi_gian_ket_thuc: dto.thoi_gian_ket_thuc,
         dia_diem_hoac_link: dto.dia_diem_hoac_link,
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Import nhan_su_lop (gọi từ ImportService) — mỗi dòng = 1 nhân sự của 1
+  // lớp. Cột file: ma_khoa, ten_lop, loai_lop (BẮT BUỘC — như diem_danh, gắn
+  // vào lớp sai loại thì không tự phát hiện được), ho_ten, vai_tro,
+  // so_dien_thoai (tùy chọn). Lớp PHẢI đã tồn tại — import này không tạo lớp.
+  // dupKeys: phát hiện 2 dòng cùng (lớp, họ tên) trong cùng file.
+  // ---------------------------------------------------------------------
+  async resolveNhanSuLopRow(
+    raw: {
+      ma_khoa?: string;
+      ten_lop?: string;
+      loai_lop?: string;
+      ho_ten?: string;
+      vai_tro?: string;
+      so_dien_thoai?: string;
+    },
+    dupKeys?: Set<string>,
+  ): Promise<RowBuildResult<NhanSuLopRowDto>> {
+    const maKhoa = raw.ma_khoa?.trim();
+    if (!maKhoa) {
+      return { error: 'Thiếu cột "ma_khoa"' };
+    }
+    const khoa = await this.prisma.khoa_boi_duong.findUnique({
+      where: { ma_khoa: maKhoa },
+    });
+    if (!khoa) {
+      return { error: `Khóa "${maKhoa}" không tồn tại` };
+    }
+
+    const tenLop = raw.ten_lop?.trim();
+    if (!tenLop) {
+      return { error: 'Thiếu cột "ten_lop"' };
+    }
+
+    const loaiLop = raw.loai_lop?.trim();
+    if (!loaiLop) {
+      return { error: 'Thiếu cột "loai_lop"' };
+    }
+    if (loaiLop !== 'truc_tiep' && loaiLop !== 'zoom' && loaiLop !== 'vle') {
+      return {
+        error: 'Cột "loai_lop" phải là "truc_tiep", "zoom" hoặc "vle"',
+      };
+    }
+
+    const lop = await this.prisma.lop_hoc.findUnique({
+      where: {
+        khoa_id_loai_lop_ten_lop: {
+          khoa_id: khoa.id,
+          loai_lop: loaiLop,
+          ten_lop: normalizeNfcName(tenLop),
+        },
+      },
+    });
+    if (!lop) {
+      return {
+        error: `Lớp "${tenLop}" (${loaiLop}) không tồn tại trong khóa "${maKhoa}"`,
+      };
+    }
+
+    const hoTenRaw = raw.ho_ten?.trim();
+    if (!hoTenRaw) {
+      return { error: 'Thiếu cột "ho_ten"' };
+    }
+    const hoTen = normalizeNfcName(hoTenRaw);
+    if (hoTen.length > 255) {
+      return { error: 'Cột "ho_ten" tối đa 255 ký tự' };
+    }
+
+    const vaiTro = raw.vai_tro?.trim();
+    if (!vaiTro) {
+      return { error: 'Thiếu cột "vai_tro"' };
+    }
+    if (vaiTro !== 'giang_vien' && vaiTro !== 'ho_tro') {
+      return { error: 'Cột "vai_tro" phải là "giang_vien" hoặc "ho_tro"' };
+    }
+
+    const soDienThoai = raw.so_dien_thoai?.trim() || undefined;
+    if (soDienThoai && soDienThoai.length > 20) {
+      return { error: 'Cột "so_dien_thoai" tối đa 20 ký tự' };
+    }
+
+    if (dupKeys) {
+      const key = `${lop.id}|${hoTen.toLowerCase()}`;
+      if (dupKeys.has(key)) {
+        return {
+          error: `Dòng trùng (lớp "${tenLop}", họ tên "${hoTen}") với dòng khác trong cùng file`,
+        };
+      }
+      dupKeys.add(key);
+    }
+
+    return {
+      dto: {
+        lop_id: lop.id,
+        ho_ten: hoTen,
+        vai_tro: vaiTro,
+        so_dien_thoai: soDienThoai,
+      },
+    };
+  }
+
+  // lop_hoc_nhan_su không có UNIQUE nào — khớp theo (lop_id, ho_ten không
+  // phân biệt hoa thường) để chạy lại file chỉ CẬP NHẬT, không tạo trùng.
+  // so_dien_thoai để trống = giữ nguyên số cũ (undefined trong data Prisma).
+  async commitNhanSuLop(dto: NhanSuLopRowDto): Promise<void> {
+    const daCo = await this.prisma.lop_hoc_nhan_su.findFirst({
+      where: {
+        lop_id: dto.lop_id,
+        ho_ten: { equals: dto.ho_ten, mode: 'insensitive' },
+      },
+    });
+    if (daCo) {
+      await this.prisma.lop_hoc_nhan_su.update({
+        where: { id: daCo.id },
+        data: { vai_tro: dto.vai_tro, so_dien_thoai: dto.so_dien_thoai },
+      });
+      return;
+    }
+    await this.prisma.lop_hoc_nhan_su.create({
+      data: {
+        lop_id: dto.lop_id,
+        ho_ten: dto.ho_ten,
+        vai_tro: dto.vai_tro,
+        so_dien_thoai: dto.so_dien_thoai,
       },
     });
   }

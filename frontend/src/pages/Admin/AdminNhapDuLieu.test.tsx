@@ -7,7 +7,7 @@ import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import AdminNhapDuLieu, { nhanLoaiImport } from './AdminNhapDuLieu';
 
-// 8 giá trị enum THẬT của loai_danh_muc_import — chép nguyên văn từ docs/database-ddl.sql
+// 11 giá trị enum THẬT của loai_danh_muc_import — chép nguyên văn từ docs/database-ddl.sql
 // (CREATE TYPE loai_danh_muc_import), không đoán/bịa. Nếu enum này được mở rộng thêm ở backend,
 // cập nhật danh sách này (và nhãn tương ứng trong AdminNhapDuLieu.tsx) trong cùng 1 lần sửa.
 const CAC_GIA_TRI_ENUM_LOAI_DANH_MUC_IMPORT = [
@@ -19,6 +19,9 @@ const CAC_GIA_TRI_ENUM_LOAI_DANH_MUC_IMPORT = [
   'tai_khoan_vle',
   'ket_qua_danh_gia',
   'lop_va_lich_hoc',
+  'diem_danh',
+  'ket_qua_giai_doan',
+  'nhan_su_lop',
 ] as const;
 
 function renderTrang() {
@@ -140,6 +143,28 @@ describe('Admin — Nhập dữ liệu', () => {
       expect(nhan).not.toBe('');
       expect(nhan.trim().length).toBeGreaterThan(0);
     }
+  });
+
+  it('nhan_su_lop có nhãn riêng, không hiện giá trị thô', () => {
+    expect(nhanLoaiImport('nhan_su_lop')).toBe('Nhân sự lớp (giảng viên/hỗ trợ)');
+  });
+
+  it('tải lên từ trang Nhập dữ liệu không gửi kèm ?ma_khoa', async () => {
+    const urls: string[] = [];
+    server.use(
+      http.post('/import/:loai', ({ request }) => {
+        urls.push(request.url);
+        return undefined;
+      }),
+    );
+    const user = userEvent.setup();
+    const { container } = renderTrang();
+    await screen.findByRole('table');
+    await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, new File(['x'], 'a.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Tải lên & kiểm tra' }));
+
+    await screen.findByText('Kết quả kiểm tra');
+    expect(new URL(urls[0]).search).toBe('');
   });
 
   it('giá trị enum lạ (chưa kịp cập nhật nhãn) hiện nguyên giá trị thô, không để trống', () => {
