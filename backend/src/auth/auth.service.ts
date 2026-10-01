@@ -342,7 +342,7 @@ export class AuthService {
     ]);
 
     const link = `${layFrontendUrl()}/dat-lai-mat-khau?token=${token}`;
-    await this.thongBaoService.guiDatLaiMatKhau(email, hoTen, link);
+    await this.thongBaoService.guiDatLaiMatKhau(email, hoTen, link, hocVienId);
   }
 
   // POST /auth/dat-lai-mat-khau — token sai/hết hạn/đã dùng trả 1 thông báo

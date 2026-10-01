@@ -811,6 +811,7 @@ export class HocVienService {
       email,
       hocVien?.ho_ten ?? '',
       link,
+      hocVienId,
     );
   }
 

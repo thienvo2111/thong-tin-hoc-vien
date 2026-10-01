@@ -1393,6 +1393,7 @@ describe('HocVienService', () => {
           'moi@test.local',
           expect.any(String),
           expect.stringContaining('/xac-minh-email?token='),
+          'hv-tdk-1',
         );
       });
 
@@ -1503,6 +1504,7 @@ describe('HocVienService', () => {
           'a@test.local',
           'Học Viên Tự Đăng Ký',
           expect.stringContaining('/xac-minh-email?token='),
+          'hv-tdk-1',
         );
       });
     });

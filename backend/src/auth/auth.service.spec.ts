@@ -544,6 +544,7 @@ describe('AuthService', () => {
         'a@example.com',
         'Nguyễn Văn A',
         expect.stringContaining('/dat-lai-mat-khau?token='),
+        'hv-1',
       );
     });
 
