@@ -157,10 +157,15 @@ describe('Hồ sơ Học viên (e2e)', () => {
   });
 
   afterAll(async () => {
-    // Xóa trước khi xóa hoc_vien — nhat_ky_thong_bao.hoc_vien_id FK
-    // onDelete: NoAction (docs/database-ddl.sql PHẦN 4). xac-nhan/duyet giờ
-    // gửi email thật (Ethereal) nên luôn ghi ít nhất 1 dòng cho mỗi hoc_vien
-    // đã gọi 2 endpoint đó trong suite này.
+    // Xóa trước khi xóa hoc_vien — nhat_ky_thong_bao.hoc_vien_id VÀ
+    // hang_doi_email.hoc_vien_id đều FK onDelete: NoAction (docs/database-
+    // ddl.sql PHẦN 4). M9 (2026-10-01): xac-nhan/duyet giờ chỉ ENQUEUE
+    // hang_doi_email ('cho_gui') thay vì gửi SMTP ngay — suite này không tự
+    // drain nên luôn còn ít nhất 1 dòng 'cho_gui' cho mỗi hoc_vien đã gọi 2
+    // endpoint đó, phải xóa trước khi xóa hoc_vien.
+    await prisma.hang_doi_email.deleteMany({
+      where: { hoc_vien_id: { in: hocVienIds } },
+    });
     await prisma.nhat_ky_thong_bao.deleteMany({
       where: { hoc_vien_id: { in: hocVienIds } },
     });

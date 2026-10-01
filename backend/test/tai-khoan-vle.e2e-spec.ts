@@ -149,6 +149,12 @@ describe('Tài khoản VLE & cổng điều kiện đánh giá đầu vào — T
     await prisma.nguoi_dung.deleteMany({
       where: { id: { in: nguoiDungHocVienIds } },
     });
+    // M9 (2026-10-01): hang_doi_email.hoc_vien_id cũng FK onDelete: NoAction
+    // (docs/database-ddl.sql PHẦN 4) — xóa trước hoc_vien cùng lý do với
+    // nhat_ky_thong_bao ở dưới.
+    await prisma.hang_doi_email.deleteMany({
+      where: { hoc_vien_id: { in: hocVienIds } },
+    });
     await prisma.nhat_ky_thong_bao.deleteMany({
       where: { hoc_vien_id: { in: hocVienIds } },
     });

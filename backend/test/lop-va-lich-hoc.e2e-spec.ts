@@ -172,6 +172,13 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
     await prisma.nguoi_dung.deleteMany({
       where: { id: { in: nguoiDungHocVienIds } },
     });
+    // M9 (2026-10-01): phòng trường hợp import phan_lop_hoc_vien ở trên có
+    // gán lớp trực tiếp thành công -> enqueue hang_doi_email (FK
+    // hoc_vien_id onDelete: NoAction, docs/database-ddl.sql PHẦN 4) — xóa
+    // trước khi xóa hoc_vien.
+    await prisma.hang_doi_email.deleteMany({
+      where: { hoc_vien_id: { in: hocVienIds } },
+    });
     await prisma.hoc_vien.deleteMany({ where: { id: { in: hocVienIds } } });
     await xoaNguoiDungTest(quanTri.nguoiDung.id);
     await xoaDonViTest(

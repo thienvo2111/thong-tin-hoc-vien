@@ -9,6 +9,7 @@ import {
   xoaNguoiDungTest,
   xoaDonViTest,
 } from './utils/test-data';
+import { HangDoiEmailProcessor } from '../src/thong-bao/hang-doi-email.processor';
 
 const NAM_HOP_LE = new Date().getUTCFullYear() - 20;
 
@@ -70,6 +71,18 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       .send({ ten_dang_nhap, mat_khau })
       .expect(200);
     return res.body.token as string;
+  }
+
+  // M9 (2026-10-01): hoc_vien_xac_nhan/hoc_vien_duyet/khoa_boi_duong_duyet/
+  // dang_ky_hoc_phan_lop/dang_ky_hoc_ket_qua chỉ enqueue hang_doi_email
+  // ('cho_gui') thay vì gửi SMTP ngay — giả lập 1 lượt cron
+  // HangDoiEmailProcessor khi test cần xác nhận "đã gửi thành công" thật qua
+  // nhat_ky_thong_bao (xem test/thong-bao.e2e-spec.ts cho helper tương tự).
+  async function drainHangDoi(soLan = 1): Promise<void> {
+    const processor = app.get(HangDoiEmailProcessor);
+    for (let i = 0; i < soLan; i++) {
+      await processor.xuLyHangDoi();
+    }
   }
 
   function baseKhoaBody(overrides: Record<string, unknown> = {}) {
@@ -215,8 +228,13 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         OR: [{ khoa_id: { in: khoaIds } }, { hoc_vien_id: { in: hocVienIds } }],
       },
     });
-    // Xóa trước khi xóa hoc_vien — nhat_ky_thong_bao.hoc_vien_id FK
-    // onDelete: NoAction, xem docs/database-ddl.sql PHẦN 4.
+    // Xóa trước khi xóa hoc_vien — nhat_ky_thong_bao.hoc_vien_id VÀ
+    // hang_doi_email.hoc_vien_id đều FK onDelete: NoAction (docs/database-
+    // ddl.sql PHẦN 4) — M9: nhiều dòng hang_doi_email còn 'cho_gui' vì suite
+    // này không drain hết (chỉ drain đúng những test cần xác nhận gửi thật).
+    await prisma.hang_doi_email.deleteMany({
+      where: { hoc_vien_id: { in: hocVienIds } },
+    });
     await prisma.nhat_ky_thong_bao.deleteMany({
       where: { hoc_vien_id: { in: hocVienIds } },
     });
@@ -1119,14 +1137,16 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       expect(dangKy?.trang_thai).toBe('da_duyet');
 
       // Nhánh chỉ ghi danh (không có dòng dang_ky_hoc_lop nào) KHÔNG kích hoạt sự kiện
-      // dang_ky_hoc_phan_lop (docs/api-contract.md mục 8).
-      const thongBaoPhanLop = await prisma.nhat_ky_thong_bao.findMany({
+      // dang_ky_hoc_phan_lop (docs/api-contract.md mục 8). M9: xác nhận
+      // KHÔNG enqueue (hang_doi_email) thay vì kiểm tra nhat_ky_thong_bao —
+      // event này không bao giờ ghi trực tiếp vào đó nữa.
+      const hangDoiPhanLop = await prisma.hang_doi_email.findMany({
         where: {
           hoc_vien_id: hocVienDaDuyetId,
           loai_su_kien: 'dang_ky_hoc_phan_lop',
         },
       });
-      expect(thongBaoPhanLop).toHaveLength(0);
+      expect(hangDoiPhanLop).toHaveLength(0);
     });
 
     it('GET /hoc-vien/toi/khoa-hoc, /ket-qua phản ánh đúng ghi danh (lop_truc_tiep=null) vừa import', async () => {
@@ -1198,8 +1218,11 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       });
       expect(lopGan?.lop_id).toBe(lopId);
 
-      // Nhánh gán lớp trực tiếp thực sự -> kích hoạt sự kiện dang_ky_hoc_phan_lop,
-      // gửi thật qua Ethereal (không SMTP giả) -> ghi trang_thai=thanh_cong.
+      // Nhánh gán lớp trực tiếp thực sự -> kích hoạt sự kiện dang_ky_hoc_phan_lop
+      // (M9: enqueue hang_doi_email, gửi thật do cron đảm nhiệm) -> drain 1
+      // lượt rồi xác nhận gửi thật qua Ethereal (không SMTP giả) -> ghi
+      // trang_thai=thanh_cong.
+      await drainHangDoi();
       const thongBaoPhanLop = await prisma.nhat_ky_thong_bao.findMany({
         where: {
           hoc_vien_id: hocVienDaDuyetId,
@@ -1291,13 +1314,16 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       });
       expect(lopGan?.lop_id).toBe(lopId);
 
-      const thongBaoPhanLop = await prisma.nhat_ky_thong_bao.findMany({
+      // Chỉ cần xác nhận sự kiện kích hoạt đúng 1 lần (đã enqueue) — không
+      // cần xác minh gửi thật ở đây (đã có 2 test khác trong describe này
+      // làm việc đó).
+      const hangDoiPhanLop = await prisma.hang_doi_email.findMany({
         where: {
           hoc_vien_id: hocVienMoiId,
           loai_su_kien: 'dang_ky_hoc_phan_lop',
         },
       });
-      expect(thongBaoPhanLop).toHaveLength(1);
+      expect(hangDoiPhanLop).toHaveLength(1);
     });
   });
 
@@ -1462,7 +1488,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       expect(dangKyA).toBeNull();
     });
 
-    it('phân lớp 100 học viên, 60 không có email -> 40 email gửi, 0 dòng that_bai, so_hoc_vien_chua_co_email=60', async () => {
+    it('phân lớp 100 học viên, 60 không có email -> 40 dòng hang_doi_email cho_gui, so_hoc_vien_chua_co_email=60', async () => {
       const suf = uniqueSuffix();
       const specs = Array.from({ length: 100 }, (_, i) => ({
         sdd: soDinhDanhNgauNhien(),
@@ -1526,26 +1552,23 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         .expect(200);
       expect(ketQua.body.so_hoc_vien_chua_co_email).toBe(60);
 
+      // M9: commitPhanLop() giờ chỉ enqueue (themVaoHangDoiEmail), KHÔNG gửi
+      // SMTP thật trong luồng import — việc gửi thật đã được xác minh end-to-
+      // end riêng ở 2 test khác trong describe này (có drainHangDoi()), nên ở
+      // đây chỉ cần xác nhận enqueue đúng số lượng (học viên có email_lien_he)
+      // qua hang_doi_email, không cần drain 40 email thật (chậm, không cần
+      // thiết cho mục đích test này) — bỏ luôn timeout 240s vì không còn gọi
+      // SMTP thật.
       const hocVienIdsBulk = created.map((h) => h.id);
-      const [thatBai, thanhCong] = await Promise.all([
-        prisma.nhat_ky_thong_bao.count({
-          where: {
-            loai_su_kien: 'dang_ky_hoc_phan_lop',
-            trang_thai: 'that_bai',
-            hoc_vien_id: { in: hocVienIdsBulk },
-          },
-        }),
-        prisma.nhat_ky_thong_bao.count({
-          where: {
-            loai_su_kien: 'dang_ky_hoc_phan_lop',
-            trang_thai: 'thanh_cong',
-            hoc_vien_id: { in: hocVienIdsBulk },
-          },
-        }),
-      ]);
-      expect(thatBai).toBe(0);
-      expect(thanhCong).toBe(40);
-    }, 240000); // connection pool) => cần timeout rộng hơn mức 30s mặc định. // xacNhan()/commitPhanLop() -> mỗi lần ~2-4s (bắt tay SMTP không dùng // khối này đã làm cho 1 email — không mock) tuần tự trong // 40 lần gửi email THẬT qua Ethereal (cùng cách các test khác trong
+      const hangDoiBulk = await prisma.hang_doi_email.findMany({
+        where: {
+          loai_su_kien: 'dang_ky_hoc_phan_lop',
+          hoc_vien_id: { in: hocVienIdsBulk },
+        },
+      });
+      expect(hangDoiBulk).toHaveLength(40);
+      expect(hangDoiBulk.every((d) => d.trang_thai === 'cho_gui')).toBe(true);
+    });
   });
 
   describe('PATCH /dang-ky-hoc/{id}/ket-qua', () => {
@@ -1608,6 +1631,9 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       expect(res.body.ket_qua).toBe('dat');
       expect(res.body.ngay_hoan_thanh).toBeDefined();
 
+      // M9: chỉ enqueue hang_doi_email — drain 1 lượt để xác nhận gửi thật
+      // thành công (trang_thai=thanh_cong trên nhat_ky_thong_bao).
+      await drainHangDoi();
       const thongBao = await prisma.nhat_ky_thong_bao.findMany({
         where: {
           hoc_vien_id: hocVienKetQuaId,
