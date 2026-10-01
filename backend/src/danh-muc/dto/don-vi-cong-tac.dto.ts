@@ -72,6 +72,10 @@ export class QueryDonViCongTacDto extends PaginationQueryDto {
   dia_ban_id?: string;
 
   @IsOptional()
+  @IsUUID()
+  tinh_id?: string;
+
+  @IsOptional()
   @IsString()
   q?: string;
 

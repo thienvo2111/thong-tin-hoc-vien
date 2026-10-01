@@ -220,7 +220,7 @@ Với mỗi dòng hợp lệ (cùng thứ tự tạo bảng đã sửa như "Lu�
 |---|---|---|---|
 | GET | `/danh-muc/dia-danh` | `?cap=&parent_id=&q=&trang_thai=&phien_ban=` | Mọi vai trò đã đăng nhập |
 | POST / PATCH | `/danh-muc/dia-danh(/{id})` | Sửa/thêm thủ công (ngoài import) | QuảnTrị |
-| GET | `/danh-muc/don-vi-cong-tac` | `?loai_don_vi=&dia_ban_id=&q=` (autocomplete dùng `q`) | Mọi vai trò đã đăng nhập |
+| GET | `/danh-muc/don-vi-cong-tac` | `?loai_don_vi=&dia_ban_id=&q=` (autocomplete dùng `q`). **Thêm 2026-10-01**: query `tinh_id` (lọc theo tỉnh — join qua `dia_ban.parent_id`, AND với `dia_ban_id` nếu truyền cả hai); mỗi item trả về kèm 3 field mới `dia_ban_ten`, `tinh_id`, `tinh_ten` (null nếu phường/xã không có parent) bên cạnh các field gốc | Mọi vai trò đã đăng nhập |
 | POST / PATCH | `/danh-muc/don-vi-cong-tac(/{id})` | Sửa/thêm thủ công | QuảnTrị |
 | GET | `/danh-muc/mon-hoc?cap_hoc=` | Lọc theo cấp học — dùng cho dropdown phụ thuộc "Môn giảng dạy" | Mọi vai trò đã đăng nhập |
 | POST / PATCH | `/danh-muc/mon-hoc(/{id})` | Sửa/thêm thủ công | QuảnTrị |

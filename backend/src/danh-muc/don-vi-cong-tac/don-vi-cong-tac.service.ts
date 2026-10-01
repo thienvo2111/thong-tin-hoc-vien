@@ -25,6 +25,7 @@ export class DonViCongTacService {
     const where: Prisma.don_vi_cong_tacWhereInput = {};
     if (query.loai_don_vi) where.loai_don_vi = query.loai_don_vi;
     if (query.dia_ban_id) where.dia_ban_id = query.dia_ban_id;
+    if (query.tinh_id) where.dia_ban = { parent_id: query.tinh_id };
     if (query.trang_thai) where.trang_thai = query.trang_thai;
     if (query.q) {
       where.ten_don_vi = { contains: query.q, mode: 'insensitive' };
@@ -36,10 +37,17 @@ export class DonViCongTacService {
         skip: (page - 1) * pageSize,
         take: pageSize,
         orderBy: { ten_don_vi: 'asc' },
+        include: { dia_ban: { include: { parent: true } } },
       }),
       this.prisma.don_vi_cong_tac.count({ where }),
     ]);
-    return paginate(data, total, page, pageSize);
+    const dataWithDiaBan = data.map((item) => ({
+      ...item,
+      dia_ban_ten: item.dia_ban.ten,
+      tinh_ten: item.dia_ban.parent?.ten ?? null,
+      tinh_id: item.dia_ban.parent_id,
+    }));
+    return paginate(dataWithDiaBan, total, page, pageSize);
   }
 
   async create(

@@ -26,10 +26,10 @@ export const PHUONG_2: DiaDanh = { id: 'phuong-2', ma: '002', ten: 'Phường Ch
 export const DIA_DANH: DiaDanh[] = [TINH_AN_GIANG, TINH_KHAC, PHUONG_1, PHUONG_2];
 
 export const DON_VI: DonViCongTac[] = [
-  { id: 'dv-1', ma_don_vi: 'THPT01', ten_don_vi: 'THPT Long Xuyên', loai_don_vi: 'truong', phuong_xa_id: 'phuong-1', ten_phuong_xa: 'Phường Long Xuyên', trang_thai: 'active' },
+  { id: 'dv-1', ma_don_vi: 'THPT01', ten_don_vi: 'THPT Long Xuyên', loai_don_vi: 'truong', dia_ban_id: 'phuong-1', dia_ban_ten: 'Phường Long Xuyên', tinh_id: 'tinh-1', tinh_ten: 'An Giang', trang_thai: 'active' },
   // dv-2: đơn vị KHÁC đơn vị tổ chức của khoa-1 (dv-1) — dùng để test "+ Thêm đơn vị theo dõi"
   // (AdminKhoaChiTiet), vì đơn vị tổ chức chính không nằm trong danh sách chọn để theo dõi thêm.
-  { id: 'dv-2', ma_don_vi: 'THPT02', ten_don_vi: 'THPT Châu Đốc', loai_don_vi: 'truong', phuong_xa_id: 'phuong-2', ten_phuong_xa: 'Phường Châu Đốc', trang_thai: 'active' },
+  { id: 'dv-2', ma_don_vi: 'THPT02', ten_don_vi: 'THPT Châu Đốc', loai_don_vi: 'truong', dia_ban_id: 'phuong-2', dia_ban_ten: 'Phường Châu Đốc', tinh_id: 'tinh-2', tinh_ten: 'Cần Thơ', trang_thai: 'active' },
 ];
 
 export const MON_HOC: MonHoc[] = [

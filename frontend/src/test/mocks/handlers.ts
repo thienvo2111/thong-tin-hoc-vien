@@ -216,10 +216,36 @@ export const handlers = [
     const url = new URL(request.url);
     const q = url.searchParams.get('q')?.toLowerCase();
     const loaiDonVi = url.searchParams.get('loai_don_vi');
-    const data = DON_VI.filter(
-      (d) => (!q || d.ten_don_vi.toLowerCase().includes(q)) && (!loaiDonVi || d.loai_don_vi === loaiDonVi),
+    const diaBanId = url.searchParams.get('dia_ban_id');
+    const tinhId = url.searchParams.get('tinh_id');
+    const page = Number(url.searchParams.get('page') ?? '1');
+    const pageSize = Number(url.searchParams.get('page_size') ?? '20');
+
+    const items = DON_VI.filter(
+      (d) =>
+        (!q || d.ten_don_vi.toLowerCase().includes(q)) &&
+        (!loaiDonVi || d.loai_don_vi === loaiDonVi) &&
+        (!diaBanId || d.dia_ban_id === diaBanId) &&
+        (!tinhId || d.tinh_id === tinhId),
     );
-    return HttpResponse.json({ data });
+    const total = items.length;
+    const start = (page - 1) * pageSize;
+    const data = items.slice(start, start + pageSize);
+    return HttpResponse.json({ data, total, page, page_size: pageSize });
+  }),
+
+  http.patch('/danh-muc/don-vi-cong-tac/:id', async ({ params, request }) => {
+    const body = (await request.json()) as { dia_ban_id?: string };
+    const donVi = DON_VI.find((d) => d.id === params.id);
+    if (!donVi) return HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Không tìm thấy đơn vị công tác' } }, { status: 404 });
+    if (body.dia_ban_id) {
+      const diaBan = DIA_DANH.find((d) => d.id === body.dia_ban_id);
+      donVi.dia_ban_id = body.dia_ban_id;
+      donVi.dia_ban_ten = diaBan?.ten ?? donVi.dia_ban_ten;
+      donVi.tinh_id = diaBan?.parent_id ?? null;
+      donVi.tinh_ten = DIA_DANH.find((t) => t.id === diaBan?.parent_id)?.ten ?? null;
+    }
+    return HttpResponse.json(donVi);
   }),
 
   http.get('/danh-muc/mon-hoc', ({ request }) => {

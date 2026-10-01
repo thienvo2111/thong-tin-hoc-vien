@@ -17,7 +17,7 @@ interface Props {
 }
 
 function nhanDonVi(d: DonViCongTac): string {
-  return d.ten_phuong_xa ? `${d.ten_don_vi} — ${d.ten_phuong_xa}` : d.ten_don_vi;
+  return d.dia_ban_ten ? `${d.ten_don_vi} — ${d.dia_ban_ten}` : d.ten_don_vi;
 }
 
 /**

@@ -104,10 +104,13 @@ export interface DonViCongTac {
   ma_don_vi: string;
   ten_don_vi: string;
   loai_don_vi: string;
-  phuong_xa_id: string | null;
-  /** Giả định: API trả kèm tên phường/xã đã join sẵn để hiển thị "Tên trường — Phường/xã" (dac-ta § M4 mục 3).
-   *  api-contract.md không ghi rõ hình dạng response này — improvised, cần backend xác nhận. */
-  ten_phuong_xa?: string;
+  dia_ban_id: string;
+  don_vi_cha_id?: string | null;
+  // Thêm 2026-10-01 — don-vi-cong-tac.service.ts#findAll trả kèm (include dia_ban + parent) để
+  // hiển thị "Tên trường — Phường/xã" / lọc theo tỉnh mà không cần gọi riêng GET /danh-muc/dia-danh.
+  dia_ban_ten: string;
+  tinh_id: string | null;
+  tinh_ten: string | null;
   trang_thai: 'active' | 'ngung';
 }
 
