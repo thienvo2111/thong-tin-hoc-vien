@@ -722,6 +722,30 @@ export const handlers = [
   }),
 
   http.get('/yeu-cau-ho-tro/toi', () => HttpResponse.json(db.danhSachYeuCauHoTro)),
+
+  http.get('/yeu-cau-ho-tro', ({ request }) => {
+    const url = new URL(request.url);
+    const trangThai = url.searchParams.get('trang_thai');
+    const page = Number(url.searchParams.get('page') ?? '1');
+    const pageSize = Number(url.searchParams.get('page_size') ?? '20');
+
+    let items = db.danhSachYeuCauHoTro;
+    if (trangThai) items = items.filter((y) => y.trang_thai === trangThai);
+    const total = items.length;
+    const start = (page - 1) * pageSize;
+    const data = items.slice(start, start + pageSize).map((y) => ({ ...y, hoi_lai: false }));
+    return HttpResponse.json({ data, total, page, page_size: pageSize });
+  }),
+
+  http.patch('/yeu-cau-ho-tro/:id/tra-loi', async ({ params, request }) => {
+    const found = db.danhSachYeuCauHoTro.find((y) => y.id === params.id);
+    if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy yêu cầu hỗ trợ');
+    const body = (await request.json()) as { noi_dung_tra_loi: string };
+    found.noi_dung_tra_loi = body.noi_dung_tra_loi;
+    found.trang_thai = 'da_phan_hoi';
+    found.thoi_gian_phan_hoi = new Date().toISOString();
+    return HttpResponse.json({ ...found, hoi_lai: false });
+  }),
 ];
 
 export { loi };
