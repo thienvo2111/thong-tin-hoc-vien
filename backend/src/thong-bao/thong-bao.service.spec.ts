@@ -4,8 +4,8 @@ import * as mailerUtil from './util/mailer.util';
 
 // Mock toàn bộ mailer.util — unit test này KHÔNG gửi email thật (khác
 // test/thong-bao.e2e-spec.ts, vốn cố ý dùng Ethereal thật cho ít nhất 1
-// luồng). Ở đây chỉ kiểm tra logic xây nội dung + ghi nhat_ky_thong_bao +
-// hành vi "không bao giờ throw" một cách nhanh, xác định.
+// luồng). Ở đây chỉ kiểm tra logic xây nội dung + ghi nhat_ky_thong_bao/
+// hang_doi_email + hành vi "không bao giờ throw" một cách nhanh, xác định.
 jest.mock('./util/mailer.util', () => ({
   getMailTransporter: jest.fn(),
   getTestMessageUrl: jest.fn(() => undefined),
@@ -18,10 +18,17 @@ describe('ThongBaoService', () => {
     nguoi_dung: { findFirst: jest.Mock };
     khoa_boi_duong: { findUnique: jest.Mock };
     dang_ky_hoc: { findUnique: jest.Mock };
+    yeu_cau_ho_tro: { findUnique: jest.Mock };
     nhat_ky_thong_bao: {
       create: jest.Mock;
       findMany: jest.Mock;
       count: jest.Mock;
+    };
+    hang_doi_email: {
+      create: jest.Mock;
+      count: jest.Mock;
+      findMany: jest.Mock;
+      update: jest.Mock;
     };
   };
   let sendMail: jest.Mock;
@@ -48,10 +55,17 @@ describe('ThongBaoService', () => {
       nguoi_dung: { findFirst: jest.fn() },
       khoa_boi_duong: { findUnique: jest.fn() },
       dang_ky_hoc: { findUnique: jest.fn() },
+      yeu_cau_ho_tro: { findUnique: jest.fn() },
       nhat_ky_thong_bao: {
         create: jest.fn(),
         findMany: jest.fn(),
         count: jest.fn(),
+      },
+      hang_doi_email: {
+        create: jest.fn(),
+        count: jest.fn(),
+        findMany: jest.fn(),
+        update: jest.fn(),
       },
     };
     service = new ThongBaoService(prisma as unknown as PrismaService);
@@ -64,33 +78,32 @@ describe('ThongBaoService', () => {
     jest.restoreAllMocks();
   });
 
+  // Làn "hàng loạt" (M9) — các sự kiện dưới đây KHÔNG còn gửi SMTP trực tiếp,
+  // chỉ insert 1 dòng hang_doi_email (trang_thai='cho_gui'); việc gửi thật
+  // do HangDoiEmailProcessor (cron) đảm nhiệm, xem hang-doi-email.processor.spec.ts.
   describe('guiHocVienXacNhan', () => {
-    it('gửi thành công -> sendMail + ghi nhat_ky_thong_bao trang_thai=thanh_cong', async () => {
+    it('gửi thành công -> ghi hang_doi_email (KHÔNG gọi sendMail, KHÔNG ghi nhat_ky_thong_bao)', async () => {
       prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDu);
       await service.guiHocVienXacNhan('hv-1');
 
-      expect(sendMail).toHaveBeenCalledTimes(1);
-      expect(sendMail.mock.calls[0][0]).toMatchObject({
-        to: 'a@test.local',
-        subject: expect.any(String),
-      });
-      expect(prisma.nhat_ky_thong_bao.create).toHaveBeenCalledWith({
+      expect(sendMail).not.toHaveBeenCalled();
+      expect(prisma.nhat_ky_thong_bao.create).not.toHaveBeenCalled();
+      expect(prisma.hang_doi_email.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           loai_su_kien: 'hoc_vien_xac_nhan',
           hoc_vien_id: 'hv-1',
           email_nguoi_nhan: 'a@test.local',
-          trang_thai: 'thanh_cong',
         }),
       });
     });
 
-    it('không có email_lien_he -> bỏ qua, không gửi, không ghi log', async () => {
+    it('không có email_lien_he -> bỏ qua, không enqueue, không ghi log', async () => {
       prisma.hoc_vien.findUnique.mockResolvedValue({
         ...hocVienDayDu,
         email_lien_he: null,
       });
       await service.guiHocVienXacNhan('hv-1');
-      expect(sendMail).not.toHaveBeenCalled();
+      expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
       expect(prisma.nhat_ky_thong_bao.create).not.toHaveBeenCalled();
     });
 
@@ -99,38 +112,24 @@ describe('ThongBaoService', () => {
       await expect(
         service.guiHocVienXacNhan('khong-ton-tai'),
       ).resolves.toBeUndefined();
-      expect(sendMail).not.toHaveBeenCalled();
+      expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
     });
 
-    it('sendMail throw -> KHÔNG throw ra ngoài, ghi nhat_ky_thong_bao trang_thai=that_bai kèm lý do', async () => {
+    it('insert hang_doi_email thất bại -> vẫn KHÔNG throw (email là side effect)', async () => {
       prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDu);
-      sendMail.mockRejectedValue(new Error('SMTP timeout'));
-
+      prisma.hang_doi_email.create.mockRejectedValue(new Error('DB down'));
       await expect(service.guiHocVienXacNhan('hv-1')).resolves.toBeUndefined();
-
-      expect(prisma.nhat_ky_thong_bao.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          trang_thai: 'that_bai',
-          loi: 'SMTP timeout',
-        }),
-      });
-    });
-
-    it('ghi nhat_ky_thong_bao thất bại -> vẫn KHÔNG throw (email là side effect)', async () => {
-      prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDu);
-      prisma.nhat_ky_thong_bao.create.mockRejectedValue(new Error('DB down'));
-
-      await expect(service.guiHocVienXacNhan('hv-1')).resolves.toBeUndefined();
-      expect(sendMail).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('guiHocVienDuyet', () => {
-    it('tu_choi kèm ly_do -> nội dung email chứa lý do', async () => {
+    it('tu_choi kèm ly_do -> nội dung HTML enqueue chứa lý do', async () => {
       prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDu);
       await service.guiHocVienDuyet('hv-1', 'tu_choi', 'Thiếu giấy tờ');
-      expect(sendMail.mock.calls[0][0].html).toContain('Thiếu giấy tờ');
-      expect(prisma.nhat_ky_thong_bao.create).toHaveBeenCalledWith({
+      expect(prisma.hang_doi_email.create.mock.calls[0][0].data.noi_dung_html).toContain(
+        'Thiếu giấy tờ',
+      );
+      expect(prisma.hang_doi_email.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ loai_su_kien: 'hoc_vien_duyet' }),
       });
     });
@@ -166,7 +165,7 @@ describe('ThongBaoService', () => {
         expect.objectContaining({ include: { created_by_user: true } }),
       );
       expect(prisma.nguoi_dung.findFirst).not.toHaveBeenCalled();
-      expect(prisma.nhat_ky_thong_bao.create).toHaveBeenCalledWith({
+      expect(prisma.hang_doi_email.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           loai_su_kien: 'khoa_boi_duong_duyet',
           hoc_vien_id: null,
@@ -191,7 +190,7 @@ describe('ThongBaoService', () => {
           where: { vai_tro: 'truong', don_vi_id: 'truong-1' },
         }),
       );
-      expect(prisma.nhat_ky_thong_bao.create).toHaveBeenCalledWith({
+      expect(prisma.hang_doi_email.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           loai_su_kien: 'khoa_boi_duong_duyet',
           hoc_vien_id: null,
@@ -207,8 +206,7 @@ describe('ThongBaoService', () => {
       });
       prisma.nguoi_dung.findFirst.mockResolvedValue(null);
       await service.guiKhoaBoiDuongDuyet('khoa-1', 'da_duyet');
-      expect(sendMail).not.toHaveBeenCalled();
-      expect(prisma.nhat_ky_thong_bao.create).not.toHaveBeenCalled();
+      expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
     });
 
     it('created_by_user có nhưng thiếu email -> bỏ qua, KHÔNG rơi xuống fallback', async () => {
@@ -218,8 +216,7 @@ describe('ThongBaoService', () => {
       });
       await service.guiKhoaBoiDuongDuyet('khoa-1', 'da_duyet');
       expect(prisma.nguoi_dung.findFirst).not.toHaveBeenCalled();
-      expect(sendMail).not.toHaveBeenCalled();
-      expect(prisma.nhat_ky_thong_bao.create).not.toHaveBeenCalled();
+      expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
     });
   });
 
@@ -233,11 +230,11 @@ describe('ThongBaoService', () => {
         dang_ky_hoc_lop: [],
       });
       const res = await service.guiDangKyHocPhanLop('dk-1');
-      expect(sendMail).not.toHaveBeenCalled();
+      expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
       expect(res).toEqual({ chuaCoEmail: false });
     });
 
-    it('có lớp trực tiếp -> gửi với nội dung nhân sự/lịch học', async () => {
+    it('có lớp trực tiếp -> enqueue với nội dung nhân sự/lịch học', async () => {
       prisma.dang_ky_hoc.findUnique.mockResolvedValue({
         id: 'dk-1',
         hoc_vien_id: 'hv-1',
@@ -262,18 +259,19 @@ describe('ThongBaoService', () => {
         ],
       });
       const res = await service.guiDangKyHocPhanLop('dk-1');
-      expect(sendMail).toHaveBeenCalledTimes(1);
-      expect(sendMail.mock.calls[0][0].html).toContain('GV B');
-      expect(prisma.nhat_ky_thong_bao.create).toHaveBeenCalledWith({
+      expect(prisma.hang_doi_email.create.mock.calls[0][0].data.noi_dung_html).toContain(
+        'GV B',
+      );
+      expect(prisma.hang_doi_email.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ loai_su_kien: 'dang_ky_hoc_phan_lop' }),
       });
       expect(res).toEqual({ chuaCoEmail: false });
     });
 
     // T3 (QĐ6): học viên chưa có email_lien_he -> bỏ qua gửi VÀ không ghi
-    // nhat_ky_thong_bao (không tính là "thất bại") — trả về chuaCoEmail=true
-    // để ImportService đếm so_hoc_vien_chua_co_email.
-    it('không có email_lien_he -> bỏ qua, không ghi nhat_ky_thong_bao, chuaCoEmail=true', async () => {
+    // nhat_ky_thong_bao/hang_doi_email (không tính là "thất bại") — trả về
+    // chuaCoEmail=true để ImportService đếm so_hoc_vien_chua_co_email.
+    it('không có email_lien_he -> bỏ qua, không enqueue, chuaCoEmail=true', async () => {
       prisma.dang_ky_hoc.findUnique.mockResolvedValue({
         id: 'dk-1',
         hoc_vien_id: 'hv-1',
@@ -287,14 +285,14 @@ describe('ThongBaoService', () => {
         ],
       });
       const res = await service.guiDangKyHocPhanLop('dk-1');
-      expect(sendMail).not.toHaveBeenCalled();
+      expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
       expect(prisma.nhat_ky_thong_bao.create).not.toHaveBeenCalled();
       expect(res).toEqual({ chuaCoEmail: true });
     });
   });
 
   describe('guiDangKyHocKetQua', () => {
-    it('gửi kèm nhãn kết quả tiếng Việt', async () => {
+    it('enqueue kèm nhãn kết quả tiếng Việt', async () => {
       prisma.dang_ky_hoc.findUnique.mockResolvedValue({
         id: 'dk-1',
         hoc_vien_id: 'hv-1',
@@ -304,10 +302,140 @@ describe('ThongBaoService', () => {
         ngay_hoan_thanh: new Date('2026-01-31T00:00:00Z'),
       });
       await service.guiDangKyHocKetQua('dk-1');
-      expect(sendMail.mock.calls[0][0].html).toContain('Đạt');
-      expect(prisma.nhat_ky_thong_bao.create).toHaveBeenCalledWith({
+      expect(prisma.hang_doi_email.create.mock.calls[0][0].data.noi_dung_html).toContain(
+        'Đạt',
+      );
+      expect(prisma.hang_doi_email.create).toHaveBeenCalledWith({
         data: expect.objectContaining({ loai_su_kien: 'dang_ky_hoc_ket_qua' }),
       });
+    });
+  });
+
+  // Làn "hàng loạt" (M9) — ticket hỗ trợ không khẩn như quên mật khẩu, nên
+  // enqueue qua hang_doi_email như các luồng guiHocVienXacNhan/... ở trên,
+  // KHÔNG dùng guiNgayVaGhiNhatKy (đó là làn "ưu tiên cao" dành cho bảo mật).
+  describe('guiYeuCauHoTroTraLoi (M8)', () => {
+    it('có email_lien_he -> enqueue hang_doi_email với loai_su_kien đúng', async () => {
+      prisma.yeu_cau_ho_tro.findUnique.mockResolvedValue({
+        id: 'yc-1',
+        hoc_vien_id: 'hv-1',
+        noi_dung_hoi: 'Quên mật khẩu',
+        noi_dung_tra_loi: 'Liên hệ số hỗ trợ để đặt lại.',
+        hoc_vien: {
+          id: 'hv-1',
+          ho_ten: 'Nguyễn Văn A',
+          email_lien_he: 'a@example.com',
+        },
+      });
+
+      await service.guiYeuCauHoTroTraLoi('yc-1');
+
+      expect(sendMail).not.toHaveBeenCalled();
+      expect(prisma.nhat_ky_thong_bao.create).not.toHaveBeenCalled();
+      expect(prisma.hang_doi_email.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          loai_su_kien: 'yeu_cau_ho_tro_tra_loi',
+          hoc_vien_id: 'hv-1',
+          email_nguoi_nhan: 'a@example.com',
+        }),
+      });
+    });
+
+    it('không có email_lien_he -> không enqueue, không ghi log, không throw', async () => {
+      prisma.yeu_cau_ho_tro.findUnique.mockResolvedValue({
+        id: 'yc-2',
+        hoc_vien_id: 'hv-2',
+        noi_dung_hoi: 'X',
+        noi_dung_tra_loi: 'Y',
+        hoc_vien: { id: 'hv-2', ho_ten: 'B', email_lien_he: null },
+      });
+
+      await expect(
+        service.guiYeuCauHoTroTraLoi('yc-2'),
+      ).resolves.toBeUndefined();
+      expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
+      expect(prisma.nhat_ky_thong_bao.create).not.toHaveBeenCalled();
+    });
+  });
+
+  // Làn "ưu tiên cao" (M9) — gửi NGAY qua transporter, KHÔNG qua hàng đợi,
+  // KHÔNG bị chặn bởi hạn mức/ngày dù đã hết (bảo mật quan trọng hơn) — nhưng
+  // từ M9, CÓ ghi nhat_ky_thong_bao (trước đây guiEmailKhongGhiNhatKy không
+  // ghi log gì cả).
+  describe('guiXacMinhEmail', () => {
+    it('gửi ngay (gọi sendMail trực tiếp, KHÔNG enqueue) + ghi nhat_ky_thong_bao', async () => {
+      await service.guiXacMinhEmail(
+        'a@test.local',
+        'Nguyễn Văn A',
+        'http://fe/xac-minh-email?token=abc',
+        'hv-1',
+      );
+      expect(sendMail).toHaveBeenCalledTimes(1);
+      expect(sendMail.mock.calls[0][0]).toMatchObject({ to: 'a@test.local' });
+      expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
+      expect(prisma.nhat_ky_thong_bao.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          loai_su_kien: 'email_xac_minh',
+          hoc_vien_id: 'hv-1',
+          email_nguoi_nhan: 'a@test.local',
+          trang_thai: 'thanh_cong',
+        }),
+      });
+    });
+
+    it('vẫn gửi ngay dù hạn mức/ngày đã hết (không bị chặn bởi hạn mức)', async () => {
+      jest.spyOn(service, 'tinhHanMucConLaiHomNay').mockResolvedValue(0);
+      await service.guiXacMinhEmail(
+        'a@test.local',
+        'Nguyễn Văn A',
+        'http://fe/xac-minh-email?token=abc',
+        'hv-1',
+      );
+      expect(sendMail).toHaveBeenCalledTimes(1);
+    });
+
+    it('sendMail throw -> KHÔNG throw ra ngoài, ghi nhat_ky_thong_bao trang_thai=that_bai', async () => {
+      sendMail.mockRejectedValue(new Error('SMTP timeout'));
+      await expect(
+        service.guiXacMinhEmail('a@test.local', 'A', 'link', 'hv-1'),
+      ).resolves.toBeUndefined();
+      expect(prisma.nhat_ky_thong_bao.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          trang_thai: 'that_bai',
+          loi: 'SMTP timeout',
+        }),
+      });
+    });
+  });
+
+  describe('guiDatLaiMatKhau', () => {
+    it('gửi ngay (gọi sendMail trực tiếp, KHÔNG enqueue) + ghi nhat_ky_thong_bao', async () => {
+      await service.guiDatLaiMatKhau(
+        'a@test.local',
+        'Nguyễn Văn A',
+        'http://fe/dat-lai-mat-khau?token=abc',
+        'hv-1',
+      );
+      expect(sendMail).toHaveBeenCalledTimes(1);
+      expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
+      expect(prisma.nhat_ky_thong_bao.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          loai_su_kien: 'dat_lai_mat_khau',
+          hoc_vien_id: 'hv-1',
+          trang_thai: 'thanh_cong',
+        }),
+      });
+    });
+
+    it('vẫn gửi ngay dù hạn mức/ngày đã hết (không bị chặn bởi hạn mức)', async () => {
+      jest.spyOn(service, 'tinhHanMucConLaiHomNay').mockResolvedValue(-5);
+      await service.guiDatLaiMatKhau(
+        'a@test.local',
+        'Nguyễn Văn A',
+        'link',
+        'hv-1',
+      );
+      expect(sendMail).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -326,6 +454,85 @@ describe('ThongBaoService', () => {
           take: 20,
         }),
       );
+    });
+  });
+
+  describe('demEmailThanhCongHomNay / tinhHanMucConLaiHomNay (M9)', () => {
+    const OLD_LIMIT = process.env.EMAIL_DAILY_LIMIT;
+
+    afterEach(() => {
+      process.env.EMAIL_DAILY_LIMIT = OLD_LIMIT;
+    });
+
+    it('0 email hôm nay -> hạn mức còn lại = EMAIL_DAILY_LIMIT', async () => {
+      process.env.EMAIL_DAILY_LIMIT = '2000';
+      prisma.nhat_ky_thong_bao.count.mockResolvedValue(0);
+      const conLai = await service.tinhHanMucConLaiHomNay(
+        new Date('2026-10-01T10:00:00Z'),
+      );
+      expect(conLai).toBe(2000);
+    });
+
+    it('gần đạt hạn mức -> còn lại đúng số dương nhỏ', async () => {
+      process.env.EMAIL_DAILY_LIMIT = '2000';
+      prisma.nhat_ky_thong_bao.count.mockResolvedValue(1995);
+      const conLai = await service.tinhHanMucConLaiHomNay(
+        new Date('2026-10-01T10:00:00Z'),
+      );
+      expect(conLai).toBe(5);
+    });
+
+    it('đã vượt hạn mức -> trả về số <= 0 (âm), không chặn tính toán', async () => {
+      process.env.EMAIL_DAILY_LIMIT = '2000';
+      prisma.nhat_ky_thong_bao.count.mockResolvedValue(2050);
+      const conLai = await service.tinhHanMucConLaiHomNay(
+        new Date('2026-10-01T10:00:00Z'),
+      );
+      expect(conLai).toBe(-50);
+      expect(conLai).toBeLessThanOrEqual(0);
+    });
+
+    it('EMAIL_DAILY_LIMIT để trống -> dùng mặc định 2000', async () => {
+      delete process.env.EMAIL_DAILY_LIMIT;
+      prisma.nhat_ky_thong_bao.count.mockResolvedValue(0);
+      const conLai = await service.tinhHanMucConLaiHomNay(new Date());
+      expect(conLai).toBe(2000);
+    });
+
+    it('truyền đúng khoảng gui_luc theo giờ Việt Nam cho count (không lẫn email hôm qua)', async () => {
+      prisma.nhat_ky_thong_bao.count.mockResolvedValue(0);
+      await service.demEmailThanhCongHomNay(new Date('2026-10-01T10:00:00Z'));
+      expect(prisma.nhat_ky_thong_bao.count).toHaveBeenCalledWith({
+        where: {
+          trang_thai: 'thanh_cong',
+          gui_luc: {
+            gte: new Date('2026-09-30T17:00:00.000Z'),
+            lt: new Date('2026-10-01T17:00:00.000Z'),
+          },
+        },
+      });
+    });
+  });
+
+  describe('trangThaiHangDoi (GET /thong-bao/hang-doi)', () => {
+    it('đếm theo trang_thai + hạn mức còn lại hôm nay', async () => {
+      process.env.EMAIL_DAILY_LIMIT = '2000';
+      prisma.hang_doi_email.count.mockImplementation(
+        ({ where }: { where: { trang_thai: string } }) => {
+          if (where.trang_thai === 'cho_gui') return Promise.resolve(10);
+          if (where.trang_thai === 'thanh_cong') return Promise.resolve(100);
+          if (where.trang_thai === 'that_bai') return Promise.resolve(2);
+          return Promise.resolve(0);
+        },
+      );
+      prisma.nhat_ky_thong_bao.count.mockResolvedValue(50);
+
+      const res = await service.trangThaiHangDoi();
+      expect(res).toEqual({
+        theo_trang_thai: { cho_gui: 10, thanh_cong: 100, that_bai: 2 },
+        da_gui_hom_nay: 50,
+        han_muc_con_lai: 1950,
+      });
     });
   });
 });

@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { paginate } from '../common/dto/pagination-query.dto';
 import { getMailTransporter, getTestMessageUrl } from './util/mailer.util';
 import { formatDateVi } from './util/format-date-vi.util';
+import { bienNgayVietNam } from './util/gio-viet-nam.util';
 import { LichSuThongBaoQueryDto } from './dto/lich-su-thong-bao-query.dto';
 
 const KET_QUA_HOC_LABEL: Record<ket_qua_hoc, string> = {
@@ -18,19 +19,44 @@ const KET_QUA_HOC_LABEL: Record<ket_qua_hoc, string> = {
   vang: 'Vắng',
 };
 
+const EMAIL_DAILY_LIMIT_MAC_DINH = 2000;
+
+// M9 (2026-10-01): hạn mức/ngày đọc từ EMAIL_DAILY_LIMIT (xem .env.example)
+// — tự đặt thấp hơn hạn mức thật của Google Workspace để có biên an toàn.
+function layGioiHanHangNgay(): number {
+  const parsed = parseInt(process.env.EMAIL_DAILY_LIMIT ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0
+    ? parsed
+    : EMAIL_DAILY_LIMIT_MAC_DINH;
+}
+
 // Dịch vụ Thông báo — docs/api-contract.md mục 8 + database-ddl.sql PHẦN 4.
-// Nội bộ, không có endpoint public trừ GET /thong-bao/lich-su. 5 phương thức
-// public dưới đây ứng với đúng 5 giá trị enum loai_su_kien_thong_bao — được
-// gọi từ hoc-vien.service.ts / khoa-boi-duong.service.ts (dependency 1
-// chiều: các module đó import ThongBaoModule, ThongBaoModule KHÔNG import
-// ngược lại — không cần HocVienService/KhoaBoiDuongService, tự truy vấn
+// Nội bộ, không có endpoint public trừ GET /thong-bao/lich-su và GET
+// /thong-bao/hang-doi. 7 phương thức public gửi email ứng với đúng 7 giá
+// trị enum loai_su_kien_thong_bao — được gọi từ hoc-vien.service.ts /
+// khoa-boi-duong.service.ts / auth.service.ts (dependency 1 chiều: các
+// module đó import ThongBaoModule, ThongBaoModule KHÔNG import ngược lại —
+// không cần HocVienService/KhoaBoiDuongService/AuthService, tự truy vấn
 // prisma trực tiếp bằng id truyền vào, xem PrismaModule @Global()).
 //
+// M9 (2026-10-01, hàng đợi + hạn mức email): 2 LÀN gửi, tách theo mức độ
+// nhạy cảm thời gian —
+//   - "Ưu tiên cao" (guiXacMinhEmail, guiDatLaiMatKhau): bảo mật quan trọng
+//     hơn hạn mức, gửi NGAY qua guiNgayVaGhiNhatKy(), không qua hàng đợi,
+//     không bị chặn dù hạn mức/ngày đã hết — nhưng VẪN ghi nhat_ky_thong_bao
+//     (khác hành vi cũ trước M9) để hạn mức đếm đúng toàn bộ email thực sự
+//     gửi qua tài khoản.
+//   - "Hàng loạt" (guiHocVienXacNhan, guiHocVienDuyet, guiKhoaBoiDuongDuyet,
+//     guiDangKyHocPhanLop, guiDangKyHocKetQua): chỉ INSERT 1 dòng
+//     hang_doi_email (trang_thai='cho_gui') qua themVaoHangDoiEmail(), trả
+//     về ngay — việc gửi SMTP thật do HangDoiEmailProcessor (cron mỗi phút,
+//     cùng thư mục) đảm nhiệm, tự trải qua nhiều ngày khi vượt hạn mức.
+//
 // NGUYÊN TẮC "email là side effect" (đã áp dụng cho hoc_vien.xac_nhan ở
-// module hoc-vien từ trước): guiVaGhiNhatKy() KHÔNG BAO GIỜ throw — mọi lỗi
-// (gửi thất bại HOẶC ghi nhat_ky_thong_bao thất bại) đều bị nuốt và log ra
-// console, để nghiệp vụ gọi vào (vd. hồ sơ duyệt) không bao giờ bị rollback
-// chỉ vì email lỗi.
+// module hoc-vien từ trước): CẢ guiNgayVaGhiNhatKy() VÀ themVaoHangDoiEmail()
+// KHÔNG BAO GIỜ throw — mọi lỗi (gửi/insert thất bại HOẶC ghi nhat_ky_
+// thong_bao thất bại) đều bị nuốt và log ra console, để nghiệp vụ gọi vào
+// (vd. hồ sơ duyệt) không bao giờ bị rollback chỉ vì email lỗi.
 //
 // PROVISIONAL: nội dung/tiêu đề email dưới đây do tự soạn — api-contract.md
 // không định nghĩa nguyên văn nội dung từng loại thông báo, chỉ định nghĩa
@@ -67,7 +93,7 @@ export class ThongBaoService {
       <p>Nếu có sai sót, vui lòng đăng nhập lại hệ thống để sửa trước khi hồ sơ được duyệt.</p>
     `;
 
-    await this.guiVaGhiNhatKy({
+    await this.themVaoHangDoiEmail({
       loaiSuKien: 'hoc_vien_xac_nhan',
       hocVienId: hocVien.id,
       email: hocVien.email_lien_he,
@@ -98,7 +124,7 @@ export class ThongBaoService {
       ${ketQua === 'tu_choi' && lyDo ? `<p>Lý do: ${lyDo}</p>` : ''}
     `;
 
-    await this.guiVaGhiNhatKy({
+    await this.themVaoHangDoiEmail({
       loaiSuKien: 'hoc_vien_duyet',
       hocVienId: hocVien.id,
       email: hocVien.email_lien_he,
@@ -143,7 +169,7 @@ export class ThongBaoService {
       <p>Khóa bồi dưỡng "<b>${khoa.ten_khoa}</b>" (mã ${khoa.ma_khoa}) ${ketQuaText}.</p>
     `;
 
-    await this.guiVaGhiNhatKy({
+    await this.themVaoHangDoiEmail({
       loaiSuKien: 'khoa_boi_duong_duyet',
       hocVienId: null,
       email: nguoiDungTruong.email,
@@ -214,7 +240,7 @@ export class ThongBaoService {
       <p>Lịch học:<br/>${lichText}</p>
     `;
 
-    await this.guiVaGhiNhatKy({
+    await this.themVaoHangDoiEmail({
       loaiSuKien: 'dang_ky_hoc_phan_lop',
       hocVienId: dangKy.hoc_vien_id,
       email: dangKy.hoc_vien.email_lien_he,
@@ -244,7 +270,7 @@ export class ThongBaoService {
       ${dangKy.ngay_hoan_thanh ? `<p>Ngày hoàn thành: ${formatDateVi(dangKy.ngay_hoan_thanh)}</p>` : ''}
     `;
 
-    await this.guiVaGhiNhatKy({
+    await this.themVaoHangDoiEmail({
       loaiSuKien: 'dang_ky_hoc_ket_qua',
       hocVienId: dangKy.hoc_vien_id,
       email: dangKy.hoc_vien.email_lien_he,
@@ -253,15 +279,47 @@ export class ThongBaoService {
     });
   }
 
-  // Thêm 2026-09-30: xác minh email liên hệ & quên/đặt lại mật khẩu (không
-  // thuộc loai_su_kien_thong_bao nào — token tự thân đã là cơ chế theo dõi
-  // duy nhất, không cần thêm dòng nhat_ky_thong_bao). Dùng chung
-  // guiEmailKhongGhiNhatKy() ở dưới, cùng nguyên tắc "email là side effect"
-  // với guiVaGhiNhatKy() — KHÔNG BAO GIỜ throw.
+  // M8 (2026-10-01): báo học viên khi ticket "Yêu cầu hỗ trợ" được quan_tri
+  // trả lời — ticket hỗ trợ không khẩn như quên mật khẩu/xác minh email, nên
+  // đi làn "hàng loạt" (themVaoHangDoiEmail), không phải "ưu tiên cao".
+  async guiYeuCauHoTroTraLoi(yeuCauId: string): Promise<void> {
+    const yeuCau = await this.prisma.yeu_cau_ho_tro.findUnique({
+      where: { id: yeuCauId },
+      include: { hoc_vien: true },
+    });
+    if (!yeuCau) return;
+    if (!yeuCau.hoc_vien.email_lien_he) {
+      this.canhBaoThieuEmail('yeu_cau_ho_tro_tra_loi', yeuCau.hoc_vien_id);
+      return;
+    }
+
+    const html = `
+      <p>Xin chào ${yeuCau.hoc_vien.ho_ten},</p>
+      <p>Yêu cầu hỗ trợ của bạn đã được trả lời:</p>
+      <p><b>Câu hỏi:</b> ${yeuCau.noi_dung_hoi}</p>
+      <p><b>Trả lời:</b> ${yeuCau.noi_dung_tra_loi}</p>
+      <p>Đăng nhập hệ thống, vào mục "Yêu cầu hỗ trợ" để xem chi tiết.</p>
+    `;
+
+    await this.themVaoHangDoiEmail({
+      loaiSuKien: 'yeu_cau_ho_tro_tra_loi',
+      hocVienId: yeuCau.hoc_vien_id,
+      email: yeuCau.hoc_vien.email_lien_he,
+      tieuDe: 'Yêu cầu hỗ trợ của bạn đã được trả lời',
+      html,
+    });
+  }
+
+  // Thêm 2026-09-30, sửa M9 (2026-10-01): xác minh email liên hệ & quên/đặt
+  // lại mật khẩu — làn "ưu tiên cao", gửi NGAY (không qua hàng đợi, không bị
+  // chặn bởi hạn mức/ngày dù đã hết) vì bảo mật quan trọng hơn. Từ M9, CÓ ghi
+  // nhat_ky_thong_bao (trước đây không ghi gì) để hạn mức đếm đúng toàn bộ
+  // email thực sự gửi qua tài khoản — cần hocVienId để ghi cột hoc_vien_id.
   async guiXacMinhEmail(
     email: string,
     hoTen: string,
     link: string,
+    hocVienId: string,
   ): Promise<void> {
     const html = `
       <p>Xin chào ${hoTen},</p>
@@ -269,13 +327,20 @@ export class ThongBaoService {
       <p><a href="${link}">${link}</a></p>
       <p>Nếu Thầy/Cô không thực hiện thay đổi này, vui lòng bỏ qua email.</p>
     `;
-    await this.guiEmailKhongGhiNhatKy(email, 'Xác minh email liên hệ', html);
+    await this.guiNgayVaGhiNhatKy({
+      loaiSuKien: 'email_xac_minh',
+      hocVienId,
+      email,
+      tieuDe: 'Xác minh email liên hệ',
+      html,
+    });
   }
 
   async guiDatLaiMatKhau(
     email: string,
     hoTen: string,
     link: string,
+    hocVienId: string,
   ): Promise<void> {
     const html = `
       <p>Xin chào ${hoTen},</p>
@@ -283,35 +348,13 @@ export class ThongBaoService {
       <p><a href="${link}">${link}</a></p>
       <p>Nếu Thầy/Cô không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này — mật khẩu hiện tại vẫn giữ nguyên.</p>
     `;
-    await this.guiEmailKhongGhiNhatKy(email, 'Đặt lại mật khẩu', html);
-  }
-
-  private async guiEmailKhongGhiNhatKy(
-    email: string,
-    tieuDe: string,
-    html: string,
-  ): Promise<void> {
-    try {
-      const { transporter, from } = await getMailTransporter();
-      const info = await transporter.sendMail({
-        from,
-        to: email,
-        subject: tieuDe,
-        html,
-      });
-      const previewUrl = getTestMessageUrl(info);
-      if (previewUrl) {
-        console.log(
-          `[thong-bao] Xem trước email (Ethereal, ${tieuDe} -> ${email}): ${previewUrl}`,
-        );
-      }
-    } catch (e) {
-      const loi =
-        e instanceof Error ? e.message : 'Lỗi không xác định khi gửi email';
-      console.error(
-        `[thong-bao] Gửi email thất bại (${tieuDe} -> ${email}): ${loi}`,
-      );
-    }
+    await this.guiNgayVaGhiNhatKy({
+      loaiSuKien: 'dat_lai_mat_khau',
+      hocVienId,
+      email,
+      tieuDe: 'Đặt lại mật khẩu',
+      html,
+    });
   }
 
   // GET /thong-bao/lich-su — cả 2 filter tùy chọn (docs/api-contract.md mục 8).
@@ -334,6 +377,52 @@ export class ThongBaoService {
     return paginate(data, total, page, pageSize);
   }
 
+  // GET /thong-bao/hang-doi — M9, QuảnTrị xem tình trạng hàng đợi + hạn mức.
+  async trangThaiHangDoi(): Promise<{
+    theo_trang_thai: { cho_gui: number; thanh_cong: number; that_bai: number };
+    da_gui_hom_nay: number;
+    han_muc_con_lai: number;
+  }> {
+    const [choGui, thanhCong, thatBai, daGuiHomNay] = await Promise.all([
+      this.prisma.hang_doi_email.count({ where: { trang_thai: 'cho_gui' } }),
+      this.prisma.hang_doi_email.count({
+        where: { trang_thai: 'thanh_cong' },
+      }),
+      this.prisma.hang_doi_email.count({ where: { trang_thai: 'that_bai' } }),
+      this.demEmailThanhCongHomNay(),
+    ]);
+    return {
+      theo_trang_thai: {
+        cho_gui: choGui,
+        thanh_cong: thanhCong,
+        that_bai: thatBai,
+      },
+      da_gui_hom_nay: daGuiHomNay,
+      han_muc_con_lai: layGioiHanHangNgay() - daGuiHomNay,
+    };
+  }
+
+  // Dùng bởi HangDoiEmailProcessor (cron) VÀ trangThaiHangDoi() ở trên — số
+  // email trang_thai=thanh_cong có gui_luc rơi vào "hôm nay" theo giờ Việt
+  // Nam (Asia/Ho_Chi_Minh, UTC+7 — KHÔNG dùng UTC thô, xem gio-viet-nam.util.ts).
+  async demEmailThanhCongHomNay(thoiDiem: Date = new Date()): Promise<number> {
+    const { tuNgay, denNgay } = bienNgayVietNam(thoiDiem);
+    return this.prisma.nhat_ky_thong_bao.count({
+      where: {
+        trang_thai: 'thanh_cong',
+        gui_luc: { gte: tuNgay, lt: denNgay },
+      },
+    });
+  }
+
+  // Hạn mức CÒN LẠI hôm nay = EMAIL_DAILY_LIMIT - số email thanh_cong đã gửi
+  // hôm nay. Có thể âm hoặc 0 — HangDoiEmailProcessor coi <= 0 là "hết hạn
+  // mức, không gửi gì thêm trong lượt này".
+  async tinhHanMucConLaiHomNay(thoiDiem: Date = new Date()): Promise<number> {
+    const daGui = await this.demEmailThanhCongHomNay(thoiDiem);
+    return layGioiHanHangNgay() - daGui;
+  }
+
   private canhBaoThieuEmail(
     loaiSuKien: loai_su_kien_thong_bao,
     hocVienId: string,
@@ -343,10 +432,13 @@ export class ThongBaoService {
     );
   }
 
-  // Gửi email + ghi 1 dòng nhat_ky_thong_bao dù thành công hay thất bại
-  // (database-ddl.sql PHẦN 4 comment: "Ghi nhận MỖI lần gửi"). KHÔNG BAO GIỜ
-  // throw ra ngoài — xem comment đầu class.
-  private async guiVaGhiNhatKy(params: {
+  // Làn "ưu tiên cao" — gửi NGAY qua transporter + ghi 1 dòng nhat_ky_
+  // thong_bao dù thành công hay thất bại (database-ddl.sql PHẦN 4 comment:
+  // "Ghi nhận MỖI lần gửi"). KHÔNG BAO GIỜ throw ra ngoài — xem comment đầu
+  // class. Trước M9 đây là guiEmailKhongGhiNhatKy() (không ghi log) — hợp
+  // nhất với guiVaGhiNhatKy() cũ vì logic gửi+ghi log giống nhau 100%, chỉ
+  // khác nguồn gọi.
+  private async guiNgayVaGhiNhatKy(params: {
     loaiSuKien: loai_su_kien_thong_bao;
     hocVienId: string | null;
     email: string;
@@ -393,6 +485,33 @@ export class ThongBaoService {
       // Ghi log tuyệt đối không được làm hỏng luồng nghiệp vụ đã gọi vào đây
       // (vd. hồ sơ duyệt) — chỉ log ra console, không throw.
       console.error('[thong-bao] Không ghi được nhat_ky_thong_bao', e);
+    }
+  }
+
+  // Làn "hàng loạt" (M9) — KHÔNG gửi SMTP ở đây, chỉ insert 1 dòng
+  // hang_doi_email (trang_thai='cho_gui') rồi trả về ngay; HangDoiEmail
+  // Processor (cron mỗi phút) đảm nhiệm gửi thật + ghi nhat_ky_thong_bao khi
+  // có kết quả cuối (thành công hoặc thất bại hẳn sau 3 lần thử). KHÔNG BAO
+  // GIỜ throw ra ngoài — cùng nguyên tắc "email là side effect".
+  private async themVaoHangDoiEmail(params: {
+    loaiSuKien: loai_su_kien_thong_bao;
+    hocVienId: string | null;
+    email: string;
+    tieuDe: string;
+    html: string;
+  }): Promise<void> {
+    try {
+      await this.prisma.hang_doi_email.create({
+        data: {
+          loai_su_kien: params.loaiSuKien,
+          hoc_vien_id: params.hocVienId,
+          email_nguoi_nhan: params.email,
+          tieu_de: params.tieuDe,
+          noi_dung_html: params.html,
+        },
+      });
+    } catch (e) {
+      console.error('[thong-bao] Không ghi được hang_doi_email', e);
     }
   }
 }
