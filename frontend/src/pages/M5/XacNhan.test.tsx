@@ -86,14 +86,15 @@ describe('M5 — Xem lại & xác nhận', () => {
   });
 
   it('hiển thị hồ sơ dạng bảng 2 cột, dùng tên danh mục thay cho id', async () => {
-    db.hoSo.noi_sinh = 'Xã Long Xuyên, Tỉnh An Giang (cũ)';
+    db.hoSo.noi_sinh_xa = 'Xã Long Xuyên';
+    db.hoSo.noi_sinh_tinh = 'An Giang (cũ)';
     db.hoSo.cu_tru_tinh_id = 'tinh-1';
     db.hoSo.cu_tru_tinh_ten = 'An Giang';
     db.hoSo.cu_tru_phuong_xa_id = 'phuong-1';
     db.hoSo.cu_tru_phuong_xa_ten = 'Phường Long Xuyên';
     renderDaDangNhap();
     await screen.findByText('Nơi sinh');
-    expect(screen.getByText('Xã Long Xuyên, Tỉnh An Giang (cũ)')).toBeInTheDocument();
+    expect(screen.getByText('Xã Long Xuyên, An Giang (cũ)')).toBeInTheDocument();
     await screen.findByText('Cư trú');
     expect(screen.getByText('Phường Long Xuyên, An Giang')).toBeInTheDocument();
   });

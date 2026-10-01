@@ -35,9 +35,11 @@ export const hoSoHocVienSchema = z
     nam_sinh: z.coerce.number().int().min(1940).max(NAM_HIEN_TAI),
     gioi_tinh: z.enum(['nam', 'nu', 'khac']).nullable().optional(),
     so_dinh_danh_ca_nhan: cccdSchema,
-    // Sửa 2026-09-30: "Nơi sinh" đổi từ Select ràng buộc dia_danh sang ô nhập
-    // tự do (giấy khai sinh có thể ghi theo địa giới hành chính cũ).
-    noi_sinh: z.string().trim().min(1, 'Vui lòng nhập nơi sinh'),
+    // T17 (2026-10-01): "Nơi sinh" tách thành 3 trường riêng (Tỉnh/Huyện/Xã), vẫn là ô nhập
+    // tự do (giấy khai sinh có thể ghi theo địa giới hành chính cũ) — tất cả hoàn toàn tùy chọn.
+    noi_sinh_tinh: z.string().trim().optional(),
+    noi_sinh_huyen: z.string().trim().optional(),
+    noi_sinh_xa: z.string().trim().optional(),
     // Thêm 2026-09-30: "Cư trú" — tùy chọn, dùng địa giới hành chính hiện tại
     // (không bắt buộc, backend đã validate khớp tỉnh/phường-xã).
     cu_tru_tinh_id: z.string().nullable().optional(),

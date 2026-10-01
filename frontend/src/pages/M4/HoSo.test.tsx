@@ -45,13 +45,35 @@ describe('M4 — Hồ sơ: xem & sửa', () => {
     expect(screen.queryByRole('button', { name: 'Lưu' })).not.toBeInTheDocument();
   });
 
-  it('nơi sinh là ô nhập tự do, gõ được giá trị bất kỳ (không giới hạn theo danh mục)', async () => {
+  it('nơi sinh là 3 ô nhập tự do (Tỉnh/Huyện/Xã), gõ được giá trị bất kỳ (không giới hạn theo danh mục)', async () => {
     const user = userEvent.setup();
     renderDaDangNhap();
-    const oNoiSinh = await screen.findByLabelText('Nơi sinh');
-    await user.clear(oNoiSinh);
-    await user.type(oNoiSinh, 'Xã Tân Bình, huyện Tân Biên, tỉnh Tây Ninh (cũ)');
-    expect(oNoiSinh).toHaveValue('Xã Tân Bình, huyện Tân Biên, tỉnh Tây Ninh (cũ)');
+    const oTinh = await screen.findByLabelText('Tỉnh/Thành nơi sinh');
+    const oHuyen = screen.getByLabelText('Quận/Huyện nơi sinh');
+    const oXa = screen.getByLabelText('Phường/Xã nơi sinh');
+    await user.type(oTinh, 'Tây Ninh (cũ)');
+    await user.type(oHuyen, 'Tân Biên');
+    await user.type(oXa, 'Tân Bình');
+    expect(oTinh).toHaveValue('Tây Ninh (cũ)');
+    expect(oHuyen).toHaveValue('Tân Biên');
+    expect(oXa).toHaveValue('Tân Bình');
+  });
+
+  it('để trống cả 3 ô nơi sinh → không có lỗi validate chặn, mục lục "Nơi sinh" không hiện chấm đỏ "cần bổ sung"', async () => {
+    const user = userEvent.setup();
+    renderDaDangNhap();
+
+    const mucLucNoiSinh = await screen.findByRole('link', { name: 'Nơi sinh' });
+    expect(mucLucNoiSinh.querySelector('[aria-hidden]')).not.toBeInTheDocument();
+
+    const oChucVu = screen.getByLabelText('Chức vụ');
+    await user.clear(oChucVu);
+    await user.type(oChucVu, 'Tổ trưởng chuyên môn');
+
+    expect(screen.getByLabelText('Tỉnh/Thành nơi sinh')).toHaveValue('');
+    expect(screen.getByLabelText('Quận/Huyện nơi sinh')).toHaveValue('');
+    expect(screen.getByLabelText('Phường/Xã nơi sinh')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Lưu' })).toBeEnabled();
   });
 
   it('đổi cư trú (tỉnh/thành) → danh sách phường/xã đổi theo, giá trị phường/xã cũ bị xóa', async () => {
@@ -107,7 +129,8 @@ describe('M4 — Hồ sơ: xem & sửa', () => {
   });
 
   it('chỉ gửi các trường đã đổi khi Lưu (PATCH một phần)', async () => {
-    db.hoSo.noi_sinh = 'Xã Long Xuyên, Tỉnh An Giang (cũ)';
+    db.hoSo.noi_sinh_xa = 'Xã Long Xuyên';
+    db.hoSo.noi_sinh_tinh = 'An Giang (cũ)';
     db.hoSo.so_dinh_danh_ca_nhan = '111111111111';
     db.hoSo.email_lien_he = 'a@vd.vn';
     db.hoSo.trinh_do_chuyen_mon = 'dai_hoc';

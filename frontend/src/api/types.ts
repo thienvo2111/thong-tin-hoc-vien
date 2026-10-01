@@ -39,13 +39,16 @@ export interface HocVien {
   thang_sinh: number | null;
   nam_sinh: number | null;
   gioi_tinh: 'nam' | 'nu' | 'khac' | null;
-  // Deprecated (sửa 2026-09-30): thay bởi "noi_sinh" (text tự do, bên dưới) —
-  // giữ nguyên 2 field này trong kiểu để không vỡ chỗ nào còn đọc dữ liệu cũ.
+  // Deprecated (sửa 2026-09-30, rồi T17 2026-10-01): thay bởi "noi_sinh" (text tự do) rồi
+  // noi_sinh_tinh/huyen/xa — giữ nguyên 2 field này trong kiểu để không vỡ chỗ nào còn đọc dữ liệu cũ.
   noi_sinh_id?: string | null;
   phuong_xa_id?: string | null;
-  // Thêm 2026-09-30: nơi sinh dạng text tự do — giấy khai sinh có thể ghi
-  // theo địa giới hành chính CŨ, khác địa giới HIỆN TẠI mà dia_danh quản lý.
-  noi_sinh?: string | null;
+  // T17 (2026-10-01): tách "noi_sinh" (1 ô text tự do) thành 3 trường riêng — vẫn text tự do
+  // (giấy khai sinh có thể ghi theo địa giới hành chính CŨ, khác địa giới HIỆN TẠI mà dia_danh
+  // quản lý), tất cả hoàn toàn tùy chọn, KHÔNG tính vào "Hồ sơ đầy đủ".
+  noi_sinh_tinh?: string | null;
+  noi_sinh_huyen?: string | null;
+  noi_sinh_xa?: string | null;
   // Thêm 2026-09-30: "Cư trú" — tùy chọn, dùng đúng địa giới hành chính HIỆN
   // TẠI (dia_danh đang có, 2 cấp tỉnh/thành -> phường/xã).
   cu_tru_tinh_id?: string | null;

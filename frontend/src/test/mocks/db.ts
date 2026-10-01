@@ -47,7 +47,6 @@ export function taoHoSoMoi(): HocVien {
     thang_sinh: 12,
     nam_sinh: 1983,
     gioi_tinh: null,
-    noi_sinh: null,
     cu_tru_tinh_id: null,
     cu_tru_phuong_xa_id: null,
     don_vi_cong_tac_id: 'dv-1',
@@ -75,7 +74,6 @@ export function taoDotXacNhanDangMoThieu(): DotXacNhan {
     day_du: false,
     thieu: [
       { field: 'so_dinh_danh_ca_nhan', message: 'Chưa có số CCCD' },
-      { field: 'noi_sinh', message: 'Chưa nhập nơi sinh' },
       { field: 'email_lien_he', message: 'Chưa có email' },
     ],
   };

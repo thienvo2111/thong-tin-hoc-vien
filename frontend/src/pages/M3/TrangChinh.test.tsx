@@ -32,7 +32,7 @@ describe('M3 — Trang chính', () => {
 
   it('đợt đang mở, hồ sơ thiếu → hiện số trường thiếu + hạn + nút Bổ sung thông tin', async () => {
     renderDaDangNhap();
-    expect(await screen.findByText(/Còn 3 thông tin cần bổ sung/)).toBeInTheDocument();
+    expect(await screen.findByText(/Còn 2 thông tin cần bổ sung/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Bổ sung thông tin' })).toHaveAttribute('href', '/toi/ho-so');
   });
 

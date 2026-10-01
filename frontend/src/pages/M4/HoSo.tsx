@@ -54,9 +54,8 @@ import { SelectDonVi } from '@/components/SelectDonVi';
 
 const NHOM_TRUONG = {
   ca_nhan: ['ho_ten', 'ngay_sinh', 'thang_sinh', 'nam_sinh', 'so_dinh_danh_ca_nhan'],
-  noi_sinh: ['noi_sinh'],
-  // Chỉ để nhóm UI (mục lục) — KHÔNG dùng cho logic "cần bổ sung" (coThieu),
-  // vì Cư trú là trường tùy chọn (sửa 2026-09-30).
+  // Nơi sinh và Cư trú KHÔNG nằm trong đối tượng này — cả 2 là trường tùy chọn
+  // (T17/sửa 2026-09-30), không tính vào logic "cần bổ sung" (coThieu). Xem MUC_LUC bên dưới.
   cu_tru: ['cu_tru_tinh_id', 'cu_tru_phuong_xa_id'],
   cong_tac: ['don_vi_cong_tac_id', 'chuc_vu'],
   lien_he: ['so_dien_thoai_lien_he', 'email_lien_he'],
@@ -67,7 +66,7 @@ const NHOM_NGAY_SINH = new Set(['ngay_sinh', 'thang_sinh', 'nam_sinh']);
 
 const MUC_LUC = [
   { id: 'section-ca-nhan', nhan: 'Thông tin cá nhân', nhom: NHOM_TRUONG.ca_nhan },
-  { id: 'section-noi-sinh', nhan: 'Nơi sinh', nhom: NHOM_TRUONG.noi_sinh },
+  { id: 'section-noi-sinh', nhan: 'Nơi sinh', nhom: null },
   { id: 'section-cu-tru', nhan: 'Cư trú', nhom: null },
   { id: 'section-cong-tac', nhan: 'Công tác', nhom: NHOM_TRUONG.cong_tac },
   { id: 'section-lien-he', nhan: 'Liên hệ', nhom: NHOM_TRUONG.lien_he },
@@ -82,7 +81,9 @@ function toFormValues(hoSo: HocVien | undefined): HoSoHocVienForm {
     nam_sinh: (hoSo?.nam_sinh ?? undefined) as unknown as number,
     gioi_tinh: hoSo?.gioi_tinh ?? null,
     so_dinh_danh_ca_nhan: hoSo?.so_dinh_danh_ca_nhan ?? '',
-    noi_sinh: hoSo?.noi_sinh ?? '',
+    noi_sinh_tinh: hoSo?.noi_sinh_tinh ?? '',
+    noi_sinh_huyen: hoSo?.noi_sinh_huyen ?? '',
+    noi_sinh_xa: hoSo?.noi_sinh_xa ?? '',
     cu_tru_tinh_id: hoSo?.cu_tru_tinh_id ?? null,
     cu_tru_phuong_xa_id: hoSo?.cu_tru_phuong_xa_id ?? null,
     don_vi_cong_tac_id: hoSo?.don_vi_cong_tac_id ?? '',
@@ -473,18 +474,28 @@ export default function HoSo() {
 
             <Card id="section-noi-sinh" withBorder radius="md">
               <Stack gap="md">
-                <Group gap={6}>
-                  {coThieu(NHOM_TRUONG.noi_sinh) && <ChamThieu />}
-                  <Text fw={600}>Nơi sinh</Text>
-                </Group>
+                <Text fw={600}>Nơi sinh</Text>
+                <Text size="xs" c="dimmed">
+                  Ghi theo giấy khai sinh.
+                </Text>
 
                 <TextInput
-                  label="Nơi sinh"
-                  placeholder="Ví dụ: Xã ABC, huyện XYZ, tỉnh Hà Tây (cũ)"
-                  description="Ghi theo giấy khai sinh — có thể theo địa giới hành chính cũ, không nhất thiết khớp danh mục tỉnh/thành hiện tại"
-                  error={loiHoacThieu('noi_sinh', errors.noi_sinh?.message, watch('noi_sinh'))}
+                  label="Tỉnh/Thành nơi sinh"
+                  placeholder="VD: Hà Tây (cũ)"
                   disabled={chiXem}
-                  {...register('noi_sinh')}
+                  {...register('noi_sinh_tinh')}
+                />
+                <TextInput
+                  label="Quận/Huyện nơi sinh"
+                  placeholder="VD: Ba Vì"
+                  disabled={chiXem}
+                  {...register('noi_sinh_huyen')}
+                />
+                <TextInput
+                  label="Phường/Xã nơi sinh"
+                  placeholder="VD: Xã Sơn Đà"
+                  disabled={chiXem}
+                  {...register('noi_sinh_xa')}
                 />
               </Stack>
             </Card>
