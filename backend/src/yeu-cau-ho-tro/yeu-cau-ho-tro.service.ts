@@ -3,13 +3,17 @@ import { Prisma, yeu_cau_ho_tro } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import {
+  ConflictAppException,
   ForbiddenAppException,
   NotFoundAppException,
   ValidationException,
 } from '../common/exceptions/app.exceptions';
+import { paginate } from '../common/dto/pagination-query.dto';
 import { TaoYeuCauHoTroDto } from './dto/tao-yeu-cau-ho-tro.dto';
 import { DanhGiaYeuCauHoTroDto } from './dto/danh-gia-yeu-cau-ho-tro.dto';
-import { SO_NGAY_TU_DONG_DONG } from './yeu-cau-ho-tro.constants';
+import { TraLoiYeuCauHoTroDto } from './dto/tra-loi-yeu-cau-ho-tro.dto';
+import { QueryYeuCauHoTroDto } from './dto/query-yeu-cau-ho-tro.dto';
+import { SO_NGAY_HOI_LAI, SO_NGAY_TU_DONG_DONG } from './yeu-cau-ho-tro.constants';
 
 export type YeuCauHoTroResponse = yeu_cau_ho_tro & {
   loai_van_de_ten: string;
@@ -108,6 +112,92 @@ export class YeuCauHoTroService {
       throw new ForbiddenAppException('Không có quyền truy cập yêu cầu hỗ trợ này');
     }
     return yeuCau;
+  }
+
+  // ---------------------------------------------------------------------
+  // Phía quan_tri (/yeu-cau-ho-tro...)
+  // ---------------------------------------------------------------------
+
+  async danhSachQuanTri(query: QueryYeuCauHoTroDto) {
+    const page = query.page ?? 1;
+    const pageSize = query.page_size ?? 20;
+    const where: Prisma.yeu_cau_ho_troWhereInput = {};
+    if (query.trang_thai) where.trang_thai = query.trang_thai;
+    if (query.loai_van_de_id) where.loai_van_de_id = query.loai_van_de_id;
+
+    const [data, total] = await Promise.all([
+      this.prisma.yeu_cau_ho_tro.findMany({
+        where,
+        include: INCLUDE_LOAI_VAN_DE,
+        orderBy: { thoi_gian_tao: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.yeu_cau_ho_tro.count({ where }),
+    ]);
+    const data_voi_hoi_lai = await Promise.all(data.map((d) => this.voiHoiLai(d)));
+    return paginate(data_voi_hoi_lai, total, page, pageSize);
+  }
+
+  async chiTietQuanTri(id: string) {
+    const yeuCau = await this.prisma.yeu_cau_ho_tro.findUnique({
+      where: { id },
+      include: INCLUDE_LOAI_VAN_DE,
+    });
+    if (!yeuCau) throw new NotFoundAppException('Không tìm thấy yêu cầu hỗ trợ');
+    return this.voiHoiLai(yeuCau);
+  }
+
+  async traLoi(
+    id: string,
+    nguoiTraLoiId: string,
+    dto: TraLoiYeuCauHoTroDto,
+  ): Promise<YeuCauHoTroResponse> {
+    const yeuCau = await this.prisma.yeu_cau_ho_tro.findUnique({
+      where: { id },
+      include: INCLUDE_LOAI_VAN_DE,
+    });
+    if (!yeuCau) throw new NotFoundAppException('Không tìm thấy yêu cầu hỗ trợ');
+    if (yeuCau.trang_thai === 'da_dong') {
+      throw new ConflictAppException('Ticket đã đóng, không thể trả lời thêm');
+    }
+
+    const updated = await this.prisma.yeu_cau_ho_tro.update({
+      where: { id },
+      data: {
+        noi_dung_tra_loi: dto.noi_dung_tra_loi,
+        trang_thai: 'da_phan_hoi',
+        thoi_gian_phan_hoi: new Date(),
+        tra_loi_boi: nguoiTraLoiId,
+      },
+      include: INCLUDE_LOAI_VAN_DE,
+    });
+
+    await this.thongBao.guiYeuCauHoTroTraLoi(id);
+    return this.toResponse(updated);
+  }
+
+  // Quyết định #8: "hỏi lại" = có >= 1 ticket KHÁC của CÙNG học viên, CÙNG
+  // loai_van_de_id, tạo trong SO_NGAY_HOI_LAI ngày SAU khi ticket này được
+  // trả lời (dấu hiệu câu trả lời chưa giải quyết được vấn đề).
+  private async voiHoiLai(
+    yeuCau: yeu_cau_ho_tro & { loai_van_de: { ten: string } },
+  ): Promise<YeuCauHoTroResponse & { hoi_lai: boolean }> {
+    const response = this.toResponse(yeuCau);
+    if (!yeuCau.thoi_gian_phan_hoi) return { ...response, hoi_lai: false };
+
+    const han = new Date(yeuCau.thoi_gian_phan_hoi);
+    han.setDate(han.getDate() + SO_NGAY_HOI_LAI);
+
+    const soLuong = await this.prisma.yeu_cau_ho_tro.count({
+      where: {
+        id: { not: yeuCau.id },
+        hoc_vien_id: yeuCau.hoc_vien_id,
+        loai_van_de_id: yeuCau.loai_van_de_id,
+        thoi_gian_tao: { gt: yeuCau.thoi_gian_phan_hoi, lte: han },
+      },
+    });
+    return { ...response, hoi_lai: soLuong > 0 };
   }
 
   private toResponse(

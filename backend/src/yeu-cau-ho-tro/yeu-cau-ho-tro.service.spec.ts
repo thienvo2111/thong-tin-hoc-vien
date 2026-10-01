@@ -132,3 +132,78 @@ describe('YeuCauHoTroService — phía học viên', () => {
     expect(ketQua.loai_van_de_ten).toBe('Quên mật khẩu');
   });
 });
+
+describe('YeuCauHoTroService — phía quan_tri', () => {
+  let service: YeuCauHoTroService;
+  let prisma: {
+    yeu_cau_ho_tro: {
+      create: jest.Mock;
+      findMany: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      count: jest.Mock;
+    };
+    loai_van_de_ho_tro: { findUniqueOrThrow: jest.Mock };
+  };
+  let thongBao: { guiYeuCauHoTroTraLoi: jest.Mock };
+
+  beforeEach(() => {
+    prisma = {
+      yeu_cau_ho_tro: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        count: jest.fn(),
+      },
+      loai_van_de_ho_tro: { findUniqueOrThrow: jest.fn() },
+    };
+    thongBao = { guiYeuCauHoTroTraLoi: jest.fn() };
+    service = new YeuCauHoTroService(
+      prisma as unknown as PrismaService,
+      thongBao as unknown as ThongBaoService,
+    );
+  });
+
+  it('traLoi ticket cho_xu_ly -> set da_phan_hoi + gọi gửi email', async () => {
+    prisma.yeu_cau_ho_tro.findUnique.mockResolvedValueOnce({
+      id: 'yc-1',
+      trang_thai: 'cho_xu_ly',
+      loai_van_de: { ten: 'X' },
+    });
+    prisma.yeu_cau_ho_tro.update.mockResolvedValueOnce({
+      id: 'yc-1',
+      trang_thai: 'da_phan_hoi',
+      thoi_gian_phan_hoi: new Date(),
+      loai_van_de: { ten: 'X' },
+    });
+
+    await service.traLoi('yc-1', 'qt-1', { noi_dung_tra_loi: 'Đã xử lý' });
+
+    expect(prisma.yeu_cau_ho_tro.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'yc-1' },
+        data: expect.objectContaining({
+          trang_thai: 'da_phan_hoi',
+          noi_dung_tra_loi: 'Đã xử lý',
+          tra_loi_boi: 'qt-1',
+        }),
+      }),
+    );
+    expect(thongBao.guiYeuCauHoTroTraLoi).toHaveBeenCalledWith('yc-1');
+  });
+
+  it('traLoi ticket đã da_dong -> ConflictAppException, không update, không gửi mail', async () => {
+    prisma.yeu_cau_ho_tro.findUnique.mockResolvedValueOnce({
+      id: 'yc-1',
+      trang_thai: 'da_dong',
+      loai_van_de: { ten: 'X' },
+    });
+
+    await expect(
+      service.traLoi('yc-1', 'qt-1', { noi_dung_tra_loi: 'Trễ rồi' }),
+    ).rejects.toThrow();
+    expect(prisma.yeu_cau_ho_tro.update).not.toHaveBeenCalled();
+    expect(thongBao.guiYeuCauHoTroTraLoi).not.toHaveBeenCalled();
+  });
+});
