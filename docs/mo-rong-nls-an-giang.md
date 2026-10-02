@@ -10,6 +10,7 @@
 - Trình tự: đánh giá đầu vào (06–11/10) → phân mức, phân lớp (12–15/10) → 3 nhóm HV gối đầu, mỗi nhóm học Zoom (nhiều buổi/lớp) rồi VLE → 9 đợt trực tiếp, mỗi đợt 3 ngày, ~20 lớp (13/11/2026–17/01/2027) → VLE lần 2 → đánh giá đầu ra → chứng nhận.
 - Đơn vị tổ chức: Trường ĐHSP TP.HCM (HCMUE) — **không** thuộc cây đơn vị của An Giang.
 - Học viên vào hệ thống qua import `ho_so_nhan_su_moet` (hồ sơ thiếu CCCD, email…). **Luồng xác nhận (chốt 2026-09-28):** Đợt 1 — học viên đăng nhập kiểm tra, sửa, bổ sung hồ sơ → hết đợt 1, dữ liệu chuyển Phòng CNTT tạo tài khoản VLE → Đợt 2 — ngay trước đánh giá đầu vào, học viên kiểm tra lại và xác nhận; **chỉ hồ sơ đầy đủ và đã xác nhận đợt 2 mới thấy link/tài khoản làm bài đánh giá**. Cổng học viên phải chạy trước khi mở đợt 1.
+- **Điều chỉnh luồng giai đoạn 1 (2026-10-02, thay luồng đợt 1/đợt 2 ở trên cho An Giang):** chưa mở đăng nhập cho học viên. Học viên làm tuần tự 2 phiếu ngoài hệ thống — *Phiếu khảo sát kĩ năng số* rồi *Phiếu đánh giá năng lực số* — và kê khai/bổ sung thông tin ngay trong phiếu (link đặt ở trang chủ, khối `khaoSatDauVao`). Chưa chốt tách phiếu theo đối tượng GV/CBQL (cấu hình đã hỗ trợ nhiều link/phiếu). Sau khảo sát, Quản trị đổ dữ liệu bổ sung + kết quả đánh giá + phân lớp qua import; học viên đăng nhập **chỉ xem** (không mở Đợt xác nhận); điều chỉnh hồ sơ mở lại ở giai đoạn kết quả cuối. Luồng đợt 1/đợt 2 + T15 vẫn giữ nguyên trong code cho địa phương khác — chuyển qua `frontend/src/content/trienKhai.ts` (xem `docs/dac-ta-cong-hoc-vien.md` mục "Chế độ triển khai").
 - Học liệu và học tập nằm trên VLE; lớp đồng bộ trên Zoom; hậu cần giảng viên (xe, khách sạn) và sổ giám sát hỗ trợ nằm trên Google Sheets — **ngoài phạm vi hệ thống**.
 
 ## 1. Quyết định thiết kế (đã chốt 2026-09-28)
@@ -502,6 +503,13 @@ CREATE TABLE chung_nhan (
 ---
 
 ## 4. Trình tự vận hành dữ liệu (không phải code)
+
+**Biến thể "khảo sát trước" (An Giang GĐ1, 2026-10-02)** — thay các bước 5–11 bên dưới:
+1. Đặt `trienKhai.cheDoHocVien = 'khao_sat'`, `danhGiaDauVaoTrongCong = false`; dán link 2 phiếu vào `gioiThieu.khaoSatDauVao`; build + deploy frontend.
+2. Gửi link trang chủ qua Sở → trường → giáo viên; học viên làm Phiếu 1 rồi Phiếu 2.
+3. Đóng khảo sát → import `ho_so_nhan_su_moet` (thông tin đã bổ sung) → tạo khóa → import `ket_qua_danh_gia` → `lop_va_lich_hoc` → `phan_lop_hoc_vien`.
+4. Đổi `cheDoHocVien = 'dang_nhap'`, ẩn khối khảo sát (`hien: false`), deploy → thông báo học viên đăng nhập xem hồ sơ/lớp. **Không mở Đợt xác nhận** ở giai đoạn này.
+5. Giai đoạn kết quả cuối: mở Đợt xác nhận để học viên kiểm tra, điều chỉnh hồ sơ trước khi cấp chứng nhận.
 
 **Trước khi mở đợt 1**
 1. Import `dia_danh`: An Giang (sau sáp nhập) + TP.HCM.

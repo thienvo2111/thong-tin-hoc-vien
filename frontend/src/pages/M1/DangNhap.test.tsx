@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http } from 'msw';
@@ -6,6 +6,7 @@ import { server } from '@/test/mocks/server';
 import { loi } from '@/test/mocks/handlers';
 import { renderVoiRouter } from '@/test/testUtils';
 import DangNhap from './DangNhap';
+import { trienKhai } from '@/content/trienKhai';
 
 const routes = [
   { path: '/dang-nhap', element: <DangNhap /> },
@@ -93,5 +94,27 @@ describe('M1 — Đăng nhập', () => {
 
     await user.click(screen.getByRole('link', { name: 'Quên mật khẩu?' }));
     expect(await screen.findByText('Màn hình quên mật khẩu')).toBeInTheDocument();
+  });
+});
+
+describe('M1 — Đăng nhập theo chế độ triển khai', () => {
+  const goc = trienKhai.cheDoHocVien;
+  afterEach(() => {
+    trienKhai.cheDoHocVien = goc;
+  });
+
+  it('chế độ "khao_sat": báo học viên chưa cần đăng nhập + link về khối khảo sát, form vẫn dùng được (quản trị)', async () => {
+    trienKhai.cheDoHocVien = 'khao_sat';
+    renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
+    expect(await screen.findByText('Học viên chưa cần đăng nhập')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Đi tới trang khảo sát' })).toHaveAttribute('href', '/#khao-sat');
+    expect(screen.getByRole('button', { name: 'Đăng nhập' })).toBeEnabled();
+  });
+
+  it('chế độ "dang_nhap": không hiện thông báo khảo sát', async () => {
+    trienKhai.cheDoHocVien = 'dang_nhap';
+    renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
+    await screen.findByRole('button', { name: 'Đăng nhập' });
+    expect(screen.queryByText('Học viên chưa cần đăng nhập')).not.toBeInTheDocument();
   });
 });

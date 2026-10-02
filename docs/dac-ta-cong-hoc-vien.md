@@ -19,6 +19,18 @@
 
 Mọi màn hình sau đăng nhập có thanh trên: tên học viên, nút "Đăng xuất", số điện thoại/Zalo hỗ trợ (lấy từ `VITE_HOTRO_LIEN_HE`).
 
+### Chế độ triển khai (cập nhật 2026-10-02)
+
+Cấu hình trong `frontend/src/content/trienKhai.ts` — đổi giai đoạn chỉ cần sửa file này, không sửa component:
+
+| Kịch bản | `cheDoHocVien` | `danhGiaDauVaoTrongCong` | Hành vi |
+|---|---|---|---|
+| **GĐ1 "khảo sát trước"** (An Giang hiện tại) | `khao_sat` | `false` | Học viên **không đăng nhập**. M0 hiện khối "Khảo sát đầu vào" với các phiếu làm **tuần tự** (Phiếu 1: khảo sát kĩ năng số → Phiếu 2: đánh giá năng lực số); học viên kê khai/bổ sung thông tin ngay trong phiếu. M1 hiện thông báo "Học viên chưa cần đăng nhập" (form vẫn dùng cho quản trị). |
+| **GĐ2 sau khi đổ dữ liệu** | `dang_nhap` | `false` | Học viên đăng nhập để **xem** hồ sơ + lớp học. Không mở Đợt xác nhận → hồ sơ `import_moet` chỉ xem. Menu M6 ẩn. Giai đoạn kết quả cuối: mở Đợt xác nhận để học viên điều chỉnh. |
+| **Địa phương bổ sung thông tin trên hệ thống trước đánh giá** | `dang_nhap` | `true` | Luồng gốc M1 → M5 → M6 như đặc tả dưới đây. |
+
+Mục nội dung trong `gioiThieu.ts` gắn `cheDo: 'khao_sat' | 'dang_nhap'` chỉ hiện ở chế độ tương ứng (áp dụng cho khối `huongDan`, từng bước `loTrinh`, từng câu `hoiDap`); không gắn = luôn hiện.
+
 ---
 
 ## M1 — Đăng nhập
@@ -30,6 +42,7 @@ Mọi màn hình sau đăng nhập có thanh trên: tên học viên, nút "Đă
 - Ô "Mã định danh" (nhãn phụ: "Mã định danh trên CSDL ngành do nhà trường cung cấp"), bàn phím số trên điện thoại (`inputMode="numeric"`), bỏ khoảng trắng khi dán.
 - Ô "Mật khẩu" có nút hiện/ẩn. Gợi ý dưới ô: "Lần đầu đăng nhập: mật khẩu là ngày sinh dạng ngày-tháng-năm viết liền, ví dụ 08121983".
 - Liên kết "Không biết mã định danh?" → mở khung hướng dẫn tĩnh: liên hệ nhà trường hoặc số hỗ trợ.
+- Chế độ `khao_sat` (2026-10-02): khung thông tin "Học viên chưa cần đăng nhập" + liên kết "Đi tới trang khảo sát" (→ `/#khao-sat`). Form vẫn hoạt động bình thường (quản trị/cán bộ đăng nhập).
 
 **Hành vi**
 - Thành công + `phai_doi_mat_khau=true` → M2; ngược lại → M3.
@@ -131,6 +144,8 @@ Mọi màn hình sau đăng nhập có thanh trên: tên học viên, nút "Đă
 
 **API:** `GET /hoc-vien/toi/danh-gia-dau-vao` (T15). Cấu hình query: `gcTime: 0`, không refetch nền.
 
+Mục menu "Đánh giá đầu vào" ở thanh trên chỉ hiện khi `trienKhai.danhGiaDauVaoTrongCong = true` (2026-10-02) — địa phương làm đánh giá qua phiếu khảo sát ngoài thì ẩn.
+
 | Phản hồi | Hiển thị |
 |---|---|
 | `du_dieu_kien: true` | Link "Vào làm bài" (mở cùng tab), tên đăng nhập VLE (có nút sao chép), mật khẩu tạm ẩn dạng •••• với nút "Hiện" và "Sao chép"; lưu ý "Hệ thống VLE sẽ yêu cầu đổi mật khẩu ở lần đăng nhập đầu" |
@@ -161,12 +176,13 @@ Mọi màn hình sau đăng nhập có thanh trên: tên học viên, nút "Đă
 
 | # | Mục | Nội dung | Bản tối thiểu |
 |---|---|---|---|
-| 1 | **Phần mở đầu** | Tên chương trình, 1 câu thông điệp, nút chính **"Đăng nhập cổng học viên"** (→ `/dang-nhap`), nút phụ "Tìm hiểu chương trình" (cuộn xuống mục 2). Nếu `thongBaoNoiBat` có giá trị (ví dụ "Đợt kiểm tra hồ sơ mở đến 23:59 ngày 04/10") → dải thông báo nổi bật phía trên | ✔ |
+| 1 | **Phần mở đầu** | Tên chương trình, 1 câu thông điệp, nút chính **"Đăng nhập cổng học viên"** (→ `/dang-nhap`) — ở chế độ `khao_sat` đổi thành **"Làm khảo sát đầu vào"** (→ `#khao-sat`), nút phụ "Tìm hiểu chương trình" (cuộn xuống mục 2). Nếu `thongBaoNoiBat` có giá trị (ví dụ "Đợt kiểm tra hồ sơ mở đến 23:59 ngày 04/10") → dải thông báo nổi bật phía trên | ✔ |
+| 1b | **Khảo sát đầu vào** (`khaoSatDauVao`, 2026-10-02) | Danh sách phiếu đánh số theo thứ tự làm; mỗi phiếu có 1 hoặc nhiều đường dẫn (tách theo đối tượng: giáo viên / cán bộ quản lý), mở tab mới; đường dẫn còn `[CHỜ]` → nút bị khóa + "Đường dẫn đang được cập nhật". Ghi chú "Sau khi hoàn thành khảo sát". Hiện khi `hien: true` (độc lập chế độ) | |
 | 2 | **Con số chương trình** | 3–4 ô số (ví dụ số tỉnh đã triển khai, số giáo viên đã tham gia) — chỉ hiển thị khi file nội dung có số; mặc định `hien: false` | |
 | 3 | **Vì sao cần năng lực số** | Mục tiêu, lợi ích cho giáo viên, 3 mức Cơ bản / Thành thạo / Nâng cao (mô tả ngắn từng mức) | |
 | 4 | **Lộ trình học** | Các giai đoạn chung theo thứ tự (không có ngày): điện thoại hiển thị dọc, desktop ngang | |
 | 5 | **Nội dung chương trình** | Danh sách mô-đun/chủ đề dạng thẻ (tên, mô tả 1–2 câu, hình thức học) | |
-| 6 | **Hướng dẫn nhanh cho học viên** | 4 bước: nhận mã định danh từ nhà trường → đăng nhập bằng mã + ngày sinh (ddmmyyyy) → bổ sung & xác nhận hồ sơ → làm bài đánh giá đầu vào | ✔ |
+| 6 | **Hướng dẫn nhanh cho học viên** | 4 bước: nhận mã định danh từ nhà trường → đăng nhập bằng mã + ngày sinh (ddmmyyyy) → bổ sung & xác nhận hồ sơ → làm bài đánh giá đầu vào. Chỉ hiện ở chế độ `dang_nhap` | ✔ |
 | 7 | **Câu hỏi thường gặp** | Accordion; danh sách câu hỏi lấy từ file nội dung (tái sử dụng FAQ của N4) | ✔ |
 | 8 | **Liên hệ hỗ trợ** | Hotline, Zalo hỗ trợ, email; giờ hỗ trợ | ✔ |
 | 9 | **Đơn vị tổ chức** | Logo + tên HCMUE; danh sách đơn vị phối hợp (nếu có) chỉ hiển thị khi được đồng ý — cờ `hien` | |
@@ -186,7 +202,8 @@ Chân trang: tên đơn vị tổ chức, địa chỉ, liên kết "Đăng nh�
 
 ### Nghiệm thu
 
-- Mở `/` khi chưa đăng nhập → thấy nút "Đăng nhập cổng học viên" ngay màn hình đầu trên điện thoại 360px.
+- Mở `/` khi chưa đăng nhập → thấy nút chính ngay màn hình đầu trên điện thoại 360px ("Làm khảo sát đầu vào" ở chế độ `khao_sat`, "Đăng nhập cổng học viên" ở chế độ `dang_nhap`).
+- Chế độ `khao_sat`: các phiếu hiện đúng thứ tự; không hiện hướng dẫn đăng nhập / FAQ mật khẩu.
 - Đổi 1 câu trong `gioiThieu.ts` → trang đổi theo, không sửa component nào.
 - Không có tên tỉnh nào xuất hiện trên M0 (test: render M0 không chứa chuỗi "An Giang").
 - Chế độ dev in danh sách khối `tam: true`.

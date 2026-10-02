@@ -45,6 +45,7 @@ Công cụ phối hợp giữa **Sở GD&ĐT**, **Phòng Văn hóa - Xã hội**
 
 ## Luồng nghiệp vụ chính
 
+- **Chế độ triển khai** (`frontend/src/content/trienKhai.ts`, 2026-10-02): `cheDoHocVien` = `khao_sat` (giai đoạn 1 kiểu An Giang — học viên KHÔNG đăng nhập, làm tuần tự các phiếu khảo sát ngoài ở khối `khaoSatDauVao` trang chủ, bổ sung thông tin ngay trong phiếu; Quản trị đổ dữ liệu về qua import `ho_so_nhan_su_moet`/`ket_qua_danh_gia`/`phan_lop_hoc_vien`) hoặc `dang_nhap` (cổng học viên). `danhGiaDauVaoTrongCong` bật/tắt menu M6. Quyền **sửa** hồ sơ `import_moet` vẫn chỉ do Đợt xác nhận quyết định — không mở đợt = học viên chỉ xem.
 - **Tự phục vụ:** học viên tự đăng ký, tài khoản tự sinh (tên đăng nhập = ĐDCN/CCCD, mật khẩu mặc định = ngày sinh ddmmyyyy), **bắt buộc đổi mật khẩu lần đầu**.
 - **Xác nhận bắt buộc** trước khi hồ sơ chuyển trạng thái chính thức + gửi email bản sao dữ liệu.
 - **Phân lớp học viên chủ yếu qua Import** (Excel/CSV, `phan_lop_hoc_vien`) do Quản trị hệ thống thực hiện; từ QĐ10, Admin UI cũng cho sửa tay phân lớp theo từng giai đoạn + cụm Zalo ở màn chi tiết học viên — xem [frontend/src/pages/Admin/AdminHocVienChiTiet.tsx](frontend/src/pages/Admin/AdminHocVienChiTiet.tsx).

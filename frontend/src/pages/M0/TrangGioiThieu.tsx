@@ -6,6 +6,7 @@ import {
   Box,
   Burger,
   Button,
+  type ButtonProps,
   Container,
   Drawer,
   Group,
@@ -24,6 +25,7 @@ import { useWindowScroll } from '@mantine/hooks';
 import { Link } from 'react-router-dom';
 import { useToi } from '@/auth/AuthContext';
 import { gioiThieu } from '@/content/gioiThieu';
+import { hopCheDo, trienKhai } from '@/content/trienKhai';
 import logoHcmue from '@/assets/logo-hcmue.png';
 
 // Trang giới thiệu công khai (M0) — layout theo design/mockup-source/project/LandingDesktop.dc.html
@@ -39,19 +41,46 @@ export default function TrangGioiThieu() {
     }
   }, []);
 
-  const { thongBaoNoiBat, moDau, conSo, viSao, doiTuong, loTrinh, noiDung, huongDan, hoiDap, lienHe, hopTac, donVi } =
+  // Trang nạp lazy nên trình duyệt không tự cuộn tới neo (vd /#khao-sat từ trang đăng nhập).
+  // Đợi trang nạp xong (CSS/ảnh) rồi mới cuộn, tránh lệch vị trí do layout còn thay đổi.
+  useEffect(() => {
+    const neo = window.location.hash.slice(1);
+    if (!neo) return;
+    const cuon = () => requestAnimationFrame(() => document.getElementById(neo)?.scrollIntoView?.());
+    if (document.readyState === 'complete') {
+      cuon();
+      return;
+    }
+    window.addEventListener('load', cuon, { once: true });
+    return () => window.removeEventListener('load', cuon);
+  }, []);
+
+  const { thongBaoNoiBat, moDau, conSo, viSao, doiTuong, khaoSatDauVao, loTrinh, noiDung, huongDan, hoiDap, lienHe, hopTac, donVi } =
     gioiThieu;
 
   const dangDaXacThuc = !dangTai && daXacThuc;
-  const dichCta = dangDaXacThuc ? '/toi' : '/dang-nhap';
+  const hienKhaoSat = khaoSatDauVao.hien;
+  const hienHuongDan = huongDan.hien && hopCheDo(huongDan);
+  const buocLoTrinh = loTrinh.buoc.filter(hopCheDo);
+  const cauHoiDap = hoiDap.cau.filter(hopCheDo);
+
+  // Chế độ 'khao_sat': học viên chưa đăng nhập — CTA chính trỏ tới khối khảo sát thay vì trang đăng nhập.
+  // Người đã đăng nhập (vd quản trị) vẫn thấy "Vào trang của tôi".
+  const cta: Cta = dangDaXacThuc
+    ? { href: '/toi', nhan: 'Vào trang của tôi', noiBo: true }
+    : trienKhai.cheDoHocVien === 'khao_sat' && hienKhaoSat
+      ? { href: '#khao-sat', nhan: moDau.nutKhaoSat, noiBo: false }
+      : { href: '/dang-nhap', nhan: moDau.nutChinh, noiBo: true };
+  const ctaHeader: Cta = cta.href === '/dang-nhap' ? { ...cta, nhan: 'Đăng nhập' } : cta;
 
   // Nhãn trên thanh menu rút gọn so với tiêu đề đầy đủ của từng khối (tiêu đề dài, dễ vỡ layout menu 1
   // hàng) — 2 khối viSao + noiDung nằm liền kề nhau nói cùng 1 chủ đề nên gộp còn 1 mục trỏ tới viSao.
   const mucLuc = [
+    hienKhaoSat && { href: '#khao-sat', label: 'Khảo sát' },
     (viSao.hien || noiDung.hien) && { href: viSao.hien ? '#vi-sao' : '#chuong-trinh', label: 'Chương trình' },
     loTrinh.hien && { href: '#lo-trinh', label: 'Lộ trình học' },
     doiTuong.hien && { href: '#doi-tuong', label: 'Đối tượng' },
-    huongDan.hien && { href: '#huong-dan', label: 'Hướng dẫn' },
+    hienHuongDan && { href: '#huong-dan', label: 'Hướng dẫn' },
     hoiDap.hien && { href: '#faq', label: 'Hỏi đáp' },
     lienHe.hien && { href: '#lien-he', label: 'Liên hệ' },
     hopTac.hien && { href: '#hop-tac', label: 'Hợp tác' },
@@ -69,13 +98,15 @@ export default function TrangGioiThieu() {
         </Box>
       )}
 
-      <HeaderCongKhai mucLuc={mucLuc} dichCta={dichCta} dangDaXacThuc={dangDaXacThuc} />
+      <HeaderCongKhai mucLuc={mucLuc} cta={ctaHeader} />
 
       {moDau.hien && (
-        <Hero moDau={moDau} noiDung={noiDung} hasHeroPanel={hasHeroPanel} dichCta={dichCta} dangDaXacThuc={dangDaXacThuc} ctaPhuHref={mucLuc[0]?.href} />
+        <Hero moDau={moDau} noiDung={noiDung} hasHeroPanel={hasHeroPanel} cta={cta} ctaPhuHref={mucLucChuongTrinh(mucLuc)} />
       )}
 
       {conSo.hien && <DaiThongKe conSo={conSo} />}
+
+      {hienKhaoSat && <KhoiKhaoSat khaoSat={khaoSatDauVao} />}
 
       {viSao.hien && <ViSao viSao={viSao} />}
 
@@ -88,7 +119,7 @@ export default function TrangGioiThieu() {
               <Title order={2} ta="center" fz={{ base: 22, sm: 28 }}>
                 {loTrinh.tieuDe}
               </Title>
-              <DanhSachBuocSo buoc={loTrinh.buoc} mau="primary" />
+              <DanhSachBuocSo buoc={buocLoTrinh} mau="primary" />
             </Stack>
           </Container>
         </Box>
@@ -96,7 +127,7 @@ export default function TrangGioiThieu() {
 
       {doiTuong.hien && <DoiTuongSection doiTuong={doiTuong} />}
 
-      {huongDan.hien && (
+      {hienHuongDan && (
         <Container id="huong-dan" size="lg" py={{ base: 48, sm: 72 }} px={{ base: 'md', sm: 'xl' }}>
           <Stack gap={32}>
             <Title order={2} ta="center" fz={{ base: 22, sm: 28 }}>
@@ -116,7 +147,7 @@ export default function TrangGioiThieu() {
               {hoiDap.tieuDe}
             </Title>
             <Stack gap={12}>
-              {hoiDap.cau.map((c) => (
+              {cauHoiDap.map((c) => (
                 <Paper key={c.hoi} withBorder radius={12} p="md">
                   <Text fw={700} fz={14} mb={4}>
                     {c.hoi}
@@ -173,17 +204,28 @@ function laNoiDungCho(s: string): boolean {
   return s.startsWith('[CHỜ');
 }
 
-function HeaderCongKhai({
-  mucLuc,
-  dichCta,
-  dangDaXacThuc,
-}: {
-  mucLuc: { href: string; label: string }[];
-  dichCta: string;
-  dangDaXacThuc: boolean;
-}) {
+type Cta = { href: string; nhan: string; noiBo: boolean };
+
+/** Nút CTA theo loại đích: route nội bộ dùng Link, neo trong trang (#...) dùng thẻ a. */
+function NutCta({ cta, ...props }: { cta: Cta; onClick?: () => void } & Omit<ButtonProps, 'children'>) {
+  return cta.noiBo ? (
+    <Button component={Link} to={cta.href} {...props}>
+      {cta.nhan}
+    </Button>
+  ) : (
+    <Button component="a" href={cta.href} {...props}>
+      {cta.nhan}
+    </Button>
+  );
+}
+
+/** Nút phụ ở hero trỏ tới khối giới thiệu chương trình — bỏ qua "Khảo sát" vì nút chính đã trỏ tới đó. */
+function mucLucChuongTrinh(mucLuc: { href: string }[]): string | undefined {
+  return mucLuc.find((m) => m.href !== '#khao-sat')?.href;
+}
+
+function HeaderCongKhai({ mucLuc, cta }: { mucLuc: { href: string; label: string }[]; cta: Cta }) {
   const [menuMoDt, setMenuMoDt] = useState(false);
-  const nhanCta = dangDaXacThuc ? 'Vào trang của tôi' : 'Đăng nhập';
 
   return (
     <Box component="header" style={{ borderBottom: '1px solid var(--mantine-color-gray-2)' }} py={12} px={{ base: 'md', sm: 'xl' }}>
@@ -209,9 +251,7 @@ function HeaderCongKhai({
         </Box>
 
         <Group gap="sm" wrap="nowrap">
-          <Button component={Link} to={dichCta} size="sm" visibleFrom="sm">
-            {nhanCta}
-          </Button>
+          <NutCta cta={cta} size="sm" visibleFrom="sm" />
           <Burger opened={menuMoDt} onClick={() => setMenuMoDt((v) => !v)} hiddenFrom="sm" />
         </Group>
       </Container>
@@ -221,9 +261,7 @@ function HeaderCongKhai({
           {mucLuc.map((m) => (
             <MucLucLinkDrawer key={m.href} href={m.href} label={m.label} onClick={() => setMenuMoDt(false)} />
           ))}
-          <Button component={Link} to={dichCta} onClick={() => setMenuMoDt(false)} mt="sm">
-            {nhanCta}
-          </Button>
+          <NutCta cta={cta} onClick={() => setMenuMoDt(false)} mt="sm" />
         </Stack>
       </Drawer>
     </Box>
@@ -278,15 +316,13 @@ function Hero({
   moDau,
   noiDung,
   hasHeroPanel,
-  dichCta,
-  dangDaXacThuc,
+  cta,
   ctaPhuHref,
 }: {
   moDau: typeof gioiThieu.moDau;
   noiDung: typeof gioiThieu.noiDung;
   hasHeroPanel: boolean;
-  dichCta: string;
-  dangDaXacThuc: boolean;
+  cta: Cta;
   ctaPhuHref?: string;
 }) {
   return (
@@ -341,9 +377,7 @@ function Hero({
               </Group>
             )}
             <Group gap="sm" wrap="wrap">
-              <Button component={Link} to={dichCta} size="lg" color="accent">
-                {dangDaXacThuc ? 'Vào trang của tôi' : moDau.nutChinh}
-              </Button>
+              <NutCta cta={cta} size="lg" color="accent" />
               {ctaPhuHref && (
                 <Button
                   component="a"
@@ -545,6 +579,93 @@ function DanhSachBuocSo({ buoc, mau }: { buoc: { ten: string; moTa: string }[]; 
         );
       })}
     </Stack>
+  );
+}
+
+/** Khối khảo sát đầu vào — các phiếu làm tuần tự theo thứ tự, mỗi phiếu 1 hoặc nhiều đường dẫn (theo đối tượng). */
+function KhoiKhaoSat({ khaoSat }: { khaoSat: typeof gioiThieu.khaoSatDauVao }) {
+  return (
+    <Box id="khao-sat" bg="primary.0" py={{ base: 48, sm: 72 }} px={{ base: 'md', sm: 'xl' }}>
+      <Container size="md" p={0}>
+        <Stack gap={28}>
+          <Stack gap={8} ta="center">
+            <Title order={2} fz={{ base: 22, sm: 28 }}>
+              {khaoSat.tieuDe}
+            </Title>
+            <Text fz={14} c="dimmed" lh={1.6} maw={640} mx="auto">
+              {khaoSat.moTa}
+            </Text>
+          </Stack>
+
+          <Stack gap="md" component="ol" m={0} p={0} style={{ listStyle: 'none' }}>
+            {khaoSat.phieu.map((p, i) => (
+              <Paper key={p.ten} component="li" withBorder radius={14} p="lg">
+                <Group gap={16} align="flex-start" wrap="nowrap">
+                  <Box
+                    w={36}
+                    h={36}
+                    aria-hidden="true"
+                    style={{
+                      borderRadius: '50%',
+                      background: 'var(--mantine-color-primary-6)',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 700,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {i + 1}
+                  </Box>
+                  <Stack gap={8} style={{ flex: 1, minWidth: 0 }}>
+                    <Title order={3} fz={{ base: 16, sm: 18 }}>
+                      {`Phiếu ${i + 1}: ${p.ten}`}
+                    </Title>
+                    <Text fz={13.5} c="dimmed" lh={1.6}>
+                      {p.moTa}
+                    </Text>
+                    <Group gap="sm" wrap="wrap" mt={4}>
+                      {p.lienKet.map((lk) =>
+                        laNoiDungCho(lk.url) ? (
+                          <Stack key={lk.nhan} gap={4}>
+                            <Button disabled variant="default">
+                              {lk.nhan}
+                            </Button>
+                            <Text fz={12} c="dimmed">
+                              Đường dẫn đang được cập nhật
+                            </Text>
+                          </Stack>
+                        ) : (
+                          <Button key={lk.nhan} component="a" href={lk.url} target="_blank" rel="noopener noreferrer">
+                            {lk.nhan}
+                          </Button>
+                        ),
+                      )}
+                    </Group>
+                  </Stack>
+                </Group>
+              </Paper>
+            ))}
+          </Stack>
+
+          {khaoSat.sauKhaoSat.length > 0 && (
+            <Paper withBorder radius={14} p="md">
+              <Text fw={700} fz={13.5} mb={8}>
+                Sau khi hoàn thành khảo sát
+              </Text>
+              <Stack gap={4} component="ul" m={0} pl="md">
+                {khaoSat.sauKhaoSat.map((d) => (
+                  <Text key={d} component="li" fz={13} lh={1.6} c="dimmed">
+                    {d}
+                  </Text>
+                ))}
+              </Stack>
+            </Paper>
+          )}
+        </Stack>
+      </Container>
+    </Box>
   );
 }
 

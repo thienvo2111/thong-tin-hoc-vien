@@ -2,10 +2,14 @@
 // Nội dung trang giới thiệu (M0). Dùng chung cho nhiều tỉnh — KHÔNG ghi tên tỉnh.
 // Khối có `tam: true` là nội dung tạm, đơn vị tổ chức sẽ thay. Chuỗi bắt đầu bằng "[CHỜ" là thông tin còn thiếu.
 // Chỉ sửa file này để đổi nội dung; không sửa component.
+// Mục có `cheDo` chỉ hiện khi khớp `trienKhai.cheDoHocVien` (src/content/trienKhai.ts) — 'khao_sat' | 'dang_nhap'.
+
+import type { CheDoHocVien } from './trienKhai';
 
 export interface Khoi {
   hien: boolean;
   tam?: boolean;
+  cheDo?: CheDoHocVien;
 }
 
 export type MaMucNangLuc = 'co_ban' | 'thanh_thao' | 'nang_cao';
@@ -13,14 +17,21 @@ export type MaMucNangLuc = 'co_ban' | 'thanh_thao' | 'nang_cao';
 export interface NoiDungGioiThieu {
   meta: { tieuDe: string; moTa: string; anhChiaSe: string };
   thongBaoNoiBat: string | null;
-  moDau: Khoi & { tenChuongTrinh: string; thongDiep: string; nutChinh: string; nutPhu: string; chiTietNhanh: string[] };
+  moDau: Khoi & { tenChuongTrinh: string; thongDiep: string; nutChinh: string; nutKhaoSat: string; nutPhu: string; chiTietNhanh: string[] };
   conSo: Khoi & { muc: { so: string; nhan: string }[] };
   viSao: Khoi & {
     tieuDe: string;
     doanMo: string;
   };
   doiTuong: Khoi & { tieuDe: string; nhom: string[]; dieuKienChungNhan: string[] };
-  loTrinh: Khoi & { tieuDe: string; buoc: { ten: string; moTa: string }[] };
+  khaoSatDauVao: Khoi & {
+    tieuDe: string;
+    moTa: string;
+    /** Làm tuần tự theo thứ tự mảng. Mỗi phiếu có 1 hoặc nhiều đường dẫn (vd tách theo đối tượng). */
+    phieu: { ten: string; moTa: string; lienKet: { nhan: string; url: string }[] }[];
+    sauKhaoSat: string[];
+  };
+  loTrinh: Khoi & { tieuDe: string; buoc: { ten: string; moTa: string; cheDo?: CheDoHocVien }[] };
   noiDung: Khoi & {
     tieuDe: string;
     tongTietMoiMuc: number;
@@ -34,7 +45,7 @@ export interface NoiDungGioiThieu {
     }[];
   };
   huongDan: Khoi & { tieuDe: string; buoc: { ten: string; moTa: string }[] };
-  hoiDap: Khoi & { tieuDe: string; cau: { hoi: string; dap: string }[] };
+  hoiDap: Khoi & { tieuDe: string; cau: { hoi: string; dap: string; cheDo?: CheDoHocVien }[] };
   lienHe: Khoi & { tieuDe: string; hotline: string; zalo: string; email: string; gioHoTro: string };
   hopTac: Khoi & { tieuDe: string; moTa: string; hotline: string; email: string };
   donVi: Khoi & {
@@ -46,7 +57,7 @@ export interface NoiDungGioiThieu {
 export const gioiThieu: NoiDungGioiThieu = {
   meta: {
     tieuDe: 'Bồi dưỡng năng lực số cho giáo viên',
-    moTa: 'Chương trình bồi dưỡng năng lực số cho giáo viên do Trường Đại học Sư phạm Thành phố Hồ Chí Minh tổ chức. Đăng nhập để kiểm tra hồ sơ và theo dõi lộ trình học.',
+    moTa: 'Chương trình bồi dưỡng năng lực số cho giáo viên do Trường Đại học Sư phạm Thành phố Hồ Chí Minh tổ chức. Thông tin chương trình, khảo sát đầu vào và cổng thông tin học viên.',
     anhChiaSe: '/og-image.png', // [CHỜ] ảnh 1200×630
   },
 
@@ -59,6 +70,7 @@ export const gioiThieu: NoiDungGioiThieu = {
     tenChuongTrinh: 'Bồi dưỡng năng lực số cho giáo viên',
     thongDiep: 'Cùng thầy cô làm chủ công nghệ số trong dạy học và công tác chuyên môn.',
     nutChinh: 'Đăng nhập cổng học viên',
+    nutKhaoSat: 'Làm khảo sát đầu vào', // dùng khi cheDoHocVien = 'khao_sat'
     nutPhu: 'Tìm hiểu chương trình',
     chiTietNhanh: [
       '100 tiết mỗi mức (70 trực tuyến + 30 trực tiếp)',
@@ -100,13 +112,42 @@ export const gioiThieu: NoiDungGioiThieu = {
     ],
   },
 
+  // Khối khảo sát đầu vào — hiện khi hien:true (bất kể chế độ). Đường dẫn "[CHỜ]" hiện nút bị khóa.
+  // Tách theo đối tượng: thêm nhiều lienKet, vd
+  //   [{ nhan: 'Dành cho giáo viên', url: 'https://...' }, { nhan: 'Dành cho cán bộ quản lý', url: 'https://...' }]
+  khaoSatDauVao: {
+    hien: true,
+    tam: true,
+    tieuDe: 'Khảo sát đầu vào',
+    moTa: 'Thầy/Cô không cần đăng nhập. Vui lòng thực hiện lần lượt 2 phiếu dưới đây, hoàn thành phiếu 1 rồi mới làm phiếu 2. Thông tin cá nhân được kê khai, bổ sung ngay trong phiếu — đề nghị Thầy/Cô điền chính xác theo hướng dẫn.',
+    phieu: [
+      {
+        ten: 'Phiếu khảo sát kĩ năng số',
+        moTa: 'Kê khai, bổ sung thông tin cá nhân và đơn vị công tác; trả lời các câu hỏi về kĩ năng số hiện có.',
+        lienKet: [{ nhan: 'Mở phiếu khảo sát', url: '[CHỜ]' }],
+      },
+      {
+        ten: 'Phiếu đánh giá năng lực số',
+        moTa: 'Làm bài đánh giá năng lực số sau khi đã hoàn thành phiếu 1. Kết quả dùng để xếp mức năng lực và chia lớp.',
+        lienKet: [{ nhan: 'Mở phiếu đánh giá', url: '[CHỜ]' }],
+      },
+    ],
+    sauKhaoSat: [
+      'Ban tổ chức tổng hợp thông tin, kết quả đánh giá; xếp mức năng lực và chia lớp.',
+      'Khi có thông báo, Thầy/Cô đăng nhập hệ thống để xem thông tin hồ sơ và lớp học (chỉ xem).',
+      'Việc kiểm tra, điều chỉnh thông tin hồ sơ được mở lại ở đợt xác nhận cuối khóa, trước khi cấp chứng nhận.',
+    ],
+  },
+
   loTrinh: {
     hien: true,
     tam: true,
     tieuDe: 'Lộ trình học',
     buoc: [
-      { ten: 'Kiểm tra hồ sơ', moTa: 'Đăng nhập, kiểm tra và bổ sung thông tin cá nhân, xác nhận hồ sơ.' },
-      { ten: 'Đánh giá đầu vào', moTa: 'Làm bài đánh giá trực tuyến để xác định mức năng lực và xếp lớp phù hợp.' },
+      { ten: 'Khảo sát kĩ năng số', moTa: 'Bổ sung thông tin cá nhân và thực hiện phiếu khảo sát kĩ năng số (không cần đăng nhập).', cheDo: 'khao_sat' },
+      { ten: 'Đánh giá năng lực số', moTa: 'Làm phiếu đánh giá năng lực số để xác định mức năng lực và xếp lớp phù hợp.', cheDo: 'khao_sat' },
+      { ten: 'Kiểm tra hồ sơ', moTa: 'Đăng nhập, kiểm tra và bổ sung thông tin cá nhân, xác nhận hồ sơ.', cheDo: 'dang_nhap' },
+      { ten: 'Đánh giá đầu vào', moTa: 'Làm bài đánh giá trực tuyến để xác định mức năng lực và xếp lớp phù hợp.', cheDo: 'dang_nhap' },
       { ten: 'Học trực tuyến qua Zoom', moTa: 'Các buổi học trực tuyến cùng giảng viên theo lịch của lớp.' },
       { ten: 'Học trực tuyến trên VLE lần 1', moTa: 'Thực hiện các nhiệm vụ trên hệ thống học tập trực tuyến với sự hướng dẫn của giảng viên.' },
       { ten: 'Tập huấn trực tiếp', moTa: 'Học tập, thực hành cùng giảng viên tại điểm học gần nơi công tác.' },
@@ -264,6 +305,7 @@ export const gioiThieu: NoiDungGioiThieu = {
 
   huongDan: {
     hien: true,
+    cheDo: 'dang_nhap', // hướng dẫn đăng nhập — chế độ 'khao_sat' dùng khối khaoSatDauVao thay thế
     tieuDe: 'Bắt đầu trong 4 bước',
     buoc: [
       { ten: 'Nhận mã định danh', moTa: 'Trường sẽ sử dụng mã định danh MOET được cung cấp để làm tên đăng nhập.' },
@@ -298,12 +340,27 @@ export const gioiThieu: NoiDungGioiThieu = {
         hoi: 'Đơn vị, trường học muốn hợp tác tổ chức bồi dưỡng thì liên hệ thế nào?',
         dap: "Thầy/Cô xem thông tin liên hệ hợp tác ở cuối trang, hoặc điền form 'Hợp tác tổ chức bồi dưỡng' bên dưới.",
       },
-      { hoi: 'Tôi không biết mã định danh của mình?', dap: 'Thầy cô liên hệ bộ phận phụ trách của nhà trường hoặc số hỗ trợ ở cuối trang.' },
-      { hoi: 'Mật khẩu lần đầu là gì?', dap: 'Là ngày sinh viết liền theo dạng ngày-tháng-năm, đủ 8 chữ số. Ví dụ: sinh ngày 8/12/1983 thì nhập 08121983.' },
-      { hoi: 'Tôi quên mật khẩu mới đã đổi?', dap: 'Thầy cô liên hệ số hỗ trợ. Sau khi xác minh thông tin, cán bộ hỗ trợ sẽ đặt lại mật khẩu về ngày sinh để thầy cô đăng nhập và đổi lại.' },
-      { hoi: 'Tài khoản báo tạm khóa?', dap: 'Do nhập sai mật khẩu nhiều lần. Vui lòng chờ 15 phút rồi thử lại, hoặc liên hệ số hỗ trợ.' },
-      { hoi: 'Thông tin của tôi trên hệ thống chưa đúng?', dap: 'Trong thời gian mở đợt kiểm tra, thầy cô tự sửa trực tiếp trên trang Hồ sơ. Họ tên và ngày sinh sẽ in trên giấy chứng nhận, vì vậy cần kiểm tra kỹ.' },
-      { hoi: 'Vì sao tôi chưa thấy đường dẫn làm bài đánh giá?', dap: 'Đường dẫn chỉ hiện khi hồ sơ đã đầy đủ và thầy cô đã xác nhận trong đợt xác nhận trước đánh giá. Nếu đã sửa hồ sơ sau khi xác nhận, thầy cô cần xác nhận lại.' },
+      {
+        hoi: 'Tôi có cần đăng nhập để làm khảo sát không?',
+        dap: 'Không. Thầy/Cô mở đường dẫn ở mục Khảo sát đầu vào trên trang này và làm lần lượt 2 phiếu: Phiếu khảo sát kĩ năng số, sau đó là Phiếu đánh giá năng lực số.',
+        cheDo: 'khao_sat',
+      },
+      {
+        hoi: 'Sau khi làm khảo sát, khi nào tôi biết lớp học của mình?',
+        dap: 'Sau khi Ban tổ chức tổng hợp kết quả và chia lớp, Thầy/Cô sẽ được thông báo để đăng nhập hệ thống xem thông tin hồ sơ và lớp học.',
+        cheDo: 'khao_sat',
+      },
+      {
+        hoi: 'Tôi kê khai sai thông tin trong phiếu thì sao?',
+        dap: 'Thầy/Cô liên hệ số hỗ trợ ở cuối trang. Thông tin hồ sơ sẽ được mở để kiểm tra, điều chỉnh ở đợt xác nhận cuối khóa, trước khi cấp chứng nhận.',
+        cheDo: 'khao_sat',
+      },
+      { hoi: 'Tôi không biết mã định danh của mình?', dap: 'Thầy cô liên hệ bộ phận phụ trách của nhà trường hoặc số hỗ trợ ở cuối trang.', cheDo: 'dang_nhap' },
+      { hoi: 'Mật khẩu lần đầu là gì?', dap: 'Là ngày sinh viết liền theo dạng ngày-tháng-năm, đủ 8 chữ số. Ví dụ: sinh ngày 8/12/1983 thì nhập 08121983.', cheDo: 'dang_nhap' },
+      { hoi: 'Tôi quên mật khẩu mới đã đổi?', dap: 'Thầy cô liên hệ số hỗ trợ. Sau khi xác minh thông tin, cán bộ hỗ trợ sẽ đặt lại mật khẩu về ngày sinh để thầy cô đăng nhập và đổi lại.', cheDo: 'dang_nhap' },
+      { hoi: 'Tài khoản báo tạm khóa?', dap: 'Do nhập sai mật khẩu nhiều lần. Vui lòng chờ 15 phút rồi thử lại, hoặc liên hệ số hỗ trợ.', cheDo: 'dang_nhap' },
+      { hoi: 'Thông tin của tôi trên hệ thống chưa đúng?', dap: 'Trong thời gian mở đợt kiểm tra, thầy cô tự sửa trực tiếp trên trang Hồ sơ. Họ tên và ngày sinh sẽ in trên giấy chứng nhận, vì vậy cần kiểm tra kỹ.', cheDo: 'dang_nhap' },
+      { hoi: 'Vì sao tôi chưa thấy đường dẫn làm bài đánh giá?', dap: 'Đường dẫn chỉ hiện khi hồ sơ đã đầy đủ và thầy cô đã xác nhận trong đợt xác nhận trước đánh giá. Nếu đã sửa hồ sơ sau khi xác nhận, thầy cô cần xác nhận lại.', cheDo: 'dang_nhap' },
       { hoi: 'Tôi có thể làm trên điện thoại không?', dap: 'Có. Trang được thiết kế để dùng tốt trên điện thoại, kể cả khi mở từ Zalo.' },
     ],
   },
