@@ -1,5 +1,6 @@
 import {
   cap_hoc,
+  doi_tuong_hoc_vien,
   hinh_thuc_giai_doan,
   ket_qua_hoc,
   loai_lop_hoc,
@@ -376,7 +377,7 @@ export function mauKetQuaHocTap(p: {
 // ---------------------------------------------------------------------------
 // 4. Xác nhận thông tin đã khai báo (bản sao hồ sơ)
 // ---------------------------------------------------------------------------
-// Cùng 15 trường, cùng thứ tự và nhãn với trang Xác nhận (frontend
+// Cùng 16 trường, cùng thứ tự và nhãn với trang Xác nhận (frontend
 // pages/M5/XacNhan.tsx → dongHoSo + lib/nhanTruong.ts) — sửa một bên thì sửa
 // cả bên kia.
 const TRINH_DO_LABEL: Record<trinh_do_chuyen_mon, string> = {
@@ -395,11 +396,7 @@ const CAP_HOC_LABEL: Record<cap_hoc, string> = {
   thpt: 'THPT',
 };
 
-// Enum doi_tuong_hoc_vien (cột hoc_vien.doi_tuong, nhánh feat/sso-khao-sat
-// bf4e0b5) — khai báo literal ở đây để mẫu không phụ thuộc schema đã merge.
-export type DoiTuongHocVien = 'giao_vien' | 'can_bo_quan_ly';
-
-const DOI_TUONG_LABEL: Record<DoiTuongHocVien, string> = {
+const DOI_TUONG_LABEL: Record<doi_tuong_hoc_vien, string> = {
   giao_vien: 'Giáo viên',
   can_bo_quan_ly: 'Cán bộ quản lý',
 };
@@ -422,9 +419,8 @@ export type HoSoTrongEmail = {
   cuTru: Array<string | null>; // phường/xã, tỉnh
   donViCongTac: string | null;
   chucVu: string | null;
-  // undefined = chưa có cột (trước khi merge) -> bỏ hẳn dòng; null = học
-  // viên chưa chọn -> "(chưa khai báo)".
-  doiTuong?: DoiTuongHocVien | null;
+  // null = học viên chưa chọn -> "(chưa khai báo)".
+  doiTuong: doi_tuong_hoc_vien | null;
   soDienThoai: string | null;
   email: string | null;
   trinhDo: trinh_do_chuyen_mon | null;
@@ -485,14 +481,10 @@ export function mauXacNhanHoSo(p: {
     ['Cư trú', giaTriHoacTrong(noi(h.cuTru))],
     ['Đơn vị công tác', giaTriHoacTrong(h.donViCongTac)],
     ['Chức vụ', giaTriHoacTrong(h.chucVu)],
-    ...(h.doiTuong === undefined
-      ? []
-      : [
-          [
-            'Đối tượng',
-            giaTriHoacTrong(h.doiTuong ? DOI_TUONG_LABEL[h.doiTuong] : null),
-          ] as [string, string],
-        ]),
+    [
+      'Đối tượng',
+      giaTriHoacTrong(h.doiTuong ? DOI_TUONG_LABEL[h.doiTuong] : null),
+    ],
     ['Số điện thoại', giaTriHoacTrong(h.soDienThoai)],
     ['Email', giaTriHoacTrong(h.email)],
     ['Trình độ chuyên môn', giaTriHoacTrong(trinhDo)],

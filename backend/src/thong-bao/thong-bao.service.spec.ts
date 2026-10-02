@@ -628,6 +628,17 @@ describe('ThongBaoService', () => {
       );
     });
 
+    it('guiHocVienXacNhan đọc hoc_vien.doi_tuong vào email', async () => {
+      prisma.hoc_vien.findUnique.mockResolvedValue({
+        ...hocVienDayDu,
+        doi_tuong: 'can_bo_quan_ly',
+      });
+      await service.guiHocVienXacNhan('hv-1');
+      expect(
+        prisma.hang_doi_email.create.mock.calls[0][0].data.noi_dung_html,
+      ).toContain('Cán bộ quản lý');
+    });
+
     it.each(['da_duyet', 'tu_choi'] as const)(
       'guiHocVienDuyet (%s)',
       async (kq) => {

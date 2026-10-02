@@ -115,6 +115,7 @@ export class ThongBaoService {
         ],
         donViCongTac: hocVien.don_vi_cong_tac?.ten_don_vi ?? null,
         chucVu: hocVien.chuc_vu,
+        doiTuong: hocVien.doi_tuong,
         soDienThoai: hocVien.so_dien_thoai_lien_he,
         email: hocVien.email_lien_he,
         trinhDo: hocVien.trinh_do_chuyen_mon,

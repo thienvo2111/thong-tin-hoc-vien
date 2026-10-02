@@ -266,6 +266,7 @@ describe('mauXacNhanHoSo', () => {
     cuTru: ['Phường Long Xuyên', 'Tỉnh An Giang'],
     donViCongTac: 'Trường THPT Long Xuyên',
     chucVu: 'Giáo viên',
+    doiTuong: 'giao_vien',
     soDienThoai: '0979427164',
     email: 'thanh@example.com',
     trinhDo: 'dai_hoc',
@@ -276,7 +277,7 @@ describe('mauXacNhanHoSo', () => {
   };
   const link = 'https://boiduongnls.hcmue.edu.vn/toi/ho-so';
 
-  it('đủ 15 trường đúng thứ tự trang Xác nhận, nhãn tiếng Việt', () => {
+  it('đủ 16 trường đúng thứ tự trang Xác nhận, nhãn tiếng Việt', () => {
     const { tieuDe, html } = mauXacNhanHoSo({ hoSo: day, linkHoSo: link });
     expect(tieuDe).toBe('[HCMUE-BDNLS] Xác nhận thông tin đã khai báo');
     const nhan = [
@@ -289,6 +290,7 @@ describe('mauXacNhanHoSo', () => {
       'Cư trú',
       'Đơn vị công tác',
       'Chức vụ',
+      'Đối tượng',
       'Số điện thoại',
       'Email',
       'Trình độ chuyên môn',
@@ -397,11 +399,6 @@ describe('mauXacNhanHoSo', () => {
       });
       expect(html).toContain('>Đối tượng</td>');
       expect(html.split('(chưa khai báo)').length - 1).toBe(1);
-    });
-
-    it('không truyền (schema chưa có cột) -> không có dòng Đối tượng', () => {
-      const { html } = mauXacNhanHoSo({ hoSo: day, linkHoSo: link });
-      expect(html).not.toContain('>Đối tượng</td>');
     });
   });
 });
