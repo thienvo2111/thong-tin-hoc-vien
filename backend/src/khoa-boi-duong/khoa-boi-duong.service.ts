@@ -2160,19 +2160,20 @@ export class KhoaBoiDuongService {
 
     const ghiChu = raw.ghi_chu?.trim() || undefined;
 
-    // Rule 🟡: buổi thuộc lớp KHÁC lớp học viên đang được gán cho đúng
-    // loai_lop này (học bù, kể cả khi học viên CHƯA được gán lớp nào của
-    // loai_lop này) -> cảnh báo, bắt buộc ghi_chu (thiếu -> lỗi 🔴).
-    const dangKyLop = await this.prisma.dang_ky_hoc_lop.findUnique({
+    // Rule 🟡 (phân lớp theo giai đoạn, spec 2026-10-02 mục 4.6): buổi thuộc
+    // lớp KHÁC lớp học viên được gán ở ĐÚNG giai đoạn của buổi này (học bù,
+    // kể cả khi học viên CHƯA được gán lớp nào ở giai đoạn đó) -> cảnh báo,
+    // bắt buộc ghi_chu (thiếu -> lỗi 🔴).
+    const phanLop = await this.prisma.phan_lop_giai_doan.findUnique({
       where: {
-        dang_ky_hoc_id_loai_lop: {
+        dang_ky_hoc_id_giai_doan_id: {
           dang_ky_hoc_id: dangKy.id,
-          loai_lop: loaiLop,
+          giai_doan_id: giaiDoan.id,
         },
       },
     });
     let canhBao: string | undefined;
-    if (!dangKyLop || dangKyLop.lop_id !== lop.id) {
+    if (!phanLop || phanLop.lop_id !== lop.id) {
       if (!ghiChu) {
         return {
           error: `Học viên "${ma}" điểm danh ở buổi của lớp "${tenLop}" khác lớp mình đang được gán (học bù) — bắt buộc nhập ghi_chu`,

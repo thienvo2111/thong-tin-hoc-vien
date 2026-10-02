@@ -600,4 +600,78 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
       expect(res.status).toBe(400);
     });
   });
+
+  describe('diem_danh: học bù so với lớp được gán ở giai đoạn của buổi', () => {
+    async function taiLenDiemDanh(rows: string[][]) {
+      const res = await request(app.getHttpServer())
+        .post('/import/diem_danh')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .attach(
+          'file',
+          await buildXlsx([
+            [
+              'so_dinh_danh_ca_nhan',
+              'ma_dinh_danh_moet',
+              'ma_khoa',
+              'ten_lop',
+              'loai_lop',
+              'giai_doan_thu_tu',
+              'buoi_so',
+              'trang_thai',
+              'nguon',
+              'ghi_chu',
+            ],
+            ...rows,
+          ]),
+          'diem-danh.xlsx',
+        )
+        .expect(201);
+      importIds.push(res.body.import_id);
+      const ketQua = await request(app.getHttpServer())
+        .get(`/import/${res.body.import_id}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      return ketQua.body as {
+        danh_sach_loi: { dong: number; ly_do: string }[];
+        danh_sach_canh_bao: { dong: number; ly_do: string }[];
+      };
+    }
+
+    it('đúng lớp GĐ -> không cần ghi chú; lớp khác cùng GĐ hoặc chưa gán GĐ -> bắt buộc ghi chú', async () => {
+      const khoa = await taoKhoa();
+      const gd2 = await taoGiaiDoan(khoa.id, 2);
+      const gd3 = await taoGiaiDoan(khoa.id, 3);
+      const zA = await taoLop(khoa.id, 'zoom', 'Zoom A');
+      const zB = await taoLop(khoa.id, 'zoom', 'Zoom B');
+      await taoBuoi(zA.id, gd2.id, 1);
+      await taoBuoi(zB.id, gd2.id, 1);
+      await taoBuoi(zA.id, gd3.id, 1);
+      const hv = await taoHocVienMoet(uniqueSuffix());
+      const dk = await ghiDanh(hv.hocVien.id, khoa.id);
+      await prisma.phan_lop_giai_doan.create({
+        data: { dang_ky_hoc_id: dk.id, giai_doan_id: gd2.id, lop_id: zA.id },
+      });
+
+      const dong = (lop: string, gd: number, ghiChu = '') => [
+        '',
+        hv.tenDangNhap,
+        khoa.ma_khoa,
+        lop,
+        'zoom',
+        String(gd),
+        '1',
+        'co_mat',
+        'zoom',
+        ghiChu,
+      ];
+      const ketQua = await taiLenDiemDanh([
+        dong('Zoom A', 2), // đúng lớp GĐ2 -> OK
+        dong('Zoom B', 2), // lớp khác cùng GĐ, thiếu ghi chú -> lỗi
+        dong('Zoom A', 3), // chưa gán GĐ3, thiếu ghi chú -> lỗi
+        dong('Zoom B', 2, 'học bù'), // có ghi chú -> OK + cảnh báo
+      ]);
+      expect(ketQua.danh_sach_loi.map((l) => l.dong)).toEqual([3, 4]);
+      expect(ketQua.danh_sach_canh_bao.map((c) => c.dong)).toEqual([5]);
+    });
+  });
 });
