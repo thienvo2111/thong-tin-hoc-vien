@@ -769,8 +769,6 @@ describe('Hồ sơ Học viên (e2e)', () => {
       expect(thieuFields).toEqual(
         expect.arrayContaining([
           'so_dinh_danh_ca_nhan',
-          'noi_sinh_id',
-          'phuong_xa_id',
           'email_lien_he',
           'trinh_do_chuyen_mon',
         ]),

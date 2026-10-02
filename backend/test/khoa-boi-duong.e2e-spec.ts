@@ -78,10 +78,18 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
   // ('cho_gui') thay vì gửi SMTP ngay — giả lập 1 lượt cron
   // HangDoiEmailProcessor khi test cần xác nhận "đã gửi thành công" thật qua
   // nhat_ky_thong_bao (xem test/thong-bao.e2e-spec.ts cho helper tương tự).
-  async function drainHangDoi(soLan = 1): Promise<void> {
+  // Chỉ gửi các dòng 'cho_gui' của hocVienId: xuLyHangDoi() lấy 20 dòng CŨ
+  // NHẤT của cả hàng đợi (FIFO) — gồm 40 dòng bulk test phân lớp 100 học viên
+  // cố ý để lại — gửi tuần tự qua Ethereal làm test vượt 30s, rồi vẫn chạy
+  // nền sau timeout và đụng afterAll đã xóa dòng (P2025).
+  async function drainHangDoi(hocVienId: string): Promise<void> {
     const processor = app.get(HangDoiEmailProcessor);
-    for (let i = 0; i < soLan; i++) {
-      await processor.xuLyHangDoi();
+    const dongChoGui = await prisma.hang_doi_email.findMany({
+      where: { hoc_vien_id: hocVienId, trang_thai: 'cho_gui' },
+      orderBy: { created_at: 'asc' },
+    });
+    for (const dong of dongChoGui) {
+      await processor['guiMotDong'](dong);
     }
   }
 
@@ -1226,7 +1234,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       // (M9: enqueue hang_doi_email, gửi thật do cron đảm nhiệm) -> drain 1
       // lượt rồi xác nhận gửi thật qua Ethereal (không SMTP giả) -> ghi
       // trang_thai=thanh_cong.
-      await drainHangDoi();
+      await drainHangDoi(hocVienDaDuyetId);
       const thongBaoPhanLop = await prisma.nhat_ky_thong_bao.findMany({
         where: {
           hoc_vien_id: hocVienDaDuyetId,
@@ -1632,7 +1640,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
 
       // M9: chỉ enqueue hang_doi_email — drain 1 lượt để xác nhận gửi thật
       // thành công (trang_thai=thanh_cong trên nhat_ky_thong_bao).
-      await drainHangDoi();
+      await drainHangDoi(hocVienKetQuaId);
       const thongBao = await prisma.nhat_ky_thong_bao.findMany({
         where: {
           hoc_vien_id: hocVienKetQuaId,

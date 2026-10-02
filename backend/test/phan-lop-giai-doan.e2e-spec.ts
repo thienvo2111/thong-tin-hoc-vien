@@ -12,10 +12,6 @@ import {
   xoaNguoiDungTest,
   xoaDonViTest,
 } from './utils/test-data';
-import {
-  timPhanLopChuaCoGiaiDoan,
-  timXungDotChuyenPhanLop,
-} from '../src/khoa-boi-duong/util/chuyen-phan-lop.util';
 
 const NAM_HOP_LE = new Date().getUTCFullYear() - 20;
 
@@ -726,50 +722,6 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
         .send({ loai_lop: 'zoom' })
         .expect(200);
       expect(res.body.canh_bao).toContain('1 đăng ký học');
-    });
-  });
-
-  // Script kiểm tra trước khi deploy migration 20261002090100 (bảng nguồn
-  // dang_ky_hoc_lop còn trong DB tới khi migration DROP chạy) — model Prisma
-  // đã gỡ nên dựng dữ liệu bằng SQL thô.
-  describe('Kiểm tra trước khi chuyển dang_ky_hoc_lop (chỉ đọc)', () => {
-    const ganLopCu = (dkId: string, lopId: string, loai: string) =>
-      prisma.$executeRawUnsafe(
-        `INSERT INTO "dang_ky_hoc_lop" ("dang_ky_hoc_id", "lop_id", "loai_lop") VALUES ($1::uuid, $2::uuid, $3::loai_lop_hoc)`,
-        dkId,
-        lopId,
-        loai,
-      );
-
-    afterAll(async () => {
-      await prisma.$executeRawUnsafe(
-        `DELETE FROM "dang_ky_hoc_lop" WHERE "dang_ky_hoc_id" IN (SELECT "id" FROM "dang_ky_hoc" WHERE "khoa_id" = ANY($1::uuid[]))`,
-        khoaIds,
-      );
-    });
-
-    it('báo lớp chưa có buổi (sẽ không được chuyển) và xung đột 2 lớp cùng giai đoạn', async () => {
-      const khoa = await taoKhoa();
-      const gd1 = await taoGiaiDoan(khoa.id, 1);
-      const lopA = await taoLop(khoa.id, 'zoom', 'Zoom A kiểm tra');
-      const lopB = await taoLop(khoa.id, 'vle', 'VLE B kiểm tra');
-      const lopRong = await taoLop(khoa.id, 'truc_tiep', 'TT chưa buổi');
-      await taoBuoi(lopA.id, gd1.id, 1);
-      await taoBuoi(lopB.id, gd1.id, 1);
-      const { hocVien } = await taoHocVienMoet(uniqueSuffix());
-      const dk = await ghiDanh(hocVien.id, khoa.id);
-      await ganLopCu(dk.id, lopA.id, 'zoom');
-      await ganLopCu(dk.id, lopB.id, 'vle');
-      await ganLopCu(dk.id, lopRong.id, 'truc_tiep');
-
-      expect(await timXungDotChuyenPhanLop(prisma)).toContainEqual({
-        dang_ky_hoc_id: dk.id,
-        giai_doan_id: gd1.id,
-        so_lop: 2,
-      });
-      expect(await timPhanLopChuaCoGiaiDoan(prisma)).toContainEqual(
-        expect.objectContaining({ dang_ky_hoc_id: dk.id, lop_id: lopRong.id }),
-      );
     });
   });
 });
