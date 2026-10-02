@@ -606,6 +606,8 @@ export class KhoaBoiDuongService {
           hinh_thuc: dto.hinh_thuc,
           thoi_gian_bat_dau: new Date(dto.thoi_gian_bat_dau),
           thoi_gian_ket_thuc: new Date(dto.thoi_gian_ket_thuc),
+          link_hoac_dia_diem: dto.link_hoac_dia_diem?.trim() || null,
+          huong_dan: dto.huong_dan?.trim() || null,
         },
       });
     } catch (e) {
@@ -656,6 +658,15 @@ export class KhoaBoiDuongService {
             ? new Date(dto.thoi_gian_ket_thuc)
             : undefined,
           trang_thai: dto.trang_thai,
+          // undefined = không đổi; null hoặc chuỗi rỗng = xóa.
+          link_hoac_dia_diem:
+            dto.link_hoac_dia_diem === undefined
+              ? undefined
+              : dto.link_hoac_dia_diem?.trim() || null,
+          huong_dan:
+            dto.huong_dan === undefined
+              ? undefined
+              : dto.huong_dan?.trim() || null,
         },
       });
     } catch (e) {

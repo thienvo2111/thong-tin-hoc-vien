@@ -3,10 +3,12 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
+  IsOptional,
   IsString,
   Min,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 // Body của POST /khoa-boi-duong/{id}/giai-doan — docs/api-contract.md mục 3.
@@ -28,4 +30,17 @@ export class CreateGiaiDoanDto {
 
   @IsDateString()
   thoi_gian_ket_thuc: string;
+
+  // Phân lớp theo giai đoạn (spec 2026-10-02): thông tin chung hiện cho toàn
+  // khóa ở M7 khi học viên không được gán lớp ở giai đoạn này. null = xóa.
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(500)
+  link_hoac_dia_diem?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  huong_dan?: string | null;
 }

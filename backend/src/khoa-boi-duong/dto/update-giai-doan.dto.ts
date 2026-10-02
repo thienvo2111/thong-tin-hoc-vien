@@ -8,6 +8,7 @@ import {
   Min,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 // Body của PATCH /khoa-boi-duong/{id}/giai-doan/{giaiDoanId} — sửa một phần
@@ -40,4 +41,17 @@ export class UpdateGiaiDoanDto {
   @IsOptional()
   @IsEnum(trang_thai_active)
   trang_thai?: trang_thai_active;
+
+  // Phân lớp theo giai đoạn (spec 2026-10-02): thông tin chung hiện cho toàn
+  // khóa ở M7 khi học viên không được gán lớp ở giai đoạn này. null = xóa.
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(500)
+  link_hoac_dia_diem?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  huong_dan?: string | null;
 }

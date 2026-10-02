@@ -268,4 +268,41 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
       ).rejects.toThrow();
     });
   });
+
+  describe('Giai đoạn: link_hoac_dia_diem + huong_dan', () => {
+    it('tạo kèm link/hướng dẫn, sửa thành null, link > 500 ký tự -> 400', async () => {
+      const khoa = await taoKhoa();
+      const tao = await request(app.getHttpServer())
+        .post(`/khoa-boi-duong/${khoa.id}/giai-doan`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({
+          thu_tu: 1,
+          ten_giai_doan: 'Đánh giá đầu vào',
+          hinh_thuc: 'danh_gia',
+          thoi_gian_bat_dau: '2026-10-06',
+          thoi_gian_ket_thuc: '2026-10-10',
+          link_hoac_dia_diem: 'https://vle.hcmue.edu.vn/danh-gia',
+          huong_dan: 'Làm bài trong 60 phút',
+        })
+        .expect(201);
+      expect(tao.body.link_hoac_dia_diem).toBe(
+        'https://vle.hcmue.edu.vn/danh-gia',
+      );
+      expect(tao.body.huong_dan).toBe('Làm bài trong 60 phút');
+
+      const sua = await request(app.getHttpServer())
+        .patch(`/khoa-boi-duong/${khoa.id}/giai-doan/${tao.body.id}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ link_hoac_dia_diem: null, huong_dan: null })
+        .expect(200);
+      expect(sua.body.link_hoac_dia_diem).toBeNull();
+      expect(sua.body.huong_dan).toBeNull();
+
+      await request(app.getHttpServer())
+        .patch(`/khoa-boi-duong/${khoa.id}/giai-doan/${tao.body.id}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ link_hoac_dia_diem: 'x'.repeat(501) })
+        .expect(400);
+    });
+  });
 });
