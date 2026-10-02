@@ -1,0 +1,61 @@
+/* Hiệu ứng trang giới thiệu (M0). Chỉ CSS + IntersectionObserver — không thư viện, giữ chunk M0 nhẹ. */
+
+/* Hiện dần khi cuộn tới. Class gt-cho-hien CHỈ được gắn khi trình duyệt có IntersectionObserver,
+   nên trình duyệt cũ / không chạy JS vẫn thấy đủ nội dung. --tre: độ trễ để các thẻ hiện so le. */
+.gt-cho-hien {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
+  transition-delay: var(--tre, 0ms);
+}
+.gt-cho-hien.gt-da-hien {
+  opacity: 1;
+  transform: none;
+}
+
+/* Thẻ nổi lên khi rê chuột — chỉ thiết bị có chuột thật, không ảnh hưởng chạm trên điện thoại. */
+.gt-the {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+@media (hover: hover) {
+  .gt-the:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--mantine-shadow-md);
+    border-color: var(--mantine-color-primary-3);
+  }
+}
+
+/* Gạch nhấn dưới tiêu đề khối. */
+.gt-gach {
+  display: block;
+  width: 48px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--mantine-color-accent-6);
+  margin: 12px auto 0;
+}
+
+/* Người dùng tắt hiệu ứng trong hệ điều hành, hoặc khi in: hiện ngay toàn bộ nội dung. */
+@media print {
+  .gt-cho-hien {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gt-cho-hien {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .gt-the,
+  .gt-the:hover {
+    transition: none;
+    transform: none;
+  }
+}

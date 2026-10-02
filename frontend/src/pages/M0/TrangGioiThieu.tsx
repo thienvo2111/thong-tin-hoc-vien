@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import {
   ActionIcon,
   Affix,
@@ -27,6 +27,7 @@ import { useToi } from '@/auth/AuthContext';
 import { gioiThieu } from '@/content/gioiThieu';
 import { hopCheDo, useCauHinhTrienKhai, type CauHinhTrienKhai } from '@/content/trienKhai';
 import logoHcmue from '@/assets/logo-hcmue.png';
+import './trangGioiThieu.css';
 
 // Trang giới thiệu công khai (M0) — layout theo design/mockup-source/project/LandingDesktop.dc.html
 // và LandingMobile.dc.html (mobile là bản ưu tiên). Mọi nội dung hiển thị đọc từ
@@ -90,6 +91,18 @@ export default function TrangGioiThieu() {
 
   const hasHeroPanel = noiDung.hien && noiDung.danhSachMuc.length > 0;
 
+  // Nền xen kẽ trắng/xám theo các khối ĐANG hiển thị — khối ẩn theo chế độ không làm 2 khối cùng nền
+  // đứng liền nhau (vd chế độ khảo sát ẩn "Hướng dẫn" khiến "Đối tượng" dính "Hỏi đáp").
+  const khoiXenKe = [
+    viSao.hien && 'vi-sao',
+    noiDung.hien && 'chuong-trinh',
+    loTrinh.hien && 'lo-trinh',
+    doiTuong.hien && 'doi-tuong',
+    hienHuongDan && 'huong-dan',
+    hoiDap.hien && 'faq',
+  ].filter(Boolean);
+  const nen = (id: string) => (khoiXenKe.indexOf(id) % 2 === 0 ? 'white' : 'gray.0');
+
   return (
     <Box>
       {thongBaoNoiBat && (
@@ -110,58 +123,52 @@ export default function TrangGioiThieu() {
 
       {hienKhaoSat && <KhoiKhaoSat khaoSat={khaoSatDauVao} phieu={cauHinh.phieu} />}
 
-      {viSao.hien && <ViSao viSao={viSao} />}
+      {viSao.hien && <ViSao viSao={viSao} nen={nen('vi-sao')} />}
 
-      {noiDung.hien && <ChuongTrinh noiDung={noiDung} />}
+      {noiDung.hien && <ChuongTrinh noiDung={noiDung} nen={nen('chuong-trinh')} />}
 
       {loTrinh.hien && (
-        <Box id="lo-trinh" bg="gray.0" py={{ base: 48, sm: 72 }}>
-          <Container size="lg" px={{ base: 'md', sm: 'xl' }}>
-            <Stack gap={32}>
-              <Title order={2} ta="center" fz={{ base: 22, sm: 28 }}>
-                {loTrinh.tieuDe}
-              </Title>
-              <DanhSachBuocSo buoc={buocLoTrinh} mau="primary" />
-            </Stack>
-          </Container>
-        </Box>
+        <KhoiTrang id="lo-trinh" nen={nen('lo-trinh')}>
+          <Stack gap={32}>
+            <TieuDeKhoi>{loTrinh.tieuDe}</TieuDeKhoi>
+            <DanhSachBuocSo buoc={buocLoTrinh} mau="primary" />
+          </Stack>
+        </KhoiTrang>
       )}
 
-      {doiTuong.hien && <DoiTuongSection doiTuong={doiTuong} />}
+      {doiTuong.hien && <DoiTuongSection doiTuong={doiTuong} nen={nen('doi-tuong')} />}
 
       {hienHuongDan && (
-        <Container id="huong-dan" size="lg" py={{ base: 48, sm: 72 }} px={{ base: 'md', sm: 'xl' }}>
+        <KhoiTrang id="huong-dan" nen={nen('huong-dan')}>
           <Stack gap={32}>
-            <Title order={2} ta="center" fz={{ base: 22, sm: 28 }}>
-              {huongDan.tieuDe}
-            </Title>
+            <TieuDeKhoi>{huongDan.tieuDe}</TieuDeKhoi>
             <Box maw={640} mx="auto" w="100%">
               <DanhSachBuocSo buoc={huongDan.buoc} mau="accent" />
             </Box>
           </Stack>
-        </Container>
+        </KhoiTrang>
       )}
 
       {hoiDap.hien && (
-        <Container id="faq" size="sm" py={{ base: 48, sm: 72 }} px={{ base: 'md', sm: 'xl' }}>
+        <KhoiTrang id="faq" nen={nen('faq')} size="sm">
           <Stack gap={24}>
-            <Title order={2} ta="center" fz={{ base: 20, sm: 26 }}>
-              {hoiDap.tieuDe}
-            </Title>
+            <TieuDeKhoi fz={{ base: 20, sm: 26 }}>{hoiDap.tieuDe}</TieuDeKhoi>
             <Stack gap={12}>
-              {cauHoiDap.map((c) => (
-                <Paper key={c.hoi} withBorder radius={12} p="md">
-                  <Text fw={700} fz={14} mb={4}>
-                    {c.hoi}
-                  </Text>
-                  <Text fz={13} c="dimmed" lh={1.6}>
-                    {c.dap}
-                  </Text>
-                </Paper>
+              {cauHoiDap.map((c, i) => (
+                <HienDan key={c.hoi} tre={Math.min(i, 5) * 60}>
+                  <Paper withBorder radius={12} p="md" className="gt-the">
+                    <Text fw={700} fz={14} mb={4}>
+                      {c.hoi}
+                    </Text>
+                    <Text fz={13} c="dimmed" lh={1.6}>
+                      {c.dap}
+                    </Text>
+                  </Paper>
+                </HienDan>
               ))}
             </Stack>
           </Stack>
-        </Container>
+        </KhoiTrang>
       )}
 
       {lienHe.hien && <KhoiLienHe lienHe={lienHe} />}
@@ -475,18 +482,84 @@ function DaiThongKe({ conSo }: { conSo: typeof gioiThieu.conSo }) {
   );
 }
 
-function ChuongTrinh({ noiDung }: { noiDung: typeof gioiThieu.noiDung }) {
+/** Hiện dần (mờ -> rõ, trượt lên) khi cuộn tới. Không có IntersectionObserver thì hiện ngay, không ẩn
+ * nội dung. `tre` (ms) để các thẻ trong cùng lưới hiện so le. Xem trangGioiThieu.css. */
+function HienDan({ children, tre = 0, component = 'div' }: { children: ReactNode; tre?: number; component?: 'div' | 'li' }) {
+  const ref = useRef<HTMLElement>(null);
+  const [coHieuUng] = useState(() => typeof window !== 'undefined' && 'IntersectionObserver' in window);
+  const [daHien, setDaHien] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !coHieuUng) return;
+    const quanSat = new IntersectionObserver(
+      ([muc]) => {
+        if (muc.isIntersecting) {
+          setDaHien(true);
+          quanSat.disconnect();
+        }
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' },
+    );
+    quanSat.observe(el);
+    return () => quanSat.disconnect();
+  }, [coHieuUng]);
+
+  const props = {
+    className: coHieuUng ? `gt-cho-hien${daHien ? ' gt-da-hien' : ''}` : undefined,
+    style: { '--tre': `${tre}ms` } as CSSProperties,
+  };
+  return component === 'li' ? (
+    <li ref={ref as RefObject<HTMLLIElement>} {...props}>
+      {children}
+    </li>
+  ) : (
+    <div ref={ref as RefObject<HTMLDivElement>} {...props}>
+      {children}
+    </div>
+  );
+}
+
+/** Tiêu đề khối + gạch nhấn màu accent. */
+function TieuDeKhoi({ children, fz = { base: 22, sm: 28 } }: { children: ReactNode; fz?: { base: number; sm: number } }) {
+  return (
+    <Box ta="center">
+      <Title order={2} fz={fz}>
+        {children}
+      </Title>
+      <span className="gt-gach" aria-hidden="true" />
+    </Box>
+  );
+}
+
+/** Khung 1 khối nội dung: nền toàn chiều rộng + đường kẻ mảnh mép trên để tách khối liền kề; nội dung hiện dần. */
+function KhoiTrang({ id, nen, size = 'lg', children }: { id: string; nen: string; size?: 'sm' | 'lg'; children: ReactNode }) {
+  return (
+    <Box
+      component="section"
+      id={id}
+      bg={nen}
+      py={{ base: 48, sm: 72 }}
+      px={{ base: 'md', sm: 'xl' }}
+      style={{ borderTop: '1px solid var(--mantine-color-gray-2)' }}
+    >
+      <Container size={size} p={0}>
+        <HienDan>{children}</HienDan>
+      </Container>
+    </Box>
+  );
+}
+
+function ChuongTrinh({ noiDung, nen }: { noiDung: typeof gioiThieu.noiDung; nen: string }) {
   const macDinh = noiDung.danhSachMuc.some((m) => m.ma === 'thanh_thao') ? 'thanh_thao' : noiDung.danhSachMuc[0]?.ma;
   const [mucChon, setMucChon] = useState<string | null>(macDinh ?? null);
   const muc = noiDung.danhSachMuc.find((m) => m.ma === mucChon) ?? noiDung.danhSachMuc[0];
 
   return (
-    <Container id="chuong-trinh" size="lg" py={{ base: 48, sm: 72 }} px={{ base: 'md', sm: 'xl' }}>
+    <KhoiTrang id="chuong-trinh" nen={nen}>
       <Stack gap={32}>
         <Stack gap={8} ta="center">
-          <Title order={2} fz={{ base: 22, sm: 28 }}>
-            {noiDung.tieuDe}
-          </Title>
+          <TieuDeKhoi>{noiDung.tieuDe}</TieuDeKhoi>
           <Text fz={13.5} c="dimmed" fw={600}>
             {noiDung.tongTietMoiMuc} tiết mỗi mức ({noiDung.tyLeHinhThucMoiMuc}) · 07 chuyên đề mỗi mức
           </Text>
@@ -509,36 +582,38 @@ function ChuongTrinh({ noiDung }: { noiDung: typeof gioiThieu.noiDung }) {
             </Text>
             <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg">
               {muc.chuyenDe.map((cd, i) => (
-                <Paper key={cd.ten} withBorder radius={16} p="lg">
-                  <Box
-                    w={44}
-                    h={44}
-                    mb="sm"
-                    style={{
-                      borderRadius: 12,
-                      background: 'var(--mantine-color-primary-0)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 800,
-                      color: 'var(--mantine-color-primary-7)',
-                    }}
-                  >
-                    {i + 1}
-                  </Box>
-                  <Text fw={700} fz={15.5} mb={6}>
-                    {cd.ten}
-                  </Text>
-                  <Text fz={12.5} c="dimmed" lh={1.5}>
-                    {cd.moTa}
-                  </Text>
-                </Paper>
+                <HienDan key={cd.ten} tre={(i % 4) * 80}>
+                  <Paper withBorder radius={16} p="lg" h="100%" className="gt-the">
+                    <Box
+                      w={44}
+                      h={44}
+                      mb="sm"
+                      style={{
+                        borderRadius: 12,
+                        background: 'var(--mantine-color-primary-0)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        color: 'var(--mantine-color-primary-7)',
+                      }}
+                    >
+                      {i + 1}
+                    </Box>
+                    <Text fw={700} fz={15.5} mb={6}>
+                      {cd.ten}
+                    </Text>
+                    <Text fz={12.5} c="dimmed" lh={1.5}>
+                      {cd.moTa}
+                    </Text>
+                  </Paper>
+                </HienDan>
               ))}
             </SimpleGrid>
           </Stack>
         )}
       </Stack>
-    </Container>
+    </KhoiTrang>
   );
 }
 
@@ -548,36 +623,38 @@ function DanhSachBuocSo({ buoc, mau }: { buoc: { ten: string; moTa: string }[]; 
       {buoc.map((b, i) => {
         const cuoi = i === buoc.length - 1;
         return (
-          <Box key={b.ten} style={{ display: 'flex', gap: 16 }}>
-            <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-              <Box
-                w={32}
-                h={32}
-                style={{
-                  borderRadius: '50%',
-                  background: `var(--mantine-color-${mau}-6)`,
-                  color: '#fff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 700,
-                  fontSize: 13,
-                  flexShrink: 0,
-                }}
-              >
-                {i + 1}
+          <HienDan key={b.ten} tre={Math.min(i, 6) * 70}>
+            <Box style={{ display: 'flex', gap: 16 }}>
+              <Box style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                <Box
+                  w={32}
+                  h={32}
+                  style={{
+                    borderRadius: '50%',
+                    background: `var(--mantine-color-${mau}-6)`,
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    flexShrink: 0,
+                  }}
+                >
+                  {i + 1}
+                </Box>
+                {!cuoi && <Box style={{ flex: 1, width: 2, background: `var(--mantine-color-${mau}-1)`, minHeight: 20 }} />}
               </Box>
-              {!cuoi && <Box style={{ flex: 1, width: 2, background: `var(--mantine-color-${mau}-1)`, minHeight: 20 }} />}
-            </Box>
-            <Box pb={cuoi ? 0 : 24} style={{ flex: 1 }}>
-              <Text fw={700} fz={14.5}>
-                {b.ten}
-              </Text>
-              <Text fz={13} c="dimmed" lh={1.55}>
-                {b.moTa}
-              </Text>
-            </Box>
-          </Box>
+              <Box pb={cuoi ? 0 : 24} style={{ flex: 1 }}>
+                <Text fw={700} fz={14.5}>
+                  {b.ten}
+                </Text>
+                <Text fz={13} c="dimmed" lh={1.55}>
+                  {b.moTa}
+                </Text>
+              </Box>
+    </Box>
+          </HienDan>
         );
       })}
     </Stack>
@@ -591,9 +668,7 @@ function KhoiKhaoSat({ khaoSat, phieu }: { khaoSat: typeof gioiThieu.khaoSatDauV
       <Container size="md" p={0}>
         <Stack gap={28}>
           <Stack gap={8} ta="center">
-            <Title order={2} fz={{ base: 22, sm: 28 }}>
-              {khaoSat.tieuDe}
-            </Title>
+            <TieuDeKhoi>{khaoSat.tieuDe}</TieuDeKhoi>
             <Text fz={14} c="dimmed" lh={1.6} maw={640} mx="auto">
               {khaoSat.moTa}
             </Text>
@@ -601,53 +676,55 @@ function KhoiKhaoSat({ khaoSat, phieu }: { khaoSat: typeof gioiThieu.khaoSatDauV
 
           <Stack gap="md" component="ol" m={0} p={0} style={{ listStyle: 'none' }}>
             {phieu.map((p, i) => (
-              <Paper key={p.ten} component="li" withBorder radius={14} p="lg">
-                <Group gap={16} align="flex-start" wrap="nowrap">
-                  <Box
-                    w={36}
-                    h={36}
-                    aria-hidden="true"
-                    style={{
-                      borderRadius: '50%',
-                      background: 'var(--mantine-color-primary-6)',
-                      color: '#fff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {i + 1}
-                  </Box>
-                  <Stack gap={8} style={{ flex: 1, minWidth: 0 }}>
-                    <Title order={3} fz={{ base: 16, sm: 18 }}>
-                      {`Phiếu ${i + 1}: ${p.ten}`}
-                    </Title>
-                    <Text fz={13.5} c="dimmed" lh={1.6}>
-                      {p.moTa}
-                    </Text>
-                    <Group gap="sm" wrap="wrap" mt={4}>
-                      {p.lienKet.map((lk) =>
-                        !lk.url || laNoiDungCho(lk.url) ? (
-                          <Stack key={lk.nhan} gap={4}>
-                            <Button disabled variant="default">
+              <HienDan key={p.ten} component="li" tre={i * 120}>
+                <Paper withBorder radius={14} p="lg" className="gt-the">
+                  <Group gap={16} align="flex-start" wrap="nowrap">
+                    <Box
+                      w={36}
+                      h={36}
+                      aria-hidden="true"
+                      style={{
+                        borderRadius: '50%',
+                        background: 'var(--mantine-color-primary-6)',
+                        color: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {i + 1}
+                    </Box>
+                    <Stack gap={8} style={{ flex: 1, minWidth: 0 }}>
+                      <Title order={3} fz={{ base: 16, sm: 18 }}>
+                        {`Phiếu ${i + 1}: ${p.ten}`}
+                      </Title>
+                      <Text fz={13.5} c="dimmed" lh={1.6}>
+                        {p.moTa}
+                      </Text>
+                      <Group gap="sm" wrap="wrap" mt={4}>
+                        {p.lienKet.map((lk) =>
+                          !lk.url || laNoiDungCho(lk.url) ? (
+                            <Stack key={lk.nhan} gap={4}>
+                              <Button disabled variant="default">
+                                {lk.nhan}
+                              </Button>
+                              <Text fz={12} c="dimmed">
+                                Đường dẫn đang được cập nhật
+                              </Text>
+                            </Stack>
+                          ) : (
+                            <Button key={lk.nhan} component="a" href={lk.url} target="_blank" rel="noopener noreferrer">
                               {lk.nhan}
                             </Button>
-                            <Text fz={12} c="dimmed">
-                              Đường dẫn đang được cập nhật
-                            </Text>
-                          </Stack>
-                        ) : (
-                          <Button key={lk.nhan} component="a" href={lk.url} target="_blank" rel="noopener noreferrer">
-                            {lk.nhan}
-                          </Button>
-                        ),
-                      )}
-                    </Group>
-                  </Stack>
-                </Group>
-              </Paper>
+                          ),
+                        )}
+                      </Group>
+                    </Stack>
+                  </Group>
+                </Paper>
+              </HienDan>
             ))}
           </Stack>
 
@@ -671,35 +748,33 @@ function KhoiKhaoSat({ khaoSat, phieu }: { khaoSat: typeof gioiThieu.khaoSatDauV
   );
 }
 
-function ViSao({ viSao }: { viSao: typeof gioiThieu.viSao }) {
+function ViSao({ viSao, nen }: { viSao: typeof gioiThieu.viSao; nen: string }) {
   return (
-    <Container id="vi-sao" size="lg" py={{ base: 48, sm: 72 }} px={{ base: 'md', sm: 'xl' }}>
+    <KhoiTrang id="vi-sao" nen={nen}>
       <Stack gap={8} maw={720} mx="auto" ta="center">
-        <Title order={2} fz={{ base: 22, sm: 28 }}>
-          {viSao.tieuDe}
-        </Title>
+        <TieuDeKhoi>{viSao.tieuDe}</TieuDeKhoi>
         <Text fz={14} c="dimmed" lh={1.6}>
           {viSao.doanMo}
         </Text>
       </Stack>
-    </Container>
+    </KhoiTrang>
   );
 }
 
-function DoiTuongSection({ doiTuong }: { doiTuong: typeof gioiThieu.doiTuong }) {
+function DoiTuongSection({ doiTuong, nen }: { doiTuong: typeof gioiThieu.doiTuong; nen: string }) {
   return (
-    <Container id="doi-tuong" size="lg" py={{ base: 48, sm: 72 }} px={{ base: 'md', sm: 'xl' }}>
+    <KhoiTrang id="doi-tuong" nen={nen}>
       <Stack gap={28}>
-        <Title order={2} ta="center" fz={{ base: 22, sm: 28 }}>
-          {doiTuong.tieuDe}
-        </Title>
+        <TieuDeKhoi>{doiTuong.tieuDe}</TieuDeKhoi>
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg">
-          {doiTuong.nhom.map((n) => (
-            <Paper key={n} withBorder radius={14} p="md" ta="center">
-              <Text fz={13.5} lh={1.6}>
-                {n}
-              </Text>
-            </Paper>
+          {doiTuong.nhom.map((n, i) => (
+            <HienDan key={n} tre={i * 80}>
+              <Paper withBorder radius={14} p="md" ta="center" h="100%" className="gt-the">
+                <Text fz={13.5} lh={1.6}>
+                  {n}
+                </Text>
+              </Paper>
+            </HienDan>
           ))}
         </SimpleGrid>
         <Paper
@@ -720,7 +795,7 @@ function DoiTuongSection({ doiTuong }: { doiTuong: typeof gioiThieu.doiTuong }) 
           </Stack>
         </Paper>
       </Stack>
-    </Container>
+    </KhoiTrang>
   );
 }
 
@@ -803,9 +878,7 @@ function KhoiHopTac({ hopTac }: { hopTac: typeof gioiThieu.hopTac }) {
       <Container size="lg" p={0}>
         <Stack gap={32}>
           <Stack gap={8} ta="center">
-            <Title order={2} fz={{ base: 22, sm: 28 }}>
-              {hopTac.tieuDe}
-            </Title>
+            <TieuDeKhoi>{hopTac.tieuDe}</TieuDeKhoi>
             <Text fz={14} c="dimmed" lh={1.6} maw={640} mx="auto">
               {hopTac.moTa}
             </Text>

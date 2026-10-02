@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
@@ -225,5 +225,96 @@ describe('M0 — chế độ "dang_nhap" (đã mở cổng học viên / địa 
     renderTrang(<TrangGioiThieu />);
     expect(await screen.findByRole('link', { name: gioiThieu.moDau.nutChinh })).toHaveAttribute('href', '/dang-nhap');
     expect(screen.getByRole('heading', { name: gioiThieu.khaoSatDauVao.tieuDe })).toBeInTheDocument();
+  });
+});
+
+describe('M0 — tách biệt giữa các khối nội dung', () => {
+  /** Nền của các khối xen kẽ theo thứ tự hiển thị (bỏ qua khối khảo sát / liên hệ có màu riêng). */
+  function nenCacKhoi(container: HTMLElement) {
+    return [...container.querySelectorAll<HTMLElement>('section[id]')].map((s) => ({
+      id: s.id,
+      nen: s.style.background || s.style.backgroundColor,
+    }));
+  }
+
+  it.each(['khao_sat', 'dang_nhap'] as const)(
+    'chế độ "%s": không có 2 khối liền kề trùng nền, mỗi khối có đường kẻ mép trên',
+    async (cheDo) => {
+      datCauHinhKhaoSatMock(cauHinh({ che_do_hoc_vien: cheDo }));
+      const { container } = renderTrang(<TrangGioiThieu />);
+      // Chờ cấu hình áp dụng: chế độ đăng nhập có khối "Hướng dẫn", chế độ khảo sát thì không.
+      if (cheDo === 'dang_nhap') await screen.findByRole('heading', { name: gioiThieu.huongDan.tieuDe });
+      else await screen.findByRole('link', { name: 'Mở phiếu khảo sát' });
+
+      const khoi = nenCacKhoi(container);
+      expect(khoi.length).toBeGreaterThanOrEqual(5);
+      for (let i = 1; i < khoi.length; i++) {
+        expect(khoi[i].nen, `${khoi[i - 1].id} và ${khoi[i].id} trùng nền`).not.toBe(khoi[i - 1].nen);
+      }
+      container
+        .querySelectorAll<HTMLElement>('section[id]')
+        .forEach((s) => expect(s.style.borderTop).toContain('1px solid'));
+    },
+  );
+});
+
+describe('M0 — hiệu ứng hiện dần & nhấn tiêu đề', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('trình duyệt KHÔNG có IntersectionObserver -> không phần tử nào bị ẩn chờ hiệu ứng', async () => {
+    vi.stubGlobal('IntersectionObserver', undefined);
+    // jsdom vốn không có IntersectionObserver; xóa hẳn khỏi window để `in` trả false.
+    delete (window as unknown as Record<string, unknown>).IntersectionObserver;
+    const { container } = renderTrang(<TrangGioiThieu />);
+    await choTrang();
+    expect(container.querySelectorAll('.gt-cho-hien')).toHaveLength(0);
+  });
+
+  it('có IntersectionObserver -> phần tử chờ hiện, cuộn tới (isIntersecting) thì hiện', async () => {
+    const quanSat: { cb: IntersectionObserverCallback; el: Element[] }[] = [];
+    class GiaLapIO {
+      private muc: { cb: IntersectionObserverCallback; el: Element[] };
+      constructor(cb: IntersectionObserverCallback) {
+        this.muc = { cb, el: [] };
+        quanSat.push(this.muc);
+      }
+      observe(el: Element) {
+        this.muc.el.push(el);
+      }
+      disconnect() {}
+      unobserve() {}
+      takeRecords() {
+        return [];
+      }
+    }
+    vi.stubGlobal('IntersectionObserver', GiaLapIO);
+    const { container } = renderTrang(<TrangGioiThieu />);
+    await choTrang();
+
+    const choHien = container.querySelectorAll('.gt-cho-hien');
+    expect(choHien.length).toBeGreaterThan(5);
+    expect(container.querySelectorAll('.gt-da-hien')).toHaveLength(0);
+
+    act(() => {
+      for (const q of quanSat) {
+        q.cb(q.el.map((target) => ({ isIntersecting: true, target }) as IntersectionObserverEntry), {} as IntersectionObserver);
+      }
+    });
+    expect(container.querySelectorAll('.gt-cho-hien:not(.gt-da-hien)')).toHaveLength(0);
+  });
+
+  it('tiêu đề mỗi khối nội dung có gạch nhấn (ẩn với trình đọc màn hình)', async () => {
+    datCauHinhKhaoSatMock(cauHinh());
+    const { container } = renderTrang(<TrangGioiThieu />);
+    await screen.findByRole('link', { name: 'Mở phiếu khảo sát' });
+    for (const tieuDe of [gioiThieu.khaoSatDauVao.tieuDe, gioiThieu.loTrinh.tieuDe, gioiThieu.hoiDap.tieuDe]) {
+      const h = screen.getByRole('heading', { level: 2, name: tieuDe });
+      const gach = h.parentElement?.querySelector('.gt-gach');
+      expect(gach, tieuDe).not.toBeNull();
+      expect(gach).toHaveAttribute('aria-hidden', 'true');
+    }
+    expect(container.querySelectorAll('.gt-the').length).toBeGreaterThan(5);
   });
 });
