@@ -69,6 +69,14 @@ describe('Import ho_so_nhan_su_moet (e2e)', () => {
   });
 
   afterAll(async () => {
+    // FK onDelete: NoAction — PATCH /hoc-vien/toi đổi email gửi ngay email
+    // xác minh (ghi nhat_ky_thong_bao), phải xóa trước khi xóa hoc_vien.
+    await prisma.hang_doi_email.deleteMany({
+      where: { hoc_vien_id: { in: hocVienIds } },
+    });
+    await prisma.nhat_ky_thong_bao.deleteMany({
+      where: { hoc_vien_id: { in: hocVienIds } },
+    });
     if (hocVienIds.length > 0) {
       await prisma.hoc_vien.updateMany({
         where: { id: { in: hocVienIds } },
@@ -205,16 +213,17 @@ describe('Import ho_so_nhan_su_moet (e2e)', () => {
           '0912345678',
           '',
         ],
-        // Lỗi: chuyên môn rỗng
+        // Lỗi: thiếu cả Mã định danh MOET lẫn Số định danh cá nhân (T4b).
+        // Không dùng "chuyên môn rỗng" — từ T4c (rule #24) không còn là lỗi.
         [
           donViFixture.donVi.ten_don_vi,
-          `MOET-${suf}-e`,
+          '',
           'Nguyễn Văn E',
           1,
           1,
           NAM_HOP_LE,
           'Giáo viên',
-          '',
+          'Toán',
           '0912345678',
           '',
         ],

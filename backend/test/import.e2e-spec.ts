@@ -126,7 +126,7 @@ describe('Import (e2e)', () => {
       expect(headerRow.slice(1)).toEqual(['ten_mon', 'cap_hoc']);
     });
 
-    it('ho_so_nhan_su_moet -> trả file xlsx đúng cột theo api-contract.md (T4: thêm "Mã đơn vị" tùy chọn)', async () => {
+    it('ho_so_nhan_su_moet -> trả file xlsx đúng cột theo api-contract.md (T4: thêm "Mã đơn vị"; T4b: thêm "Số định danh cá nhân")', async () => {
       const res = await request(app.getHttpServer())
         .get('/import/mau-excel?loai=ho_so_nhan_su_moet')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
@@ -141,6 +141,7 @@ describe('Import (e2e)', () => {
         'Đơn vị',
         'Mã đơn vị',
         'Mã định danh (CDSL moet)',
+        'Số định danh cá nhân',
         'Họ và tên',
         'Ngày',
         'Tháng',
