@@ -179,8 +179,15 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
     await prisma.giai_doan_khoa.deleteMany({
       where: { khoa_id: { in: khoaIds } },
     });
+    // Lượt import lỗi cả file (400) cũng ghi nhat_ky_import với id ngẫu nhiên
+    // -> dọn theo người import thay vì chỉ theo importIds.
     await prisma.nhat_ky_import.deleteMany({
-      where: { id: { in: importIds } },
+      where: {
+        OR: [
+          { id: { in: importIds } },
+          { nguoi_import_id: quanTri.nguoiDung.id },
+        ],
+      },
     });
     await prisma.khoa_boi_duong.deleteMany({ where: { id: { in: khoaIds } } });
     if (hocVienIds.length > 0) {
@@ -341,9 +348,7 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
 
     it('thay bằng lớp không có buổi trong GĐ + sai hình thức -> 200 kèm canh_bao, vẫn 1 dòng', async () => {
       const res = await put(gd2.id, lopTT.id).expect(200);
-      expect(res.body.canh_bao).toContain(
-        'không có buổi nào trong giai đoạn',
-      );
+      expect(res.body.canh_bao).toContain('không có buổi nào trong giai đoạn');
       expect(res.body.canh_bao).toContain(
         'lớp trực tiếp nhưng giai đoạn là trực tuyến',
       );
@@ -393,6 +398,206 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
           [donViKhac.diaDanhXa.id, donViKhac.diaDanhTinh.id],
         );
       }
+    });
+  });
+
+  describe('Import phan_lop_hoc_vien theo giai đoạn', () => {
+    let khoa: { id: string; ma_khoa: string };
+    let hv: { hocVien: { id: string }; tenDangNhap: string };
+    const H = ['so_dinh_danh_ca_nhan', 'ma_dinh_danh_moet'];
+
+    async function taiLenPhanLop(maKhoa: string, rows: string[][]) {
+      const res = await request(app.getHttpServer())
+        .post(`/import/phan_lop_hoc_vien?ma_khoa=${encodeURIComponent(maKhoa)}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .attach('file', await buildXlsx(rows), 'phan-lop.xlsx');
+      expect(res.status).toBe(201);
+      importIds.push(res.body.import_id);
+      const ketQua = await request(app.getHttpServer())
+        .get(`/import/${res.body.import_id}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      return {
+        importId: res.body.import_id as string,
+        ketQua: ketQua.body as {
+          so_dong_loi: number;
+          so_dong_thanh_cong: number;
+          danh_sach_loi: { dong: number; ly_do: string }[];
+          danh_sach_canh_bao: { dong: number; ly_do: string }[];
+        },
+      };
+    }
+
+    async function xacNhan(importId: string) {
+      await request(app.getHttpServer())
+        .post(`/import/${importId}/xac-nhan`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(201);
+    }
+
+    // Tải mẫu và trả dòng tiêu đề.
+    async function taiMauHeader(maKhoa: string) {
+      const res = await request(app.getHttpServer())
+        .get(
+          `/import/mau-excel?loai=phan_lop_hoc_vien&ma_khoa=${encodeURIComponent(maKhoa)}`,
+        )
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .buffer(true)
+        .parse((r, cb) => {
+          const c: Buffer[] = [];
+          r.on('data', (x: Buffer) => c.push(x));
+          r.on('end', () => cb(null, Buffer.concat(c)));
+        })
+        .expect(200);
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(res.body as unknown as ExcelJS.Buffer);
+      return (wb.worksheets[0].getRow(1).values as unknown[]).slice(1);
+    }
+
+    const phanLop = () =>
+      prisma.phan_lop_giai_doan
+        .findMany({
+          where: {
+            dang_ky_hoc: { hoc_vien_id: hv.hocVien.id, khoa_id: khoa.id },
+          },
+          include: { lop: true, giai_doan: true },
+        })
+        .then((r) =>
+          Object.fromEntries(r.map((x) => [x.giai_doan.thu_tu, x.lop.ten_lop])),
+        );
+
+    beforeAll(async () => {
+      khoa = await taoKhoa();
+      await taoGiaiDoan(khoa.id, 1, { hinh_thuc: 'danh_gia' });
+      const gd2 = await taoGiaiDoan(khoa.id, 2);
+      const gd3 = await taoGiaiDoan(khoa.id, 3);
+      await taoGiaiDoan(khoa.id, 4, { trang_thai: 'ngung' });
+      const z3 = await taoLop(khoa.id, 'zoom', 'Lớp zoom 3');
+      const v3 = await taoLop(khoa.id, 'vle', 'Lớp VLE 3');
+      await taoLop(khoa.id, 'vle', 'Lớp VLE 5');
+      await taoBuoi(z3.id, gd2.id, 1);
+      await taoBuoi(v3.id, gd3.id, 1);
+      await taoLop(khoa.id, 'zoom', 'Trùng tên');
+      await taoLop(khoa.id, 'vle', 'Trùng tên');
+      await prisma.cum_hoc_vien.create({
+        data: { khoa_id: khoa.id, ten_cum: 'Cụm 1' },
+      });
+      hv = await taoHocVienMoet(uniqueSuffix());
+    });
+
+    it('mẫu: chỉ GĐ active, đúng thứ tự, có ten_cum; thiếu ma_khoa -> 400', async () => {
+      expect(await taiMauHeader(khoa.ma_khoa)).toEqual([
+        'so_dinh_danh_ca_nhan',
+        'ma_dinh_danh_moet',
+        'GĐ1 - Giai đoạn 1',
+        'GĐ2 - Giai đoạn 2',
+        'GĐ3 - Giai đoạn 3',
+        'ten_cum',
+      ]);
+      await request(app.getHttpServer())
+        .get('/import/mau-excel?loai=phan_lop_hoc_vien')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(400);
+    });
+
+    it('gán GĐ2 + GĐ3 + cụm (tên lớp dạng NFD vẫn khớp) -> da_phan_lop', async () => {
+      const { importId, ketQua } = await taiLenPhanLop(khoa.ma_khoa, [
+        [...H, 'GĐ2 - x', 'GĐ3 - y', 'ten_cum'],
+        [
+          '',
+          hv.tenDangNhap,
+          'Lớp zoom 3'.normalize('NFD'),
+          'Lớp VLE 3',
+          'Cụm 1',
+        ],
+      ]);
+      expect(ketQua.danh_sach_loi).toEqual([]);
+      expect(ketQua.danh_sach_canh_bao).toEqual([]);
+      await xacNhan(importId);
+      expect(await phanLop()).toEqual({ 2: 'Lớp zoom 3', 3: 'Lớp VLE 3' });
+      const dk = await prisma.dang_ky_hoc.findUniqueOrThrow({
+        where: {
+          hoc_vien_id_khoa_id: { hoc_vien_id: hv.hocVien.id, khoa_id: khoa.id },
+        },
+        include: { cum: true },
+      });
+      expect(dk.trang_thai).toBe('da_phan_lop');
+      expect(dk.cum?.ten_cum).toBe('Cụm 1');
+    });
+
+    it('file chỉ có cột GĐ3 đổi lớp -> GĐ2 giữ nguyên; lớp không có buổi trong GĐ -> cảnh báo', async () => {
+      const { importId, ketQua } = await taiLenPhanLop(khoa.ma_khoa, [
+        [...H, 'GĐ3'],
+        ['', hv.tenDangNhap, 'Lớp VLE 5'],
+      ]);
+      expect(ketQua.danh_sach_canh_bao[0].ly_do).toContain(
+        'không có buổi nào trong giai đoạn',
+      );
+      await xacNhan(importId);
+      expect(await phanLop()).toEqual({ 2: 'Lớp zoom 3', 3: 'Lớp VLE 5' });
+    });
+
+    it('ô "-" gỡ, ô trống giữ, trạng thái đăng ký không đổi', async () => {
+      const { importId } = await taiLenPhanLop(khoa.ma_khoa, [
+        [...H, 'GĐ2', 'GĐ3'],
+        ['', hv.tenDangNhap, '-', ''],
+      ]);
+      await xacNhan(importId);
+      expect(await phanLop()).toEqual({ 3: 'Lớp VLE 5' });
+    });
+
+    it.each([
+      ['lớp không tồn tại', 'Lớp ma', 'không tồn tại'],
+      ['tên trùng nhiều loại lớp', 'Trùng tên', 'nhiều loại lớp'],
+    ])('%s -> dòng lỗi', async (_t, tenLop, chua) => {
+      const { ketQua } = await taiLenPhanLop(khoa.ma_khoa, [
+        [...H, 'GĐ2'],
+        ['', hv.tenDangNhap, tenLop],
+      ]);
+      expect(ketQua.so_dong_loi).toBe(1);
+      expect(ketQua.danh_sach_loi[0].ly_do).toContain(chua);
+    });
+
+    it('học viên lặp 2 dòng -> dòng sau lỗi', async () => {
+      const { ketQua } = await taiLenPhanLop(khoa.ma_khoa, [
+        [...H, 'GĐ2'],
+        ['', hv.tenDangNhap, ''],
+        ['', hv.tenDangNhap, ''],
+      ]);
+      expect(ketQua.so_dong_loi).toBe(1);
+      expect(ketQua.danh_sach_loi[0].ly_do).toContain('trùng');
+    });
+
+    it('cột GĐ4 (giai đoạn đã ngừng) hoặc mẫu cũ -> lỗi cả file (400)', async () => {
+      for (const header of [
+        [...H, 'GĐ4'],
+        [...H, 'ma_khoa', 'ten_lop'],
+      ]) {
+        const res = await request(app.getHttpServer())
+          .post(`/import/phan_lop_hoc_vien?ma_khoa=${khoa.ma_khoa}`)
+          .set('Authorization', `Bearer ${tokenQuanTri}`)
+          .attach(
+            'file',
+            await buildXlsx([header, ['', hv.tenDangNhap, 'x', 'y']]),
+            'pl.xlsx',
+          );
+        expect(res.status).toBe(400);
+      }
+    });
+
+    it('POST thiếu ma_khoa -> 400', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/import/phan_lop_hoc_vien')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .attach(
+          'file',
+          await buildXlsx([
+            [...H, 'GĐ2'],
+            ['', hv.tenDangNhap, ''],
+          ]),
+          'pl.xlsx',
+        );
+      expect(res.status).toBe(400);
     });
   });
 });

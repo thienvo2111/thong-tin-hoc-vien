@@ -255,7 +255,10 @@ export class ThongBaoService {
             },
           },
         },
-        dang_ky_hoc_lop: {
+        // Phân lớp theo giai đoạn (spec 2026-10-02): lớp được gán theo từng
+        // giai đoạn — email chỉ liệt kê buổi thuộc giai đoạn mà học viên được
+        // gán đúng lớp đó.
+        phan_lop_giai_doan: {
           include: {
             lop: { include: { nhan_su: true, lich_hoc: true } },
           },
@@ -263,8 +266,8 @@ export class ThongBaoService {
       },
     });
     if (!dangKy) return { chuaCoEmail: false };
-    const coLopTrucTiep = dangKy.dang_ky_hoc_lop.some(
-      (d) => d.loai_lop === 'truc_tiep',
+    const coLopTrucTiep = dangKy.phan_lop_giai_doan.some(
+      (p) => p.lop.loai_lop === 'truc_tiep',
     );
     if (!coLopTrucTiep) return { chuaCoEmail: false };
     if (!dangKy.hoc_vien.email_lien_he) {
@@ -273,28 +276,36 @@ export class ThongBaoService {
     }
 
     const thuTuLop: Record<string, number> = { truc_tiep: 0, zoom: 1, vle: 2 };
-    const dsLop = [...dangKy.dang_ky_hoc_lop].sort(
-      (a, b) => thuTuLop[a.loai_lop] - thuTuLop[b.loai_lop],
+    // 1 lớp có thể được gán ở nhiều giai đoạn -> khử trùng theo lop.id.
+    const dsLop = [
+      ...new Map(
+        dangKy.phan_lop_giai_doan.map((p) => [p.lop.id, p.lop]),
+      ).values(),
+    ].sort((a, b) => thuTuLop[a.loai_lop] - thuTuLop[b.loai_lop]);
+    const lopTheoGiaiDoan = new Map(
+      dangKy.phan_lop_giai_doan.map((p) => [p.giai_doan_id, p.lop.id]),
     );
-    const buoiHoc = dsLop.flatMap((d) =>
-      d.lop.lich_hoc.map((l) => ({
-        giaiDoanId: l.giai_doan_id,
-        loaiLop: d.loai_lop,
-        buoiSo: l.buoi_so,
-        batDau: l.thoi_gian_bat_dau,
-        ketThuc: l.thoi_gian_ket_thuc,
-        diaDiemHoacLink: l.dia_diem_hoac_link,
-      })),
+    const buoiHoc = dsLop.flatMap((lop) =>
+      lop.lich_hoc
+        .filter((l) => lopTheoGiaiDoan.get(l.giai_doan_id) === lop.id)
+        .map((l) => ({
+          giaiDoanId: l.giai_doan_id,
+          loaiLop: lop.loai_lop,
+          buoiSo: l.buoi_so,
+          batDau: l.thoi_gian_bat_dau,
+          ketThuc: l.thoi_gian_ket_thuc,
+          diaDiemHoacLink: l.dia_diem_hoac_link,
+        })),
     );
 
     const { tieuDe, html } = mauLichHoc({
       hoTen: dangKy.hoc_vien.ho_ten,
       tenKhoa: dangKy.khoa.ten_khoa,
       maKhoa: dangKy.khoa.ma_khoa,
-      lop: dsLop.map((d) => ({
-        loaiLop: d.loai_lop,
-        tenLop: d.lop.ten_lop,
-        nhanSu: d.lop.nhan_su.map((n) => ({
+      lop: dsLop.map((lop) => ({
+        loaiLop: lop.loai_lop,
+        tenLop: lop.ten_lop,
+        nhanSu: lop.nhan_su.map((n) => ({
           hoTen: n.ho_ten,
           vaiTro: n.vai_tro,
           soDienThoai: n.so_dien_thoai,

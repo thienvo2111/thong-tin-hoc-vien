@@ -32,6 +32,7 @@ export class ImportController {
   async taiMauExcel(@Query() query: MauExcelQueryDto, @Res() res: Response) {
     const { buffer, filename } = await this.importService.taiMauExcel(
       query.loai,
+      query.ma_khoa,
     );
     res
       .set({

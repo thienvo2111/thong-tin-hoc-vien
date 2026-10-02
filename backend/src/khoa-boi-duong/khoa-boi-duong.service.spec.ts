@@ -22,6 +22,8 @@ describe('KhoaBoiDuongService', () => {
     lop_hoc: {
       create: jest.Mock;
       findUnique: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
       update: jest.Mock;
       upsert: jest.Mock;
     };
@@ -41,8 +43,17 @@ describe('KhoaBoiDuongService', () => {
       deleteMany: jest.Mock;
       count: jest.Mock;
     };
-    giai_doan_khoa: { findUnique: jest.Mock; update: jest.Mock };
-    lich_hoc_lop: { findUnique: jest.Mock; update: jest.Mock };
+    phan_lop_giai_doan: { upsert: jest.Mock; deleteMany: jest.Mock };
+    giai_doan_khoa: {
+      findUnique: jest.Mock;
+      findMany: jest.Mock;
+      update: jest.Mock;
+    };
+    lich_hoc_lop: {
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      count: jest.Mock;
+    };
     hoc_vien: { findUnique: jest.Mock };
     diem_danh: { findMany: jest.Mock };
     ket_qua_giai_doan: { findMany: jest.Mock };
@@ -80,6 +91,8 @@ describe('KhoaBoiDuongService', () => {
       lop_hoc: {
         create: jest.fn(),
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
         update: jest.fn(),
         upsert: jest.fn(),
       },
@@ -99,8 +112,17 @@ describe('KhoaBoiDuongService', () => {
         deleteMany: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
       },
-      giai_doan_khoa: { findUnique: jest.fn(), update: jest.fn() },
-      lich_hoc_lop: { findUnique: jest.fn(), update: jest.fn() },
+      phan_lop_giai_doan: { upsert: jest.fn(), deleteMany: jest.fn() },
+      giai_doan_khoa: {
+        findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn(),
+      },
+      lich_hoc_lop: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+        count: jest.fn().mockResolvedValue(1),
+      },
       hoc_vien: { findUnique: jest.fn() },
       // T12 (mo-rong-nls-an-giang.md, 2026-09-30): khoaHocTheoHocVienId (dùng
       // bởi khoaHocCuaToi/khoaHocCuaHocVien) nay truy vấn thêm điểm danh/tiến
@@ -510,9 +532,21 @@ describe('KhoaBoiDuongService', () => {
     });
   });
 
-  describe('resolvePhanLopRow + commitPhanLop', () => {
+  describe('resolvePhanLopRow + commitPhanLop (theo giai đoạn)', () => {
     const hocVienDaDuyet = { id: 'hv-1', trang_thai: 'da_duyet' };
-    const khoaFull = { id: 'khoa-1', ma_khoa: 'K1' };
+    const khoa = { id: 'khoa-1', ma_khoa: 'K1' };
+    const gd2 = {
+      id: 'gd-2',
+      thu_tu: 2,
+      ten_giai_doan: 'Zoom',
+      hinh_thuc: 'truc_tuyen',
+    };
+    const gd3 = {
+      id: 'gd-3',
+      thu_tu: 3,
+      ten_giai_doan: 'VLE',
+      hinh_thuc: 'truc_tuyen',
+    };
 
     beforeEach(() => {
       prisma.hoc_vien.findUnique.mockImplementation(({ where }) => {
@@ -520,82 +554,95 @@ describe('KhoaBoiDuongService', () => {
           return hocVienDaDuyet;
         return null;
       });
-      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoaFull);
+      prisma.giai_doan_khoa.findMany.mockResolvedValue([gd2, gd3]);
     });
 
-    it('resolve cả 3 loại lớp + cụm cùng lúc', async () => {
-      prisma.lop_hoc.findUnique.mockImplementation(({ where }) => {
-        const k = where.khoa_id_loai_lop_ten_lop;
-        if (k.loai_lop === 'truc_tiep' && k.ten_lop === 'Lớp TT')
-          return { id: 'lop-tt', muc_nang_luc: null };
-        if (k.loai_lop === 'zoom' && k.ten_lop === 'Lớp Zoom')
-          return { id: 'lop-zoom', muc_nang_luc: null };
-        if (k.loai_lop === 'vle' && k.ten_lop === 'Lớp VLE')
-          return { id: 'lop-vle', muc_nang_luc: null };
-        return null;
-      });
+    it('ô tên lớp -> gán, ô "-" -> gỡ, cột vắng/ô trống -> không có trong gan; kèm cụm', async () => {
+      prisma.lop_hoc.findMany.mockResolvedValue([
+        {
+          id: 'lop-zoom',
+          ten_lop: 'Lớp Zoom',
+          loai_lop: 'zoom',
+          muc_nang_luc: null,
+        },
+      ]);
       prisma.cum_hoc_vien.findUnique.mockResolvedValue({ id: 'cum-1' });
 
-      const { dto, error } = await service.resolvePhanLopRow({
-        so_dinh_danh_ca_nhan: '123456789012',
-        ma_khoa: 'K1',
-        ten_lop: 'Lớp TT',
-        ten_lop_zoom: 'Lớp Zoom',
-        ten_lop_vle: 'Lớp VLE',
-        ten_cum: 'Cụm A',
-      });
+      const { dto, error, canhBao } = await service.resolvePhanLopRow(
+        {
+          so_dinh_danh_ca_nhan: '123456789012',
+          'gd:2': 'Lớp Zoom',
+          'gd:3': '-',
+          ten_cum: 'Cụm A',
+        },
+        khoa,
+      );
 
       expect(error).toBeUndefined();
+      expect(canhBao).toBeUndefined();
       expect(dto).toEqual({
         hoc_vien_id: 'hv-1',
         khoa_id: 'khoa-1',
-        lop_truc_tiep_id: 'lop-tt',
-        lop_zoom_id: 'lop-zoom',
-        lop_vle_id: 'lop-vle',
         cum_id: 'cum-1',
+        gan: [
+          { giai_doan_id: 'gd-2', lop_id: 'lop-zoom' },
+          { giai_doan_id: 'gd-3', lop_id: null },
+        ],
       });
     });
 
-    it('không tìm thấy lớp zoom -> lỗi rõ ràng, không lẫn với lớp trực tiếp', async () => {
-      prisma.lop_hoc.findUnique.mockImplementation(({ where }) => {
-        const k = where.khoa_id_loai_lop_ten_lop;
-        if (k.loai_lop === 'truc_tiep') return { id: 'lop-tt' };
-        return null;
-      });
-
-      const { error, dto } = await service.resolvePhanLopRow({
-        so_dinh_danh_ca_nhan: '123456789012',
-        ma_khoa: 'K1',
-        ten_lop: 'Lớp TT',
-        ten_lop_zoom: 'Lớp Zoom Không Tồn Tại',
-      });
-
+    it('không tìm thấy lớp -> lỗi ghi rõ GĐ và tên lớp', async () => {
+      prisma.lop_hoc.findMany.mockResolvedValue([]);
+      const { error, dto } = await service.resolvePhanLopRow(
+        { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': 'Lớp Ma' },
+        khoa,
+      );
       expect(dto).toBeUndefined();
-      expect(error).toContain('Zoom');
+      expect(error).toContain('GĐ2');
+      expect(error).toContain('Lớp Ma');
     });
 
     it('không tìm thấy cụm -> lỗi rõ ràng', async () => {
-      prisma.lop_hoc.findUnique.mockResolvedValue(null);
       prisma.cum_hoc_vien.findUnique.mockResolvedValue(null);
-
-      const { error } = await service.resolvePhanLopRow({
-        so_dinh_danh_ca_nhan: '123456789012',
-        ma_khoa: 'K1',
-        ten_cum: 'Cụm Không Tồn Tại',
-      });
-
+      const { error } = await service.resolvePhanLopRow(
+        { so_dinh_danh_ca_nhan: '123456789012', ten_cum: 'Cụm Không Tồn Tại' },
+        khoa,
+      );
       expect(error).toContain('cụm học viên');
     });
 
-    it('commitPhanLop: gán cả truc_tiep + zoom -> upsert dang_ky_hoc_lop 2 lần, trang_thai da_phan_lop, gửi email (chỉ vì có truc_tiep)', async () => {
+    it('mức năng lực lớp khác mức đầu vào -> cảnh báo, không chặn', async () => {
+      prisma.lop_hoc.findMany.mockResolvedValue([
+        {
+          id: 'lop-zoom',
+          ten_lop: 'Lớp Zoom',
+          loai_lop: 'zoom',
+          muc_nang_luc: 'nang_cao',
+        },
+      ]);
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        muc_dau_vao: 'co_ban',
+      });
+      const { dto, canhBao } = await service.resolvePhanLopRow(
+        { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': 'Lớp Zoom' },
+        khoa,
+      );
+      expect(dto).toBeDefined();
+      expect(canhBao).toContain('co_ban');
+      expect(canhBao).toContain('nang_cao');
+    });
+
+    it('commitPhanLop: gán lớp trực tiếp -> upsert phan_lop_giai_doan, da_phan_lop, gửi email', async () => {
       prisma.dang_ky_hoc.upsert.mockResolvedValue({ id: 'dk-1' });
-      prisma.dang_ky_hoc_lop.upsert.mockResolvedValue({});
+      prisma.lop_hoc.count.mockResolvedValue(1);
 
       const res = await service.commitPhanLop({
         hoc_vien_id: 'hv-1',
         khoa_id: 'khoa-1',
-        lop_truc_tiep_id: 'lop-tt',
-        lop_zoom_id: 'lop-zoom',
+        gan: [
+          { giai_doan_id: 'gd-4', lop_id: 'lop-tt' },
+          { giai_doan_id: 'gd-2', lop_id: 'lop-zoom' },
+        ],
       });
 
       expect(prisma.dang_ky_hoc.upsert).toHaveBeenCalledWith(
@@ -603,18 +650,19 @@ describe('KhoaBoiDuongService', () => {
           create: expect.objectContaining({ trang_thai: 'da_phan_lop' }),
         }),
       );
-      expect(prisma.dang_ky_hoc_lop.upsert).toHaveBeenCalledTimes(2);
+      expect(prisma.phan_lop_giai_doan.upsert).toHaveBeenCalledTimes(2);
       expect(thongBaoService.guiDangKyHocPhanLop).toHaveBeenCalledWith('dk-1');
       expect(res).toEqual({ hocVienChuaCoEmail: false });
     });
 
-    it('commitPhanLop: chỉ gán cụm (không lớp nào) -> không gọi dang_ky_hoc_lop.upsert, không gửi email, trang_thai mặc định da_duyet', async () => {
+    it('commitPhanLop: chỉ gán cụm -> không đụng phan_lop_giai_doan, không email, mặc định da_duyet', async () => {
       prisma.dang_ky_hoc.upsert.mockResolvedValue({ id: 'dk-1' });
 
       const res = await service.commitPhanLop({
         hoc_vien_id: 'hv-1',
         khoa_id: 'khoa-1',
         cum_id: 'cum-1',
+        gan: [],
       });
 
       expect(prisma.dang_ky_hoc.upsert).toHaveBeenCalledWith(
@@ -625,34 +673,43 @@ describe('KhoaBoiDuongService', () => {
           }),
         }),
       );
-      expect(prisma.dang_ky_hoc_lop.upsert).not.toHaveBeenCalled();
+      expect(prisma.phan_lop_giai_doan.upsert).not.toHaveBeenCalled();
       expect(thongBaoService.guiDangKyHocPhanLop).not.toHaveBeenCalled();
       expect(res).toEqual({ hocVienChuaCoEmail: false });
     });
 
-    it('commitPhanLop: chỉ gán zoom (không truc_tiep) -> vẫn da_phan_lop nhưng KHÔNG gửi email', async () => {
+    it('commitPhanLop: chỉ gán zoom + gỡ 1 GĐ -> da_phan_lop, deleteMany GĐ bị gỡ, KHÔNG email', async () => {
       prisma.dang_ky_hoc.upsert.mockResolvedValue({ id: 'dk-1' });
-      prisma.dang_ky_hoc_lop.upsert.mockResolvedValue({});
+      prisma.lop_hoc.count.mockResolvedValue(0);
 
-      const res = await service.commitPhanLop({
+      await service.commitPhanLop({
         hoc_vien_id: 'hv-1',
         khoa_id: 'khoa-1',
-        lop_zoom_id: 'lop-zoom',
+        gan: [
+          { giai_doan_id: 'gd-2', lop_id: 'lop-zoom' },
+          { giai_doan_id: 'gd-3', lop_id: null },
+        ],
       });
 
-      expect(prisma.dang_ky_hoc.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          create: expect.objectContaining({ trang_thai: 'da_phan_lop' }),
-        }),
-      );
+      expect(prisma.phan_lop_giai_doan.deleteMany).toHaveBeenCalledWith({
+        where: { dang_ky_hoc_id: 'dk-1', giai_doan_id: 'gd-3' },
+      });
       expect(thongBaoService.guiDangKyHocPhanLop).not.toHaveBeenCalled();
-      expect(res).toEqual({ hocVienChuaCoEmail: false });
     });
   });
 
   describe('resolveLopVaLichHocRow — loai_lop (QĐ10)', () => {
     const khoaFull = { id: 'khoa-1', ma_khoa: 'K1' };
-    const giaiDoan1 = { id: 'gd-1', khoa_id: 'khoa-1', thu_tu: 1 };
+    // Đủ field cho canhBaoBuoiHocGiaiDoan (ngày + hình thức của giai đoạn).
+    const giaiDoan1 = {
+      id: 'gd-1',
+      khoa_id: 'khoa-1',
+      thu_tu: 1,
+      ten_giai_doan: 'Giai đoạn 1',
+      hinh_thuc: 'truc_tuyen',
+      thoi_gian_bat_dau: new Date('2026-01-01T00:00:00Z'),
+      thoi_gian_ket_thuc: new Date('2026-12-31T00:00:00Z'),
+    };
 
     beforeEach(() => {
       prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoaFull);

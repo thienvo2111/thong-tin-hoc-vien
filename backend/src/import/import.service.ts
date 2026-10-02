@@ -38,6 +38,11 @@ import {
 } from './util/excel.util';
 import { readMoetWorkbookRows } from './util/moet-excel.util';
 import {
+  readPhanLopWorkbook,
+  tieuDeCotGiaiDoan,
+  valuesTheoTieuDe,
+} from './util/phan-lop-excel.util';
+import {
   docFileGoc,
   docFileLoi,
   docKetQua,
@@ -84,14 +89,81 @@ export class ImportService {
 
   async taiMauExcel(
     loaiRaw: string,
+    maKhoa?: string,
   ): Promise<{ buffer: Buffer; filename: string }> {
     const loai = this.assertSupported(loaiRaw);
+    if (loai === 'phan_lop_hoc_vien') {
+      const { khoa, columns } = await this.cotPhanLop(maKhoa);
+      const buffer = await buildTemplateWorkbook(
+        columns,
+        await this.ghiChuCotPhanLop(khoa),
+      );
+      return { buffer, filename: `mau-${loai}-${khoa.ma_khoa}.xlsx` };
+    }
     const columns = this.getColumns(loai);
     const buffer = await buildTemplateWorkbook(
       columns,
       this.getColumnNotes(loai),
     );
     return { buffer, filename: `mau-${loai}.xlsx` };
+  }
+
+  // phan_lop_hoc_vien (spec 2026-10-02 mục 4.1): cột phụ thuộc giai đoạn
+  // ACTIVE của khóa -> bắt buộc ma_khoa cho cả tải mẫu, tải lên và xác nhận.
+  private async cotPhanLop(maKhoaRaw?: string) {
+    const maKhoa = maKhoaRaw?.trim();
+    if (!maKhoa) {
+      throw new ValidationException(
+        'Import phân lớp học viên bắt buộc chọn khóa (tham số ma_khoa)',
+        [{ field: 'ma_khoa', message: 'Bắt buộc' }],
+      );
+    }
+    const khoa = await this.prisma.khoa_boi_duong.findUnique({
+      where: { ma_khoa: maKhoa },
+      include: {
+        giai_doan: {
+          where: { trang_thai: 'active' },
+          orderBy: { thu_tu: 'asc' },
+        },
+      },
+    });
+    if (!khoa) throw new NotFoundAppException(`Khóa "${maKhoa}" không tồn tại`);
+    const columns = [
+      'so_dinh_danh_ca_nhan',
+      'ma_dinh_danh_moet',
+      ...khoa.giai_doan.map(tieuDeCotGiaiDoan),
+      'ten_cum',
+    ];
+    return {
+      khoa,
+      columns,
+      thuTuHopLe: new Set(khoa.giai_doan.map((g) => g.thu_tu)),
+    };
+  }
+
+  // Ghi chú ô tiêu đề mẫu phân lớp: quy ước ô + gợi ý lớp có buổi trong
+  // từng giai đoạn.
+  private async ghiChuCotPhanLop(khoa: {
+    id: string;
+    giai_doan: { id: string; thu_tu: number; ten_giai_doan: string }[];
+  }): Promise<Record<string, string>> {
+    const notes = this.getColumnNotes('phan_lop_hoc_vien');
+    for (const gd of khoa.giai_doan) {
+      const lops = await this.prisma.lop_hoc.findMany({
+        where: {
+          khoa_id: khoa.id,
+          lich_hoc: { some: { giai_doan_id: gd.id } },
+        },
+        select: { ten_lop: true },
+        orderBy: { ten_lop: 'asc' },
+      });
+      const goiY = lops.length
+        ? `Lớp có buổi trong giai đoạn này: ${lops.map((l) => l.ten_lop).join(', ')}.`
+        : 'Chưa có lớp nào có buổi trong giai đoạn này.';
+      notes[tieuDeCotGiaiDoan(gd)] =
+        `Ô trống = giữ nguyên lớp hiện có; "-" = gỡ khỏi lớp của giai đoạn; tên lớp = gán/thay. ${goiY}`;
+    }
+    return notes;
   }
 
   async taoImport(
@@ -106,12 +178,26 @@ export class ImportService {
         { field: 'file', message: 'Bắt buộc' },
       ]);
     }
-    const columns = this.getColumns(loai);
-    const maKhoa = await this.kiemTraMaKhoaMacDinh(columns, maKhoaMacDinh);
+    // phan_lop_hoc_vien: cột sinh theo giai đoạn của khóa, đọc bằng
+    // readPhanLopWorkbook; file lỗi dùng đúng tiêu đề người dùng đã nộp.
+    const phanLop =
+      loai === 'phan_lop_hoc_vien'
+        ? await this.cotPhanLop(maKhoaMacDinh)
+        : undefined;
+    let columns = this.getColumns(loai);
+    const maKhoa = phanLop
+      ? undefined
+      : await this.kiemTraMaKhoaMacDinh(columns, maKhoaMacDinh);
 
     let rows: Awaited<ReturnType<typeof readWorkbookRows>>;
     try {
-      rows = await this.readRows(loai, file.buffer, columns);
+      if (phanLop) {
+        const doc = await readPhanLopWorkbook(file.buffer, phanLop.thuTuHopLe);
+        columns = doc.headers;
+        rows = doc.rows;
+      } else {
+        rows = await this.readRows(loai, file.buffer, columns);
+      }
     } catch (e) {
       await this.prisma.nhat_ky_import.create({
         data: {
@@ -151,6 +237,7 @@ export class ImportService {
         loai,
         apDung.values,
         dupKeys,
+        phanLop?.khoa,
       );
       if (error || !dto) {
         danhSachLoi.push({
@@ -173,7 +260,7 @@ export class ImportService {
       danh_sach_loi: danhSachLoi,
       dong_hop_le: dongHopLe,
       danh_sach_canh_bao: danhSachCanhBao,
-      ma_khoa_mac_dinh: maKhoa,
+      ma_khoa_mac_dinh: phanLop?.khoa.ma_khoa ?? maKhoa,
     });
     if (danhSachLoi.length > 0) {
       const rowsByDong = new Map(rows.map((r) => [r.dong, r.values]));
@@ -181,7 +268,12 @@ export class ImportService {
         columns,
         danhSachLoi.map((l) => ({
           dong: l.dong,
-          values: this.redactChoFileLoi(loai, rowsByDong.get(l.dong) ?? {}),
+          values: this.redactChoFileLoi(
+            loai,
+            phanLop
+              ? valuesTheoTieuDe(columns, rowsByDong.get(l.dong) ?? {})
+              : (rowsByDong.get(l.dong) ?? {}),
+          ),
           ly_do: l.ly_do,
         })),
       );
@@ -263,9 +355,20 @@ export class ImportService {
       );
     }
 
-    const columns = this.getColumns(loai);
+    let columns = this.getColumns(loai);
     const fileGoc = await docFileGoc(id);
-    const rows = await this.readRows(loai, fileGoc, columns);
+    const phanLop =
+      loai === 'phan_lop_hoc_vien'
+        ? await this.cotPhanLop(ketQuaCu.ma_khoa_mac_dinh)
+        : undefined;
+    let rows: Awaited<ReturnType<typeof readWorkbookRows>>;
+    if (phanLop) {
+      const doc = await readPhanLopWorkbook(fileGoc, phanLop.thuTuHopLe);
+      columns = doc.headers;
+      rows = doc.rows;
+    } else {
+      rows = await this.readRows(loai, fileGoc, columns);
+    }
     const rowsByDong = new Map(rows.map((r) => [r.dong, r.values]));
 
     const danhSachLoiMoi = [...ketQuaCu.danh_sach_loi];
@@ -289,13 +392,18 @@ export class ImportService {
       }
       const apDung = this.apDungMaKhoaMacDinh(
         values,
-        ketQuaCu.ma_khoa_mac_dinh,
+        phanLop ? undefined : ketQuaCu.ma_khoa_mac_dinh,
       );
       if ('error' in apDung) {
         danhSachLoiMoi.push({ dong, ly_do: apDung.error });
         continue;
       }
-      const { dto, error } = await this.buildDto(loai, apDung.values, dupKeys);
+      const { dto, error } = await this.buildDto(
+        loai,
+        apDung.values,
+        dupKeys,
+        phanLop?.khoa,
+      );
       if (error || !dto) {
         danhSachLoiMoi.push({
           dong,
@@ -329,7 +437,12 @@ export class ImportService {
         columns,
         danhSachLoiMoi.map((l) => ({
           dong: l.dong,
-          values: this.redactChoFileLoi(loai, rowsByDong.get(l.dong) ?? {}),
+          values: this.redactChoFileLoi(
+            loai,
+            phanLop
+              ? valuesTheoTieuDe(columns, rowsByDong.get(l.dong) ?? {})
+              : (rowsByDong.get(l.dong) ?? {}),
+          ),
           ly_do: l.ly_do,
         })),
       );
@@ -402,25 +515,9 @@ export class ImportService {
       case 'mon_hoc':
         return ['ten_mon', 'cap_hoc'];
       case 'phan_lop_hoc_vien':
-        // Nguyên văn cột theo docs/api-contract.md mục 5, ghi chú riêng cho
-        // phan_lop_hoc_vien. ten_lop TÙY CHỌN (đã sửa 2026-09-25) — để trống
-        // = chỉ ghi danh, có giá trị = ghi danh + phân lớp trực tiếp.
-        // ma_dinh_danh_moet thêm ở T3 (mo-rong-nls-an-giang.md, QĐ1) — cả 2
-        // mã định danh đều TÙY CHỌN theo nghĩa từng cột nhưng phải có ÍT
-        // NHẤT 1 (dùng chung HocVienResolver). ten_lop_zoom/ten_lop_vle/
-        // ten_cum thêm ở QĐ10 (2026-09-30) — TÙY CHỌN, độc lập với ten_lop và
-        // với nhau (xem KhoaBoiDuongService.resolvePhanLopRow). ten_lop giữ
-        // NGUYÊN tên cột cũ (không đổi thành ten_lop_truc_tiep) để không vỡ
-        // file mẫu/thói quen nhập liệu đang dùng.
-        return [
-          'so_dinh_danh_ca_nhan',
-          'ma_dinh_danh_moet',
-          'ma_khoa',
-          'ten_lop',
-          'ten_lop_zoom',
-          'ten_lop_vle',
-          'ten_cum',
-        ];
+        // Phân lớp theo giai đoạn (spec 2026-10-02): chỉ là các cột CỐ ĐỊNH —
+        // cột "GĐ<n> - <tên>" sinh theo giai đoạn của khóa, xem cotPhanLop().
+        return ['so_dinh_danh_ca_nhan', 'ma_dinh_danh_moet', 'ten_cum'];
       case 'ho_so_nhan_su_moet':
         // Nguyên văn cột theo docs/api-contract.md mục 2 "Luồng import nhân
         // sự từ CSDL MOET". "Mã đơn vị" thêm ở T4 (mo-rong-nls-an-giang.md) —
@@ -600,14 +697,8 @@ export class ImportService {
         so_dinh_danh_ca_nhan:
           'Tùy chọn — phải có ít nhất 1 trong 2 cột so_dinh_danh_ca_nhan/ma_dinh_danh_moet để xác định học viên. Có cả 2 thì phải trỏ cùng 1 hồ sơ.',
         ma_dinh_danh_moet: 'Tùy chọn — xem ghi chú cột so_dinh_danh_ca_nhan.',
-        ten_lop:
-          'Tùy chọn — tên lớp TRỰC TIẾP. Để trống nếu chỉ muốn ghi danh vào khóa, chưa phân lớp. Có thể chạy lại import sau với ten_lop để phân lớp cho học viên đã ghi danh.',
-        ten_lop_zoom:
-          'Tùy chọn — tên lớp ZOOM, độc lập hoàn toàn với ten_lop (trực tiếp). Để trống nếu học viên không thuộc lớp zoom nào.',
-        ten_lop_vle:
-          'Tùy chọn — tên lớp VLE, độc lập hoàn toàn với ten_lop/ten_lop_zoom. Để trống nếu học viên không thuộc lớp vle nào.',
         ten_cum:
-          'Tùy chọn — tên cụm học viên (nhóm Zalo hỗ trợ), độc lập với cả 3 cột lớp ở trên. Để trống nếu chưa gán cụm.',
+          'Tùy chọn — tên cụm học viên (nhóm Zalo hỗ trợ). Để trống = giữ nguyên cụm hiện có.',
       };
     }
     if (loai === 'ho_so_nhan_su_moet') {
@@ -711,6 +802,7 @@ export class ImportService {
     loai: SupportedImportType,
     raw: Record<string, string>,
     dupKeys?: Set<string>,
+    khoaPhanLop?: { id: string; ma_khoa: string },
   ): Promise<
     RowBuildResult<
       | CreateDiaDanhDto
@@ -737,15 +829,14 @@ export class ImportService {
           cap_hoc: raw.cap_hoc,
         });
       case 'phan_lop_hoc_vien':
-        return this.khoaBoiDuongService.resolvePhanLopRow({
-          so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
-          ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
-          ma_khoa: raw.ma_khoa,
-          ten_lop: raw.ten_lop,
-          ten_lop_zoom: raw.ten_lop_zoom,
-          ten_lop_vle: raw.ten_lop_vle,
-          ten_cum: raw.ten_cum,
-        });
+        if (!khoaPhanLop) {
+          return { error: 'Thiếu khóa (ma_khoa) cho import phân lớp' };
+        }
+        return this.khoaBoiDuongService.resolvePhanLopRow(
+          raw,
+          khoaPhanLop,
+          dupKeys,
+        );
       case 'ho_so_nhan_su_moet':
         return this.buildHoSoMoetDto(raw);
       case 'tai_khoan_vle':

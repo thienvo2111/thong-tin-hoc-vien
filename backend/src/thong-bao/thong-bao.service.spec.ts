@@ -221,14 +221,14 @@ describe('ThongBaoService', () => {
     });
   });
 
-  describe('guiDangKyHocPhanLop', () => {
-    it('dang_ky_hoc_lop rỗng (chưa gán lớp trực tiếp) -> bỏ qua (không được gọi cho nhánh chỉ ghi danh)', async () => {
+  describe('guiDangKyHocPhanLop (phân lớp theo giai đoạn)', () => {
+    it('chưa gán lớp nào -> bỏ qua (không được gọi cho nhánh chỉ ghi danh)', async () => {
       prisma.dang_ky_hoc.findUnique.mockResolvedValue({
         id: 'dk-1',
         hoc_vien_id: 'hv-1',
         hoc_vien: hocVienDayDu,
-        khoa: { ten_khoa: 'Khóa A' },
-        dang_ky_hoc_lop: [],
+        khoa: { ten_khoa: 'Khóa A', giai_doan: [] },
+        phan_lop_giai_doan: [],
       });
       const res = await service.guiDangKyHocPhanLop('dk-1');
       expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
@@ -254,47 +254,62 @@ describe('ThongBaoService', () => {
       },
     ];
     const lopTrucTiep = {
+      id: 'lop-1',
       loai_lop: 'truc_tiep',
-      lop: {
-        ten_lop: 'Lớp 1',
-        nhan_su: [
-          { ho_ten: 'GV B', vai_tro: 'giang_vien', so_dien_thoai: null },
-        ],
-        lich_hoc: [
-          {
-            giai_doan_id: 'gd-1',
-            buoi_so: 1,
-            thoi_gian_bat_dau: new Date('2026-01-02T00:30:00Z'),
-            thoi_gian_ket_thuc: new Date('2026-01-02T04:00:00Z'),
-            dia_diem_hoac_link: 'Hội trường',
-          },
-        ],
-      },
+      ten_lop: 'Lớp 1',
+      nhan_su: [{ ho_ten: 'GV B', vai_tro: 'giang_vien', so_dien_thoai: null }],
+      lich_hoc: [
+        {
+          giai_doan_id: 'gd-1',
+          buoi_so: 1,
+          thoi_gian_bat_dau: new Date('2026-01-02T00:30:00Z'),
+          thoi_gian_ket_thuc: new Date('2026-01-02T04:00:00Z'),
+          dia_diem_hoac_link: 'Hội trường',
+        },
+      ],
     };
     const lopZoom = {
+      id: 'lop-zoom',
       loai_lop: 'zoom',
-      lop: {
-        ten_lop: 'Zoom 3',
-        nhan_su: [],
-        lich_hoc: [
-          {
-            giai_doan_id: 'gd-1',
-            buoi_so: 2,
-            thoi_gian_bat_dau: new Date('2026-01-02T12:00:00Z'),
-            thoi_gian_ket_thuc: new Date('2026-01-02T14:00:00Z'),
-            dia_diem_hoac_link: 'https://zoom.us/j/123',
-          },
-        ],
-      },
+      ten_lop: 'Zoom 3',
+      nhan_su: [],
+      lich_hoc: [
+        {
+          giai_doan_id: 'gd-2',
+          buoi_so: 1,
+          thoi_gian_bat_dau: new Date('2026-02-02T12:00:00Z'),
+          thoi_gian_ket_thuc: new Date('2026-02-02T14:00:00Z'),
+          dia_diem_hoac_link: 'https://zoom.us/j/123',
+        },
+        {
+          // buổi của lớp ở GĐ1 — học viên học lớp trực tiếp ở GĐ1, KHÔNG
+          // được gán lớp Zoom này ở GĐ1
+          giai_doan_id: 'gd-1',
+          buoi_so: 1,
+          thoi_gian_bat_dau: new Date('2026-01-02T12:00:00Z'),
+          thoi_gian_ket_thuc: new Date('2026-01-02T14:00:00Z'),
+          dia_diem_hoac_link: 'https://zoom.us/j/khong-duoc-gan',
+        },
+      ],
     };
+    const gan = (giai_doan_id: string, lop: { id: string }) => ({
+      giai_doan_id,
+      lop_id: lop.id,
+      lop,
+    });
 
-    it('có lớp trực tiếp -> enqueue lịch học MỌI lớp, gom theo giai đoạn', async () => {
+    it('có lớp trực tiếp -> enqueue lịch học mọi lớp được gán, gom theo giai đoạn; buổi ở GĐ không được gán bị loại', async () => {
       prisma.dang_ky_hoc.findUnique.mockResolvedValue({
         id: 'dk-1',
         hoc_vien_id: 'hv-1',
         hoc_vien: hocVienDayDu,
         khoa: { ten_khoa: 'Khóa A', ma_khoa: 'KA', giai_doan: giaiDoanKhoa },
-        dang_ky_hoc_lop: [lopZoom, lopTrucTiep],
+        // Cùng lớp Zoom gán ở 2 GĐ -> chỉ liệt kê lớp 1 lần.
+        phan_lop_giai_doan: [
+          gan('gd-1', lopTrucTiep),
+          gan('gd-2', lopZoom),
+          gan('gd-3', lopZoom),
+        ],
       });
       const res = await service.guiDangKyHocPhanLop('dk-1');
       const data = prisma.hang_doi_email.create.mock.calls[0][0].data;
@@ -302,8 +317,9 @@ describe('ThongBaoService', () => {
       expect(data.tieu_de).toBe('[BDNLS] Lịch học khóa Khóa A');
       expect(data.noi_dung_html).toContain('GV B');
       expect(data.noi_dung_html).toContain('Lớp 1');
-      expect(data.noi_dung_html).toContain('Zoom 3');
+      expect(data.noi_dung_html.match(/Zoom 3/g)).toHaveLength(1);
       expect(data.noi_dung_html).toContain('https://zoom.us/j/123');
+      expect(data.noi_dung_html).not.toContain('khong-duoc-gan');
       // 00:30Z = 07:30 giờ Việt Nam
       expect(data.noi_dung_html).toContain('07:30 – 11:00');
       expect(data.noi_dung_html).toContain('GĐ 2 chưa có lịch');
@@ -316,7 +332,7 @@ describe('ThongBaoService', () => {
         hoc_vien_id: 'hv-1',
         hoc_vien: hocVienDayDu,
         khoa: { ten_khoa: 'Khóa A', ma_khoa: 'KA', giai_doan: giaiDoanKhoa },
-        dang_ky_hoc_lop: [lopZoom],
+        phan_lop_giai_doan: [gan('gd-2', lopZoom)],
       });
       const res = await service.guiDangKyHocPhanLop('dk-1');
       expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
@@ -331,13 +347,8 @@ describe('ThongBaoService', () => {
         id: 'dk-1',
         hoc_vien_id: 'hv-1',
         hoc_vien: { ...hocVienDayDu, email_lien_he: null },
-        khoa: { ten_khoa: 'Khóa A' },
-        dang_ky_hoc_lop: [
-          {
-            loai_lop: 'truc_tiep',
-            lop: { ten_lop: 'Lớp 1', nhan_su: [], lich_hoc: [] },
-          },
-        ],
+        khoa: { ten_khoa: 'Khóa A', giai_doan: [] },
+        phan_lop_giai_doan: [gan('gd-1', lopTrucTiep)],
       });
       const res = await service.guiDangKyHocPhanLop('dk-1');
       expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();

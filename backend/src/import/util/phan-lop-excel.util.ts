@@ -104,3 +104,17 @@ export async function readPhanLopWorkbook(
   });
   return { headers: headers.filter(Boolean), rows };
 }
+
+// File lỗi re-export dòng gốc theo đúng tiêu đề người dùng đã nộp: đổi key
+// "gd:<n>" ngược về tiêu đề cột giai đoạn tương ứng.
+export function valuesTheoTieuDe(
+  headers: string[],
+  values: Record<string, string>,
+): Record<string, string> {
+  const kq: Record<string, string> = {};
+  for (const h of headers) {
+    const thuTu = parseThuTuCotGiaiDoan(h);
+    kq[h] = values[thuTu !== null ? `gd:${thuTu}` : h.toLowerCase()] ?? '';
+  }
+  return kq;
+}

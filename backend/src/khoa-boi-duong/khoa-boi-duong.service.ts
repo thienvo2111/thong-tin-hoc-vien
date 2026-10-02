@@ -1369,38 +1369,20 @@ export class KhoaBoiDuongService {
   }
 
   // ---------------------------------------------------------------------
-  // Import phan_lop_hoc_vien (gọi từ ImportService) — cột file:
-  // so_dinh_danh_ca_nhan, ma_dinh_danh_moet (cả 2 TÙY CHỌN — T3, xem
-  // resolveHocVienImportRow), ma_khoa, ten_lop (ten_lop TÙY CHỌN). Đây là CƠ
-  // CHẾ DUY NHẤT gán dang_ky_hoc.khoa_id/lop_id — không có ghi danh/tự động
-  // nào khác (đã sửa 2026-09-25, xem docs/api-contract.md mục 5 và
-  // validation-checklist.md #45: trước đó có một hook tự tạo dang_ky_hoc khi
-  // hồ sơ học viên da_duyet, nhưng không có cơ sở để biết tự động ghi danh
-  // vào khóa nào — đã bỏ, không thay bằng suy đoán khác).
-  //
-  // ten_lop để trống -> chỉ ghi danh (lop_id=NULL, trang_thai=da_duyet); có
-  // giá trị -> ghi danh + phân lớp luôn (lop_id, trang_thai=da_phan_lop). Cho
-  // phép chạy import 2 lần: ghi danh trước (ten_lop trống), phân lớp sau
-  // (chạy lại với ten_lop có giá trị cho học viên đã ghi danh).
-  //
-  // T3 (QĐ1, mo-rong-nls-an-giang.md): trước đây chỉ nhận
-  // so_dinh_danh_ca_nhan (CCCD) -> học viên import_moet chưa có CCCD (đa số,
-  // xem T4) không ghi danh được. Nay dùng resolveHocVienImportRow (mục 2 quy
-  // tắc #3) để nhận diện qua ma_dinh_danh_moet, gỡ bỏ chặn đó — "hồ sơ đầy
-  // đủ" không còn là điều kiện ghi danh (chuyển sang cổng đánh giá T15 + cấp
-  // chứng nhận T13, xem checklist #36d). Check trang_thai='da_duyet' dưới đây
-  // GIỮ NGUYÊN — đó là trạng thái duyệt hồ sơ (workflow), không phải "đầy đủ
-  // dữ liệu", và với import_moet luôn da_duyet ngay từ lúc import.
+  // Import phan_lop_hoc_vien theo giai đoạn (gọi từ ImportService — spec
+  // 2026-10-02-phan-lop-theo-giai-doan mục 4). raw gồm so_dinh_danh_ca_nhan,
+  // ma_dinh_danh_moet, ten_cum và key "gd:<thu_tu>" cho mỗi cột giai đoạn có
+  // trong file. Ô trống = giữ nguyên; "-" = gỡ; tên lớp = gán/thay. Tên lớp
+  // tra trong cả khóa (không theo loại) — trùng tên giữa các loại lớp là lỗi,
+  // buộc đổi tên để không phải đoán. Đây vẫn là cơ chế DUY NHẤT tạo
+  // dang_ky_hoc (ghi danh) — xem validation-checklist.md #45. Check
+  // trang_thai='da_duyet' của hồ sơ giữ nguyên như trước (T3).
   // ---------------------------------------------------------------------
-  async resolvePhanLopRow(raw: {
-    so_dinh_danh_ca_nhan?: string;
-    ma_dinh_danh_moet?: string;
-    ma_khoa?: string;
-    ten_lop?: string;
-    ten_lop_zoom?: string;
-    ten_lop_vle?: string;
-    ten_cum?: string;
-  }): Promise<RowBuildResult<PhanLopHocVienRowDto>> {
+  async resolvePhanLopRow(
+    raw: Record<string, string>,
+    khoa: { id: string; ma_khoa: string },
+    dupKeys?: Set<string>,
+  ): Promise<RowBuildResult<PhanLopHocVienRowDto>> {
     const resolved = await resolveHocVienImportRow(this.prisma, {
       so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
       ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
@@ -1409,78 +1391,55 @@ export class KhoaBoiDuongService {
       return { error: resolved.error ?? 'Không xác định được học viên' };
     }
     const hocVien = resolved.hocVien;
+    const ma =
+      raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim() || '';
     if (hocVien.trang_thai !== 'da_duyet') {
-      const ma =
-        raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
       return {
         error: `Học viên "${ma}" chưa được duyệt (trang_thai hiện tại: "${hocVien.trang_thai}")`,
       };
     }
-
-    const maKhoa = raw.ma_khoa?.trim();
-    if (!maKhoa) {
-      return { error: 'Thiếu cột "ma_khoa"' };
-    }
-    const khoa = await this.prisma.khoa_boi_duong.findUnique({
-      where: { ma_khoa: maKhoa },
-    });
-    if (!khoa) {
-      return { error: `Khóa "${maKhoa}" không tồn tại` };
-    }
-
-    const ma =
-      raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
-
-    // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): 3 cột lớp độc lập nhau, mỗi
-    // cột tùy chọn. T6 (QĐ3/QĐ4): lop_hoc.muc_nang_luc khác
-    // dang_ky_hoc.muc_dau_vao -> cảnh báo 🟡, KHÔNG chặn dòng — áp dụng cho
-    // CẢ 3 loại lớp (trước đây chỉ áp dụng cho lớp trực tiếp).
-    const canhBaoList: string[] = [];
-    const resolveLop = async (
-      tenLopRaw: string | undefined,
-      loaiLop: loai_lop_hoc,
-      nhanLoai: string,
-    ): Promise<{ lopId?: string; error?: string }> => {
-      const tenLop = tenLopRaw?.trim();
-      if (!tenLop) return {};
-      const lop = await this.prisma.lop_hoc.findUnique({
-        where: {
-          khoa_id_loai_lop_ten_lop: {
-            khoa_id: khoa.id,
-            loai_lop: loaiLop,
-            ten_lop: tenLop,
-          },
-        },
-      });
-      if (!lop) {
+    if (dupKeys) {
+      if (dupKeys.has(hocVien.id)) {
         return {
-          error: `Không tìm thấy lớp ${nhanLoai} "${tenLop}" trong khóa "${maKhoa}"`,
+          error: `Dòng trùng học viên "${ma}" với dòng khác trong cùng file`,
         };
       }
-      if (lop.muc_nang_luc) {
-        const dangKyHienTai = await this.prisma.dang_ky_hoc.findUnique({
-          where: {
-            hoc_vien_id_khoa_id: { hoc_vien_id: hocVien.id, khoa_id: khoa.id },
-          },
-        });
-        if (
-          dangKyHienTai?.muc_dau_vao &&
-          dangKyHienTai.muc_dau_vao !== lop.muc_nang_luc
-        ) {
-          canhBaoList.push(
-            `Học viên "${ma}" có mức đầu vào "${dangKyHienTai.muc_dau_vao}" khác mức năng lực "${lop.muc_nang_luc}" của lớp ${nhanLoai} "${tenLop}" — kiểm tra lại phân lớp`,
-          );
-        }
-      }
-      return { lopId: lop.id };
-    };
+      dupKeys.add(hocVien.id);
+    }
 
-    const tt = await resolveLop(raw.ten_lop, 'truc_tiep', 'trực tiếp');
-    if (tt.error) return { error: tt.error };
-    const zoom = await resolveLop(raw.ten_lop_zoom, 'zoom', 'Zoom');
-    if (zoom.error) return { error: zoom.error };
-    const vle = await resolveLop(raw.ten_lop_vle, 'vle', 'VLE');
-    if (vle.error) return { error: vle.error };
+    const giaiDoanList = await this.prisma.giai_doan_khoa.findMany({
+      where: { khoa_id: khoa.id, trang_thai: 'active' },
+      orderBy: { thu_tu: 'asc' },
+    });
+    const gan: { giai_doan_id: string; lop_id: string | null }[] = [];
+    const canhBaoList: string[] = [];
+    for (const gd of giaiDoanList) {
+      const o = raw[`gd:${gd.thu_tu}`]?.trim();
+      if (!o) continue;
+      if (o === '-') {
+        gan.push({ giai_doan_id: gd.id, lop_id: null });
+        continue;
+      }
+      const lops = await this.prisma.lop_hoc.findMany({
+        where: { khoa_id: khoa.id, ten_lop: normalizeNfcName(o) },
+      });
+      if (lops.length === 0) {
+        return {
+          error: `GĐ${gd.thu_tu}: lớp "${o}" không tồn tại trong khóa "${khoa.ma_khoa}"`,
+        };
+      }
+      if (lops.length > 1) {
+        return {
+          error: `GĐ${gd.thu_tu}: tên lớp "${o}" có ở nhiều loại lớp (${lops.map((l) => l.loai_lop).join(', ')}) — đổi tên lớp cho khác nhau`,
+        };
+      }
+      const lop = lops[0];
+      gan.push({ giai_doan_id: gd.id, lop_id: lop.id });
+      const cb = await this.canhBaoGanLopGiaiDoan(lop, gd);
+      if (cb) canhBaoList.push(cb);
+      const mucCb = await this.canhBaoMucNangLuc(hocVien.id, khoa.id, lop, ma);
+      if (mucCb) canhBaoList.push(mucCb);
+    }
 
     let cumId: string | undefined;
     const tenCum = raw.ten_cum?.trim();
@@ -1490,54 +1449,56 @@ export class KhoaBoiDuongService {
       });
       if (!cum) {
         return {
-          error: `Không tìm thấy cụm học viên "${tenCum}" trong khóa "${maKhoa}"`,
+          error: `Không tìm thấy cụm học viên "${tenCum}" trong khóa "${khoa.ma_khoa}"`,
         };
       }
       cumId = cum.id;
     }
 
     return {
-      dto: {
-        hoc_vien_id: hocVien.id,
-        khoa_id: khoa.id,
-        lop_truc_tiep_id: tt.lopId,
-        lop_zoom_id: zoom.lopId,
-        lop_vle_id: vle.lopId,
-        cum_id: cumId,
-      },
+      dto: { hoc_vien_id: hocVien.id, khoa_id: khoa.id, cum_id: cumId, gan },
       canhBao: canhBaoList.length ? canhBaoList.join('; ') : undefined,
     };
   }
 
-  // Không cần bước checkValid riêng: resolvePhanLopRow() (buildDto) đã tra
-  // cứu/validate toàn bộ FK + trạng thái hồ sơ; commitPhanLop() là upsert nên
-  // không còn ràng buộc "phải có dang_ky_hoc từ trước" để kiểm tra thêm.
+  // T6 (QĐ3/QĐ4), giữ nguyên ý nghĩa cũ: mức năng lực của lớp khác mức đầu
+  // vào của học viên -> cảnh báo 🟡, KHÔNG chặn dòng.
+  private async canhBaoMucNangLuc(
+    hocVienId: string,
+    khoaId: string,
+    lop: { ten_lop: string; muc_nang_luc: muc_nang_luc | null },
+    ma: string,
+  ): Promise<string | undefined> {
+    if (!lop.muc_nang_luc) return undefined;
+    const dk = await this.prisma.dang_ky_hoc.findUnique({
+      where: {
+        hoc_vien_id_khoa_id: { hoc_vien_id: hocVienId, khoa_id: khoaId },
+      },
+    });
+    if (dk?.muc_dau_vao && dk.muc_dau_vao !== lop.muc_nang_luc) {
+      return `Học viên "${ma}" có mức đầu vào "${dk.muc_dau_vao}" khác mức năng lực "${lop.muc_nang_luc}" của lớp "${lop.ten_lop}" — kiểm tra lại phân lớp`;
+    }
+    return undefined;
+  }
+
+  // Ghi danh (upsert dang_ky_hoc) + áp từng gán theo giai đoạn. Gán ≥ 1 lớp
+  // -> da_phan_lop; gỡ KHÔNG đổi trạng thái; dòng chỉ ghi danh/gán cụm giữ
+  // hành vi cũ (không hạ cấp trạng thái, mặc định da_duyet khi tạo mới).
   //
-  // Trả về hocVienChuaCoEmail để ImportService đếm
-  // so_hoc_vien_chua_co_email (T3, QĐ6) trên GET /import/{id} — CHỈ nhánh
-  // gán lớp TRỰC TIẾP mới có ý nghĩa (giữ nguyên hành vi cũ — email phân lớp
-  // chỉ gắn với lớp trực tiếp, chưa mở rộng sang zoom/vle ở lượt này).
+  // Trả về hocVienChuaCoEmail để ImportService đếm so_hoc_vien_chua_co_email
+  // (T3, QĐ6). Email dang_ky_hoc_phan_lop chỉ khi dòng gán ≥ 1 lớp TRỰC TIẾP
+  // (giữ nguyên trigger cũ).
   async commitPhanLop(
     dto: PhanLopHocVienRowDto,
   ): Promise<{ hocVienChuaCoEmail: boolean }> {
-    const where = {
-      hoc_vien_id_khoa_id: {
-        hoc_vien_id: dto.hoc_vien_id,
-        khoa_id: dto.khoa_id,
-      },
-    };
-    // QĐ10: "đã phân lớp" nay tổng quát hóa thành "đã được gán ÍT NHẤT 1
-    // trong 3 loại lớp" (trước đây chỉ có 1 loại lớp duy nhất nên tương
-    // đương). Dòng chỉ ghi danh/chỉ gán cụm (không gán lớp nào) giữ nguyên
-    // hành vi cũ: không hạ cấp trang_thai đã có, mặc định da_duyet nếu tạo mới.
-    const coGanLop = !!(
-      dto.lop_truc_tiep_id ||
-      dto.lop_zoom_id ||
-      dto.lop_vle_id
-    );
-
+    const coGanLop = dto.gan.some((g) => g.lop_id);
     const dangKy = await this.prisma.dang_ky_hoc.upsert({
-      where,
+      where: {
+        hoc_vien_id_khoa_id: {
+          hoc_vien_id: dto.hoc_vien_id,
+          khoa_id: dto.khoa_id,
+        },
+      },
       create: {
         hoc_vien_id: dto.hoc_vien_id,
         khoa_id: dto.khoa_id,
@@ -1550,32 +1511,36 @@ export class KhoaBoiDuongService {
       },
     });
 
-    const ganLop: Array<{ loai: loai_lop_hoc; lopId: string }> = [];
-    if (dto.lop_truc_tiep_id)
-      ganLop.push({ loai: 'truc_tiep', lopId: dto.lop_truc_tiep_id });
-    if (dto.lop_zoom_id) ganLop.push({ loai: 'zoom', lopId: dto.lop_zoom_id });
-    if (dto.lop_vle_id) ganLop.push({ loai: 'vle', lopId: dto.lop_vle_id });
-
-    for (const g of ganLop) {
-      await this.prisma.dang_ky_hoc_lop.upsert({
+    for (const g of dto.gan) {
+      if (g.lop_id === null) {
+        await this.prisma.phan_lop_giai_doan.deleteMany({
+          where: { dang_ky_hoc_id: dangKy.id, giai_doan_id: g.giai_doan_id },
+        });
+        continue;
+      }
+      await this.prisma.phan_lop_giai_doan.upsert({
         where: {
-          dang_ky_hoc_id_loai_lop: {
+          dang_ky_hoc_id_giai_doan_id: {
             dang_ky_hoc_id: dangKy.id,
-            loai_lop: g.loai,
+            giai_doan_id: g.giai_doan_id,
           },
         },
         create: {
           dang_ky_hoc_id: dangKy.id,
-          lop_id: g.lopId,
-          loai_lop: g.loai,
+          giai_doan_id: g.giai_doan_id,
+          lop_id: g.lop_id,
         },
-        update: { lop_id: g.lopId },
+        update: { lop_id: g.lop_id },
       });
     }
 
-    // Event dang_ky_hoc_phan_lop (docs/api-contract.md mục 8) CHỈ kích hoạt
-    // khi dòng này gán lớp TRỰC TIẾP — giữ nguyên trigger cũ.
-    if (dto.lop_truc_tiep_id) {
+    const lopIds = dto.gan.flatMap((g) => (g.lop_id ? [g.lop_id] : []));
+    const coLopTrucTiep =
+      lopIds.length > 0 &&
+      (await this.prisma.lop_hoc.count({
+        where: { id: { in: lopIds }, loai_lop: 'truc_tiep' },
+      })) > 0;
+    if (coLopTrucTiep) {
       const { chuaCoEmail } = await this.thongBaoService.guiDangKyHocPhanLop(
         dangKy.id,
       );

@@ -1000,6 +1000,17 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         .send({ loai_lop: 'truc_tiep', ten_lop: tenLop })
         .expect(201);
       lopId = lop.body.id;
+      // Phân lớp theo giai đoạn: khóa cần ít nhất 1 giai đoạn (cột GĐ1).
+      await prisma.giai_doan_khoa.create({
+        data: {
+          khoa_id: khoaId,
+          thu_tu: 1,
+          ten_giai_doan: 'Học trực tiếp',
+          hinh_thuc: 'truc_tiep',
+          thoi_gian_bat_dau: new Date('2026-01-01'),
+          thoi_gian_ket_thuc: new Date('2026-12-31'),
+        },
+      });
 
       // Học viên có hồ sơ da_duyet — điều kiện CẦN để được import ghi danh,
       // nhưng KHÔNG tự động có dang_ky_hoc nào (không còn hook rule #52).
@@ -1073,7 +1084,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
 
     it('GET /import/mau-excel?loai=phan_lop_hoc_vien -> đúng 4 cột', async () => {
       const res = await request(app.getHttpServer())
-        .get('/import/mau-excel?loai=phan_lop_hoc_vien')
+        .get(`/import/mau-excel?loai=phan_lop_hoc_vien&ma_khoa=${maKhoa}`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .expect(200);
       expect(res.headers['content-type']).toContain('spreadsheetml');
@@ -1082,24 +1093,21 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     it('ten_lop để trống -> chỉ ghi danh (lop_id=null, trang_thai=da_duyet); các dòng lỗi khác (rule #45)', async () => {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('data');
+      // Mẫu phân lớp theo giai đoạn (spec 2026-10-02): mỗi giai đoạn 1 cột.
       sheet.addRow([
         'so_dinh_danh_ca_nhan',
         'ma_dinh_danh_moet',
-        'ma_khoa',
-        'ten_lop',
-        'ten_lop_zoom',
-        'ten_lop_vle',
+        'GĐ1',
         'ten_cum',
       ]);
-      sheet.addRow([sddDaDuyet, '', maKhoa, '', '', '', '']); // hợp lệ — chỉ ghi danh
-      sheet.addRow(['000000000000', '', maKhoa, '', '', '', '']); // ĐDCN không tồn tại
-      sheet.addRow([sddChuaDuyet, '', maKhoa, '', '', '', '']); // hồ sơ chưa được duyệt
-      sheet.addRow([sddDaDuyet, '', 'KHONG-TON-TAI', '', '', '', '']); // khóa không tồn tại
-      sheet.addRow([sddDaDuyet, '', maKhoa, 'Lớp không tồn tại', '', '', '']); // lớp không tồn tại trong khóa
+      sheet.addRow([sddDaDuyet, '', '', '']); // hợp lệ — chỉ ghi danh
+      sheet.addRow(['000000000000', '', '', '']); // ĐDCN không tồn tại
+      sheet.addRow([sddChuaDuyet, '', '', '']); // hồ sơ chưa được duyệt
+      sheet.addRow([sddDaDuyet, '', 'Lớp không tồn tại', '']); // trùng học viên dòng 2 (spec 4.4)
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
-        .post('/import/phan_lop_hoc_vien')
+        .post(`/import/phan_lop_hoc_vien?ma_khoa=${maKhoa}`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .attach('file', buffer, 'phan-lop-1.xlsx')
         .expect(201);
@@ -1110,16 +1118,16 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         .get(`/import/${importId}`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .expect(200);
-      expect(ketQua.body.tong_so_dong).toBe(5);
+      expect(ketQua.body.tong_so_dong).toBe(4);
       expect(ketQua.body.so_dong_thanh_cong).toBe(1);
-      expect(ketQua.body.so_dong_loi).toBe(4);
+      expect(ketQua.body.so_dong_loi).toBe(3);
 
       const xacNhan = await request(app.getHttpServer())
         .post(`/import/${importId}/xac-nhan`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .expect(201);
       expect(xacNhan.body.so_dong_thanh_cong).toBe(1);
-      expect(xacNhan.body.so_dong_loi).toBe(4);
+      expect(xacNhan.body.so_dong_loi).toBe(3);
 
       const dangKy = await prisma.dang_ky_hoc.findUnique({
         where: {
@@ -1130,13 +1138,13 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         },
       });
       expect(dangKy).not.toBeNull();
-      const lopGan = await prisma.dang_ky_hoc_lop.findMany({
+      const lopGan = await prisma.phan_lop_giai_doan.findMany({
         where: { dang_ky_hoc_id: dangKy!.id },
       });
       expect(lopGan).toHaveLength(0);
       expect(dangKy?.trang_thai).toBe('da_duyet');
 
-      // Nhánh chỉ ghi danh (không có dòng dang_ky_hoc_lop nào) KHÔNG kích hoạt sự kiện
+      // Nhánh chỉ ghi danh (không có dòng phan_lop_giai_doan nào) KHÔNG kích hoạt sự kiện
       // dang_ky_hoc_phan_lop (docs/api-contract.md mục 8). M9: xác nhận
       // KHÔNG enqueue (hang_doi_email) thay vì kiểm tra nhat_ky_thong_bao —
       // event này không bao giờ ghi trực tiếp vào đó nữa.
@@ -1175,20 +1183,18 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     it('chạy lại import lần 2 với ten_lop có giá trị -> phân lớp cho học viên đã ghi danh (lop_id, trang_thai=da_phan_lop)', async () => {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('data');
+      // Mẫu phân lớp theo giai đoạn (spec 2026-10-02): mỗi giai đoạn 1 cột.
       sheet.addRow([
         'so_dinh_danh_ca_nhan',
         'ma_dinh_danh_moet',
-        'ma_khoa',
-        'ten_lop',
-        'ten_lop_zoom',
-        'ten_lop_vle',
+        'GĐ1',
         'ten_cum',
       ]);
-      sheet.addRow([sddDaDuyet, '', maKhoa, tenLop, '', '', '']);
+      sheet.addRow([sddDaDuyet, '', tenLop, '']);
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
-        .post('/import/phan_lop_hoc_vien')
+        .post(`/import/phan_lop_hoc_vien?ma_khoa=${maKhoa}`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .attach('file', buffer, 'phan-lop-2.xlsx')
         .expect(201);
@@ -1208,13 +1214,8 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         },
       });
       expect(dangKy?.trang_thai).toBe('da_phan_lop');
-      const lopGan = await prisma.dang_ky_hoc_lop.findUnique({
-        where: {
-          dang_ky_hoc_id_loai_lop: {
-            dang_ky_hoc_id: dangKy!.id,
-            loai_lop: 'truc_tiep',
-          },
-        },
+      const lopGan = await prisma.phan_lop_giai_doan.findFirst({
+        where: { dang_ky_hoc_id: dangKy!.id },
       });
       expect(lopGan?.lop_id).toBe(lopId);
 
@@ -1273,20 +1274,18 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
 
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('data');
+      // Mẫu phân lớp theo giai đoạn (spec 2026-10-02): mỗi giai đoạn 1 cột.
       sheet.addRow([
         'so_dinh_danh_ca_nhan',
         'ma_dinh_danh_moet',
-        'ma_khoa',
-        'ten_lop',
-        'ten_lop_zoom',
-        'ten_lop_vle',
+        'GĐ1',
         'ten_cum',
       ]);
-      sheet.addRow([sddMoi, '', maKhoa, tenLop, '', '', '']);
+      sheet.addRow([sddMoi, '', tenLop, '']);
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
-        .post('/import/phan_lop_hoc_vien')
+        .post(`/import/phan_lop_hoc_vien?ma_khoa=${maKhoa}`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .attach('file', buffer, 'phan-lop-3.xlsx')
         .expect(201);
@@ -1304,13 +1303,8 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       });
       expect(dangKy).not.toBeNull();
       expect(dangKy?.trang_thai).toBe('da_phan_lop');
-      const lopGan = await prisma.dang_ky_hoc_lop.findUnique({
-        where: {
-          dang_ky_hoc_id_loai_lop: {
-            dang_ky_hoc_id: dangKy!.id,
-            loai_lop: 'truc_tiep',
-          },
-        },
+      const lopGan = await prisma.phan_lop_giai_doan.findFirst({
+        where: { dang_ky_hoc_id: dangKy!.id },
       });
       expect(lopGan?.lop_id).toBe(lopId);
 
@@ -1356,6 +1350,16 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       await prisma.lop_hoc.create({
         data: { khoa_id: khoaId, loai_lop: 'truc_tiep', ten_lop: tenLop },
       });
+      await prisma.giai_doan_khoa.create({
+        data: {
+          khoa_id: khoaId,
+          thu_tu: 1,
+          ten_giai_doan: 'Học trực tiếp',
+          hinh_thuc: 'truc_tiep',
+          thoi_gian_bat_dau: new Date('2026-01-01'),
+          thoi_gian_ket_thuc: new Date('2026-01-31'),
+        },
+      });
     });
 
     function hocVienMoetTrucTiep(overrides: Record<string, unknown> = {}) {
@@ -1390,20 +1394,18 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
 
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('data');
+      // Mẫu phân lớp theo giai đoạn (spec 2026-10-02): mỗi giai đoạn 1 cột.
       sheet.addRow([
         'so_dinh_danh_ca_nhan',
         'ma_dinh_danh_moet',
-        'ma_khoa',
-        'ten_lop',
-        'ten_lop_zoom',
-        'ten_lop_vle',
+        'GĐ1',
         'ten_cum',
       ]);
-      sheet.addRow(['', maMoet, maKhoa, '', '', '', '']);
+      sheet.addRow(['', maMoet, '', '']);
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
-        .post('/import/phan_lop_hoc_vien')
+        .post(`/import/phan_lop_hoc_vien?ma_khoa=${maKhoa}`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .attach('file', buffer, 'phan-lop-moet-1.xlsx')
         .expect(201);
@@ -1426,7 +1428,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         where: { hoc_vien_id_khoa_id: { hoc_vien_id: hv.id, khoa_id: khoaId } },
       });
       expect(dangKy).not.toBeNull();
-      const lopGan = await prisma.dang_ky_hoc_lop.findMany({
+      const lopGan = await prisma.phan_lop_giai_doan.findMany({
         where: { dang_ky_hoc_id: dangKy!.id },
       });
       expect(lopGan).toHaveLength(0);
@@ -1450,20 +1452,18 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
 
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('data');
+      // Mẫu phân lớp theo giai đoạn (spec 2026-10-02): mỗi giai đoạn 1 cột.
       sheet.addRow([
         'so_dinh_danh_ca_nhan',
         'ma_dinh_danh_moet',
-        'ma_khoa',
-        'ten_lop',
-        'ten_lop_zoom',
-        'ten_lop_vle',
+        'GĐ1',
         'ten_cum',
       ]);
-      sheet.addRow([sddA, moetB, maKhoa, '', '', '', '']); // trỏ 2 hồ sơ khác nhau
+      sheet.addRow([sddA, moetB, '', '']); // trỏ 2 hồ sơ khác nhau
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
-        .post('/import/phan_lop_hoc_vien')
+        .post(`/import/phan_lop_hoc_vien?ma_khoa=${maKhoa}`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .attach('file', buffer, 'phan-lop-moet-2.xlsx')
         .expect(201);
@@ -1510,22 +1510,18 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
 
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('data');
+      // Mẫu phân lớp theo giai đoạn (spec 2026-10-02): mỗi giai đoạn 1 cột.
       sheet.addRow([
         'so_dinh_danh_ca_nhan',
         'ma_dinh_danh_moet',
-        'ma_khoa',
-        'ten_lop',
-        'ten_lop_zoom',
-        'ten_lop_vle',
+        'GĐ1',
         'ten_cum',
       ]);
-      specs.forEach((s) =>
-        sheet.addRow([s.sdd, '', maKhoa, tenLop, '', '', '']),
-      );
+      specs.forEach((s) => sheet.addRow([s.sdd, '', tenLop, '']));
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
-        .post('/import/phan_lop_hoc_vien')
+        .post(`/import/phan_lop_hoc_vien?ma_khoa=${maKhoa}`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .attach('file', buffer, 'phan-lop-moet-bulk.xlsx')
         .expect(201);

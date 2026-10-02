@@ -3,6 +3,7 @@ import {
   parseThuTuCotGiaiDoan,
   readPhanLopWorkbook,
   tieuDeCotGiaiDoan,
+  valuesTheoTieuDe,
 } from './phan-lop-excel.util';
 
 async function xlsx(rows: (string | undefined)[][]): Promise<Buffer> {
@@ -84,5 +85,20 @@ describe('readPhanLopWorkbook', () => {
     await expect(readPhanLopWorkbook(buf, hopLe)).rejects.toMatchObject({
       response: { error: { message: expect.stringContaining(chua) } },
     });
+  });
+});
+
+it('valuesTheoTieuDe: map key gd:<n> và cột cố định về đúng tiêu đề gốc (dùng cho file lỗi)', () => {
+  expect(
+    valuesTheoTieuDe(['ma_dinh_danh_moet', 'GD 2 - tên cũ', 'ten_cum'], {
+      ma_dinh_danh_moet: '0890',
+      'gd:2': 'Lớp zoom 3',
+      ten_cum: '',
+      so_dinh_danh_ca_nhan: '',
+    }),
+  ).toEqual({
+    ma_dinh_danh_moet: '0890',
+    'GD 2 - tên cũ': 'Lớp zoom 3',
+    ten_cum: '',
   });
 });

@@ -578,6 +578,7 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
 
       // Lớp có mức năng lực mục tiêu KHÁC ("nang_cao").
       const tenLop = `Lop-canhbao-${suf}`;
+      await taoGiaiDoan(khoa.id, 1); // cột GĐ1 của mẫu phân lớp theo giai đoạn
       await prisma.lop_hoc.create({
         data: {
           khoa_id: khoa.id,
@@ -589,20 +590,18 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
 
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet('data');
+      // Mẫu phân lớp theo giai đoạn (spec 2026-10-02): mỗi giai đoạn 1 cột.
       sheet.addRow([
         'so_dinh_danh_ca_nhan',
         'ma_dinh_danh_moet',
-        'ma_khoa',
-        'ten_lop',
-        'ten_lop_zoom',
-        'ten_lop_vle',
+        'GĐ1',
         'ten_cum',
       ]);
-      sheet.addRow([undefined, tenDangNhap, khoa.ma_khoa, tenLop, '', '', '']);
+      sheet.addRow([undefined, tenDangNhap, tenLop, '']);
       const bufferPhanLop = Buffer.from(await workbook.xlsx.writeBuffer());
 
       const res = await request(app.getHttpServer())
-        .post('/import/phan_lop_hoc_vien')
+        .post(`/import/phan_lop_hoc_vien?ma_khoa=${khoa.ma_khoa}`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .attach('file', bufferPhanLop, 'phan-lop-canhbao.xlsx')
         .expect(201);
@@ -631,13 +630,8 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         },
       });
       expect(dangKySau?.trang_thai).toBe('da_phan_lop');
-      const lopGan = await prisma.dang_ky_hoc_lop.findUnique({
-        where: {
-          dang_ky_hoc_id_loai_lop: {
-            dang_ky_hoc_id: dangKySau!.id,
-            loai_lop: 'truc_tiep',
-          },
-        },
+      const lopGan = await prisma.phan_lop_giai_doan.findFirst({
+        where: { dang_ky_hoc_id: dangKySau!.id },
       });
       expect(lopGan).not.toBeNull();
     });
