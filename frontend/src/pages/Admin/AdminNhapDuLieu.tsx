@@ -17,6 +17,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { taiFileLoiImport, taiMauExcel, useLichSuImport, useTaiLenImport } from '@/api/nhapDuLieu';
+import { useDanhSachKhoa } from '@/api/khoaBoiDuong';
 import type { LoaiDanhMucImport } from '@/api/types';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { taiFileTuBlob } from '@/lib/taiFile';
@@ -68,12 +69,18 @@ export default function AdminNhapDuLieu() {
   const [loai, setLoai] = useState<LoaiDanhMucImport>('ho_so_nhan_su_moet');
   const [file, setFile] = useState<File | null>(null);
   const [importId, setImportId] = useState<string | undefined>();
+  // Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.5): mẫu + file phân lớp sinh theo giai đoạn của
+  // 1 khóa -> bắt buộc chọn khóa trước khi tải mẫu/tải lên.
+  const [maKhoa, setMaKhoa] = useState<string | null>(null);
+  const canKhoa = loai === 'phan_lop_hoc_vien';
+  const thieuKhoa = canKhoa && !maKhoa;
+  const danhSachKhoa = useDanhSachKhoa({ page_size: 100 });
   const panelRef = useRef<HTMLDivElement>(null);
 
   const upload = useTaiLenImport();
   const lichSu = useLichSuImport();
   const taiMau = useMutation({
-    mutationFn: () => taiMauExcel(loai),
+    mutationFn: () => taiMauExcel(loai, canKhoa ? (maKhoa ?? undefined) : undefined),
     onSuccess: (blob) => taiFileTuBlob(blob, `mau-${loai}.xlsx`),
     onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
   });
@@ -86,7 +93,7 @@ export default function AdminNhapDuLieu() {
   function xuLyTaiLen() {
     if (!file) return;
     upload.mutate(
-      { loai, file },
+      { loai, file, maKhoa: canKhoa ? (maKhoa ?? undefined) : undefined },
       {
         onSuccess: (res) => {
           setImportId(res.import_id);
@@ -128,11 +135,29 @@ export default function AdminNhapDuLieu() {
                 onChange={(v) => setLoai((v as LoaiDanhMucImport) ?? loai)}
                 allowDeselect={false}
               />
+              {canKhoa && (
+                <Select
+                  label="Khóa bồi dưỡng"
+                  placeholder="Chọn khóa"
+                  required
+                  searchable
+                  data={(danhSachKhoa.data?.data ?? []).map((k) => ({ value: k.ma_khoa, label: `${k.ma_khoa} – ${k.ten_khoa}` }))}
+                  value={maKhoa}
+                  onChange={setMaKhoa}
+                />
+              )}
               <FileInput label="File Excel" placeholder="Chọn file .xlsx" accept=".xlsx" value={file} onChange={setFile} clearable />
-              <Button variant="subtle" size="compact-sm" loading={taiMau.isPending} onClick={() => taiMau.mutate()} style={{ alignSelf: 'flex-start' }}>
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                loading={taiMau.isPending}
+                disabled={thieuKhoa}
+                onClick={() => taiMau.mutate()}
+                style={{ alignSelf: 'flex-start' }}
+              >
                 ⇩ Tải file mẫu Excel
               </Button>
-              <Button color="danger" loading={upload.isPending} disabled={!file} onClick={xuLyTaiLen} fullWidth>
+              <Button color="danger" loading={upload.isPending} disabled={!file || thieuKhoa} onClick={xuLyTaiLen} fullWidth>
                 Tải lên &amp; kiểm tra
               </Button>
             </Stack>

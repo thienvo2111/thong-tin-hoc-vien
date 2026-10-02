@@ -15,8 +15,9 @@ function xayQueryString(params: object): string {
   return s ? `?${s}` : '';
 }
 
-export function taiMauExcel(loai: LoaiDanhMucImport) {
-  return apiFetchBlob(`/import/mau-excel?loai=${loai}`);
+/** maKhoa bắt buộc với phan_lop_hoc_vien (mẫu sinh cột theo giai đoạn của khóa). */
+export function taiMauExcel(loai: LoaiDanhMucImport, maKhoa?: string) {
+  return apiFetchBlob(`/import/mau-excel${xayQueryString({ loai, ma_khoa: maKhoa })}`);
 }
 
 /** maKhoa (tùy chọn): import từ trang chi tiết khóa — dòng để trống ma_khoa được gán khóa này, dòng

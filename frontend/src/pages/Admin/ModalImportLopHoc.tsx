@@ -9,14 +9,15 @@ import { thongDiepLoiChung } from '@/lib/loiApi';
 import { taiFileTuBlob } from '@/lib/taiFile';
 import { PanelXemTruocImport } from '@/components/PanelXemTruocImport';
 
-type LoaiImportLop = Extract<LoaiDanhMucImport, 'lop_va_lich_hoc' | 'nhan_su_lop'>;
+type LoaiImportLop = Extract<LoaiDanhMucImport, 'lop_va_lich_hoc' | 'nhan_su_lop' | 'phan_lop_hoc_vien'>;
 
 const TUY_CHON_LOAI: { value: LoaiImportLop; label: string }[] = [
   { value: 'lop_va_lich_hoc', label: 'Lớp & lịch học (mỗi dòng 1 buổi)' },
   { value: 'nhan_su_lop', label: 'Nhân sự lớp' },
+  { value: 'phan_lop_hoc_vien', label: 'Phân lớp học viên' },
 ];
 
-/** Import lớp/lịch học hoặc nhân sự lớp ngay trong trang chi tiết khóa — dùng lại luồng 2 bước của
+/** Import lớp/lịch học, nhân sự lớp hoặc phân lớp học viên ngay trong trang chi tiết khóa — dùng lại luồng 2 bước của
  * /import (tải lên + kiểm tra, rồi xác nhận), gửi kèm ?ma_khoa= để file không cần ghi mã khóa. */
 export function ModalImportLopHoc({
   opened,
@@ -36,7 +37,7 @@ export function ModalImportLopHoc({
 
   const upload = useTaiLenImport();
   const taiMau = useMutation({
-    mutationFn: () => taiMauExcel(loai),
+    mutationFn: () => taiMauExcel(loai, maKhoa),
     onSuccess: (blob) => taiFileTuBlob(blob, `mau-${loai}.xlsx`),
     onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
   });
@@ -75,10 +76,17 @@ export function ModalImportLopHoc({
             onChange={(v) => setLoai(v as LoaiImportLop)}
             fullWidth
           />
-          <Text fz={13} c="dimmed">
-            Cột ma_khoa có thể để trống — hệ thống tự gán khóa <b>{maKhoa}</b>. Dòng ghi khóa khác sẽ bị báo lỗi.
-            {loai === 'nhan_su_lop' && ' Lớp phải được tạo trước.'}
-          </Text>
+          {loai === 'phan_lop_hoc_vien' ? (
+            <Text fz={13} c="dimmed">
+              File dành riêng cho khóa <b>{maKhoa}</b>: mỗi học viên 1 dòng, mỗi giai đoạn 1 cột. Ô trống = giữ
+              nguyên, &quot;-&quot; = gỡ lớp. Tải mẫu mới mỗi khi khóa thêm/bớt giai đoạn.
+            </Text>
+          ) : (
+            <Text fz={13} c="dimmed">
+              Cột ma_khoa có thể để trống — hệ thống tự gán khóa <b>{maKhoa}</b>. Dòng ghi khóa khác sẽ bị báo lỗi.
+              {loai === 'nhan_su_lop' && ' Lớp phải được tạo trước.'}
+            </Text>
+          )}
           <Button
             variant="subtle"
             size="compact-sm"

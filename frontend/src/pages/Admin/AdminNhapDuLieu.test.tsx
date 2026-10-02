@@ -167,6 +167,29 @@ describe('Admin — Nhập dữ liệu', () => {
     expect(new URL(urls[0]).search).toBe('');
   });
 
+  it('loại "Phân lớp học viên": bắt chọn khóa trước khi tải lên; upload gửi ?ma_khoa', async () => {
+    const urls: string[] = [];
+    server.use(
+      http.post('/import/:loai', ({ request }) => {
+        urls.push(request.url);
+        return undefined;
+      }),
+    );
+    const user = userEvent.setup();
+    const { container } = renderTrang();
+    await screen.findByRole('table');
+    await user.click(screen.getByRole('textbox', { name: 'Loại dữ liệu' }));
+    await user.click(await screen.findByRole('option', { name: 'Phân lớp học viên (MOET)' }));
+    await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, new File(['x'], 'pl.xlsx'));
+    expect(screen.getByRole('button', { name: 'Tải lên & kiểm tra' })).toBeDisabled();
+
+    await user.click(screen.getByRole('textbox', { name: /Khóa bồi dưỡng/ }));
+    await user.click(await screen.findByRole('option', { name: /AG-2026-014/ }));
+    await user.click(screen.getByRole('button', { name: 'Tải lên & kiểm tra' }));
+    await screen.findByText('Kết quả kiểm tra');
+    expect(new URL(urls[0]).searchParams.get('ma_khoa')).toBe('AG-2026-014');
+  });
+
   it('giá trị enum lạ (chưa kịp cập nhật nhãn) hiện nguyên giá trị thô, không để trống', () => {
     expect(nhanLoaiImport('gia_tri_enum_moi_chua_co_nhan')).toBe('gia_tri_enum_moi_chua_co_nhan');
   });

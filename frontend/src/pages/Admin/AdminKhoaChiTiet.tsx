@@ -167,6 +167,9 @@ interface FormGiaiDoan {
   hinh_thuc: HinhThucGiaiDoan | '';
   thoi_gian_bat_dau: string;
   thoi_gian_ket_thuc: string;
+  // Phân lớp theo giai đoạn (spec 2026-10-02): thông tin chung cho giai đoạn không gán lớp.
+  link_hoac_dia_diem: string;
+  huong_dan: string;
 }
 const FORM_GIAI_DOAN_RONG: FormGiaiDoan = {
   thu_tu: '',
@@ -174,6 +177,8 @@ const FORM_GIAI_DOAN_RONG: FormGiaiDoan = {
   hinh_thuc: '',
   thoi_gian_bat_dau: '',
   thoi_gian_ket_thuc: '',
+  link_hoac_dia_diem: '',
+  huong_dan: '',
 };
 
 interface FormCum {
@@ -494,6 +499,8 @@ export default function AdminKhoaChiTiet() {
         hinh_thuc: formTaoGiaiDoan.hinh_thuc as HinhThucGiaiDoan,
         thoi_gian_bat_dau: formTaoGiaiDoan.thoi_gian_bat_dau,
         thoi_gian_ket_thuc: formTaoGiaiDoan.thoi_gian_ket_thuc,
+        link_hoac_dia_diem: formTaoGiaiDoan.link_hoac_dia_diem.trim() || undefined,
+        huong_dan: formTaoGiaiDoan.huong_dan.trim() || undefined,
       },
       {
         onSuccess: (gd) => {
@@ -517,6 +524,8 @@ export default function AdminKhoaChiTiet() {
       hinh_thuc: gd.hinh_thuc,
       thoi_gian_bat_dau: gd.thoi_gian_bat_dau.slice(0, 10),
       thoi_gian_ket_thuc: gd.thoi_gian_ket_thuc.slice(0, 10),
+      link_hoac_dia_diem: gd.link_hoac_dia_diem ?? '',
+      huong_dan: gd.huong_dan ?? '',
     });
     setLoiSuaGiaiDoan({});
   }
@@ -533,6 +542,8 @@ export default function AdminKhoaChiTiet() {
           hinh_thuc: formSuaGiaiDoan.hinh_thuc as HinhThucGiaiDoan,
           thoi_gian_bat_dau: formSuaGiaiDoan.thoi_gian_bat_dau,
           thoi_gian_ket_thuc: formSuaGiaiDoan.thoi_gian_ket_thuc,
+          link_hoac_dia_diem: formSuaGiaiDoan.link_hoac_dia_diem.trim() || null,
+          huong_dan: formSuaGiaiDoan.huong_dan.trim() || null,
         },
       },
       {
@@ -827,6 +838,7 @@ export default function AdminKhoaChiTiet() {
                           <Table.Th>Tên lớp</Table.Th>
                           <Table.Th>Loại lớp</Table.Th>
                           <Table.Th>Sĩ số tối đa</Table.Th>
+                          <Table.Th>Sĩ số hiện tại</Table.Th>
                           <Table.Th>Giảng viên / nhân sự</Table.Th>
                           <Table.Th>Trạng thái</Table.Th>
                           <Table.Th>Số buổi đã lên lịch</Table.Th>
@@ -855,6 +867,7 @@ export default function AdminKhoaChiTiet() {
                                   </Badge>
                                 </Table.Td>
                                 <Table.Td>{lop.si_so_toi_da ?? '—'}</Table.Td>
+                                <Table.Td>{lop.si_so_hien_tai ?? 0}</Table.Td>
                                 <Table.Td>
                                   {lop.nhan_su && lop.nhan_su.length > 0
                                     ? lop.nhan_su.map((n) => n.ho_ten).join(', ')
@@ -1499,6 +1512,20 @@ export default function AdminKhoaChiTiet() {
               onChange={(e) => { const v = e.currentTarget.value; setFormTaoGiaiDoan((f) => ({ ...f, thoi_gian_ket_thuc: v })); }}
             />
           </Group>
+          <TextInput
+            label="Link hoặc địa điểm"
+            description="Hiện cho học viên không được gán lớp ở giai đoạn này (vd link bài đánh giá)"
+            value={formTaoGiaiDoan.link_hoac_dia_diem}
+            error={loiTaoGiaiDoan.link_hoac_dia_diem}
+            onChange={(e) => { const v = e.currentTarget.value; setFormTaoGiaiDoan((f) => ({ ...f, link_hoac_dia_diem: v })); }}
+          />
+          <Textarea
+            label="Hướng dẫn"
+            autosize
+            minRows={2}
+            value={formTaoGiaiDoan.huong_dan}
+            onChange={(e) => { const v = e.currentTarget.value; setFormTaoGiaiDoan((f) => ({ ...f, huong_dan: v })); }}
+          />
           <Button mt="sm" loading={taoGiaiDoan.isPending} disabled={!formTaoGiaiDoanHopLe} onClick={xuLyTaoGiaiDoan} fullWidth>
             Tạo giai đoạn
           </Button>
@@ -1550,6 +1577,20 @@ export default function AdminKhoaChiTiet() {
                 onChange={(e) => { const v = e.currentTarget.value; setFormSuaGiaiDoan((f) => (f ? { ...f, thoi_gian_ket_thuc: v } : f)); }}
               />
             </Group>
+            <TextInput
+              label="Link hoặc địa điểm"
+              description="Hiện cho học viên không được gán lớp ở giai đoạn này (vd link bài đánh giá)"
+              value={formSuaGiaiDoan.link_hoac_dia_diem}
+              error={loiSuaGiaiDoan.link_hoac_dia_diem}
+              onChange={(e) => { const v = e.currentTarget.value; setFormSuaGiaiDoan((f) => (f ? { ...f, link_hoac_dia_diem: v } : f)); }}
+            />
+            <Textarea
+              label="Hướng dẫn"
+              autosize
+              minRows={2}
+              value={formSuaGiaiDoan.huong_dan}
+              onChange={(e) => { const v = e.currentTarget.value; setFormSuaGiaiDoan((f) => (f ? { ...f, huong_dan: v } : f)); }}
+            />
             <Button mt="sm" loading={capNhatGiaiDoan.isPending} disabled={!formSuaGiaiDoanHopLe} onClick={xuLySuaGiaiDoan} fullWidth>
               Lưu thay đổi
             </Button>

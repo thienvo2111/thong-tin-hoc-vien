@@ -242,6 +242,8 @@ export interface CreateGiaiDoanDto {
   hinh_thuc: HinhThucGiaiDoan;
   thoi_gian_bat_dau: string;
   thoi_gian_ket_thuc: string;
+  link_hoac_dia_diem?: string | null;
+  huong_dan?: string | null;
 }
 
 export interface UpdateGiaiDoanDto {
@@ -251,6 +253,9 @@ export interface UpdateGiaiDoanDto {
   thoi_gian_bat_dau?: string;
   thoi_gian_ket_thuc?: string;
   trang_thai?: TrangThaiActive;
+  // null = xóa (chuỗi rỗng ở form gửi null).
+  link_hoac_dia_diem?: string | null;
+  huong_dan?: string | null;
 }
 
 export function taoGiaiDoan(khoaId: string, dto: CreateGiaiDoanDto) {

@@ -282,6 +282,7 @@ export function taoChiTietKhoaMau(danhSach: KhoaBoiDuong[]): Record<string, Khoa
         muc_nang_luc: 'co_ban',
         nhan_su: [{ id: 'ns-1', lop_id: 'lop-1', ho_ten: 'Nguyễn Văn Long', vai_tro: 'giang_vien', so_dien_thoai: null }],
         lich_hoc: [],
+        si_so_hien_tai: 12,
       },
       {
         id: 'lop-2',

@@ -320,3 +320,79 @@ describe('Admin — Chi tiết khóa: Import Excel trong tab Lớp học', () =>
     await waitFor(() => expect(urlsChiTiet.length).toBeGreaterThan(soLanTruoc));
   });
 });
+
+// Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.4): link/hướng dẫn giai đoạn, sĩ số hiện tại,
+// import "Phân lớp học viên" từ trang chi tiết khóa.
+// Luồng nhiều thao tác -> timeout 15s cho từng ca dài (mặc định 5s không đủ khi chạy cả suite).
+describe('Admin — Chi tiết khóa: phân lớp theo giai đoạn', () => {
+  function ghiLaiUrl(method: 'get' | 'post', path: string, urls: string[]) {
+    server.use(
+      http[method](path, ({ request }) => {
+        urls.push(request.url);
+        return undefined;
+      }),
+    );
+  }
+
+  it('bảng lớp có cột "Sĩ số hiện tại" lấy từ si_so_hien_tai', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    renderTrang('khoa-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+    expect(screen.getByRole('columnheader', { name: 'Sĩ số hiện tại' })).toBeInTheDocument();
+    const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
+    expect(within(dong).getByText('12')).toBeInTheDocument();
+  });
+
+  it('tạo giai đoạn kèm link + hướng dẫn -> body gửi đúng 2 field', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const bodies: unknown[] = [];
+    server.use(
+      http.post('/khoa-boi-duong/:id/giai-doan', async ({ request }) => {
+        bodies.push(await request.clone().json());
+        return undefined;
+      }),
+    );
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+    await user.click(screen.getByRole('tab', { name: 'Giai đoạn' }));
+    await user.click(screen.getByRole('button', { name: '+ Tạo giai đoạn' }));
+    await user.type(await screen.findByLabelText(/^Thứ tự/), '6');
+    await user.type(screen.getByLabelText(/^Tên giai đoạn/), 'Đánh giá đầu ra');
+    await user.click(screen.getByRole('textbox', { name: /^Hình thức/ }));
+    await user.click(await screen.findByRole('option', { name: 'Đánh giá' }));
+    await user.type(screen.getByLabelText(/^Ngày bắt đầu/), '2026-12-15');
+    await user.type(screen.getByLabelText(/^Ngày kết thúc/), '2026-12-31');
+    await user.type(screen.getByLabelText('Link hoặc địa điểm'), 'https://vle.example/dg');
+    await user.type(screen.getByLabelText('Hướng dẫn'), 'Làm bài 60 phút');
+    await user.click(screen.getByRole('button', { name: 'Tạo giai đoạn' }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ link_hoac_dia_diem: 'https://vle.example/dg', huong_dan: 'Làm bài 60 phút' });
+  }, 15_000);
+
+  it('modal import "Phân lớp học viên": mẫu và upload đều kèm ma_khoa', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const urlMau: string[] = [];
+    const urlUp: string[] = [];
+    ghiLaiUrl('get', '/import/mau-excel', urlMau);
+    ghiLaiUrl('post', '/import/:loai', urlUp);
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+    await user.click(screen.getByRole('button', { name: '⇪ Import Excel' }));
+    const modal = await screen.findByRole('dialog', { name: 'Import lớp học từ Excel' });
+    await user.click(within(modal).getByText('Phân lớp học viên'));
+    expect(within(modal).getByText(/Ô trống = giữ nguyên/)).toBeInTheDocument();
+    await user.click(within(modal).getByRole('button', { name: '⇩ Tải file mẫu Excel' }));
+    await user.upload(modal.querySelector('input[type="file"]') as HTMLInputElement, new File(['x'], 'pl.xlsx'));
+    await user.click(within(modal).getByRole('button', { name: 'Tải lên & kiểm tra' }));
+    await screen.findByText('Kết quả kiểm tra');
+
+    await waitFor(() => expect(urlMau).toHaveLength(1));
+    expect(new URL(urlMau[0]).searchParams.get('loai')).toBe('phan_lop_hoc_vien');
+    expect(new URL(urlMau[0]).searchParams.get('ma_khoa')).toBe('AG-2026-014');
+    expect(new URL(urlUp[0]).pathname).toBe('/import/phan_lop_hoc_vien');
+    expect(new URL(urlUp[0]).searchParams.get('ma_khoa')).toBe('AG-2026-014');
+  }, 15_000);
+});
