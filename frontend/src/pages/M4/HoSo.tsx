@@ -14,6 +14,7 @@ import {
   Group,
   Loader,
   Modal,
+  Radio,
   Select,
   Stack,
   Text,
@@ -48,7 +49,7 @@ import {
 import { chuanHoaObjectNfc } from '@/lib/nfc';
 import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
-import { CAP_GIANG_DAY_OPTIONS, GIOI_TINH_OPTIONS, TRINH_DO_OPTIONS } from '@/lib/tuyChonHoSo';
+import { CAP_GIANG_DAY_OPTIONS, DOI_TUONG_OPTIONS, GIOI_TINH_OPTIONS, TRINH_DO_OPTIONS } from '@/lib/tuyChonHoSo';
 import { StatusBanner } from '@/components/StatusBanner';
 import { SelectDiaDanh } from '@/components/SelectDiaDanh';
 import { SelectDonVi } from '@/components/SelectDonVi';
@@ -58,7 +59,7 @@ const NHOM_TRUONG = {
   // Nơi sinh và Cư trú KHÔNG nằm trong đối tượng này — cả 2 là trường tùy chọn
   // (T17/sửa 2026-09-30), không tính vào logic "cần bổ sung" (coThieu). Xem MUC_LUC bên dưới.
   cu_tru: ['cu_tru_tinh_id', 'cu_tru_phuong_xa_id'],
-  cong_tac: ['don_vi_cong_tac_id', 'chuc_vu'],
+  cong_tac: ['don_vi_cong_tac_id', 'chuc_vu', 'doi_tuong'],
   lien_he: ['so_dien_thoai_lien_he', 'email_lien_he'],
   chuyen_mon: ['trinh_do_chuyen_mon', 'trinh_do_chuyen_mon_khac', 'cap_giang_day', 'mon_giang_day_id', 'chuyen_mon'],
 } as const;
@@ -89,6 +90,7 @@ function toFormValues(hoSo: HocVien | undefined): HoSoHocVienForm {
     cu_tru_phuong_xa_id: hoSo?.cu_tru_phuong_xa_id ?? null,
     don_vi_cong_tac_id: hoSo?.don_vi_cong_tac_id ?? '',
     chuc_vu: hoSo?.chuc_vu ?? '',
+    doi_tuong: (hoSo?.doi_tuong ?? undefined) as HoSoHocVienForm['doi_tuong'],
     so_dien_thoai_lien_he: hoSo?.so_dien_thoai_lien_he ?? '',
     email_lien_he: hoSo?.email_lien_he ?? '',
     trinh_do_chuyen_mon: (hoSo?.trinh_do_chuyen_mon ?? undefined) as HoSoHocVienForm['trinh_do_chuyen_mon'],
@@ -160,6 +162,10 @@ export default function HoSo() {
         errors[truong] = { type: issue.code, message: issue.message };
       }
     }
+    // Không có lỗi ở trường vừa sửa -> cho submit với giá trị form thật. Trả `values: {}` ở đây (bản cũ)
+    // khiến onSubmit đọc values[truong] = undefined -> PATCH rỗng mà vẫn báo "Đã lưu" mỗi khi có 1 trường
+    // CHƯA sửa không hợp lệ (vd hồ sơ MOET thiếu trình độ, hay chưa chọn đối tượng).
+    if (Object.keys(errors).length === 0) return { values, errors: {} };
     return { values: {}, errors: errors as FieldErrors<HoSoHocVienForm> };
   }, []);
 
@@ -574,6 +580,27 @@ export default function HoSo() {
                 />
 
                 <TextInput label="Chức vụ" disabled={chiXem} {...register('chuc_vu')} />
+
+                <Controller
+                  name="doi_tuong"
+                  control={control}
+                  render={({ field }) => (
+                    <Radio.Group
+                      label="Đối tượng"
+                      description="Chọn đúng để được làm bài khảo sát/đánh giá dành cho đối tượng của Thầy/Cô"
+                      value={field.value ?? null}
+                      onChange={field.onChange}
+                      error={loiHoacThieu('doi_tuong', errors.doi_tuong?.message, field.value)}
+                      required
+                    >
+                      <Group gap="xl" mt={6}>
+                        {DOI_TUONG_OPTIONS.map((o) => (
+                          <Radio key={o.value} value={o.value} label={o.label} disabled={chiXem} />
+                        ))}
+                      </Group>
+                    </Radio.Group>
+                  )}
+                />
               </Stack>
             </Card>
 

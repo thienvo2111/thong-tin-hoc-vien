@@ -16,6 +16,13 @@ import {
 export const CHE_DO_HOC_VIEN = ['khao_sat', 'dang_nhap'] as const;
 export type CheDoHocVien = (typeof CHE_DO_HOC_VIEN)[number];
 
+// Kênh làm bài đánh giá đầu vào ở M6: 'sso' = chuyển sang hệ thống khảo sát
+// bằng mã dùng một lần (chỉ cần hồ sơ đầy đủ); 'vle' = luồng T15 cũ (đợt 2 +
+// đã xác nhận + tài khoản VLE). Cấu hình lưu trước 2026-10-02 không có trường
+// này -> coi là 'vle' (giữ nguyên hành vi cũ).
+export const KENH_DANH_GIA = ['sso', 'vle'] as const;
+export type KenhDanhGia = (typeof KENH_DANH_GIA)[number];
+
 export class LienKetKhaoSatDto {
   @IsString()
   @MinLength(1)
@@ -62,6 +69,9 @@ export class CauHinhKhaoSatDto {
 
   @IsBoolean()
   hien_khao_sat: boolean;
+
+  @IsIn(KENH_DANH_GIA)
+  kenh_danh_gia: KenhDanhGia;
 
   // Thứ tự mảng = thứ tự học viên làm phiếu.
   @IsArray()

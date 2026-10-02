@@ -98,3 +98,34 @@ export function toRowErrorMessage(exception: unknown): string {
   if (exception instanceof Error) return exception.message;
   return 'Lỗi không xác định';
 }
+
+// SSO sang hệ thống khảo sát (2026-10-02): mã không tồn tại / đã dùng / hết
+// hạn — gộp 1 thông báo, không tiết lộ mã rơi vào trường hợp nào.
+export class SsoMaKhongHopLeException extends HttpException {
+  constructor() {
+    super(
+      {
+        error: {
+          code: 'SSO_MA_KHONG_HOP_LE',
+          message: 'Mã không hợp lệ, đã được dùng hoặc đã hết hạn',
+        },
+      },
+      400,
+    );
+  }
+}
+
+// SSO: máy chủ chưa đặt SSO_KHAO_SAT_API_KEY -> tắt hẳn việc đổi mã.
+export class SsoChuaCauHinhException extends HttpException {
+  constructor() {
+    super(
+      {
+        error: {
+          code: 'SSO_CHUA_CAU_HINH',
+          message: 'Máy chủ chưa cấu hình khóa API cho hệ thống khảo sát',
+        },
+      },
+      503,
+    );
+  }
+}

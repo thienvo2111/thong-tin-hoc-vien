@@ -11,6 +11,7 @@ import {
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
+import { CauHinhKhaoSatService } from '../cau-hinh-khao-sat/cau-hinh-khao-sat.service';
 
 const namHopLe = new Date().getUTCFullYear() - 20;
 
@@ -67,9 +68,16 @@ describe('HocVienService', () => {
     coXacNhanConHieuLuc: jest.Mock;
     huyXacNhanNeuCo: jest.Mock;
     taoXacNhan: jest.Mock;
+    coXacNhanTruocDanhGiaConHieuLuc: jest.Mock;
+    dotXacNhanTruocDanhGiaApDung: jest.Mock;
   };
+  let cauHinhKhaoSatService: { layKenhDanhGia: jest.Mock };
 
   beforeEach(() => {
+    // 2026-10-02: mặc định kênh 'vle' = hành vi cũ, test SSO tự override.
+    cauHinhKhaoSatService = {
+      layKenhDanhGia: jest.fn().mockResolvedValue('vle'),
+    };
     prisma = {
       hoc_vien: {
         findUnique: jest.fn(),
@@ -118,12 +126,15 @@ describe('HocVienService', () => {
       coXacNhanConHieuLuc: jest.fn().mockResolvedValue(false),
       huyXacNhanNeuCo: jest.fn().mockResolvedValue(false),
       taoXacNhan: jest.fn(),
+      coXacNhanTruocDanhGiaConHieuLuc: jest.fn().mockResolvedValue(false),
+      dotXacNhanTruocDanhGiaApDung: jest.fn().mockResolvedValue(null),
     };
     service = new HocVienService(
       prisma as unknown as PrismaService,
       scopeService as unknown as ScopeService,
       thongBaoService as unknown as ThongBaoService,
       dotXacNhanService as unknown as DotXacNhanService,
+      cauHinhKhaoSatService as unknown as CauHinhKhaoSatService,
     );
 
     // Fixture mặc định: mọi FK tra cứu hợp lệ (test override khi cần âm tính).
@@ -769,6 +780,7 @@ describe('HocVienService', () => {
         trinh_do_chuyen_mon_khac: null,
         cap_giang_day: null,
         mon_giang_day_id: null,
+        doi_tuong: 'giao_vien',
         chuyen_mon: [
           { id: 'cm-1', hoc_vien_id: 'hv-1', chuyen_mon: 'Sư phạm Toán' },
         ],
@@ -810,6 +822,59 @@ describe('HocVienService', () => {
     it('bổ sung đủ mọi trường -> day_du=true', async () => {
       const res = await service.danhGiaDayDu(baseHocVienDayDu() as never);
       expect(res).toEqual({ day_du: true, thieu: [] });
+    });
+
+    it('2026-10-02: chưa chọn đối tượng (GV/CBQL) -> day_du=false, thiếu đúng doi_tuong', async () => {
+      const res = await service.danhGiaDayDu(
+        baseHocVienDayDu({ doi_tuong: null }) as never,
+      );
+      expect(res.day_du).toBe(false);
+      expect(res.thieu).toEqual([
+        {
+          field: 'doi_tuong',
+          message: 'Chưa chọn đối tượng (giáo viên hoặc cán bộ quản lý)',
+        },
+      ]);
+    });
+
+    describe('danhGiaDauVaoCuaToi — kênh đánh giá (2026-10-02)', () => {
+      const caller = {
+        id: 'nd-1',
+        vai_tro: 'hoc_vien',
+        hoc_vien_id: 'hv-1',
+      } as AuthenticatedUser;
+
+      it('kênh sso + hồ sơ đầy đủ -> đủ điều kiện, KHÔNG cần đợt 2 / xác nhận / tài khoản VLE, không trả link', async () => {
+        cauHinhKhaoSatService.layKenhDanhGia.mockResolvedValue('sso');
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseHocVienDayDu());
+        const res = await service.danhGiaDauVaoCuaToi(caller);
+        expect(res).toEqual({ kenh: 'sso', du_dieu_kien: true });
+        expect(
+          dotXacNhanService.coXacNhanTruocDanhGiaConHieuLuc,
+        ).not.toHaveBeenCalled();
+      });
+
+      it('kênh sso + hồ sơ thiếu -> chưa đủ điều kiện, ly_do liệt kê trường thiếu', async () => {
+        cauHinhKhaoSatService.layKenhDanhGia.mockResolvedValue('sso');
+        prisma.hoc_vien.findUnique.mockResolvedValue(
+          baseHocVienDayDu({ doi_tuong: null }),
+        );
+        const res = await service.danhGiaDauVaoCuaToi(caller);
+        expect(res).toEqual({
+          kenh: 'sso',
+          du_dieu_kien: false,
+          ly_do: ['Chưa chọn đối tượng (giáo viên hoặc cán bộ quản lý)'],
+        });
+      });
+
+      it('kênh vle -> giữ luồng cũ (cần xác nhận đợt 2), response gắn kenh', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseHocVienDayDu());
+        const res = await service.danhGiaDauVaoCuaToi(caller);
+        expect(res).toMatchObject({ kenh: 'vle', du_dieu_kien: false });
+        expect((res as { ly_do: string[] }).ly_do).toContain(
+          'Chưa xác nhận hồ sơ ở đợt xác nhận trước đánh giá (đợt 2)',
+        );
+      });
     });
 
     it('cu_tru_phuong_xa_id (tùy chọn, đã điền) không thuộc cu_tru_tinh_id -> vẫn day_du=false kèm lý do', async () => {
@@ -1578,6 +1643,7 @@ describe('HocVienService', () => {
           noi_sinh_xa: 'Xã Long Xuyên (cũ)',
           email_lien_he: 'du@test.local',
           trinh_do_chuyen_mon: 'dai_hoc',
+          doi_tuong: 'can_bo_quan_ly',
         });
         prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDu);
         dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue({

@@ -368,6 +368,7 @@ describe('Đợt xác nhận & lịch sử thay đổi hồ sơ — T14 (e2e)', 
           noi_sinh_id: tinh.id,
           phuong_xa_id: xaTruong1.id,
           trinh_do_chuyen_mon: 'dai_hoc',
+          doi_tuong: 'giao_vien',
         })
         .expect(200);
 

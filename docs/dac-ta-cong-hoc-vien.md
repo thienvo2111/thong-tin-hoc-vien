@@ -103,7 +103,7 @@ Mục nội dung trong `gioiThieu.ts` gắn `cheDo: 'khao_sat' | 'dang_nhap'` ch
    - Phường/xã: Select phụ thuộc, `cap=phuong_xa_dac_khu&parent_id={noi_sinh_id}`; đổi tỉnh → xóa phường/xã đã chọn.
 3. **Công tác**
    - Đơn vị công tác: Autocomplete `GET /danh-muc/don-vi-cong-tac?loai_don_vi=truong&q=` (gõ ≥ 2 ký tự, debounce 300 ms); hiển thị "Tên trường — Phường/xã".
-   - Chức vụ (text); Số điện thoại (bàn phím số, 10 số bắt đầu 0).
+   - Chức vụ (text); **Đối tượng** (2026-10-02, radio Giáo viên / Cán bộ quản lý — bắt buộc để hồ sơ "đầy đủ", gửi sang hệ thống khảo sát); Số điện thoại (bàn phím số, 10 số bắt đầu 0).
 4. **Liên hệ**
    - Email: ghi chú "Hệ thống gửi bản sao hồ sơ và thông báo lớp học qua email này".
 5. **Trình độ & chuyên môn**
@@ -143,6 +143,8 @@ Mục nội dung trong `gioiThieu.ts` gắn `cheDo: 'khao_sat' | 'dang_nhap'` ch
 ## M6 — Làm bài đánh giá đầu vào (đợt 2)
 
 **API:** `GET /hoc-vien/toi/danh-gia-dau-vao` (T15). Cấu hình query: `gcTime: 0`, không refetch nền.
+
+**Kênh trang khảo sát — `kenh = 'sso'` (2026-10-02, chọn ở `/admin/cau-hinh-khao-sat`):** chỉ cần hồ sơ đầy đủ. Đủ điều kiện → 3 nút: "Làm phiếu khảo sát kĩ năng số" (`target=khao-sat`), "Làm phiếu đánh giá năng lực số" (`target=danh-gia`), "Xem tất cả bài cần làm" (không target). Bấm → `POST /sso/cap-ma` → chuyển trang **cùng tab** (không mở cửa sổ mới — trình duyệt Zalo); lỗi cấp mã thì hiện thông báo, không chuyển. Chưa đủ → liệt kê `ly_do` + nút "Bổ sung hồ sơ" (không có nút xác nhận). Không hiện tài khoản VLE. Bảng dưới đây áp dụng cho kênh `vle`.
 
 Mục menu "Đánh giá đầu vào" ở thanh trên chỉ hiện khi cấu hình `danh_gia_dau_vao_trong_cong = true` (2026-10-02, `/admin/cau-hinh-khao-sat`) — địa phương làm đánh giá qua phiếu khảo sát ngoài thì ẩn.
 

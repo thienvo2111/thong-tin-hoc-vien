@@ -66,6 +66,18 @@ export function layDanhGiaDauVao() {
   return apiFetch<DanhGiaDauVao>('/hoc-vien/toi/danh-gia-dau-vao');
 }
 
+/** Bài trên hệ thống khảo sát; bỏ trống -> bên khảo sát hiện danh sách bài cần làm. */
+export type SsoTarget = 'khao-sat' | 'danh-gia';
+
+// 2026-10-02: cấp mã dùng 1 lần (hết hạn sau vài phút) rồi chuyển sang hệ thống khảo sát — chỉ gọi lúc
+// học viên bấm nút, không gọi sẵn khi tải trang.
+export function capMaSso(target?: SsoTarget) {
+  return apiFetch<{ url: string; het_han: string }>('/sso/cap-ma', {
+    method: 'POST',
+    body: JSON.stringify(target ? { target } : {}),
+  });
+}
+
 export function layKhoaHocToi() {
   return apiFetch<KhoaHocDangKy[]>('/hoc-vien/toi/khoa-hoc');
 }

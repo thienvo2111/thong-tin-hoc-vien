@@ -14,6 +14,7 @@ export const nhanTruong: Record<string, string> = {
   cu_tru_phuong_xa_id: 'Cư trú (phường/xã)',
   don_vi_cong_tac_id: 'Đơn vị công tác',
   chuc_vu: 'Chức vụ',
+  doi_tuong: 'Đối tượng',
   so_dien_thoai_lien_he: 'Số điện thoại',
   email_lien_he: 'Email',
   trinh_do_chuyen_mon: 'Trình độ chuyên môn',

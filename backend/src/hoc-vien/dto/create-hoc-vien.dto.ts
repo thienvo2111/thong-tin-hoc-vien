@@ -1,4 +1,8 @@
-import { cap_hoc, trinh_do_chuyen_mon } from '@prisma/client';
+import {
+  cap_hoc,
+  doi_tuong_hoc_vien,
+  trinh_do_chuyen_mon,
+} from '@prisma/client';
 import {
   ArrayMinSize,
   ArrayNotEmpty,
@@ -45,6 +49,12 @@ export class CreateHocVienDto {
   @IsString()
   @MaxLength(100)
   chuc_vu?: string;
+
+  // 2026-10-02: học viên tự chọn — bắt buộc để hồ sơ "đầy đủ" (danhGiaDayDu),
+  // gửi sang hệ thống khảo sát qua SSO (vai trò GV/CBQL).
+  @IsOptional()
+  @IsEnum(doi_tuong_hoc_vien)
+  doi_tuong?: doi_tuong_hoc_vien;
 
   // T17 (2026-10-01): tách "noi_sinh" (1 ô, thêm 2026-09-30) thành 3 trường
   // Tỉnh/Huyện/Xã riêng biệt — HOÀN TOÀN TÙY CHỌN cho mọi nguon_tao (không

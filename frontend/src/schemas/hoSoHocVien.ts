@@ -26,6 +26,9 @@ const NAM_HIEN_TAI = dayjs().year();
 
 export const trinhDoChuyenMonEnum = z.enum(['trung_cap', 'cao_dang', 'dai_hoc', 'thac_si', 'tien_si', 'khac']);
 export const capGiangDayEnum = z.enum(['mam_non', 'tieu_hoc', 'thcs', 'thpt']);
+export const doiTuongEnum = z.enum(['giao_vien', 'can_bo_quan_ly'], {
+  errorMap: () => ({ message: 'Vui lòng chọn đối tượng' }),
+});
 
 export const hoSoHocVienSchema = z
   .object({
@@ -46,6 +49,8 @@ export const hoSoHocVienSchema = z
     cu_tru_phuong_xa_id: z.string().nullable().optional(),
     don_vi_cong_tac_id: z.string().min(1, 'Vui lòng chọn đơn vị công tác'),
     chuc_vu: z.string().trim().optional(),
+    // 2026-10-02: bắt buộc cho "hồ sơ đầy đủ" (backend danhGiaDayDu).
+    doi_tuong: doiTuongEnum,
     so_dien_thoai_lien_he: soDienThoaiSchema,
     email_lien_he: emailSchema,
     trinh_do_chuyen_mon: trinhDoChuyenMonEnum,

@@ -18,6 +18,7 @@ import { ScopeService } from '../auth/scope/scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
+import { CauHinhKhaoSatService } from '../cau-hinh-khao-sat/cau-hinh-khao-sat.service';
 import { normalizeNfcName } from '../common/utils/normalize-text.util';
 import { dieuKienKhongDau } from '../common/utils/tim-kiem-khong-dau.util';
 import { decryptVleMatKhau } from '../common/utils/vle-crypto.util';
@@ -115,6 +116,7 @@ export class HocVienService {
     private readonly scopeService: ScopeService,
     private readonly thongBaoService: ThongBaoService,
     private readonly dotXacNhanService: DotXacNhanService,
+    private readonly cauHinhKhaoSatService: CauHinhKhaoSatService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -386,6 +388,7 @@ export class HocVienService {
     'nam_sinh',
     'gioi_tinh',
     'chuc_vu',
+    'doi_tuong',
     'noi_sinh_tinh',
     'noi_sinh_huyen',
     'noi_sinh_xa',
@@ -535,6 +538,7 @@ export class HocVienService {
             nam_sinh: dto.nam_sinh,
             gioi_tinh: dto.gioi_tinh,
             chuc_vu: dto.chuc_vu,
+            doi_tuong: dto.doi_tuong,
             noi_sinh_tinh: dto.noi_sinh_tinh,
             noi_sinh_huyen: dto.noi_sinh_huyen,
             noi_sinh_xa: dto.noi_sinh_xa,
@@ -716,6 +720,7 @@ export class HocVienService {
               nam_sinh: merged.nam_sinh,
               gioi_tinh: dto.gioi_tinh,
               chuc_vu: dto.chuc_vu,
+              doi_tuong: dto.doi_tuong,
               noi_sinh_tinh: merged.noi_sinh_tinh,
               noi_sinh_huyen: merged.noi_sinh_huyen,
               noi_sinh_xa: merged.noi_sinh_xa,
@@ -969,7 +974,23 @@ export class HocVienService {
   // TUYỆT ĐỐI không trả bất kỳ thông tin tai_khoan_vle nào (QĐ8: cách B chặn
   // mềm nhưng lộ đường dẫn/tài khoản cho người chưa đủ điều kiện vẫn là rò
   // rỉ không mong muốn).
+  //
+  // 2026-10-02: rẽ nhánh theo kênh trong cấu hình khảo sát. Kênh 'sso' chỉ cần
+  // hồ sơ đầy đủ — link thật được cấp lúc bấm (POST /sso/cap-ma, mã dùng 1
+  // lần), endpoint này KHÔNG trả link để mã không bị tạo thừa/hết hạn sẵn.
   async danhGiaDauVaoCuaToi(caller: AuthenticatedUser) {
+    const kenh = await this.cauHinhKhaoSatService.layKenhDanhGia();
+    if (kenh === 'sso') {
+      const hocVien = await this.getHocVienCuaToi(caller);
+      const { day_du, thieu } = await this.danhGiaDayDu(hocVien);
+      return day_du
+        ? { kenh, du_dieu_kien: true }
+        : { kenh, du_dieu_kien: false, ly_do: thieu.map((t) => t.message) };
+    }
+    return { kenh, ...(await this.danhGiaDauVaoQuaVle(caller)) };
+  }
+
+  private async danhGiaDauVaoQuaVle(caller: AuthenticatedUser) {
     const hocVien = await this.getHocVienCuaToi(caller);
     const { day_du, thieu } = await this.danhGiaDayDu(hocVien);
     const daXacNhanDot2 =
@@ -1058,6 +1079,15 @@ export class HocVienService {
       { ...hocVien, chuyen_mon: hocVien.chuyen_mon.map((c) => c.chuyen_mon) },
       { requireFull: true, excludeHocVienId: hocVien.id },
     );
+    // 2026-10-02: "Đối tượng" (GV/CBQL) bắt buộc cho "đầy đủ" nhưng KHÔNG đặt
+    // trong validateHocVien — bộ quy tắc đó còn dùng cho POST /hoc-vien (tự
+    // đăng ký), thêm vào đó sẽ chặn các luồng tạo hồ sơ hiện có.
+    if (!hocVien.doi_tuong) {
+      loi.push({
+        field: 'doi_tuong',
+        message: 'Chưa chọn đối tượng (giáo viên hoặc cán bộ quản lý)',
+      });
+    }
     return { day_du: loi.length === 0, thieu: loi };
   }
 

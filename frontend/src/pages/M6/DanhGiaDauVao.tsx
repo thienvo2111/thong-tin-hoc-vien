@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Box, Button, Center, Container, CopyButton, Group, List, Loader, Stack, Text, TextInput, Title } from '@mantine/core';
+import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { useDanhGiaDauVao } from '@/api/hocVien';
+import { capMaSso, useDanhGiaDauVao, type SsoTarget } from '@/api/hocVien';
 import type { DanhGiaDauVao, DanhGiaDauVaoDuDieuKien } from '@/api/types';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
@@ -38,7 +39,7 @@ export default function DanhGiaDauVaoPage() {
 }
 
 function NoiDung({ data }: { data: DanhGiaDauVao }) {
-  if (data.du_dieu_kien) return <KhoiDuDieuKien data={data} />;
+  if (data.du_dieu_kien) return data.kenh === 'sso' ? <KhoiSso /> : <KhoiDuDieuKien data={data} />;
 
   if (data.het_han) {
     const hoTro = import.meta.env.VITE_HOTRO_LIEN_HE || 'bộ phận hỗ trợ';
@@ -77,6 +78,37 @@ function NoiDung({ data }: { data: DanhGiaDauVao }) {
         </Group>
       </Stack>
     </StatusBanner>
+  );
+}
+
+/** Kênh SSO (2026-10-02): bấm nút -> cổng cấp mã dùng 1 lần -> chuyển sang hệ thống khảo sát CÙNG TAB
+ * (không mở cửa sổ mới — trình duyệt nhúng Zalo). Mã chỉ cấp lúc bấm vì hết hạn sau vài phút. */
+function KhoiSso() {
+  const chuyen = useMutation({
+    mutationFn: capMaSso,
+    onSuccess: ({ url }) => window.location.assign(url),
+  });
+  const dangChuyen = (target?: SsoTarget) => chuyen.isPending && chuyen.variables === target;
+
+  return (
+    <Stack gap="md">
+      <StatusBanner loai="success" tieuDe="Hồ sơ đã đầy đủ">
+        Thầy/Cô bấm vào bài cần làm. Hệ thống sẽ chuyển sang trang khảo sát và đăng nhập sẵn, không cần nhập lại mật
+        khẩu.
+      </StatusBanner>
+
+      {chuyen.isError && <StatusBanner loai="error">{thongDiepLoiChung(chuyen.error)}</StatusBanner>}
+
+      <Button size="lg" fullWidth loading={dangChuyen('khao-sat')} disabled={chuyen.isPending} onClick={() => chuyen.mutate('khao-sat')}>
+        Làm phiếu khảo sát kĩ năng số
+      </Button>
+      <Button size="lg" fullWidth loading={dangChuyen('danh-gia')} disabled={chuyen.isPending} onClick={() => chuyen.mutate('danh-gia')}>
+        Làm phiếu đánh giá năng lực số
+      </Button>
+      <Button variant="subtle" loading={dangChuyen(undefined)} disabled={chuyen.isPending} onClick={() => chuyen.mutate(undefined)}>
+        Xem tất cả bài cần làm
+      </Button>
+    </Stack>
   );
 }
 

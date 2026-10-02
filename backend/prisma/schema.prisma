@@ -254,6 +254,13 @@ enum nguon_diem_danh {
 // hoc_vien, không phải chat real-time. Enum MỚI hoàn toàn nên CREATE TYPE
 // dùng ngay trong migration tạo bảng (không bị ràng buộc "ALTER TYPE khác
 // transaction" như enum MỞ RỘNG ở trên).
+/// Đối tượng học viên tự chọn (2026-10-02) — gửi sang hệ thống khảo sát qua SSO,
+/// bắt buộc để hồ sơ được coi là "đầy đủ" (HocVienService.danhGiaDayDu).
+enum doi_tuong_hoc_vien {
+  giao_vien
+  can_bo_quan_ly
+}
+
 enum trang_thai_yeu_cau_ho_tro {
   cho_xu_ly
   da_phan_hoi
@@ -460,6 +467,7 @@ model hoc_vien {
   nam_sinh             Int     @db.SmallInt
   gioi_tinh            String? @db.VarChar(20)
   chuc_vu              String? @db.VarChar(100)
+  doi_tuong            doi_tuong_hoc_vien?
 
   // Deprecated 2026-09-30: thay bởi "noi_sinh" (text tự do, xem bên dưới) —
   // GIỮ NGUYÊN cột/quan hệ này để không mất dữ liệu cũ, không còn dùng trong
@@ -530,6 +538,7 @@ model hoc_vien {
   yeu_cau_ho_tro     yeu_cau_ho_tro[]
   lich_su_thay_doi   lich_su_thay_doi_ho_so[]
   tai_khoan_vle      tai_khoan_vle?
+  ma_sso_mot_lan     ma_sso_mot_lan[]
 
   token_xac_thuc token_xac_thuc[]
 
@@ -1030,4 +1039,21 @@ model cau_hinh_he_thong {
   gia_tri      Json
   cap_nhat_luc DateTime @default(now()) @db.Timestamptz(6)
   cap_nhat_boi String?  @db.Uuid
+}
+
+/// Mã dùng một lần để chuyển học viên sang hệ thống khảo sát (SSO, 2026-10-02).
+/// Chỉ lưu SHA-256 của mã — mã gốc chỉ nằm trên URL chuyển hướng. Hết hạn sau
+/// vài phút; bên khảo sát đổi mã qua POST /sso/doi-ma (đánh dấu da_dung_luc).
+model ma_sso_mot_lan {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ma_hash     String    @unique(map: "uq_ma_sso_hash") @db.Char(64)
+  hoc_vien_id String    @db.Uuid
+  target      String?   @db.VarChar(20)
+  het_han     DateTime  @db.Timestamptz(6)
+  da_dung_luc DateTime? @db.Timestamptz(6)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+
+  hoc_vien hoc_vien @relation(fields: [hoc_vien_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([hoc_vien_id], map: "idx_ma_sso_hoc_vien")
 }

@@ -172,4 +172,27 @@ describe('Admin — Cấu hình khảo sát', () => {
     expect(await screen.findByText('Máy chủ lỗi')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '+ Thêm phiếu' })).not.toBeInTheDocument();
   });
+
+  describe('kênh đánh giá đầu vào (2026-10-02)', () => {
+    it('cấu hình lưu trước khi có lựa chọn kênh -> hiện "Tài khoản VLE" (giữ hành vi đang chạy)', async () => {
+      datCauHinhKhaoSatMock(DA_LUU);
+      renderTrang();
+      expect(await screen.findByRole('radio', { name: 'Tài khoản VLE' })).toBeChecked();
+    });
+
+    it('chọn "Trang khảo sát (đăng nhập một lần)" rồi lưu -> PUT kenh_danh_gia=sso', async () => {
+      datCauHinhKhaoSatMock(DA_LUU);
+      const user = userEvent.setup();
+      renderTrang();
+      await user.click(await screen.findByRole('radio', { name: 'Trang khảo sát (đăng nhập một lần)' }));
+      await user.click(screen.getByRole('button', { name: 'Lưu cấu hình' }));
+      await waitFor(() => expect(banDaLuu()?.kenh_danh_gia).toBe('sso'));
+    });
+
+    it('đã lưu kênh sso -> radio tương ứng được chọn sẵn', async () => {
+      datCauHinhKhaoSatMock({ ...DA_LUU, kenh_danh_gia: 'sso' });
+      renderTrang();
+      expect(await screen.findByRole('radio', { name: 'Trang khảo sát (đăng nhập một lần)' })).toBeChecked();
+    });
+  });
 });

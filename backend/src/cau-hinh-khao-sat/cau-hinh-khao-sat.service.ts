@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ValidationException } from '../common/exceptions/app.exceptions';
-import { CauHinhKhaoSatDto } from './dto/cau-hinh-khao-sat.dto';
+import { CauHinhKhaoSatDto, KenhDanhGia } from './dto/cau-hinh-khao-sat.dto';
 
 export const KHOA_CAU_HINH_KHAO_SAT = 'khao_sat_dau_vao';
 
@@ -9,6 +9,8 @@ export interface CauHinhKhaoSat {
   che_do_hoc_vien: CauHinhKhaoSatDto['che_do_hoc_vien'];
   danh_gia_dau_vao_trong_cong: boolean;
   hien_khao_sat: boolean;
+  /** Thiếu ở cấu hình lưu trước 2026-10-02 — đọc qua layKenhDanhGia(). */
+  kenh_danh_gia?: KenhDanhGia;
   phieu: {
     ten: string;
     mo_ta: string;
@@ -34,6 +36,12 @@ export class CauHinhKhaoSatService {
       cau_hinh: (row?.gia_tri as unknown as CauHinhKhaoSat) ?? null,
       cap_nhat_luc: row?.cap_nhat_luc ?? null,
     };
+  }
+
+  /** Kênh đánh giá đầu vào đang áp dụng; chưa lưu cấu hình / cấu hình cũ -> 'vle'. */
+  async layKenhDanhGia(): Promise<KenhDanhGia> {
+    const { cau_hinh } = await this.layCauHinh();
+    return cau_hinh?.kenh_danh_gia ?? 'vle';
   }
 
   async luuCauHinh(
@@ -62,6 +70,7 @@ export class CauHinhKhaoSatService {
       che_do_hoc_vien: dto.che_do_hoc_vien,
       danh_gia_dau_vao_trong_cong: dto.danh_gia_dau_vao_trong_cong,
       hien_khao_sat: dto.hien_khao_sat,
+      kenh_danh_gia: dto.kenh_danh_gia,
       phieu: dto.phieu.map((p) => ({
         ten: p.ten.trim(),
         mo_ta: p.mo_ta.trim(),

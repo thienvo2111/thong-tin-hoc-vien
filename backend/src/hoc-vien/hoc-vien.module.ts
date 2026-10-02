@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { ThongBaoModule } from '../thong-bao/thong-bao.module';
 import { DotXacNhanModule } from '../dot-xac-nhan/dot-xac-nhan.module';
+import { CauHinhKhaoSatModule } from '../cau-hinh-khao-sat/cau-hinh-khao-sat.module';
 import { HocVienController } from './hoc-vien.controller';
 import { HocVienService } from './hoc-vien.service';
 
@@ -16,7 +17,7 @@ import { HocVienService } from './hoc-vien.service';
 // phan_lop_hoc_vien (xem KhoaBoiDuongService.resolvePhanLopRow/commitPhanLop,
 // sửa 2026-09-25).
 @Module({
-  imports: [AuthModule, ThongBaoModule, DotXacNhanModule],
+  imports: [AuthModule, ThongBaoModule, DotXacNhanModule, CauHinhKhaoSatModule],
   controllers: [HocVienController],
   providers: [HocVienService],
   exports: [HocVienService],

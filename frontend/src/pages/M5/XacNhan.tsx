@@ -7,7 +7,7 @@ import type { HocVien, XacNhanResponse } from '@/api/types';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { dinhDangNgayGio } from '@/lib/ngay';
-import { CAP_GIANG_DAY_OPTIONS, GIOI_TINH_OPTIONS, TRINH_DO_OPTIONS, nhanTuTuyChon } from '@/lib/tuyChonHoSo';
+import { CAP_GIANG_DAY_OPTIONS, DOI_TUONG_OPTIONS, GIOI_TINH_OPTIONS, TRINH_DO_OPTIONS, nhanTuTuyChon } from '@/lib/tuyChonHoSo';
 import { StatusBanner } from '@/components/StatusBanner';
 import { CountdownTimer } from '@/components/CountdownTimer';
 
@@ -36,6 +36,7 @@ function dongHoSo(hoSo: HocVien): { truong: string; giaTri: string }[] {
     },
     { truong: 'don_vi_cong_tac_id', giaTri: hoSo.don_vi_cong_tac_ten ?? '' },
     { truong: 'chuc_vu', giaTri: hoSo.chuc_vu ?? '' },
+    { truong: 'doi_tuong', giaTri: nhanTuTuyChon(DOI_TUONG_OPTIONS, hoSo.doi_tuong) },
     { truong: 'so_dien_thoai_lien_he', giaTri: hoSo.so_dien_thoai_lien_he ?? '' },
     { truong: 'email_lien_he', giaTri: hoSo.email_lien_he ?? '' },
     { truong: 'trinh_do_chuyen_mon', giaTri: trinhDo },

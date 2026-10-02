@@ -62,6 +62,7 @@ export function taoHoSoMoi(): HocVien {
     don_vi_cong_tac_id: 'dv-1',
     don_vi_cong_tac_ten: 'THPT Long Xuyên — Phường Long Xuyên',
     chuc_vu: 'Giáo viên',
+    doi_tuong: 'giao_vien',
     so_dien_thoai_lien_he: '0912345678',
     email_lien_he: null,
     email_da_xac_minh: false,
@@ -91,6 +92,7 @@ export function taoDotXacNhanDangMoThieu(): DotXacNhan {
 
 export function taoDanhGiaDauVaoDuDieuKien(): DanhGiaDauVao {
   return {
+    kenh: 'vle',
     du_dieu_kien: true,
     duong_dan: 'https://vle.example.edu.vn/danh-gia-dau-vao',
     ten_dang_nhap_vle: '9115131060',

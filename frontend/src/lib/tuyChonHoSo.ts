@@ -15,6 +15,11 @@ export const CAP_GIANG_DAY_OPTIONS = [
   { value: 'thpt', label: 'THPT' },
 ];
 
+export const DOI_TUONG_OPTIONS = [
+  { value: 'giao_vien', label: 'Giáo viên' },
+  { value: 'can_bo_quan_ly', label: 'Cán bộ quản lý' },
+];
+
 export const GIOI_TINH_OPTIONS = [
   { value: 'nam', label: 'Nam' },
   { value: 'nu', label: 'Nữ' },

@@ -74,6 +74,7 @@ describe('Hồ sơ Học viên (e2e)', () => {
       so_dien_thoai_lien_he: '0912345678',
       email_lien_he: `hv-${suf}@test.local`,
       trinh_do_chuyen_mon: 'dai_hoc',
+      doi_tuong: 'giao_vien',
       chuyen_mon: ['Sư phạm Toán'],
       ...overrides,
     };
@@ -801,6 +802,7 @@ describe('Hồ sơ Học viên (e2e)', () => {
           phuong_xa_id: xaTruong.id,
           email_lien_he: `t9-${suf}@test.local`,
           trinh_do_chuyen_mon: 'dai_hoc',
+          doi_tuong: 'giao_vien',
         })
         .expect(200);
 

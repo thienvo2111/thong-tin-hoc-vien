@@ -1,4 +1,8 @@
-import { cap_hoc, trinh_do_chuyen_mon } from '@prisma/client';
+import {
+  cap_hoc,
+  doi_tuong_hoc_vien,
+  trinh_do_chuyen_mon,
+} from '@prisma/client';
 import {
   IsEnum,
   IsInt,
@@ -46,6 +50,12 @@ export class UpdateHocVienDto {
   @IsString()
   @MaxLength(100)
   chuc_vu?: string;
+
+  // 2026-10-02: học viên tự chọn — bắt buộc để hồ sơ "đầy đủ" (danhGiaDayDu),
+  // gửi sang hệ thống khảo sát qua SSO (vai trò GV/CBQL).
+  @IsOptional()
+  @IsEnum(doi_tuong_hoc_vien)
+  doi_tuong?: doi_tuong_hoc_vien;
 
   // Deprecated 2026-09-30: thay bởi "noi_sinh" (text tự do) — GIỮ NGUYÊN 2
   // field này trong DTO để tương thích ngược nếu còn nơi nào gọi, nhưng

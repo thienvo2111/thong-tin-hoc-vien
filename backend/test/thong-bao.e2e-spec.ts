@@ -103,6 +103,7 @@ describe('Dịch vụ Thông báo (e2e)', () => {
       so_dien_thoai_lien_he: '0911111111',
       email_lien_he: `tb-${suf}@test.local`,
       trinh_do_chuyen_mon: 'dai_hoc',
+      doi_tuong: 'giao_vien',
       chuyen_mon: ['Sư phạm Văn'],
       ...overrides,
     };

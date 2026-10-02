@@ -32,6 +32,7 @@ const MAC_DINH_API: CauHinhKhaoSat = {
   che_do_hoc_vien: cauHinhMacDinh.cheDoHocVien,
   danh_gia_dau_vao_trong_cong: cauHinhMacDinh.danhGiaDauVaoTrongCong,
   hien_khao_sat: cauHinhMacDinh.hienKhaoSat,
+  kenh_danh_gia: 'vle',
   phieu: cauHinhMacDinh.phieu.map((p) => ({ ten: p.ten, mo_ta: p.moTa, lien_ket: p.lienKet })),
 };
 
@@ -57,7 +58,8 @@ export default function AdminCauHinhKhaoSat() {
   const [loi, setLoi] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (data && !form) setForm(structuredClone(data.cau_hinh ?? MAC_DINH_API));
+    // Cấu hình lưu trước khi có lựa chọn kênh -> 'vle' (đúng hành vi đang chạy).
+    if (data && !form) setForm({ kenh_danh_gia: 'vle', ...structuredClone(data.cau_hinh ?? MAC_DINH_API) });
   }, [data, form]);
 
   const luu = useMutation({
@@ -153,6 +155,24 @@ export default function AdminCauHinhKhaoSat() {
                       value="dang_nhap"
                       label="Đăng nhập cổng học viên"
                       description="Trang chủ mời đăng nhập. Học viên chỉ sửa được hồ sơ khi có Đợt xác nhận đang mở."
+                    />
+                  </Stack>
+                </Radio.Group>
+                <Radio.Group
+                  value={form.kenh_danh_gia ?? 'vle'}
+                  onChange={(v) => setForm({ ...form, kenh_danh_gia: v as CauHinhKhaoSat['kenh_danh_gia'] })}
+                  label="Kênh làm bài đánh giá đầu vào (mục Đánh giá đầu vào của học viên)"
+                >
+                  <Stack gap="sm" mt="xs">
+                    <Radio
+                      value="sso"
+                      label="Trang khảo sát (đăng nhập một lần)"
+                      description="Hồ sơ đầy đủ là làm được. Học viên bấm nút, hệ thống chuyển sang trang khảo sát kèm mã dùng một lần — không cần đợt xác nhận hay tài khoản VLE."
+                    />
+                    <Radio
+                      value="vle"
+                      label="Tài khoản VLE"
+                      description="Cần đã xác nhận hồ sơ ở đợt xác nhận trước đánh giá và có tài khoản VLE (nhập qua Nhập dữ liệu)."
                     />
                   </Stack>
                 </Radio.Group>
