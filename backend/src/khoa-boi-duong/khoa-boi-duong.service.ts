@@ -1368,8 +1368,14 @@ export class KhoaBoiDuongService {
     let cumId: string | undefined;
     const tenCum = raw.ten_cum?.trim();
     if (tenCum) {
+      // Tên cụm lưu dạng NFC — file Excel từ Mac có thể là NFD.
       const cum = await this.prisma.cum_hoc_vien.findUnique({
-        where: { khoa_id_ten_cum: { khoa_id: khoa.id, ten_cum: tenCum } },
+        where: {
+          khoa_id_ten_cum: {
+            khoa_id: khoa.id,
+            ten_cum: normalizeNfcName(tenCum),
+          },
+        },
       });
       if (!cum) {
         return {

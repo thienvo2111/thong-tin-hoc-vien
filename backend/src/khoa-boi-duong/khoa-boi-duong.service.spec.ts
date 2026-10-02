@@ -400,6 +400,27 @@ describe('KhoaBoiDuongService', () => {
       expect(error).toContain('Lớp Ma');
     });
 
+    it('tên cụm dạng NFD (Excel trên Mac) -> tra theo NFC, vẫn khớp cụm', async () => {
+      prisma.cum_hoc_vien.findUnique.mockResolvedValue({ id: 'cum-1' });
+      const { dto, error } = await service.resolvePhanLopRow(
+        {
+          so_dinh_danh_ca_nhan: '123456789012',
+          ten_cum: 'Cụm Long Xuyên'.normalize('NFD'),
+        },
+        khoa,
+      );
+      expect(error).toBeUndefined();
+      expect(dto?.cum_id).toBe('cum-1');
+      expect(prisma.cum_hoc_vien.findUnique).toHaveBeenCalledWith({
+        where: {
+          khoa_id_ten_cum: {
+            khoa_id: 'khoa-1',
+            ten_cum: 'Cụm Long Xuyên'.normalize('NFC'),
+          },
+        },
+      });
+    });
+
     it('không tìm thấy cụm -> lỗi rõ ràng', async () => {
       prisma.cum_hoc_vien.findUnique.mockResolvedValue(null);
       const { error } = await service.resolvePhanLopRow(
