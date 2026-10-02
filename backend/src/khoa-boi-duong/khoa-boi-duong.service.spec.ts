@@ -1,4 +1,4 @@
-import { KhoaBoiDuongService } from './khoa-boi-duong.service';
+import { KhoaBoiDuongService, taoBoNhoPhanLop } from './khoa-boi-duong.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from '../auth/scope/scope.service';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
@@ -337,13 +337,13 @@ describe('KhoaBoiDuongService', () => {
       id: 'gd-2',
       thu_tu: 2,
       ten_giai_doan: 'Zoom',
-      hinh_thuc: 'truc_tuyen',
+      hinh_thuc: 'truc_tuyen' as const,
     };
     const gd3 = {
       id: 'gd-3',
       thu_tu: 3,
       ten_giai_doan: 'VLE',
-      hinh_thuc: 'truc_tuyen',
+      hinh_thuc: 'truc_tuyen' as const,
     };
 
     beforeEach(() => {
@@ -398,6 +398,41 @@ describe('KhoaBoiDuongService', () => {
       expect(dto).toBeUndefined();
       expect(error).toContain('GĐ2');
       expect(error).toContain('Lớp Ma');
+    });
+
+    // Hiệu năng (~9.000 học viên/lượt): giai đoạn truyền sẵn từ ImportService,
+    // tra lớp theo tên + đếm buổi (lớp, GĐ) nhớ lại trong cả lượt import.
+    it('dùng chung bộ nhớ lượt import: không query lại giai đoạn; mỗi tên lớp và mỗi (lớp, GĐ) chỉ tra 1 lần', async () => {
+      prisma.hoc_vien.findUnique.mockImplementation(({ where }) => ({
+        id: `hv-${where.so_dinh_danh_ca_nhan}`,
+        trang_thai: 'da_duyet',
+      }));
+      prisma.lop_hoc.findMany.mockResolvedValue([
+        {
+          id: 'lop-zoom',
+          ten_lop: 'Lớp Zoom',
+          loai_lop: 'zoom',
+          muc_nang_luc: null,
+        },
+      ]);
+      const boNho = taoBoNhoPhanLop();
+      const khoaCoGiaiDoan = { ...khoa, giai_doan: [gd2, gd3] };
+
+      for (const sdd of ['111111111111', '222222222222', '333333333333']) {
+        const { error, dto } = await service.resolvePhanLopRow(
+          { so_dinh_danh_ca_nhan: sdd, 'gd:2': 'Lớp Zoom' },
+          khoaCoGiaiDoan,
+          undefined,
+          boNho,
+        );
+        expect(error).toBeUndefined();
+        expect(dto?.gan).toEqual([
+          { giai_doan_id: 'gd-2', lop_id: 'lop-zoom' },
+        ]);
+      }
+      expect(prisma.giai_doan_khoa.findMany).not.toHaveBeenCalled();
+      expect(prisma.lop_hoc.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.lich_hoc_lop.count).toHaveBeenCalledTimes(1);
     });
 
     it('tên cụm dạng NFD (Excel trên Mac) -> tra theo NFC, vẫn khớp cụm', async () => {

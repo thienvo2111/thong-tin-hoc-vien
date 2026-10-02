@@ -6,7 +6,11 @@ import { DiaDanhService } from '../danh-muc/dia-danh/dia-danh.service';
 import { DonViCongTacService } from '../danh-muc/don-vi-cong-tac/don-vi-cong-tac.service';
 import { MonHocService } from '../danh-muc/mon-hoc/mon-hoc.service';
 import { HocVienService } from '../hoc-vien/hoc-vien.service';
-import { KhoaBoiDuongService } from '../khoa-boi-duong/khoa-boi-duong.service';
+import {
+  BoNhoPhanLop,
+  KhoaBoiDuongService,
+  taoBoNhoPhanLop,
+} from '../khoa-boi-duong/khoa-boi-duong.service';
 import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
 import { CreateDiaDanhDto } from '../danh-muc/dto/dia-danh.dto';
 import { CreateDonViCongTacDto } from '../danh-muc/dto/don-vi-cong-tac.dto';
@@ -226,6 +230,8 @@ export class ImportService {
     // taoImport()/xacNhan() (không dùng chung giữa 2 lượt preview/xác nhận
     // vì mỗi lượt đọc lại toàn bộ file từ đầu).
     const dupKeys = new Set<string>();
+    // phan_lop_hoc_vien: tra lớp/cảnh báo 1 lần cho cả lượt (xem BoNhoPhanLop).
+    const boNho = taoBoNhoPhanLop();
 
     for (const row of rows) {
       const apDung = this.apDungMaKhoaMacDinh(row.values, maKhoa);
@@ -238,6 +244,7 @@ export class ImportService {
         apDung.values,
         dupKeys,
         phanLop?.khoa,
+        boNho,
       );
       if (error || !dto) {
         danhSachLoi.push({
@@ -380,6 +387,8 @@ export class ImportService {
     // T6: xem ghi chú dupKeys ở taoImport() — reset riêng cho lượt xác nhận
     // này (đọc lại file từ đầu).
     const dupKeys = new Set<string>();
+    // phan_lop_hoc_vien: tra lớp/cảnh báo 1 lần cho cả lượt (xem BoNhoPhanLop).
+    const boNho = taoBoNhoPhanLop();
 
     for (const dong of ketQuaCu.dong_hop_le) {
       const values = rowsByDong.get(dong);
@@ -403,6 +412,7 @@ export class ImportService {
         apDung.values,
         dupKeys,
         phanLop?.khoa,
+        boNho,
       );
       if (error || !dto) {
         danhSachLoiMoi.push({
@@ -802,7 +812,8 @@ export class ImportService {
     loai: SupportedImportType,
     raw: Record<string, string>,
     dupKeys?: Set<string>,
-    khoaPhanLop?: { id: string; ma_khoa: string },
+    khoaPhanLop?: Parameters<KhoaBoiDuongService['resolvePhanLopRow']>[1],
+    boNho?: BoNhoPhanLop,
   ): Promise<
     RowBuildResult<
       | CreateDiaDanhDto
@@ -836,6 +847,7 @@ export class ImportService {
           raw,
           khoaPhanLop,
           dupKeys,
+          boNho,
         );
       case 'ho_so_nhan_su_moet':
         return this.buildHoSoMoetDto(raw);
