@@ -6,6 +6,7 @@ import {
   mauDatLaiMatKhau,
   mauKetQuaHocTap,
   mauLichHoc,
+  mauXacNhanHoSo,
 } from '../../backend/src/thong-bao/mau-email/mau-email';
 
 const web = 'https://boiduongnls.hcmue.edu.vn';
@@ -113,3 +114,31 @@ out(
   }).html,
 );
 console.log('OK');
+
+out(
+  '4-xac-nhan-ho-so.html',
+  mauXacNhanHoSo({
+    hoSo: {
+      maDinhDanhMoet: '8912345678',
+      hoTen: 'Hà Thị Thanh',
+      ngaySinh: 11,
+      thangSinh: 9,
+      namSinh: 1988,
+      gioiTinh: 'nu',
+      soDinhDanhCaNhan: '089188001234',
+      noiSinh: ['Xã Mỹ Hòa Hưng', 'TP. Long Xuyên', 'Tỉnh An Giang'],
+      cuTru: ['Phường Long Xuyên', 'Tỉnh An Giang'],
+      donViCongTac: 'Trường THPT Long Xuyên',
+      chucVu: 'Tổ trưởng chuyên môn',
+      doiTuong: 'giao_vien',
+      soDienThoai: '0979427164',
+      email: 'thanh@example.com',
+      trinhDo: 'dai_hoc',
+      trinhDoKhac: null,
+      chuyenMon: ['Công nghệ'],
+      capGiangDay: 'thpt',
+      monGiangDay: null,
+    },
+    linkHoSo: `${web}/toi/ho-so`,
+  }).html,
+);

@@ -5,6 +5,9 @@ import {
   mauDatLaiMatKhau,
   mauKetQuaHocTap,
   mauLichHoc,
+  mauXacNhanHoSo,
+  HoSoTrongEmail,
+  anCccd,
   thuNgay,
 } from './mau-email';
 
@@ -247,5 +250,158 @@ describe('mauKetQuaHocTap', () => {
     expect(html).not.toContain('Kết quả theo giai đoạn');
     expect(html).not.toContain('Mức năng lực đầu vào');
     expect(html).not.toContain('Ngày hoàn thành');
+  });
+});
+
+describe('mauXacNhanHoSo', () => {
+  const day: HoSoTrongEmail = {
+    maDinhDanhMoet: '8912345678',
+    hoTen: 'Hà Thị Thanh',
+    ngaySinh: 11,
+    thangSinh: 9,
+    namSinh: 1988,
+    gioiTinh: 'nu',
+    soDinhDanhCaNhan: '089188001234',
+    noiSinh: ['Xã Mỹ Hòa', null, 'Tỉnh An Giang'],
+    cuTru: ['Phường Long Xuyên', 'Tỉnh An Giang'],
+    donViCongTac: 'Trường THPT Long Xuyên',
+    chucVu: 'Giáo viên',
+    soDienThoai: '0979427164',
+    email: 'thanh@example.com',
+    trinhDo: 'dai_hoc',
+    trinhDoKhac: null,
+    chuyenMon: ['Công nghệ', 'Tin học'],
+    capGiangDay: 'thpt',
+    monGiangDay: 'Công nghệ',
+  };
+  const link = 'https://boiduongnls.hcmue.edu.vn/toi/ho-so';
+
+  it('đủ 15 trường đúng thứ tự trang Xác nhận, nhãn tiếng Việt', () => {
+    const { tieuDe, html } = mauXacNhanHoSo({ hoSo: day, linkHoSo: link });
+    expect(tieuDe).toBe('[HCMUE-BDNLS] Xác nhận thông tin đã khai báo');
+    const nhan = [
+      'Mã định danh CSDL ngành',
+      'Họ và tên',
+      'Ngày sinh',
+      'Giới tính',
+      'Số CCCD',
+      'Nơi sinh',
+      'Cư trú',
+      'Đơn vị công tác',
+      'Chức vụ',
+      'Số điện thoại',
+      'Email',
+      'Trình độ chuyên môn',
+      'Chuyên môn',
+      'Cấp giảng dạy',
+      'Môn giảng dạy',
+    ];
+    const viTri = nhan.map((n) => html.indexOf(`>${n}</td>`));
+    expect(viTri.every((v) => v > 0)).toBe(true);
+    expect([...viTri].sort((a, b) => a - b)).toEqual(viTri);
+    for (const giaTri of [
+      '8912345678',
+      '11/09/1988',
+      'Nữ',
+      'Xã Mỹ Hòa, Tỉnh An Giang',
+      'Phường Long Xuyên, Tỉnh An Giang',
+      'Trường THPT Long Xuyên',
+      'Giáo viên',
+      '0979427164',
+      'thanh@example.com',
+      'Đại học',
+      'Công nghệ, Tin học',
+      'THPT',
+    ]) {
+      expect(html).toContain(giaTri);
+    }
+    expect(html).not.toContain('(chưa khai báo)');
+  });
+
+  it('CCCD chỉ hiện 4 số cuối', () => {
+    const { html } = mauXacNhanHoSo({ hoSo: day, linkHoSo: link });
+    expect(html).not.toContain('089188001234');
+    expect(html).toContain('••••••••1234');
+    expect(anCccd('123')).toBe('123');
+  });
+
+  it('trường trống/null -> "(chưa khai báo)", không có chuỗi "null"', () => {
+    const { html } = mauXacNhanHoSo({
+      hoSo: {
+        ...day,
+        maDinhDanhMoet: null,
+        gioiTinh: null,
+        soDinhDanhCaNhan: null,
+        noiSinh: [null, null, null],
+        cuTru: [null, '  '],
+        donViCongTac: null,
+        chucVu: '',
+        soDienThoai: null,
+        trinhDo: null,
+        chuyenMon: [],
+        capGiangDay: null,
+        monGiangDay: null,
+      },
+      linkHoSo: link,
+    });
+    expect(html.split('(chưa khai báo)').length - 1).toBe(12);
+    expect(html).not.toMatch(/>null</);
+  });
+
+  it('trình độ "khac" -> hiện mô tả tự nhập; "khac" không mô tả -> "Khác"', () => {
+    const coMoTa = mauXacNhanHoSo({
+      hoSo: { ...day, trinhDo: 'khac', trinhDoKhac: 'Chuyên khoa I' },
+      linkHoSo: link,
+    }).html;
+    expect(coMoTa).toContain('Chuyên khoa I');
+    const khongMoTa = mauXacNhanHoSo({
+      hoSo: { ...day, trinhDo: 'khac', trinhDoKhac: null },
+      linkHoSo: link,
+    }).html;
+    expect(khongMoTa).toContain('>Khác</td>');
+  });
+
+  it('escape dữ liệu tự nhập', () => {
+    const { html } = mauXacNhanHoSo({
+      hoSo: { ...day, chucVu: '<b>Tổ trưởng</b>' },
+      linkHoSo: link,
+    });
+    expect(html).toContain('&lt;b&gt;Tổ trưởng&lt;/b&gt;');
+  });
+
+  describe('Đối tượng (GV/CBQL)', () => {
+    it.each([
+      ['giao_vien', 'Giáo viên'],
+      ['can_bo_quan_ly', 'Cán bộ quản lý'],
+    ] as const)(
+      '%s -> "%s", nằm ngay sau Chức vụ, trước Số điện thoại',
+      (dt, nhan) => {
+        const { html } = mauXacNhanHoSo({
+          hoSo: { ...day, doiTuong: dt },
+          linkHoSo: link,
+        });
+        const viTri = ['Chức vụ', 'Đối tượng', 'Số điện thoại'].map((n) =>
+          html.indexOf(`>${n}</td>`),
+        );
+        expect(viTri[0]).toBeGreaterThan(0);
+        expect(viTri[0]).toBeLessThan(viTri[1]);
+        expect(viTri[1]).toBeLessThan(viTri[2]);
+        expect(html).toContain(nhan);
+      },
+    );
+
+    it('null (chưa chọn) -> "(chưa khai báo)"', () => {
+      const { html } = mauXacNhanHoSo({
+        hoSo: { ...day, doiTuong: null },
+        linkHoSo: link,
+      });
+      expect(html).toContain('>Đối tượng</td>');
+      expect(html.split('(chưa khai báo)').length - 1).toBe(1);
+    });
+
+    it('không truyền (schema chưa có cột) -> không có dòng Đối tượng', () => {
+      const { html } = mauXacNhanHoSo({ hoSo: day, linkHoSo: link });
+      expect(html).not.toContain('>Đối tượng</td>');
+    });
   });
 });

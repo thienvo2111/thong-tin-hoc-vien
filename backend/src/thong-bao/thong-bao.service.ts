@@ -22,6 +22,7 @@ import {
   mauDatLaiMatKhau,
   mauKetQuaHocTap,
   mauLichHoc,
+  mauXacNhanHoSo,
 } from './mau-email/mau-email';
 
 const EMAIL_DAILY_LIMIT_MAC_DINH = 2000;
@@ -80,7 +81,13 @@ export class ThongBaoService {
   async guiHocVienXacNhan(hocVienId: string): Promise<void> {
     const hocVien = await this.prisma.hoc_vien.findUnique({
       where: { id: hocVienId },
-      include: { chuyen_mon: true },
+      include: {
+        chuyen_mon: true,
+        cu_tru_tinh: true,
+        cu_tru_phuong_xa: true,
+        don_vi_cong_tac: true,
+        mon_giang_day: true,
+      },
     });
     if (!hocVien) return;
     if (!hocVien.email_lien_he) {
@@ -88,40 +95,42 @@ export class ThongBaoService {
       return;
     }
 
-    const chuyenMonText =
-      hocVien.chuyen_mon.map((c) => c.chuyen_mon).join(', ') ||
-      '(chưa khai báo)';
-    const html = boCucEmail({
-      xemTruoc: 'Bản sao thông tin Thầy/Cô vừa khai báo/xác nhận.',
-      nhan: 'HỒ SƠ HỌC VIÊN',
-      tieuDe: 'Xác nhận thông tin đã khai báo',
-      noiDung: [
-        doanVan(`Kính gửi Thầy/Cô <b>${e(hocVien.ho_ten)}</b>,`),
-        doanVan(
-          'Hệ thống đã ghi nhận thông tin Thầy/Cô vừa khai báo/xác nhận như sau:',
-        ),
-        bangThongTin([
-          ['Họ và tên', e(hocVien.ho_ten)],
-          [
-            'Ngày sinh',
-            e(`${hocVien.ngay_sinh}/${hocVien.thang_sinh}/${hocVien.nam_sinh}`),
-          ],
-          ['Số điện thoại liên hệ', e(hocVien.so_dien_thoai_lien_he)],
-          ['Chuyên môn', e(chuyenMonText)],
-        ]),
-        khoiNoiBat(
-          'canh_bao',
-          'Nếu có sai sót, vui lòng đăng nhập Cổng thông tin để sửa trước khi hồ sơ được duyệt.',
-        ),
-        nutBam('Xem hồ sơ của tôi', `${layFrontendUrl()}/toi/ho-so`),
-      ].join(''),
+    const { tieuDe, html } = mauXacNhanHoSo({
+      hoSo: {
+        maDinhDanhMoet: hocVien.ma_dinh_danh_moet,
+        hoTen: hocVien.ho_ten,
+        ngaySinh: hocVien.ngay_sinh,
+        thangSinh: hocVien.thang_sinh,
+        namSinh: hocVien.nam_sinh,
+        gioiTinh: hocVien.gioi_tinh,
+        soDinhDanhCaNhan: hocVien.so_dinh_danh_ca_nhan,
+        noiSinh: [
+          hocVien.noi_sinh_xa,
+          hocVien.noi_sinh_huyen,
+          hocVien.noi_sinh_tinh,
+        ],
+        cuTru: [
+          hocVien.cu_tru_phuong_xa?.ten ?? null,
+          hocVien.cu_tru_tinh?.ten ?? null,
+        ],
+        donViCongTac: hocVien.don_vi_cong_tac?.ten_don_vi ?? null,
+        chucVu: hocVien.chuc_vu,
+        soDienThoai: hocVien.so_dien_thoai_lien_he,
+        email: hocVien.email_lien_he,
+        trinhDo: hocVien.trinh_do_chuyen_mon,
+        trinhDoKhac: hocVien.trinh_do_chuyen_mon_khac,
+        chuyenMon: hocVien.chuyen_mon.map((c) => c.chuyen_mon),
+        capGiangDay: hocVien.cap_giang_day,
+        monGiangDay: hocVien.mon_giang_day?.ten_mon ?? null,
+      },
+      linkHoSo: `${layFrontendUrl()}/toi/ho-so`,
     });
 
     await this.themVaoHangDoiEmail({
       loaiSuKien: 'hoc_vien_xac_nhan',
       hocVienId: hocVien.id,
       email: hocVien.email_lien_he,
-      tieuDe: '[HCMUE-BDNLS] Xác nhận thông tin đã khai báo',
+      tieuDe,
       html,
     });
   }

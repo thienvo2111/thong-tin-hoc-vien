@@ -1,8 +1,10 @@
 import {
+  cap_hoc,
   hinh_thuc_giai_doan,
   ket_qua_hoc,
   loai_lop_hoc,
   muc_nang_luc,
+  trinh_do_chuyen_mon,
   vai_tro_nhan_su_lop,
 } from '@prisma/client';
 import {
@@ -365,6 +367,162 @@ export function mauKetQuaHocTap(p: {
     html: boCucEmail({
       xemTruoc: `Kết quả khóa ${p.tenKhoa}: ${KET_QUA_HOC_LABEL[ketQua]}.`,
       nhan: 'KẾT QUẢ HỌC TẬP',
+      tieuDe,
+      noiDung,
+    }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 4. Xác nhận thông tin đã khai báo (bản sao hồ sơ)
+// ---------------------------------------------------------------------------
+// Cùng 15 trường, cùng thứ tự và nhãn với trang Xác nhận (frontend
+// pages/M5/XacNhan.tsx → dongHoSo + lib/nhanTruong.ts) — sửa một bên thì sửa
+// cả bên kia.
+const TRINH_DO_LABEL: Record<trinh_do_chuyen_mon, string> = {
+  trung_cap: 'Trung cấp',
+  cao_dang: 'Cao đẳng',
+  dai_hoc: 'Đại học',
+  thac_si: 'Thạc sĩ',
+  tien_si: 'Tiến sĩ',
+  khac: 'Khác',
+};
+
+const CAP_HOC_LABEL: Record<cap_hoc, string> = {
+  mam_non: 'Mầm non',
+  tieu_hoc: 'Tiểu học',
+  thcs: 'THCS',
+  thpt: 'THPT',
+};
+
+// Enum doi_tuong_hoc_vien (cột hoc_vien.doi_tuong, nhánh feat/sso-khao-sat
+// bf4e0b5) — khai báo literal ở đây để mẫu không phụ thuộc schema đã merge.
+export type DoiTuongHocVien = 'giao_vien' | 'can_bo_quan_ly';
+
+const DOI_TUONG_LABEL: Record<DoiTuongHocVien, string> = {
+  giao_vien: 'Giáo viên',
+  can_bo_quan_ly: 'Cán bộ quản lý',
+};
+
+const GIOI_TINH_LABEL: Record<string, string> = {
+  nam: 'Nam',
+  nu: 'Nữ',
+  khac: 'Khác',
+};
+
+export type HoSoTrongEmail = {
+  maDinhDanhMoet: string | null;
+  hoTen: string;
+  ngaySinh: number;
+  thangSinh: number;
+  namSinh: number;
+  gioiTinh: string | null;
+  soDinhDanhCaNhan: string | null;
+  noiSinh: Array<string | null>; // xã, huyện, tỉnh
+  cuTru: Array<string | null>; // phường/xã, tỉnh
+  donViCongTac: string | null;
+  chucVu: string | null;
+  // undefined = chưa có cột (trước khi merge) -> bỏ hẳn dòng; null = học
+  // viên chưa chọn -> "(chưa khai báo)".
+  doiTuong?: DoiTuongHocVien | null;
+  soDienThoai: string | null;
+  email: string | null;
+  trinhDo: trinh_do_chuyen_mon | null;
+  trinhDoKhac: string | null;
+  chuyenMon: string[];
+  capGiangDay: cap_hoc | null;
+  monGiangDay: string | null;
+};
+
+// Email đi qua nhiều máy chủ trung gian — chỉ hiện 4 số cuối CCCD.
+export function anCccd(cccd: string): string {
+  const so = cccd.trim();
+  return so.length <= 4 ? so : `${'•'.repeat(so.length - 4)}${so.slice(-4)}`;
+}
+
+const CHUA_KHAI = `<span style="font-weight:400;color:${MAU.chuPhu};">(chưa khai báo)</span>`;
+
+function giaTriHoacTrong(giaTri: string | null | undefined): string {
+  const v = (giaTri ?? '').trim();
+  return v ? e(v) : CHUA_KHAI;
+}
+
+export function mauXacNhanHoSo(p: {
+  hoSo: HoSoTrongEmail;
+  linkHoSo: string;
+}): EmailDaDung {
+  const h = p.hoSo;
+  const tieuDe = 'Xác nhận thông tin đã khai báo';
+  const trinhDo =
+    h.trinhDo === 'khac' && h.trinhDoKhac?.trim()
+      ? h.trinhDoKhac
+      : h.trinhDo
+        ? TRINH_DO_LABEL[h.trinhDo]
+        : null;
+  const noi = (ds: Array<string | null>) =>
+    ds.filter((x) => x && x.trim()).join(', ');
+
+  const dong: Array<[string, string]> = [
+    ['Mã định danh CSDL ngành', giaTriHoacTrong(h.maDinhDanhMoet)],
+    ['Họ và tên', giaTriHoacTrong(h.hoTen)],
+    [
+      'Ngày sinh',
+      e(
+        `${String(h.ngaySinh).padStart(2, '0')}/${String(h.thangSinh).padStart(2, '0')}/${h.namSinh}`,
+      ),
+    ],
+    [
+      'Giới tính',
+      giaTriHoacTrong(
+        h.gioiTinh ? (GIOI_TINH_LABEL[h.gioiTinh] ?? h.gioiTinh) : null,
+      ),
+    ],
+    [
+      'Số CCCD',
+      giaTriHoacTrong(h.soDinhDanhCaNhan ? anCccd(h.soDinhDanhCaNhan) : null),
+    ],
+    ['Nơi sinh', giaTriHoacTrong(noi(h.noiSinh))],
+    ['Cư trú', giaTriHoacTrong(noi(h.cuTru))],
+    ['Đơn vị công tác', giaTriHoacTrong(h.donViCongTac)],
+    ['Chức vụ', giaTriHoacTrong(h.chucVu)],
+    ...(h.doiTuong === undefined
+      ? []
+      : [
+          [
+            'Đối tượng',
+            giaTriHoacTrong(h.doiTuong ? DOI_TUONG_LABEL[h.doiTuong] : null),
+          ] as [string, string],
+        ]),
+    ['Số điện thoại', giaTriHoacTrong(h.soDienThoai)],
+    ['Email', giaTriHoacTrong(h.email)],
+    ['Trình độ chuyên môn', giaTriHoacTrong(trinhDo)],
+    ['Chuyên môn', giaTriHoacTrong(h.chuyenMon.join(', '))],
+    [
+      'Cấp giảng dạy',
+      giaTriHoacTrong(h.capGiangDay ? CAP_HOC_LABEL[h.capGiangDay] : null),
+    ],
+    ['Môn giảng dạy', giaTriHoacTrong(h.monGiangDay)],
+  ];
+
+  const noiDung = [
+    doanVan(`Kính gửi Thầy/Cô <b>${e(h.hoTen)}</b>,`),
+    doanVan(
+      'Hệ thống đã ghi nhận thông tin Thầy/Cô vừa khai báo/xác nhận như sau:',
+    ),
+    bangThongTin(dong),
+    chuNho('Vì lý do bảo mật, số CCCD chỉ hiển thị 4 chữ số cuối.'),
+    khoiNoiBat(
+      'canh_bao',
+      'Nếu có sai sót, vui lòng đăng nhập Cổng thông tin để sửa trước khi hồ sơ được duyệt.',
+    ),
+    nutBam('Xem hồ sơ của tôi', p.linkHoSo),
+  ].join('');
+
+  return {
+    tieuDe: `[HCMUE-BDNLS] ${tieuDe}`,
+    html: boCucEmail({
+      xemTruoc: 'Bản sao thông tin Thầy/Cô vừa khai báo/xác nhận.',
+      nhan: 'HỒ SƠ HỌC VIÊN',
       tieuDe,
       noiDung,
     }),
