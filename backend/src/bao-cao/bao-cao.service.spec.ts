@@ -23,7 +23,7 @@ describe('BaoCaoService.tongQuan', () => {
   let service: BaoCaoService;
   let prisma: {
     dang_ky_hoc: { findMany: jest.Mock };
-    dang_ky_hoc_lop: { findMany: jest.Mock };
+    phan_lop_giai_doan: { findMany: jest.Mock };
     nguoi_dung: { count: jest.Mock };
     lich_su_thay_doi_ho_so: { findMany: jest.Mock };
   };
@@ -35,7 +35,7 @@ describe('BaoCaoService.tongQuan', () => {
   beforeEach(() => {
     prisma = {
       dang_ky_hoc: { findMany: jest.fn().mockResolvedValue([]) },
-      dang_ky_hoc_lop: { findMany: jest.fn().mockResolvedValue([]) },
+      phan_lop_giai_doan: { findMany: jest.fn().mockResolvedValue([]) },
       nguoi_dung: { count: jest.fn().mockResolvedValue(0) },
       lich_su_thay_doi_ho_so: { findMany: jest.fn().mockResolvedValue([]) },
     };
@@ -117,12 +117,19 @@ describe('BaoCaoService.tongQuan', () => {
     prisma.dang_ky_hoc.findMany.mockResolvedValue([
       { hoc_vien_id: 'hv-1', muc_dau_vao: null, muc_dau_ra: null },
     ]);
-    prisma.dang_ky_hoc_lop.findMany.mockResolvedValue([
-      { loai_lop: 'truc_tiep', dang_ky_hoc: { ket_qua: 'dat' } },
-      { loai_lop: 'truc_tiep', dang_ky_hoc: { ket_qua: 'dang_hoc' } },
-      { loai_lop: 'zoom', dang_ky_hoc: { ket_qua: 'khong_dat' } },
-      { loai_lop: 'vle', dang_ky_hoc: { ket_qua: 'vang' } },
-      { loai_lop: 'vle', dang_ky_hoc: { ket_qua: null } },
+    // Phân lớp theo giai đoạn: dk-4 học VLE ở 2 giai đoạn -> chỉ đếm 1 lần.
+    const pl = (dk: string, loai: string, ket_qua: string | null) => ({
+      dang_ky_hoc_id: dk,
+      lop: { loai_lop: loai },
+      dang_ky_hoc: { ket_qua },
+    });
+    prisma.phan_lop_giai_doan.findMany.mockResolvedValue([
+      pl('dk-1', 'truc_tiep', 'dat'),
+      pl('dk-2', 'truc_tiep', 'dang_hoc'),
+      pl('dk-3', 'zoom', 'khong_dat'),
+      pl('dk-4', 'vle', 'vang'),
+      pl('dk-4', 'vle', 'vang'),
+      pl('dk-5', 'vle', null),
     ]);
 
     const result = await service.tongQuan({}, caller());

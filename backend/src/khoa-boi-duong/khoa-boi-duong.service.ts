@@ -581,7 +581,24 @@ export class KhoaBoiDuongService {
         }
       }
     }
-    return khoa;
+
+    // Sĩ số hiện tại = số đăng ký khác nhau đang được gán vào lớp ở bất kỳ
+    // giai đoạn nào (1 học viên học cùng lớp ở 2 giai đoạn chỉ tính 1).
+    const capLopDangKy = await this.prisma.phan_lop_giai_doan.groupBy({
+      by: ['lop_id', 'dang_ky_hoc_id'],
+      where: { lop: { khoa_id: id } },
+    });
+    const siSoTheoLop = new Map<string, number>();
+    for (const r of capLopDangKy) {
+      siSoTheoLop.set(r.lop_id, (siSoTheoLop.get(r.lop_id) ?? 0) + 1);
+    }
+    return {
+      ...khoa,
+      lop_hoc: khoa.lop_hoc.map((l) => ({
+        ...l,
+        si_so_hien_tai: siSoTheoLop.get(l.id) ?? 0,
+      })),
+    };
   }
 
   // ---------------------------------------------------------------------
@@ -724,11 +741,14 @@ export class KhoaBoiDuongService {
 
     let canhBao: string | undefined;
     if (dto.loai_lop && dto.loai_lop !== lop.loai_lop) {
-      const soDangKy = await this.prisma.dang_ky_hoc_lop.count({
-        where: { lop_id: lopId },
-      });
+      const soDangKy = (
+        await this.prisma.phan_lop_giai_doan.groupBy({
+          by: ['dang_ky_hoc_id'],
+          where: { lop_id: lopId },
+        })
+      ).length;
       if (soDangKy > 0) {
-        canhBao = `Lớp này đang có ${soDangKy} đăng ký học gán loại lớp "${lop.loai_lop}" — đổi sang "${dto.loai_lop}" KHÔNG tự động cập nhật các đăng ký đó, cần rà soát/gán lại thủ công qua PATCH /dang-ky-hoc/{id}/lop`;
+        canhBao = `Lớp này đang có ${soDangKy} đăng ký học được phân vào — đổi loại lớp sang "${dto.loai_lop}" không tự cập nhật phân lớp theo giai đoạn, cần rà soát lại`;
       }
     }
 
@@ -1004,33 +1024,34 @@ export class KhoaBoiDuongService {
     return caller.hoc_vien_id;
   }
 
-  // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): trả riêng 3 loại lớp
-  // (lop_truc_tiep/lop_zoom/lop_vle) + cum thay cho 1 trường "lop" duy nhất
-  // như trước — THAY ĐỔI CẤU TRÚC RESPONSE của endpoint này. Frontend M7
-  // (ThongTinLopHoc.tsx) đang dùng field "lop" cũ sẽ tạm hiển thị
-  // sai/thiếu dữ liệu cho tới khi task frontend riêng cập nhật — dự kiến,
-  // không phải lỗi (xem báo cáo cuối task này).
+  // Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.1) — THAY ĐỔI CẤU TRÚC
+  // RESPONSE: bỏ lop_truc_tiep/lop_zoom/lop_vle/tien_do_giai_doan, thay bằng
+  // giai_doan[] (mọi giai đoạn active của khóa, theo thu_tu) — mỗi phần tử
+  // kèm lớp được gán ở giai đoạn đó (chỉ buổi thuộc giai đoạn đó) hoặc null,
+  // link/hướng dẫn chung của giai đoạn, và tiến độ (ket_qua_giai_doan).
   //
-  // Tách riêng phần đọc dữ liệu (dùng chung cho GET /hoc-vien/toi/khoa-hoc
-  // VÀ GET /hoc-vien/{id}/khoa-hoc — thêm 2026-09-30) khỏi phần xác định
-  // hocVienId (từ token đăng nhập hoặc từ param + kiểm tra quyền).
+  // Dùng chung cho GET /hoc-vien/toi/khoa-hoc VÀ GET /hoc-vien/{id}/khoa-hoc.
   private async khoaHocTheoHocVienId(hocVienId: string) {
     const dangKyList = await this.prisma.dang_ky_hoc.findMany({
       where: { hoc_vien_id: hocVienId },
       include: {
-        khoa: true,
+        khoa: {
+          include: {
+            giai_doan: {
+              where: { trang_thai: 'active' },
+              orderBy: { thu_tu: 'asc' },
+            },
+          },
+        },
         cum: true,
-        dang_ky_hoc_lop: {
+        phan_lop_giai_doan: {
           include: {
             lop: {
               include: {
                 nhan_su: true,
-                // T6 (mo-rong-nls-an-giang.md): sắp buổi theo giai đoạn,
-                // buổi, thời gian, địa điểm/link (nghiệm thu T6).
                 lich_hoc: {
                   include: { giai_doan: true },
                   orderBy: [
-                    { giai_doan: { thu_tu: 'asc' } },
                     { buoi_so: 'asc' },
                     { thoi_gian_bat_dau: 'asc' },
                     { dia_diem_hoac_link: 'asc' },
@@ -1044,11 +1065,8 @@ export class KhoaBoiDuongService {
       orderBy: { ngay_dang_ky: 'desc' },
     });
 
-    // T12 (mo-rong-nls-an-giang.md, 2026-09-30): trạng thái điểm danh từng
-    // buổi + tiến độ từng giai đoạn — truy vấn RIÊNG (không lồng vào include
-    // ở trên vì cần lọc theo CHÍNH dang_ky_hoc_id của từng dòng dang_ky_hoc,
-    // Prisma không hỗ trợ tham chiếu field anh em trong nested where) rồi map
-    // thủ công theo cặp (dang_ky_hoc_id, lich_hoc_id)/dang_ky_hoc_id.
+    // T12: trạng thái điểm danh từng buổi + tiến độ từng giai đoạn — truy
+    // vấn RIÊNG rồi map thủ công (Prisma không lọc nested theo field anh em).
     const dangKyIds = dangKyList.map((dk) => dk.id);
     const [diemDanhList, ketQuaGiaiDoanList] = dangKyIds.length
       ? await Promise.all([
@@ -1062,7 +1080,6 @@ export class KhoaBoiDuongService {
           }),
           this.prisma.ket_qua_giai_doan.findMany({
             where: { dang_ky_hoc_id: { in: dangKyIds } },
-            include: { giai_doan: { select: { ten_giai_doan: true } } },
           }),
         ])
       : [[], []];
@@ -1073,47 +1090,51 @@ export class KhoaBoiDuongService {
         d.trang_thai,
       ]),
     );
-    const tienDoTheoDangKy = new Map<
-      string,
-      {
-        giai_doan_id: string;
-        ten_giai_doan: string;
-        ty_le_hoan_thanh: number | null;
-        diem: number | null;
-      }[]
-    >();
-    for (const kq of ketQuaGiaiDoanList) {
-      const list = tienDoTheoDangKy.get(kq.dang_ky_hoc_id) ?? [];
-      list.push({
-        giai_doan_id: kq.giai_doan_id,
-        ten_giai_doan: kq.giai_doan.ten_giai_doan,
-        ty_le_hoan_thanh:
-          kq.ty_le_hoan_thanh == null ? null : Number(kq.ty_le_hoan_thanh),
-        diem: kq.diem == null ? null : Number(kq.diem),
-      });
-      tienDoTheoDangKy.set(kq.dang_ky_hoc_id, list);
-    }
+    const tienDoMap = new Map(
+      ketQuaGiaiDoanList.map((kq) => [
+        `${kq.dang_ky_hoc_id}|${kq.giai_doan_id}`,
+        {
+          ty_le_hoan_thanh:
+            kq.ty_le_hoan_thanh == null ? null : Number(kq.ty_le_hoan_thanh),
+          diem: kq.diem == null ? null : Number(kq.diem),
+        },
+      ]),
+    );
 
     return dangKyList.map((dk) => {
-      const { dang_ky_hoc_lop, ...rest } = dk;
-      const lopTheoLoai = (loai: loai_lop_hoc) => {
-        const lop = dang_ky_hoc_lop.find((d) => d.loai_lop === loai)?.lop;
-        if (!lop) return null;
-        return {
-          ...lop,
-          lich_hoc: (lop.lich_hoc ?? []).map((buoi) => ({
-            ...buoi,
-            trang_thai_diem_danh:
-              diemDanhMap.get(`${dk.id}|${buoi.id}`) ?? null,
-          })),
-        };
-      };
+      const { phan_lop_giai_doan, khoa, ...rest } = dk;
+      const { giai_doan: dsGiaiDoan, ...khoaGon } = khoa;
       return {
         ...rest,
-        lop_truc_tiep: lopTheoLoai('truc_tiep'),
-        lop_zoom: lopTheoLoai('zoom'),
-        lop_vle: lopTheoLoai('vle'),
-        tien_do_giai_doan: tienDoTheoDangKy.get(dk.id) ?? [],
+        khoa: khoaGon,
+        giai_doan: dsGiaiDoan.map((gd) => {
+          const lop = phan_lop_giai_doan.find(
+            (p) => p.giai_doan_id === gd.id,
+          )?.lop;
+          return {
+            id: gd.id,
+            thu_tu: gd.thu_tu,
+            ten_giai_doan: gd.ten_giai_doan,
+            hinh_thuc: gd.hinh_thuc,
+            thoi_gian_bat_dau: gd.thoi_gian_bat_dau,
+            thoi_gian_ket_thuc: gd.thoi_gian_ket_thuc,
+            link_hoac_dia_diem: gd.link_hoac_dia_diem,
+            huong_dan: gd.huong_dan,
+            lop: lop
+              ? {
+                  ...lop,
+                  lich_hoc: lop.lich_hoc
+                    .filter((b) => b.giai_doan_id === gd.id)
+                    .map((b) => ({
+                      ...b,
+                      trang_thai_diem_danh:
+                        diemDanhMap.get(`${dk.id}|${b.id}`) ?? null,
+                    })),
+                }
+              : null,
+            tien_do: tienDoMap.get(`${dk.id}|${gd.id}`) ?? null,
+          };
+        }),
       };
     });
   }
@@ -1148,10 +1169,6 @@ export class KhoaBoiDuongService {
     return this.khoaHocTheoHocVienId(hocVienId);
   }
 
-  // QĐ10: hệ quả bắt buộc từ việc bỏ dang_ky_hoc.lop_id — cũng tách
-  // lop_truc_tiep/lop_zoom/lop_vle giống khoaHocCuaToi() ở trên (không nằm
-  // trong 17 yêu cầu gốc của task, nhưng bắt buộc để code compile được sau
-  // khi cột lop_id bị xóa).
   async ketQuaCuaToi(caller: AuthenticatedUser) {
     const hocVienId = this.assertHocVienId(caller);
     const list = await this.prisma.dang_ky_hoc.findMany({
@@ -1162,27 +1179,27 @@ export class KhoaBoiDuongService {
         ket_qua: true,
         ngay_hoan_thanh: true,
         khoa: { select: { id: true, ma_khoa: true, ten_khoa: true } },
-        dang_ky_hoc_lop: {
+        phan_lop_giai_doan: {
           select: {
-            loai_lop: true,
+            giai_doan: { select: { thu_tu: true, ten_giai_doan: true } },
             lop: { select: { id: true, ten_lop: true } },
           },
+          orderBy: { giai_doan: { thu_tu: 'asc' } },
         },
       },
       orderBy: { ngay_dang_ky: 'desc' },
     });
 
-    return list.map((dk) => {
-      const { dang_ky_hoc_lop, ...rest } = dk;
-      const lopTheoLoai = (loai: loai_lop_hoc) =>
-        dang_ky_hoc_lop.find((d) => d.loai_lop === loai)?.lop ?? null;
-      return {
-        ...rest,
-        lop_truc_tiep: lopTheoLoai('truc_tiep'),
-        lop_zoom: lopTheoLoai('zoom'),
-        lop_vle: lopTheoLoai('vle'),
-      };
-    });
+    // Phân lớp theo giai đoạn (spec 2026-10-02): phan_lop thay cho 3 trường
+    // lop_truc_tiep/lop_zoom/lop_vle.
+    return list.map(({ phan_lop_giai_doan, ...rest }) => ({
+      ...rest,
+      phan_lop: phan_lop_giai_doan.map((p) => ({
+        thu_tu: p.giai_doan.thu_tu,
+        ten_giai_doan: p.giai_doan.ten_giai_doan,
+        lop: p.lop,
+      })),
+    }));
   }
 
   // ---------------------------------------------------------------------

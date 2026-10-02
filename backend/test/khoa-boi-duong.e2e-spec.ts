@@ -1157,7 +1157,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       expect(hangDoiPhanLop).toHaveLength(0);
     });
 
-    it('GET /hoc-vien/toi/khoa-hoc, /ket-qua phản ánh đúng ghi danh (lop_truc_tiep=null) vừa import', async () => {
+    it('GET /hoc-vien/toi/khoa-hoc, /ket-qua phản ánh đúng ghi danh (chưa phân lớp giai đoạn nào) vừa import', async () => {
       const khoaHoc = await request(app.getHttpServer())
         .get('/hoc-vien/toi/khoa-hoc')
         .set('Authorization', `Bearer ${tokenHocVienDaDuyet}`)
@@ -1166,7 +1166,10 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         (r: { khoa: { id: string } }) => r.khoa.id === khoaId,
       );
       expect(entry).toBeDefined();
-      expect(entry.lop_truc_tiep).toBeNull();
+      // Phân lớp theo giai đoạn: chỉ ghi danh -> mọi giai đoạn chưa có lớp.
+      expect(
+        entry.giai_doan.every((g: { lop: unknown }) => g.lop === null),
+      ).toBe(true);
 
       const ketQua = await request(app.getHttpServer())
         .get('/hoc-vien/toi/ket-qua')
@@ -1177,7 +1180,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       );
       expect(entryKq).toBeDefined();
       expect(entryKq.trang_thai).toBe('da_duyet');
-      expect(entryKq.lop_truc_tiep).toBeNull();
+      expect(entryKq.phan_lop).toEqual([]);
     });
 
     it('chạy lại import lần 2 với ten_lop có giá trị -> phân lớp cho học viên đã ghi danh (lop_id, trang_thai=da_phan_lop)', async () => {

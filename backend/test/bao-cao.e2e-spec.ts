@@ -441,17 +441,38 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
         muc_dau_vao: 'thanh_thao',
       },
     });
-    await prisma.dang_ky_hoc_lop.createMany({
+    // Phân lớp theo giai đoạn: dkVh1 học cùng lớp ở 2 giai đoạn -> sĩ số
+    // vẫn chỉ tính 1 (khử trùng theo đăng ký).
+    const [gdVh1, gdVh2] = await Promise.all(
+      [1, 2].map((thu_tu) =>
+        prisma.giai_doan_khoa.create({
+          data: {
+            khoa_id: khoaVanHanh,
+            thu_tu,
+            ten_giai_doan: `Trực tiếp đợt ${thu_tu}`,
+            hinh_thuc: 'truc_tiep',
+            thoi_gian_bat_dau: new Date('2026-01-01'),
+            thoi_gian_ket_thuc: new Date('2026-12-31'),
+          },
+        }),
+      ),
+    );
+    await prisma.phan_lop_giai_doan.createMany({
       data: [
         {
           dang_ky_hoc_id: dkVh1.id,
+          giai_doan_id: gdVh1.id,
           lop_id: lopVanHanh.id,
-          loai_lop: 'truc_tiep',
+        },
+        {
+          dang_ky_hoc_id: dkVh1.id,
+          giai_doan_id: gdVh2.id,
+          lop_id: lopVanHanh.id,
         },
         {
           dang_ky_hoc_id: dkVhKhac.id,
+          giai_doan_id: gdVh1.id,
           lop_id: lopVanHanh.id,
-          loai_lop: 'truc_tiep',
         },
       ],
     });

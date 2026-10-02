@@ -674,4 +674,122 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
       expect(ketQua.danh_sach_canh_bao.map((c) => c.dong)).toEqual([5]);
     });
   });
+
+  describe('Đường đọc theo giai đoạn', () => {
+    it('khoa-hoc của học viên: mọi GĐ active theo thứ tự; GĐ có lớp chỉ kèm buổi của GĐ đó; GĐ không lớp có link/hướng dẫn; tiến độ ghép đúng GĐ', async () => {
+      const khoa = await taoKhoa();
+      await taoGiaiDoan(khoa.id, 1, {
+        hinh_thuc: 'danh_gia',
+        link_hoac_dia_diem: 'https://x/dg',
+        huong_dan: 'Làm bài',
+      });
+      const gd2 = await taoGiaiDoan(khoa.id, 2);
+      const gd3 = await taoGiaiDoan(khoa.id, 3);
+      await taoGiaiDoan(khoa.id, 4, { trang_thai: 'ngung' });
+      const z = await taoLop(khoa.id, 'zoom', 'Zoom đọc');
+      await taoBuoi(z.id, gd2.id, 1);
+      await taoBuoi(z.id, gd3.id, 1); // buổi GĐ3 KHÔNG được hiện dưới GĐ2
+      const hv = await taoHocVienMoet(uniqueSuffix());
+      const dk = await ghiDanh(hv.hocVien.id, khoa.id);
+      await prisma.phan_lop_giai_doan.create({
+        data: { dang_ky_hoc_id: dk.id, giai_doan_id: gd2.id, lop_id: z.id },
+      });
+      await prisma.ket_qua_giai_doan.create({
+        data: {
+          dang_ky_hoc_id: dk.id,
+          giai_doan_id: gd2.id,
+          ty_le_hoan_thanh: 80,
+        },
+      });
+      const token = await dangNhap(hv.tenDangNhap, 'x');
+
+      const res = await request(app.getHttpServer())
+        .get('/hoc-vien/toi/khoa-hoc')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const entry = res.body.find(
+        (r: { khoa_id: string }) => r.khoa_id === khoa.id,
+      );
+      expect(entry.lop_zoom).toBeUndefined();
+      expect(entry.khoa.ma_khoa).toBe(khoa.ma_khoa);
+      expect(entry.giai_doan.map((g: { thu_tu: number }) => g.thu_tu)).toEqual([
+        1, 2, 3,
+      ]);
+      const [g1, g2, g3] = entry.giai_doan;
+      expect(g1).toMatchObject({
+        lop: null,
+        link_hoac_dia_diem: 'https://x/dg',
+        huong_dan: 'Làm bài',
+        tien_do: null,
+      });
+      expect(g2.lop.ten_lop).toBe('Zoom đọc');
+      expect(g2.lop.loai_lop).toBe('zoom');
+      expect(g2.lop.lich_hoc).toHaveLength(1);
+      expect(g2.lop.lich_hoc[0].giai_doan_id).toBe(gd2.id);
+      expect(g2.lop.lich_hoc[0].trang_thai_diem_danh).toBeNull();
+      expect(g2.tien_do).toEqual({ ty_le_hoan_thanh: 80, diem: null });
+      expect(g3.lop).toBeNull();
+
+      const kq = await request(app.getHttpServer())
+        .get('/hoc-vien/toi/ket-qua')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const entryKq = kq.body.find(
+        (r: { khoa: { id: string } }) => r.khoa.id === khoa.id,
+      );
+      expect(entryKq.lop_zoom).toBeUndefined();
+      expect(entryKq.phan_lop).toEqual([
+        {
+          thu_tu: 2,
+          ten_giai_doan: 'Giai đoạn 2',
+          lop: { id: z.id, ten_lop: 'Zoom đọc' },
+        },
+      ]);
+    });
+
+    it('chi tiết khóa: si_so_hien_tai đếm đăng ký khác nhau (1 học viên ở 2 GĐ cùng lớp = 1)', async () => {
+      const khoa = await taoKhoa();
+      const gd2 = await taoGiaiDoan(khoa.id, 2);
+      const gd3 = await taoGiaiDoan(khoa.id, 3);
+      const v = await taoLop(khoa.id, 'vle', 'VLE sĩ số');
+      const rong = await taoLop(khoa.id, 'zoom', 'Zoom rỗng');
+      const hv = await taoHocVienMoet(uniqueSuffix());
+      const dk = await ghiDanh(hv.hocVien.id, khoa.id);
+      await prisma.phan_lop_giai_doan.createMany({
+        data: [
+          { dang_ky_hoc_id: dk.id, giai_doan_id: gd2.id, lop_id: v.id },
+          { dang_ky_hoc_id: dk.id, giai_doan_id: gd3.id, lop_id: v.id },
+        ],
+      });
+      const res = await request(app.getHttpServer())
+        .get(`/khoa-boi-duong/${khoa.id}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      const lop = (id: string) =>
+        res.body.lop_hoc.find((l: { id: string }) => l.id === id);
+      expect(lop(v.id).si_so_hien_tai).toBe(1);
+      expect(lop(rong.id).si_so_hien_tai).toBe(0);
+    });
+
+    it('đổi loai_lop của lớp đang có học viên -> 200 kèm canh_bao đếm theo đăng ký', async () => {
+      const khoa = await taoKhoa();
+      const gd2 = await taoGiaiDoan(khoa.id, 2);
+      const gd3 = await taoGiaiDoan(khoa.id, 3);
+      const v = await taoLop(khoa.id, 'vle', 'VLE đổi loại');
+      const hv = await taoHocVienMoet(uniqueSuffix());
+      const dk = await ghiDanh(hv.hocVien.id, khoa.id);
+      await prisma.phan_lop_giai_doan.createMany({
+        data: [
+          { dang_ky_hoc_id: dk.id, giai_doan_id: gd2.id, lop_id: v.id },
+          { dang_ky_hoc_id: dk.id, giai_doan_id: gd3.id, lop_id: v.id },
+        ],
+      });
+      const res = await request(app.getHttpServer())
+        .patch(`/khoa-boi-duong/${khoa.id}/lop/${v.id}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ loai_lop: 'zoom' })
+        .expect(200);
+      expect(res.body.canh_bao).toContain('1 đăng ký học');
+    });
+  });
 });

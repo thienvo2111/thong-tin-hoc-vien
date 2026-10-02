@@ -529,11 +529,9 @@ export class BaoCaoService {
         ? undefined
         : { hoc_vien: { don_vi_cong_tac_id: { in: hocVienScope } } };
 
-    // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): lop_hoc.dang_ky_hoc trực
-    // tiếp (qua dang_ky_hoc.lop_id cũ) đã bị xóa — nay đi qua bảng nối
-    // dang_ky_hoc_lop, lọc theo dang_ky_hoc lồng bên trong đúng như trước
-    // (giữ nguyên phạm vi đếm, không cần lọc thêm theo loai_lop vì
-    // dang_ky_hoc_lop.loai_lop luôn khớp lop_hoc.loai_lop của chính lớp này).
+    // Phân lớp theo giai đoạn (spec 2026-10-02): đi qua phan_lop_giai_doan,
+    // lọc theo dang_ky_hoc lồng bên trong đúng phạm vi như trước; 1 học viên
+    // học cùng lớp ở nhiều giai đoạn chỉ tính 1 (khử trùng theo đăng ký).
     const lops = await this.prisma.lop_hoc.findMany({
       where,
       select: {
@@ -541,11 +539,12 @@ export class BaoCaoService {
         ten_lop: true,
         nhom_hoc_vien: true,
         muc_nang_luc: true,
-        dang_ky_hoc_lop: {
+        phan_lop_giai_doan: {
           where: dangKyHocWhere ? { dang_ky_hoc: dangKyHocWhere } : undefined,
           select: {
             dang_ky_hoc: {
               select: {
+                id: true,
                 muc_dau_vao: true,
                 hoc_vien: { include: { chuyen_mon: true } },
               },
@@ -569,8 +568,11 @@ export class BaoCaoService {
         so_ho_so_day_du: 0,
         theo_muc_dau_vao: this.emptyTheoMucDauVao(),
       };
-      for (const dkl of lop.dang_ky_hoc_lop) {
-        const dk = dkl.dang_ky_hoc;
+      const daDem = new Set<string>();
+      for (const pl of lop.phan_lop_giai_doan) {
+        const dk = pl.dang_ky_hoc;
+        if (daDem.has(dk.id)) continue;
+        daDem.add(dk.id);
         row.si_so += 1;
         if (dk.hoc_vien.email_lien_he) row.so_co_email += 1;
         const { day_du } = await this.hocVienService.danhGiaDayDu(dk.hoc_vien);
@@ -640,7 +642,7 @@ export class BaoCaoService {
       new Set(dangKyRows.map((r) => r.hoc_vien_id)),
     );
 
-    const [daDangNhap, hoSoDaSuaRows, dangKyHocLopRows] = await Promise.all([
+    const [daDangNhap, hoSoDaSuaRows, phanLopRows] = await Promise.all([
       hocVienIds.length === 0
         ? Promise.resolve(0)
         : this.prisma.nguoi_dung.count({
@@ -657,14 +659,29 @@ export class BaoCaoService {
             select: { hoc_vien_id: true },
             distinct: ['hoc_vien_id'],
           }),
-      this.prisma.dang_ky_hoc_lop.findMany({
+      this.prisma.phan_lop_giai_doan.findMany({
         where: { dang_ky_hoc: where },
         select: {
-          loai_lop: true,
+          dang_ky_hoc_id: true,
+          lop: { select: { loai_lop: true } },
           dang_ky_hoc: { select: { ket_qua: true } },
         },
       }),
     ]);
+
+    // Phân lớp theo giai đoạn (spec 2026-10-02): 1 đăng ký có thể học cùng
+    // loại lớp ở nhiều giai đoạn -> khử trùng theo (đăng ký, loại lớp) để giữ
+    // đúng ý nghĩa "số đăng ký theo hình thức" như khi còn dang_ky_hoc_lop.
+    const theoHinhThuc = new Map<
+      string,
+      { loai_lop: string; dang_ky_hoc: { ket_qua: string | null } }
+    >();
+    for (const r of phanLopRows) {
+      theoHinhThuc.set(`${r.dang_ky_hoc_id}|${r.lop.loai_lop}`, {
+        loai_lop: r.lop.loai_lop,
+        dang_ky_hoc: r.dang_ky_hoc,
+      });
+    }
 
     return {
       tong_hoc_vien_tham_gia: dangKyRows.length,
@@ -674,7 +691,9 @@ export class BaoCaoService {
         dau_vao: this.demKhaoSat(dangKyRows.map((r) => r.muc_dau_vao)),
         dau_ra: this.demKhaoSat(dangKyRows.map((r) => r.muc_dau_ra)),
       },
-      ket_qua_theo_hinh_thuc: this.demKetQuaTheoHinhThuc(dangKyHocLopRows),
+      ket_qua_theo_hinh_thuc: this.demKetQuaTheoHinhThuc([
+        ...theoHinhThuc.values(),
+      ]),
     };
   }
 

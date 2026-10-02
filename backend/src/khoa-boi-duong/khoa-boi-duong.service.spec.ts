@@ -43,7 +43,11 @@ describe('KhoaBoiDuongService', () => {
       deleteMany: jest.Mock;
       count: jest.Mock;
     };
-    phan_lop_giai_doan: { upsert: jest.Mock; deleteMany: jest.Mock };
+    phan_lop_giai_doan: {
+      upsert: jest.Mock;
+      deleteMany: jest.Mock;
+      groupBy: jest.Mock;
+    };
     giai_doan_khoa: {
       findUnique: jest.Mock;
       findMany: jest.Mock;
@@ -112,7 +116,11 @@ describe('KhoaBoiDuongService', () => {
         deleteMany: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
       },
-      phan_lop_giai_doan: { upsert: jest.fn(), deleteMany: jest.fn() },
+      phan_lop_giai_doan: {
+        upsert: jest.fn(),
+        deleteMany: jest.fn(),
+        groupBy: jest.fn().mockResolvedValue([]),
+      },
       giai_doan_khoa: {
         findUnique: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
@@ -428,19 +436,30 @@ describe('KhoaBoiDuongService', () => {
   });
 
   describe('khoaHocCuaToi', () => {
-    it('tách dang_ky_hoc_lop thành lop_truc_tiep/lop_zoom/lop_vle + cum', async () => {
-      const lopTT = { id: 'lop-tt', ten_lop: 'Lớp TT' };
-      const lopZoom = { id: 'lop-zoom', ten_lop: 'Lớp Zoom' };
+    it('trả giai_doan[] theo giai đoạn active: lớp được gán (chỉ buổi của GĐ đó) hoặc null + cum', async () => {
+      const gd = (id: string, thu_tu: number) => ({
+        id,
+        thu_tu,
+        ten_giai_doan: `GĐ ${thu_tu}`,
+        hinh_thuc: 'truc_tuyen',
+        link_hoac_dia_diem: null,
+        huong_dan: null,
+      });
+      const lopZoom = {
+        id: 'lop-zoom',
+        ten_lop: 'Lớp Zoom',
+        lich_hoc: [
+          { id: 'b-2', giai_doan_id: 'gd-2' },
+          { id: 'b-3', giai_doan_id: 'gd-3' },
+        ],
+      };
       prisma.dang_ky_hoc.findMany.mockResolvedValue([
         {
           id: 'dk-1',
           hoc_vien_id: 'hv-1',
-          khoa: { id: 'khoa-1' },
+          khoa: { id: 'khoa-1', giai_doan: [gd('gd-1', 1), gd('gd-2', 2)] },
           cum: { id: 'cum-1', ten_cum: 'Cụm A' },
-          dang_ky_hoc_lop: [
-            { loai_lop: 'truc_tiep', lop: lopTT },
-            { loai_lop: 'zoom', lop: lopZoom },
-          ],
+          phan_lop_giai_doan: [{ giai_doan_id: 'gd-2', lop: lopZoom }],
         },
       ]);
 
@@ -453,13 +472,19 @@ describe('KhoaBoiDuongService', () => {
       expect(res).toHaveLength(1);
       expect(res[0]).toMatchObject({
         id: 'dk-1',
-        lop_truc_tiep: lopTT,
-        lop_zoom: lopZoom,
-        lop_vle: null,
+        khoa: { id: 'khoa-1' },
         cum: { id: 'cum-1', ten_cum: 'Cụm A' },
       });
-      // dang_ky_hoc_lop (mảng nội bộ) không nên lọt ra response cuối.
-      expect(res[0]).not.toHaveProperty('dang_ky_hoc_lop');
+      expect(res[0].giai_doan.map((g) => g.lop?.id ?? null)).toEqual([
+        null,
+        'lop-zoom',
+      ]);
+      expect(res[0].giai_doan[1].lop?.lich_hoc.map((b) => b.id)).toEqual([
+        'b-2',
+      ]);
+      // mảng nội bộ không lọt ra response cuối.
+      expect(res[0]).not.toHaveProperty('phan_lop_giai_doan');
+      expect(res[0].khoa).not.toHaveProperty('giai_doan');
     });
 
     it('không có hoc_vien_id -> ForbiddenAppException', async () => {
@@ -488,9 +513,14 @@ describe('KhoaBoiDuongService', () => {
         {
           id: 'dk-1',
           hoc_vien_id: 'hv-1',
-          khoa: { id: 'khoa-1' },
+          khoa: {
+            id: 'khoa-1',
+            giai_doan: [{ id: 'gd-4', thu_tu: 4, ten_giai_doan: 'Trực tiếp' }],
+          },
           cum: null,
-          dang_ky_hoc_lop: [{ loai_lop: 'truc_tiep', lop: lopTT }],
+          phan_lop_giai_doan: [
+            { giai_doan_id: 'gd-4', lop: { ...lopTT, lich_hoc: [] } },
+          ],
         },
       ]);
 
@@ -501,13 +531,8 @@ describe('KhoaBoiDuongService', () => {
         'dv-truong-1',
       );
       expect(res).toHaveLength(1);
-      expect(res[0]).toMatchObject({
-        id: 'dk-1',
-        lop_truc_tiep: lopTT,
-        lop_zoom: null,
-        lop_vle: null,
-        cum: null,
-      });
+      expect(res[0]).toMatchObject({ id: 'dk-1', cum: null });
+      expect(res[0].giai_doan[0].lop).toMatchObject(lopTT);
     });
 
     it('ngoài phạm vi quyền -> ForbiddenAppException, không đọc dang_ky_hoc', async () => {
@@ -898,7 +923,12 @@ describe('KhoaBoiDuongService', () => {
     it('đổi loai_lop khi lớp đang có đăng ký -> vẫn cho phép, kèm canh_bao', async () => {
       prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoa1);
       prisma.lop_hoc.findUnique.mockResolvedValue(lop1);
-      prisma.dang_ky_hoc_lop.count.mockResolvedValue(3);
+      // 3 đăng ký khác nhau đang được phân vào lớp (groupBy theo đăng ký).
+      prisma.phan_lop_giai_doan.groupBy.mockResolvedValue([
+        { dang_ky_hoc_id: 'dk-1' },
+        { dang_ky_hoc_id: 'dk-2' },
+        { dang_ky_hoc_id: 'dk-3' },
+      ]);
       prisma.lop_hoc.update.mockResolvedValue({ ...lop1, loai_lop: 'zoom' });
 
       const res = await service.capNhatLop(

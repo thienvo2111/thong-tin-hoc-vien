@@ -529,12 +529,13 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
           trang_thai: 'da_phan_lop',
         },
       });
-      await prisma.dang_ky_hoc_lop.create({
-        data: {
+      // Phân lớp theo giai đoạn: cùng lớp ở cả 2 giai đoạn.
+      await prisma.phan_lop_giai_doan.createMany({
+        data: [giaiDoan1.id, giaiDoan2.id].map((giai_doan_id) => ({
           dang_ky_hoc_id: dangKy.id,
+          giai_doan_id,
           lop_id: lopId,
-          loai_lop: 'truc_tiep',
-        },
+        })),
       });
       const token = await dangNhap(tenDangNhap, 'x');
 
@@ -546,10 +547,13 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         (r: { khoa: { id: string } }) => r.khoa.id === khoa.id,
       );
       expect(entry).toBeDefined();
-      const buoiList = entry.lop_truc_tiep.lich_hoc as {
-        giai_doan: { thu_tu: number };
-        buoi_so: number;
-      }[];
+      const buoiList = (
+        entry.giai_doan as {
+          lop: {
+            lich_hoc: { giai_doan: { thu_tu: number }; buoi_so: number }[];
+          } | null;
+        }[]
+      ).flatMap((g) => g.lop?.lich_hoc ?? []);
       expect(buoiList).toHaveLength(3);
       expect(buoiList.map((b) => [b.giai_doan.thu_tu, b.buoi_so])).toEqual([
         [1, 1],
