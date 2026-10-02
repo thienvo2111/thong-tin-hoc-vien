@@ -89,8 +89,8 @@ export default function AdminHocVienChiTiet() {
   );
 }
 
-// Thêm 2026-09-30 (QĐ10, docs/api-contract.md mục 3) — sửa tay lớp (trực tiếp/Zoom/VLE, 3 loại độc
-// lập nhau qua bảng nối dang_ky_hoc_lop) và cụm hỗ trợ Zalo cho từng khóa mà học viên đã ghi danh.
+// Thêm 2026-09-30 (QĐ10, docs/api-contract.md mục 3) — sửa tay phân lớp theo giai đoạn (spec
+// 2026-10-02, xem PhanLopTheoGiaiDoan) và cụm hỗ trợ Zalo cho từng khóa mà học viên đã ghi danh.
 // Thao tác sửa tay ít dùng — giao diện đơn giản (Select + nút Lưu), không cần đẹp phức tạp, đúng tính
 // chất "placeholder, hoàn thiện sau" của trang này.
 function KhoaVaLopCuaHocVien({ hocVienId }: { hocVienId: string }) {

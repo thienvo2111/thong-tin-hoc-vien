@@ -761,10 +761,6 @@ model lop_hoc {
 
   lich_hoc           lich_hoc_lop[]
   nhan_su            lop_hoc_nhan_su[]
-  // QĐ10: thay cho quan hệ dang_ky_hoc[] trực tiếp cũ (dang_ky_hoc.lop_id đã
-  // bị xóa) — nay đi qua bảng nối dang_ky_hoc_lop, vì 1 lớp có thể được gán
-  // cho nhiều đăng ký học thuộc bất kỳ loại lớp nào khớp loai_lop của nó.
-  dang_ky_hoc_lop    dang_ky_hoc_lop[]
   phan_lop_giai_doan phan_lop_giai_doan[]
 
   // QĐ10: UNIQUE đổi từ (khoa_id, ten_lop) sang (khoa_id, loai_lop, ten_lop)
@@ -835,11 +831,9 @@ model dang_ky_hoc {
   id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   hoc_vien_id     String             @db.Uuid
   khoa_id         String             @db.Uuid
-  // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): cột lop_id cũ (1 lớp duy
-  // nhất/đăng ký) đã bị XÓA — thay bằng bảng nối dang_ky_hoc_lop (1 đăng ký
-  // có thể có đồng thời tối đa 3 dòng, mỗi loai_lop 1 dòng). Dữ liệu cũ đã
-  // được di chuyển sang dang_ky_hoc_lop (loai_lop='truc_tiep') trước khi cột
-  // này bị xóa — xem migration di_chuyen_lop_id_sang_dang_ky_hoc_lop.
+  // Phân lớp theo giai đoạn (spec 2026-10-02): lớp gán qua phan_lop_giai_doan
+  // (1 lớp mỗi giai đoạn); bảng cũ 1 lớp mỗi loại đã drop ở migration
+  // 20261002100000.
   ngay_dang_ky    DateTime           @default(dbgenerated("CURRENT_DATE")) @db.Date
   trang_thai      trang_thai_dang_ky @default(cho_duyet)
   ket_qua         ket_qua_hoc?
@@ -856,7 +850,6 @@ model dang_ky_hoc {
   khoa     khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   cum      cum_hoc_vien?  @relation(fields: [cum_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  dang_ky_hoc_lop    dang_ky_hoc_lop[]
   phan_lop_giai_doan phan_lop_giai_doan[]
   // T12 (mo-rong-nls-an-giang.md, 2026-09-30): điểm danh từng buổi + tiến độ
   // từng giai đoạn của đăng ký học này, nhập qua import diem_danh/
@@ -870,30 +863,8 @@ model dang_ky_hoc {
   @@index([cum_id], map: "idx_dang_ky_cum")
 }
 
-// QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): bảng NỐI thay cho 3-4 cột FK
-// riêng trên dang_ky_hoc — dễ mở rộng thêm loại lớp thứ 4/5 sau này mà không
-// phải sửa lại schema/API. loai_lop trên mỗi dòng là BẢN SAO của
-// lop_hoc.loai_lop tại thời điểm gán (để làm được UNIQUE bên dưới mà không
-// cần trigger) — PHẢI luôn khớp lop_hoc.loai_lop của lop_id tương ứng, kiểm
-// tra ở TẦNG SERVICE khi tạo/sửa (không dùng DB trigger, xem
-// KhoaBoiDuongService.assertLopThuocKhoaVaLoai), không khớp thì từ chối.
-model dang_ky_hoc_lop {
-  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dang_ky_hoc_id String       @db.Uuid
-  lop_id         String       @db.Uuid
-  loai_lop       loai_lop_hoc
-  created_at     DateTime     @default(now()) @db.Timestamptz(6)
-
-  dang_ky_hoc dang_ky_hoc @relation(fields: [dang_ky_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  lop         lop_hoc     @relation(fields: [lop_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  // Mỗi đăng ký chỉ có 1 lớp cho mỗi loại lớp.
-  @@unique([dang_ky_hoc_id, loai_lop], map: "uq_dang_ky_hoc_lop_loai")
-  @@index([lop_id], map: "idx_dang_ky_hoc_lop_lop")
-}
-
 // Phân lớp theo giai đoạn (spec 2026-10-02-phan-lop-theo-giai-doan): mỗi
-// (đăng ký học, giai đoạn) tối đa 1 lớp — thay thế dang_ky_hoc_lop (1 lớp
+// (đăng ký học, giai đoạn) tối đa 1 lớp — thay thế bảng cũ (1 lớp
 // mỗi loại). Bất biến cùng khoa_id kiểm ở KhoaBoiDuongService.
 model phan_lop_giai_doan {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

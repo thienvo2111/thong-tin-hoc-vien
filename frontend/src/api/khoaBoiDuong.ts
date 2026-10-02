@@ -157,41 +157,6 @@ export function useKhoaHocCuaHocVien(hocVienId: string | undefined) {
   });
 }
 
-export interface CapNhatLopDangKyDto {
-  loai_lop: LoaiLop;
-  lop_id: string;
-}
-
-export function capNhatLopDangKy(dangKyHocId: string, dto: CapNhatLopDangKyDto) {
-  return apiFetch<void>(`/dang-ky-hoc/${dangKyHocId}/lop`, { method: 'PATCH', body: JSON.stringify(dto) });
-}
-
-export function useCapNhatLopDangKy(hocVienId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ dangKyHocId, dto }: { dangKyHocId: string; dto: CapNhatLopDangKyDto }) =>
-      capNhatLopDangKy(dangKyHocId, dto),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: khoaHocCuaHocVienKey(hocVienId) });
-    },
-  });
-}
-
-export function xoaLopDangKy(dangKyHocId: string, loaiLop: LoaiLop) {
-  return apiFetch<void>(`/dang-ky-hoc/${dangKyHocId}/lop/${loaiLop}`, { method: 'DELETE' });
-}
-
-export function useXoaLopDangKy(hocVienId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ dangKyHocId, loaiLop }: { dangKyHocId: string; loaiLop: LoaiLop }) =>
-      xoaLopDangKy(dangKyHocId, loaiLop),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: khoaHocCuaHocVienKey(hocVienId) });
-    },
-  });
-}
-
 // Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.3): gán/thay/gỡ lớp của 1 giai đoạn (lopId null = gỡ).
 // canh_bao: lớp không có buổi trong giai đoạn / loại lớp lệch hình thức — không chặn.
 export function ganLopGiaiDoan(dangKyHocId: string, giaiDoanId: string, lopId: string | null) {

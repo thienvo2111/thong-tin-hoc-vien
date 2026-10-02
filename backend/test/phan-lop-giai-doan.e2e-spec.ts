@@ -12,11 +12,6 @@ import {
   xoaNguoiDungTest,
   xoaDonViTest,
 } from './utils/test-data';
-import {
-  SQL_CHUYEN_PHAN_LOP,
-  timPhanLopChuaCoGiaiDoan,
-  timXungDotChuyenPhanLop,
-} from '../src/khoa-boi-duong/util/chuyen-phan-lop.util';
 
 const NAM_HOP_LE = new Date().getUTCFullYear() - 20;
 
@@ -157,7 +152,6 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
   afterAll(async () => {
     const dkWhere = { dang_ky_hoc: { khoa_id: { in: khoaIds } } };
     await prisma.phan_lop_giai_doan.deleteMany({ where: dkWhere });
-    await prisma.dang_ky_hoc_lop.deleteMany({ where: dkWhere });
     await prisma.diem_danh.deleteMany({ where: dkWhere });
     await prisma.ket_qua_giai_doan.deleteMany({ where: dkWhere });
     await prisma.hang_doi_email.deleteMany({
@@ -212,68 +206,6 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
     );
     await prisma.$disconnect();
     await app.close();
-  });
-
-  describe('Chuyển dang_ky_hoc_lop -> phan_lop_giai_doan', () => {
-    it('lớp có buổi ở 2 giai đoạn -> 2 dòng; lớp không có buổi -> 0 dòng và nằm trong danh sách chưa có giai đoạn', async () => {
-      const khoa = await taoKhoa();
-      const gd1 = await taoGiaiDoan(khoa.id, 1);
-      const gd2 = await taoGiaiDoan(khoa.id, 2);
-      const lopZoom = await taoLop(khoa.id, 'zoom', 'Zoom chuyển');
-      const lopVle = await taoLop(khoa.id, 'vle', 'VLE chưa buổi');
-      await taoBuoi(lopZoom.id, gd1.id, 1);
-      await taoBuoi(lopZoom.id, gd2.id, 1);
-      const { hocVien } = await taoHocVienMoet(uniqueSuffix());
-      const dk = await ghiDanh(hocVien.id, khoa.id);
-      await prisma.dang_ky_hoc_lop.createMany({
-        data: [
-          { dang_ky_hoc_id: dk.id, lop_id: lopZoom.id, loai_lop: 'zoom' },
-          { dang_ky_hoc_id: dk.id, lop_id: lopVle.id, loai_lop: 'vle' },
-        ],
-      });
-
-      const chuaCo = await timPhanLopChuaCoGiaiDoan(prisma);
-      expect(chuaCo).toContainEqual(
-        expect.objectContaining({ dang_ky_hoc_id: dk.id, lop_id: lopVle.id }),
-      );
-      await prisma.$executeRawUnsafe(SQL_CHUYEN_PHAN_LOP, [dk.id]);
-
-      const rows = await prisma.phan_lop_giai_doan.findMany({
-        where: { dang_ky_hoc_id: dk.id },
-      });
-      expect(rows.map((r) => [r.giai_doan_id, r.lop_id]).sort()).toEqual(
-        [
-          [gd1.id, lopZoom.id],
-          [gd2.id, lopZoom.id],
-        ].sort(),
-      );
-    });
-
-    it('2 lớp của cùng đăng ký có buổi chung 1 giai đoạn -> được báo xung đột, INSERT thất bại', async () => {
-      const khoa = await taoKhoa();
-      const gd1 = await taoGiaiDoan(khoa.id, 1);
-      const lopA = await taoLop(khoa.id, 'zoom', 'Zoom A');
-      const lopB = await taoLop(khoa.id, 'vle', 'VLE B');
-      await taoBuoi(lopA.id, gd1.id, 1);
-      await taoBuoi(lopB.id, gd1.id, 1);
-      const { hocVien } = await taoHocVienMoet(uniqueSuffix());
-      const dk = await ghiDanh(hocVien.id, khoa.id);
-      await prisma.dang_ky_hoc_lop.createMany({
-        data: [
-          { dang_ky_hoc_id: dk.id, lop_id: lopA.id, loai_lop: 'zoom' },
-          { dang_ky_hoc_id: dk.id, lop_id: lopB.id, loai_lop: 'vle' },
-        ],
-      });
-
-      expect(await timXungDotChuyenPhanLop(prisma)).toContainEqual({
-        dang_ky_hoc_id: dk.id,
-        giai_doan_id: gd1.id,
-        so_lop: 2,
-      });
-      await expect(
-        prisma.$executeRawUnsafe(SQL_CHUYEN_PHAN_LOP, [dk.id]),
-      ).rejects.toThrow();
-    });
   });
 
   describe('Giai đoạn: link_hoac_dia_diem + huong_dan', () => {

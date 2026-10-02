@@ -13,7 +13,7 @@ import { loai_lop_hoc, muc_nang_luc, trang_thai_active } from '@prisma/client';
 // Body của PATCH /khoa-boi-duong/{id}/lop/{lopId} — sửa một phần (partial),
 // docs/api-contract.md mục 3. Thêm 2026-09-30. Không có khoa_id — không cho
 // đổi khóa cha của lớp qua endpoint này. Đổi loai_lop khi lớp đang có đăng ký
-// (dang_ky_hoc_lop) KHÔNG bị chặn — service trả kèm canh_bao trong response,
+// (phan_lop_giai_doan) KHÔNG bị chặn — service trả kèm canh_bao trong response,
 // xem KhoaBoiDuongService.capNhatLop.
 export class UpdateLopHocDto {
   @IsOptional()

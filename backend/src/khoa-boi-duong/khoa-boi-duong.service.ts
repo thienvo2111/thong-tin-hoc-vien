@@ -35,7 +35,6 @@ import { CreateNhanSuDto } from './dto/create-nhan-su.dto';
 import { ThemDonViTheoDoiDto } from './dto/them-don-vi-theo-doi.dto';
 import { CreateCumHocVienDto } from './dto/create-cum-hoc-vien.dto';
 import { UpdateCumHocVienDto } from './dto/update-cum-hoc-vien.dto';
-import { CapNhatLopDangKyDto } from './dto/capnhat-lop-dang-ky.dto';
 import { CapNhatCumDangKyDto } from './dto/capnhat-cum-dang-ky.dto';
 import { PhanLopHocVienRowDto } from './dto/phan-lop-row.dto';
 import { KetQuaDangKyDto } from './dto/ket-qua-dang-ky.dto';
@@ -146,42 +145,6 @@ export class KhoaBoiDuongService {
         'Body rỗng — phải có ít nhất 1 trường hợp lệ để sửa',
       );
     }
-  }
-
-  // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): lop_id gán vào dang_ky_hoc_lop
-  // phải (1) thuộc đúng khoa_id của đăng ký học và (2) có lop_hoc.loai_lop
-  // khớp đúng loai_lop truyền vào — kiểm tra ở tầng service, KHÔNG dùng DB
-  // trigger (khác cách làm cũ của chk_dang_ky_lop_thuoc_khoa, đã bỏ cùng cột
-  // dang_ky_hoc.lop_id — xem migration di_chuyen_lop_id_sang_dang_ky_hoc_lop).
-  private async assertLopThuocKhoaVaLoai(
-    lopId: string,
-    khoaId: string,
-    loaiLop: loai_lop_hoc,
-  ): Promise<lop_hoc> {
-    const lop = await this.prisma.lop_hoc.findUnique({ where: { id: lopId } });
-    if (!lop) {
-      throw new ValidationException('lop_id không tồn tại', [
-        { field: 'lop_id', message: 'Không tồn tại' },
-      ]);
-    }
-    if (lop.khoa_id !== khoaId) {
-      throw new ValidationException(
-        'Lớp không thuộc cùng khóa với đăng ký học này',
-        [{ field: 'lop_id', message: 'Phải thuộc cùng khóa bồi dưỡng' }],
-      );
-    }
-    if (lop.loai_lop !== loaiLop) {
-      throw new ValidationException(
-        `Lớp này thuộc loại "${lop.loai_lop}", không khớp loai_lop "${loaiLop}" đã chọn`,
-        [
-          {
-            field: 'loai_lop',
-            message: 'Không khớp loại lớp thực tế của lop_id',
-          },
-        ],
-      );
-    }
-    return lop;
   }
 
   // Rule #47: chỉ Trường tổ chức (chủ khóa) mới thao tác được trên khóa của
@@ -721,12 +684,12 @@ export class KhoaBoiDuongService {
 
   // ---------------------------------------------------------------------
   // PATCH /khoa-boi-duong/{id}/lop/{lopId} — sửa một phần. Thêm 2026-09-30.
-  // Đổi loai_lop khi lớp đang có đăng ký (dang_ky_hoc_lop trỏ tới) KHÔNG bị
+  // Đổi loai_lop khi lớp đang có đăng ký (phan_lop_giai_doan trỏ tới) KHÔNG bị
   // chặn (quyết định tự chọn — flagged trong self-review: yêu cầu không nói
   // rõ nên chặn hay cho phép, chọn "cho phép + cảnh báo" giống cách làm hiện
   // có cho lệch mức năng lực khi import phân lớp, xem resolvePhanLopRow phía
   // trên) — trả kèm canh_bao trong response, KHÔNG tự động sửa/xóa các dòng
-  // dang_ky_hoc_lop cũ (đổi hộ có thể gây mất dữ liệu ngoài ý muốn).
+  // phan_lop_giai_doan (đổi hộ có thể gây mất dữ liệu ngoài ý muốn).
   // ---------------------------------------------------------------------
   async capNhatLop(
     khoaId: string,
@@ -1203,11 +1166,10 @@ export class KhoaBoiDuongService {
   }
 
   // ---------------------------------------------------------------------
-  // PATCH /dang-ky-hoc/{id}/lop, DELETE /dang-ky-hoc/{id}/lop/{loai_lop},
-  // PATCH /dang-ky-hoc/{id}/cum — QĐ10 (mo-rong-nls-an-giang.md,
-  // 2026-09-30): thao tác thủ công từng đăng ký học một (chuẩn bị cho màn
-  // hình admin sửa tay ở task frontend sau). Quyền: Trường (chủ khóa của
-  // dang_ky_hoc.khoa_id) + quan_tri — dùng lại assertChuKhoa() sẵn có.
+  // PUT /dang-ky-hoc/{id}/giai-doan/{giaiDoanId}/lop, PATCH
+  // /dang-ky-hoc/{id}/cum — thao tác thủ công từng đăng ký học một (màn admin
+  // chi tiết học viên). Quyền: Trường (chủ khóa của dang_ky_hoc.khoa_id) +
+  // quan_tri — dùng lại assertChuKhoa() sẵn có.
   // ---------------------------------------------------------------------
   private async getDangKyOrThrow(id: string) {
     const dangKy = await this.prisma.dang_ky_hoc.findUnique({
@@ -1216,61 +1178,6 @@ export class KhoaBoiDuongService {
     });
     if (!dangKy) throw new NotFoundAppException('Không tìm thấy đăng ký học');
     return dangKy;
-  }
-
-  async capNhatLopDangKy(
-    id: string,
-    dto: CapNhatLopDangKyDto,
-    caller: AuthenticatedUser,
-  ) {
-    const dangKy = await this.getDangKyOrThrow(id);
-    this.assertChuKhoa(dangKy.khoa, caller);
-    await this.assertLopThuocKhoaVaLoai(
-      dto.lop_id,
-      dangKy.khoa_id,
-      dto.loai_lop,
-    );
-
-    const dangKyLop = await this.prisma.dang_ky_hoc_lop.upsert({
-      where: {
-        dang_ky_hoc_id_loai_lop: {
-          dang_ky_hoc_id: id,
-          loai_lop: dto.loai_lop,
-        },
-      },
-      create: {
-        dang_ky_hoc_id: id,
-        lop_id: dto.lop_id,
-        loai_lop: dto.loai_lop,
-      },
-      update: { lop_id: dto.lop_id },
-    });
-    if (dangKy.trang_thai !== 'da_phan_lop') {
-      await this.prisma.dang_ky_hoc.update({
-        where: { id },
-        data: { trang_thai: 'da_phan_lop' },
-      });
-    }
-    return dangKyLop;
-  }
-
-  async xoaLopDangKy(
-    id: string,
-    loaiLop: loai_lop_hoc,
-    caller: AuthenticatedUser,
-  ) {
-    const dangKy = await this.getDangKyOrThrow(id);
-    this.assertChuKhoa(dangKy.khoa, caller);
-
-    const result = await this.prisma.dang_ky_hoc_lop.deleteMany({
-      where: { dang_ky_hoc_id: id, loai_lop: loaiLop },
-    });
-    if (result.count === 0) {
-      throw new NotFoundAppException(
-        `Đăng ký học này chưa được gán lớp loại "${loaiLop}"`,
-      );
-    }
-    return { da_xoa: true };
   }
 
   // Cảnh báo 🟡 khi gán lớp vào giai đoạn: lớp không có buổi nào trong giai
@@ -1296,7 +1203,7 @@ export class KhoaBoiDuongService {
   }
 
   // PUT /dang-ky-hoc/{id}/giai-doan/{giaiDoanId}/lop — gán/thay/gỡ lớp của 1
-  // giai đoạn. Gán -> da_phan_lop; gỡ KHÔNG đổi trạng thái (như xoaLopDangKy).
+  // giai đoạn. Gán -> da_phan_lop; gỡ KHÔNG đổi trạng thái đăng ký.
   async ganLopGiaiDoan(
     dangKyHocId: string,
     giaiDoanId: string,

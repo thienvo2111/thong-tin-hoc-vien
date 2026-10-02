@@ -9,8 +9,8 @@ import {
   ValidationException,
 } from '../common/exceptions/app.exceptions';
 
-// QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): test cho phần tách 3 loại lớp
-// độc lập (dang_ky_hoc_lop) + cụm học viên (cum_hoc_vien) trong
+// QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30) + phân lớp theo giai đoạn (spec
+// 2026-10-02): test cho phân lớp (phan_lop_giai_doan) + cụm học viên trong
 // KhoaBoiDuongService. File spec MỚI hoàn toàn — service này trước đó chưa
 // có unit test riêng (chỉ có e2e), theo đúng pattern mock Prisma của
 // hoc-vien.service.spec.ts/thong-bao.service.spec.ts (object jest.fn() thô,
@@ -37,11 +37,6 @@ describe('KhoaBoiDuongService', () => {
       findMany: jest.Mock;
       upsert: jest.Mock;
       update: jest.Mock;
-    };
-    dang_ky_hoc_lop: {
-      upsert: jest.Mock;
-      deleteMany: jest.Mock;
-      count: jest.Mock;
     };
     phan_lop_giai_doan: {
       upsert: jest.Mock;
@@ -110,11 +105,6 @@ describe('KhoaBoiDuongService', () => {
         findMany: jest.fn(),
         upsert: jest.fn(),
         update: jest.fn(),
-      },
-      dang_ky_hoc_lop: {
-        upsert: jest.fn(),
-        deleteMany: jest.fn(),
-        count: jest.fn().mockResolvedValue(0),
       },
       phan_lop_giai_doan: {
         upsert: jest.fn(),
@@ -215,223 +205,6 @@ describe('KhoaBoiDuongService', () => {
         },
       });
       expect(res).toEqual({ id: 'cum-1' });
-    });
-  });
-
-  describe('capNhatLopDangKy', () => {
-    const dangKy1 = {
-      id: 'dk-1',
-      khoa_id: 'khoa-1',
-      trang_thai: 'da_duyet',
-      khoa: khoa1,
-    };
-
-    it('lop hợp lệ (đúng khóa + đúng loai_lop) -> upsert dang_ky_hoc_lop + chuyển trang_thai da_phan_lop', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue(dangKy1);
-      prisma.lop_hoc.findUnique.mockResolvedValue({
-        id: 'lop-1',
-        khoa_id: 'khoa-1',
-        loai_lop: 'zoom',
-      });
-      prisma.dang_ky_hoc_lop.upsert.mockResolvedValue({
-        id: 'dkl-1',
-        loai_lop: 'zoom',
-        lop_id: 'lop-1',
-      });
-
-      await service.capNhatLopDangKy(
-        'dk-1',
-        { loai_lop: 'zoom', lop_id: 'lop-1' },
-        truong,
-      );
-
-      expect(prisma.dang_ky_hoc_lop.upsert).toHaveBeenCalledWith({
-        where: {
-          dang_ky_hoc_id_loai_lop: { dang_ky_hoc_id: 'dk-1', loai_lop: 'zoom' },
-        },
-        create: { dang_ky_hoc_id: 'dk-1', lop_id: 'lop-1', loai_lop: 'zoom' },
-        update: { lop_id: 'lop-1' },
-      });
-      expect(prisma.dang_ky_hoc.update).toHaveBeenCalledWith({
-        where: { id: 'dk-1' },
-        data: { trang_thai: 'da_phan_lop' },
-      });
-    });
-
-    it('đã da_phan_lop từ trước -> không update lại trang_thai', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
-        ...dangKy1,
-        trang_thai: 'da_phan_lop',
-      });
-      prisma.lop_hoc.findUnique.mockResolvedValue({
-        id: 'lop-1',
-        khoa_id: 'khoa-1',
-        loai_lop: 'truc_tiep',
-      });
-      prisma.dang_ky_hoc_lop.upsert.mockResolvedValue({});
-
-      await service.capNhatLopDangKy(
-        'dk-1',
-        { loai_lop: 'truc_tiep', lop_id: 'lop-1' },
-        truong,
-      );
-
-      expect(prisma.dang_ky_hoc.update).not.toHaveBeenCalled();
-    });
-
-    it('lop thuộc khóa khác -> ValidationException, không upsert', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue(dangKy1);
-      prisma.lop_hoc.findUnique.mockResolvedValue({
-        id: 'lop-x',
-        khoa_id: 'khoa-khac',
-        loai_lop: 'zoom',
-      });
-
-      await expect(
-        service.capNhatLopDangKy(
-          'dk-1',
-          { loai_lop: 'zoom', lop_id: 'lop-x' },
-          truong,
-        ),
-      ).rejects.toBeInstanceOf(ValidationException);
-      expect(prisma.dang_ky_hoc_lop.upsert).not.toHaveBeenCalled();
-    });
-
-    it('loai_lop không khớp lop_hoc.loai_lop thực tế -> ValidationException', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue(dangKy1);
-      prisma.lop_hoc.findUnique.mockResolvedValue({
-        id: 'lop-1',
-        khoa_id: 'khoa-1',
-        loai_lop: 'vle',
-      });
-
-      await expect(
-        service.capNhatLopDangKy(
-          'dk-1',
-          { loai_lop: 'zoom', lop_id: 'lop-1' },
-          truong,
-        ),
-      ).rejects.toBeInstanceOf(ValidationException);
-    });
-
-    it('lop_id không tồn tại -> ValidationException', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue(dangKy1);
-      prisma.lop_hoc.findUnique.mockResolvedValue(null);
-
-      await expect(
-        service.capNhatLopDangKy(
-          'dk-1',
-          { loai_lop: 'zoom', lop_id: 'khong-ton-tai' },
-          truong,
-        ),
-      ).rejects.toBeInstanceOf(ValidationException);
-    });
-
-    it('không phải chủ khóa -> ForbiddenAppException', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue(dangKy1);
-      await expect(
-        service.capNhatLopDangKy(
-          'dk-1',
-          { loai_lop: 'zoom', lop_id: 'lop-1' },
-          truongKhac,
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenAppException);
-    });
-
-    it('không tìm thấy đăng ký học -> NotFoundAppException', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue(null);
-      await expect(
-        service.capNhatLopDangKy(
-          'dk-x',
-          { loai_lop: 'zoom', lop_id: 'lop-1' },
-          truong,
-        ),
-      ).rejects.toBeInstanceOf(NotFoundAppException);
-    });
-  });
-
-  describe('xoaLopDangKy', () => {
-    it('xóa thành công', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
-        id: 'dk-1',
-        khoa_id: 'khoa-1',
-        khoa: khoa1,
-      });
-      prisma.dang_ky_hoc_lop.deleteMany.mockResolvedValue({ count: 1 });
-
-      const res = await service.xoaLopDangKy('dk-1', 'zoom', truong);
-
-      expect(prisma.dang_ky_hoc_lop.deleteMany).toHaveBeenCalledWith({
-        where: { dang_ky_hoc_id: 'dk-1', loai_lop: 'zoom' },
-      });
-      expect(res).toEqual({ da_xoa: true });
-    });
-
-    it('chưa gán lớp loại này -> NotFoundAppException', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
-        id: 'dk-1',
-        khoa_id: 'khoa-1',
-        khoa: khoa1,
-      });
-      prisma.dang_ky_hoc_lop.deleteMany.mockResolvedValue({ count: 0 });
-
-      await expect(
-        service.xoaLopDangKy('dk-1', 'vle', truong),
-      ).rejects.toBeInstanceOf(NotFoundAppException);
-    });
-  });
-
-  describe('capNhatCumDangKy', () => {
-    const dangKy1 = { id: 'dk-1', khoa_id: 'khoa-1', khoa: khoa1 };
-
-    it('gán cụm hợp lệ (cùng khóa)', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue(dangKy1);
-      prisma.cum_hoc_vien.findUnique.mockResolvedValue({
-        id: 'cum-1',
-        khoa_id: 'khoa-1',
-      });
-      prisma.dang_ky_hoc.update.mockResolvedValue({});
-
-      await service.capNhatCumDangKy('dk-1', { cum_id: 'cum-1' }, truong);
-
-      expect(prisma.dang_ky_hoc.update).toHaveBeenCalledWith({
-        where: { id: 'dk-1' },
-        data: { cum_id: 'cum-1' },
-      });
-    });
-
-    it('cum_id=null -> gỡ gán cụm', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue(dangKy1);
-      prisma.dang_ky_hoc.update.mockResolvedValue({});
-
-      await service.capNhatCumDangKy('dk-1', { cum_id: null }, truong);
-
-      expect(prisma.cum_hoc_vien.findUnique).not.toHaveBeenCalled();
-      expect(prisma.dang_ky_hoc.update).toHaveBeenCalledWith({
-        where: { id: 'dk-1' },
-        data: { cum_id: null },
-      });
-    });
-
-    it('cụm thuộc khóa khác -> ValidationException', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue(dangKy1);
-      prisma.cum_hoc_vien.findUnique.mockResolvedValue({
-        id: 'cum-x',
-        khoa_id: 'khoa-khac',
-      });
-
-      await expect(
-        service.capNhatCumDangKy('dk-1', { cum_id: 'cum-x' }, truong),
-      ).rejects.toBeInstanceOf(ValidationException);
-    });
-
-    it('cum_id không tồn tại -> ValidationException', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue(dangKy1);
-      prisma.cum_hoc_vien.findUnique.mockResolvedValue(null);
-
-      await expect(
-        service.capNhatCumDangKy('dk-1', { cum_id: 'khong-ton-tai' }, truong),
-      ).rejects.toBeInstanceOf(ValidationException);
     });
   });
 
