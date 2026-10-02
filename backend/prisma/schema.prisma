@@ -294,19 +294,19 @@ model nhat_ky_import {
 }
 
 model dia_danh {
-  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ma              String            @unique(map: "uq_dia_danh_ma") @db.VarChar(20)
-  ten             String            @db.VarChar(255)
+  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ma              String             @unique(map: "uq_dia_danh_ma") @db.VarChar(20)
+  ten             String             @db.VarChar(255)
   cap             cap_dia_danh
-  parent_id       String?           @db.Uuid
-  trang_thai      trang_thai_active @default(active)
+  parent_id       String?            @db.Uuid
+  trang_thai      trang_thai_active  @default(active)
   // Thêm 2026-09-30: hien_tai (mặc định) / lich_su (mã cũ trước sáp nhập,
   // giữ để lưu đúng lịch sử công tác) / dac_biet (placeholder, không phải
   // địa giới thật).
   phien_ban       phien_ban_dia_danh @default(hien_tai)
-  nguon_import_id String?           @db.Uuid
-  created_at      DateTime          @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime          @default(now()) @db.Timestamptz(6)
+  nguon_import_id String?            @db.Uuid
+  created_at      DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime           @default(now()) @db.Timestamptz(6)
 
   parent   dia_danh?  @relation("dia_danh_hierarchy", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children dia_danh[] @relation("dia_danh_hierarchy")
@@ -721,9 +721,14 @@ model giai_doan_khoa {
   thoi_gian_bat_dau  DateTime            @db.Date
   thoi_gian_ket_thuc DateTime            @db.Date
   trang_thai         trang_thai_active   @default(active)
+  // Phân lớp theo giai đoạn (spec 2026-10-02): thông tin chung cho giai đoạn
+  // không gán lớp (vd đánh giá đầu vào/đầu ra) — hiện cho toàn khóa ở M7.
+  link_hoac_dia_diem String?             @db.VarChar(500)
+  huong_dan          String?
 
-  khoa              khoa_boi_duong      @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  khoa              khoa_boi_duong       @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   lich_hoc          lich_hoc_lop[]
+  phan_lop          phan_lop_giai_doan[]
   // T12 (mo-rong-nls-an-giang.md, 2026-09-30): tiến độ/kết quả từng giai
   // đoạn, nhập qua import ket_qua_giai_doan.
   ket_qua_giai_doan ket_qua_giai_doan[]
@@ -754,12 +759,13 @@ model lop_hoc {
 
   khoa khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  lich_hoc        lich_hoc_lop[]
-  nhan_su         lop_hoc_nhan_su[]
+  lich_hoc           lich_hoc_lop[]
+  nhan_su            lop_hoc_nhan_su[]
   // QĐ10: thay cho quan hệ dang_ky_hoc[] trực tiếp cũ (dang_ky_hoc.lop_id đã
   // bị xóa) — nay đi qua bảng nối dang_ky_hoc_lop, vì 1 lớp có thể được gán
   // cho nhiều đăng ký học thuộc bất kỳ loại lớp nào khớp loai_lop của nó.
-  dang_ky_hoc_lop dang_ky_hoc_lop[]
+  dang_ky_hoc_lop    dang_ky_hoc_lop[]
+  phan_lop_giai_doan phan_lop_giai_doan[]
 
   // QĐ10: UNIQUE đổi từ (khoa_id, ten_lop) sang (khoa_id, loai_lop, ten_lop)
   // — cho phép trùng tên lớp GIỮA các loại lớp khác nhau trong cùng khóa
@@ -850,12 +856,13 @@ model dang_ky_hoc {
   khoa     khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   cum      cum_hoc_vien?  @relation(fields: [cum_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  dang_ky_hoc_lop   dang_ky_hoc_lop[]
+  dang_ky_hoc_lop    dang_ky_hoc_lop[]
+  phan_lop_giai_doan phan_lop_giai_doan[]
   // T12 (mo-rong-nls-an-giang.md, 2026-09-30): điểm danh từng buổi + tiến độ
   // từng giai đoạn của đăng ký học này, nhập qua import diem_danh/
   // ket_qua_giai_doan.
-  diem_danh         diem_danh[]
-  ket_qua_giai_doan ket_qua_giai_doan[]
+  diem_danh          diem_danh[]
+  ket_qua_giai_doan  ket_qua_giai_doan[]
 
   @@unique([hoc_vien_id, khoa_id], map: "uq_dang_ky_hoc_vien_khoa")
   @@index([hoc_vien_id], map: "idx_dang_ky_hoc_vien")
@@ -883,6 +890,25 @@ model dang_ky_hoc_lop {
   // Mỗi đăng ký chỉ có 1 lớp cho mỗi loại lớp.
   @@unique([dang_ky_hoc_id, loai_lop], map: "uq_dang_ky_hoc_lop_loai")
   @@index([lop_id], map: "idx_dang_ky_hoc_lop_lop")
+}
+
+// Phân lớp theo giai đoạn (spec 2026-10-02-phan-lop-theo-giai-doan): mỗi
+// (đăng ký học, giai đoạn) tối đa 1 lớp — thay thế dang_ky_hoc_lop (1 lớp
+// mỗi loại). Bất biến cùng khoa_id kiểm ở KhoaBoiDuongService.
+model phan_lop_giai_doan {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dang_ky_hoc_id String   @db.Uuid
+  giai_doan_id   String   @db.Uuid
+  lop_id         String   @db.Uuid
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  dang_ky_hoc dang_ky_hoc    @relation(fields: [dang_ky_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  giai_doan   giai_doan_khoa @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lop         lop_hoc        @relation(fields: [lop_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([dang_ky_hoc_id, giai_doan_id], map: "uq_phan_lop_giai_doan")
+  @@index([lop_id], map: "idx_phan_lop_giai_doan_lop")
+  @@index([giai_doan_id], map: "idx_phan_lop_giai_doan_giai_doan")
 }
 
 // T12 (mo-rong-nls-an-giang.md, 2026-09-30): điểm danh nhập qua IMPORT EXCEL
@@ -990,12 +1016,12 @@ model hang_doi_email {
 // =====================================================================
 
 model loai_van_de_ho_tro {
-  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ten             String            @db.VarChar(255)
-  noi_dung_goi_y  String            @db.Text
-  trang_thai      trang_thai_active @default(active)
-  created_at      DateTime          @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime          @default(now()) @db.Timestamptz(6)
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ten            String            @db.VarChar(255)
+  noi_dung_goi_y String            @db.Text
+  trang_thai     trang_thai_active @default(active)
+  created_at     DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime          @default(now()) @db.Timestamptz(6)
 
   yeu_cau yeu_cau_ho_tro[]
 
@@ -1003,21 +1029,21 @@ model loai_van_de_ho_tro {
 }
 
 model yeu_cau_ho_tro {
-  id                 String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  hoc_vien_id        String                     @db.Uuid
-  loai_van_de_id     String                     @db.Uuid
-  noi_dung_hoi       String                     @db.Text
-  noi_dung_tra_loi   String?                    @db.Text
-  trang_thai         trang_thai_yeu_cau_ho_tro  @default(cho_xu_ly)
+  id                 String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hoc_vien_id        String                    @db.Uuid
+  loai_van_de_id     String                    @db.Uuid
+  noi_dung_hoi       String                    @db.Text
+  noi_dung_tra_loi   String?                   @db.Text
+  trang_thai         trang_thai_yeu_cau_ho_tro @default(cho_xu_ly)
   danh_gia           danh_gia_yeu_cau_ho_tro?
-  tra_loi_boi        String?                    @db.Uuid
-  thoi_gian_tao      DateTime                   @default(now()) @db.Timestamptz(6)
-  thoi_gian_phan_hoi DateTime?                  @db.Timestamptz(6)
-  thoi_gian_dong     DateTime?                  @db.Timestamptz(6)
+  tra_loi_boi        String?                   @db.Uuid
+  thoi_gian_tao      DateTime                  @default(now()) @db.Timestamptz(6)
+  thoi_gian_phan_hoi DateTime?                 @db.Timestamptz(6)
+  thoi_gian_dong     DateTime?                 @db.Timestamptz(6)
 
-  hoc_vien         hoc_vien            @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  loai_van_de      loai_van_de_ho_tro  @relation(fields: [loai_van_de_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  tra_loi_boi_user nguoi_dung?         @relation("yeu_cau_ho_tro_tra_loi_boi", fields: [tra_loi_boi], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  hoc_vien         hoc_vien           @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  loai_van_de      loai_van_de_ho_tro @relation(fields: [loai_van_de_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tra_loi_boi_user nguoi_dung?        @relation("yeu_cau_ho_tro_tra_loi_boi", fields: [tra_loi_boi], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([trang_thai], map: "idx_yeu_cau_ho_tro_trang_thai")
   @@index([hoc_vien_id], map: "idx_yeu_cau_ho_tro_hoc_vien")
