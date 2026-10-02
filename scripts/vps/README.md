@@ -131,9 +131,14 @@ Backend không dùng `setGlobalPrefix` (xem `backend/src/main.ts`) — mỗi
 đúng sang backend, phần còn lại rơi vào SPA catch-all. Nếu sau này thêm
 `@Controller` mới ở root (`grep -rn "@Controller(" backend/src` để rà lại),
 phải thêm tên vào regex `location ~ ^/(...)"` trong
-`05-install-nginx.sh` rồi `sudo nginx -t && sudo systemctl reload
-nginx` — nếu không, các route mới sẽ bị SPA nuốt mất, trả về `index.html`
-thay vì gọi API.
+`05-install-nginx.sh` rồi chạy lại `sudo bash 05-install-nginx.sh` (an toàn
+chạy lại: ghi đè site config, không đụng `WEB_ROOT` đã có build) — nếu không,
+các route mới sẽ bị SPA nuốt mất, trả về `index.html` thay vì gọi API.
+
+Từ 2026-10-02, `06-deploy.sh` tự so prefix `@Controller` với site config Nginx
+đang chạy và in `!! CANH BAO: Nginx CHUA proxy cac prefix: ...` nếu thiếu
+(chỉ cảnh báo, không dừng deploy). Đã từng bị lọt: `yeu-cau-ho-tro` (M8) và
+`cau-hinh-khao-sat` — đã bổ sung vào regex cùng ngày.
 
 ## Vẫn còn ngoài phạm vi script (chưa tự động hoá)
 

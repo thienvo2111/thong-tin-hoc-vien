@@ -4,6 +4,7 @@
 # Chay bang APP_USER (KHONG sudo): bash 06-deploy.sh
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(pwd)"
 source ./00-config.sh
 
 if [ "$(id -u)" -eq 0 ]; then
@@ -50,6 +51,23 @@ npx prisma generate
 
 echo "==> Backend: build"
 npm run build
+
+echo "==> Kiem tra Nginx da proxy du moi prefix controller backend"
+# Nginx chi chuyen ve backend cac prefix liet ke trong 05-install-nginx.sh; prefix
+# thieu se bi tra index.html (SPA) va API hong am tham. Chi canh bao, khong dung deploy.
+NGINX_CONF="/etc/nginx/sites-available/${DOMAIN}"
+if [ -r "${NGINX_CONF}" ]; then
+  THIEU=""
+  for p in $(grep -rhoE "@Controller\('[^'/]+" src --include=*.controller.ts | sed "s/@Controller('//" | sort -u); do
+    grep -qE "[(|]${p}[|)]" "${NGINX_CONF}" || THIEU="${THIEU} ${p}"
+  done
+  if [ -n "${THIEU}" ]; then
+    echo "    !! CANH BAO: Nginx CHUA proxy cac prefix:${THIEU}"
+    echo "    !! Chay lai: sudo bash ${SCRIPT_DIR}/05-install-nginx.sh"
+  else
+    echo "    OK"
+  fi
+fi
 
 echo "==> Backend: sao luu Postgres truoc khi migrate (phong migration loi/sai)"
 BACKUP_SCRIPT="/home/${APP_USER}/bin/backup-postgres.sh"
