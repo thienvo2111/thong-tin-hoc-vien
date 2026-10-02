@@ -1,0 +1,62 @@
+# CONTEXT.md
+
+Ngôn ngữ domain và các quyết định nền tảng của hệ thống "Thu thập thông tin học viên". Đọc trước khi khám phá codebase hoặc đặt tên khái niệm mới (issue, test, biến). Nguồn sự thật chi tiết hơn: [docs/api-contract.md](docs/api-contract.md), [docs/database-ddl.sql](docs/database-ddl.sql) (⚠️ xem ghi chú lệch pha bên dưới), [docs/validation-checklist.md](docs/validation-checklist.md), [README.md](README.md), và khi nghi ngờ tài liệu lệch với code — **tin `backend/prisma/schema.prisma` làm nguồn sự thật cuối cùng**.
+
+**⚠️ Lệch pha tài liệu đã biết (phát hiện 2026-10-01):** `docs/database-ddl.sql` và `docs/mo-rong-nls-an-giang.md` chưa được cập nhật theo QĐ10 và T12 dù 2 việc này **đã code xong thật** trong `backend/prisma/schema.prisma` (model `dang_ky_hoc_lop`, `cum_hoc_vien`, `diem_danh`, `ket_qua_giai_doan` đều đã tồn tại, có service + import + unit test). Đừng tin README/tài liệu kế hoạch nói "T12 chưa làm" — luôn verify lại bằng code trước khi tạo issue cho các task đã có vẻ "chưa làm" theo tài liệu.
+
+## Hệ thống là gì
+
+Công cụ phối hợp giữa **Sở GD&ĐT**, **Phòng Văn hóa - Xã hội** (thuộc UBND cấp Xã), **Trường/đơn vị đào tạo** và **Học viên** để thu thập, xác nhận và quản lý thông tin học viên tham gia các **khóa bồi dưỡng**. Mô hình monolith: NestJS + Prisma + PostgreSQL ở `backend/`, React (Vite) ở `frontend/`.
+
+## Tác nhân (vai_tro)
+
+| Vai trò | Phạm vi (scope) |
+|---|---|
+| `quan_tri` | Toàn hệ thống (`'ALL'`), không gắn `don_vi_id` |
+| `so_gddt` | Đơn vị mình + mọi đơn vị con (BFS theo `don_vi_cha_id`) |
+| `phong_vhxh` | Đơn vị mình + mọi đơn vị con |
+| `truong` | Chỉ đơn vị mình (trường) |
+| `hoc_vien` | Không có scope đơn vị — chỉ truy cập hồ sơ của chính mình qua `hoc_vien_id` |
+
+**Chính quyền 2 cấp:** không còn Phòng Giáo dục cấp huyện. Sở GD&ĐT quản lý trực tiếp Trường THPT; Phòng Văn hóa - Xã hội quản lý Trường Mầm non/Tiểu học/THCS trên địa bàn.
+
+**Phân quyền scope-based suy ra động** qua cây `DonViCongTac.don_vi_cha_id` (`ScopeService`, BFS cycle-safe) — không có bảng phân quyền riêng. Cấp trên duyệt thay được cấp dưới.
+
+## Thực thể cốt lõi (và tên gọi chuẩn — dùng đúng, đừng đổi từ đồng nghĩa)
+
+- **HocVien** (hồ sơ học viên) — `trang_thai`: `nhap → cho_duyet → da_duyet` (hoặc `tu_choi`). `nguon_tao`: `tu_dang_ky` (tự đăng ký) hoặc `import_moet` (import từ MOET).
+- **DonViCongTac** — đơn vị công tác (`loai_don_vi`: `truong` | `khac`), cây cha-con qua `don_vi_cha_id`.
+- **DiaDanh** — địa danh (tỉnh/xã), dùng cho `noi_sinh`/`dia_ban`.
+- **NguoiDung** — tài khoản đăng nhập, gắn `vai_tro` + (`don_vi_id` hoặc `hoc_vien_id`).
+- **MonHoc**, **ChuyenMon** (text tự do có autocomplete, KHÔNG phải danh mục quản trị).
+- **KhoaBoiDuong** — khóa bồi dưỡng, do **Trường** tự tạo & quản lý; Sở/Phòng VHXH chỉ duyệt + xem thống kê. `trang_thai`: `nhap → cho_duyet → da_duyet` (+ `tu_choi`, `dong_dang_ky`). Duyệt khóa định tuyến theo `don_vi_cha_id` của Trường tổ chức (khác hẳn routing hồ sơ học viên).
+- **GiaiDoanKhoa** — giai đoạn của khóa = **hình thức × nhóm** (vd "Zoom – nhóm 1", "Trực tiếp – đợt 5"); không có thực thể "đợt" riêng. `link_hoac_dia_diem` / `huong_dan` (spec 2026-10-02) — thông tin chung hiện ở M7 cho học viên **không được gán lớp** ở giai đoạn đó (điển hình: đánh giá đầu vào/đầu ra).
+- **LopHoc** — `loai_lop` (`truc_tiep`|`zoom`|`vle`) là **3 loại lớp ĐỘC LẬP HOÀN TOÀN** (không phải lớp cha/con) — 1 học viên có thể cùng lúc ở 1 lớp trực tiếp + 1 lớp zoom + 1 "lớp" vle không liên quan thành viên nhau. Unique theo `(khoa_id, loai_lop, ten_lop)` — được phép trùng tên lớp giữa các loại khác nhau trong cùng khóa.
+- **LichHocLop** — 1 lớp có nhiều buổi (`buoi_so`) trong cùng giai đoạn; unique `(lop_id, giai_doan_id, buoi_so)`.
+- **PhanLopGiaiDoan** (spec 2026-10-02 `docs/superpowers/specs/2026-10-02-phan-lop-theo-giai-doan-design.md`) — gán 1 `DangKyHoc` vào tối đa 1 `LopHoc` **cho mỗi `GiaiDoanKhoa`**, unique `(dang_ky_hoc_id, giai_doan_id)`. Thay hoàn toàn `DangKyHocLop` (QĐ10, 1 lớp mỗi `loai_lop` — đã drop, migration `20261002100000`). **`DangKyHoc` KHÔNG có cột `lop_id`** — mọi gán lớp đi qua bảng này. Import `phan_lop_hoc_vien`: mỗi học viên 1 dòng, mỗi giai đoạn 1 cột `GĐ<n> - <tên>`, ô trống = giữ, `-` = gỡ; bắt buộc `ma_khoa`. Học bù (import điểm danh) so với lớp được gán ở **đúng giai đoạn của buổi**.
+- **CumHocVien** (cụm học viên, QĐ10) — nhóm Zalo hỗ trợ theo địa lý, khái niệm **độc lập hoàn toàn với cây đơn vị công tác và với lớp**; gán trực tiếp qua `DangKyHoc.cum_id`, không qua lớp nào.
+- **DangKyHoc** — ghi danh học viên vào khóa. `khoa_id` **chỉ được gán qua import `phan_lop_hoc_vien` bởi Quản trị hệ thống** — không có tự ghi danh, không có tự động hóa (đã bị gỡ bỏ sau khi phát hiện giả định sai, xem lịch sử trong memory dự án). Có `muc_dau_vao`/`muc_dau_ra` (enum `muc_nang_luc`: `co_ban`/`thanh_thao`/`nang_cao`, T5) và `ket_qua` (enum `ket_qua_hoc`: `dang_hoc`/`dat`/`khong_dat`/`vang`).
+- **DiemDanh** (T12, đã code xong) — điểm danh học viên theo từng buổi (`LichHocLop`), nhập qua import, unique `(dang_ky_hoc_id, lich_hoc_id)`, upsert khi chạy lại.
+- **KetQuaGiaiDoan** (T12, đã code xong) — tiến độ/điểm theo từng `GiaiDoanKhoa` (vd tỉ lệ hoàn thành VLE), nhập qua import, unique `(dang_ky_hoc_id, giai_doan_id)`.
+- **DotXacNhan** / **XacNhanHoSo** / **LichSuThayDoiHoSo** — cửa sổ xác nhận hồ sơ theo đợt; mỗi lần sửa trường trong đợt mở ghi 1 dòng lịch sử; hồ sơ `import_moet` chỉ sửa được khi có đợt đang mở.
+- **TaiKhoanVLE** — tài khoản hệ thống học trực tuyến (VLE), `mat_khau_tam` mã hóa AES-256-GCM ở tầng ứng dụng — **không bao giờ lưu plaintext**, kể cả trong file lỗi import.
+- **NhatKyImport**, **NhatKyThongBao** — bảng nhật ký/audit trail.
+- **Chưa tồn tại (xác nhận 2026-10-01, không nhầm với đã code):** `DiemHoc` (địa điểm học trực tiếp), `GiangVien`/`PhanCongGiangDay`, `ChungNhan` — xem issue T10/T11/T13 trên GitHub Issues.
+
+## Luồng nghiệp vụ chính
+
+- **Tự phục vụ:** học viên tự đăng ký, tài khoản tự sinh (tên đăng nhập = ĐDCN/CCCD, mật khẩu mặc định = ngày sinh ddmmyyyy), **bắt buộc đổi mật khẩu lần đầu**.
+- **Xác nhận bắt buộc** trước khi hồ sơ chuyển trạng thái chính thức + gửi email bản sao dữ liệu.
+- **Phân lớp học viên chủ yếu qua Import** (Excel/CSV, `phan_lop_hoc_vien`) do Quản trị hệ thống thực hiện; từ QĐ10, Admin UI cũng cho sửa tay phân lớp theo từng giai đoạn + cụm Zalo ở màn chi tiết học viên — xem [frontend/src/pages/Admin/AdminHocVienChiTiet.tsx](frontend/src/pages/Admin/AdminHocVienChiTiet.tsx).
+- **Danh mục dùng chung** (địa danh, đơn vị công tác, môn học) là khóa ngoại, import có validate theo dòng — không nhập tự do; `ChuyenMon` là ngoại lệ (text tự do).
+- **Điều kiện vào đánh giá đầu vào** (`GET /hoc-vien/toi/danh-gia-dau-vao`): cần đợt xác nhận `xac_nhan_truoc_danh_gia` đang mở + hồ sơ "đầy đủ" (`day_du`, tính động, không lưu cột sẵn) — kiểm tra tại thời điểm gọi, không cache.
+
+## Quy ước code
+
+- Tên biến/bảng/API field: **tiếng Việt không dấu, snake_case** (vd. `hoc_vien`, `don_vi_cong_tac_id`, `trang_thai`). Giữ nguyên quy ước này khi thêm field/endpoint mới.
+- Response field có hậu tố `_ten` (vd. `noi_sinh_ten`) = tên đã join sẵn cho hiển thị — chỉ một số endpoint cụ thể trả về (`toResponseVoiTen`), không phải mặc định toàn bộ.
+- `trang_thai` là state machine rõ ràng theo từng thực thể — không tự suy luận trạng thái mới ngoài enum đã định nghĩa trong DDL.
+
+## Trước khi thêm khái niệm mới
+
+Nếu một khái niệm chưa có trong CONTEXT.md này — hoặc là bạn đang bịa ngôn ngữ mới (cân nhắc lại, dùng từ đã có), hoặc đây là một khoảng trống thật sự (ghi chú lại, cập nhật file này khi khái niệm được chốt).
