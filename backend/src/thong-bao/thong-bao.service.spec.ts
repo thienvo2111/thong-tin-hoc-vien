@@ -602,4 +602,75 @@ describe('ThongBaoService', () => {
       });
     });
   });
+
+  // 2026-10-02: tiêu đề thư 5 email phụ có tiền tố [HCMUE-BDNLS] để học viên
+  // nhận diện/lọc thư của hệ thống.
+  describe('tiền tố tiêu đề [HCMUE-BDNLS]', () => {
+    const tieuDeHangDoi = () =>
+      prisma.hang_doi_email.create.mock.calls[0][0].data.tieu_de as string;
+
+    it('guiHocVienXacNhan', async () => {
+      prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDu);
+      await service.guiHocVienXacNhan('hv-1');
+      expect(tieuDeHangDoi()).toBe(
+        '[HCMUE-BDNLS] Xác nhận thông tin đã khai báo',
+      );
+    });
+
+    it.each(['da_duyet', 'tu_choi'] as const)(
+      'guiHocVienDuyet (%s)',
+      async (kq) => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(hocVienDayDu);
+        await service.guiHocVienDuyet('hv-1', kq);
+        expect(tieuDeHangDoi()).toBe('[HCMUE-BDNLS] Kết quả duyệt hồ sơ');
+      },
+    );
+
+    it('guiKhoaBoiDuongDuyet', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue({
+        id: 'khoa-1',
+        ten_khoa: 'Khóa A',
+        ma_khoa: 'KA',
+        don_vi_to_chuc_id: 'truong-1',
+        created_by_user: { id: 'nd-1', email: 'truong@hcmue.edu.vn' },
+      });
+      await service.guiKhoaBoiDuongDuyet('khoa-1', 'da_duyet');
+      expect(tieuDeHangDoi()).toBe(
+        '[HCMUE-BDNLS] Kết quả duyệt khóa bồi dưỡng',
+      );
+    });
+
+    it('guiYeuCauHoTroTraLoi', async () => {
+      prisma.yeu_cau_ho_tro.findUnique.mockResolvedValue({
+        id: 'yc-1',
+        hoc_vien_id: 'hv-1',
+        noi_dung_hoi: 'Hỏi',
+        noi_dung_tra_loi: 'Đáp',
+        hoc_vien: hocVienDayDu,
+      });
+      await service.guiYeuCauHoTroTraLoi('yc-1');
+      expect(tieuDeHangDoi()).toBe(
+        '[HCMUE-BDNLS] Yêu cầu hỗ trợ của bạn đã được trả lời',
+      );
+    });
+
+    it('guiXacMinhEmail (gửi ngay, tiêu đề ở sendMail + nhật ký)', async () => {
+      await service.guiXacMinhEmail(
+        'a@test.local',
+        'A',
+        'https://x/xac-minh-email?token=t',
+        'hv-1',
+      );
+      expect(sendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: '[HCMUE-BDNLS] Xác minh email liên hệ',
+        }),
+      );
+      expect(prisma.nhat_ky_thong_bao.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          tieu_de: '[HCMUE-BDNLS] Xác minh email liên hệ',
+        }),
+      });
+    });
+  });
 });

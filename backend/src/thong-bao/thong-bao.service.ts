@@ -121,7 +121,7 @@ export class ThongBaoService {
       loaiSuKien: 'hoc_vien_xac_nhan',
       hocVienId: hocVien.id,
       email: hocVien.email_lien_he,
-      tieuDe: 'Xác nhận thông tin đã khai báo',
+      tieuDe: '[HCMUE-BDNLS] Xác nhận thông tin đã khai báo',
       html,
     });
   }
@@ -168,7 +168,7 @@ export class ThongBaoService {
       loaiSuKien: 'hoc_vien_duyet',
       hocVienId: hocVien.id,
       email: hocVien.email_lien_he,
-      tieuDe: 'Kết quả duyệt hồ sơ',
+      tieuDe: '[HCMUE-BDNLS] Kết quả duyệt hồ sơ',
       html,
     });
   }
@@ -225,7 +225,7 @@ export class ThongBaoService {
       loaiSuKien: 'khoa_boi_duong_duyet',
       hocVienId: null,
       email: nguoiDungTruong.email,
-      tieuDe: 'Kết quả duyệt khóa bồi dưỡng',
+      tieuDe: '[HCMUE-BDNLS] Kết quả duyệt khóa bồi dưỡng',
       html,
     });
   }
@@ -397,7 +397,7 @@ export class ThongBaoService {
       loaiSuKien: 'yeu_cau_ho_tro_tra_loi',
       hocVienId: yeuCau.hoc_vien_id,
       email: yeuCau.hoc_vien.email_lien_he,
-      tieuDe: 'Yêu cầu hỗ trợ của bạn đã được trả lời',
+      tieuDe: '[HCMUE-BDNLS] Yêu cầu hỗ trợ của bạn đã được trả lời',
       html,
     });
   }
@@ -433,7 +433,7 @@ export class ThongBaoService {
       loaiSuKien: 'email_xac_minh',
       hocVienId,
       email,
-      tieuDe: 'Xác minh email liên hệ',
+      tieuDe: '[HCMUE-BDNLS] Xác minh email liên hệ',
       html,
     });
   }
