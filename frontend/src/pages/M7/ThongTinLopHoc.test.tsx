@@ -80,14 +80,14 @@ describe('M7 — Thông tin lớp học', () => {
       'https://vle.example/danh-gia',
     );
     expect(within(gd1).getByText('Làm bài trong 60 phút')).toBeInTheDocument();
-    expect(within(gd1).queryByText(/Chưa được phân lớp/)).not.toBeInTheDocument();
+    expect(within(gd1).queryByText(/sẽ được cập nhật sau/)).not.toBeInTheDocument();
   });
 
   it('giai đoạn không lớp, không link, không hướng dẫn: chỉ tiêu đề + ngày + dòng nhắc, không lỗi', async () => {
     renderDaDangNhap();
     const gd4 = (await cacTheGiaiDoan())[3];
     expect(within(gd4).queryByRole('link')).not.toBeInTheDocument();
-    expect(within(gd4).getByText('Chưa được phân lớp ở giai đoạn này.')).toBeInTheDocument();
+    expect(within(gd4).getByText('Thông tin lớp ở giai đoạn này sẽ được cập nhật sau.')).toBeInTheDocument();
   });
 
   it('cụm Zalo và kết quả đánh giá vẫn hiện như trước', async () => {
@@ -102,7 +102,7 @@ describe('M7 — Thông tin lớp học', () => {
     expect(screen.getByText(/Đầu ra: Chưa có kết quả/)).toBeInTheDocument();
   });
 
-  it('chưa được phân lớp ở giai đoạn nào → banner chờ phân lớp, không có buổi học, không cụm', async () => {
+  it('chưa được phân lớp ở giai đoạn nào → vẫn hiện đủ thẻ giai đoạn + dòng nhắc sau cùng, không có buổi học, không cụm', async () => {
     const dangKy: KhoaHocDangKy = {
       ...db.khoaHocToi[0],
       cum: null,
@@ -112,8 +112,36 @@ describe('M7 — Thông tin lớp học', () => {
     renderDaDangNhap();
 
     expect(await screen.findByText(dangKy.khoa.ten_khoa)).toBeInTheDocument();
-    expect(screen.getByText('Chưa được phân vào lớp nào.')).toBeInTheDocument();
+
+    const the = await cacTheGiaiDoan();
+    expect(the.map((t) => within(t).getByRole('heading').textContent)).toEqual([
+      'GĐ1 · Đánh giá đầu vào',
+      'GĐ2 · Học trực tiếp',
+      'GĐ3 · Học trực tuyến qua zoom',
+      'GĐ4 · Học trực tuyến qua VLE',
+    ]);
+
+    const ghiChu = screen.getAllByText(/sẽ được phân chia và cập nhật sau/);
+    expect(ghiChu).toHaveLength(1);
+    const theCuoi = the[the.length - 1];
+    // eslint-disable-next-line no-bitwise
+    expect(theCuoi.compareDocumentPosition(ghiChu[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    expect(screen.queryByText('Thông tin lớp ở giai đoạn này sẽ được cập nhật sau.')).not.toBeInTheDocument();
     expect(screen.queryByText(/^Buổi/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Cụm hỗ trợ Zalo/)).not.toBeInTheDocument();
+  });
+
+  it('chưa được phân lớp và khóa chưa có giai đoạn nào → thông báo lịch sẽ cập nhật sau, không có thẻ nào', async () => {
+    const dangKy: KhoaHocDangKy = {
+      ...db.khoaHocToi[0],
+      cum: null,
+      giai_doan: [],
+    };
+    server.use(http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json([dangKy])));
+    renderDaDangNhap();
+
+    expect(await screen.findByText('Lịch các giai đoạn của khóa học sẽ được cập nhật sau.')).toBeInTheDocument();
+    expect(screen.queryByTestId('the-giai-doan')).not.toBeInTheDocument();
   });
 });

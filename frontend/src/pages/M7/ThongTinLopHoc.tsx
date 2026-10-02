@@ -108,11 +108,20 @@ function KhoiKhoaHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
 
         {cum && <KhoiCum cum={cum} />}
 
-        {chuaCoLopNao && <StatusBanner loai="info">Chưa được phân vào lớp nào.</StatusBanner>}
-
         {giai_doan.map((gd) => (
-          <TheGiaiDoan key={gd.id} gd={gd} />
+          <TheGiaiDoan key={gd.id} gd={gd} chuaPhanLop={chuaCoLopNao} />
         ))}
+
+        {chuaCoLopNao && giai_doan.length > 0 && (
+          <StatusBanner loai="info">
+            Lưu ý: Danh sách lớp, giảng viên và lịch học chi tiết của từng giai đoạn sẽ được phân chia và cập nhật
+            sau. Thầy/Cô vui lòng theo dõi trang này hoặc nhóm Zalo để nhận thông tin mới nhất.
+          </StatusBanner>
+        )}
+
+        {chuaCoLopNao && giai_doan.length === 0 && (
+          <StatusBanner loai="info">Lịch các giai đoạn của khóa học sẽ được cập nhật sau.</StatusBanner>
+        )}
 
         <Box>
           <Text fw={700} size="sm" mb={4}>
@@ -138,7 +147,7 @@ function laLink(s: string): boolean {
 
 // Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.2): 1 thẻ/giai đoạn. Có lớp -> lớp + nhân sự + buổi
 // của đúng giai đoạn; không lớp -> link/hướng dẫn chung của giai đoạn (vd đánh giá đầu vào/đầu ra).
-function TheGiaiDoan({ gd }: { gd: GiaiDoanCuaToi }) {
+function TheGiaiDoan({ gd, chuaPhanLop }: { gd: GiaiDoanCuaToi; chuaPhanLop: boolean }) {
   return (
     <Paper p="md" radius="md" withBorder data-testid="the-giai-doan">
       <Group gap="xs" mb={2} wrap="wrap">
@@ -181,9 +190,9 @@ function TheGiaiDoan({ gd }: { gd: GiaiDoanCuaToi }) {
             ) : (
               <Text size="sm">Địa điểm: {gd.link_hoac_dia_diem}</Text>
             ))}
-          {!gd.huong_dan && !gd.link_hoac_dia_diem && (
+          {!gd.huong_dan && !gd.link_hoac_dia_diem && !chuaPhanLop && (
             <Text size="sm" c="dimmed">
-              Chưa được phân lớp ở giai đoạn này.
+              Thông tin lớp ở giai đoạn này sẽ được cập nhật sau.
             </Text>
           )}
         </Stack>
