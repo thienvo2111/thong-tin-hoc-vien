@@ -1020,3 +1020,14 @@ model yeu_cau_ho_tro {
   @@index([hoc_vien_id], map: "idx_yeu_cau_ho_tro_hoc_vien")
   @@index([loai_van_de_id, trang_thai], map: "idx_yeu_cau_ho_tro_loai_trang_thai")
 }
+
+/// Cấu hình vận hành dạng khóa-giá trị (2026-10-02). Hiện có 1 khóa
+/// 'khao_sat_dau_vao' — chế độ triển khai cho học viên + danh sách phiếu khảo
+/// sát ở trang chủ, do quan_tri sửa tại /admin/cau-hinh-khao-sat. Shape gia_tri
+/// do DTO tầng ứng dụng kiểm soát (cau-hinh-khao-sat.dto.ts).
+model cau_hinh_he_thong {
+  khoa         String   @id @db.VarChar(100)
+  gia_tri      Json
+  cap_nhat_luc DateTime @default(now()) @db.Timestamptz(6)
+  cap_nhat_boi String?  @db.Uuid
+}

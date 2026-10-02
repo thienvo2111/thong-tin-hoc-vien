@@ -25,7 +25,7 @@ import { useWindowScroll } from '@mantine/hooks';
 import { Link } from 'react-router-dom';
 import { useToi } from '@/auth/AuthContext';
 import { gioiThieu } from '@/content/gioiThieu';
-import { hopCheDo, trienKhai } from '@/content/trienKhai';
+import { hopCheDo, useCauHinhTrienKhai, type CauHinhTrienKhai } from '@/content/trienKhai';
 import logoHcmue from '@/assets/logo-hcmue.png';
 
 // Trang giới thiệu công khai (M0) — layout theo design/mockup-source/project/LandingDesktop.dc.html
@@ -59,16 +59,18 @@ export default function TrangGioiThieu() {
     gioiThieu;
 
   const dangDaXacThuc = !dangTai && daXacThuc;
-  const hienKhaoSat = khaoSatDauVao.hien;
-  const hienHuongDan = huongDan.hien && hopCheDo(huongDan);
-  const buocLoTrinh = loTrinh.buoc.filter(hopCheDo);
-  const cauHoiDap = hoiDap.cau.filter(hopCheDo);
+  const { cauHinh } = useCauHinhTrienKhai();
+  const hop = hopCheDo(cauHinh.cheDoHocVien);
+  const hienKhaoSat = cauHinh.hienKhaoSat && cauHinh.phieu.length > 0;
+  const hienHuongDan = huongDan.hien && hop(huongDan);
+  const buocLoTrinh = loTrinh.buoc.filter(hop);
+  const cauHoiDap = hoiDap.cau.filter(hop);
 
   // Chế độ 'khao_sat': học viên chưa đăng nhập — CTA chính trỏ tới khối khảo sát thay vì trang đăng nhập.
   // Người đã đăng nhập (vd quản trị) vẫn thấy "Vào trang của tôi".
   const cta: Cta = dangDaXacThuc
     ? { href: '/toi', nhan: 'Vào trang của tôi', noiBo: true }
-    : trienKhai.cheDoHocVien === 'khao_sat' && hienKhaoSat
+    : cauHinh.cheDoHocVien === 'khao_sat' && hienKhaoSat
       ? { href: '#khao-sat', nhan: moDau.nutKhaoSat, noiBo: false }
       : { href: '/dang-nhap', nhan: moDau.nutChinh, noiBo: true };
   const ctaHeader: Cta = cta.href === '/dang-nhap' ? { ...cta, nhan: 'Đăng nhập' } : cta;
@@ -106,7 +108,7 @@ export default function TrangGioiThieu() {
 
       {conSo.hien && <DaiThongKe conSo={conSo} />}
 
-      {hienKhaoSat && <KhoiKhaoSat khaoSat={khaoSatDauVao} />}
+      {hienKhaoSat && <KhoiKhaoSat khaoSat={khaoSatDauVao} phieu={cauHinh.phieu} />}
 
       {viSao.hien && <ViSao viSao={viSao} />}
 
@@ -583,7 +585,7 @@ function DanhSachBuocSo({ buoc, mau }: { buoc: { ten: string; moTa: string }[]; 
 }
 
 /** Khối khảo sát đầu vào — các phiếu làm tuần tự theo thứ tự, mỗi phiếu 1 hoặc nhiều đường dẫn (theo đối tượng). */
-function KhoiKhaoSat({ khaoSat }: { khaoSat: typeof gioiThieu.khaoSatDauVao }) {
+function KhoiKhaoSat({ khaoSat, phieu }: { khaoSat: typeof gioiThieu.khaoSatDauVao; phieu: CauHinhTrienKhai['phieu'] }) {
   return (
     <Box id="khao-sat" bg="primary.0" py={{ base: 48, sm: 72 }} px={{ base: 'md', sm: 'xl' }}>
       <Container size="md" p={0}>
@@ -598,7 +600,7 @@ function KhoiKhaoSat({ khaoSat }: { khaoSat: typeof gioiThieu.khaoSatDauVao }) {
           </Stack>
 
           <Stack gap="md" component="ol" m={0} p={0} style={{ listStyle: 'none' }}>
-            {khaoSat.phieu.map((p, i) => (
+            {phieu.map((p, i) => (
               <Paper key={p.ten} component="li" withBorder radius={14} p="lg">
                 <Group gap={16} align="flex-start" wrap="nowrap">
                   <Box
@@ -627,7 +629,7 @@ function KhoiKhaoSat({ khaoSat }: { khaoSat: typeof gioiThieu.khaoSatDauVao }) {
                     </Text>
                     <Group gap="sm" wrap="wrap" mt={4}>
                       {p.lienKet.map((lk) =>
-                        laNoiDungCho(lk.url) ? (
+                        !lk.url || laNoiDungCho(lk.url) ? (
                           <Stack key={lk.nhan} gap={4}>
                             <Button disabled variant="default">
                               {lk.nhan}

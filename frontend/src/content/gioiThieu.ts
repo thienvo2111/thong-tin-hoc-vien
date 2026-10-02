@@ -2,7 +2,7 @@
 // Nội dung trang giới thiệu (M0). Dùng chung cho nhiều tỉnh — KHÔNG ghi tên tỉnh.
 // Khối có `tam: true` là nội dung tạm, đơn vị tổ chức sẽ thay. Chuỗi bắt đầu bằng "[CHỜ" là thông tin còn thiếu.
 // Chỉ sửa file này để đổi nội dung; không sửa component.
-// Mục có `cheDo` chỉ hiện khi khớp `trienKhai.cheDoHocVien` (src/content/trienKhai.ts) — 'khao_sat' | 'dang_nhap'.
+// Mục có `cheDo` chỉ hiện khi khớp chế độ triển khai hiện tại ('khao_sat' | 'dang_nhap') — quản trị chọn tại /admin/cau-hinh-khao-sat.
 
 import type { CheDoHocVien } from './trienKhai';
 
@@ -24,13 +24,9 @@ export interface NoiDungGioiThieu {
     doanMo: string;
   };
   doiTuong: Khoi & { tieuDe: string; nhom: string[]; dieuKienChungNhan: string[] };
-  khaoSatDauVao: Khoi & {
-    tieuDe: string;
-    moTa: string;
-    /** Làm tuần tự theo thứ tự mảng. Mỗi phiếu có 1 hoặc nhiều đường dẫn (vd tách theo đối tượng). */
-    phieu: { ten: string; moTa: string; lienKet: { nhan: string; url: string }[] }[];
-    sauKhaoSat: string[];
-  };
+  /** Phần chữ của khối khảo sát. Danh sách phiếu, đường dẫn và bật/tắt khối do quản trị cấu hình tại
+   * /admin/cau-hinh-khao-sat (mặc định trong content/trienKhai.ts). */
+  khaoSatDauVao: { tam?: boolean; tieuDe: string; moTa: string; sauKhaoSat: string[] };
   loTrinh: Khoi & { tieuDe: string; buoc: { ten: string; moTa: string; cheDo?: CheDoHocVien }[] };
   noiDung: Khoi & {
     tieuDe: string;
@@ -112,26 +108,10 @@ export const gioiThieu: NoiDungGioiThieu = {
     ],
   },
 
-  // Khối khảo sát đầu vào — hiện khi hien:true (bất kể chế độ). Đường dẫn "[CHỜ]" hiện nút bị khóa.
-  // Tách theo đối tượng: thêm nhiều lienKet, vd
-  //   [{ nhan: 'Dành cho giáo viên', url: 'https://...' }, { nhan: 'Dành cho cán bộ quản lý', url: 'https://...' }]
   khaoSatDauVao: {
-    hien: true,
     tam: true,
     tieuDe: 'Khảo sát đầu vào',
-    moTa: 'Thầy/Cô không cần đăng nhập. Vui lòng thực hiện lần lượt 2 phiếu dưới đây, hoàn thành phiếu 1 rồi mới làm phiếu 2. Thông tin cá nhân được kê khai, bổ sung ngay trong phiếu — đề nghị Thầy/Cô điền chính xác theo hướng dẫn.',
-    phieu: [
-      {
-        ten: 'Phiếu khảo sát kĩ năng số',
-        moTa: 'Kê khai, bổ sung thông tin cá nhân và đơn vị công tác; trả lời các câu hỏi về kĩ năng số hiện có.',
-        lienKet: [{ nhan: 'Mở phiếu khảo sát', url: '[CHỜ]' }],
-      },
-      {
-        ten: 'Phiếu đánh giá năng lực số',
-        moTa: 'Làm bài đánh giá năng lực số sau khi đã hoàn thành phiếu 1. Kết quả dùng để xếp mức năng lực và chia lớp.',
-        lienKet: [{ nhan: 'Mở phiếu đánh giá', url: '[CHỜ]' }],
-      },
-    ],
+    moTa: 'Thầy/Cô không cần đăng nhập. Vui lòng thực hiện lần lượt các phiếu dưới đây theo đúng thứ tự, hoàn thành phiếu trước rồi mới làm phiếu sau. Thông tin cá nhân được kê khai, bổ sung ngay trong phiếu — đề nghị Thầy/Cô điền chính xác theo hướng dẫn.',
     sauKhaoSat: [
       'Ban tổ chức tổng hợp thông tin, kết quả đánh giá; xếp mức năng lực và chia lớp.',
       'Khi có thông báo, Thầy/Cô đăng nhập hệ thống để xem thông tin hồ sơ và lớp học (chỉ xem).',

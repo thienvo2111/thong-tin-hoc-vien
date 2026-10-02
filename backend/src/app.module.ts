@@ -16,6 +16,7 @@ import { ValidateModule } from './validate/validate.module';
 import { NguoiDungModule } from './nguoi-dung/nguoi-dung.module';
 import { DotXacNhanModule } from './dot-xac-nhan/dot-xac-nhan.module';
 import { YeuCauHoTroModule } from './yeu-cau-ho-tro/yeu-cau-ho-tro.module';
+import { CauHinhKhaoSatModule } from './cau-hinh-khao-sat/cau-hinh-khao-sat.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { YeuCauHoTroModule } from './yeu-cau-ho-tro/yeu-cau-ho-tro.module';
     NguoiDungModule,
     DotXacNhanModule,
     YeuCauHoTroModule,
+    CauHinhKhaoSatModule,
   ],
   controllers: [AppController],
   providers: [AppService],

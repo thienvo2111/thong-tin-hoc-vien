@@ -47,7 +47,7 @@ Xem chi tiết đầy đủ trong các board ở trên. Tóm tắt:
 ## Bước tiếp theo
 
 - **P2–P4 của đợt mở rộng An Giang** (T8, T10–T13) — xem `docs/mo-rong-nls-an-giang.md`.
-- **Link 2 phiếu khảo sát GĐ1** — dán vào `frontend/src/content/gioiThieu.ts` (`khaoSatDauVao.phieu[].lienKet`, hiện còn `[CHỜ]`); chờ chốt có tách theo đối tượng GV/CBQL hay không.
+- **Link 2 phiếu khảo sát GĐ1** — quản trị nhập ở `/admin/cau-hinh-khao-sat` khi có (chưa nhập thì trang chủ hiện nút bị khóa); chờ chốt có tách theo đối tượng GV/CBQL hay không.
 - **M0 bản đầy đủ** (mục 2/3/5/9) — chờ nội dung chính thức từ đơn vị tổ chức, hiện `frontend/src/content/gioiThieu.ts` mới có nội dung tạm.
 - **SMTP thật** — `thong-bao` hiện dùng tài khoản test Ethereal khi không đặt `SMTP_HOST`; cần cấu hình SMTP thật trước khi dùng thật (xem `backend/.env.example`).
 - **1 điểm giòn (fragile) đã flag ở M6**: màn "Làm bài đánh giá" khi chưa đủ điều kiện so khớp *chuỗi* `ly_do` từ backend để quyết định điều hướng về M4 hay M5 (không có mã lý do có cấu trúc) — nếu backend đổi câu chữ thông báo, FE âm thầm rơi về M4. Nên bổ sung mã lý do (enum) ở `GET /hoc-vien/toi/danh-gia-dau-vao` khi có dịp.
@@ -138,4 +138,4 @@ npm run dev
 
 Test: `npm test -- --run` (Vitest + Testing Library + MSW, không cần backend chạy thật). Build: `npm run build` — M0 (trang giới thiệu công khai) nằm ở chunk riêng, tách khỏi Mantine form/dates và TanStack Query, mục tiêu <150KB gzip (thực đo ~114KB tính đến M0-M6).
 
-7 màn hình theo `docs/dac-ta-cong-hoc-vien.md`: M0 (giới thiệu, công khai) → M1 (đăng nhập) → M2 (đổi mật khẩu lần đầu) → M3 (trang chính) → M4 (hồ sơ xem/sửa) → M5 (xem lại & xác nhận) → M6 (làm bài đánh giá đầu vào, cần đợt 2 mở). Toàn bộ nội dung M0 lấy từ `src/content/gioiThieu.ts`, không sửa cứng trong component. **Chế độ triển khai** (`src/content/trienKhai.ts`, 2026-10-02): `khao_sat` = học viên không đăng nhập, làm tuần tự các phiếu khảo sát ngoài ở trang chủ (An Giang GĐ1); `dang_nhap` = cổng học viên như trên — xem `docs/dac-ta-cong-hoc-vien.md` mục "Chế độ triển khai".
+7 màn hình theo `docs/dac-ta-cong-hoc-vien.md`: M0 (giới thiệu, công khai) → M1 (đăng nhập) → M2 (đổi mật khẩu lần đầu) → M3 (trang chính) → M4 (hồ sơ xem/sửa) → M5 (xem lại & xác nhận) → M6 (làm bài đánh giá đầu vào, cần đợt 2 mở). Toàn bộ nội dung M0 lấy từ `src/content/gioiThieu.ts`, không sửa cứng trong component. **Chế độ triển khai** (quản trị chọn ở `/admin/cau-hinh-khao-sat`, mặc định trong `src/content/trienKhai.ts`, 2026-10-02): `khao_sat` = học viên không đăng nhập, làm tuần tự các phiếu khảo sát ngoài ở trang chủ (An Giang GĐ1); `dang_nhap` = cổng học viên như trên — xem `docs/dac-ta-cong-hoc-vien.md` mục "Chế độ triển khai".

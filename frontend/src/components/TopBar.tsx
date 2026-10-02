@@ -4,20 +4,24 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useToi } from '@/auth/AuthContext';
 import { useHoSoToi } from '@/api/hocVien';
 import logoHcmue from '@/assets/logo-hcmue.png';
-import { trienKhai } from '@/content/trienKhai';
+import { useCauHinhTrienKhai } from '@/content/trienKhai';
 
-const MUC_MENU = [
-  { toi: '/toi', nhan: 'Trang chủ' },
-  { toi: '/toi/ho-so', nhan: 'Hồ sơ' },
-  { toi: '/toi/lop-hoc', nhan: 'Lớp học' },
-  { toi: '/toi/xac-nhan', nhan: 'Xác nhận' },
-  // Ẩn khi đánh giá đầu vào làm qua phiếu khảo sát ngoài (content/trienKhai.ts).
-  ...(trienKhai.danhGiaDauVaoTrongCong ? [{ toi: '/toi/danh-gia-dau-vao', nhan: 'Đánh giá đầu vào' }] : []),
-  { toi: '/toi/yeu-cau-ho-tro', nhan: 'Hỗ trợ' },
-];
+function taoMenu(danhGiaDauVaoTrongCong: boolean) {
+  return [
+    { toi: '/toi', nhan: 'Trang chủ' },
+    { toi: '/toi/ho-so', nhan: 'Hồ sơ' },
+    { toi: '/toi/lop-hoc', nhan: 'Lớp học' },
+    { toi: '/toi/xac-nhan', nhan: 'Xác nhận' },
+    // Ẩn khi đánh giá đầu vào làm qua phiếu khảo sát ngoài (cấu hình tại /admin/cau-hinh-khao-sat).
+    ...(danhGiaDauVaoTrongCong ? [{ toi: '/toi/danh-gia-dau-vao', nhan: 'Đánh giá đầu vào' }] : []),
+    { toi: '/toi/yeu-cau-ho-tro', nhan: 'Hỗ trợ' },
+  ];
+}
 
 /** Thanh trên mọi màn hình sau đăng nhập — menu điều hướng, tên học viên, Đăng xuất, liên hệ hỗ trợ (dac-ta § "Route"). */
 export function TopBar() {
+  const { cauHinh } = useCauHinhTrienKhai();
+  const MUC_MENU = taoMenu(cauHinh.danhGiaDauVaoTrongCong);
   const { dangXuat } = useToi();
   const navigate = useNavigate();
   const location = useLocation();

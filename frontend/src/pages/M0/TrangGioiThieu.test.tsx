@@ -1,29 +1,40 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { server } from '@/test/mocks/server';
+import { datCauHinhKhaoSatMock } from '@/test/mocks/cauHinhKhaoSat';
 import { renderTrang } from '@/test/testUtils';
 import TrangGioiThieu from './TrangGioiThieu';
 import { gioiThieu } from '@/content/gioiThieu';
-import { trienKhai } from '@/content/trienKhai';
+import { cauHinhMacDinh } from '@/content/trienKhai';
+import type { CauHinhKhaoSat } from '@/api/cauHinhKhaoSat';
 
-// Test đổi trực tiếp cấu hình (object module dùng chung) — lưu bản gốc và khôi phục sau mỗi test.
-const goc = {
-  trienKhai: structuredClone(trienKhai),
-  khaoSat: structuredClone(gioiThieu.khaoSatDauVao),
-  conSoHien: gioiThieu.conSo.hien,
-};
-
-beforeEach(() => {
-  Object.assign(trienKhai, structuredClone(goc.trienKhai));
-  gioiThieu.khaoSatDauVao = structuredClone(goc.khaoSat);
-  gioiThieu.conSo.hien = goc.conSoHien;
-});
-
+const conSoHienGoc = gioiThieu.conSo.hien;
 afterEach(() => {
-  Object.assign(trienKhai, structuredClone(goc.trienKhai));
-  gioiThieu.khaoSatDauVao = structuredClone(goc.khaoSat);
-  gioiThieu.conSo.hien = goc.conSoHien;
+  gioiThieu.conSo.hien = conSoHienGoc;
 });
+
+/** Cấu hình quản trị đã lưu (GET /cau-hinh-khao-sat) — mặc định chế độ khảo sát, 2 phiếu có link thật. */
+function cauHinh(sua: Partial<CauHinhKhaoSat> = {}): CauHinhKhaoSat {
+  return {
+    che_do_hoc_vien: 'khao_sat',
+    danh_gia_dau_vao_trong_cong: false,
+    hien_khao_sat: true,
+    phieu: [
+      { ten: 'Phiếu khảo sát kĩ năng số', mo_ta: 'Mô tả 1', lien_ket: [{ nhan: 'Mở phiếu khảo sát', url: 'https://forms.example/ks' }] },
+      {
+        ten: 'Phiếu đánh giá năng lực số',
+        mo_ta: 'Mô tả 2',
+        lien_ket: [
+          { nhan: 'Dành cho giáo viên', url: 'https://forms.example/gv' },
+          { nhan: 'Dành cho cán bộ quản lý', url: '' },
+        ],
+      },
+    ],
+    ...sua,
+  };
+}
 
 /** Chờ trang render xong (AuthContext tải xong) — neo vào tiêu đề khối viSao, có ở mọi chế độ. */
 async function choTrang() {
@@ -97,97 +108,102 @@ describe('M0 — Trang giới thiệu: nội dung chung', () => {
   });
 });
 
-describe('M0 — chế độ "khao_sat" (giai đoạn 1: chưa mở đăng nhập học viên)', () => {
-  beforeEach(() => {
-    trienKhai.cheDoHocVien = 'khao_sat';
+describe('M0 — quản trị chưa lưu cấu hình / API lỗi -> dùng mặc định', () => {
+  it('chưa lưu (cau_hinh null): chế độ khảo sát, phiếu mặc định chưa có link -> nút bị khóa', async () => {
+    renderTrang(<TrangGioiThieu />);
+    await screen.findByRole('heading', { name: gioiThieu.khaoSatDauVao.tieuDe });
+    const nhan = cauHinhMacDinh.phieu[0].lienKet[0].nhan;
+    expect(screen.getByRole('button', { name: nhan })).toBeDisabled();
+    expect(screen.getAllByText('Đường dẫn đang được cập nhật').length).toBe(cauHinhMacDinh.phieu.length);
+    expect(screen.queryByRole('link', { name: nhan })).not.toBeInTheDocument();
   });
 
-  it('nút chính và nút header trỏ tới khối khảo sát, không mời đăng nhập', async () => {
+  it('API lỗi -> trang vẫn hiển thị theo mặc định, không vỡ', async () => {
+    server.use(http.get('/cau-hinh-khao-sat', () => HttpResponse.json({}, { status: 500 })));
     renderTrang(<TrangGioiThieu />);
-    await choTrang();
+    await screen.findByRole('heading', { name: gioiThieu.khaoSatDauVao.tieuDe });
+    expect(screen.getAllByRole('link', { name: gioiThieu.moDau.nutKhaoSat }).length).toBeGreaterThan(0);
+  });
+});
+
+describe('M0 — chế độ "khao_sat" (giai đoạn 1: chưa mở đăng nhập học viên)', () => {
+  it('nút chính và nút header trỏ tới khối khảo sát, không mời đăng nhập', async () => {
+    datCauHinhKhaoSatMock(cauHinh());
+    renderTrang(<TrangGioiThieu />);
+    await screen.findByRole('link', { name: 'Mở phiếu khảo sát' });
     const nutChinh = screen.getAllByRole('link', { name: gioiThieu.moDau.nutKhaoSat });
     expect(nutChinh.length).toBeGreaterThan(0);
     nutChinh.forEach((n) => expect(n).toHaveAttribute('href', '#khao-sat'));
     expect(screen.queryByRole('link', { name: gioiThieu.moDau.nutChinh })).not.toBeInTheDocument();
   });
 
-  it('hiện 2 phiếu theo đúng thứ tự: kĩ năng số trước, năng lực số sau', async () => {
+  it('hiện các phiếu theo đúng thứ tự cấu hình', async () => {
+    datCauHinhKhaoSatMock(cauHinh());
     renderTrang(<TrangGioiThieu />);
-    await screen.findByRole('heading', { name: gioiThieu.khaoSatDauVao.tieuDe });
+    await screen.findByRole('link', { name: 'Mở phiếu khảo sát' });
     const tieuDePhieu = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-    expect(tieuDePhieu).toEqual([
-      'Phiếu 1: Phiếu khảo sát kĩ năng số',
-      'Phiếu 2: Phiếu đánh giá năng lực số',
-    ]);
+    expect(tieuDePhieu).toEqual(['Phiếu 1: Phiếu khảo sát kĩ năng số', 'Phiếu 2: Phiếu đánh giá năng lực số']);
   });
 
-  it('đường dẫn còn "[CHỜ]" -> nút bị khóa, không có link hỏng', async () => {
+  it('đổi thứ tự phiếu trong cấu hình -> trang đổi theo', async () => {
+    const c = cauHinh();
+    datCauHinhKhaoSatMock({ ...c, phieu: [...c.phieu].reverse() });
     renderTrang(<TrangGioiThieu />);
-    await screen.findByRole('heading', { name: gioiThieu.khaoSatDauVao.tieuDe });
-    const nhan = gioiThieu.khaoSatDauVao.phieu[0].lienKet[0].nhan;
-    expect(screen.getByRole('button', { name: new RegExp(nhan) })).toBeDisabled();
-    expect(screen.queryByRole('link', { name: nhan })).not.toBeInTheDocument();
+    await screen.findByRole('link', { name: 'Mở phiếu khảo sát' });
+    const tieuDePhieu = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(tieuDePhieu[0]).toBe('Phiếu 1: Phiếu đánh giá năng lực số');
   });
 
-  it('đường dẫn thật -> mở tab mới; tách theo đối tượng -> mỗi đối tượng 1 nút', async () => {
-    gioiThieu.khaoSatDauVao.phieu[0].lienKet = [{ nhan: 'Mở phiếu khảo sát', url: 'https://forms.example/ks' }];
-    gioiThieu.khaoSatDauVao.phieu[1].lienKet = [
-      { nhan: 'Dành cho giáo viên', url: 'https://forms.example/gv' },
-      { nhan: 'Dành cho cán bộ quản lý', url: 'https://forms.example/cbql' },
-    ];
+  it('link thật mở tab mới; tách theo đối tượng -> mỗi đối tượng 1 nút; url rỗng -> nút khóa', async () => {
+    datCauHinhKhaoSatMock(cauHinh());
     renderTrang(<TrangGioiThieu />);
-    await screen.findByRole('heading', { name: gioiThieu.khaoSatDauVao.tieuDe });
-
-    const ks = screen.getByRole('link', { name: 'Mở phiếu khảo sát' });
+    const ks = await screen.findByRole('link', { name: 'Mở phiếu khảo sát' });
     expect(ks).toHaveAttribute('href', 'https://forms.example/ks');
     expect(ks).toHaveAttribute('target', '_blank');
     expect(ks).toHaveAttribute('rel', expect.stringContaining('noopener'));
     expect(screen.getByRole('link', { name: 'Dành cho giáo viên' })).toHaveAttribute('href', 'https://forms.example/gv');
-    expect(screen.getByRole('link', { name: 'Dành cho cán bộ quản lý' })).toHaveAttribute(
-      'href',
-      'https://forms.example/cbql',
-    );
+    expect(screen.getByRole('button', { name: 'Dành cho cán bộ quản lý' })).toBeDisabled();
   });
 
-  it('hiện ghi chú "sau khi hoàn thành khảo sát" (chỉ xem, điều chỉnh ở đợt cuối)', async () => {
+  it('hiện ghi chú "sau khi hoàn thành khảo sát"', async () => {
+    datCauHinhKhaoSatMock(cauHinh());
     renderTrang(<TrangGioiThieu />);
-    await screen.findByRole('heading', { name: gioiThieu.khaoSatDauVao.tieuDe });
+    await screen.findByRole('link', { name: 'Mở phiếu khảo sát' });
     gioiThieu.khaoSatDauVao.sauKhaoSat.forEach((d) => expect(screen.getByText(d)).toBeInTheDocument());
   });
 
   it('ẩn hướng dẫn đăng nhập + FAQ về mật khẩu; hiện FAQ + lộ trình khảo sát', async () => {
+    datCauHinhKhaoSatMock(cauHinh());
     renderTrang(<TrangGioiThieu />);
-    await choTrang();
+    await screen.findByRole('link', { name: 'Mở phiếu khảo sát' });
     expect(screen.queryByRole('heading', { name: gioiThieu.huongDan.tieuDe })).not.toBeInTheDocument();
     hoiTheoCheDo('dang_nhap').forEach((h) => expect(screen.queryByText(h)).not.toBeInTheDocument());
     hoiTheoCheDo('khao_sat').forEach((h) => expect(screen.getByText(h)).toBeInTheDocument());
     tenTheoCheDo('dang_nhap').forEach((t) => expect(screen.queryByText(t)).not.toBeInTheDocument());
     tenTheoCheDo('khao_sat').forEach((t) => expect(screen.getByText(t)).toBeInTheDocument());
-    // Bước chung (không gắn cheDo) vẫn hiện.
     const cuoi = gioiThieu.loTrinh.buoc[gioiThieu.loTrinh.buoc.length - 1];
     expect(screen.getByText(cuoi.ten)).toBeInTheDocument();
   });
 
   it('menu có mục "Khảo sát" trỏ tới #khao-sat', async () => {
+    datCauHinhKhaoSatMock(cauHinh());
     renderTrang(<TrangGioiThieu />);
-    await choTrang();
+    await screen.findByRole('link', { name: 'Mở phiếu khảo sát' });
     const header = screen.getByRole('banner');
     expect(within(header).getByRole('link', { name: 'Khảo sát' })).toHaveAttribute('href', '#khao-sat');
   });
 });
 
 describe('M0 — chế độ "dang_nhap" (đã mở cổng học viên / địa phương bổ sung thông tin trên hệ thống)', () => {
-  beforeEach(() => {
-    trienKhai.cheDoHocVien = 'dang_nhap';
-  });
-
   it('nút chính dẫn tới /dang-nhap', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ che_do_hoc_vien: 'dang_nhap' }));
     renderTrang(<TrangGioiThieu />);
     const nut = await screen.findByRole('link', { name: gioiThieu.moDau.nutChinh });
     expect(nut).toHaveAttribute('href', '/dang-nhap');
   });
 
   it('hiện hướng dẫn đăng nhập + FAQ đăng nhập; ẩn FAQ + bước lộ trình của chế độ khảo sát', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ che_do_hoc_vien: 'dang_nhap' }));
     renderTrang(<TrangGioiThieu />);
     await screen.findByRole('heading', { name: gioiThieu.huongDan.tieuDe });
     expect(screen.getByText(gioiThieu.huongDan.buoc[0].ten)).toBeInTheDocument();
@@ -196,17 +212,18 @@ describe('M0 — chế độ "dang_nhap" (đã mở cổng học viên / địa 
     tenTheoCheDo('khao_sat').forEach((t) => expect(screen.queryByText(t)).not.toBeInTheDocument());
   });
 
-  it('tắt khối khảo sát (hien:false) -> không render khối và không có mục menu', async () => {
-    gioiThieu.khaoSatDauVao.hien = false;
+  it('tắt khối khảo sát -> không render khối và không có mục menu', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ che_do_hoc_vien: 'dang_nhap', hien_khao_sat: false }));
     renderTrang(<TrangGioiThieu />);
-    await choTrang();
+    await screen.findByRole('link', { name: gioiThieu.moDau.nutChinh });
     expect(screen.queryByRole('heading', { name: gioiThieu.khaoSatDauVao.tieuDe })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Khảo sát' })).not.toBeInTheDocument();
   });
 
-  it('khảo sát vẫn có thể bật song song (vd khảo sát bổ sung) mà nút chính vẫn là đăng nhập', async () => {
+  it('khảo sát vẫn bật song song được mà nút chính vẫn là đăng nhập', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ che_do_hoc_vien: 'dang_nhap' }));
     renderTrang(<TrangGioiThieu />);
-    await screen.findByRole('heading', { name: gioiThieu.khaoSatDauVao.tieuDe });
-    expect(screen.getByRole('link', { name: gioiThieu.moDau.nutChinh })).toHaveAttribute('href', '/dang-nhap');
+    expect(await screen.findByRole('link', { name: gioiThieu.moDau.nutChinh })).toHaveAttribute('href', '/dang-nhap');
+    expect(screen.getByRole('heading', { name: gioiThieu.khaoSatDauVao.tieuDe })).toBeInTheDocument();
   });
 });

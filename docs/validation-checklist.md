@@ -238,3 +238,14 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 91 | Import `ket_qua_giai_doan`: học viên xác định được phải **đã ghi danh** vào đúng khóa đó (`dang_ky_hoc` cho `(hoc_vien_id, khoa_id)` đã tồn tại, cùng quy tắc `ket_qua_danh_gia` T5) — chưa ghi danh thì dòng lỗi rõ ràng, import này **không** tự tạo `dang_ky_hoc`. `ty_le_hoan_thanh` (khi có giá trị) giới hạn 0–100 | 🔴 | API (`KhoaBoiDuongService.resolveKetQuaGiaiDoanRow`) + DB (`CHECK (ty_le_hoan_thanh BETWEEN 0 AND 100)` = `chk_ket_qua_giai_doan_ty_le`) |
 | 92 | Mỗi `ket_qua_giai_doan` chỉ có tối đa 1 dòng cho mỗi cặp `(dang_ky_hoc_id, giai_doan_id)` — import là **upsert** theo cặp này, chạy lại file ghi đè `ty_le_hoan_thanh`/`diem`, không cộng dồn | 🔴 | DB (`UNIQUE(dang_ky_hoc_id, giai_doan_id)` = `uq_ket_qua_giai_doan`) |
 | 93 | `GET /hoc-vien/toi/khoa-hoc` và `GET /hoc-vien/{id}/khoa-hoc` trả thêm `trang_thai_diem_danh` cho mỗi buổi (cả 3 khối `lop_truc_tiep`/`lop_zoom`/`lop_vle`) — `null` nếu học viên chưa được điểm danh cho buổi đó, KHÔNG suy diễn thành "vắng" | 🔴 | API (`KhoaBoiDuongService.khoaHocTheoHocVienId`) |
+
+## Cấu hình khảo sát đầu vào (2026-10-02 — api-contract.md mục 9)
+
+| # | Quy tắc | Mức | Nơi thực thi |
+|---|---|---|---|
+| 94 | `PUT /cau-hinh-khao-sat` chỉ `quan_tri`; `GET` công khai | 🔴 | API (`@Roles` cấp method — KHÔNG đặt cấp class vì sẽ chặn luôn route `@Public()`) |
+| 95 | `che_do_hoc_vien` ∈ {`khao_sat`, `dang_nhap`}; `danh_gia_dau_vao_trong_cong`, `hien_khao_sat` là boolean | 🔴 | API (DTO) + FE (zod) |
+| 96 | `phieu` tối đa 10; mỗi phiếu: `ten` 1–200 ký tự, `mo_ta` ≤ 1000, `lien_ket` 1–5 mục; mỗi đường dẫn: `nhan` 1–100 ký tự, `url` rỗng HOẶC URL `http://`/`https://` hợp lệ ≤ 1000 ký tự (chặn `javascript:` …) | 🔴 | API (DTO) + FE (zod) |
+| 97 | `che_do_hoc_vien = khao_sat` thì bắt buộc `hien_khao_sat = true` (học viên không có chỗ nào để làm khảo sát) | 🔴 | API (`CauHinhKhaoSatService.luuCauHinh`) + FE |
+| 98 | `hien_khao_sat = true` thì cần ít nhất 1 phiếu | 🔴 | API + FE |
+| 99 | Chuỗi được trim (và NFC ở FE) trước khi lưu; thứ tự `phieu` giữ nguyên như gửi lên | 🟡 | API + FE |

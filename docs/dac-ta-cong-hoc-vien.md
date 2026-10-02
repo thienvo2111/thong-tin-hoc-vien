@@ -21,7 +21,7 @@ Mọi màn hình sau đăng nhập có thanh trên: tên học viên, nút "Đă
 
 ### Chế độ triển khai (cập nhật 2026-10-02)
 
-Cấu hình trong `frontend/src/content/trienKhai.ts` — đổi giai đoạn chỉ cần sửa file này, không sửa component:
+Quản trị cấu hình tại **`/admin/cau-hinh-khao-sat`** (menu "Cấu hình khảo sát", API `GET`/`PUT /cau-hinh-khao-sat` — `api-contract.md` mục 9): chọn chế độ, bật/tắt menu M6, bật/tắt khối khảo sát, nhập danh sách phiếu + đường dẫn (thêm/xóa/đổi thứ tự, nhiều đường dẫn/phiếu khi tách theo đối tượng). Có hiệu lực ngay, không cần deploy. Khi chưa lưu lần nào hoặc API lỗi, frontend dùng giá trị mặc định trong `frontend/src/content/trienKhai.ts`. Phần chữ của khối (tiêu đề, mô tả, "Sau khi hoàn thành khảo sát") vẫn ở `gioiThieu.khaoSatDauVao`.
 
 | Kịch bản | `cheDoHocVien` | `danhGiaDauVaoTrongCong` | Hành vi |
 |---|---|---|---|
@@ -144,7 +144,7 @@ Mục nội dung trong `gioiThieu.ts` gắn `cheDo: 'khao_sat' | 'dang_nhap'` ch
 
 **API:** `GET /hoc-vien/toi/danh-gia-dau-vao` (T15). Cấu hình query: `gcTime: 0`, không refetch nền.
 
-Mục menu "Đánh giá đầu vào" ở thanh trên chỉ hiện khi `trienKhai.danhGiaDauVaoTrongCong = true` (2026-10-02) — địa phương làm đánh giá qua phiếu khảo sát ngoài thì ẩn.
+Mục menu "Đánh giá đầu vào" ở thanh trên chỉ hiện khi cấu hình `danh_gia_dau_vao_trong_cong = true` (2026-10-02, `/admin/cau-hinh-khao-sat`) — địa phương làm đánh giá qua phiếu khảo sát ngoài thì ẩn.
 
 | Phản hồi | Hiển thị |
 |---|---|
@@ -177,7 +177,7 @@ Mục menu "Đánh giá đầu vào" ở thanh trên chỉ hiện khi `trienKhai
 | # | Mục | Nội dung | Bản tối thiểu |
 |---|---|---|---|
 | 1 | **Phần mở đầu** | Tên chương trình, 1 câu thông điệp, nút chính **"Đăng nhập cổng học viên"** (→ `/dang-nhap`) — ở chế độ `khao_sat` đổi thành **"Làm khảo sát đầu vào"** (→ `#khao-sat`), nút phụ "Tìm hiểu chương trình" (cuộn xuống mục 2). Nếu `thongBaoNoiBat` có giá trị (ví dụ "Đợt kiểm tra hồ sơ mở đến 23:59 ngày 04/10") → dải thông báo nổi bật phía trên | ✔ |
-| 1b | **Khảo sát đầu vào** (`khaoSatDauVao`, 2026-10-02) | Danh sách phiếu đánh số theo thứ tự làm; mỗi phiếu có 1 hoặc nhiều đường dẫn (tách theo đối tượng: giáo viên / cán bộ quản lý), mở tab mới; đường dẫn còn `[CHỜ]` → nút bị khóa + "Đường dẫn đang được cập nhật". Ghi chú "Sau khi hoàn thành khảo sát". Hiện khi `hien: true` (độc lập chế độ) | |
+| 1b | **Khảo sát đầu vào** (`khaoSatDauVao`, 2026-10-02) | Danh sách phiếu đánh số theo thứ tự làm; mỗi phiếu có 1 hoặc nhiều đường dẫn (tách theo đối tượng: giáo viên / cán bộ quản lý), mở tab mới; đường dẫn còn `[CHỜ]` → nút bị khóa + "Đường dẫn đang được cập nhật". Ghi chú "Sau khi hoàn thành khảo sát". Hiện khi bật "Hiện khối khảo sát" trong `/admin/cau-hinh-khao-sat` (độc lập chế độ) | |
 | 2 | **Con số chương trình** | 3–4 ô số (ví dụ số tỉnh đã triển khai, số giáo viên đã tham gia) — chỉ hiển thị khi file nội dung có số; mặc định `hien: false` | |
 | 3 | **Vì sao cần năng lực số** | Mục tiêu, lợi ích cho giáo viên, 3 mức Cơ bản / Thành thạo / Nâng cao (mô tả ngắn từng mức) | |
 | 4 | **Lộ trình học** | Các giai đoạn chung theo thứ tự (không có ngày): điện thoại hiển thị dọc, desktop ngang | |

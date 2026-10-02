@@ -3,6 +3,7 @@ import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { server } from './mocks/server';
 import { resetDb } from './mocks/db';
+import { datCauHinhKhaoSatMock } from './mocks/cauHinhKhaoSat';
 import { xoaToken } from '@/auth/tokenStore';
 
 // Polyfill cần cho các component Mantine (Combobox/Select/Popover…) chạy trong jsdom.
@@ -39,6 +40,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   server.resetHandlers();
   resetDb();
+  datCauHinhKhaoSatMock(null);
   xoaToken();
   cleanup();
 });

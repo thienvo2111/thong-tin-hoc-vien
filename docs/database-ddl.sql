@@ -726,6 +726,21 @@ CREATE INDEX idx_hang_doi_email_hoc_vien ON hang_doi_email(hoc_vien_id);
 
 
 -- =====================================================================
+-- PHẦN 5 — CẤU HÌNH VẬN HÀNH (2026-10-02, migration 20261002110000)
+-- =====================================================================
+-- Khóa-giá trị. Hiện có 1 khóa 'khao_sat_dau_vao': chế độ triển khai cho học
+-- viên ('khao_sat' | 'dang_nhap') + danh sách phiếu khảo sát ở trang chủ, do
+-- quan_tri sửa (PUT /cau-hinh-khao-sat), đọc công khai (GET). Shape gia_tri do
+-- DTO tầng ứng dụng kiểm soát — xem docs/api-contract.md mục 9.
+CREATE TABLE cau_hinh_he_thong (
+    khoa          VARCHAR(100) PRIMARY KEY,
+    gia_tri       JSONB NOT NULL,
+    cap_nhat_luc  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    cap_nhat_boi  UUID            -- nguoi_dung.id, cố ý không FK (bảng cấu hình độc lập)
+);
+
+
+-- =====================================================================
 -- updated_at TRIGGER DÙNG CHUNG
 -- =====================================================================
 CREATE OR REPLACE FUNCTION trg_set_updated_at() RETURNS trigger AS $$

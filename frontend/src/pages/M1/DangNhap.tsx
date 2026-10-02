@@ -9,7 +9,7 @@ import { useToi } from '@/auth/AuthContext';
 import { dangNhapSchema, type DangNhapForm } from '@/schemas/dangNhap';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { gioiThieu } from '@/content/gioiThieu';
-import { trienKhai } from '@/content/trienKhai';
+import { useCauHinhTrienKhai } from '@/content/trienKhai';
 import { StatusBanner } from '@/components/StatusBanner';
 import { trangChuTheoVaiTro } from '@/lib/trangChuTheoVaiTro';
 import logoHcmue from '@/assets/logo-hcmue.png';
@@ -53,6 +53,7 @@ function PanelGioiThieu() {
 export default function DangNhap() {
   const { dangNhap } = useToi();
   const navigate = useNavigate();
+  const { cauHinh, daTai: daTaiCauHinh } = useCauHinhTrienKhai();
   const [hienHuongDan, setHienHuongDan] = useState(false);
 
   const {
@@ -114,7 +115,7 @@ export default function DangNhap() {
               </Text>
             </Box>
 
-            {trienKhai.cheDoHocVien === 'khao_sat' && (
+            {daTaiCauHinh && cauHinh.cheDoHocVien === 'khao_sat' && (
               <StatusBanner loai="info" tieuDe="Học viên chưa cần đăng nhập">
                 Giai đoạn hiện tại Thầy/Cô chỉ cần thực hiện khảo sát đầu vào, không cần đăng nhập.{' '}
                 <Anchor component={Link} to="/#khao-sat" fw={600}>

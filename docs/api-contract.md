@@ -312,3 +312,33 @@ Nội bộ, không có endpoint public cho FE trừ 2 mục xem lịch sử/hàn
 |---|---|---|---|
 | GET | `/thong-bao/lich-su?hoc_vien_id=&loai_su_kien=` | Lịch sử gửi cho 1 hồ sơ (đối chiếu khi học viên báo không nhận được), lọc thêm theo loại sự kiện nếu cần | QuảnTrị |
 | GET | `/thong-bao/hang-doi` | **Thêm M9**: đếm `hang_doi_email` theo từng `trang_thai` (`cho_gui`/`thanh_cong`/`that_bai`) + số email đã gửi thành công hôm nay (giờ Việt Nam) + hạn mức còn lại | QuảnTrị |
+
+## 9. Cấu hình khảo sát đầu vào & chế độ triển khai (2026-10-02)
+
+Bản ghi duy nhất (khóa `khao_sat_dau_vao` trong `cau_hinh_he_thong`, `database-ddl.sql` PHẦN 5). Trang chủ (M0), trang đăng nhập (M1) và thanh menu cổng học viên đọc cấu hình này; quản trị sửa ở `/admin/cau-hinh-khao-sat`. Có hiệu lực ngay, không cần deploy lại.
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| GET | `/cau-hinh-khao-sat` | Trả `{ cau_hinh, cap_nhat_luc }`. `cau_hinh = null` khi quản trị chưa lưu lần nào → frontend dùng giá trị mặc định trong `frontend/src/content/trienKhai.ts` | **Công khai** (không cần token) |
+| PUT | `/cau-hinh-khao-sat` | Ghi đè toàn bộ cấu hình, trả cùng shape với GET | QuảnTrị |
+
+Body `PUT` (cũng là shape `cau_hinh` của `GET`):
+
+```json
+{
+  "che_do_hoc_vien": "khao_sat",
+  "danh_gia_dau_vao_trong_cong": false,
+  "hien_khao_sat": true,
+  "phieu": [
+    { "ten": "Phiếu khảo sát kĩ năng số", "mo_ta": "…", "lien_ket": [{ "nhan": "Mở phiếu khảo sát", "url": "https://…" }] },
+    { "ten": "Phiếu đánh giá năng lực số", "mo_ta": "…", "lien_ket": [
+      { "nhan": "Dành cho giáo viên", "url": "https://…" },
+      { "nhan": "Dành cho cán bộ quản lý", "url": "" }
+    ] }
+  ]
+}
+```
+
+- `che_do_hoc_vien`: `khao_sat` = học viên không đăng nhập, làm tuần tự các phiếu ở trang chủ; `dang_nhap` = mời đăng nhập cổng học viên (quyền sửa hồ sơ vẫn do Đợt xác nhận quyết định).
+- `danh_gia_dau_vao_trong_cong`: hiện/ẩn menu "Đánh giá đầu vào" (M6) trong cổng học viên.
+- `phieu`: thứ tự mảng = thứ tự làm. `url` rỗng = chưa có đường dẫn (trang chủ hiện nút bị khóa). Ràng buộc chi tiết: `validation-checklist.md` mục "Cấu hình khảo sát đầu vào".

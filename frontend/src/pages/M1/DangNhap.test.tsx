@@ -1,12 +1,11 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
 import { loi } from '@/test/mocks/handlers';
 import { renderVoiRouter } from '@/test/testUtils';
 import DangNhap from './DangNhap';
-import { trienKhai } from '@/content/trienKhai';
 
 const routes = [
   { path: '/dang-nhap', element: <DangNhap /> },
@@ -97,24 +96,28 @@ describe('M1 — Đăng nhập', () => {
   });
 });
 
-describe('M1 — Đăng nhập theo chế độ triển khai', () => {
-  const goc = trienKhai.cheDoHocVien;
-  afterEach(() => {
-    trienKhai.cheDoHocVien = goc;
-  });
-
-  it('chế độ "khao_sat": báo học viên chưa cần đăng nhập + link về khối khảo sát, form vẫn dùng được (quản trị)', async () => {
-    trienKhai.cheDoHocVien = 'khao_sat';
+describe('M1 — Đăng nhập theo chế độ triển khai (cấu hình quản trị)', () => {
+  it('chưa lưu cấu hình (mặc định "khao_sat"): báo học viên chưa cần đăng nhập + link về khối khảo sát; form vẫn dùng được', async () => {
     renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
     expect(await screen.findByText('Học viên chưa cần đăng nhập')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Đi tới trang khảo sát' })).toHaveAttribute('href', '/#khao-sat');
     expect(screen.getByRole('button', { name: 'Đăng nhập' })).toBeEnabled();
   });
 
-  it('chế độ "dang_nhap": không hiện thông báo khảo sát', async () => {
-    trienKhai.cheDoHocVien = 'dang_nhap';
+  it('quản trị chọn "dang_nhap": không hiện thông báo khảo sát', async () => {
+    let daGoi = false;
+    server.use(
+      http.get('/cau-hinh-khao-sat', () => {
+        daGoi = true;
+        return HttpResponse.json({
+          cau_hinh: { che_do_hoc_vien: 'dang_nhap', danh_gia_dau_vao_trong_cong: true, hien_khao_sat: false, phieu: [] },
+          cap_nhat_luc: '2026-10-02T03:00:00.000Z',
+        });
+      }),
+    );
     renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
+    await waitFor(() => expect(daGoi).toBe(true));
     await screen.findByRole('button', { name: 'Đăng nhập' });
-    expect(screen.queryByText('Học viên chưa cần đăng nhập')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Học viên chưa cần đăng nhập')).not.toBeInTheDocument());
   });
 });
