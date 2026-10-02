@@ -990,6 +990,23 @@ export class HocVienService {
     return { kenh, ...(await this.danhGiaDauVaoQuaVle(caller)) };
   }
 
+  // Khảo sát đầu ra qua SSO (target 'dau-ra'): quản trị bật ở cấu hình khảo sát,
+  // điều kiện giống kênh sso đầu vào — chỉ cần hồ sơ đầy đủ (T9).
+  async khaoSatDauRaCuaToi(caller: AuthenticatedUser) {
+    if (!(await this.cauHinhKhaoSatService.khaoSatDauRaDangMo())) {
+      return { mo: false as const };
+    }
+    const hocVien = await this.getHocVienCuaToi(caller);
+    const { day_du, thieu } = await this.danhGiaDayDu(hocVien);
+    return day_du
+      ? { mo: true as const, du_dieu_kien: true }
+      : {
+          mo: true as const,
+          du_dieu_kien: false,
+          ly_do: thieu.map((t) => t.message),
+        };
+  }
+
   private async danhGiaDauVaoQuaVle(caller: AuthenticatedUser) {
     const hocVien = await this.getHocVienCuaToi(caller);
     const { day_du, thieu } = await this.danhGiaDayDu(hocVien);

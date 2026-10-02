@@ -1,6 +1,6 @@
 import { IsIn, IsOptional, IsString, Length } from 'class-validator';
 
-export const SSO_TARGET = ['khao-sat', 'danh-gia'] as const;
+export const SSO_TARGET = ['khao-sat', 'danh-gia', 'dau-ra'] as const;
 export type SsoTarget = (typeof SSO_TARGET)[number];
 
 // POST /sso/cap-ma (hoc_vien). Bỏ target -> bên khảo sát hiện danh sách bài cần làm.

@@ -19,7 +19,10 @@ describe('SsoService', () => {
       findUnique: jest.Mock;
     };
   };
-  let hocVienService: { danhGiaDauVaoCuaToi: jest.Mock };
+  let hocVienService: {
+    danhGiaDauVaoCuaToi: jest.Mock;
+    khaoSatDauRaCuaToi: jest.Mock;
+  };
   const envGoc = { ...process.env };
 
   const caller = {
@@ -40,6 +43,9 @@ describe('SsoService', () => {
       danhGiaDauVaoCuaToi: jest
         .fn()
         .mockResolvedValue({ kenh: 'sso', du_dieu_kien: true }),
+      khaoSatDauRaCuaToi: jest
+        .fn()
+        .mockResolvedValue({ mo: true, du_dieu_kien: true }),
     };
     service = new SsoService(
       prisma as unknown as PrismaService,
@@ -118,6 +124,41 @@ describe('SsoService', () => {
         ly_do: ['Chưa chọn đối tượng'],
       });
       await expect(service.capMa(caller)).rejects.toBeInstanceOf(
+        ForbiddenAppException,
+      );
+      expect(prisma.ma_sso_mot_lan.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('capMa — khảo sát đầu ra (target dau-ra)', () => {
+    it('đã mở + hồ sơ đủ -> cấp mã target dau-ra, không phụ thuộc kênh đầu vào', async () => {
+      hocVienService.danhGiaDauVaoCuaToi.mockResolvedValue({
+        kenh: 'vle',
+        du_dieu_kien: false,
+      });
+      const kq = await service.capMa(caller, 'dau-ra');
+      expect(new URL(kq.url).searchParams.get('target')).toBe('dau-ra');
+      expect(
+        prisma.ma_sso_mot_lan.create.mock.calls[0][0].data.target,
+      ).toBe('dau-ra');
+      expect(hocVienService.danhGiaDauVaoCuaToi).not.toHaveBeenCalled();
+    });
+
+    it('chưa mở -> 403, không tạo mã', async () => {
+      hocVienService.khaoSatDauRaCuaToi.mockResolvedValue({ mo: false });
+      await expect(service.capMa(caller, 'dau-ra')).rejects.toBeInstanceOf(
+        ForbiddenAppException,
+      );
+      expect(prisma.ma_sso_mot_lan.create).not.toHaveBeenCalled();
+    });
+
+    it('đã mở nhưng hồ sơ thiếu -> 403, không tạo mã', async () => {
+      hocVienService.khaoSatDauRaCuaToi.mockResolvedValue({
+        mo: true,
+        du_dieu_kien: false,
+        ly_do: ['Chưa có email'],
+      });
+      await expect(service.capMa(caller, 'dau-ra')).rejects.toBeInstanceOf(
         ForbiddenAppException,
       );
       expect(prisma.ma_sso_mot_lan.create).not.toHaveBeenCalled();

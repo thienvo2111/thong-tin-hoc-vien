@@ -19,6 +19,8 @@ export interface CauHinhTrienKhai {
   cheDoHocVien: CheDoHocVien;
   /** false = đánh giá đầu vào làm qua phiếu ngoài — ẩn menu M6 trong cổng học viên. */
   danhGiaDauVaoTrongCong: boolean;
+  /** true = trang chủ cổng học viên hiện khối "Khảo sát đầu ra" (SSO target 'dau-ra'). */
+  khaoSatDauRaMo: boolean;
   hienKhaoSat: boolean;
   /** Thứ tự mảng = thứ tự làm. Mỗi phiếu 1 hoặc nhiều đường dẫn (vd tách theo đối tượng). */
   phieu: { ten: string; moTa: string; lienKet: { nhan: string; url: string }[] }[];
@@ -27,6 +29,7 @@ export interface CauHinhTrienKhai {
 export const cauHinhMacDinh: CauHinhTrienKhai = {
   cheDoHocVien: 'khao_sat',
   danhGiaDauVaoTrongCong: false,
+  khaoSatDauRaMo: false,
   hienKhaoSat: true,
   phieu: [
     {
@@ -47,6 +50,7 @@ export function tuCauHinhApi(c: CauHinhKhaoSat | null): CauHinhTrienKhai {
   return {
     cheDoHocVien: c.che_do_hoc_vien,
     danhGiaDauVaoTrongCong: c.danh_gia_dau_vao_trong_cong,
+    khaoSatDauRaMo: c.khao_sat_dau_ra_mo ?? false,
     hienKhaoSat: c.hien_khao_sat,
     phieu: c.phieu.map((p) => ({ ten: p.ten, moTa: p.mo_ta, lienKet: p.lien_ket })),
   };

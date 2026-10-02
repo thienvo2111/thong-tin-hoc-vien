@@ -1,6 +1,9 @@
 import { Box, Button, Card, Center, Container, Group, List, Loader, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { useDotXacNhan } from '@/api/hocVien';
+import { capMaSso, useDotXacNhan, useHoSoToi, useMucDoDayDu } from '@/api/hocVien';
+import type { HocVien, MucDoDayDu } from '@/api/types';
+import { useCauHinhTrienKhai } from '@/content/trienKhai';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { thongDiepLoiChung } from '@/lib/loiApi';
@@ -12,9 +15,20 @@ const MUC_MENU_CHINH = [
   { toi: '/toi/lop-hoc', bieuTuong: '🏫', tieuDe: 'Thông tin lớp học', moTa: 'Lịch học, địa điểm, kết quả đánh giá đầu vào' },
 ];
 
+/** Xưng hô theo giới tính; chưa có giới tính -> "Thầy/Cô". */
+function xungHo(gioiTinh: HocVien['gioi_tinh'] | undefined) {
+  if (gioiTinh === 'nam') return 'Thầy';
+  if (gioiTinh === 'nu') return 'Cô';
+  return 'Thầy/Cô';
+}
+
 /** M3 — trang chính, khối trạng thái theo bảng trong dac-ta-cong-hoc-vien.md § M3. */
 export default function TrangChinh() {
   const { data, isLoading, isError, error } = useDotXacNhan();
+  const { data: hoSo } = useHoSoToi();
+  const { cauHinh } = useCauHinhTrienKhai();
+  const coKhaoSat = cauHinh.danhGiaDauVaoTrongCong || cauHinh.khaoSatDauRaMo;
+  const { data: mucDo } = useMucDoDayDu(coKhaoSat);
 
   return (
     <Container size="sm" py="xl">
@@ -27,7 +41,8 @@ export default function TrangChinh() {
           }}
         >
           <Title order={1} size="h2" c="white">
-            Chào mừng trở lại 👋
+            Chào mừng {xungHo(hoSo?.gioi_tinh)}
+            {hoSo?.ho_ten ? ` ${hoSo.ho_ten}` : ''} 👋
           </Title>
           <Text c="gray.3" size="sm" mt={4}>
             Theo dõi tiến độ hồ sơ và các đợt xác nhận của bạn tại đây.
@@ -49,6 +64,8 @@ export default function TrangChinh() {
                 Việc cần làm
               </Text>
               <KhoiTrangThai data={data} />
+              {mucDo && cauHinh.danhGiaDauVaoTrongCong && <KhoiKhaoSatDauVao mucDo={mucDo} />}
+              {mucDo && cauHinh.khaoSatDauRaMo && <KhoiKhaoSatDauRa mucDo={mucDo} />}
             </Stack>
 
             <MenuChinh />
@@ -180,6 +197,64 @@ function KhoiTrangThai({ data }: { data: NonNullable<ReturnType<typeof useDotXac
           Xem hồ sơ
         </Button>
       </Stack>
+    </StatusBanner>
+  );
+}
+
+/** Danh sách thông tin còn thiếu, phải cập nhật xong mới làm được khảo sát. */
+function DieuKienKhaoSat({ mucDo }: { mucDo: MucDoDayDu }) {
+  return (
+    <Stack gap="xs">
+      <Text>Thầy/Cô cần hoàn thành cập nhật các thông tin sau trước khi bắt đầu làm khảo sát:</Text>
+      <List size="sm">
+        {mucDo.thieu.map((t) => (
+          <List.Item key={t.field}>{nhanCuaTruong(t.field)}</List.Item>
+        ))}
+      </List>
+      <Button component={Link} to="/toi/ho-so" variant="default" mt="xs">
+        Cập nhật thông tin hồ sơ
+      </Button>
+    </Stack>
+  );
+}
+
+function KhoiKhaoSatDauVao({ mucDo }: { mucDo: MucDoDayDu }) {
+  return (
+    <StatusBanner loai={mucDo.day_du ? 'success' : 'warning'} tieuDe="Khảo sát đầu vào đã mở">
+      {mucDo.day_du ? (
+        <Stack gap="xs">
+          <Text>Hồ sơ đã đầy đủ. Thầy/Cô có thể bắt đầu làm khảo sát đầu vào.</Text>
+          <Button component={Link} to="/toi/danh-gia-dau-vao" mt="xs">
+            Làm khảo sát đầu vào
+          </Button>
+        </Stack>
+      ) : (
+        <DieuKienKhaoSat mucDo={mucDo} />
+      )}
+    </StatusBanner>
+  );
+}
+
+/** Đầu ra: bấm nút -> cấp mã SSO dùng 1 lần -> chuyển cùng tab (giống M6, không mở cửa sổ mới). */
+function KhoiKhaoSatDauRa({ mucDo }: { mucDo: MucDoDayDu }) {
+  const chuyen = useMutation({
+    mutationFn: () => capMaSso('dau-ra'),
+    onSuccess: ({ url }) => window.location.assign(url),
+  });
+
+  return (
+    <StatusBanner loai={mucDo.day_du ? 'success' : 'warning'} tieuDe="Khảo sát đầu ra đã mở">
+      {mucDo.day_du ? (
+        <Stack gap="xs">
+          <Text>Hồ sơ đã đầy đủ. Thầy/Cô có thể bắt đầu làm khảo sát đầu ra.</Text>
+          {chuyen.isError && <Text c="red">{thongDiepLoiChung(chuyen.error)}</Text>}
+          <Button mt="xs" loading={chuyen.isPending} onClick={() => chuyen.mutate()}>
+            Làm khảo sát đầu ra
+          </Button>
+        </Stack>
+      ) : (
+        <DieuKienKhaoSat mucDo={mucDo} />
+      )}
     </StatusBanner>
   );
 }

@@ -11,6 +11,8 @@ export interface CauHinhKhaoSat {
   hien_khao_sat: boolean;
   /** Thiếu ở cấu hình lưu trước 2026-10-02 — đọc qua layKenhDanhGia(). */
   kenh_danh_gia?: KenhDanhGia;
+  /** Thiếu = chưa mở khảo sát đầu ra. */
+  khao_sat_dau_ra_mo?: boolean;
   phieu: {
     ten: string;
     mo_ta: string;
@@ -44,6 +46,11 @@ export class CauHinhKhaoSatService {
     return cau_hinh?.kenh_danh_gia ?? 'vle';
   }
 
+  async khaoSatDauRaDangMo(): Promise<boolean> {
+    const { cau_hinh } = await this.layCauHinh();
+    return cau_hinh?.khao_sat_dau_ra_mo === true;
+  }
+
   async luuCauHinh(
     dto: CauHinhKhaoSatDto,
     nguoiCapNhatId: string,
@@ -71,6 +78,7 @@ export class CauHinhKhaoSatService {
       danh_gia_dau_vao_trong_cong: dto.danh_gia_dau_vao_trong_cong,
       hien_khao_sat: dto.hien_khao_sat,
       kenh_danh_gia: dto.kenh_danh_gia,
+      khao_sat_dau_ra_mo: dto.khao_sat_dau_ra_mo ?? false,
       phieu: dto.phieu.map((p) => ({
         ten: p.ten.trim(),
         mo_ta: p.mo_ta.trim(),

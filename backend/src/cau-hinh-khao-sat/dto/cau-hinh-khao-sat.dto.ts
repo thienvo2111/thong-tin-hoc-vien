@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsOptional,
   IsString,
   IsUrl,
   MaxLength,
@@ -72,6 +73,11 @@ export class CauHinhKhaoSatDto {
 
   @IsIn(KENH_DANH_GIA)
   kenh_danh_gia: KenhDanhGia;
+
+  // Mở khảo sát đầu ra (SSO target 'dau-ra'). Thiếu = false (cấu hình trước 2026-10-02).
+  @IsOptional()
+  @IsBoolean()
+  khao_sat_dau_ra_mo?: boolean;
 
   // Thứ tự mảng = thứ tự học viên làm phiếu.
   @IsArray()

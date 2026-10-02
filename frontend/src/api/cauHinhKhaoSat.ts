@@ -26,6 +26,8 @@ export interface CauHinhKhaoSat {
   hien_khao_sat: boolean;
   /** Thiếu ở cấu hình lưu trước 2026-10-02 -> coi là 'vle'. Khi lưu (PUT) luôn bắt buộc. */
   kenh_danh_gia?: KenhDanhGia;
+  /** Mở khảo sát đầu ra (SSO target 'dau-ra'). Thiếu = chưa mở. */
+  khao_sat_dau_ra_mo?: boolean;
   phieu: PhieuKhaoSat[];
 }
 

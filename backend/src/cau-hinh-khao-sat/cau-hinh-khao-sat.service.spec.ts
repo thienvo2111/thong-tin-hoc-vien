@@ -81,7 +81,47 @@ describe('CauHinhKhaoSatService', () => {
     });
   });
 
+  describe('khaoSatDauRaDangMo', () => {
+    it('chưa lưu / cấu hình cũ không có cờ -> chưa mở', async () => {
+      prisma.cau_hinh_he_thong.findUnique.mockResolvedValue(null);
+      await expect(service.khaoSatDauRaDangMo()).resolves.toBe(false);
+      prisma.cau_hinh_he_thong.findUnique.mockResolvedValue({
+        gia_tri: { kenh_danh_gia: 'sso' },
+        cap_nhat_luc: new Date(),
+      });
+      await expect(service.khaoSatDauRaDangMo()).resolves.toBe(false);
+    });
+
+    it('đã bật -> mở', async () => {
+      prisma.cau_hinh_he_thong.findUnique.mockResolvedValue({
+        gia_tri: { khao_sat_dau_ra_mo: true },
+        cap_nhat_luc: new Date(),
+      });
+      await expect(service.khaoSatDauRaDangMo()).resolves.toBe(true);
+    });
+  });
+
   describe('luuCauHinh', () => {
+    it('không gửi khao_sat_dau_ra_mo -> lưu false; gửi true -> lưu true', async () => {
+      prisma.cau_hinh_he_thong.upsert.mockResolvedValue({
+        cap_nhat_luc: new Date(),
+      });
+      await service.luuCauHinh(hopLe(), 'qt-1');
+      expect(
+        prisma.cau_hinh_he_thong.upsert.mock.calls[0][0].update.gia_tri
+          .khao_sat_dau_ra_mo,
+      ).toBe(false);
+
+      await service.luuCauHinh(
+        { ...hopLe(), khao_sat_dau_ra_mo: true },
+        'qt-1',
+      );
+      expect(
+        prisma.cau_hinh_he_thong.upsert.mock.calls[1][0].update.gia_tri
+          .khao_sat_dau_ra_mo,
+      ).toBe(true);
+    });
+
     it('hợp lệ -> upsert theo khóa, trim chuỗi, ghi người cập nhật', async () => {
       const luc = new Date();
       prisma.cau_hinh_he_thong.upsert.mockResolvedValue({ cap_nhat_luc: luc });

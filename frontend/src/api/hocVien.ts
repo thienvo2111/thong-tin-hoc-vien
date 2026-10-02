@@ -67,7 +67,7 @@ export function layDanhGiaDauVao() {
 }
 
 /** Bài trên hệ thống khảo sát; bỏ trống -> bên khảo sát hiện danh sách bài cần làm. */
-export type SsoTarget = 'khao-sat' | 'danh-gia';
+export type SsoTarget = 'khao-sat' | 'danh-gia' | 'dau-ra';
 
 // 2026-10-02: cấp mã dùng 1 lần (hết hạn sau vài phút) rồi chuyển sang hệ thống khảo sát — chỉ gọi lúc
 // học viên bấm nút, không gọi sẵn khi tải trang.

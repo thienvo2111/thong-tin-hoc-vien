@@ -33,6 +33,7 @@ const MAC_DINH_API: CauHinhKhaoSat = {
   danh_gia_dau_vao_trong_cong: cauHinhMacDinh.danhGiaDauVaoTrongCong,
   hien_khao_sat: cauHinhMacDinh.hienKhaoSat,
   kenh_danh_gia: 'vle',
+  khao_sat_dau_ra_mo: cauHinhMacDinh.khaoSatDauRaMo,
   phieu: cauHinhMacDinh.phieu.map((p) => ({ ten: p.ten, mo_ta: p.moTa, lien_ket: p.lienKet })),
 };
 
@@ -181,6 +182,12 @@ export default function AdminCauHinhKhaoSat() {
                   onChange={(e) => setForm({ ...form, danh_gia_dau_vao_trong_cong: e.currentTarget.checked })}
                   label='Hiện mục "Đánh giá đầu vào" trong cổng học viên'
                   description="Tắt khi đánh giá đầu vào làm qua phiếu khảo sát bên ngoài."
+                />
+                <Switch
+                  checked={form.khao_sat_dau_ra_mo ?? false}
+                  onChange={(e) => setForm({ ...form, khao_sat_dau_ra_mo: e.currentTarget.checked })}
+                  label="Mở khảo sát đầu ra"
+                  description="Trang chủ học viên hiện mục Khảo sát đầu ra. Hồ sơ đầy đủ là bấm sang trang khảo sát được (đăng nhập một lần)."
                 />
               </Stack>
             </Paper>

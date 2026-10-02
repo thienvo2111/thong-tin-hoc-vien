@@ -173,6 +173,19 @@ describe('Admin — Cấu hình khảo sát', () => {
     expect(screen.queryByRole('button', { name: '+ Thêm phiếu' })).not.toBeInTheDocument();
   });
 
+  describe('khảo sát đầu ra (2026-10-02)', () => {
+    it('cấu hình cũ không có cờ -> công tắc tắt; bật rồi lưu -> PUT khao_sat_dau_ra_mo=true', async () => {
+      datCauHinhKhaoSatMock(DA_LUU);
+      const user = userEvent.setup();
+      renderTrang();
+      const congTac = await screen.findByRole('switch', { name: /Mở khảo sát đầu ra/ });
+      expect(congTac).not.toBeChecked();
+      await user.click(congTac);
+      await user.click(screen.getByRole('button', { name: 'Lưu cấu hình' }));
+      await waitFor(() => expect(banDaLuu()?.khao_sat_dau_ra_mo).toBe(true));
+    });
+  });
+
   describe('kênh đánh giá đầu vào (2026-10-02)', () => {
     it('cấu hình lưu trước khi có lựa chọn kênh -> hiện "Tài khoản VLE" (giữ hành vi đang chạy)', async () => {
       datCauHinhKhaoSatMock(DA_LUU);

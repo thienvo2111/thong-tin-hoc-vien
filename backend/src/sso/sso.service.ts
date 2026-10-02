@@ -57,17 +57,10 @@ export class SsoService {
     caller: AuthenticatedUser,
     target?: SsoTarget,
   ): Promise<{ url: string; het_han: Date }> {
-    // Tái dùng đúng cổng điều kiện M6 — 1 nơi quyết định "đủ điều kiện".
-    const dieuKien = await this.hocVienService.danhGiaDauVaoCuaToi(caller);
-    if (dieuKien.kenh !== 'sso') {
-      throw new ForbiddenAppException(
-        'Hiện không dùng trang khảo sát cho bài đánh giá đầu vào',
-      );
-    }
-    if (!dieuKien.du_dieu_kien) {
-      throw new ForbiddenAppException(
-        'Hồ sơ chưa đầy đủ, chưa thể chuyển sang trang khảo sát',
-      );
+    if (target === 'dau-ra') {
+      await this.kiemTraKhaoSatDauRa(caller);
+    } else {
+      await this.kiemTraDanhGiaDauVao(caller);
     }
 
     const ma = randomBytes(32).toString('base64url');
@@ -85,6 +78,34 @@ export class SsoService {
     url.searchParams.set('code', ma);
     if (target) url.searchParams.set('target', target);
     return { url: url.toString(), het_han: hetHan };
+  }
+
+  // Khảo sát đầu ra: quản trị đã bật + hồ sơ đầy đủ (không phụ thuộc kênh đầu vào).
+  private async kiemTraKhaoSatDauRa(caller: AuthenticatedUser) {
+    const dauRa = await this.hocVienService.khaoSatDauRaCuaToi(caller);
+    if (!dauRa.mo) {
+      throw new ForbiddenAppException('Khảo sát đầu ra chưa mở');
+    }
+    if (!dauRa.du_dieu_kien) {
+      throw new ForbiddenAppException(
+        'Hồ sơ chưa đầy đủ, chưa thể chuyển sang trang khảo sát',
+      );
+    }
+  }
+
+  // Tái dùng đúng cổng điều kiện M6 — 1 nơi quyết định "đủ điều kiện".
+  private async kiemTraDanhGiaDauVao(caller: AuthenticatedUser) {
+    const dieuKien = await this.hocVienService.danhGiaDauVaoCuaToi(caller);
+    if (dieuKien.kenh !== 'sso') {
+      throw new ForbiddenAppException(
+        'Hiện không dùng trang khảo sát cho bài đánh giá đầu vào',
+      );
+    }
+    if (!dieuKien.du_dieu_kien) {
+      throw new ForbiddenAppException(
+        'Hồ sơ chưa đầy đủ, chưa thể chuyển sang trang khảo sát',
+      );
+    }
   }
 
   async doiMa(apiKey: string | undefined, ma: string): Promise<ThongTinSso> {

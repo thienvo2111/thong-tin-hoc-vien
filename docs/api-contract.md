@@ -345,6 +345,7 @@ Body `PUT` (cũng là shape `cau_hinh` của `GET`):
 - `che_do_hoc_vien`: `khao_sat` = học viên không đăng nhập, làm tuần tự các phiếu ở trang chủ; `dang_nhap` = mời đăng nhập cổng học viên (quyền sửa hồ sơ vẫn do Đợt xác nhận quyết định).
 - `danh_gia_dau_vao_trong_cong`: hiện/ẩn menu "Đánh giá đầu vào" (M6) trong cổng học viên.
 - `kenh_danh_gia` (2026-10-02, **bắt buộc khi PUT**): `sso` = M6 chuyển sang hệ thống khảo sát bằng mã dùng 1 lần (mục 10); `vle` = luồng T15 (tài khoản VLE). Cấu hình lưu trước ngày này không có trường → đọc là `vle`.
+- `khao_sat_dau_ra_mo` (2026-10-02, tùy chọn, thiếu = `false`): mở khảo sát đầu ra — trang chủ cổng học viên hiện khối "Khảo sát đầu ra" và cho cấp mã SSO `target=dau-ra` (mục 10). Điều kiện học viên: chỉ cần hồ sơ đầy đủ (T9), không phụ thuộc `kenh_danh_gia`.
 - `phieu`: thứ tự mảng = thứ tự làm. `url` rỗng = chưa có đường dẫn (trang chủ hiện nút bị khóa). Ràng buộc chi tiết: `validation-checklist.md` mục "Cấu hình khảo sát đầu vào".
 
 ## 10. SSO sang hệ thống khảo sát (2026-10-02)
@@ -355,12 +356,12 @@ Mục đích: học viên đã đăng nhập cổng bồi dưỡng sang hệ th�
 
 1. Học viên (hồ sơ đầy đủ, `kenh_danh_gia = sso`) bấm nút ở M6 → FE gọi `POST /sso/cap-ma`.
 2. Cổng tạo mã 32 byte ngẫu nhiên (base64url, 43 ký tự), lưu **SHA-256** của mã (`ma_sso_mot_lan`, DDL PHẦN 6), hết hạn sau **5 phút**, trả URL. FE chuyển trang **cùng tab** tới:
-   `{SSO_KHAO_SAT_URL}?code={MA_MOT_LAN}&target={khao-sat|danh-gia}` — bỏ `target` thì bên khảo sát hiện danh sách bài cần làm. Mặc định `SSO_KHAO_SAT_URL = https://khaosatnls.hcmue.edu.vn/sso/start`.
+   `{SSO_KHAO_SAT_URL}?code={MA_MOT_LAN}&target={khao-sat|danh-gia|dau-ra}` — bỏ `target` thì bên khảo sát hiện danh sách bài cần làm. Mặc định `SSO_KHAO_SAT_URL = https://khaosatnls.hcmue.edu.vn/sso/start`.
 3. **Máy chủ** khảo sát (không phải trình duyệt) gọi `POST /sso/doi-ma` kèm header `X-API-Key` → nhận thông tin học viên → tự tạo phiên đăng nhập bên mình → mở đúng bài.
 
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
-| POST | `/sso/cap-ma` | Body `{ target?: 'khao-sat' \| 'danh-gia' }` → `201 { url, het_han }`. 403 nếu kênh không phải `sso` hoặc hồ sơ chưa đầy đủ (dùng chung cổng điều kiện M6). 400 nếu `target` khác 2 giá trị trên | HọcViên (JWT) |
+| POST | `/sso/cap-ma` | Body `{ target?: 'khao-sat' \| 'danh-gia' \| 'dau-ra' }` → `201 { url, het_han }`. `khao-sat`/`danh-gia`/bỏ trống: 403 nếu kênh không phải `sso` hoặc hồ sơ chưa đầy đủ (dùng chung cổng điều kiện M6). `dau-ra`: 403 nếu `khao_sat_dau_ra_mo` chưa bật hoặc hồ sơ chưa đầy đủ. 400 nếu `target` khác 3 giá trị trên | HọcViên (JWT) |
 | POST | `/sso/doi-ma` | Body `{ code }` + header `X-API-Key` → `200` thông tin học viên (dưới đây). Mỗi mã đổi được **đúng 1 lần** | Máy chủ khảo sát (không JWT) |
 
 Response `POST /sso/doi-ma`:
