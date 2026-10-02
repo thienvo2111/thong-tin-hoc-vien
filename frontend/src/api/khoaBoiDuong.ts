@@ -192,6 +192,26 @@ export function useXoaLopDangKy(hocVienId: string) {
   });
 }
 
+// Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.3): gán/thay/gỡ lớp của 1 giai đoạn (lopId null = gỡ).
+// canh_bao: lớp không có buổi trong giai đoạn / loại lớp lệch hình thức — không chặn.
+export function ganLopGiaiDoan(dangKyHocId: string, giaiDoanId: string, lopId: string | null) {
+  return apiFetch<{ phan_lop: unknown; canh_bao?: string }>(`/dang-ky-hoc/${dangKyHocId}/giai-doan/${giaiDoanId}/lop`, {
+    method: 'PUT',
+    body: JSON.stringify({ lop_id: lopId }),
+  });
+}
+
+export function useGanLopGiaiDoan(hocVienId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dangKyHocId, giaiDoanId, lopId }: { dangKyHocId: string; giaiDoanId: string; lopId: string | null }) =>
+      ganLopGiaiDoan(dangKyHocId, giaiDoanId, lopId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: khoaHocCuaHocVienKey(hocVienId) });
+    },
+  });
+}
+
 export interface CapNhatCumDangKyDto {
   cum_id: string | null;
 }

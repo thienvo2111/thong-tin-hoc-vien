@@ -189,15 +189,16 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     await user.click(screen.getByRole('tab', { name: 'Giai đoạn' }));
     await user.click(screen.getByRole('button', { name: '+ Tạo giai đoạn' }));
 
-    await user.type(await screen.findByLabelText(/^Thứ tự/), '1');
-    await user.type(screen.getByLabelText(/^Tên giai đoạn/), 'Giai đoạn 1 — Tập trung');
+    // khoa-1 (mock) đã có GĐ1..GĐ4 (phân lớp theo giai đoạn) -> tạo GĐ5 để không trùng thứ tự.
+    await user.type(await screen.findByLabelText(/^Thứ tự/), '5');
+    await user.type(screen.getByLabelText(/^Tên giai đoạn/), 'Giai đoạn 5 — Tập trung');
     await user.click(screen.getByRole('textbox', { name: /^Hình thức/ }));
     await user.click(await screen.findByRole('option', { name: 'Trực tiếp' }));
     await user.type(screen.getByLabelText(/^Ngày bắt đầu/), '2026-10-05');
     await user.type(screen.getByLabelText(/^Ngày kết thúc/), '2026-10-10');
     await user.click(screen.getByRole('button', { name: 'Tạo giai đoạn' }));
 
-    expect(await screen.findByText('Giai đoạn 1 — Tập trung')).toBeInTheDocument();
+    expect(await screen.findByText('Giai đoạn 5 — Tập trung')).toBeInTheDocument();
   });
 
   it('tạo cụm hỗ trợ Zalo mới: điền form hợp lệ → gọi API, hiện trong bảng Cụm', async () => {

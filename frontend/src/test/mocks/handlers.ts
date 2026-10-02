@@ -3,7 +3,7 @@ import type { ImportChiTiet, KhoaBoiDuong, LoaiLop, YeuCauHoTro } from '@/api/ty
 import { DIA_DANH, DON_VI, LOAI_VAN_DE_HO_TRO, MON_HOC, db } from './db';
 
 // QĐ10 (2026-09-30): dang_ky_hoc mẫu nằm rải trong db.khoaHocCuaHocVien (map theo hoc_vien_id) — tìm
-// theo id đăng ký học (không phải hoc_vien_id) để dùng chung cho PATCH/DELETE /dang-ky-hoc/{id}/*.
+// theo id đăng ký học (không phải hoc_vien_id) để dùng chung cho PUT/PATCH /dang-ky-hoc/{id}/*.
 function timDangKyTheoId(id: string) {
   for (const list of Object.values(db.khoaHocCuaHocVien)) {
     const found = list.find((dk) => dk.id === id);
@@ -144,40 +144,31 @@ export const handlers = [
   }),
 
   // Thêm 2026-09-30 (QĐ10) — thao tác thủ công lớp/cụm của 1 đăng ký học (dùng chung ở AdminHocVienChiTiet).
-  http.patch('/dang-ky-hoc/:id/lop', async ({ params, request }) => {
+  // Phân lớp theo giai đoạn (spec 2026-10-02): gán/thay/gỡ lớp của 1 giai đoạn.
+  http.put('/dang-ky-hoc/:id/giai-doan/:gdId/lop', async ({ params, request }) => {
     const dangKy = timDangKyTheoId(params.id as string);
     if (!dangKy) return loi(404, 'NOT_FOUND', 'Không tìm thấy đăng ký học');
-    const body = (await request.json()) as { loai_lop: LoaiLop; lop_id: string };
-    const khoa = db.chiTietKhoa[dangKy.khoa_id];
-    const lop = khoa?.lop_hoc.find((l) => l.id === body.lop_id);
-    if (!lop) return loi(400, 'VALIDATION_ERROR', 'lop_id không tồn tại');
-    if (lop.loai_lop !== body.loai_lop) {
-      return loi(400, 'VALIDATION_ERROR', 'Không khớp loại lớp thực tế của lop_id');
+    const body = (await request.json()) as { lop_id: string | null };
+    const gd = dangKy.giai_doan.find((g) => g.id === params.gdId);
+    if (!gd) return loi(400, 'VALIDATION_ERROR', 'Giai đoạn không thuộc khóa của đăng ký này');
+    if (body.lop_id === null) {
+      gd.lop = null;
+      return HttpResponse.json({ phan_lop: null });
     }
-    const lopToi = {
+    const lop = db.chiTietKhoa[dangKy.khoa_id]?.lop_hoc.find((l) => l.id === body.lop_id);
+    if (!lop) return loi(400, 'VALIDATION_ERROR', 'Lớp không thuộc khóa của đăng ký này');
+    gd.lop = {
       id: lop.id,
       ten_lop: lop.ten_lop,
+      loai_lop: lop.loai_lop,
       si_so_toi_da: lop.si_so_toi_da,
       nhom_hoc_vien: lop.nhom_hoc_vien,
-      muc_nang_luc: lop.muc_nang_luc as never,
+      muc_nang_luc: lop.muc_nang_luc,
       nhan_su: [],
       lich_hoc: [],
     };
-    if (body.loai_lop === 'truc_tiep') dangKy.lop_truc_tiep = lopToi;
-    else if (body.loai_lop === 'zoom') dangKy.lop_zoom = lopToi;
-    else dangKy.lop_vle = lopToi;
     dangKy.trang_thai = 'da_phan_lop';
-    return HttpResponse.json({ dang_ky_hoc_id: dangKy.id, loai_lop: body.loai_lop, lop_id: body.lop_id });
-  }),
-
-  http.delete('/dang-ky-hoc/:id/lop/:loaiLop', ({ params }) => {
-    const dangKy = timDangKyTheoId(params.id as string);
-    if (!dangKy) return loi(404, 'NOT_FOUND', 'Không tìm thấy đăng ký học');
-    const loaiLop = params.loaiLop as LoaiLop;
-    if (loaiLop === 'truc_tiep') dangKy.lop_truc_tiep = null;
-    else if (loaiLop === 'zoom') dangKy.lop_zoom = null;
-    else dangKy.lop_vle = null;
-    return HttpResponse.json({ da_xoa: true });
+    return HttpResponse.json({ phan_lop: { dang_ky_hoc_id: dangKy.id, giai_doan_id: gd.id, lop_id: lop.id } });
   }),
 
   http.patch('/dang-ky-hoc/:id/cum', async ({ params, request }) => {
@@ -344,6 +335,8 @@ export const handlers = [
       hinh_thuc: string;
       thoi_gian_bat_dau: string;
       thoi_gian_ket_thuc: string;
+      link_hoac_dia_diem?: string | null;
+      huong_dan?: string | null;
     };
     if (khoa.giai_doan.some((g) => g.thu_tu === body.thu_tu)) {
       return loi(409, 'CONFLICT', `Thứ tự ${body.thu_tu} đã tồn tại trong khóa này`, {
@@ -359,6 +352,8 @@ export const handlers = [
       thoi_gian_bat_dau: body.thoi_gian_bat_dau,
       thoi_gian_ket_thuc: body.thoi_gian_ket_thuc,
       trang_thai: 'active' as const,
+      link_hoac_dia_diem: body.link_hoac_dia_diem ?? null,
+      huong_dan: body.huong_dan ?? null,
     };
     khoa.giai_doan = [...khoa.giai_doan, moi].sort((a, b) => a.thu_tu - b.thu_tu);
     return HttpResponse.json(moi);

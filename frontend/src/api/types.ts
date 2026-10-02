@@ -296,6 +296,9 @@ export interface GiaiDoanKhoa {
   thoi_gian_bat_dau: string;
   thoi_gian_ket_thuc: string;
   trang_thai: TrangThaiActive;
+  // Phân lớp theo giai đoạn (spec 2026-10-02): thông tin chung cho giai đoạn không gán lớp.
+  link_hoac_dia_diem: string | null;
+  huong_dan: string | null;
 }
 
 export interface NhanSuLop {
@@ -333,6 +336,8 @@ export interface LopHoc {
   muc_nang_luc: MucNangLuc | null;
   nhan_su?: NhanSuLop[];
   lich_hoc?: LichHocLop[];
+  // Chỉ có trong GET /khoa-boi-duong/{id}: số đăng ký khác nhau đang được phân vào lớp.
+  si_so_hien_tai?: number;
 }
 
 // cum_hoc_vien (QĐ10) — nhóm Zalo hỗ trợ theo địa lý, độc lập với cây đơn vị công tác VÀ với 3 loại
@@ -462,14 +467,6 @@ export interface LichHocLopToi {
   trang_thai_diem_danh: TrangThaiDiemDanh | null;
 }
 
-// Thêm 2026-09-30 (T12) — 1 phần tử/giai đoạn, nhập qua import ket_qua_giai_doan.
-export interface TienDoGiaiDoan {
-  giai_doan_id: string;
-  ten_giai_doan: string;
-  ty_le_hoan_thanh: number | null;
-  diem: number | null;
-}
-
 export interface NhanSuLopToi {
   id: string;
   ho_ten: string;
@@ -480,6 +477,7 @@ export interface NhanSuLopToi {
 export interface LopHocToi {
   id: string;
   ten_lop: string;
+  loai_lop: LoaiLop;
   si_so_toi_da: number | null;
   nhom_hoc_vien: number | null;
   muc_nang_luc: MucNangLuc | null;
@@ -487,9 +485,21 @@ export interface LopHocToi {
   lich_hoc: LichHocLopToi[];
 }
 
-// Sửa 2026-09-30 (QĐ10) — THAY ĐỔI CẤU TRÚC: trường "lop" (1 lớp duy nhất) đã bị thay bằng 3 trường
-// độc lập lop_truc_tiep/lop_zoom/lop_vle (mỗi trường LopHocToi | null, hệ quả bắt buộc từ việc xóa cột
-// dang_ky_hoc.lop_id — xem khoa-boi-duong.service.ts#khoaHocTheoHocVienId) + cum (cụm hỗ trợ Zalo).
+// Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.1): 1 phần tử/giai đoạn active của khóa, theo thu_tu.
+// lop = lớp học viên được gán ở giai đoạn này (lich_hoc chỉ gồm buổi của giai đoạn này) hoặc null.
+export interface GiaiDoanCuaToi {
+  id: string;
+  thu_tu: number;
+  ten_giai_doan: string;
+  hinh_thuc: HinhThucGiaiDoan;
+  thoi_gian_bat_dau: string;
+  thoi_gian_ket_thuc: string;
+  link_hoac_dia_diem: string | null;
+  huong_dan: string | null;
+  lop: LopHocToi | null;
+  tien_do: { ty_le_hoan_thanh: number | null; diem: number | null } | null;
+}
+
 export interface KhoaHocDangKy {
   id: string;
   hoc_vien_id: string;
@@ -511,11 +521,8 @@ export interface KhoaHocDangKy {
     trang_thai: TrangThaiKhoa;
   };
   cum: CumHocVien | null;
-  lop_truc_tiep: LopHocToi | null;
-  lop_zoom: LopHocToi | null;
-  lop_vle: LopHocToi | null;
-  // Thêm 2026-09-30 (T12) — mảng rỗng nếu chưa có dữ liệu (import ket_qua_giai_doan).
-  tien_do_giai_doan: TienDoGiaiDoan[];
+  // Phân lớp theo giai đoạn (spec 2026-10-02) — thay lop_truc_tiep/lop_zoom/lop_vle/tien_do_giai_doan.
+  giai_doan: GiaiDoanCuaToi[];
 }
 
 // GET /import — "Nhật ký import" (api-contract.md mục 5). Hàng là bản ghi thô của bảng nhat_ky_import

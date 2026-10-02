@@ -2,15 +2,14 @@ import { Badge, Box, Button, Center, Container, Group, Loader, Paper, Stack, Tex
 import { useKhoaHocToi } from '@/api/hocVien';
 import type {
   CumHocVien,
+  GiaiDoanCuaToi,
   KhoaHocDangKy,
   LichHocLopToi,
-  LopHocToi,
   MucNangLuc,
-  TienDoGiaiDoan,
   TrangThaiDiemDanh,
   VaiTroNhanSuLop,
 } from '@/api/types';
-import { dinhDangNgayGio } from '@/lib/ngay';
+import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
 
@@ -87,8 +86,8 @@ export default function ThongTinLopHoc() {
 }
 
 function KhoiKhoaHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
-  const { khoa, cum, lop_truc_tiep, lop_zoom, lop_vle, muc_dau_vao, muc_dau_ra, tien_do_giai_doan } = dangKy;
-  const chuaCoLopNao = !lop_truc_tiep && !lop_zoom && !lop_vle;
+  const { khoa, cum, giai_doan, muc_dau_vao, muc_dau_ra } = dangKy;
+  const chuaCoLopNao = giai_doan.every((gd) => !gd.lop);
 
   return (
     <Box p="lg" style={{ borderRadius: 14, border: '1px solid var(--mantine-color-gray-3)', background: 'var(--mantine-color-white)' }}>
@@ -109,15 +108,11 @@ function KhoiKhoaHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
 
         {cum && <KhoiCum cum={cum} />}
 
-        {chuaCoLopNao && (
-          <StatusBanner loai="info">Chưa được phân vào lớp nào (trực tiếp/Zoom/VLE).</StatusBanner>
-        )}
+        {chuaCoLopNao && <StatusBanner loai="info">Chưa được phân vào lớp nào.</StatusBanner>}
 
-        {lop_truc_tiep && <KhoiLop tieuDe="Lớp trực tiếp" lop={lop_truc_tiep} />}
-        {lop_zoom && <KhoiLop tieuDe="Lớp học qua Zoom" lop={lop_zoom} />}
-        {lop_vle && <KhoiLop tieuDe="Lớp học trên VLE" lop={lop_vle} />}
-
-        {tien_do_giai_doan.length > 0 && <KhoiTienDoGiaiDoan tienDo={tien_do_giai_doan} />}
+        {giai_doan.map((gd) => (
+          <TheGiaiDoan key={gd.id} gd={gd} />
+        ))}
 
         <Box>
           <Text fw={700} size="sm" mb={4}>
@@ -137,32 +132,76 @@ function KhoiKhoaHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
   );
 }
 
-// T12 (mo-rong-nls-an-giang.md, 2026-09-30) — tiến độ theo từng giai đoạn (vd tiến độ VLE, điểm
-// đánh giá giai đoạn), nhập qua import ket_qua_giai_doan.
-function KhoiTienDoGiaiDoan({ tienDo }: { tienDo: TienDoGiaiDoan[] }) {
+function laLink(s: string): boolean {
+  return s.startsWith('http://') || s.startsWith('https://');
+}
+
+// Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.2): 1 thẻ/giai đoạn. Có lớp -> lớp + nhân sự + buổi
+// của đúng giai đoạn; không lớp -> link/hướng dẫn chung của giai đoạn (vd đánh giá đầu vào/đầu ra).
+function TheGiaiDoan({ gd }: { gd: GiaiDoanCuaToi }) {
   return (
-    <Box>
-      <Text fw={700} size="sm" mb={4}>
-        Tiến độ học tập
+    <Paper p="md" radius="md" withBorder data-testid="the-giai-doan">
+      <Group gap="xs" mb={2} wrap="wrap">
+        <Title order={3} size="h5">{`GĐ${gd.thu_tu} · ${gd.ten_giai_doan}`}</Title>
+        <Badge size="sm" color={MAU_HINH_THUC[gd.hinh_thuc] ?? 'gray'}>
+          {NHAN_HINH_THUC[gd.hinh_thuc] ?? gd.hinh_thuc}
+        </Badge>
+      </Group>
+      <Text size="sm" c="dimmed" mb="sm">
+        {dinhDangNgay(gd.thoi_gian_bat_dau)} – {dinhDangNgay(gd.thoi_gian_ket_thuc)}
       </Text>
-      <Stack gap="xs">
-        {tienDo.map((gd) => (
-          <Group key={gd.giai_doan_id} gap="xs" justify="space-between">
-            <Text size="sm">{gd.ten_giai_doan}</Text>
-            <Group gap="xs">
-              <Badge variant="light" color="blue" size="sm">
-                Hoàn thành: {gd.ty_le_hoan_thanh == null ? 'Chưa có' : `${gd.ty_le_hoan_thanh}%`}
-              </Badge>
-              {gd.diem != null && (
-                <Badge variant="light" color="gray" size="sm">
-                  Điểm: {gd.diem}
-                </Badge>
-              )}
-            </Group>
-          </Group>
-        ))}
-      </Stack>
-    </Box>
+
+      {gd.lop ? (
+        <Stack gap="sm">
+          <Text fw={700}>{gd.lop.ten_lop}</Text>
+          {gd.lop.nhan_su.length > 0 && (
+            <Stack gap={4}>
+              {gd.lop.nhan_su.map((ns) => (
+                <Text size="sm" key={ns.id}>
+                  {NHAN_VAI_TRO_NHAN_SU[ns.vai_tro] ?? ns.vai_tro}: {ns.ho_ten}
+                  {ns.so_dien_thoai ? ` — ${ns.so_dien_thoai}` : ''}
+                </Text>
+              ))}
+            </Stack>
+          )}
+          <DanhSachBuoi lichHoc={gd.lop.lich_hoc} />
+        </Stack>
+      ) : (
+        <Stack gap="xs">
+          {gd.huong_dan && (
+            <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
+              {gd.huong_dan}
+            </Text>
+          )}
+          {gd.link_hoac_dia_diem &&
+            (laLink(gd.link_hoac_dia_diem) ? (
+              <Button component="a" href={gd.link_hoac_dia_diem} size="xs" style={{ alignSelf: 'flex-start' }}>
+                Mở liên kết
+              </Button>
+            ) : (
+              <Text size="sm">Địa điểm: {gd.link_hoac_dia_diem}</Text>
+            ))}
+          {!gd.huong_dan && !gd.link_hoac_dia_diem && (
+            <Text size="sm" c="dimmed">
+              Chưa được phân lớp ở giai đoạn này.
+            </Text>
+          )}
+        </Stack>
+      )}
+
+      {gd.tien_do && (
+        <Group gap="xs" mt="sm">
+          <Badge variant="light" color="blue" size="sm">
+            Hoàn thành: {gd.tien_do.ty_le_hoan_thanh == null ? 'Chưa có' : `${gd.tien_do.ty_le_hoan_thanh}%`}
+          </Badge>
+          {gd.tien_do.diem != null && (
+            <Badge variant="light" color="gray" size="sm">
+              Điểm: {gd.tien_do.diem}
+            </Badge>
+          )}
+        </Group>
+      )}
+    </Paper>
   );
 }
 
@@ -186,90 +225,35 @@ function KhoiCum({ cum }: { cum: CumHocVien }) {
   );
 }
 
-function KhoiLop({ tieuDe, lop }: { tieuDe: string; lop: LopHocToi }) {
+function DanhSachBuoi({ lichHoc }: { lichHoc: LichHocLopToi[] }) {
+  if (lichHoc.length === 0) return null;
   return (
-    <Paper p="md" radius="md" withBorder>
-      <Text fw={700} size="sm" c="dimmed" mb={4}>
-        {tieuDe}
-      </Text>
-      <Stack gap="sm">
-        <Text fw={700}>{lop.ten_lop}</Text>
-
-        {lop.nhan_su.length > 0 && (
-          <Stack gap={4}>
-            {lop.nhan_su.map((ns) => (
-              <Text size="sm" key={ns.id}>
-                {NHAN_VAI_TRO_NHAN_SU[ns.vai_tro] ?? ns.vai_tro}: {ns.ho_ten}
-                {ns.so_dien_thoai ? ` — ${ns.so_dien_thoai}` : ''}
+    <Stack gap="xs">
+      {lichHoc.map((buoi) => (
+        <Box key={buoi.id} p="sm" style={{ borderRadius: 10, background: 'var(--mantine-color-gray-0)' }}>
+          <Group gap="xs">
+            <Text size="sm" fw={600}>
+              Buổi {buoi.buoi_so}
+            </Text>
+            {buoi.trang_thai_diem_danh && (
+              <Badge size="sm" color={MAU_DIEM_DANH[buoi.trang_thai_diem_danh]}>
+                {NHAN_DIEM_DANH[buoi.trang_thai_diem_danh]}
+              </Badge>
+            )}
+          </Group>
+          <Text size="sm" c="dimmed">
+            {dinhDangNgayGio(buoi.thoi_gian_bat_dau)} – {dinhDangNgayGio(buoi.thoi_gian_ket_thuc)}
+          </Text>
+          {buoi.dia_diem_hoac_link &&
+            (laLink(buoi.dia_diem_hoac_link) ? (
+              <Button component="a" href={buoi.dia_diem_hoac_link} size="xs" mt={6}>
+                Vào học
+              </Button>
+            ) : (
+              <Text size="sm" mt={4}>
+                Địa điểm: {buoi.dia_diem_hoac_link}
               </Text>
             ))}
-          </Stack>
-        )}
-
-        <BuoiHocTheoGiaiDoan lichHoc={lop.lich_hoc} />
-      </Stack>
-    </Paper>
-  );
-}
-
-function BuoiHocTheoGiaiDoan({ lichHoc }: { lichHoc: LichHocLopToi[] }) {
-  if (lichHoc.length === 0) return null;
-
-  const nhomTheoGiaiDoan = new Map<string, { ten: string; hinhThuc: string; buoi: LichHocLopToi[] }>();
-  for (const buoi of lichHoc) {
-    const nhom = nhomTheoGiaiDoan.get(buoi.giai_doan_id);
-    if (nhom) {
-      nhom.buoi.push(buoi);
-    } else {
-      nhomTheoGiaiDoan.set(buoi.giai_doan_id, {
-        ten: buoi.giai_doan.ten_giai_doan,
-        hinhThuc: buoi.giai_doan.hinh_thuc,
-        buoi: [buoi],
-      });
-    }
-  }
-
-  return (
-    <Stack gap="md">
-      {[...nhomTheoGiaiDoan.values()].map((giaiDoan) => (
-        <Box key={giaiDoan.ten}>
-          <Group gap="xs" mb={6}>
-            <Text fw={600} size="sm">
-              {giaiDoan.ten}
-            </Text>
-            <Badge size="sm" color={MAU_HINH_THUC[giaiDoan.hinhThuc] ?? 'gray'}>
-              {NHAN_HINH_THUC[giaiDoan.hinhThuc] ?? giaiDoan.hinhThuc}
-            </Badge>
-          </Group>
-          <Stack gap="xs">
-            {giaiDoan.buoi.map((buoi) => (
-              <Box key={buoi.id} p="sm" style={{ borderRadius: 10, background: 'var(--mantine-color-gray-0)' }}>
-                <Group gap="xs">
-                  <Text size="sm" fw={600}>
-                    Buổi {buoi.buoi_so}
-                  </Text>
-                  {buoi.trang_thai_diem_danh && (
-                    <Badge size="sm" color={MAU_DIEM_DANH[buoi.trang_thai_diem_danh]}>
-                      {NHAN_DIEM_DANH[buoi.trang_thai_diem_danh]}
-                    </Badge>
-                  )}
-                </Group>
-                <Text size="sm" c="dimmed">
-                  {dinhDangNgayGio(buoi.thoi_gian_bat_dau)} – {dinhDangNgayGio(buoi.thoi_gian_ket_thuc)}
-                </Text>
-                {buoi.dia_diem_hoac_link &&
-                  (buoi.dia_diem_hoac_link.startsWith('http://') || buoi.dia_diem_hoac_link.startsWith('https://') ? (
-                    <Button component="a" href={buoi.dia_diem_hoac_link} size="xs" mt={6}>
-                      Vào học
-                    </Button>
-                  ) : (
-                    <Text size="sm" mt={4}>
-                      Địa điểm: {buoi.dia_diem_hoac_link}
-                    </Text>
-                  ))}
-              </Box>
-            ))}
-          </Stack>
         </Box>
       ))}
     </Stack>

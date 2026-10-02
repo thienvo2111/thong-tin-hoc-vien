@@ -5,22 +5,15 @@ import { notifications } from '@mantine/notifications';
 import { useHocVienTheoId } from '@/api/admin';
 import {
   useCapNhatCumDangKy,
-  useCapNhatLopDangKy,
   useChiTietKhoa,
   useKhoaHocCuaHocVien,
-  useXoaLopDangKy,
 } from '@/api/khoaBoiDuong';
-import type { KhoaHocDangKy, LoaiLop } from '@/api/types';
+import type { KhoaHocDangKy } from '@/api/types';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { TrangThaiBadge } from '@/components/TrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
-
-const NHAN_LOAI_LOP: Record<LoaiLop, string> = {
-  truc_tiep: 'Lớp trực tiếp',
-  zoom: 'Lớp Zoom',
-  vle: 'Lớp VLE',
-};
+import { PhanLopTheoGiaiDoan } from './PhanLopTheoGiaiDoan';
 
 // Placeholder tối thiểu cho phase này (yêu cầu phase 3 mục 4: "chưa cần đẹp, sẽ hoàn thiện ở phase
 // sau") — hiện vài field chính từ GET /hoc-vien/{id}, không phải màn chi tiết đầy đủ.
@@ -126,37 +119,9 @@ function KhoaVaLopCuaHocVien({ hocVienId }: { hocVienId: string }) {
 
 function KhoiDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHocDangKy }) {
   const { data: khoa } = useChiTietKhoa(dangKy.khoa_id);
-  const capNhatLop = useCapNhatLopDangKy(hocVienId);
-  const xoaLop = useXoaLopDangKy(hocVienId);
   const capNhatCum = useCapNhatCumDangKy(hocVienId);
 
-  const [chonLop, setChonLop] = useState<Record<LoaiLop, string>>({
-    truc_tiep: dangKy.lop_truc_tiep?.id ?? '',
-    zoom: dangKy.lop_zoom?.id ?? '',
-    vle: dangKy.lop_vle?.id ?? '',
-  });
   const [chonCum, setChonCum] = useState(dangKy.cum?.id ?? '');
-
-  function luuLop(loaiLop: LoaiLop) {
-    const lopId = chonLop[loaiLop];
-    if (!lopId) {
-      xoaLop.mutate(
-        { dangKyHocId: dangKy.id, loaiLop },
-        {
-          onSuccess: () => notifications.show({ color: 'green', message: 'Đã bỏ gán lớp' }),
-          onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
-        },
-      );
-      return;
-    }
-    capNhatLop.mutate(
-      { dangKyHocId: dangKy.id, dto: { loai_lop: loaiLop, lop_id: lopId } },
-      {
-        onSuccess: () => notifications.show({ color: 'green', message: 'Đã lưu lớp' }),
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
-      },
-    );
-  }
 
   function luuCum() {
     capNhatCum.mutate(
@@ -178,30 +143,7 @@ function KhoiDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHocD
 
       {khoa && (
         <Stack gap="sm">
-          {(Object.keys(NHAN_LOAI_LOP) as LoaiLop[]).map((loaiLop) => (
-            <Group key={loaiLop} gap="sm" wrap="wrap" data-testid={`dong-lop-${loaiLop}`}>
-              <Select
-                label={NHAN_LOAI_LOP[loaiLop]}
-                data={[
-                  { value: '', label: '-- Bỏ gán --' },
-                  ...khoa.lop_hoc
-                    .filter((l) => l.loai_lop === loaiLop)
-                    .map((l) => ({ value: l.id, label: l.ten_lop })),
-                ]}
-                value={chonLop[loaiLop]}
-                onChange={(v) => setChonLop((f) => ({ ...f, [loaiLop]: v ?? '' }))}
-                allowDeselect={false}
-                w={260}
-              />
-              <Button
-                size="xs"
-                loading={capNhatLop.isPending || xoaLop.isPending}
-                onClick={() => luuLop(loaiLop)}
-              >
-                Lưu
-              </Button>
-            </Group>
-          ))}
+          <PhanLopTheoGiaiDoan hocVienId={hocVienId} dangKy={dangKy} khoa={khoa} />
 
           <Group gap="sm" wrap="wrap" data-testid="dong-cum">
             <Select
