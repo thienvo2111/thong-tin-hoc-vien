@@ -96,7 +96,11 @@ describe('Cấu hình khảo sát đầu vào (e2e)', () => {
     const res = await request(app.getHttpServer())
       .get('/cau-hinh-khao-sat')
       .expect(200);
-    expect(res.body).toEqual({ cau_hinh: null, cap_nhat_luc: null });
+    expect(res.body).toEqual({
+      cau_hinh: null,
+      cap_nhat_luc: null,
+      pham_vi: { loai: 'chung' },
+    });
   });
 
   it('PUT không token -> 401', async () => {
@@ -161,7 +165,8 @@ describe('Cấu hình khảo sát đầu vào (e2e)', () => {
     const res = await request(app.getHttpServer())
       .get('/cau-hinh-khao-sat')
       .expect(200);
-    expect(res.body.cau_hinh).toEqual(hopLe);
+    // khao_sat_dau_ra_mo không gửi -> lưu false (cấu hình khảo sát đầu ra).
+    expect(res.body.cau_hinh).toEqual({ ...hopLe, khao_sat_dau_ra_mo: false });
     expect(res.body.cap_nhat_luc).toEqual(expect.any(String));
 
     const row = await prisma.cau_hinh_he_thong.findUnique({
@@ -186,6 +191,7 @@ describe('Cấu hình khảo sát đầu vào (e2e)', () => {
     const res = await request(app.getHttpServer())
       .get('/cau-hinh-khao-sat')
       .expect(200);
-    expect(res.body.cau_hinh).toEqual(moi);
+    // khao_sat_dau_ra_mo không gửi -> lưu false (cấu hình khảo sát đầu ra).
+    expect(res.body.cau_hinh).toEqual({ ...moi, khao_sat_dau_ra_mo: false });
   });
 });

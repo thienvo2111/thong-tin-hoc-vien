@@ -37,6 +37,8 @@ export interface ThongTinSso {
   ma_dinh_danh_moet: string | null;
   vai_tro: 'giao_vien' | 'can_bo_quan_ly' | null;
   ma_don_vi: string | null;
+  /** Khóa đã duyệt mới nhất học viên ghi danh (null nếu chưa ghi danh) — để bên khảo sát biết tỉnh/khóa. */
+  ma_khoa: string | null;
   ten_don_vi: string;
   target: SsoTarget | null;
   lop: {
@@ -172,12 +174,20 @@ export class SsoService {
     });
     if (!ban) throw new SsoMaKhongHopLeException();
     const hv = ban.hoc_vien;
+    const khoaGanNhat = hv.dang_ky_hoc
+      .filter((dk) => dk.khoa.trang_thai === 'da_duyet')
+      .sort(
+        (a, b) =>
+          (b.khoa.ngay_duyet?.getTime() ?? 0) -
+          (a.khoa.ngay_duyet?.getTime() ?? 0),
+      )[0]?.khoa;
 
     return {
       hoc_vien_id: hv.id,
       ma_dinh_danh_moet: hv.ma_dinh_danh_moet,
       vai_tro: hv.doi_tuong,
       ma_don_vi: hv.don_vi_cong_tac.ma_don_vi,
+      ma_khoa: khoaGanNhat?.ma_khoa ?? null,
       ten_don_vi: hv.don_vi_cong_tac.ten_don_vi,
       target: (ban.target as SsoTarget | null) ?? null,
       lop: hv.dang_ky_hoc.flatMap((dk) =>

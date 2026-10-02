@@ -7,6 +7,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsUUID,
   IsUrl,
   MaxLength,
   MinLength,
@@ -85,4 +86,14 @@ export class CauHinhKhaoSatDto {
   @ValidateNested({ each: true })
   @Type(() => PhieuKhaoSatDto)
   phieu: PhieuKhaoSatDto[];
+}
+
+// PUT /cau-hinh-khao-sat/khoa/:khoaId (quan_tri) — cấu hình riêng của 1 khóa.
+// tinh_id: tỉnh hiển thị ở ô "Chọn tỉnh/thành" trang chủ (null = không hiện ở
+// trang chủ, chỉ áp dụng cho học viên đã ghi danh khóa).
+export class CauHinhKhaoSatKhoaDto extends CauHinhKhaoSatDto {
+  @IsOptional()
+  @ValidateIf((o: CauHinhKhaoSatKhoaDto) => o.tinh_id !== null)
+  @IsUUID()
+  tinh_id?: string | null;
 }

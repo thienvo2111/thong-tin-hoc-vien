@@ -11,6 +11,7 @@ import {
   Drawer,
   Group,
   Image,
+  NativeSelect,
   Paper,
   SimpleGrid,
   Stack,
@@ -26,6 +27,7 @@ import { Link } from 'react-router-dom';
 import { useToi } from '@/auth/AuthContext';
 import { gioiThieu } from '@/content/gioiThieu';
 import { hopCheDo, useCauHinhTrienKhai, type CauHinhTrienKhai } from '@/content/trienKhai';
+import { layDanhSachTinhKhaoSat, type TinhCoCauHinh } from '@/api/cauHinhKhaoSat';
 import logoHcmue from '@/assets/logo-hcmue.png';
 import './trangGioiThieu.css';
 
@@ -60,7 +62,24 @@ export default function TrangGioiThieu() {
     gioiThieu;
 
   const dangDaXacThuc = !dangTai && daXacThuc;
-  const { cauHinh } = useCauHinhTrienKhai();
+  // 2026-10-02: mỗi khóa có thể có cấu hình riêng gắn 1 tỉnh — người xem chọn tỉnh để thấy đúng hướng dẫn.
+  const [dsTinh, setDsTinh] = useState<TinhCoCauHinh[]>([]);
+  const [tinh, setTinh] = useState<string | null>(docTinhDaChon);
+  useEffect(() => {
+    let huy = false;
+    layDanhSachTinhKhaoSat()
+      .then((ds) => !huy && setDsTinh(ds))
+      .catch(() => undefined);
+    return () => {
+      huy = true;
+    };
+  }, []);
+  const { cauHinh } = useCauHinhTrienKhai({ loai: 'cong_khai', tinh });
+  const chonTinh = (v: string) => {
+    const moi = v || null;
+    setTinh(moi);
+    ghiTinhDaChon(moi);
+  };
   const hop = hopCheDo(cauHinh.cheDoHocVien);
   const hienKhaoSat = cauHinh.hienKhaoSat && cauHinh.phieu.length > 0;
   const hienHuongDan = huongDan.hien && hop(huongDan);
@@ -120,6 +139,8 @@ export default function TrangGioiThieu() {
       )}
 
       {conSo.hien && <DaiThongKe conSo={conSo} />}
+
+      {dsTinh.length > 0 && <KhoiChonTinh dsTinh={dsTinh} tinh={tinh} onChange={chonTinh} />}
 
       {hienKhaoSat && <KhoiKhaoSat khaoSat={khaoSatDauVao} phieu={cauHinh.phieu} />}
 
@@ -658,6 +679,58 @@ function DanhSachBuocSo({ buoc, mau }: { buoc: { ten: string; moTa: string }[]; 
         );
       })}
     </Stack>
+  );
+}
+
+/** Tỉnh đã chọn: ưu tiên ?tinh= trên link (gửi qua Zalo cho từng tỉnh), sau đó lựa chọn lần trước trên máy này. */
+function docTinhDaChon(): string | null {
+  const tuLink = new URLSearchParams(window.location.search).get('tinh');
+  if (tuLink) return tuLink;
+  try {
+    return localStorage.getItem('gt_tinh');
+  } catch {
+    return null;
+  }
+}
+
+function ghiTinhDaChon(tinh: string | null) {
+  try {
+    if (tinh) localStorage.setItem('gt_tinh', tinh);
+    else localStorage.removeItem('gt_tinh');
+  } catch {
+    // Trình duyệt chặn lưu trữ — chỉ mất tiện ích nhớ lựa chọn, không ảnh hưởng hiển thị.
+  }
+  const url = new URL(window.location.href);
+  if (tinh) url.searchParams.set('tinh', tinh);
+  else url.searchParams.delete('tinh');
+  window.history.replaceState(window.history.state, '', url);
+}
+
+/** Ô chọn tỉnh/thành — chỉ hiện khi có ít nhất 1 tỉnh dùng cấu hình khảo sát riêng. */
+function KhoiChonTinh({
+  dsTinh,
+  tinh,
+  onChange,
+}: {
+  dsTinh: TinhCoCauHinh[];
+  tinh: string | null;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <Box bg="primary.0" pt={{ base: 32, sm: 48 }} px={{ base: 'md', sm: 'xl' }}>
+      <Container size="md" p={0}>
+        <Paper withBorder radius={14} p="md">
+          <NativeSelect
+            label="Thầy/Cô công tác tại tỉnh/thành nào?"
+            description="Chọn để xem đúng hướng dẫn khảo sát của địa phương."
+            value={tinh ?? ''}
+            onChange={(e) => onChange(e.currentTarget.value)}
+            data={[{ value: '', label: '— Chọn tỉnh/thành —' }, ...dsTinh.map((t) => ({ value: t.tinh_id, label: t.ten_tinh }))]}
+            size="md"
+          />
+        </Paper>
+      </Container>
+    </Box>
   );
 }
 

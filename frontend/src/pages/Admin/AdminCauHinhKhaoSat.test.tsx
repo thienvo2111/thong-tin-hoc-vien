@@ -4,7 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { http } from 'msw';
 import { server } from '@/test/mocks/server';
 import { loi } from '@/test/mocks/handlers';
-import { datCauHinhKhaoSatMock, layCauHinhKhaoSatMock } from '@/test/mocks/cauHinhKhaoSat';
+import {
+  datCauHinhKhaoSatMock,
+  datCauHinhKhoaMock,
+  layCauHinhKhaoSatMock,
+  layCauHinhKhoaMock,
+} from '@/test/mocks/cauHinhKhaoSat';
+import { db } from '@/test/mocks/db';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import { cauHinhMacDinh } from '@/content/trienKhai';
@@ -231,5 +237,63 @@ describe('Admin — Cấu hình khảo sát', () => {
       await user.click(screen.getByRole('button', { name: 'Tạo mã thử' }));
       expect(await screen.findByText('Không tìm thấy học viên có mã định danh này')).toBeInTheDocument();
     });
+  });
+});
+
+describe('Admin — cấu hình riêng theo khóa (2026-10-02)', () => {
+  function themKhoaDaDuyet() {
+    db.danhSachKhoa = [
+      ...db.danhSachKhoa,
+      { ...db.danhSachKhoa[0], id: 'k-duyet', ma_khoa: 'K-DUYET', ten_khoa: 'Khóa đã duyệt', trang_thai: 'da_duyet' },
+    ];
+  }
+
+  async function chonPhamVi(user: ReturnType<typeof userEvent.setup>, nhan: RegExp) {
+    await user.click(await screen.findByRole('textbox', { name: 'Áp dụng cho' }));
+    await user.click(await screen.findByRole('option', { name: nhan }));
+  }
+
+  it('khóa chưa có cấu hình riêng -> báo đang dùng cấu hình chung; tạo riêng sao chép cấu hình chung rồi lưu theo khóa', async () => {
+    themKhoaDaDuyet();
+    datCauHinhKhaoSatMock(DA_LUU);
+    const user = userEvent.setup();
+    renderTrang();
+    await screen.findByDisplayValue('Phiếu A');
+    await chonPhamVi(user, /K-DUYET/);
+
+    expect(await screen.findByText(/đang dùng cấu hình chung/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Tạo cấu hình riêng/ }));
+    const ten = await screen.findAllByLabelText('Tên phiếu');
+    expect((ten[0] as HTMLInputElement).value).toBe('Phiếu A');
+    await user.clear(ten[0]);
+    await user.type(ten[0], 'Phiếu riêng khóa');
+    await user.click(screen.getByRole('button', { name: 'Lưu cấu hình' }));
+
+    await waitFor(() => expect(layCauHinhKhoaMock('k-duyet')?.cau_hinh.phieu[0].ten).toBe('Phiếu riêng khóa'));
+    // Cấu hình chung không bị đổi.
+    expect(banDaLuu()?.phieu[0].ten).toBe('Phiếu A');
+  });
+
+  it('khóa đã có cấu hình riêng -> "Dùng lại cấu hình chung" (xác nhận) xóa cấu hình riêng', async () => {
+    themKhoaDaDuyet();
+    datCauHinhKhoaMock({ khoa_id: 'k-duyet', ma_khoa: 'K-DUYET', ten_khoa: 'Khóa đã duyệt', tinh: null, cau_hinh: DA_LUU });
+    const user = userEvent.setup();
+    renderTrang();
+    await chonPhamVi(user, /K-DUYET/);
+    expect(await screen.findByDisplayValue('Phiếu A')).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: 'Dùng lại cấu hình chung' }));
+    await user.click(await screen.findByRole('button', { name: 'Xóa cấu hình riêng' }));
+    await waitFor(() => expect(layCauHinhKhoaMock('k-duyet')).toBeNull());
+    expect(await screen.findByText(/đang dùng cấu hình chung/)).toBeInTheDocument();
+  });
+
+  it('chỉ liệt kê khóa đã duyệt trong ô "Áp dụng cho"', async () => {
+    themKhoaDaDuyet();
+    const user = userEvent.setup();
+    renderTrang();
+    await user.click(await screen.findByRole('textbox', { name: 'Áp dụng cho' }));
+    expect(await screen.findByRole('option', { name: /K-DUYET/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /AG-2026-015/ })).not.toBeInTheDocument();
   });
 });

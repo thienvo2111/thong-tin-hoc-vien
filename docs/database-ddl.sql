@@ -763,6 +763,22 @@ CREATE INDEX idx_ma_sso_hoc_vien ON ma_sso_mot_lan(hoc_vien_id);
 
 
 -- =====================================================================
+-- PHẦN 7 — CẤU HÌNH KHẢO SÁT THEO KHÓA (2026-10-02, migration 20261002130000)
+-- =====================================================================
+-- Ghi đè cấu hình chung (PHẦN 5, khóa 'khao_sat_dau_vao') cho 1 khóa. Shape
+-- gia_tri giống cấu hình chung. tinh_id = tỉnh hiển thị ở ô chọn tỉnh trang
+-- chủ; mỗi tỉnh gắn tối đa 1 khóa (UNIQUE, NULL được lặp). Xem api-contract mục 9.
+CREATE TABLE cau_hinh_khao_sat_khoa (
+    khoa_id       uuid PRIMARY KEY REFERENCES khoa_boi_duong(id) ON DELETE CASCADE,
+    tinh_id       uuid REFERENCES dia_danh(id),   -- cấp tinh_thanh (kiểm tra ở tầng ứng dụng)
+    gia_tri       jsonb NOT NULL,
+    cap_nhat_luc  timestamptz NOT NULL DEFAULT now(),
+    cap_nhat_boi  uuid,
+    CONSTRAINT uq_cau_hinh_khao_sat_khoa_tinh UNIQUE (tinh_id)
+);
+
+
+-- =====================================================================
 -- updated_at TRIGGER DÙNG CHUNG
 -- =====================================================================
 CREATE OR REPLACE FUNCTION trg_set_updated_at() RETURNS trigger AS $$

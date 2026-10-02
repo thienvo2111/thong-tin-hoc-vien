@@ -141,9 +141,9 @@ describe('SsoService', () => {
       });
       const kq = await service.capMa(caller, 'dau-ra');
       expect(new URL(kq.url).searchParams.get('target')).toBe('dau-ra');
-      expect(
-        prisma.ma_sso_mot_lan.create.mock.calls[0][0].data.target,
-      ).toBe('dau-ra');
+      expect(prisma.ma_sso_mot_lan.create.mock.calls[0][0].data.target).toBe(
+        'dau-ra',
+      );
       expect(hocVienService.danhGiaDauVaoCuaToi).not.toHaveBeenCalled();
     });
 
@@ -212,7 +212,11 @@ describe('SsoService', () => {
         don_vi_cong_tac: { ma_don_vi: 'DV01', ten_don_vi: 'Trường A' },
         dang_ky_hoc: [
           {
-            khoa: { ma_khoa: 'NLS-AG' },
+            khoa: {
+              ma_khoa: 'NLS-AG',
+              trang_thai: 'da_duyet',
+              ngay_duyet: new Date('2026-10-01'),
+            },
             phan_lop_giai_doan: [
               {
                 lop: { ten_lop: 'Lớp 1', loai_lop: 'zoom' },
@@ -272,6 +276,7 @@ describe('SsoService', () => {
         ma_dinh_danh_moet: '9115131060',
         vai_tro: 'can_bo_quan_ly',
         ma_don_vi: 'DV01',
+        ma_khoa: 'NLS-AG',
         ten_don_vi: 'Trường A',
         target: 'khao-sat',
         lop: [

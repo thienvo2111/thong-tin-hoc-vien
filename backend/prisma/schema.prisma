@@ -327,6 +327,7 @@ model dia_danh {
   // noi_sinh/phuong_xa ở trên vốn là nơi sinh theo địa giới có thể đã cũ).
   hoc_vien_cu_tru_tinh      hoc_vien[]        @relation("hoc_vien_cu_tru_tinh")
   hoc_vien_cu_tru_phuong_xa hoc_vien[]        @relation("hoc_vien_cu_tru_phuong_xa")
+  cau_hinh_khao_sat_khoa    cau_hinh_khao_sat_khoa[]
 
   @@index([parent_id], map: "idx_dia_danh_parent")
   @@index([cap], map: "idx_dia_danh_cap")
@@ -695,6 +696,7 @@ model khoa_boi_duong {
   dang_ky_hoc     dang_ky_hoc[]
   dot_xac_nhan    dot_xac_nhan[]
   don_vi_theo_doi khoa_don_vi_theo_doi[]
+  cau_hinh_khao_sat cau_hinh_khao_sat_khoa?
   // QĐ10: cụm học viên (nhóm Zalo hỗ trợ theo địa lý) — độc lập với cây đơn
   // vị công tác, thuộc trực tiếp về khóa.
   cum_hoc_vien    cum_hoc_vien[]
@@ -1056,4 +1058,19 @@ model ma_sso_mot_lan {
   hoc_vien hoc_vien @relation(fields: [hoc_vien_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([hoc_vien_id], map: "idx_ma_sso_hoc_vien")
+}
+
+/// Cấu hình khảo sát RIÊNG của 1 khóa (2026-10-02) — ghi đè cấu hình chung
+/// (cau_hinh_he_thong 'khao_sat_dau_vao') cho học viên ghi danh khóa này và cho
+/// trang chủ khi người xem chọn đúng tỉnh. Shape gia_tri giống cấu hình chung.
+/// tinh_id = tỉnh hiển thị ở trang chủ; mỗi tỉnh gắn tối đa 1 khóa.
+model cau_hinh_khao_sat_khoa {
+  khoa_id      String    @id @db.Uuid
+  tinh_id      String?   @unique(map: "uq_cau_hinh_khao_sat_khoa_tinh") @db.Uuid
+  gia_tri      Json
+  cap_nhat_luc DateTime  @default(now()) @db.Timestamptz(6)
+  cap_nhat_boi String?   @db.Uuid
+
+  khoa khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tinh dia_danh?      @relation(fields: [tinh_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }

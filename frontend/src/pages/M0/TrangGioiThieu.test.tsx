@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
-import { datCauHinhKhaoSatMock } from '@/test/mocks/cauHinhKhaoSat';
+import { datCauHinhKhaoSatMock, datCauHinhKhoaMock } from '@/test/mocks/cauHinhKhaoSat';
 import { renderTrang } from '@/test/testUtils';
 import TrangGioiThieu from './TrangGioiThieu';
 import { gioiThieu } from '@/content/gioiThieu';
@@ -316,5 +316,60 @@ describe('M0 — hiệu ứng hiện dần & nhấn tiêu đề', () => {
       expect(gach).toHaveAttribute('aria-hidden', 'true');
     }
     expect(container.querySelectorAll('.gt-the').length).toBeGreaterThan(5);
+  });
+});
+
+describe('M0 — chọn tỉnh/thành (cấu hình khảo sát theo khóa, 2026-10-02)', () => {
+  const phieuRieng = (ten: string) => [{ ten, mo_ta: '', lien_ket: [{ nhan: 'Mở phiếu riêng', url: 'https://forms.example/rieng' }] }];
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/');
+    try {
+      localStorage.removeItem('gt_tinh');
+    } catch {
+      // bỏ qua
+    }
+  });
+
+  function coKhoaRieng() {
+    datCauHinhKhaoSatMock(cauHinh());
+    datCauHinhKhoaMock({
+      khoa_id: 'k-1',
+      ma_khoa: 'K-1',
+      ten_khoa: 'Khóa tỉnh thử',
+      tinh: { tinh_id: 't-thu', ten_tinh: 'Tỉnh Thử' },
+      cau_hinh: { ...cauHinh(), phieu: phieuRieng('Phiếu riêng của tỉnh') },
+    });
+  }
+
+  it('chưa tỉnh nào có cấu hình riêng -> không hiện ô chọn tỉnh', async () => {
+    datCauHinhKhaoSatMock(cauHinh());
+    renderTrang(<TrangGioiThieu />);
+    await screen.findByRole('link', { name: 'Mở phiếu khảo sát' });
+    expect(screen.queryByLabelText(/công tác tại tỉnh\/thành nào/)).not.toBeInTheDocument();
+  });
+
+  it('chọn tỉnh -> hiện phiếu của khóa gắn tỉnh đó, link cập nhật ?tinh=; bỏ chọn -> về cấu hình chung', async () => {
+    coKhoaRieng();
+    const user = userEvent.setup();
+    renderTrang(<TrangGioiThieu />);
+    const o = await screen.findByLabelText(/công tác tại tỉnh\/thành nào/);
+    expect(await screen.findByText('Phiếu 1: Phiếu khảo sát kĩ năng số')).toBeInTheDocument();
+
+    await user.selectOptions(o, 't-thu');
+    expect(await screen.findByText('Phiếu 1: Phiếu riêng của tỉnh')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('tinh')).toBe('t-thu');
+
+    await user.selectOptions(o, '');
+    expect(await screen.findByText('Phiếu 1: Phiếu khảo sát kĩ năng số')).toBeInTheDocument();
+    expect(window.location.search).toBe('');
+  });
+
+  it('mở link có ?tinh= -> chọn sẵn tỉnh, hiện đúng phiếu của tỉnh', async () => {
+    coKhoaRieng();
+    window.history.replaceState(null, '', '/?tinh=t-thu');
+    renderTrang(<TrangGioiThieu />);
+    expect(await screen.findByText('Phiếu 1: Phiếu riêng của tỉnh')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText(/công tác tại tỉnh\/thành nào/)).toHaveValue('t-thu'));
   });
 });

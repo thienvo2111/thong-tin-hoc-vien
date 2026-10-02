@@ -29,6 +29,8 @@ Quản trị cấu hình tại **`/admin/cau-hinh-khao-sat`** (menu "Cấu hình
 | **GĐ2 sau khi đổ dữ liệu** | `dang_nhap` | `false` | Học viên đăng nhập để **xem** hồ sơ + lớp học. Không mở Đợt xác nhận → hồ sơ `import_moet` chỉ xem. Menu M6 ẩn. Giai đoạn kết quả cuối: mở Đợt xác nhận để học viên điều chỉnh. |
 | **Địa phương bổ sung thông tin trên hệ thống trước đánh giá** | `dang_nhap` | `true` | Luồng gốc M1 → M5 → M6 như đặc tả dưới đây. |
 
+**Theo khóa (2026-10-02):** cấu hình trên có thể đặt riêng cho từng khóa (admin: ô "Áp dụng cho"). M0 hiện ô "Thầy/Cô công tác tại tỉnh/thành nào?" (NativeSelect, chỉ khi có ≥1 tỉnh dùng cấu hình riêng) — chọn tỉnh thì trang dùng cấu hình khóa của tỉnh đó; link `/?tinh=<id>` chọn sẵn; lựa chọn nhớ trên máy (localStorage, lỗi lưu trữ không ảnh hưởng). Cổng học viên (M3, M6, thanh menu) dùng cấu hình theo khóa đã ghi danh.
+
 Mục nội dung trong `gioiThieu.ts` gắn `cheDo: 'khao_sat' | 'dang_nhap'` chỉ hiện ở chế độ tương ứng (áp dụng cho khối `huongDan`, từng bước `loTrinh`, từng câu `hoiDap`); không gắn = luôn hiện.
 
 ---

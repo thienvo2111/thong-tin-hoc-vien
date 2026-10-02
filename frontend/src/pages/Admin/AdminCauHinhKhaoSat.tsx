@@ -6,8 +6,10 @@ import {
   Button,
   Container,
   Group,
+  Modal,
   Paper,
   Radio,
+  Select,
   Skeleton,
   Stack,
   Switch,
@@ -18,7 +20,17 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { layCauHinhKhaoSat, luuCauHinhKhaoSat, type CauHinhKhaoSat } from '@/api/cauHinhKhaoSat';
+import {
+  layCauHinhKhaoSat,
+  layCauHinhKhoa,
+  luuCauHinhKhaoSat,
+  luuCauHinhKhoa,
+  xoaCauHinhKhoa,
+  type CauHinhKhaoSat,
+  type KetQuaCauHinhKhaoSat,
+} from '@/api/cauHinhKhaoSat';
+import { useDanhSachKhoa } from '@/api/khoaBoiDuong';
+import { SelectDiaDanh } from '@/components/SelectDiaDanh';
 import { cauHinhMacDinh } from '@/content/trienKhai';
 import { cauHinhKhaoSatSchema } from '@/schemas/cauHinhKhaoSat';
 import { chuanHoaNfc } from '@/lib/nfc';
@@ -27,7 +39,7 @@ import { dinhDangNgayGio } from '@/lib/ngay';
 import { AdminPageHeader } from './AdminPageHeader';
 import { TheThuSso } from './TheThuSso';
 
-const QUERY_KEY = ['admin', 'cau-hinh-khao-sat'] as const;
+const queryKey = (khoaId: string | null) => ['admin', 'cau-hinh-khao-sat', khoaId ?? 'chung'] as const;
 
 const MAC_DINH_API: CauHinhKhaoSat = {
   che_do_hoc_vien: cauHinhMacDinh.cheDoHocVien,
@@ -51,23 +63,99 @@ function chuanHoa(c: CauHinhKhaoSat): CauHinhKhaoSat {
   };
 }
 
-/** Cấu hình khảo sát đầu vào + chế độ triển khai cho học viên (quan_tri). Trang chủ, trang đăng nhập và
- * cổng học viên đọc cấu hình này qua GET /cau-hinh-khao-sat (công khai) — lưu xong có hiệu lực ngay. */
+/** Cấu hình khảo sát (quan_tri): cấu hình CHUNG làm mặc định + cấu hình RIÊNG tùy chọn theo từng khóa
+ * (2026-10-02) khi tỉnh/khóa đó chọn phương án khác. Lưu xong có hiệu lực ngay. */
 export default function AdminCauHinhKhaoSat() {
+  const [phamVi, setPhamVi] = useState('');
+  const khoa = useDanhSachKhoa({ trang_thai: 'da_duyet', page_size: 200 });
+  const tuyChon = [
+    { value: '', label: 'Cấu hình chung (mặc định cho mọi khóa)' },
+    ...(khoa.data?.data ?? []).map((k) => ({ value: k.id, label: `${k.ma_khoa} — ${k.ten_khoa}` })),
+  ];
+
+  return (
+    <>
+      <AdminPageHeader
+        title="Cấu hình khảo sát"
+        actions={
+          <Button component="a" href="/" target="_blank" rel="noopener noreferrer" variant="default">
+            Xem trang chủ
+          </Button>
+        }
+      />
+      <Container size="md" py="lg">
+        <Stack gap="lg">
+          <Paper withBorder radius="md" p="lg">
+            <Stack gap="xs">
+              <Select
+                label="Áp dụng cho"
+                description="Khóa không có cấu hình riêng dùng cấu hình chung. Học viên nhận cấu hình theo khóa đã ghi danh; trang chủ theo tỉnh người xem chọn."
+                data={tuyChon}
+                value={phamVi}
+                onChange={(v) => setPhamVi(v ?? '')}
+                allowDeselect={false}
+                searchable
+              />
+            </Stack>
+          </Paper>
+
+          <BieuMauCauHinh key={phamVi || 'chung'} khoaId={phamVi || null} />
+
+          <TheThuSso />
+        </Stack>
+      </Container>
+    </>
+  );
+}
+
+function BieuMauCauHinh({ khoaId }: { khoaId: string | null }) {
   const queryClient = useQueryClient();
-  const { data, isLoading, isError, error } = useQuery({ queryKey: QUERY_KEY, queryFn: layCauHinhKhaoSat });
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: queryKey(khoaId),
+    queryFn: () => (khoaId ? layCauHinhKhoa(khoaId) : layCauHinhKhaoSat()),
+  });
   const [form, setForm] = useState<CauHinhKhaoSat | null>(null);
+  const [tinhId, setTinhId] = useState<string | null>(null);
   const [loi, setLoi] = useState<Record<string, string>>({});
+  const [hoiXoa, setHoiXoa] = useState(false);
+  const phamVi = data?.pham_vi;
 
   useEffect(() => {
+    if (!data || form) return;
+    // Khóa chưa có cấu hình riêng: chờ quản trị bấm "Tạo cấu hình riêng".
+    if (khoaId && !data.cau_hinh) return;
     // Cấu hình lưu trước khi có lựa chọn kênh -> 'vle' (đúng hành vi đang chạy).
-    if (data && !form) setForm({ kenh_danh_gia: 'vle', ...structuredClone(data.cau_hinh ?? MAC_DINH_API) });
-  }, [data, form]);
+    setForm({ kenh_danh_gia: 'vle', ...structuredClone(data.cau_hinh ?? MAC_DINH_API) });
+    if (data.pham_vi?.loai === 'khoa') setTinhId(data.pham_vi.tinh_id);
+  }, [data, form, khoaId]);
+
+  const taoRieng = useMutation({
+    mutationFn: () => layCauHinhKhaoSat(),
+    onSuccess: (chung) => setForm({ kenh_danh_gia: 'vle', ...structuredClone(chung.cau_hinh ?? MAC_DINH_API) }),
+    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+  });
+
+  const xoa = useMutation({
+    mutationFn: () => xoaCauHinhKhoa(khoaId!),
+    onSuccess: () => {
+      // Xóa ngay cấu hình trong cache — nếu chỉ invalidate, effect khởi tạo form sẽ dựng lại form từ dữ
+      // liệu cũ trước khi tải lại xong.
+      queryClient.setQueryData<KetQuaCauHinhKhaoSat>(queryKey(khoaId), (cu) =>
+        cu ? { ...cu, cau_hinh: null, cap_nhat_luc: null } : cu,
+      );
+      setHoiXoa(false);
+      setForm(null);
+      setTinhId(null);
+      queryClient.invalidateQueries({ queryKey: queryKey(khoaId) });
+      notifications.show({ color: 'green', message: 'Khóa đã quay về dùng cấu hình chung' });
+    },
+    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+  });
 
   const luu = useMutation({
-    mutationFn: luuCauHinhKhaoSat,
+    mutationFn: (c: CauHinhKhaoSat) => (khoaId ? luuCauHinhKhoa(khoaId, c, tinhId) : luuCauHinhKhaoSat(c)),
     onSuccess: (kq) => {
-      queryClient.setQueryData(QUERY_KEY, kq);
+      queryClient.setQueryData(queryKey(khoaId), kq);
       notifications.show({ color: 'green', message: 'Đã lưu cấu hình khảo sát' });
     },
     onError: (err) => {
@@ -104,37 +192,76 @@ export default function AdminCauHinhKhaoSat() {
     });
   }
 
+  if (isLoading) return <Skeleton h={320} radius="md" />;
+  if (isError) return <Alert color="red">{thongDiepLoiChung(error)}</Alert>;
+  if (!data) return null;
+
+  if (khoaId && !form) {
+    return (
+      <Alert color="blue" title={`Khóa ${phamVi?.loai === 'khoa' ? phamVi.ma_khoa : ''} đang dùng cấu hình chung`}>
+        <Stack gap="sm">
+          <Text fz="sm">Chỉ cần tạo cấu hình riêng khi khóa/tỉnh này chọn phương án khác với cấu hình chung.</Text>
+          <Button w="fit-content" onClick={() => taoRieng.mutate()} loading={taoRieng.isPending}>
+            Tạo cấu hình riêng (sao chép từ cấu hình chung)
+          </Button>
+        </Stack>
+      </Alert>
+    );
+  }
+  if (!form) return null;
+
   return (
     <>
-      <AdminPageHeader
-        title="Cấu hình khảo sát"
-        actions={
-          <Group gap="sm">
-            <Button component="a" href="/" target="_blank" rel="noopener noreferrer" variant="default">
-              Xem trang chủ
-            </Button>
-            <Button onClick={xuLyLuu} loading={luu.isPending} disabled={!form}>
-              Lưu cấu hình
-            </Button>
-          </Group>
-        }
-      />
-      <Container size="md" py="lg">
-        {isLoading && <Skeleton h={320} radius="md" />}
-        {isError && <Alert color="red">{thongDiepLoiChung(error)}</Alert>}
-
-        {form && data && (
           <Stack gap="lg">
-            {data.cau_hinh ? (
-              data.cap_nhat_luc && (
+            <Group justify="space-between" align="center">
+              {data.cau_hinh ? (
                 <Text fz="sm" c="dimmed">
-                  Cập nhật lần cuối: {dinhDangNgayGio(data.cap_nhat_luc)}
+                  {data.cap_nhat_luc ? `Cập nhật lần cuối: ${dinhDangNgayGio(data.cap_nhat_luc)}` : ''}
                 </Text>
-              )
-            ) : (
+              ) : (
+                <Text fz="sm" c="dimmed">
+                  {khoaId ? 'Cấu hình riêng chưa lưu' : ''}
+                </Text>
+              )}
+              <Group gap="sm">
+                {khoaId && data.cau_hinh && (
+                  <Button variant="default" color="red" onClick={() => setHoiXoa(true)}>
+                    Dùng lại cấu hình chung
+                  </Button>
+                )}
+                <Button onClick={xuLyLuu} loading={luu.isPending}>
+                  Lưu cấu hình
+                </Button>
+              </Group>
+            </Group>
+
+            {!khoaId && !data.cau_hinh && (
               <Alert color="yellow" title="Chưa lưu cấu hình">
                 Hệ thống đang dùng giá trị mặc định trong mã nguồn. Nhập đường dẫn rồi bấm "Lưu cấu hình" để áp dụng.
               </Alert>
+            )}
+
+            {khoaId && (
+              <Paper withBorder radius="md" p="lg">
+                <Stack gap="xs">
+                  <Title order={2} fz={16}>
+                    Hiển thị ở trang chủ
+                  </Title>
+                  <SelectDiaDanh
+                    label="Tỉnh/thành của khóa"
+                    placeholder="Không hiện ở trang chủ"
+                    cap="tinh_thanh"
+                    value={tinhId}
+                    onChange={(v) => setTinhId(v)}
+                    error={loi.tinh_id}
+                    phienBan="hien_tai"
+                  />
+                  <Text fz="sm" c="dimmed">
+                    Người xem trang chủ chọn đúng tỉnh này sẽ thấy cấu hình của khóa. Để trống thì cấu hình chỉ áp dụng
+                    cho học viên đã ghi danh khóa. Mỗi tỉnh chỉ gắn một khóa.
+                  </Text>
+                </Stack>
+              </Paper>
             )}
 
             <Paper withBorder radius="md" p="lg">
@@ -331,11 +458,24 @@ export default function AdminCauHinhKhaoSat() {
                 </Button>
               </Stack>
             </Paper>
-
-            <TheThuSso />
           </Stack>
-        )}
-      </Container>
+
+      <Modal opened={hoiXoa} onClose={() => setHoiXoa(false)} title="Dùng lại cấu hình chung?" centered>
+        <Stack gap="md">
+          <Text fz="sm">
+            Cấu hình riêng của khóa này sẽ bị xóa. Học viên của khóa và người xem trang chủ chọn tỉnh này sẽ nhận cấu
+            hình chung.
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setHoiXoa(false)}>
+              Hủy
+            </Button>
+            <Button color="red" onClick={() => xoa.mutate()} loading={xoa.isPending}>
+              Xóa cấu hình riêng
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </>
   );
 }
