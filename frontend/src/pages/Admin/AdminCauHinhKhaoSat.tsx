@@ -151,7 +151,7 @@ export default function AdminCauHinhKhaoSat() {
                     <Radio
                       value="khao_sat"
                       label="Khảo sát (chưa mở đăng nhập)"
-                      description="Trang chủ mời học viên làm lần lượt các phiếu bên dưới; trang đăng nhập báo học viên chưa cần đăng nhập."
+                      description="Trang chủ mời học viên làm lần lượt các phiếu bên dưới. Trang đăng nhập vẫn mở bình thường."
                     />
                     <Radio
                       value="dang_nhap"
