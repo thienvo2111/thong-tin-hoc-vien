@@ -46,6 +46,7 @@ async function buildTransporter(): Promise<{
         ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
         : undefined,
     });
+    transporter.use('compile', chanDiaChiKhongGiaoDuoc);
     return { transporter, from };
   }
 
@@ -63,3 +64,39 @@ async function buildTransporter(): Promise<{
 }
 
 export { getTestMessageUrl } from 'nodemailer';
+
+// Tên miền dành riêng (RFC 2606/6761) — không bao giờ nhận được thư. e2e dùng
+// CHUNG DB với backend dev nên dòng hang_doi_email tạo bởi test (vd.
+// e2e-truong-xxx@test.local) bị cron của backend dev gửi qua Gmail thật ->
+// bị trả về hàng loạt, tốn hạn mức và giảm uy tín tài khoản gửi. Chỉ gắn vào
+// nhánh SMTP thật; Ethereal vẫn nhận mọi địa chỉ để e2e kiểm tra được.
+const TEN_MIEN_DANH_RIENG = /\.(local|test|example|invalid|localhost)$/i;
+
+export function laDiaChiKhongGiaoDuoc(email: string): boolean {
+  const tenMien = email.trim().replace(/>$/, '').split('@').pop() ?? '';
+  return TEN_MIEN_DANH_RIENG.test(tenMien);
+}
+
+function layDiaChi(nguoiNhan: unknown): string[] {
+  if (Array.isArray(nguoiNhan)) return nguoiNhan.flatMap(layDiaChi);
+  if (typeof nguoiNhan === 'string') return nguoiNhan.split(',');
+  if (nguoiNhan && typeof nguoiNhan === 'object' && 'address' in nguoiNhan) {
+    return [String((nguoiNhan as { address: unknown }).address)];
+  }
+  return [];
+}
+
+function chanDiaChiKhongGiaoDuoc(
+  mail: { data: { to?: unknown } },
+  callback: (err?: Error | null) => void,
+): void {
+  const diaChi = layDiaChi(mail.data.to);
+  const bad = diaChi.find(laDiaChiKhongGiaoDuoc);
+  callback(
+    bad
+      ? new Error(
+          `Không gửi tới tên miền dành riêng (không có thật): ${bad.trim()}`,
+        )
+      : null,
+  );
+}
