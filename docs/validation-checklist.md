@@ -249,3 +249,15 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 97 | `che_do_hoc_vien = khao_sat` thì bắt buộc `hien_khao_sat = true` (học viên không có chỗ nào để làm khảo sát) | 🔴 | API (`CauHinhKhaoSatService.luuCauHinh`) + FE |
 | 98 | `hien_khao_sat = true` thì cần ít nhất 1 phiếu | 🔴 | API + FE |
 | 99 | Chuỗi được trim (và NFC ở FE) trước khi lưu; thứ tự `phieu` giữ nguyên như gửi lên | 🟡 | API + FE |
+
+## Đối tượng học viên & SSO sang hệ thống khảo sát (2026-10-02 — api-contract.md mục 9, 10)
+
+| # | Quy tắc | Mức | Nơi thực thi |
+|---|---|---|---|
+| 100 | `doi_tuong` ∈ {`giao_vien`, `can_bo_quan_ly`}; NULL được phép lưu (hồ sơ cũ/import chưa chọn) | 🔴 | DB (enum) + API (DTO `@IsEnum`) + FE (zod) |
+| 101 | Hồ sơ **chưa chọn `doi_tuong`** → **không "đầy đủ"** (thêm 1 mục vào `thieu`). Đặt trong `danhGiaDayDu`, KHÔNG trong `validateHocVien` (bộ quy tắc đó còn dùng cho `POST /hoc-vien` tự đăng ký — không chặn luồng tạo hồ sơ) | 🔴 | API (`HocVienService.danhGiaDayDu`) |
+| 102 | Sửa `doi_tuong` ghi `lich_su_thay_doi_ho_so` như các trường hồ sơ khác; học viên `import_moet` chỉ tự sửa được khi có Đợt xác nhận đang mở (T14) — quản trị sửa được mọi lúc | 🔴 | API |
+| 103 | `kenh_danh_gia` ∈ {`sso`, `vle`}, bắt buộc khi PUT cấu hình; đọc cấu hình cũ thiếu trường → `vle` | 🔴 | API (DTO + `layKenhDanhGia`) |
+| 104 | `POST /sso/cap-ma`: chỉ `hoc_vien`; chỉ khi `kenh_danh_gia = sso` **và** hồ sơ đầy đủ (dùng chung cổng M6); `target` ∈ {`khao-sat`, `danh-gia`} hoặc bỏ trống | 🔴 | API |
+| 105 | Mã SSO: 32 byte ngẫu nhiên, DB chỉ lưu SHA-256, hết hạn 5 phút, đổi được đúng 1 lần (UPDATE nguyên tử), sai API key **không** đốt mã | 🔴 | API (`SsoService`) + DB (`UNIQUE(ma_hash)`) |
+| 106 | `POST /sso/doi-ma` không trả CCCD/ngày sinh/email/SĐT; thiếu `SSO_KHAO_SAT_API_KEY` → 503 | 🔴 | API |

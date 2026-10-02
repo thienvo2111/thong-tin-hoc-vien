@@ -16,6 +16,7 @@ describe('CauHinhKhaoSatService', () => {
     che_do_hoc_vien: 'khao_sat',
     danh_gia_dau_vao_trong_cong: false,
     hien_khao_sat: true,
+    kenh_danh_gia: 'vle',
     phieu: [
       {
         ten: '  Phiếu khảo sát kĩ năng số ',
@@ -54,6 +55,29 @@ describe('CauHinhKhaoSatService', () => {
       const kq = await service.layCauHinh();
       expect(kq.cau_hinh).toEqual({ che_do_hoc_vien: 'dang_nhap' });
       expect(kq.cap_nhat_luc).toBe(luc);
+    });
+  });
+
+  describe('layKenhDanhGia', () => {
+    it('chưa lưu cấu hình -> vle (giữ hành vi cũ)', async () => {
+      prisma.cau_hinh_he_thong.findUnique.mockResolvedValue(null);
+      await expect(service.layKenhDanhGia()).resolves.toBe('vle');
+    });
+
+    it('cấu hình lưu trước khi có trường kenh_danh_gia -> vle', async () => {
+      prisma.cau_hinh_he_thong.findUnique.mockResolvedValue({
+        gia_tri: { che_do_hoc_vien: 'dang_nhap' },
+        cap_nhat_luc: new Date(),
+      });
+      await expect(service.layKenhDanhGia()).resolves.toBe('vle');
+    });
+
+    it('đã chọn sso -> sso', async () => {
+      prisma.cau_hinh_he_thong.findUnique.mockResolvedValue({
+        gia_tri: { kenh_danh_gia: 'sso' },
+        cap_nhat_luc: new Date(),
+      });
+      await expect(service.layKenhDanhGia()).resolves.toBe('sso');
     });
   });
 
@@ -121,6 +145,7 @@ describe('CauHinhKhaoSatService', () => {
         che_do_hoc_vien: 'dang_nhap',
         danh_gia_dau_vao_trong_cong: true,
         hien_khao_sat: false,
+        kenh_danh_gia: 'sso',
         phieu: [],
       };
       await expect(service.luuCauHinh(dto, 'qt-1')).resolves.toMatchObject({

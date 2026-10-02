@@ -111,6 +111,8 @@ CREATE TYPE trang_thai_hang_doi_email AS ENUM ('cho_gui', 'thanh_cong', 'that_ba
 -- T14 (mo-rong-nls-an-giang.md, 2026-09-28): đợt xác nhận cho hồ sơ
 -- import_moet — xem PHẦN 2b bên dưới.
 CREATE TYPE loai_dot_xac_nhan AS ENUM ('kiem_tra_bo_sung', 'xac_nhan_truoc_danh_gia');
+-- 2026-10-02 (migration 20261002120000): học viên tự chọn, gửi sang hệ thống khảo sát qua SSO.
+CREATE TYPE doi_tuong_hoc_vien AS ENUM ('giao_vien', 'can_bo_quan_ly');
 
 
 -- =====================================================================
@@ -302,6 +304,7 @@ CREATE TABLE hoc_vien (
     nam_sinh                smallint NOT NULL,
     gioi_tinh               varchar(20),
     chuc_vu                 varchar(100),       -- vd: TTCM, Giáo viên, Nhân viên — tự do (từ import)
+    doi_tuong               doi_tuong_hoc_vien, -- 2026-10-02: học viên tự chọn; NULL = chưa chọn -> hồ sơ CHƯA đầy đủ
 
     -- Nơi sinh / cư trú — không có trong danh sách tiếp nhận MOET, học viên
     -- tự bổ sung sau. LƯU Ý: phần dưới đây đã được cập nhật qua Prisma trực
@@ -738,6 +741,25 @@ CREATE TABLE cau_hinh_he_thong (
     cap_nhat_luc  TIMESTAMPTZ NOT NULL DEFAULT now(),
     cap_nhat_boi  UUID            -- nguoi_dung.id, cố ý không FK (bảng cấu hình độc lập)
 );
+
+
+-- =====================================================================
+-- PHẦN 6 — SSO SANG HỆ THỐNG KHẢO SÁT (2026-10-02, migration 20261002120000)
+-- =====================================================================
+-- Mã dùng 1 lần, hết hạn sau 5 phút. CHỈ lưu SHA-256 (hex) của mã — mã gốc
+-- chỉ nằm trên URL chuyển hướng. Đổi mã: UPDATE nguyên tử đặt da_dung_luc.
+-- Xem docs/api-contract.md mục 10.
+CREATE TABLE ma_sso_mot_lan (
+    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    ma_hash      char(64) NOT NULL,
+    hoc_vien_id  uuid NOT NULL REFERENCES hoc_vien(id) ON DELETE CASCADE,
+    target       varchar(20),          -- 'khao-sat' | 'danh-gia' | NULL (danh sách bài)
+    het_han      timestamptz NOT NULL,
+    da_dung_luc  timestamptz,          -- NULL = chưa đổi
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_ma_sso_hash UNIQUE (ma_hash)
+);
+CREATE INDEX idx_ma_sso_hoc_vien ON ma_sso_mot_lan(hoc_vien_id);
 
 
 -- =====================================================================

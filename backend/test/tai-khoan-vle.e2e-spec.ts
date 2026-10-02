@@ -84,6 +84,7 @@ describe('Tài khoản VLE & cổng điều kiện đánh giá đầu vào — T
         noi_sinh_id: donViFixture.diaDanhTinh.id,
         phuong_xa_id: donViFixture.diaDanhXa.id,
         trinh_do_chuyen_mon: 'dai_hoc',
+        doi_tuong: 'giao_vien',
         don_vi_cong_tac_id: donViFixture.donVi.id,
         so_dien_thoai_lien_he: '0900000000',
         trang_thai: 'da_duyet',

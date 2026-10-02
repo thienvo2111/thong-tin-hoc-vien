@@ -17,6 +17,7 @@ import { NguoiDungModule } from './nguoi-dung/nguoi-dung.module';
 import { DotXacNhanModule } from './dot-xac-nhan/dot-xac-nhan.module';
 import { YeuCauHoTroModule } from './yeu-cau-ho-tro/yeu-cau-ho-tro.module';
 import { CauHinhKhaoSatModule } from './cau-hinh-khao-sat/cau-hinh-khao-sat.module';
+import { SsoModule } from './sso/sso.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { CauHinhKhaoSatModule } from './cau-hinh-khao-sat/cau-hinh-khao-sat.modu
     DotXacNhanModule,
     YeuCauHoTroModule,
     CauHinhKhaoSatModule,
+    SsoModule,
   ],
   controllers: [AppController],
   providers: [AppService],

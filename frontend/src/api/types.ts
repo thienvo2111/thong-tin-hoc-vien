@@ -57,6 +57,8 @@ export interface HocVien {
   cu_tru_phuong_xa_ten?: string | null;
   don_vi_cong_tac_id: string | null;
   chuc_vu: string | null;
+  // 2026-10-02: học viên tự chọn — bắt buộc cho "hồ sơ đầy đủ", gửi sang hệ thống khảo sát qua SSO.
+  doi_tuong?: DoiTuongHocVien | null;
   so_dien_thoai_lien_he: string | null;
   email_lien_he: string | null;
   // Thêm 2026-09-30: xác minh email liên hệ (backend hoc_vien.email_da_xac_minh) — đổi email_lien_he
@@ -231,14 +233,27 @@ export interface TongQuanResult {
   ket_qua_theo_hinh_thuc: KetQuaTheoHinhThucRow[];
 }
 
+export type DoiTuongHocVien = 'giao_vien' | 'can_bo_quan_ly';
+
+/** Kênh làm bài đánh giá đầu vào (cấu hình admin): 'sso' = chuyển sang hệ thống khảo sát; 'vle' = T15. */
+export type KenhDanhGia = 'sso' | 'vle';
+
 export interface DanhGiaDauVaoDuDieuKien {
+  kenh: 'vle';
   du_dieu_kien: true;
   duong_dan: string;
   ten_dang_nhap_vle: string;
   mat_khau_tam: string | null;
 }
 
+/** Kênh SSO: chỉ báo đủ điều kiện — link (mã dùng 1 lần) được cấp lúc bấm qua POST /sso/cap-ma. */
+export interface DanhGiaDauVaoSsoDuDieuKien {
+  kenh: 'sso';
+  du_dieu_kien: true;
+}
+
 export interface DanhGiaDauVaoChuaDu {
+  kenh: KenhDanhGia;
   du_dieu_kien: false;
   het_han?: boolean;
   // ly_do là danh sách câu tiếng Việt hoàn chỉnh do backend dựng sẵn (T15,
@@ -255,7 +270,7 @@ export interface DanhGiaDauVaoChuaDu {
   } | null;
 }
 
-export type DanhGiaDauVao = DanhGiaDauVaoDuDieuKien | DanhGiaDauVaoChuaDu;
+export type DanhGiaDauVao = DanhGiaDauVaoDuDieuKien | DanhGiaDauVaoSsoDuDieuKien | DanhGiaDauVaoChuaDu;
 
 // Phase 4 redesign — module Khóa bồi dưỡng (Admin), docs/api-contract.md mục 3 + database-ddl.sql
 // (CREATE TABLE khoa_boi_duong/giai_doan_khoa/lop_hoc). GET /khoa-boi-duong trả bản ghi thô (không

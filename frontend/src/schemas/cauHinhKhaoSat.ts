@@ -18,6 +18,7 @@ export const cauHinhKhaoSatSchema = z
     che_do_hoc_vien: z.enum(['khao_sat', 'dang_nhap']),
     danh_gia_dau_vao_trong_cong: z.boolean(),
     hien_khao_sat: z.boolean(),
+    kenh_danh_gia: z.enum(['sso', 'vle']),
     phieu: z
       .array(
         z.object({

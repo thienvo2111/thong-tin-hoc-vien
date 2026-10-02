@@ -41,7 +41,7 @@ server {
     # Backend NestJS (khong co global prefix - xem backend/src/*.controller.ts)
     # /api la Swagger docs; cac path con lai la route API that su.
     # THEM CONTROLLER MOI -> them prefix vao day roi chay lai script nay (06-deploy.sh co canh bao neu thieu).
-    location ~ ^/(api|auth|hoc-vien|khoa-boi-duong|dot-xac-nhan|thong-bao|danh-muc|nguoi-dung|bao-cao|import|validate|lop|dang-ky-hoc|yeu-cau-ho-tro|cau-hinh-khao-sat) {
+    location ~ ^/(api|auth|hoc-vien|khoa-boi-duong|dot-xac-nhan|thong-bao|danh-muc|nguoi-dung|bao-cao|import|validate|lop|dang-ky-hoc|yeu-cau-ho-tro|cau-hinh-khao-sat|sso) {
         proxy_pass http://127.0.0.1:${BACKEND_PORT};
         proxy_http_version 1.1;
         proxy_set_header Host \$host;

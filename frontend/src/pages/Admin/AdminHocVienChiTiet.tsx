@@ -25,6 +25,7 @@ const TRUONG_HIEN_THI = [
   'nam_sinh',
   'gioi_tinh',
   'chuc_vu',
+  'doi_tuong',
   'so_dien_thoai_lien_he',
   'email_lien_he',
   'trinh_do_chuyen_mon',

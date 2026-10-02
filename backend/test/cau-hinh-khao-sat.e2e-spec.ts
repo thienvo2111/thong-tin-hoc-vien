@@ -27,6 +27,7 @@ describe('Cấu hình khảo sát đầu vào (e2e)', () => {
     che_do_hoc_vien: 'khao_sat',
     danh_gia_dau_vao_trong_cong: false,
     hien_khao_sat: true,
+    kenh_danh_gia: 'vle',
     phieu: [
       {
         ten: 'Phiếu khảo sát kĩ năng số',
@@ -174,6 +175,7 @@ describe('Cấu hình khảo sát đầu vào (e2e)', () => {
       che_do_hoc_vien: 'dang_nhap',
       danh_gia_dau_vao_trong_cong: true,
       hien_khao_sat: false,
+      kenh_danh_gia: 'sso',
       phieu: [],
     };
     await request(app.getHttpServer())

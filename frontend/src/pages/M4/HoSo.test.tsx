@@ -322,4 +322,74 @@ describe('M4 — Hồ sơ: xem & sửa', () => {
     await user.click(within(hopThoai).getByRole('button', { name: 'Xác nhận lại' }));
     expect(await screen.findByText('Màn hình xác nhận')).toBeInTheDocument();
   });
+
+  describe('Đối tượng (GV/CBQL, 2026-10-02)', () => {
+    function hoSoDuNgoaiDoiTuong() {
+      db.hoSo.noi_sinh_xa = 'Xã Long Xuyên';
+      db.hoSo.so_dinh_danh_ca_nhan = '111111111111';
+      db.hoSo.email_lien_he = 'a@vd.vn';
+      db.hoSo.trinh_do_chuyen_mon = 'dai_hoc';
+      db.hoSo.chuyen_mon = ['Tin học'];
+    }
+
+    it('chọn "Cán bộ quản lý" rồi Lưu -> PATCH chỉ gửi doi_tuong', async () => {
+      hoSoDuNgoaiDoiTuong();
+      db.hoSo.doi_tuong = null;
+      let thanPatch: Record<string, unknown> | null = null;
+      server.use(
+        http.patch('/hoc-vien/toi', async ({ request }) => {
+          thanPatch = (await request.json()) as Record<string, unknown>;
+          Object.assign(db.hoSo, thanPatch);
+          return HttpResponse.json(db.hoSo);
+        }),
+      );
+      const user = userEvent.setup();
+      renderDaDangNhap();
+
+      const cbql = await screen.findByRole('radio', { name: 'Cán bộ quản lý' });
+      expect(cbql).not.toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Giáo viên' })).not.toBeChecked();
+      await user.click(cbql);
+      await user.click(screen.getByRole('button', { name: 'Lưu' }));
+
+      await waitFor(() => expect(thanPatch).not.toBeNull());
+      expect(thanPatch).toEqual({ doi_tuong: 'can_bo_quan_ly' });
+    });
+
+    it('hồ sơ đã có đối tượng -> radio tương ứng được chọn sẵn', async () => {
+      db.hoSo.doi_tuong = 'giao_vien';
+      renderDaDangNhap();
+      expect(await screen.findByRole('radio', { name: 'Giáo viên' })).toBeChecked();
+    });
+
+    it('bổ sung dần: chưa chọn đối tượng vẫn lưu được trường khác; backend báo thiếu -> ô Đối tượng hiện "Cần bổ sung"', async () => {
+      hoSoDuNgoaiDoiTuong();
+      db.hoSo.doi_tuong = null;
+      db.dotXacNhan.day_du = false;
+      db.dotXacNhan.thieu = [{ field: 'doi_tuong', message: 'Chưa chọn đối tượng (giáo viên hoặc cán bộ quản lý)' }];
+      let thanPatch: Record<string, unknown> | null = null;
+      server.use(
+        http.patch('/hoc-vien/toi', async ({ request }) => {
+          thanPatch = (await request.json()) as Record<string, unknown>;
+          Object.assign(db.hoSo, thanPatch);
+          return HttpResponse.json(db.hoSo);
+        }),
+      );
+      const user = userEvent.setup();
+      renderDaDangNhap();
+
+      // Mantine đặt thông báo lỗi cạnh nhóm radio, liên kết qua aria-describedby (trình đọc màn hình đọc được).
+      const nhom = (await screen.findByRole('radio', { name: 'Giáo viên' })).closest('[role="radiogroup"]') as HTMLElement;
+      await waitFor(() => {
+        const idLoi = nhom.getAttribute('aria-describedby')?.split(' ').find((id) => id.endsWith('-error'));
+        expect(idLoi && document.getElementById(idLoi)).toHaveTextContent('Cần bổ sung');
+      });
+
+      const oChucVu = screen.getByLabelText('Chức vụ');
+      await user.clear(oChucVu);
+      await user.type(oChucVu, 'Tổ trưởng');
+      await user.click(screen.getByRole('button', { name: 'Lưu' }));
+      await waitFor(() => expect(thanPatch).toEqual({ chuc_vu: 'Tổ trưởng' }));
+    });
+  });
 });

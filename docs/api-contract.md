@@ -113,6 +113,8 @@ Quyết định nghiệp vụ chốt 2026-09-30: giấy khai sinh có thể ghi 
 
 ### Cổng điều kiện làm đánh giá đầu vào & tài khoản VLE (T15, 2026-09-28) — QĐ8, QĐ9
 
+> **2026-10-02 — 2 kênh, chọn ở cấu hình khảo sát (`kenh_danh_gia`, mục 9).** Response `GET /hoc-vien/toi/danh-gia-dau-vao` luôn có thêm `kenh: 'sso' | 'vle'`. Kênh `vle` = toàn bộ quy tắc T15 bên dưới (mặc định, kể cả khi chưa lưu cấu hình). Kênh `sso`: **đủ điều kiện = chỉ cần hồ sơ đầy đủ (T9)** — không cần đợt 2, xác nhận hay tài khoản VLE; trả `{ kenh: 'sso', du_dieu_kien: true }` (KHÔNG kèm link — link cấp lúc bấm qua `POST /sso/cap-ma`, mục 10) hoặc `{ kenh: 'sso', du_dieu_kien: false, ly_do: string[] }`.
+
 Cách B (QĐ8): Phòng CNTT tạo tài khoản VLE cho **TẤT CẢ** học viên `import_moet` (import `tai_khoan_vle`, xem mục 5) — hệ thống chỉ **ẩn/hiện** thông tin đường dẫn + tài khoản, không chặn việc tạo tài khoản (chặn "mềm").
 
 - **Đủ điều kiện** = có `xac_nhan_ho_so` **còn hiệu lực** (`con_hieu_luc=true`) ở 1 đợt `loai='xac_nhan_truoc_danh_gia'` áp dụng cho học viên **VÀ** hồ sơ đầy đủ (T9, `danhGiaDayDu`) **tại thời điểm gọi** — không phải tại lúc xác nhận. Sửa hồ sơ sau khi xác nhận sẽ hủy xác nhận đó (T14) nên tự động mất điều kiện; **không cần đợt đang mở** để vẫn được coi là đủ (chỉ cần xác nhận CÒN HIỆU LỰC, đợt đã đóng hay chưa không quan trọng).
@@ -329,6 +331,7 @@ Body `PUT` (cũng là shape `cau_hinh` của `GET`):
   "che_do_hoc_vien": "khao_sat",
   "danh_gia_dau_vao_trong_cong": false,
   "hien_khao_sat": true,
+  "kenh_danh_gia": "vle",
   "phieu": [
     { "ten": "Phiếu khảo sát kĩ năng số", "mo_ta": "…", "lien_ket": [{ "nhan": "Mở phiếu khảo sát", "url": "https://…" }] },
     { "ten": "Phiếu đánh giá năng lực số", "mo_ta": "…", "lien_ket": [
@@ -341,4 +344,53 @@ Body `PUT` (cũng là shape `cau_hinh` của `GET`):
 
 - `che_do_hoc_vien`: `khao_sat` = học viên không đăng nhập, làm tuần tự các phiếu ở trang chủ; `dang_nhap` = mời đăng nhập cổng học viên (quyền sửa hồ sơ vẫn do Đợt xác nhận quyết định).
 - `danh_gia_dau_vao_trong_cong`: hiện/ẩn menu "Đánh giá đầu vào" (M6) trong cổng học viên.
+- `kenh_danh_gia` (2026-10-02, **bắt buộc khi PUT**): `sso` = M6 chuyển sang hệ thống khảo sát bằng mã dùng 1 lần (mục 10); `vle` = luồng T15 (tài khoản VLE). Cấu hình lưu trước ngày này không có trường → đọc là `vle`.
 - `phieu`: thứ tự mảng = thứ tự làm. `url` rỗng = chưa có đường dẫn (trang chủ hiện nút bị khóa). Ràng buộc chi tiết: `validation-checklist.md` mục "Cấu hình khảo sát đầu vào".
+
+## 10. SSO sang hệ thống khảo sát (2026-10-02)
+
+Mục đích: học viên đã đăng nhập cổng bồi dưỡng sang hệ thống khảo sát (`khaosatnls.hcmue.edu.vn`, **chưa triển khai**) **không phải đăng nhập lại**. Trên URL chỉ có mã ngẫu nhiên dùng 1 lần — **không có CCCD, mật khẩu hay mã định danh**.
+
+**Luồng**
+
+1. Học viên (hồ sơ đầy đủ, `kenh_danh_gia = sso`) bấm nút ở M6 → FE gọi `POST /sso/cap-ma`.
+2. Cổng tạo mã 32 byte ngẫu nhiên (base64url, 43 ký tự), lưu **SHA-256** của mã (`ma_sso_mot_lan`, DDL PHẦN 6), hết hạn sau **5 phút**, trả URL. FE chuyển trang **cùng tab** tới:
+   `{SSO_KHAO_SAT_URL}?code={MA_MOT_LAN}&target={khao-sat|danh-gia}` — bỏ `target` thì bên khảo sát hiện danh sách bài cần làm. Mặc định `SSO_KHAO_SAT_URL = https://khaosatnls.hcmue.edu.vn/sso/start`.
+3. **Máy chủ** khảo sát (không phải trình duyệt) gọi `POST /sso/doi-ma` kèm header `X-API-Key` → nhận thông tin học viên → tự tạo phiên đăng nhập bên mình → mở đúng bài.
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| POST | `/sso/cap-ma` | Body `{ target?: 'khao-sat' \| 'danh-gia' }` → `201 { url, het_han }`. 403 nếu kênh không phải `sso` hoặc hồ sơ chưa đầy đủ (dùng chung cổng điều kiện M6). 400 nếu `target` khác 2 giá trị trên | HọcViên (JWT) |
+| POST | `/sso/doi-ma` | Body `{ code }` + header `X-API-Key` → `200` thông tin học viên (dưới đây). Mỗi mã đổi được **đúng 1 lần** | Máy chủ khảo sát (không JWT) |
+
+Response `POST /sso/doi-ma`:
+
+```json
+{
+  "hoc_vien_id": "uuid — định danh ổn định trong cổng (dùng khi không có mã MOET)",
+  "ma_dinh_danh_moet": "9115131060",
+  "vai_tro": "giao_vien",
+  "ma_don_vi": "DV01",
+  "ten_don_vi": "Trường THPT …",
+  "target": "danh-gia",
+  "lop": [{ "ma_khoa": "NLS-AG", "ten_lop": "Lớp 1", "loai_lop": "zoom", "giai_doan": "Zoom – nhóm 1" }]
+}
+```
+
+- `ma_dinh_danh_moet`: mã định danh CSDL ngành — `null` với hồ sơ tự đăng ký không có mã MOET (dùng `hoc_vien_id`).
+- `vai_tro`: `giao_vien` | `can_bo_quan_ly` (học viên tự chọn ở hồ sơ, trường `doi_tuong`). Kênh `sso` chỉ cấp mã cho hồ sơ đầy đủ nên trường này luôn có giá trị.
+- `ma_don_vi`: có thể `null` nếu đơn vị chưa có mã. `lop`: rỗng nếu chưa được phân lớp (thường gặp ở giai đoạn đánh giá đầu vào).
+- **Cố ý KHÔNG trả** CCCD, ngày sinh, email, SĐT (tối thiểu hóa dữ liệu).
+
+Lỗi `POST /sso/doi-ma` (cùng thân lỗi chung `{ error: { code, message } }`):
+
+| HTTP | `code` | Khi nào |
+|---|---|---|
+| 401 | `UNAUTHORIZED` | Thiếu/sai `X-API-Key` (so khớp thời gian hằng) — mã **không** bị đốt |
+| 400 | `SSO_MA_KHONG_HOP_LE` | Mã không tồn tại, đã dùng, hoặc hết hạn — gộp 1 thông báo, không tiết lộ trường hợp nào |
+| 400 | `VALIDATION_ERROR` | Thiếu `code` hoặc độ dài ngoài 20–100 |
+| 503 | `SSO_CHUA_CAU_HINH` | Máy chủ cổng chưa đặt `SSO_KHAO_SAT_API_KEY` |
+
+Quy tắc bảo mật: đánh dấu đã dùng **nguyên tử** (`UPDATE … WHERE da_dung_luc IS NULL AND het_han > now()` — 2 lần đổi đồng thời chỉ 1 lần thắng); DB không lưu mã gốc; API key là bí mật dùng chung, đặt bằng biến môi trường ở **cả 2 phía**, đổi khóa = đổi biến môi trường rồi reload. Nginx phải proxy prefix `/sso` (đã có trong `scripts/vps/05-install-nginx.sh`).
+
+**Chưa làm (khi bên khảo sát cần):** dọn định kỳ bản ghi mã đã hết hạn (hiện chỉ tích lũy, mỗi lượt bấm 1 dòng nhỏ); giới hạn tần suất cấp mã theo học viên.

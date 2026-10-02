@@ -17,10 +17,15 @@ export interface PhieuKhaoSat {
   lien_ket: LienKetKhaoSat[];
 }
 
+/** Kênh làm bài đánh giá đầu vào ở M6: 'sso' = chuyển sang hệ thống khảo sát; 'vle' = tài khoản VLE (T15). */
+export type KenhDanhGia = 'sso' | 'vle';
+
 export interface CauHinhKhaoSat {
   che_do_hoc_vien: CheDoHocVien;
   danh_gia_dau_vao_trong_cong: boolean;
   hien_khao_sat: boolean;
+  /** Thiếu ở cấu hình lưu trước 2026-10-02 -> coi là 'vle'. Khi lưu (PUT) luôn bắt buộc. */
+  kenh_danh_gia?: KenhDanhGia;
   phieu: PhieuKhaoSat[];
 }
 
