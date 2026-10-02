@@ -1,4 +1,7 @@
-import { canhBaoBuoiHocGiaiDoan } from './canh-bao-buoi-hoc.util';
+import {
+  canhBaoBuoiHocGiaiDoan,
+  canhBaoLoaiLopGiaiDoan,
+} from './canh-bao-buoi-hoc.util';
 
 // Giai đoạn @db.Date: Prisma trả 00:00 UTC của ngày.
 const ngay = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
@@ -122,5 +125,18 @@ describe('canhBaoBuoiHocGiaiDoan', () => {
         { ...giaiDoanZoom, hinh_thuc: 'khac' },
       ),
     ).toBeUndefined();
+  });
+});
+
+describe('canhBaoLoaiLopGiaiDoan', () => {
+  it.each([
+    ['zoom', 'truc_tuyen', undefined],
+    ['truc_tiep', 'truc_tiep', undefined],
+    ['truc_tiep', 'khac', undefined],
+    ['truc_tiep', 'truc_tuyen', 'lớp trực tiếp nhưng giai đoạn là trực tuyến'],
+    ['vle', 'truc_tiep', 'lớp vle nhưng giai đoạn là trực tiếp'],
+    ['zoom', 'danh_gia', 'giai đoạn là đánh giá, không phải giai đoạn học'],
+  ] as const)('%s + %s -> %s', (loai, hinhThuc, mongDoi) => {
+    expect(canhBaoLoaiLopGiaiDoan(loai, hinhThuc)).toBe(mongDoi);
   });
 });

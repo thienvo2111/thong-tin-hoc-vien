@@ -4,6 +4,7 @@ import {
   khoa_boi_duong,
   lop_hoc,
   loai_lop_hoc,
+  hinh_thuc_giai_doan,
   muc_nang_luc,
   trang_thai_diem_danh,
   nguon_diem_danh,
@@ -41,7 +42,10 @@ import { KetQuaDangKyDto } from './dto/ket-qua-dang-ky.dto';
 import { KetQuaDanhGiaRowDto } from './dto/ket-qua-danh-gia-row.dto';
 import { LopVaLichHocRowDto } from './dto/lop-va-lich-hoc-row.dto';
 import { NhanSuLopRowDto } from './dto/nhan-su-lop-row.dto';
-import { canhBaoBuoiHocGiaiDoan } from './util/canh-bao-buoi-hoc.util';
+import {
+  canhBaoBuoiHocGiaiDoan,
+  canhBaoLoaiLopGiaiDoan,
+} from './util/canh-bao-buoi-hoc.util';
 import { DiemDanhRowDto } from './dto/diem-danh-row.dto';
 import { KetQuaGiaiDoanRowDto } from './dto/ket-qua-giai-doan-row.dto';
 import { RowBuildResult } from '../import/import.types';
@@ -1250,6 +1254,87 @@ export class KhoaBoiDuongService {
       );
     }
     return { da_xoa: true };
+  }
+
+  // Cảnh báo 🟡 khi gán lớp vào giai đoạn: lớp không có buổi nào trong giai
+  // đoạn, hoặc loại lớp lệch hình thức — dùng chung gán tay + import.
+  async canhBaoGanLopGiaiDoan(
+    lop: { id: string; ten_lop: string; loai_lop: loai_lop_hoc },
+    giaiDoan: {
+      id: string;
+      thu_tu: number;
+      ten_giai_doan: string;
+      hinh_thuc: hinh_thuc_giai_doan;
+    },
+  ): Promise<string | undefined> {
+    const lyDo: string[] = [];
+    const soBuoi = await this.prisma.lich_hoc_lop.count({
+      where: { lop_id: lop.id, giai_doan_id: giaiDoan.id },
+    });
+    if (soBuoi === 0) lyDo.push('lớp không có buổi nào trong giai đoạn này');
+    const lech = canhBaoLoaiLopGiaiDoan(lop.loai_lop, giaiDoan.hinh_thuc);
+    if (lech) lyDo.push(lech);
+    if (lyDo.length === 0) return undefined;
+    return `Lớp "${lop.ten_lop}" ở giai đoạn ${giaiDoan.thu_tu} "${giaiDoan.ten_giai_doan}": ${lyDo.join('; ')}`;
+  }
+
+  // PUT /dang-ky-hoc/{id}/giai-doan/{giaiDoanId}/lop — gán/thay/gỡ lớp của 1
+  // giai đoạn. Gán -> da_phan_lop; gỡ KHÔNG đổi trạng thái (như xoaLopDangKy).
+  async ganLopGiaiDoan(
+    dangKyHocId: string,
+    giaiDoanId: string,
+    lopId: string | null,
+    caller: AuthenticatedUser,
+  ) {
+    const dangKy = await this.getDangKyOrThrow(dangKyHocId);
+    this.assertChuKhoa(dangKy.khoa, caller);
+    const giaiDoan = await this.prisma.giai_doan_khoa.findUnique({
+      where: { id: giaiDoanId },
+    });
+    if (!giaiDoan || giaiDoan.khoa_id !== dangKy.khoa_id) {
+      throw new ValidationException(
+        'Giai đoạn không thuộc khóa của đăng ký này',
+        [{ field: 'giai_doan_id', message: 'Phải thuộc cùng khóa bồi dưỡng' }],
+      );
+    }
+
+    if (lopId === null) {
+      await this.prisma.phan_lop_giai_doan.deleteMany({
+        where: { dang_ky_hoc_id: dangKyHocId, giai_doan_id: giaiDoanId },
+      });
+      return { phan_lop: null };
+    }
+
+    const lop = await this.prisma.lop_hoc.findUnique({ where: { id: lopId } });
+    if (!lop || lop.khoa_id !== dangKy.khoa_id) {
+      throw new ValidationException('Lớp không thuộc khóa của đăng ký này', [
+        { field: 'lop_id', message: 'Phải thuộc cùng khóa bồi dưỡng' },
+      ]);
+    }
+    const phanLop = await this.prisma.phan_lop_giai_doan.upsert({
+      where: {
+        dang_ky_hoc_id_giai_doan_id: {
+          dang_ky_hoc_id: dangKyHocId,
+          giai_doan_id: giaiDoanId,
+        },
+      },
+      create: {
+        dang_ky_hoc_id: dangKyHocId,
+        giai_doan_id: giaiDoanId,
+        lop_id: lopId,
+      },
+      update: { lop_id: lopId },
+    });
+    if (dangKy.trang_thai !== 'da_phan_lop') {
+      await this.prisma.dang_ky_hoc.update({
+        where: { id: dangKyHocId },
+        data: { trang_thai: 'da_phan_lop' },
+      });
+    }
+    const canhBao = await this.canhBaoGanLopGiaiDoan(lop, giaiDoan);
+    return canhBao
+      ? { phan_lop: phanLop, canh_bao: canhBao }
+      : { phan_lop: phanLop };
   }
 
   async capNhatCumDangKy(

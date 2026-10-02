@@ -31,14 +31,27 @@ export function canhBaoBuoiHocGiaiDoan(
     lyDo.push('buổi học nằm ngoài khoảng thời gian của giai đoạn');
   }
 
-  if (giaiDoan.hinh_thuc === 'danh_gia') {
-    lyDo.push('giai đoạn là đánh giá, không phải giai đoạn học');
-  } else if (loaiLop === 'truc_tiep' && giaiDoan.hinh_thuc === 'truc_tuyen') {
-    lyDo.push('lớp trực tiếp nhưng giai đoạn là trực tuyến');
-  } else if (loaiLop !== 'truc_tiep' && giaiDoan.hinh_thuc === 'truc_tiep') {
-    lyDo.push(`lớp ${loaiLop} nhưng giai đoạn là trực tiếp`);
-  }
+  const lech = canhBaoLoaiLopGiaiDoan(loaiLop, giaiDoan.hinh_thuc);
+  if (lech) lyDo.push(lech);
 
   if (lyDo.length === 0) return undefined;
   return `Kiểm tra giai_doan_thu_tu: buổi được gắn vào giai đoạn ${giaiDoan.thu_tu} "${giaiDoan.ten_giai_doan}" — ${lyDo.join('; ')}`;
+}
+
+// Loại lớp không khớp hình thức giai đoạn — dùng chung cho import lịch học,
+// import phân lớp và gán tay (spec phân lớp theo giai đoạn, mục 4.5).
+export function canhBaoLoaiLopGiaiDoan(
+  loaiLop: loai_lop_hoc,
+  hinhThuc: hinh_thuc_giai_doan,
+): string | undefined {
+  if (hinhThuc === 'danh_gia') {
+    return 'giai đoạn là đánh giá, không phải giai đoạn học';
+  }
+  if (loaiLop === 'truc_tiep' && hinhThuc === 'truc_tuyen') {
+    return 'lớp trực tiếp nhưng giai đoạn là trực tuyến';
+  }
+  if (loaiLop !== 'truc_tiep' && hinhThuc === 'truc_tiep') {
+    return `lớp ${loaiLop} nhưng giai đoạn là trực tiếp`;
+  }
+  return undefined;
 }

@@ -6,6 +6,7 @@ import {
   ParseEnumPipe,
   ParseUUIDPipe,
   Patch,
+  Put,
 } from '@nestjs/common';
 import { loai_lop_hoc } from '@prisma/client';
 import { KhoaBoiDuongService } from './khoa-boi-duong.service';
@@ -14,6 +15,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { CapNhatLopDangKyDto } from './dto/capnhat-lop-dang-ky.dto';
 import { CapNhatCumDangKyDto } from './dto/capnhat-cum-dang-ky.dto';
+import { GanLopGiaiDoanDto } from './dto/gan-lop-giai-doan.dto';
 
 // PATCH/DELETE /dang-ky-hoc/{id}/lop, PATCH /dang-ky-hoc/{id}/cum — QĐ10
 // (mo-rong-nls-an-giang.md, 2026-09-30): thao tác thủ công từng đăng ký học
@@ -53,5 +55,23 @@ export class DangKyHocThaoTacController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.khoaBoiDuongService.capNhatCumDangKy(id, dto, user);
+  }
+
+  // Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.3): gán/thay/gỡ lớp của 1
+  // giai đoạn; lop_id null = gỡ.
+  @Roles('truong', 'quan_tri')
+  @Put(':id/giai-doan/:giaiDoanId/lop')
+  ganLopGiaiDoan(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('giaiDoanId', ParseUUIDPipe) giaiDoanId: string,
+    @Body() dto: GanLopGiaiDoanDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.khoaBoiDuongService.ganLopGiaiDoan(
+      id,
+      giaiDoanId,
+      dto.lop_id,
+      user,
+    );
   }
 }

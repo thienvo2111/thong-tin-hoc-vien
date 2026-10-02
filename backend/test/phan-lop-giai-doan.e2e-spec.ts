@@ -305,4 +305,94 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
         .expect(400);
     });
   });
+
+  describe('PUT /dang-ky-hoc/:id/giai-doan/:gdId/lop', () => {
+    let gd2: { id: string };
+    let lopZoom: { id: string };
+    let lopTT: { id: string };
+    let dkId: string;
+
+    beforeAll(async () => {
+      const khoa = await taoKhoa();
+      await taoGiaiDoan(khoa.id, 1, { hinh_thuc: 'danh_gia' });
+      gd2 = await taoGiaiDoan(khoa.id, 2);
+      lopZoom = await taoLop(khoa.id, 'zoom', 'Zoom gán tay');
+      lopTT = await taoLop(khoa.id, 'truc_tiep', 'TT gán tay');
+      await taoBuoi(lopZoom.id, gd2.id, 1);
+      const { hocVien } = await taoHocVienMoet(uniqueSuffix());
+      dkId = (await ghiDanh(hocVien.id, khoa.id)).id;
+    });
+
+    const put = (gdId: string, lop_id: string | null, token?: string) =>
+      request(app.getHttpServer())
+        .put(`/dang-ky-hoc/${dkId}/giai-doan/${gdId}/lop`)
+        .set('Authorization', `Bearer ${token ?? tokenQuanTri}`)
+        .send({ lop_id });
+
+    it('gán -> 200, đăng ký thành da_phan_lop, không cảnh báo', async () => {
+      const res = await put(gd2.id, lopZoom.id).expect(200);
+      expect(res.body.phan_lop.lop_id).toBe(lopZoom.id);
+      expect(res.body.canh_bao).toBeUndefined();
+      const dk = await prisma.dang_ky_hoc.findUniqueOrThrow({
+        where: { id: dkId },
+      });
+      expect(dk.trang_thai).toBe('da_phan_lop');
+    });
+
+    it('thay bằng lớp không có buổi trong GĐ + sai hình thức -> 200 kèm canh_bao, vẫn 1 dòng', async () => {
+      const res = await put(gd2.id, lopTT.id).expect(200);
+      expect(res.body.canh_bao).toContain(
+        'không có buổi nào trong giai đoạn',
+      );
+      expect(res.body.canh_bao).toContain(
+        'lớp trực tiếp nhưng giai đoạn là trực tuyến',
+      );
+      expect(
+        await prisma.phan_lop_giai_doan.count({
+          where: { dang_ky_hoc_id: dkId },
+        }),
+      ).toBe(1);
+    });
+
+    it('lop_id null -> gỡ, trạng thái đăng ký giữ da_phan_lop', async () => {
+      const res = await put(gd2.id, null).expect(200);
+      expect(res.body.phan_lop).toBeNull();
+      expect(
+        await prisma.phan_lop_giai_doan.count({
+          where: { dang_ky_hoc_id: dkId },
+        }),
+      ).toBe(0);
+      const dk = await prisma.dang_ky_hoc.findUniqueOrThrow({
+        where: { id: dkId },
+      });
+      expect(dk.trang_thai).toBe('da_phan_lop');
+    });
+
+    it('lớp hoặc giai đoạn của khóa khác -> 400', async () => {
+      const khoaKhac = await taoKhoa();
+      const gdKhac = await taoGiaiDoan(khoaKhac.id, 1);
+      const lopKhac = await taoLop(khoaKhac.id, 'zoom', 'Zoom khóa khác');
+      await put(gd2.id, lopKhac.id).expect(400);
+      await put(gdKhac.id, lopZoom.id).expect(400);
+    });
+
+    it('Trường không phải chủ khóa -> 403', async () => {
+      const donViKhac = await taoDonViTest('plk');
+      const truongKhac = await taoNguoiDungTest({
+        vai_tro: 'truong',
+        don_vi_id: donViKhac.donVi.id,
+        mat_khau: 'MatKhau123',
+      });
+      try {
+        const token = await dangNhap(truongKhac.ten_dang_nhap, 'MatKhau123');
+        await put(gd2.id, lopZoom.id, token).expect(403);
+      } finally {
+        await xoaNguoiDungTest(truongKhac.nguoiDung.id);
+        await xoaDonViTest(
+          [donViKhac.donVi.id],
+          [donViKhac.diaDanhXa.id, donViKhac.diaDanhTinh.id],
+        );
+      }
+    });
+  });
 });
