@@ -5,6 +5,7 @@ import { HocVienService } from '../hoc-vien/hoc-vien.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
   ForbiddenAppException,
+  NotFoundAppException,
   SsoChuaCauHinhException,
   SsoMaKhongHopLeException,
   UnauthorizedAppException,
@@ -18,6 +19,7 @@ describe('SsoService', () => {
       updateMany: jest.Mock;
       findUnique: jest.Mock;
     };
+    hoc_vien: { findUnique: jest.Mock };
   };
   let hocVienService: {
     danhGiaDauVaoCuaToi: jest.Mock;
@@ -38,6 +40,7 @@ describe('SsoService', () => {
         updateMany: jest.fn(),
         findUnique: jest.fn(),
       },
+      hoc_vien: { findUnique: jest.fn() },
     };
     hocVienService = {
       danhGiaDauVaoCuaToi: jest
@@ -162,6 +165,39 @@ describe('SsoService', () => {
         ForbiddenAppException,
       );
       expect(prisma.ma_sso_mot_lan.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('taoMaThu (quản trị thử tích hợp)', () => {
+    it('mã MOET không tồn tại -> 404, không tạo mã', async () => {
+      prisma.hoc_vien.findUnique.mockResolvedValue(null);
+      await expect(service.taoMaThu('khong-co')).rejects.toBeInstanceOf(
+        NotFoundAppException,
+      );
+      expect(prisma.ma_sso_mot_lan.create).not.toHaveBeenCalled();
+    });
+
+    it('có học viên -> tạo mã cho đúng học viên, BỎ QUA điều kiện kênh/hồ sơ, trả code + URL + thông tin để đối chiếu', async () => {
+      prisma.hoc_vien.findUnique.mockResolvedValue({
+        id: 'hv-9',
+        ho_ten: 'Nguyễn Văn Thử',
+        ma_dinh_danh_moet: '9115131060',
+        doi_tuong: null,
+      });
+      const kq = await service.taoMaThu('9115131060', 'khao-sat');
+
+      expect(hocVienService.danhGiaDauVaoCuaToi).not.toHaveBeenCalled();
+      const data = prisma.ma_sso_mot_lan.create.mock.calls[0][0].data;
+      expect(data.hoc_vien_id).toBe('hv-9');
+      expect(data.ma_hash).toBe(
+        createHash('sha256').update(kq.code).digest('hex'),
+      );
+      expect(new URL(kq.url).searchParams.get('code')).toBe(kq.code);
+      expect(new URL(kq.url).searchParams.get('target')).toBe('khao-sat');
+      expect(kq.hoc_vien).toMatchObject({
+        id: 'hv-9',
+        ma_dinh_danh_moet: '9115131060',
+      });
     });
   });
 

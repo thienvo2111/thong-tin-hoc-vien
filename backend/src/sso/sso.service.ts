@@ -5,6 +5,7 @@ import { HocVienService } from '../hoc-vien/hoc-vien.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
   ForbiddenAppException,
+  NotFoundAppException,
   SsoChuaCauHinhException,
   SsoMaKhongHopLeException,
   UnauthorizedAppException,
@@ -63,12 +64,39 @@ export class SsoService {
       await this.kiemTraDanhGiaDauVao(caller);
     }
 
+    const { url, het_han } = await this.taoMa(caller.hoc_vien_id!, target);
+    return { url, het_han };
+  }
+
+  // POST /sso/ma-thu (quan_tri) — mã THỬ cho 1 học viên chọn theo mã MOET, để
+  // quản trị / đội khảo sát gọi thử /sso/doi-ma khi tích hợp. Cố ý BỎ QUA điều
+  // kiện kênh + hồ sơ đầy đủ (mục đích là thử). Không mở thêm quyền: quản trị
+  // vốn xem được mọi hồ sơ, và đổi mã vẫn bắt buộc API key của máy chủ khảo sát.
+  async taoMaThu(maDinhDanhMoet: string, target?: SsoTarget) {
+    const hocVien = await this.prisma.hoc_vien.findUnique({
+      where: { ma_dinh_danh_moet: maDinhDanhMoet },
+      select: {
+        id: true,
+        ho_ten: true,
+        ma_dinh_danh_moet: true,
+        doi_tuong: true,
+      },
+    });
+    if (!hocVien) {
+      throw new NotFoundAppException(
+        'Không tìm thấy học viên có mã định danh này',
+      );
+    }
+    return { ...(await this.taoMa(hocVien.id, target)), hoc_vien: hocVien };
+  }
+
+  private async taoMa(hocVienId: string, target?: SsoTarget) {
     const ma = randomBytes(32).toString('base64url');
     const hetHan = new Date(Date.now() + SSO_MA_HIEU_LUC_MS);
     await this.prisma.ma_sso_mot_lan.create({
       data: {
         ma_hash: bamMa(ma),
-        hoc_vien_id: caller.hoc_vien_id!,
+        hoc_vien_id: hocVienId,
         target: target ?? null,
         het_han: hetHan,
       },
@@ -77,7 +105,7 @@ export class SsoService {
     const url = new URL(process.env.SSO_KHAO_SAT_URL || SSO_URL_MAC_DINH);
     url.searchParams.set('code', ma);
     if (target) url.searchParams.set('target', target);
-    return { url: url.toString(), het_han: hetHan };
+    return { url: url.toString(), code: ma, het_han: hetHan };
   }
 
   // Khảo sát đầu ra: quản trị đã bật + hồ sơ đầy đủ (không phụ thuộc kênh đầu vào).

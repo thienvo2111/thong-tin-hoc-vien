@@ -362,6 +362,7 @@ Mục đích: học viên đã đăng nhập cổng bồi dưỡng sang hệ th�
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
 | POST | `/sso/cap-ma` | Body `{ target?: 'khao-sat' \| 'danh-gia' \| 'dau-ra' }` → `201 { url, het_han }`. `khao-sat`/`danh-gia`/bỏ trống: 403 nếu kênh không phải `sso` hoặc hồ sơ chưa đầy đủ (dùng chung cổng điều kiện M6). `dau-ra`: 403 nếu `khao_sat_dau_ra_mo` chưa bật hoặc hồ sơ chưa đầy đủ. 400 nếu `target` khác 3 giá trị trên | HọcViên (JWT) |
+| POST | `/sso/ma-thu` | **Mã thử để tích hợp.** Body `{ ma_dinh_danh_moet, target? }` → `201 { url, code, het_han, hoc_vien: { id, ho_ten, ma_dinh_danh_moet, doi_tuong } }`. Cố ý BỎ QUA điều kiện kênh/hồ sơ đầy đủ; mã hoạt động y hệt mã thật (5 phút, 1 lần). 404 nếu không có học viên mang mã định danh đó. Giao diện: admin Cấu hình khảo sát → "Thử tích hợp SSO". Không mở thêm quyền: quản trị vốn xem được mọi hồ sơ, đổi mã vẫn cần API key | QuảnTrị |
 | POST | `/sso/doi-ma` | Body `{ code }` + header `X-API-Key` → `200` thông tin học viên (dưới đây). Mỗi mã đổi được **đúng 1 lần** | Máy chủ khảo sát (không JWT) |
 
 Response `POST /sso/doi-ma`:

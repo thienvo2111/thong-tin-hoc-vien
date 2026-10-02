@@ -25,6 +25,7 @@ import { chuanHoaNfc } from '@/lib/nfc';
 import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { AdminPageHeader } from './AdminPageHeader';
+import { TheThuSso } from './TheThuSso';
 
 const QUERY_KEY = ['admin', 'cau-hinh-khao-sat'] as const;
 
@@ -330,6 +331,8 @@ export default function AdminCauHinhKhaoSat() {
                 </Button>
               </Stack>
             </Paper>
+
+            <TheThuSso />
           </Stack>
         )}
       </Container>

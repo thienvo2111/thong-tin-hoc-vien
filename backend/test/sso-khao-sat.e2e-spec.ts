@@ -57,7 +57,12 @@ describe('SSO sang hệ thống khảo sát (e2e)', () => {
       .expect(200);
   }
 
-  async function taoHocVien(doiTuong: 'giao_vien' | 'can_bo_quan_ly' | null) {
+  // coDangNhap=false cho test không cần token học viên — POST /auth/dang-nhap
+  // bị giới hạn 10 lần/phút/IP (T1), file này tạo nhiều học viên liên tiếp.
+  async function taoHocVien(
+    doiTuong: 'giao_vien' | 'can_bo_quan_ly' | null,
+    coDangNhap = true,
+  ) {
     const suf = uniqueSuffix();
     const tenDangNhap = `MOET-SSO-${suf}`;
     const hocVien = await prisma.hoc_vien.create({
@@ -96,7 +101,9 @@ describe('SSO sang hệ thống khảo sát (e2e)', () => {
     });
     hocVienIds.push(hocVien.id);
     nguoiDungHocVienIds.push(nguoiDung.id);
-    const token = await dangNhap(tenDangNhap, ddmmyyyy(15, 6, NAM_HOP_LE));
+    const token = coDangNhap
+      ? await dangNhap(tenDangNhap, ddmmyyyy(15, 6, NAM_HOP_LE))
+      : '';
     return { hocVien, token, tenDangNhap };
   }
 
@@ -266,7 +273,7 @@ describe('SSO sang hệ thống khảo sát (e2e)', () => {
   });
 
   it('doi_tuong không hợp lệ -> 400', async () => {
-    const { hocVien } = await taoHocVien(null);
+    const { hocVien } = await taoHocVien(null, false);
     await request(app.getHttpServer())
       .patch(`/hoc-vien/${hocVien.id}`)
       .set('Authorization', `Bearer ${tokenQuanTri}`)
@@ -294,5 +301,48 @@ describe('SSO sang hệ thống khảo sát (e2e)', () => {
     } finally {
       await datKenh('sso');
     }
+  });
+
+  describe('POST /sso/ma-thu (quản trị thử tích hợp)', () => {
+    it('quản trị tạo mã thử cho học viên (kể cả hồ sơ CHƯA đầy đủ) -> đổi được qua /sso/doi-ma', async () => {
+      const { hocVien, tenDangNhap } = await taoHocVien(null, false);
+      const res = await request(app.getHttpServer())
+        .post('/sso/ma-thu')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ ma_dinh_danh_moet: tenDangNhap, target: 'khao-sat' })
+        .expect(201);
+      expect(res.body.hoc_vien).toMatchObject({
+        id: hocVien.id,
+        ma_dinh_danh_moet: tenDangNhap,
+      });
+      expect(new URL(res.body.url).searchParams.get('code')).toBe(
+        res.body.code,
+      );
+
+      const doi = await doiMa(res.body.code).expect(200);
+      expect(doi.body).toMatchObject({
+        hoc_vien_id: hocVien.id,
+        vai_tro: null,
+        target: 'khao-sat',
+      });
+    });
+
+    it('mã MOET không tồn tại -> 404; học viên gọi -> 403; không token -> 401', async () => {
+      const { token } = await taoHocVien('giao_vien');
+      await request(app.getHttpServer())
+        .post('/sso/ma-thu')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ ma_dinh_danh_moet: 'KHONG-TON-TAI' })
+        .expect(404);
+      await request(app.getHttpServer())
+        .post('/sso/ma-thu')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ ma_dinh_danh_moet: 'x' })
+        .expect(403);
+      await request(app.getHttpServer())
+        .post('/sso/ma-thu')
+        .send({ ma_dinh_danh_moet: 'x' })
+        .expect(401);
+    });
   });
 });

@@ -208,4 +208,28 @@ describe('Admin — Cấu hình khảo sát', () => {
       expect(await screen.findByRole('radio', { name: 'Trang khảo sát (đăng nhập một lần)' })).toBeChecked();
     });
   });
+
+  describe('thử tích hợp SSO', () => {
+    it('tạo mã thử -> hiện học viên, đường dẫn và lệnh curl gọi /sso/doi-ma (không lộ khóa)', async () => {
+      const user = userEvent.setup();
+      renderTrang();
+      await user.type(await screen.findByLabelText('Mã định danh CSDL ngành của học viên'), '9115131060');
+      await user.click(screen.getByRole('button', { name: 'Tạo mã thử' }));
+
+      expect(await screen.findByText('Hà Thị Thanh')).toBeInTheDocument();
+      expect(screen.getByText('https://khaosat.test/sso/start?code=ma-thu-gia-lap')).toBeInTheDocument();
+      const curl = screen.getByText(/curl -X POST/).textContent!;
+      expect(curl).toContain('/sso/doi-ma');
+      expect(curl).toContain('ma-thu-gia-lap');
+      expect(curl).toContain('X-API-Key: <SSO_KHAO_SAT_API_KEY>');
+    });
+
+    it('mã định danh không tồn tại -> hiện lỗi', async () => {
+      const user = userEvent.setup();
+      renderTrang();
+      await user.type(await screen.findByLabelText('Mã định danh CSDL ngành của học viên'), 'khong-co');
+      await user.click(screen.getByRole('button', { name: 'Tạo mã thử' }));
+      expect(await screen.findByText('Không tìm thấy học viên có mã định danh này')).toBeInTheDocument();
+    });
+  });
 });
