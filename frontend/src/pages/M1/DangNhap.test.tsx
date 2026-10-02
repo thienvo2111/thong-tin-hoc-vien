@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
+import { http } from 'msw';
 import { server } from '@/test/mocks/server';
 import { loi } from '@/test/mocks/handlers';
 import { renderVoiRouter } from '@/test/testUtils';
@@ -96,28 +96,11 @@ describe('M1 — Đăng nhập', () => {
   });
 });
 
-describe('M1 — Đăng nhập theo chế độ triển khai (cấu hình quản trị)', () => {
-  it('chưa lưu cấu hình (mặc định "khao_sat"): báo học viên chưa cần đăng nhập + link về khối khảo sát; form vẫn dùng được', async () => {
+describe('M1 — Đăng nhập không phụ thuộc chế độ triển khai', () => {
+  it('kể cả chế độ "khao_sat" (mặc định): không hiện thông báo "chưa cần đăng nhập", form dùng được', async () => {
     renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
-    expect(await screen.findByText('Học viên chưa cần đăng nhập')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Đi tới trang khảo sát' })).toHaveAttribute('href', '/#khao-sat');
-    expect(screen.getByRole('button', { name: 'Đăng nhập' })).toBeEnabled();
-  });
-
-  it('quản trị chọn "dang_nhap": không hiện thông báo khảo sát', async () => {
-    let daGoi = false;
-    server.use(
-      http.get('/cau-hinh-khao-sat', () => {
-        daGoi = true;
-        return HttpResponse.json({
-          cau_hinh: { che_do_hoc_vien: 'dang_nhap', danh_gia_dau_vao_trong_cong: true, hien_khao_sat: false, phieu: [] },
-          cap_nhat_luc: '2026-10-02T03:00:00.000Z',
-        });
-      }),
-    );
-    renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
-    await waitFor(() => expect(daGoi).toBe(true));
-    await screen.findByRole('button', { name: 'Đăng nhập' });
-    await waitFor(() => expect(screen.queryByText('Học viên chưa cần đăng nhập')).not.toBeInTheDocument());
+    expect(await screen.findByRole('button', { name: 'Đăng nhập' })).toBeEnabled();
+    expect(screen.queryByText('Học viên chưa cần đăng nhập')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Đi tới trang khảo sát' })).not.toBeInTheDocument();
   });
 });
