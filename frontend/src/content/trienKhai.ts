@@ -16,6 +16,7 @@ import {
   layCauHinhKhaoSat,
   type CauHinhKhaoSat,
   type CheDoHocVien,
+  type KenhDanhGia,
   type PhamViCauHinh,
 } from '@/api/cauHinhKhaoSat';
 
@@ -28,6 +29,8 @@ export interface CauHinhTrienKhai {
   /** true = trang chủ cổng học viên hiện khối "Khảo sát đầu ra" (SSO target 'dau-ra'). */
   khaoSatDauRaMo: boolean;
   hienKhaoSat: boolean;
+  /** Kênh làm bài đánh giá đầu vào; cấu hình cũ không có -> 'vle'. */
+  kenhDanhGia: KenhDanhGia;
   /** Thứ tự mảng = thứ tự làm. Mỗi phiếu 1 hoặc nhiều đường dẫn (vd tách theo đối tượng). */
   phieu: { ten: string; moTa: string; lienKet: { nhan: string; url: string }[] }[];
 }
@@ -37,6 +40,7 @@ export const cauHinhMacDinh: CauHinhTrienKhai = {
   danhGiaDauVaoTrongCong: false,
   khaoSatDauRaMo: false,
   hienKhaoSat: true,
+  kenhDanhGia: 'vle',
   phieu: [
     {
       ten: 'Phiếu khảo sát kĩ năng số',
@@ -58,6 +62,7 @@ export function tuCauHinhApi(c: CauHinhKhaoSat | null): CauHinhTrienKhai {
     danhGiaDauVaoTrongCong: c.danh_gia_dau_vao_trong_cong,
     khaoSatDauRaMo: c.khao_sat_dau_ra_mo ?? false,
     hienKhaoSat: c.hien_khao_sat,
+    kenhDanhGia: c.kenh_danh_gia ?? 'vle',
     phieu: c.phieu.map((p) => ({ ten: p.ten, moTa: p.mo_ta, lienKet: p.lien_ket })),
   };
 }

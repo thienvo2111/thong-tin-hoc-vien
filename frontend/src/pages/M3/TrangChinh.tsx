@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { capMaSso, useDotXacNhan, useHoSoToi, useMucDoDayDu } from '@/api/hocVien';
 import type { HocVien, MucDoDayDu } from '@/api/types';
-import { useCauHinhTrienKhai } from '@/content/trienKhai';
+import { useCauHinhTrienKhai, type CauHinhTrienKhai } from '@/content/trienKhai';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { thongDiepLoiChung } from '@/lib/loiApi';
@@ -26,9 +26,12 @@ function xungHo(gioiTinh: HocVien['gioi_tinh'] | undefined) {
 export default function TrangChinh() {
   const { data, isLoading, isError, error } = useDotXacNhan();
   const { data: hoSo } = useHoSoToi();
-  const { cauHinh } = useCauHinhTrienKhai({ loai: 'cua_toi' });
-  const coKhaoSat = cauHinh.danhGiaDauVaoTrongCong || cauHinh.khaoSatDauRaMo;
-  const { data: mucDo } = useMucDoDayDu(coKhaoSat);
+  const { cauHinh, daTai: daTaiCauHinh } = useCauHinhTrienKhai({ loai: 'cua_toi' });
+  // Đầu vào "đã mở" khi quản trị bật khối khảo sát trên trang chủ HOẶC mục Đánh giá đầu vào.
+  // Chờ tải xong cấu hình thật, tránh chớp theo giá trị mặc định.
+  const dauVaoMo = daTaiCauHinh && (cauHinh.hienKhaoSat || cauHinh.danhGiaDauVaoTrongCong);
+  const dauRaMo = daTaiCauHinh && cauHinh.khaoSatDauRaMo;
+  const { data: mucDo } = useMucDoDayDu(dauVaoMo || dauRaMo);
 
   return (
     <Container size="sm" py="xl">
@@ -63,9 +66,9 @@ export default function TrangChinh() {
               <Text fw={700} size="sm">
                 Việc cần làm
               </Text>
+              {mucDo && dauVaoMo && <KhoiKhaoSatDauVao mucDo={mucDo} cauHinh={cauHinh} />}
+              {mucDo && dauRaMo && <KhoiKhaoSatDauRa mucDo={mucDo} />}
               <KhoiTrangThai data={data} />
-              {mucDo && cauHinh.danhGiaDauVaoTrongCong && <KhoiKhaoSatDauVao mucDo={mucDo} />}
-              {mucDo && cauHinh.khaoSatDauRaMo && <KhoiKhaoSatDauRa mucDo={mucDo} />}
             </Stack>
 
             <TheHuongDan />
@@ -234,20 +237,52 @@ function DieuKienKhaoSat({ mucDo }: { mucDo: MucDoDayDu }) {
   );
 }
 
-function KhoiKhaoSatDauVao({ mucDo }: { mucDo: MucDoDayDu }) {
+function KhoiKhaoSatDauVao({ mucDo, cauHinh }: { mucDo: MucDoDayDu; cauHinh: CauHinhTrienKhai }) {
+  // SSO hoặc mục M6 đang bật -> làm qua M6; còn lại (kênh VLE, chỉ dùng phiếu ngoài) -> mở thẳng phiếu.
+  const quaM6 = cauHinh.kenhDanhGia === 'sso' || cauHinh.danhGiaDauVaoTrongCong;
   return (
     <StatusBanner loai={mucDo.day_du ? 'success' : 'warning'} tieuDe="Khảo sát đầu vào đã mở">
       {mucDo.day_du ? (
         <Stack gap="xs">
           <Text>Hồ sơ đã đầy đủ. Thầy/Cô có thể bắt đầu làm khảo sát đầu vào.</Text>
-          <Button component={Link} to="/toi/danh-gia-dau-vao" mt="xs">
-            Làm khảo sát đầu vào
-          </Button>
+          {quaM6 ? (
+            <Button component={Link} to="/toi/danh-gia-dau-vao" mt="xs">
+              Làm khảo sát đầu vào
+            </Button>
+          ) : (
+            <DanhSachPhieu phieu={cauHinh.phieu} />
+          )}
         </Stack>
       ) : (
         <DieuKienKhaoSat mucDo={mucDo} />
       )}
     </StatusBanner>
+  );
+}
+
+/** Phiếu ngoài theo thứ tự làm; mở cùng tab (trình duyệt nhúng Zalo). Chưa có đường dẫn -> nút khóa. */
+function DanhSachPhieu({ phieu }: { phieu: CauHinhTrienKhai['phieu'] }) {
+  return (
+    <Stack gap="sm" mt="xs">
+      {phieu.map((p, i) => (
+        <Stack key={p.ten} gap={4}>
+          <Text fw={700} size="sm">
+            {i + 1}. {p.ten}
+          </Text>
+          {p.lienKet.map((lk) =>
+            lk.url ? (
+              <Button key={lk.nhan} component="a" href={lk.url}>
+                {lk.nhan}
+              </Button>
+            ) : (
+              <Button key={lk.nhan} disabled>
+                Đường dẫn đang được cập nhật
+              </Button>
+            ),
+          )}
+        </Stack>
+      ))}
+    </Stack>
   );
 }
 

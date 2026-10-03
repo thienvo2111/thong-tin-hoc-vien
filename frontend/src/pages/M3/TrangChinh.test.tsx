@@ -199,6 +199,42 @@ describe('M3 — khảo sát đầu vào / đầu ra', () => {
     expect(await screen.findByText('Khảo sát đầu ra chưa mở')).toBeInTheDocument();
   });
 
+  it('cấu hình thật: chỉ bật khối khảo sát trên trang chủ + kênh sso, hồ sơ thiếu -> vẫn hiện khối đầu vào + danh sách thiếu', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ hien_khao_sat: true, danh_gia_dau_vao_trong_cong: false, kenh_danh_gia: 'sso' }));
+    renderDaDangNhap();
+    expect(await screen.findByText('Khảo sát đầu vào đã mở')).toBeInTheDocument();
+    expect(screen.getByText(/cần hoàn thành cập nhật các thông tin sau/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cập nhật thông tin hồ sơ' })).toHaveAttribute('href', '/toi/ho-so');
+  });
+
+  it('bật khối khảo sát + kênh sso, hồ sơ đủ -> nút sang M6 (dù mục M6 đang ẩn trên menu)', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ hien_khao_sat: true, kenh_danh_gia: 'sso' }));
+    datDayDu();
+    renderDaDangNhap();
+    expect(await screen.findByRole('link', { name: 'Làm khảo sát đầu vào' })).toHaveAttribute(
+      'href',
+      '/toi/danh-gia-dau-vao',
+    );
+  });
+
+  it('bật khối khảo sát + kênh vle, hồ sơ đủ -> hiện phiếu ngoài theo thứ tự; chưa có đường dẫn -> nút khóa', async () => {
+    datCauHinhKhaoSatMock(
+      cauHinh({
+        hien_khao_sat: true,
+        kenh_danh_gia: 'vle',
+        phieu: [
+          { ten: 'Phiếu A', mo_ta: '', lien_ket: [{ nhan: 'Mở phiếu A', url: 'https://forms.example/a' }] },
+          { ten: 'Phiếu B', mo_ta: '', lien_ket: [{ nhan: 'Mở phiếu B', url: '' }] },
+        ],
+      }),
+    );
+    datDayDu();
+    renderDaDangNhap();
+    expect(await screen.findByRole('link', { name: 'Mở phiếu A' })).toHaveAttribute('href', 'https://forms.example/a');
+    expect(screen.getByRole('button', { name: 'Đường dẫn đang được cập nhật' })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: 'Làm khảo sát đầu vào' })).not.toBeInTheDocument();
+  });
+
   it('mở cả hai -> hiện cả 2 khối', async () => {
     datCauHinhKhaoSatMock(cauHinh({ danh_gia_dau_vao_trong_cong: true, khao_sat_dau_ra_mo: true }));
     datDayDu();
