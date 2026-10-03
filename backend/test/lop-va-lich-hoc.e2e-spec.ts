@@ -68,7 +68,7 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
       .send({
         ma_khoa: `K-T6-${suf}`,
         ten_khoa: `Khóa test T6 ${suf}`,
-        don_vi_to_chuc_id: donViFixture.donVi.id,
+        don_vi_dat_hang_id: donViFixture.donVi.id,
         thoi_gian_bat_dau: '2026-01-01',
         thoi_gian_ket_thuc: '2026-12-31',
         ...overrides,

@@ -109,7 +109,7 @@ describe('Import ket_qua_danh_gia — phân mức đầu vào/đầu ra — T5 (
       data: {
         ma_khoa: maKhoa,
         ten_khoa: `Khóa test T5 ${suf}`,
-        don_vi_to_chuc_id: donViFixture.donVi.id,
+        don_vi_dat_hang_id: donViFixture.donVi.id,
         thoi_gian_bat_dau: new Date(),
         thoi_gian_ket_thuc: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         trang_thai: 'da_duyet',

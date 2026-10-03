@@ -141,7 +141,7 @@ describe('ThongBaoService', () => {
       id: 'khoa-1',
       ten_khoa: 'Khóa A',
       ma_khoa: 'K1',
-      don_vi_to_chuc_id: 'truong-1',
+      don_vi_dat_hang_id: 'truong-1',
     };
 
     // Gap 4 (2026-09-28): created_by nay là nguồn CHÍNH — findFirst chỉ là
@@ -653,7 +653,7 @@ describe('ThongBaoService', () => {
         id: 'khoa-1',
         ten_khoa: 'Khóa A',
         ma_khoa: 'KA',
-        don_vi_to_chuc_id: 'truong-1',
+        don_vi_dat_hang_id: 'truong-1',
         created_by_user: { id: 'nd-1', email: 'truong@hcmue.edu.vn' },
       });
       await service.guiKhoaBoiDuongDuyet('khoa-1', 'da_duyet');

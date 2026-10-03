@@ -146,7 +146,7 @@ function buildKhoaSheet(
   const header = [
     'Mã khóa',
     'Tên khóa',
-    'Đơn vị tổ chức',
+    'Đơn vị đặt hàng',
     'Trạng thái khóa',
     'Tổng đăng ký',
     ...TRANG_THAI_DANG_KY.map((t) => NHAN_TRANG_THAI_DANG_KY[t]),
@@ -160,7 +160,7 @@ function buildKhoaSheet(
     sheet.addRow([
       row.ma_khoa,
       row.ten_khoa,
-      row.don_vi_to_chuc,
+      row.don_vi_dat_hang,
       row.trang_thai_khoa,
       row.tong_dang_ky,
       ...TRANG_THAI_DANG_KY.map((t) => row.theo_trang_thai_dang_ky[t] ?? 0),

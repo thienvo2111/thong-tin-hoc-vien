@@ -12,7 +12,7 @@ export class QueryKhoaBoiDuongDto extends PaginationQueryDto {
 
   @IsOptional()
   @IsUUID()
-  don_vi_to_chuc_id?: string;
+  don_vi_dat_hang_id?: string;
 
   @IsOptional()
   @IsString()

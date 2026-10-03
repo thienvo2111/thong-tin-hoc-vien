@@ -43,7 +43,7 @@ export interface TongHopKhoaRow {
   khoa_id: string;
   ma_khoa: string;
   ten_khoa: string;
-  don_vi_to_chuc: string;
+  don_vi_dat_hang: string;
   trang_thai_khoa: string;
   tong_dang_ky: number;
   theo_trang_thai_dang_ky: Record<string, number>;

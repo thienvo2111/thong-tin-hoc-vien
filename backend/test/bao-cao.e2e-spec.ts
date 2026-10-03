@@ -308,7 +308,7 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
       data: {
         ma_khoa: `K-bc-${suf2}`,
         ten_khoa: 'Khóa Bồi Dưỡng Báo Cáo',
-        don_vi_to_chuc_id: truong1.id,
+        don_vi_dat_hang_id: truong1.id,
         thoi_gian_bat_dau: new Date('2026-03-01'),
         thoi_gian_ket_thuc: new Date('2026-03-10'),
         trang_thai: 'da_duyet',
@@ -338,7 +338,7 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
       data: {
         ma_khoa: `K-rong-bc-${suf2}`,
         ten_khoa: 'Khóa Chưa Có Ai Đăng Ký',
-        don_vi_to_chuc_id: truong1.id,
+        don_vi_dat_hang_id: truong1.id,
         thoi_gian_bat_dau: new Date('2026-04-01'),
         thoi_gian_ket_thuc: new Date('2026-04-05'),
         trang_thai: 'nhap',
@@ -351,7 +351,7 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
       data: {
         ma_khoa: `K-khac-bc-${suf2}`,
         ten_khoa: 'Khóa Ngoài Phạm Vi',
-        don_vi_to_chuc_id: truongKhac.id,
+        don_vi_dat_hang_id: truongKhac.id,
         thoi_gian_bat_dau: new Date('2026-03-01'),
         thoi_gian_ket_thuc: new Date('2026-03-10'),
         trang_thai: 'da_duyet',
@@ -407,7 +407,7 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
       data: {
         ma_khoa: `K-vh-${suf2}`,
         ten_khoa: 'Khóa Vận Hành Báo Cáo',
-        don_vi_to_chuc_id: truong3.id,
+        don_vi_dat_hang_id: truong3.id,
         thoi_gian_bat_dau: new Date('2026-03-01'),
         thoi_gian_ket_thuc: new Date('2026-03-10'),
         trang_thai: 'da_duyet',

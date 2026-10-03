@@ -165,11 +165,11 @@ export class KhoaBoiDuongService {
   // định đã áp dụng cho hoc-vien.service.ts#duyet — flagged trong self-review,
   // không có trong bảng "Ai gọi" của api-contract.md).
   private assertChuKhoa(
-    khoa: { don_vi_to_chuc_id: string },
+    khoa: { don_vi_dat_hang_id: string },
     caller: AuthenticatedUser,
   ) {
     if (caller.vai_tro === 'quan_tri') return;
-    if (caller.don_vi_id !== khoa.don_vi_to_chuc_id) {
+    if (caller.don_vi_id !== khoa.don_vi_dat_hang_id) {
       throw new ForbiddenAppException(
         'Chỉ Trường tổ chức khóa này mới được thao tác',
       );
@@ -213,7 +213,7 @@ export class KhoaBoiDuongService {
   // riêng) hoặc 'truong' bất kỳ; khóa tạo ra được da_duyet NGAY (đơn vị tổ
   // chức khóa đã "được xác thực" bởi chính Quản trị, không cần quy trình
   // nộp duyệt/duyệt như Trường tự tạo). Trường tự gọi endpoint này vẫn theo
-  // luồng cũ (trang_thai=nhap, don_vi_to_chuc_id suy từ caller.don_vi_id).
+  // luồng cũ (trang_thai=nhap, don_vi_dat_hang_id suy từ caller.don_vi_id).
   async taoKhoa(dto: CreateKhoaBoiDuongDto, caller: AuthenticatedUser) {
     this.assertThoiGianHopLe(
       dto.thoi_gian_bat_dau,
@@ -223,25 +223,25 @@ export class KhoaBoiDuongService {
     );
 
     if (caller.vai_tro === 'quan_tri') {
-      if (!dto.don_vi_to_chuc_id) {
+      if (!dto.don_vi_dat_hang_id) {
         throw new ValidationException(
           'Quản trị tạo khóa phải chỉ định đơn vị tổ chức',
-          [{ field: 'don_vi_to_chuc_id', message: 'Bắt buộc' }],
+          [{ field: 'don_vi_dat_hang_id', message: 'Bắt buộc' }],
         );
       }
       const donVi = await this.prisma.don_vi_cong_tac.findUnique({
-        where: { id: dto.don_vi_to_chuc_id },
+        where: { id: dto.don_vi_dat_hang_id },
       });
       if (!donVi || donVi.trang_thai !== 'active') {
         throw new ValidationException(
-          'don_vi_to_chuc_id không tồn tại hoặc đã ngừng hoạt động',
-          [{ field: 'don_vi_to_chuc_id', message: 'Không hợp lệ' }],
+          'don_vi_dat_hang_id không tồn tại hoặc đã ngừng hoạt động',
+          [{ field: 'don_vi_dat_hang_id', message: 'Không hợp lệ' }],
         );
       }
       if (donVi.loai_don_vi !== 'khac' && donVi.loai_don_vi !== 'truong') {
         throw new ValidationException(
-          'don_vi_to_chuc_id phải thuộc loại "khac" hoặc "truong"',
-          [{ field: 'don_vi_to_chuc_id', message: 'Sai loại đơn vị' }],
+          'don_vi_dat_hang_id phải thuộc loại "khac" hoặc "truong"',
+          [{ field: 'don_vi_dat_hang_id', message: 'Sai loại đơn vị' }],
         );
       }
       try {
@@ -249,7 +249,7 @@ export class KhoaBoiDuongService {
           data: {
             ma_khoa: dto.ma_khoa.trim(),
             ten_khoa: normalizeNfcName(dto.ten_khoa),
-            don_vi_to_chuc_id: donVi.id,
+            don_vi_dat_hang_id: donVi.id,
             dia_diem: dto.dia_diem,
             thoi_gian_bat_dau: new Date(dto.thoi_gian_bat_dau),
             thoi_gian_ket_thuc: new Date(dto.thoi_gian_ket_thuc),
@@ -275,7 +275,7 @@ export class KhoaBoiDuongService {
         data: {
           ma_khoa: dto.ma_khoa.trim(),
           ten_khoa: normalizeNfcName(dto.ten_khoa),
-          don_vi_to_chuc_id: caller.don_vi_id,
+          don_vi_dat_hang_id: caller.don_vi_id,
           dia_diem: dto.dia_diem,
           thoi_gian_bat_dau: new Date(dto.thoi_gian_bat_dau),
           thoi_gian_ket_thuc: new Date(dto.thoi_gian_ket_thuc),
@@ -356,7 +356,7 @@ export class KhoaBoiDuongService {
       );
     }
 
-    const donViDuyet = await this.resolveDonViDuyetKhoa(khoa.don_vi_to_chuc_id);
+    const donViDuyet = await this.resolveDonViDuyetKhoa(khoa.don_vi_dat_hang_id);
     const coQuyen = await this.scopeService.canAccessDonVi(
       caller,
       donViDuyet.id,
@@ -433,7 +433,7 @@ export class KhoaBoiDuongService {
 
     const coQuyen = await this.scopeService.canAccessDonVi(
       caller,
-      dangKy.khoa.don_vi_to_chuc_id,
+      dangKy.khoa.don_vi_dat_hang_id,
     );
     if (!coQuyen) {
       throw new ForbiddenAppException(
@@ -469,30 +469,30 @@ export class KhoaBoiDuongService {
     } else {
       const scope = await this.scopeService.getAccessibleDonViIds(caller);
       if (scope !== 'ALL') {
-        if (query.don_vi_to_chuc_id) {
-          if (!scope.includes(query.don_vi_to_chuc_id)) {
+        if (query.don_vi_dat_hang_id) {
+          if (!scope.includes(query.don_vi_dat_hang_id)) {
             throw new ForbiddenAppException(
               'Đơn vị tổ chức nằm ngoài phạm vi quyền',
             );
           }
-          where.don_vi_to_chuc_id = query.don_vi_to_chuc_id;
+          where.don_vi_dat_hang_id = query.don_vi_dat_hang_id;
         } else {
           // T2 (QĐ2): mở rộng thêm các khóa mà đơn vị của caller đang "theo
           // dõi" (là chính đơn vị theo dõi hoặc nằm dưới nó trong cây) —
-          // ngoài phạm vi sở hữu don_vi_to_chuc_id như trước.
+          // ngoài phạm vi sở hữu don_vi_dat_hang_id như trước.
           const theoDoiKhoaIds =
             await this.scopeService.getKhoaIdsTheoDoi(caller);
           where.OR =
             theoDoiKhoaIds.length > 0
               ? [
-                  { don_vi_to_chuc_id: { in: scope } },
+                  { don_vi_dat_hang_id: { in: scope } },
                   { id: { in: theoDoiKhoaIds } },
                 ]
               : undefined;
-          if (!where.OR) where.don_vi_to_chuc_id = { in: scope };
+          if (!where.OR) where.don_vi_dat_hang_id = { in: scope };
         }
-      } else if (query.don_vi_to_chuc_id) {
-        where.don_vi_to_chuc_id = query.don_vi_to_chuc_id;
+      } else if (query.don_vi_dat_hang_id) {
+        where.don_vi_dat_hang_id = query.don_vi_dat_hang_id;
       }
       if (query.trang_thai) where.trang_thai = query.trang_thai;
     }
@@ -543,10 +543,10 @@ export class KhoaBoiDuongService {
     } else {
       const coQuyen = await this.scopeService.canAccessDonVi(
         caller,
-        khoa.don_vi_to_chuc_id,
+        khoa.don_vi_dat_hang_id,
       );
       if (!coQuyen) {
-        // T2 (QĐ2): chưa sở hữu don_vi_to_chuc_id — vẫn xem được nếu đơn vị
+        // T2 (QĐ2): chưa sở hữu don_vi_dat_hang_id — vẫn xem được nếu đơn vị
         // của caller là/nằm dưới một đơn vị đang "theo dõi" khóa này.
         const theoDoiKhoaIds =
           await this.scopeService.getKhoaIdsTheoDoi(caller);

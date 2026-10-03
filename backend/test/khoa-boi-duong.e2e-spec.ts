@@ -291,14 +291,14 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
   });
 
   describe('POST /khoa-boi-duong', () => {
-    it('truong tạo khóa -> 201, trang_thai=nhap, don_vi_to_chuc_id=own, created_by=tài khoản gọi (gap 4)', async () => {
+    it('truong tạo khóa -> 201, trang_thai=nhap, don_vi_dat_hang_id=own, created_by=tài khoản gọi (gap 4)', async () => {
       const res = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenTruong1}`)
         .send(baseKhoaBody())
         .expect(201);
       expect(res.body.trang_thai).toBe('nhap');
-      expect(res.body.don_vi_to_chuc_id).toBe(truong1.id);
+      expect(res.body.don_vi_dat_hang_id).toBe(truong1.id);
       expect(res.body.created_by).toBe(truong1Account.nguoiDung.id);
       khoaIds.push(res.body.id);
     });
@@ -352,7 +352,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
   });
 
   describe('POST /khoa-boi-duong — quan_tri tạo khóa cho đơn vị "khac" (T2, QĐ2)', () => {
-    it('quan_tri thiếu don_vi_to_chuc_id -> 400', async () => {
+    it('quan_tri thiếu don_vi_dat_hang_id -> 400', async () => {
       await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
@@ -366,7 +366,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send(
           baseKhoaBody({
-            don_vi_to_chuc_id: '00000000-0000-0000-0000-000000000000',
+            don_vi_dat_hang_id: '00000000-0000-0000-0000-000000000000',
           }),
         )
         .expect(400);
@@ -376,7 +376,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .send(baseKhoaBody({ don_vi_to_chuc_id: phongVhxh.id }))
+        .send(baseKhoaBody({ don_vi_dat_hang_id: phongVhxh.id }))
         .expect(400);
     });
 
@@ -384,9 +384,9 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .send(baseKhoaBody({ don_vi_to_chuc_id: hcmue.id }))
+        .send(baseKhoaBody({ don_vi_dat_hang_id: hcmue.id }))
         .expect(201);
-      expect(res.body.don_vi_to_chuc_id).toBe(hcmue.id);
+      expect(res.body.don_vi_dat_hang_id).toBe(hcmue.id);
       expect(res.body.trang_thai).toBe('da_duyet');
       expect(res.body.nguoi_duyet_id).toBe(quanTri.nguoiDung.id);
       expect(res.body.cap_duyet_thuc_te).toBe('quan_tri');
@@ -398,7 +398,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .send(baseKhoaBody({ don_vi_to_chuc_id: truong1.id }))
+        .send(baseKhoaBody({ don_vi_dat_hang_id: truong1.id }))
         .expect(201);
       expect(res.body.trang_thai).toBe('da_duyet');
       khoaIds.push(res.body.id);
@@ -412,7 +412,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .send(baseKhoaBody({ don_vi_to_chuc_id: hcmue.id }))
+        .send(baseKhoaBody({ don_vi_dat_hang_id: hcmue.id }))
         .expect(201);
       khoaHcmueId = res.body.id;
       khoaIds.push(khoaHcmueId);
@@ -486,7 +486,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .send(baseKhoaBody({ don_vi_to_chuc_id: hcmue.id }))
+        .send(baseKhoaBody({ don_vi_dat_hang_id: hcmue.id }))
         .expect(201);
       khoaHcmueId = res.body.id;
       khoaIds.push(khoaHcmueId);
@@ -1348,7 +1348,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         data: {
           ma_khoa: `K-T3-${suf}`,
           ten_khoa: 'Khóa T3 MOET',
-          don_vi_to_chuc_id: truong1.id,
+          don_vi_dat_hang_id: truong1.id,
           thoi_gian_bat_dau: new Date('2026-01-01'),
           thoi_gian_ket_thuc: new Date('2026-01-31'),
         },
@@ -1611,7 +1611,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         data: {
           ma_khoa: `K-KQ-${suf}`,
           ten_khoa: 'Khóa kiểm tra kết quả',
-          don_vi_to_chuc_id: truong1.id,
+          don_vi_dat_hang_id: truong1.id,
           thoi_gian_bat_dau: new Date('2026-01-01'),
           thoi_gian_ket_thuc: new Date('2026-01-31'),
         },

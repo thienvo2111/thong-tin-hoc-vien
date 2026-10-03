@@ -82,7 +82,7 @@ describe('KhoaBoiDuongService', () => {
     don_vi_id: null,
   };
 
-  const khoa1 = { id: 'khoa-1', don_vi_to_chuc_id: 'dv-truong-1' };
+  const khoa1 = { id: 'khoa-1', don_vi_dat_hang_id: 'dv-truong-1' };
 
   beforeEach(() => {
     prisma = {

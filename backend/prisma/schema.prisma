@@ -672,7 +672,7 @@ model khoa_boi_duong {
   id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ma_khoa            String              @unique(map: "uq_khoa_ma") @db.VarChar(30)
   ten_khoa           String              @db.VarChar(255)
-  don_vi_to_chuc_id  String              @db.Uuid
+  don_vi_dat_hang_id String              @db.Uuid
   dia_diem           String?             @db.VarChar(255)
   thoi_gian_bat_dau  DateTime            @db.Date
   thoi_gian_ket_thuc DateTime            @db.Date
@@ -687,7 +687,7 @@ model khoa_boi_duong {
   // NULL cho khóa tạo trước migration này (không truy ngược được), xem
   // docs/database-ddl.sql comment tại đây.
 
-  don_vi_to_chuc  don_vi_cong_tac @relation(fields: [don_vi_to_chuc_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  don_vi_dat_hang don_vi_cong_tac @relation(fields: [don_vi_dat_hang_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   nguoi_duyet     nguoi_dung?     @relation("khoa_boi_duong_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   created_by_user nguoi_dung?     @relation("khoa_boi_duong_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
@@ -701,7 +701,7 @@ model khoa_boi_duong {
   // vị công tác, thuộc trực tiếp về khóa.
   cum_hoc_vien    cum_hoc_vien[]
 
-  @@index([don_vi_to_chuc_id], map: "idx_khoa_don_vi")
+  @@index([don_vi_dat_hang_id], map: "idx_khoa_don_vi")
   @@index([trang_thai], map: "idx_khoa_trang_thai")
 }
 

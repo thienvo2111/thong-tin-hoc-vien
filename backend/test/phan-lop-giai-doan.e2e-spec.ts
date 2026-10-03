@@ -50,7 +50,7 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
       .send({
         ma_khoa: `K-PL-${suf}`,
         ten_khoa: `Khóa test phân lớp ${suf}`,
-        don_vi_to_chuc_id: donViFixture.donVi.id,
+        don_vi_dat_hang_id: donViFixture.donVi.id,
         thoi_gian_bat_dau: '2026-01-01',
         thoi_gian_ket_thuc: '2026-12-31',
       })

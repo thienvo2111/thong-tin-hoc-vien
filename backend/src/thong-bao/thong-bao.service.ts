@@ -203,7 +203,7 @@ export class ThongBaoService {
     const nguoiDungTruong =
       khoa.created_by_user ??
       (await this.prisma.nguoi_dung.findFirst({
-        where: { vai_tro: 'truong', don_vi_id: khoa.don_vi_to_chuc_id },
+        where: { vai_tro: 'truong', don_vi_id: khoa.don_vi_dat_hang_id },
         orderBy: { created_at: 'asc' },
       }));
     if (!nguoiDungTruong?.email) {

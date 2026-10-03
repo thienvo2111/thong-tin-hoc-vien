@@ -122,7 +122,7 @@ describe('report-excel.util', () => {
           khoa_id: 'k1',
           ma_khoa: 'K-001',
           ten_khoa: 'Bồi dưỡng Tiếng Việt lớp 1 – đợt 1',
-          don_vi_to_chuc: 'Trường Tiểu học Đống Đa',
+          don_vi_dat_hang: 'Trường Tiểu học Đống Đa',
           trang_thai_khoa: 'da_duyet',
           tong_dang_ky: 2,
           theo_trang_thai_dang_ky: {
@@ -148,7 +148,7 @@ describe('report-excel.util', () => {
     expect(rows[0]).toEqual([
       'Mã khóa',
       'Tên khóa',
-      'Đơn vị tổ chức',
+      'Đơn vị đặt hàng',
       'Trạng thái khóa',
       'Tổng đăng ký',
       'Chờ duyệt',

@@ -205,7 +205,7 @@ export class BaoCaoService {
     if (scope !== 'ALL' && scope.length === 0) return [];
     const where: Prisma.khoa_boi_duongWhereInput = {};
     if (scope !== 'ALL') {
-      where.don_vi_to_chuc_id = { in: scope };
+      where.don_vi_dat_hang_id = { in: scope };
     }
     if (query.tu_ngay || query.den_ngay) {
       where.thoi_gian_bat_dau = {};
@@ -221,7 +221,7 @@ export class BaoCaoService {
         ma_khoa: true,
         ten_khoa: true,
         trang_thai: true,
-        don_vi_to_chuc: { select: { ten_don_vi: true } },
+        don_vi_dat_hang: { select: { ten_don_vi: true } },
         dang_ky_hoc: { select: { trang_thai: true, ket_qua: true } },
       },
       orderBy: { ma_khoa: 'asc' },
@@ -245,7 +245,7 @@ export class BaoCaoService {
         khoa_id: k.id,
         ma_khoa: k.ma_khoa,
         ten_khoa: k.ten_khoa,
-        don_vi_to_chuc: k.don_vi_to_chuc.ten_don_vi,
+        don_vi_dat_hang: k.don_vi_dat_hang.ten_don_vi,
         trang_thai_khoa: k.trang_thai,
         tong_dang_ky: k.dang_ky_hoc.length,
         theo_trang_thai_dang_ky,
@@ -458,7 +458,7 @@ export class BaoCaoService {
   // -------------------------------------------------------------------
   // T7 — GET /bao-cao/van-hanh?khoa_id=&nhom_hoc_vien=&lop_id=. Mỗi dòng =
   // 1 lop_hoc. 2 lớp phạm vi KHÁC NHAU áp dụng đồng thời (T2, QĐ2):
-  //  - Phạm vi XEM lớp (khóa nào hiện ra): chủ khóa (don_vi_to_chuc_id
+  //  - Phạm vi XEM lớp (khóa nào hiện ra): chủ khóa (don_vi_dat_hang_id
   //    trong scope) HOẶC khóa đang được đơn vị của caller "theo dõi"
   //    (getKhoaIdsTheoDoi) — giống GET /khoa-boi-duong.
   //  - Phạm vi ĐẾM học viên bên trong mỗi lớp: LUÔN theo scope hồ sơ
@@ -476,14 +476,14 @@ export class BaoCaoService {
     if (query.khoa_id) {
       const khoa = await this.prisma.khoa_boi_duong.findUnique({
         where: { id: query.khoa_id },
-        select: { id: true, don_vi_to_chuc_id: true },
+        select: { id: true, don_vi_dat_hang_id: true },
       });
       if (!khoa)
         throw new NotFoundAppException('Không tìm thấy khóa bồi dưỡng');
       if (caller.vai_tro !== 'quan_tri') {
         const coQuyen = await this.scopeService.canAccessDonVi(
           caller,
-          khoa.don_vi_to_chuc_id,
+          khoa.don_vi_dat_hang_id,
         );
         if (!coQuyen) {
           const theoDoiKhoaIds =
@@ -506,7 +506,7 @@ export class BaoCaoService {
       where.khoa = {
         OR: [
           ...(scopeIds.length > 0
-            ? [{ don_vi_to_chuc_id: { in: scopeIds } }]
+            ? [{ don_vi_dat_hang_id: { in: scopeIds } }]
             : []),
           ...(theoDoiKhoaIds.length > 0
             ? [{ id: { in: theoDoiKhoaIds } }]

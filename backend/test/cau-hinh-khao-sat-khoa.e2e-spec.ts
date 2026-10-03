@@ -50,7 +50,7 @@ describe('Cấu hình khảo sát theo khóa (e2e)', () => {
       data: {
         ma_khoa: `K-chk-${uniqueSuffix()}`,
         ten_khoa: 'Khóa thử cấu hình',
-        don_vi_to_chuc_id: dv.donVi.id,
+        don_vi_dat_hang_id: dv.donVi.id,
         thoi_gian_bat_dau: new Date('2026-10-01'),
         thoi_gian_ket_thuc: new Date('2027-01-31'),
         trang_thai: 'da_duyet',
