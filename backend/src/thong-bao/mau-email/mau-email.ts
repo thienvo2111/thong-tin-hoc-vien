@@ -132,6 +132,41 @@ export function mauDatLaiMatKhau(p: {
   };
 }
 
+// Tài khoản đơn vị (ADR 0002): link kích hoạt 72 giờ cho tài khoản quản lý
+// Sở/Phòng VHXH/Trường do Quản trị tạo.
+export function mauKichHoatTaiKhoan(p: {
+  hoTen: string;
+  tenDonVi: string;
+  tenDangNhap: string;
+  link: string;
+}): EmailDaDung {
+  const tieuDe = 'Kích hoạt tài khoản';
+  const noiDung = [
+    doanVan(`Kính gửi <b>${e(p.hoTen)}</b>,`),
+    doanVan(
+      `Quản trị hệ thống đã cấp tài khoản quản lý cho đơn vị <b>${e(p.tenDonVi)}</b> trên Cổng thông tin Bồi dưỡng Năng lực số. Tên đăng nhập: <b>${e(p.tenDangNhap)}</b>. Vui lòng bấm nút bên dưới để đặt mật khẩu và kích hoạt tài khoản:`,
+    ),
+    nutBam('Kích hoạt tài khoản', p.link),
+    khoiNoiBat(
+      'canh_bao',
+      'Liên kết chỉ dùng được <b>1 lần</b> và hết hiệu lực sau <b>72 giờ</b>. Không chia sẻ email này cho người khác.',
+    ),
+    chuNho(
+      `Nút không hoạt động? Sao chép liên kết sau và dán vào trình duyệt:<br><a href="${e(p.link)}" style="color:${MAU.navy};word-break:break-all;">${e(p.link)}</a>`,
+    ),
+  ].join('');
+
+  return {
+    tieuDe: `[HCMUE-BDNLS] ${tieuDe}`,
+    html: boCucEmail({
+      xemTruoc: 'Liên kết kích hoạt tài khoản có hiệu lực trong 72 giờ.',
+      nhan: 'TÀI KHOẢN QUẢN LÝ',
+      tieuDe,
+      noiDung,
+    }),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // 2. Lịch học các giai đoạn
 // ---------------------------------------------------------------------------

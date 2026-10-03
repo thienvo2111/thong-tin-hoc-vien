@@ -291,6 +291,11 @@ describe('AuthService', () => {
         where: {
           OR: [
             { ten_dang_nhap: '123456789012' },
+            // ADR 0002: chỉ tài khoản đơn vị khớp không phân biệt hoa/thường.
+            {
+              vai_tro: { in: ['so_gddt', 'phong_vhxh', 'truong'] },
+              ten_dang_nhap: { equals: '123456789012', mode: 'insensitive' },
+            },
             { hoc_vien: { so_dinh_danh_ca_nhan: '123456789012' } },
           ],
         },
@@ -489,10 +494,13 @@ describe('AuthService', () => {
       expect(prisma.token_xac_thuc.create).not.toHaveBeenCalled();
     });
 
-    it('tài khoản không phải hoc_vien -> vẫn trả da_gui:true, không tạo token (rule #9/#34b)', async () => {
+    // ADR 0002: tài khoản đơn vị CÓ email nay được gửi link (xem e2e
+    // tai-khoan-don-vi-auth); không email thì vẫn im lặng như cũ.
+    it('tài khoản đơn vị không có email -> vẫn trả da_gui:true, không tạo token (rule #9/#34b)', async () => {
       prisma.nguoi_dung.findFirst.mockResolvedValue({
         ...baseUser,
         vai_tro: 'truong',
+        email: null,
       });
       const res = await service.quenMatKhau({
         ten_dang_nhap: baseUser.ten_dang_nhap,

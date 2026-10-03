@@ -21,6 +21,7 @@ import {
 import {
   mauDatLaiMatKhau,
   mauKetQuaHocTap,
+  mauKichHoatTaiKhoan,
   mauLichHoc,
   mauXacNhanHoSo,
 } from './mau-email/mau-email';
@@ -402,11 +403,12 @@ export class ThongBaoService {
     });
   }
 
+  // hocVienId null: tài khoản đơn vị (ADR 0002) — không có hồ sơ học viên.
   async guiDatLaiMatKhau(
     email: string,
     hoTen: string,
     link: string,
-    hocVienId: string,
+    hocVienId: string | null,
   ): Promise<void> {
     const { tieuDe, html } = mauDatLaiMatKhau({
       hoTen,
@@ -417,6 +419,30 @@ export class ThongBaoService {
       loaiSuKien: 'dat_lai_mat_khau',
       hocVienId,
       email,
+      tieuDe,
+      html,
+    });
+  }
+
+  // Tài khoản đơn vị (ADR 0002): link kích hoạt đi làn "hàng loạt" (hàng
+  // đợi) vì import Excel có thể tạo hàng trăm tài khoản cùng lúc.
+  async guiKichHoatTaiKhoan(params: {
+    email: string;
+    hoTen: string;
+    tenDonVi: string;
+    tenDangNhap: string;
+    link: string;
+  }): Promise<void> {
+    const { tieuDe, html } = mauKichHoatTaiKhoan({
+      hoTen: params.hoTen,
+      tenDonVi: params.tenDonVi,
+      tenDangNhap: params.tenDangNhap,
+      link: params.link,
+    });
+    await this.themVaoHangDoiEmail({
+      loaiSuKien: 'kich_hoat_tai_khoan',
+      hocVienId: null,
+      email: params.email,
       tieuDe,
       html,
     });

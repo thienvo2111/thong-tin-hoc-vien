@@ -29,6 +29,10 @@ import {
   FieldMessage,
   matKhauMacDinhTuNgaySinh,
 } from '../hoc-vien/hoc-vien-validation.util';
+import {
+  THOI_HAN_KICH_HOAT_MS,
+  VAI_TRO_DON_VI,
+} from '../nguoi-dung/tai-khoan-don-vi.util';
 
 const BCRYPT_SALT_ROUNDS = 10;
 
@@ -67,11 +71,19 @@ export class AuthService {
   // khoản được tạo bằng mã MOET rồi CCCD mới bổ sung sau qua PATCH
   // /hoc-vien/toi. Dùng chung cho dangNhap() và quenMatKhau() (2026-09-30) —
   // không lặp lại logic tìm tài khoản.
+  //
+  // ADR 0002: tài khoản đơn vị (so_gddt/phong_vhxh/truong) lưu tên đăng nhập
+  // chữ thường và khớp KHÔNG phân biệt hoa/thường; học viên/quan_tri vẫn khớp
+  // chính xác như cũ (không đổi hành vi đăng nhập của học viên).
   private timTaiKhoanTheoTenDangNhap(tenDangNhap: string) {
     return this.prisma.nguoi_dung.findFirst({
       where: {
         OR: [
           { ten_dang_nhap: tenDangNhap },
+          {
+            vai_tro: { in: VAI_TRO_DON_VI },
+            ten_dang_nhap: { equals: tenDangNhap, mode: 'insensitive' },
+          },
           { hoc_vien: { so_dinh_danh_ca_nhan: tenDangNhap } },
         ],
       },
@@ -294,6 +306,14 @@ export class AuthService {
         nguoiDung.hoc_vien.ho_ten,
         nguoiDung.hoc_vien.email_lien_he,
       );
+    } else if (
+      nguoiDung &&
+      nguoiDung.trang_thai === 'active' &&
+      (VAI_TRO_DON_VI as string[]).includes(nguoiDung.vai_tro) &&
+      nguoiDung.email
+    ) {
+      // ADR 0002: tài khoản đơn vị có email tự lấy lại mật khẩu.
+      await this.taoVaGuiTokenDatLaiMatKhauNguoiDung(nguoiDung);
     }
 
     return { da_gui: true };
@@ -345,16 +365,92 @@ export class AuthService {
     await this.thongBaoService.guiDatLaiMatKhau(email, hoTen, link, hocVienId);
   }
 
-  // POST /auth/dat-lai-mat-khau — token sai/hết hạn/đã dùng trả 1 thông báo
-  // lỗi chung (không tiết lộ chi tiết, cùng nguyên tắc với xacMinhEmail()).
-  async datLaiMatKhau(dto: DatLaiMatKhauDto): Promise<{ da_dat_lai: true }> {
-    const tokenRow = await this.timVaXacThucToken(
-      dto.token,
+  private async taoVaGuiTokenDatLaiMatKhauNguoiDung(
+    nguoiDung: nguoi_dung,
+  ): Promise<void> {
+    const tokenGanDay = await this.prisma.token_xac_thuc.findFirst({
+      where: {
+        nguoi_dung_id: nguoiDung.id,
+        loai: 'dat_lai_mat_khau',
+        da_dung_luc: null,
+        het_han_luc: { gt: new Date() },
+        tao_luc: { gt: new Date(Date.now() - THOI_GIAN_CHAN_SPAM_TOKEN_MS) },
+      },
+    });
+    if (tokenGanDay) return;
+    const token = await this.taoTokenChoNguoiDung(
+      nguoiDung.id,
       'dat_lai_mat_khau',
     );
-    const nguoiDung = await this.prisma.nguoi_dung.findUnique({
-      where: { hoc_vien_id: tokenRow.hoc_vien_id },
+    const link = `${layFrontendUrl()}/dat-lai-mat-khau?token=${token}`;
+    await this.thongBaoService.guiDatLaiMatKhau(
+      nguoiDung.email!,
+      nguoiDung.ho_ten,
+      link,
+      null,
+    );
+  }
+
+  // ADR 0002 — token gắn nguoi_dung_id (tài khoản đơn vị). Vô hiệu mọi token
+  // CHƯA DÙNG cùng loại của người dùng, tạo token mới; trả token gốc (chỉ
+  // hash được lưu). Dùng bởi TaiKhoanDonViService (kích hoạt) và quên mật khẩu.
+  async taoTokenChoNguoiDung(
+    nguoiDungId: string,
+    loai: 'kich_hoat_tai_khoan' | 'dat_lai_mat_khau',
+    tx?: Prisma.TransactionClient,
+  ): Promise<string> {
+    const db = tx ?? this.prisma;
+    const now = new Date();
+    const thoiHanMs =
+      loai === 'kich_hoat_tai_khoan'
+        ? THOI_HAN_KICH_HOAT_MS
+        : THOI_HAN_DAT_LAI_MAT_KHAU_MS;
+    const { token, tokenHash } = taoTokenXacThuc();
+    await db.token_xac_thuc.updateMany({
+      where: { nguoi_dung_id: nguoiDungId, loai, da_dung_luc: null },
+      data: { da_dung_luc: now },
     });
+    await db.token_xac_thuc.create({
+      data: {
+        nguoi_dung_id: nguoiDungId,
+        loai,
+        token_hash: tokenHash,
+        het_han_luc: new Date(now.getTime() + thoiHanMs),
+      },
+    });
+    return token;
+  }
+
+  // Vô hiệu MỌI token chưa dùng (mọi loại) của người dùng — khi cấp mật khẩu
+  // tạm hoặc xóa email (ADR 0002: 2 cách cấp loại trừ nhau).
+  async voHieuTokenNguoiDung(
+    nguoiDungId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    await (tx ?? this.prisma).token_xac_thuc.updateMany({
+      where: { nguoi_dung_id: nguoiDungId, da_dung_luc: null },
+      data: { da_dung_luc: new Date() },
+    });
+  }
+
+  // POST /auth/dat-lai-mat-khau — token sai/hết hạn/đã dùng trả 1 thông báo
+  // lỗi chung (không tiết lộ chi tiết, cùng nguyên tắc với xacMinhEmail()).
+  // ADR 0002: nhận cả token kich_hoat_tai_khoan; token gắn hoc_vien_id (học
+  // viên, như cũ) hoặc nguoi_dung_id (tài khoản đơn vị).
+  async datLaiMatKhau(dto: DatLaiMatKhauDto): Promise<{ da_dat_lai: true }> {
+    const tokenRow = await this.timVaXacThucToken(dto.token, [
+      'dat_lai_mat_khau',
+      'kich_hoat_tai_khoan',
+    ]);
+    const nguoiDung = tokenRow.nguoi_dung_id
+      ? await this.prisma.nguoi_dung.findUnique({
+          where: { id: tokenRow.nguoi_dung_id },
+        })
+      : tokenRow.hoc_vien_id
+        ? await this.prisma.nguoi_dung.findUnique({
+            where: { hoc_vien_id: tokenRow.hoc_vien_id },
+          })
+        : null;
     if (!nguoiDung) {
       // Không có tài khoản gắn với hồ sơ này — dữ liệu không nhất quán, coi
       // như token không hợp lệ thay vì lộ chi tiết nội bộ.
@@ -382,13 +478,15 @@ export class AuthService {
         where: { id: nguoiDung.id },
         data: { mat_khau_hash: matKhauHashMoi, phai_doi_mat_khau: false },
       }),
-      // Vô hiệu MỌI token dat_lai_mat_khau chưa dùng của cùng học viên (kể cả
-      // token vừa dùng — updateMany bao trọn, không cần update riêng rồi
+      // Vô hiệu MỌI token chưa dùng cùng loại của cùng chủ thể (kể cả token
+      // vừa dùng — updateMany bao trọn, không cần update riêng rồi
       // updateMany phần còn lại).
       this.prisma.token_xac_thuc.updateMany({
         where: {
-          hoc_vien_id: tokenRow.hoc_vien_id,
-          loai: 'dat_lai_mat_khau',
+          ...(tokenRow.nguoi_dung_id
+            ? { nguoi_dung_id: tokenRow.nguoi_dung_id }
+            : { hoc_vien_id: tokenRow.hoc_vien_id }),
+          loai: tokenRow.loai,
           da_dung_luc: null,
         },
         data: { da_dung_luc: now },
@@ -401,10 +499,10 @@ export class AuthService {
   // POST /auth/xac-minh-email — token sai/hết hạn/đã dùng trả 1 thông báo lỗi
   // chung, không tiết lộ chi tiết.
   async xacMinhEmail(dto: XacMinhEmailDto): Promise<{ da_xac_minh: true }> {
-    const tokenRow = await this.timVaXacThucToken(dto.token, 'xac_minh_email');
+    const tokenRow = await this.timVaXacThucToken(dto.token, ['xac_minh_email']);
     await this.prisma.$transaction([
       this.prisma.hoc_vien.update({
-        where: { id: tokenRow.hoc_vien_id },
+        where: { id: tokenRow.hoc_vien_id! },
         data: { email_da_xac_minh: true },
       }),
       this.prisma.token_xac_thuc.update({
@@ -415,7 +513,10 @@ export class AuthService {
     return { da_xac_minh: true };
   }
 
-  private async timVaXacThucToken(tokenGoc: string, loai: loai_token_xac_thuc) {
+  private async timVaXacThucToken(
+    tokenGoc: string,
+    cacLoai: loai_token_xac_thuc[],
+  ) {
     const tokenHash = hashTokenXacThuc(tokenGoc);
     const row = await this.prisma.token_xac_thuc.findUnique({
       where: { token_hash: tokenHash },
@@ -423,7 +524,7 @@ export class AuthService {
     const now = new Date();
     if (
       !row ||
-      row.loai !== loai ||
+      !cacLoai.includes(row.loai) ||
       row.da_dung_luc ||
       row.het_han_luc <= now
     ) {
