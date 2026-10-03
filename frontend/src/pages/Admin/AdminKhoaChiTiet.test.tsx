@@ -26,12 +26,14 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     expect(await screen.findByText('Không tìm thấy khóa bồi dưỡng')).toBeInTheDocument();
   });
 
-  it('có dữ liệu: hiện tên khóa, badge trạng thái, danh sách lớp học', async () => {
+  it('có dữ liệu: hiện tên khóa, badge trạng thái, danh sách lớp học, header "Đặt hàng"/"Tổ chức"', async () => {
     renderTrang('khoa-1');
     expect(await screen.findByText('Bồi dưỡng NLS – Mức cơ bản')).toBeInTheDocument();
     expect(screen.getByText('Chờ duyệt')).toBeInTheDocument();
     expect(screen.getByText('Lớp 01 – Nhóm cơ bản A')).toBeInTheDocument();
     expect(screen.getByText('Nguyễn Văn Long')).toBeInTheDocument();
+    expect(screen.getByText(/Đặt hàng: Sở GD&ĐT An Giang/)).toBeInTheDocument();
+    expect(screen.getByText(/Tổ chức: Trường ĐHSP TP\.HCM/)).toBeInTheDocument();
   });
 
   it('khóa chưa có lớp học → hiện thông báo trống thay vì bảng rỗng im lặng', async () => {
@@ -40,44 +42,17 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     expect(screen.getByText('Khóa chưa có lớp học nào.')).toBeInTheDocument();
   });
 
-  it('trang_thai=nhap + vai_tro=truong → hiện nút Nộp duyệt, không hiện nút Duyệt', async () => {
-    db.nguoiDung.vai_tro = 'truong';
-    renderTrang('khoa-2');
-    await screen.findByText('Bồi dưỡng NLS – Mức thành thạo');
-    expect(screen.getByRole('button', { name: 'Nộp duyệt' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '✓ Duyệt khóa' })).not.toBeInTheDocument();
-  });
-
-  it('trang_thai=cho_duyet + vai_tro=so_gddt → hiện nút Duyệt/Từ chối, click Duyệt gọi API duyệt', async () => {
-    db.nguoiDung.vai_tro = 'so_gddt';
-    const user = userEvent.setup();
-    renderTrang('khoa-1');
-    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
-
-    expect(screen.getByRole('button', { name: '✓ Duyệt khóa' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Từ chối' })).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: '✓ Duyệt khóa' }));
-    expect(await screen.findByText('Đã duyệt')).toBeInTheDocument();
-  });
-
-  it('trang_thai=cho_duyet + vai_tro=truong → không hiện nút Duyệt (không đúng vai trò được duyệt)', async () => {
-    db.nguoiDung.vai_tro = 'truong';
-    renderTrang('khoa-1');
-    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
-    expect(screen.queryByRole('button', { name: '✓ Duyệt khóa' })).not.toBeInTheDocument();
-  });
-
-  it('lỗi khi nộp duyệt: hiện thông báo lỗi qua notification', async () => {
-    server.use(http.post('/khoa-boi-duong/:id/nop-duyet', () => HttpResponse.error()));
-    db.nguoiDung.vai_tro = 'truong';
-    const user = userEvent.setup();
-    renderTrang('khoa-2');
-    await screen.findByText('Bồi dưỡng NLS – Mức thành thạo');
-
-    await user.click(screen.getByRole('button', { name: 'Nộp duyệt' }));
-    expect(await screen.findByText('Không kết nối được máy chủ. Kiểm tra mạng và thử lại.')).toBeInTheDocument();
-  });
+  it.each(['quan_tri', 'truong', 'so_gddt', 'phong_vhxh', 'hoc_vien'])(
+    'vai_tro=%s → không còn nút "Nộp duyệt"/"✓ Duyệt khóa", không còn tab "Đơn vị theo dõi"',
+    async (vaiTro) => {
+      db.nguoiDung.vai_tro = vaiTro;
+      renderTrang('khoa-1');
+      await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+      expect(screen.queryByRole('button', { name: 'Nộp duyệt' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '✓ Duyệt khóa' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: 'Đơn vị theo dõi' })).not.toBeInTheDocument();
+    },
+  );
 
   it('vai_tro=hoc_vien → không hiện nút "+ Tạo lớp mới" (không đúng quyền)', async () => {
     db.nguoiDung.vai_tro = 'hoc_vien';
@@ -87,15 +62,74 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     expect(screen.queryByRole('button', { name: 'Sửa' })).not.toBeInTheDocument();
   });
 
-  it('vai_tro=truong → không hiện tab "Đơn vị theo dõi" (chỉ quan_tri)', async () => {
+  it('vai_tro=truong → không có nút thêm giai đoạn/lớp/cụm/nhân sự, import, sửa khóa (chỉ quan_tri)', async () => {
     db.nguoiDung.vai_tro = 'truong';
+    const user = userEvent.setup();
     renderTrang('khoa-1');
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
-    expect(screen.queryByRole('tab', { name: 'Đơn vị theo dõi' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '+ Tạo lớp mới' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '⇪ Import Excel' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sửa khóa' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Giai đoạn' }));
+    expect(screen.queryByRole('button', { name: '+ Tạo giai đoạn' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Cụm hỗ trợ Zalo' }));
+    expect(screen.queryByRole('button', { name: '+ Tạo cụm' })).not.toBeInTheDocument();
   });
 
-  it('tạo lớp mới (Trường): điền form hợp lệ → gọi API, hiện lớp mới trong bảng', async () => {
-    db.nguoiDung.vai_tro = 'truong';
+  it('vai_tro=quan_tri → có đủ nút thêm giai đoạn/lớp/cụm, import, sửa khóa', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    renderTrang('khoa-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+    expect(screen.getByRole('button', { name: '+ Tạo lớp mới' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '⇪ Import Excel' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sửa khóa' })).toBeInTheDocument();
+  });
+
+  it('pham_vi_hoc_vien="don_vi" → hiện Alert phạm vi học viên', async () => {
+    server.use(
+      http.get('/khoa-boi-duong/:id', () =>
+        HttpResponse.json({ ...db.chiTietKhoa['khoa-1'], pham_vi_hoc_vien: 'don_vi' }),
+      ),
+    );
+    renderTrang('khoa-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+    expect(
+      await screen.findByText('Bạn đang xem các học viên thuộc đơn vị của mình trong khóa này.'),
+    ).toBeInTheDocument();
+  });
+
+  it('pham_vi_hoc_vien="toan_bo" (mặc định mock) → không hiện Alert phạm vi học viên', async () => {
+    renderTrang('khoa-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+    expect(
+      screen.queryByText('Bạn đang xem các học viên thuộc đơn vị của mình trong khóa này.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('quan_tri: nút "Sửa khóa" mở modal có Select "Đơn vị đặt hàng", lưu thành công', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+
+    await user.click(screen.getByRole('button', { name: 'Sửa khóa' }));
+    // getByRole('textbox', ...) thay vì getByLabelText: dropdown (role=listbox) của Select cũng mang
+    // aria-labelledby trỏ tới đúng label này — getByLabelText khớp cả 2, gây lỗi "multiple elements".
+    const oDonVi = await screen.findByRole('textbox', { name: /^Đơn vị đặt hàng/ });
+    expect(oDonVi).toBeInTheDocument();
+
+    const oTenKhoa = screen.getByLabelText(/^Tên khóa/);
+    await user.clear(oTenKhoa);
+    await user.type(oTenKhoa, 'Bồi dưỡng NLS – Mức cơ bản (đã sửa)');
+    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+
+    expect(await screen.findByText('Bồi dưỡng NLS – Mức cơ bản (đã sửa)')).toBeInTheDocument();
+  });
+
+  it('tạo lớp mới (Quản trị): điền form hợp lệ → gọi API, hiện lớp mới trong bảng', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();
     renderTrang('khoa-1');
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
@@ -113,7 +147,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
   });
 
   it('tạo lớp trùng tên trong cùng loại lớp → hiện lỗi field ten_lop, không đóng modal', async () => {
-    db.nguoiDung.vai_tro = 'truong';
+    db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();
     renderTrang('khoa-1');
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
@@ -129,7 +163,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
   });
 
   it('sửa lớp: đổi tên + đặt nhóm học viên/mức năng lực → lưu thành công, hiện bảng đã cập nhật', async () => {
-    db.nguoiDung.vai_tro = 'truong';
+    db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();
     renderTrang('khoa-1');
     await screen.findByText('Lớp 01 – Nhóm cơ bản A');
@@ -147,7 +181,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
   });
 
   it('vô hiệu hóa lớp: xác nhận → badge chuyển "Đã vô hiệu hóa", nút đổi thành "Kích hoạt lại"', async () => {
-    db.nguoiDung.vai_tro = 'truong';
+    db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();
     renderTrang('khoa-1');
     await screen.findByText('Lớp 01 – Nhóm cơ bản A');
@@ -162,7 +196,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
   });
 
   it('xem chi tiết lớp: mở rộng dòng → hiện nhân sự + thêm nhân sự mới thành công', async () => {
-    db.nguoiDung.vai_tro = 'truong';
+    db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();
     renderTrang('khoa-1');
     await screen.findByText('Lớp 01 – Nhóm cơ bản A');
@@ -181,7 +215,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
   });
 
   it('tạo giai đoạn mới: điền form hợp lệ → gọi API, hiện trong bảng Giai đoạn', async () => {
-    db.nguoiDung.vai_tro = 'truong';
+    db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();
     renderTrang('khoa-1');
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
@@ -202,7 +236,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
   });
 
   it('tạo cụm hỗ trợ Zalo mới: điền form hợp lệ → gọi API, hiện trong bảng Cụm', async () => {
-    db.nguoiDung.vai_tro = 'truong';
+    db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();
     renderTrang('khoa-1');
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
@@ -215,26 +249,6 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     await user.click(screen.getByRole('button', { name: 'Tạo cụm' }));
 
     expect(await screen.findByText('Cụm Châu Đốc')).toBeInTheDocument();
-  });
-
-  it('vai_tro=quan_tri: thêm đơn vị theo dõi → hiện trong danh sách phiên làm việc, gỡ lại thành công', async () => {
-    db.nguoiDung.vai_tro = 'quan_tri';
-    const user = userEvent.setup();
-    renderTrang('khoa-1');
-    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
-
-    await user.click(screen.getByRole('tab', { name: 'Đơn vị theo dõi' }));
-    await user.click(screen.getByRole('button', { name: '+ Thêm đơn vị theo dõi' }));
-    await user.click(await screen.findByRole('textbox', { name: /^Đơn vị/ }));
-    await user.click(await screen.findByRole('option', { name: 'THPT Châu Đốc' }));
-    await user.click(screen.getByRole('button', { name: 'Thêm' }));
-
-    expect(await screen.findByText('THPT Châu Đốc')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Gỡ' }));
-    await user.click(await screen.findByRole('button', { name: 'Xác nhận' }));
-
-    expect(await screen.findByText('Chưa thêm đơn vị theo dõi nào trong phiên này.')).toBeInTheDocument();
   });
 });
 
@@ -257,14 +271,6 @@ describe('Admin — Chi tiết khóa: Import Excel trong tab Lớp học', () =>
     await user.click(within(modal).getByRole('button', { name: 'Tải lên & kiểm tra' }));
     return modal;
   }
-
-  it('vai_tro=truong → không hiện nút Import Excel (API import chỉ dành cho quan_tri)', async () => {
-    db.nguoiDung.vai_tro = 'truong';
-    renderTrang('khoa-1');
-    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
-    expect(screen.getByRole('button', { name: '+ Tạo lớp mới' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '⇪ Import Excel' })).not.toBeInTheDocument();
-  });
 
   it('quan_tri: tải lên lớp & lịch học gửi kèm ?ma_khoa của khóa đang xem, hiện kết quả kiểm tra', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';

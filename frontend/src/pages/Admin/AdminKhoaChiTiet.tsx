@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   Alert,
@@ -27,19 +27,16 @@ import { ApiError } from '@/api/client';
 import {
   useCapNhatCum,
   useCapNhatGiaiDoan,
+  useCapNhatKhoa,
   useCapNhatLichHoc,
   useCapNhatLop,
   useChiTietKhoa,
   useDonViChoKhoa,
-  useDuyetKhoa,
-  useNopDuyetKhoa,
   useTaoCum,
   useTaoGiaiDoan,
   useTaoLop,
-  useThemDonViTheoDoi,
   useThemLichHoc,
   useThemNhanSu,
-  useXoaDonViTheoDoi,
   useXoaNhanSu,
 } from '@/api/khoaBoiDuong';
 import type {
@@ -61,11 +58,6 @@ import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { KhoaTrangThaiBadge } from '@/components/KhoaTrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
 import { ModalImportLopHoc } from './ModalImportLopHoc';
-
-// Trường (chủ khóa) + QuảnTrị — đúng cột "Ai gọi" cho nộp duyệt VÀ toàn bộ CRUD giai đoạn/lớp/cụm/
-// buổi học/nhân sự (docs/api-contract.md mục 3) — cùng 1 tập vai trò nên dùng chung 1 hằng số.
-const VAI_TRO_QUAN_LY_KHOA = ['truong', 'quan_tri'];
-const VAI_TRO_DUYET = ['phong_vhxh', 'so_gddt', 'quan_tri'];
 
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 const MAU_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'blue', zoom: 'grape', vle: 'teal' };
@@ -193,65 +185,99 @@ type XacNhanToggle =
   | { loai: 'giai-doan'; id: string; ten: string; dangHoatDong: boolean }
   | { loai: 'cum'; id: string; ten: string; dangHoatDong: boolean };
 
-type XacNhanXoa =
-  | { loai: 'nhan-su'; lopId: string; nhanSuId: string; ten: string }
-  | { loai: 'don-vi'; donViId: string; ten: string };
+type XacNhanXoa = { loai: 'nhan-su'; lopId: string; nhanSuId: string; ten: string };
 
-/** Chi tiết khóa bồi dưỡng (quản trị). Nút hành động hiện theo trang_thai + vai_tro đúng bảng
- * "Ai gọi" của docs/api-contract.md mục 3. FE chỉ lọc theo vai_tro — quyền phạm vi thật (chủ khóa/
- * scope cây đơn vị) do backend chặn (403) nếu tài khoản không đúng đơn vị, không tự đoán ở FE.
- *
- * Tab "Đơn vị theo dõi": backend KHÔNG có endpoint GET để lấy danh sách đơn vị đang theo dõi khóa
- * (chỉ có POST/DELETE — xem khoa-boi-duong.service.ts#findOne, không include khoa_don_vi_theo_doi).
- * FE chỉ hiển thị được các đơn vị vừa thêm TRONG PHIÊN LÀM VIỆC HIỆN TẠI, không phục hồi được danh
- * sách đã lưu từ trước khi tải lại trang — giới hạn thật của backend, không tự bịa thêm field/endpoint.
+interface FormSuaKhoa {
+  ma_khoa: string;
+  ten_khoa: string;
+  dia_diem: string;
+  thoi_gian_bat_dau: string;
+  thoi_gian_ket_thuc: string;
+  don_vi_dat_hang_id: string;
+}
+
+/** Chi tiết khóa bồi dưỡng. Mọi endpoint ghi (giai đoạn/lớp/cụm/buổi học/nhân sự/sửa khóa, import)
+ * chỉ `quan_tri` gọi được (2026-10-03-don-vi-dat-hang, xem khoa-boi-duong.controller.ts) — đã bỏ
+ * luồng nộp duyệt/duyệt và "Đơn vị theo dõi" (khóa chỉ còn 1 đơn vị đặt hàng, không còn danh sách
+ * đơn vị theo dõi riêng). FE chỉ lọc theo vai_tro — quyền phạm vi thật (scope cây đơn vị) do backend
+ * chặn (403) nếu tài khoản không đúng đơn vị, không tự đoán ở FE.
  */
 export default function AdminKhoaChiTiet() {
   const { id } = useParams<{ id: string }>();
   const khoaId = id ?? '';
   const { nguoiDung } = useToi();
   const vaiTro = nguoiDung?.vai_tro ?? '';
-  const coQuyenQuanLy = VAI_TRO_QUAN_LY_KHOA.includes(vaiTro);
+  const laQuanTri = vaiTro === 'quan_tri';
   const { data: khoa, isLoading, isError, error } = useChiTietKhoa(id);
   const donVi = useDonViChoKhoa();
   const donViMap = new Map((donVi.data ?? []).map((d) => [d.id, d.ten_don_vi]));
 
-  const [modalTuChoi, setModalTuChoi] = useState(false);
-  const [lyDoTuChoi, setLyDoTuChoi] = useState('');
-
-  const nopDuyet = useNopDuyetKhoa(khoaId);
-  const duyet = useDuyetKhoa(khoaId);
-
-  function xuLyNopDuyet() {
-    nopDuyet.mutate(undefined, {
-      onSuccess: () => notifications.show({ color: 'green', message: 'Đã nộp duyệt khóa bồi dưỡng' }),
-      onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+  // Select "Đơn vị đặt hàng" (form sửa khóa) — cùng cách nhóm với form tạo khóa ở AdminKhoaBoiDuong.
+  const nhomDonViDatHang = useMemo(() => {
+    const list = donVi.data ?? [];
+    const nhom = (loai: string, group: string) => ({
+      group,
+      items: list.filter((d) => d.loai_don_vi === loai).map((d) => ({ value: d.id, label: d.ten_don_vi })),
     });
-  }
-
-  function xuLyDuyet() {
-    duyet.mutate(
-      { ket_qua: 'da_duyet' },
-      {
-        onSuccess: () => notifications.show({ color: 'green', message: 'Đã duyệt khóa bồi dưỡng' }),
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
-      },
+    return [nhom('so_gddt', 'Sở GD&ĐT'), nhom('khac', 'Đơn vị khác'), nhom('truong', 'Trường')].filter(
+      (n) => n.items.length > 0,
     );
+  }, [donVi.data]);
+
+  // --- Sửa khóa (chỉ quan_tri) ------------------------------------------
+  const capNhatKhoa = useCapNhatKhoa(khoaId);
+  const [modalSuaKhoa, setModalSuaKhoa] = useState(false);
+  const [formSuaKhoa, setFormSuaKhoa] = useState<FormSuaKhoa | null>(null);
+  const [loiSuaKhoa, setLoiSuaKhoa] = useState<Record<string, string>>({});
+
+  function moModalSuaKhoa() {
+    if (!khoa) return;
+    setFormSuaKhoa({
+      ma_khoa: khoa.ma_khoa,
+      ten_khoa: khoa.ten_khoa,
+      dia_diem: khoa.dia_diem ?? '',
+      thoi_gian_bat_dau: khoa.thoi_gian_bat_dau.slice(0, 10),
+      thoi_gian_ket_thuc: khoa.thoi_gian_ket_thuc.slice(0, 10),
+      don_vi_dat_hang_id: khoa.don_vi_dat_hang_id,
+    });
+    setLoiSuaKhoa({});
+    setModalSuaKhoa(true);
   }
 
-  function xuLyTuChoi() {
-    duyet.mutate(
-      { ket_qua: 'tu_choi', ly_do: lyDoTuChoi || undefined },
+  function xuLySuaKhoa() {
+    if (!formSuaKhoa) return;
+    setLoiSuaKhoa({});
+    capNhatKhoa.mutate(
       {
-        onSuccess: () => {
-          notifications.show({ color: 'green', message: 'Đã từ chối khóa bồi dưỡng' });
-          setModalTuChoi(false);
-          setLyDoTuChoi('');
+        ma_khoa: formSuaKhoa.ma_khoa.trim(),
+        ten_khoa: formSuaKhoa.ten_khoa.trim(),
+        dia_diem: formSuaKhoa.dia_diem.trim() || undefined,
+        thoi_gian_bat_dau: formSuaKhoa.thoi_gian_bat_dau,
+        thoi_gian_ket_thuc: formSuaKhoa.thoi_gian_ket_thuc,
+        don_vi_dat_hang_id: formSuaKhoa.don_vi_dat_hang_id,
+      },
+      {
+        onSuccess: (khoaMoi) => {
+          notifications.show({ color: 'green', message: `Đã lưu thay đổi khóa "${khoaMoi.ten_khoa}"` });
+          setModalSuaKhoa(false);
+          setFormSuaKhoa(null);
         },
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+        onError: (err) => {
+          const fields = loiFieldsThanhMap(err);
+          if (Object.keys(fields).length > 0) setLoiSuaKhoa(fields);
+          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+        },
       },
     );
   }
+
+  const formSuaKhoaHopLe =
+    !!formSuaKhoa &&
+    formSuaKhoa.ma_khoa.trim() !== '' &&
+    formSuaKhoa.ten_khoa.trim() !== '' &&
+    formSuaKhoa.thoi_gian_bat_dau !== '' &&
+    formSuaKhoa.thoi_gian_ket_thuc !== '' &&
+    formSuaKhoa.don_vi_dat_hang_id !== '';
 
   // --- Lớp học -------------------------------------------------------------
   const taoLop = useTaoLop(khoaId);
@@ -659,60 +685,22 @@ export default function AdminKhoaChiTiet() {
 
   const dangXuLyToggle = capNhatLop.isPending || capNhatGiaiDoan.isPending || capNhatCum.isPending;
 
-  // --- Xóa (nhân sự lớp, đơn vị theo dõi dùng chung 1 modal xác nhận) --------
+  // --- Xóa nhân sự lớp -------------------------------------------------------
   const [xacNhanXoa, setXacNhanXoa] = useState<XacNhanXoa | null>(null);
 
   function xuLyXacNhanXoa() {
     if (!xacNhanXoa) return;
-    const onSuccess = () => {
-      notifications.show({ color: 'green', message: `Đã gỡ "${xacNhanXoa.ten}"` });
-      setXacNhanXoa(null);
-    };
-    const onError = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
-
-    if (xacNhanXoa.loai === 'nhan-su') {
-      xoaNhanSu.mutate({ lopId: xacNhanXoa.lopId, nhanSuId: xacNhanXoa.nhanSuId }, { onSuccess, onError });
-    } else {
-      xoaDonViTheoDoi.mutate(xacNhanXoa.donViId, {
+    xoaNhanSu.mutate(
+      { lopId: xacNhanXoa.lopId, nhanSuId: xacNhanXoa.nhanSuId },
+      {
         onSuccess: () => {
-          setDonViTheoDoiThem((cu) => cu.filter((d) => d.id !== xacNhanXoa.donViId));
-          onSuccess();
+          notifications.show({ color: 'green', message: `Đã gỡ "${xacNhanXoa.ten}"` });
+          setXacNhanXoa(null);
         },
-        onError,
-      });
-    }
-  }
-
-  // --- Đơn vị theo dõi (chỉ quan_tri — xem ghi chú GET đầu file) -------------
-  const themDonViTheoDoi = useThemDonViTheoDoi(khoaId);
-  const xoaDonViTheoDoi = useXoaDonViTheoDoi(khoaId);
-  const [donViTheoDoiThem, setDonViTheoDoiThem] = useState<{ id: string; ten_don_vi: string }[]>([]);
-  const [modalThemDonVi, setModalThemDonVi] = useState(false);
-  const [donViChonThem, setDonViChonThem] = useState('');
-  const [loiThemDonVi, setLoiThemDonVi] = useState('');
-
-  function moModalThemDonVi() {
-    setDonViChonThem('');
-    setLoiThemDonVi('');
-    setModalThemDonVi(true);
-  }
-
-  function xuLyThemDonVi() {
-    setLoiThemDonVi('');
-    themDonViTheoDoi.mutate(donViChonThem, {
-      onSuccess: () => {
-        const ten = donViMap.get(donViChonThem) ?? donViChonThem;
-        setDonViTheoDoiThem((cu) => [...cu, { id: donViChonThem, ten_don_vi: ten }]);
-        notifications.show({ color: 'green', message: `Đã thêm đơn vị theo dõi "${ten}"` });
-        setModalThemDonVi(false);
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) }),
       },
-      onError: (err) => setLoiThemDonVi(thongDiepLoiKhoa(err)),
-    });
+    );
   }
-
-  const tuyChonDonViThem = (donVi.data ?? [])
-    .filter((d) => d.id !== khoa?.don_vi_to_chuc_id && !donViTheoDoiThem.some((x) => x.id === d.id))
-    .map((d) => ({ value: d.id, label: d.ten_don_vi }));
 
   // --- Form hợp lệ (validate tối thiểu client-side) -------------------------
   const formTaoLopHopLe = formTaoLop.ten_lop.trim() !== '' && formTaoLop.loai_lop !== '';
@@ -782,43 +770,40 @@ export default function AdminKhoaChiTiet() {
                   <KhoaTrangThaiBadge trangThai={khoa.trang_thai} />
                 </Group>
                 <Text fz={13} c="dimmed">
-                  Mã khóa <b>{khoa.ma_khoa}</b> · {donViMap.get(khoa.don_vi_to_chuc_id) ?? '—'} ·{' '}
-                  {dinhDangNgay(khoa.thoi_gian_bat_dau)} – {dinhDangNgay(khoa.thoi_gian_ket_thuc)} ·{' '}
-                  {khoa.lop_hoc.length} lớp học
+                  Mã khóa <b>{khoa.ma_khoa}</b> · {dinhDangNgay(khoa.thoi_gian_bat_dau)} –{' '}
+                  {dinhDangNgay(khoa.thoi_gian_ket_thuc)} · {khoa.lop_hoc.length} lớp học
+                </Text>
+                <Text fz={13} c="dimmed">
+                  Đặt hàng: {donViMap.get(khoa.don_vi_dat_hang_id) ?? '—'} · Tổ chức: Trường ĐHSP TP.HCM
                 </Text>
               </Box>
 
               <Group gap="sm">
-                {VAI_TRO_QUAN_LY_KHOA.includes(vaiTro) && ['nhap', 'tu_choi'].includes(khoa.trang_thai) && (
-                  <Button variant="default" loading={nopDuyet.isPending} onClick={xuLyNopDuyet}>
-                    Nộp duyệt
+                {laQuanTri && (
+                  <Button variant="default" onClick={moModalSuaKhoa}>
+                    Sửa khóa
                   </Button>
-                )}
-                {VAI_TRO_DUYET.includes(vaiTro) && khoa.trang_thai === 'cho_duyet' && (
-                  <>
-                    <Button variant="default" color="red" onClick={() => setModalTuChoi(true)}>
-                      Từ chối
-                    </Button>
-                    <Button loading={duyet.isPending} onClick={xuLyDuyet}>
-                      ✓ Duyệt khóa
-                    </Button>
-                  </>
                 )}
               </Group>
             </Group>
+
+            {khoa.pham_vi_hoc_vien === 'don_vi' && (
+              <Alert color="blue" variant="light">
+                Bạn đang xem các học viên thuộc đơn vị của mình trong khóa này.
+              </Alert>
+            )}
 
             <Tabs defaultValue="lop-hoc">
               <Tabs.List>
                 <Tabs.Tab value="lop-hoc">Lớp học</Tabs.Tab>
                 <Tabs.Tab value="giai-doan">Giai đoạn</Tabs.Tab>
                 <Tabs.Tab value="cum">Cụm hỗ trợ Zalo</Tabs.Tab>
-                {vaiTro === 'quan_tri' && <Tabs.Tab value="don-vi-theo-doi">Đơn vị theo dõi</Tabs.Tab>}
               </Tabs.List>
 
               {/* ---------------- Tab Lớp học ---------------- */}
               <Tabs.Panel value="lop-hoc" pt="md">
                 <Stack gap="sm">
-                  {coQuyenQuanLy && (
+                  {laQuanTri && (
                     <Group justify="flex-end">
                       {/* /import chỉ QuảnTrị gọi được — Trường không thấy nút này. */}
                       {vaiTro === 'quan_tri' && (
@@ -882,7 +867,7 @@ export default function AdminKhoaChiTiet() {
                                     <Button variant="subtle" size="xs" onClick={() => toggleMoRongLop(lop.id)}>
                                       {moRong ? 'Thu gọn ▴' : 'Xem chi tiết ▾'}
                                     </Button>
-                                    {coQuyenQuanLy && (
+                                    {laQuanTri && (
                                       <>
                                         <Button variant="subtle" size="xs" onClick={() => moModalSuaLop(lop)}>
                                           Sửa
@@ -916,7 +901,7 @@ export default function AdminKhoaChiTiet() {
                                           <Text fw={600} fz={13.5}>
                                             Buổi học
                                           </Text>
-                                          {coQuyenQuanLy && (
+                                          {laQuanTri && (
                                             <Button variant="light" size="xs" onClick={() => moModalThemBuoi(lop)}>
                                               + Thêm buổi học
                                             </Button>
@@ -950,7 +935,7 @@ export default function AdminKhoaChiTiet() {
                                                   <Table.Td>{lich.dia_diem_hoac_link ?? '—'}</Table.Td>
                                                   <Table.Td>{NHAN_TRANG_THAI_LICH_HOC[lich.trang_thai]}</Table.Td>
                                                   <Table.Td ta="right">
-                                                    {coQuyenQuanLy && (
+                                                    {laQuanTri && (
                                                       <Button variant="subtle" size="xs" onClick={() => moModalSuaBuoi(lop, lich)}>
                                                         Sửa
                                                       </Button>
@@ -968,7 +953,7 @@ export default function AdminKhoaChiTiet() {
                                           <Text fw={600} fz={13.5}>
                                             Nhân sự
                                           </Text>
-                                          {coQuyenQuanLy && (
+                                          {laQuanTri && (
                                             <Button variant="light" size="xs" onClick={() => moModalThemNhanSu(lop)}>
                                               + Thêm nhân sự
                                             </Button>
@@ -987,7 +972,7 @@ export default function AdminKhoaChiTiet() {
                                                   {ns.ho_ten} — {NHAN_VAI_TRO_NHAN_SU[ns.vai_tro]}
                                                   {ns.so_dien_thoai ? ` · ${ns.so_dien_thoai}` : ''}
                                                 </Text>
-                                                {coQuyenQuanLy && (
+                                                {laQuanTri && (
                                                   <Button
                                                     variant="subtle"
                                                     size="xs"
@@ -1020,7 +1005,7 @@ export default function AdminKhoaChiTiet() {
               {/* ---------------- Tab Giai đoạn ---------------- */}
               <Tabs.Panel value="giai-doan" pt="md">
                 <Stack gap="sm">
-                  {coQuyenQuanLy && (
+                  {laQuanTri && (
                     <Group justify="flex-end">
                       <Button color="accent" onClick={moModalTaoGiaiDoan}>
                         + Tạo giai đoạn
@@ -1061,7 +1046,7 @@ export default function AdminKhoaChiTiet() {
                               <BadgeHoatDong trangThai={gd.trang_thai} />
                             </Table.Td>
                             <Table.Td>
-                              {coQuyenQuanLy && (
+                              {laQuanTri && (
                                 <Group gap={6} justify="flex-end" wrap="nowrap">
                                   <Button variant="subtle" size="xs" onClick={() => moModalSuaGiaiDoan(gd)}>
                                     Sửa
@@ -1095,7 +1080,7 @@ export default function AdminKhoaChiTiet() {
               {/* ---------------- Tab Cụm hỗ trợ Zalo ---------------- */}
               <Tabs.Panel value="cum" pt="md">
                 <Stack gap="sm">
-                  {coQuyenQuanLy && (
+                  {laQuanTri && (
                     <Group justify="flex-end">
                       <Button color="accent" onClick={moModalTaoCum}>
                         + Tạo cụm
@@ -1140,7 +1125,7 @@ export default function AdminKhoaChiTiet() {
                               <BadgeHoatDong trangThai={cum.trang_thai} />
                             </Table.Td>
                             <Table.Td>
-                              {coQuyenQuanLy && (
+                              {laQuanTri && (
                                 <Group gap={6} justify="flex-end" wrap="nowrap">
                                   <Button variant="subtle" size="xs" onClick={() => moModalSuaCum(cum)}>
                                     Sửa
@@ -1171,76 +1156,68 @@ export default function AdminKhoaChiTiet() {
                 </Stack>
               </Tabs.Panel>
 
-              {/* ---------------- Tab Đơn vị theo dõi (chỉ quan_tri) ---------------- */}
-              {vaiTro === 'quan_tri' && (
-                <Tabs.Panel value="don-vi-theo-doi" pt="md">
-                  <Stack gap="sm">
-                    <Alert color="blue" variant="light">
-                      Backend chưa có API đọc lại danh sách đơn vị đang theo dõi khóa này — bảng dưới đây chỉ hiện các đơn vị vừa
-                      được thêm trong phiên làm việc hiện tại, sẽ mất khi tải lại trang.
-                    </Alert>
-                    <Group justify="flex-end">
-                      <Button color="accent" onClick={moModalThemDonVi}>
-                        + Thêm đơn vị theo dõi
-                      </Button>
-                    </Group>
-                    <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
-                      <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
-                        <Table.Thead>
-                          <Table.Tr>
-                            <Table.Th>Đơn vị</Table.Th>
-                            <Table.Th />
-                          </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                          {donViTheoDoiThem.length === 0 && (
-                            <Table.Tr>
-                              <Table.Td colSpan={2}>
-                                <Text c="dimmed" ta="center" py="lg">
-                                  Chưa thêm đơn vị theo dõi nào trong phiên này.
-                                </Text>
-                              </Table.Td>
-                            </Table.Tr>
-                          )}
-                          {donViTheoDoiThem.map((d) => (
-                            <Table.Tr key={d.id}>
-                              <Table.Td>{d.ten_don_vi}</Table.Td>
-                              <Table.Td ta="right">
-                                <Button
-                                  variant="subtle"
-                                  size="xs"
-                                  color="red"
-                                  onClick={() => setXacNhanXoa({ loai: 'don-vi', donViId: d.id, ten: d.ten_don_vi })}
-                                >
-                                  Gỡ
-                                </Button>
-                              </Table.Td>
-                            </Table.Tr>
-                          ))}
-                        </Table.Tbody>
-                      </Table>
-                    </Paper>
-                  </Stack>
-                </Tabs.Panel>
-              )}
             </Tabs>
           </Stack>
         )}
       </Container>
 
-      {/* ================= Modal: Từ chối khóa ================= */}
-      <Modal opened={modalTuChoi} onClose={() => setModalTuChoi(false)} title="Từ chối khóa bồi dưỡng" centered>
-        <Stack gap="sm">
-          <Textarea
-            label="Lý do từ chối"
-            value={lyDoTuChoi}
-            onChange={(e) => setLyDoTuChoi(e.currentTarget.value)}
-            minRows={3}
-          />
-          <Button color="red" loading={duyet.isPending} onClick={xuLyTuChoi} fullWidth>
-            Xác nhận từ chối
-          </Button>
-        </Stack>
+      {/* ================= Modal: Sửa khóa (chỉ quan_tri) ================= */}
+      <Modal opened={modalSuaKhoa} onClose={() => setModalSuaKhoa(false)} title="Sửa khóa bồi dưỡng" centered>
+        {formSuaKhoa && (
+          <Stack gap="sm">
+            <TextInput
+              label="Mã khóa"
+              required
+              value={formSuaKhoa.ma_khoa}
+              error={loiSuaKhoa.ma_khoa}
+              onChange={(e) => { const v = e.currentTarget.value; setFormSuaKhoa((f) => (f ? { ...f, ma_khoa: v } : f)); }}
+            />
+            <TextInput
+              label="Tên khóa"
+              required
+              value={formSuaKhoa.ten_khoa}
+              error={loiSuaKhoa.ten_khoa}
+              onChange={(e) => { const v = e.currentTarget.value; setFormSuaKhoa((f) => (f ? { ...f, ten_khoa: v } : f)); }}
+            />
+            <TextInput
+              label="Địa điểm"
+              value={formSuaKhoa.dia_diem}
+              error={loiSuaKhoa.dia_diem}
+              onChange={(e) => { const v = e.currentTarget.value; setFormSuaKhoa((f) => (f ? { ...f, dia_diem: v } : f)); }}
+            />
+            <Group grow>
+              <TextInput
+                type="date"
+                label="Ngày bắt đầu"
+                required
+                value={formSuaKhoa.thoi_gian_bat_dau}
+                error={loiSuaKhoa.thoi_gian_bat_dau}
+                onChange={(e) => { const v = e.currentTarget.value; setFormSuaKhoa((f) => (f ? { ...f, thoi_gian_bat_dau: v } : f)); }}
+              />
+              <TextInput
+                type="date"
+                label="Ngày kết thúc"
+                required
+                value={formSuaKhoa.thoi_gian_ket_thuc}
+                error={loiSuaKhoa.thoi_gian_ket_thuc}
+                onChange={(e) => { const v = e.currentTarget.value; setFormSuaKhoa((f) => (f ? { ...f, thoi_gian_ket_thuc: v } : f)); }}
+              />
+            </Group>
+            <Select
+              label="Đơn vị đặt hàng"
+              required
+              searchable
+              filter={locTiengViet}
+              data={nhomDonViDatHang}
+              value={formSuaKhoa.don_vi_dat_hang_id || null}
+              error={loiSuaKhoa.don_vi_dat_hang_id}
+              onChange={(v) => setFormSuaKhoa((f) => (f ? { ...f, don_vi_dat_hang_id: v ?? '' } : f))}
+            />
+            <Button mt="sm" loading={capNhatKhoa.isPending} disabled={!formSuaKhoaHopLe} onClick={xuLySuaKhoa} fullWidth>
+              Lưu thay đổi
+            </Button>
+          </Stack>
+        )}
       </Modal>
 
       {khoa && (
@@ -1658,29 +1635,6 @@ export default function AdminKhoaChiTiet() {
         )}
       </Modal>
 
-      {/* ================= Modal: Thêm đơn vị theo dõi ================= */}
-      <Modal opened={modalThemDonVi} onClose={() => setModalThemDonVi(false)} title="Thêm đơn vị theo dõi" centered>
-        <Stack gap="sm">
-          <Select
-            label="Đơn vị"
-            required
-            searchable
-            filter={locTiengViet}
-            data={tuyChonDonViThem}
-            value={donViChonThem || null}
-            onChange={(v) => setDonViChonThem(v ?? '')}
-          />
-          {loiThemDonVi && (
-            <Text c="red" fz={13}>
-              {loiThemDonVi}
-            </Text>
-          )}
-          <Button mt="sm" loading={themDonViTheoDoi.isPending} disabled={!donViChonThem} onClick={xuLyThemDonVi} fullWidth>
-            Thêm
-          </Button>
-        </Stack>
-      </Modal>
-
       {/* ================= Modal xác nhận: vô hiệu hóa / kích hoạt lại ================= */}
       <Modal
         opened={!!xacNhanToggle}
@@ -1707,16 +1661,12 @@ export default function AdminKhoaChiTiet() {
         )}
       </Modal>
 
-      {/* ================= Modal xác nhận: xóa nhân sự / gỡ đơn vị theo dõi ================= */}
+      {/* ================= Modal xác nhận: xóa nhân sự ================= */}
       <Modal opened={!!xacNhanXoa} onClose={() => setXacNhanXoa(null)} title="Xác nhận" centered>
         {xacNhanXoa && (
           <Stack gap="sm">
-            <Text fz={14}>
-              {xacNhanXoa.loai === 'nhan-su'
-                ? `Xóa nhân sự "${xacNhanXoa.ten}" khỏi lớp? Thao tác này xóa cứng, không thể hoàn tác.`
-                : `Gỡ đơn vị "${xacNhanXoa.ten}" khỏi danh sách theo dõi khóa này?`}
-            </Text>
-            <Button color="red" loading={xoaNhanSu.isPending || xoaDonViTheoDoi.isPending} onClick={xuLyXacNhanXoa} fullWidth>
+            <Text fz={14}>Xóa nhân sự "{xacNhanXoa.ten}" khỏi lớp? Thao tác này xóa cứng, không thể hoàn tác.</Text>
+            <Button color="red" loading={xoaNhanSu.isPending} onClick={xuLyXacNhanXoa} fullWidth>
               Xác nhận
             </Button>
           </Stack>
