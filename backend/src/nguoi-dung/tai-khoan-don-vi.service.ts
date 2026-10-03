@@ -260,12 +260,12 @@ export class TaiKhoanDonViService {
     if (dto.ho_ten !== undefined && dto.ho_ten.trim()) {
       data.ho_ten = dto.ho_ten.trim();
     }
-    let xoaEmail = false;
+    let doiEmail = false;
     if (dto.email !== undefined) {
       const email = this.chuanHoaEmail(dto.email);
       if (email) loi.push(...(await this.kiemTraEmail(email, id)));
       data.email = email;
-      xoaEmail = !email && !!tk.email;
+      doiEmail = email !== tk.email;
     }
     if (dto.trang_thai) data.trang_thai = dto.trang_thai;
     if (loi.length > 0) this.nemLoi(loi);
@@ -277,8 +277,9 @@ export class TaiKhoanDonViService {
           data,
           select: SELECT_VIEW,
         });
-        // Xóa email -> link kích hoạt/đặt lại còn hạn không còn hợp lệ.
-        if (xoaEmail) await this.authService.voHieuTokenNguoiDung(id, tx);
+        // Đổi/xóa email (vd. đổi người phụ trách) -> link kích hoạt/đặt lại
+        // đã gửi tới email cũ không còn hợp lệ.
+        if (doiEmail) await this.authService.voHieuTokenNguoiDung(id, tx);
         return kq;
       });
     } catch (e) {

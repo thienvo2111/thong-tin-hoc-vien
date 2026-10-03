@@ -290,6 +290,21 @@ describe('Tài khoản đơn vị — API (e2e)', () => {
       expect(gui.body.error.fields).toEqual([{ field: 'email', message: 'Cần email để gửi link kích hoạt' }]);
     });
 
+    it('đổi email sang địa chỉ khác: link kích hoạt gửi tới email cũ bị vô hiệu', async () => {
+      await http().patch(`/nguoi-dung/don-vi/${tkT.id}`).set(auth(tokenQuanTri)).send({ email: `cu-${suf}@tkdv.vn` });
+      await http().post(`/nguoi-dung/don-vi/${tkT.id}/gui-email-kich-hoat`).set(auth(tokenQuanTri));
+      const q = await prisma.hang_doi_email.findFirst({
+        where: { email_nguoi_nhan: `cu-${suf}@tkdv.vn` },
+        orderBy: { created_at: 'desc' },
+      });
+      const token = /token=([0-9a-f]+)/.exec(q!.noi_dung_html)![1];
+      const doi = await http().patch(`/nguoi-dung/don-vi/${tkT.id}`).set(auth(tokenQuanTri)).send({ email: `moi-${suf}@tkdv.vn` });
+      expect(doi.status).toBe(200);
+      expect(doi.body.email).toBe(`moi-${suf}@tkdv.vn`);
+      const dat = await http().post('/auth/dat-lai-mat-khau').send({ token, mat_khau_moi: 'NguoiCu12345' });
+      expect(dat.status).toBe(400);
+    });
+
     it('id không phải tài khoản đơn vị -> 404', async () => {
       const res = await http().post(`/nguoi-dung/don-vi/${nguoiDungTestIds[0]}/cap-mat-khau-tam`).set(auth(tokenQuanTri));
       expect(res.status).toBe(404);

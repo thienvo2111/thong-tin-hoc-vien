@@ -177,7 +177,7 @@ Ký hiệu: 🔴 lỗi chặn lưu · 🟡 cảnh báo không chặn (chỉ nh�
 | 61 | `ten_dang_nhap` tài khoản đơn vị: trim + chữ thường, regex `^[a-z0-9][a-z0-9._-]{2,49}$`; mặc định `lower(ma_don_vi)`; không trùng (không phân biệt hoa/thường) với BẤT KỲ `nguoi_dung` nào | 🔴 | API + DB (`uq_nguoi_dung_ten_dang_nhap`) |
 | 62 | Email tài khoản đơn vị tùy chọn (chỉ `quan_tri` bắt buộc — `chk_nguoi_dung_email_bat_buoc`), chữ thường, không trùng | 🔴 | DB + API |
 | 63 | Mật khẩu tạm: 10 ký tự, có chữ và số, không gồm `0 O o 1 l I L`; chỉ trả 1 lần (response / file `.xlsx` import), không lưu dạng rõ, `phai_doi_mat_khau=true` | 🔴 | API |
-| 64 | Link kích hoạt (`kich_hoat_tai_khoan`): 72 giờ, dùng 1 lần; cấp mật khẩu tạm ⇄ gửi link vô hiệu đường vào còn lại; xóa email vô hiệu link còn hạn | 🔴 | API |
+| 64 | Link kích hoạt (`kich_hoat_tai_khoan`): 72 giờ, dùng 1 lần; cấp mật khẩu tạm ⇄ gửi link vô hiệu đường vào còn lại; đổi hoặc xóa email vô hiệu link còn hạn | 🔴 | API |
 | 65 | Đăng nhập tài khoản đơn vị khớp `ten_dang_nhap` không phân biệt hoa/thường; học viên/Quản trị khớp chính xác (không đổi) | 🔴 | API (`AuthService.timTaiKhoanTheoTenDangNhap`) |
 
 ## Hồ sơ đầy đủ (T9, 2026-09-28 — mo-rong-nls-an-giang.md)
