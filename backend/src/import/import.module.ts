@@ -5,6 +5,7 @@ import { DanhMucModule } from '../danh-muc/danh-muc.module';
 import { HocVienModule } from '../hoc-vien/hoc-vien.module';
 import { KhoaBoiDuongModule } from '../khoa-boi-duong/khoa-boi-duong.module';
 import { DotXacNhanModule } from '../dot-xac-nhan/dot-xac-nhan.module';
+import { NguoiDungModule } from '../nguoi-dung/nguoi-dung.module';
 
 // Dịch vụ Import — docs/api-contract.md mục 5. Tái sử dụng service của
 // DanhMucModule/HocVienModule/KhoaBoiDuongModule để đảm bảo cùng 1 bộ quy tắc
@@ -13,7 +14,13 @@ import { DotXacNhanModule } from '../dot-xac-nhan/dot-xac-nhan.module';
 // dùng để tính cảnh báo "lách cổng" cho import ket_qua_danh_gia (không phụ
 // thuộc ngược, xem dot-xac-nhan.module.ts).
 @Module({
-  imports: [DanhMucModule, HocVienModule, KhoaBoiDuongModule, DotXacNhanModule],
+  imports: [
+    DanhMucModule,
+    HocVienModule,
+    KhoaBoiDuongModule,
+    DotXacNhanModule,
+    NguoiDungModule,
+  ],
   controllers: [ImportController],
   providers: [ImportService],
 })

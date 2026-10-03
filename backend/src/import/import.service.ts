@@ -23,6 +23,14 @@ import { NhanSuLopRowDto } from '../khoa-boi-duong/dto/nhan-su-lop-row.dto';
 import { DiemDanhRowDto } from '../khoa-boi-duong/dto/diem-danh-row.dto';
 import { KetQuaGiaiDoanRowDto } from '../khoa-boi-duong/dto/ket-qua-giai-doan-row.dto';
 import { TaiKhoanVleRowDto } from './dto/tai-khoan-vle-row.dto';
+import { TaiKhoanDonViRowDto } from './dto/tai-khoan-don-vi-row.dto';
+import { TaiKhoanDonViService } from '../nguoi-dung/tai-khoan-don-vi.service';
+import { chuanHoaTenDangNhap } from '../nguoi-dung/tai-khoan-don-vi.util';
+import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import {
+  TaiKhoanDonViDaTao,
+  buildMatKhauTamWorkbook,
+} from './util/tai-khoan-don-vi-excel.util';
 import {
   ConflictAppException,
   NotFoundAppException,
@@ -80,12 +88,13 @@ export class ImportService {
     private readonly hocVienService: HocVienService,
     private readonly khoaBoiDuongService: KhoaBoiDuongService,
     private readonly dotXacNhanService: DotXacNhanService,
+    private readonly taiKhoanDonViService: TaiKhoanDonViService,
   ) {}
 
   assertSupported(loai: string): SupportedImportType {
     if (!isSupportedImportType(loai)) {
       throw new ValidationException(
-        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc, diem_danh, ket_qua_giai_doan, nhan_su_lop)`,
+        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc, diem_danh, ket_qua_giai_doan, nhan_su_lop, tai_khoan_don_vi)`,
       );
     }
     return loai;
@@ -339,6 +348,13 @@ export class ImportService {
   }
 
   async xacNhan(id: string) {
+    return (await this.xacNhanVoiFile(id)).nhat_ky;
+  }
+
+  // Tài khoản đơn vị (ADR 0002): loại tai_khoan_don_vi trả thêm file Excel
+  // mật khẩu tạm (chỉ trong response, không lưu); loại khác file_mat_khau
+  // luôn undefined.
+  async xacNhanVoiFile(id: string) {
     const nhatKy = await this.prisma.nhat_ky_import.findUnique({
       where: { id },
     });
@@ -389,6 +405,7 @@ export class ImportService {
     const dupKeys = new Set<string>();
     // phan_lop_hoc_vien: tra lớp/cảnh báo 1 lần cho cả lượt (xem BoNhoPhanLop).
     const boNho = taoBoNhoPhanLop();
+    const taiKhoanDaTao: TaiKhoanDonViDaTao[] = [];
 
     for (const dong of ketQuaCu.dong_hop_le) {
       const values = rowsByDong.get(dong);
@@ -422,7 +439,7 @@ export class ImportService {
         continue;
       }
       try {
-        const { hocVienChuaCoEmail } = await this.commitRow(
+        const { hocVienChuaCoEmail, taiKhoanDonVi } = await this.commitRow(
           loai,
           dto,
           id,
@@ -430,6 +447,7 @@ export class ImportService {
           dupKeys,
         );
         if (hocVienChuaCoEmail) soHocVienChuaCoEmail++;
+        if (taiKhoanDonVi) taiKhoanDaTao.push(taiKhoanDonVi);
         soDongThanhCong++;
       } catch (e) {
         danhSachLoiMoi.push({ dong, ly_do: toRowErrorMessage(e) });
@@ -459,7 +477,7 @@ export class ImportService {
       await luuFileLoi(id, buffer);
     }
 
-    return this.prisma.nhat_ky_import.update({
+    const nhatKyMoi = await this.prisma.nhat_ky_import.update({
       where: { id },
       data: {
         so_dong_thanh_cong: soDongThanhCong,
@@ -469,6 +487,13 @@ export class ImportService {
           danhSachLoiMoi.length > 0 ? `/import/${id}/file-loi` : null,
       },
     });
+    return {
+      nhat_ky: nhatKyMoi,
+      file_mat_khau:
+        loai === 'tai_khoan_don_vi'
+          ? await buildMatKhauTamWorkbook(taiKhoanDaTao)
+          : undefined,
+    };
   }
 
   async lichSu(query: LichSuImportQueryDto) {
@@ -630,6 +655,8 @@ export class ImportService {
           'ty_le_hoan_thanh',
           'diem',
         ];
+      case 'tai_khoan_don_vi':
+        return ['ma_don_vi', 'ten_dang_nhap', 'ho_ten', 'email'];
       case 'nhan_su_lop':
         // Mỗi dòng = 1 nhân sự (giảng viên/hỗ trợ) của 1 lớp ĐÃ TỒN TẠI (xem
         // KhoaBoiDuongService.resolveNhanSuLopRow).
@@ -781,6 +808,17 @@ export class ImportService {
         diem: 'Tùy chọn — điểm số.',
       };
     }
+    if (loai === 'tai_khoan_don_vi') {
+      return {
+        ma_don_vi:
+          'Bắt buộc — mã đơn vị trong danh mục (Sở GD&ĐT, Phòng VHXH hoặc Trường đang hoạt động). Mỗi đơn vị chỉ 1 tài khoản.',
+        ten_dang_nhap:
+          'Tùy chọn — tên gợi nhớ (vd sgd-angiang): chữ thường không dấu, số, . _ - (3–50 ký tự). Để trống = dùng mã đơn vị viết thường.',
+        ho_ten: 'Tùy chọn — người phụ trách. Để trống = dùng tên đơn vị.',
+        email:
+          'Tùy chọn — có email: hệ thống gửi link kích hoạt (72 giờ). Không email: mật khẩu tạm nằm trong file kết quả tải về 1 lần khi xác nhận nạp.',
+      };
+    }
     if (loai === 'nhan_su_lop') {
       return {
         ma_khoa:
@@ -827,6 +865,7 @@ export class ImportService {
       | DiemDanhRowDto
       | KetQuaGiaiDoanRowDto
       | NhanSuLopRowDto
+      | TaiKhoanDonViRowDto
     >
   > {
     switch (loai) {
@@ -914,6 +953,8 @@ export class ImportService {
           ty_le_hoan_thanh: raw.ty_le_hoan_thanh,
           diem: raw.diem,
         });
+      case 'tai_khoan_don_vi':
+        return this.buildTaiKhoanDonViDto(raw, dupKeys);
       case 'nhan_su_lop':
         return this.khoaBoiDuongService.resolveNhanSuLopRow(
           {
@@ -954,6 +995,52 @@ export class ImportService {
     return `Học viên "${ma}" có kết quả đánh giá nhưng CHƯA đủ điều kiện làm đánh giá đầu vào tại thời điểm import (chưa xác nhận đợt xác nhận trước đánh giá hoặc hồ sơ chưa đầy đủ) — kiểm tra khả năng lách cổng`;
   }
 
+  // Tài khoản đơn vị (ADR 0002): tra đơn vị theo ma_don_vi (trim, không phân
+  // biệt hoa/thường), chặn trùng mã/tên đăng nhập/email TRONG FILE, rồi chạy
+  // cùng bộ quy tắc với POST /nguoi-dung/don-vi (chuanBiTao).
+  private async buildTaiKhoanDonViDto(
+    raw: Record<string, string>,
+    dupKeys?: Set<string>,
+  ): Promise<RowBuildResult<TaiKhoanDonViRowDto>> {
+    const ma = (raw.ma_don_vi ?? '').trim();
+    if (!ma) return { error: 'Thiếu ma_don_vi' };
+    const donVi = await this.prisma.don_vi_cong_tac.findFirst({
+      where: { ma_don_vi: { equals: ma, mode: 'insensitive' } },
+    });
+    if (!donVi) return { error: `Không tìm thấy đơn vị có mã "${ma}"` };
+
+    const tenNhap = raw.ten_dang_nhap?.trim() || undefined;
+    const hoTen = raw.ho_ten?.trim() || undefined;
+    const email = raw.email?.trim().toLowerCase() || undefined;
+    const khoa: [string, string][] = [
+      [`tkdv-ma:${donVi.id}`, 'mã đơn vị'],
+      [`tkdv-ten:${chuanHoaTenDangNhap(tenNhap ?? donVi.ma_don_vi)}`, 'tên đăng nhập'],
+    ];
+    if (email) khoa.push([`tkdv-email:${email}`, 'email']);
+    const trung = khoa.find(([k]) => dupKeys?.has(k));
+    if (trung) return { error: `Trùng ${trung[1]} với dòng khác trong file` };
+    khoa.forEach(([k]) => dupKeys?.add(k));
+
+    const { loi } = await this.taiKhoanDonViService.chuanBiTao({
+      don_vi_id: donVi.id,
+      ten_dang_nhap: tenNhap,
+      ho_ten: hoTen,
+      email,
+      cach_cap: email ? 'email' : 'mat_khau_tam',
+    });
+    if (loi.length > 0) return { error: loi.map((l) => l.message).join('; ') };
+    return {
+      dto: {
+        ma_don_vi: donVi.ma_don_vi,
+        ten_don_vi: donVi.ten_don_vi,
+        don_vi_id: donVi.id,
+        ten_dang_nhap: tenNhap,
+        ho_ten: hoTen,
+        email,
+      },
+    };
+  }
+
   private async checkValid(
     loai: SupportedImportType,
     dto:
@@ -967,7 +1054,8 @@ export class ImportService {
       | LopVaLichHocRowDto
       | DiemDanhRowDto
       | KetQuaGiaiDoanRowDto
-      | NhanSuLopRowDto,
+      | NhanSuLopRowDto
+      | TaiKhoanDonViRowDto,
     dupKeys?: Set<string>,
   ): Promise<string | undefined> {
     try {
@@ -1010,6 +1098,9 @@ export class ImportService {
       } else if (loai === 'ket_qua_giai_doan') {
         // Không cần kiểm tra thêm: resolveKetQuaGiaiDoanRow() (buildDto) đã
         // tra cứu FK + phạm vi giá trị rồi.
+      } else if (loai === 'tai_khoan_don_vi') {
+        // Không cần kiểm tra thêm: buildTaiKhoanDonViDto() đã chạy
+        // TaiKhoanDonViService.chuanBiTao() (cùng quy tắc với POST tạo lẻ).
       } else if (loai === 'nhan_su_lop') {
         // Không cần kiểm tra thêm: resolveNhanSuLopRow() (buildDto) đã tra
         // cứu lớp + validate + trùng lặp trong file rồi.
@@ -1052,11 +1143,15 @@ export class ImportService {
       | LopVaLichHocRowDto
       | DiemDanhRowDto
       | KetQuaGiaiDoanRowDto
-      | NhanSuLopRowDto,
+      | NhanSuLopRowDto
+      | TaiKhoanDonViRowDto,
     importId: string,
     nguoiImportId: string,
     dupKeys?: Set<string>,
-  ): Promise<{ hocVienChuaCoEmail?: boolean }> {
+  ): Promise<{
+    hocVienChuaCoEmail?: boolean;
+    taiKhoanDonVi?: TaiKhoanDonViDaTao;
+  }> {
     if (loai === 'dia_danh') {
       await this.diaDanhService.create(dto as CreateDiaDanhDto, importId);
     } else if (loai === 'don_vi_cong_tac') {
@@ -1092,6 +1187,27 @@ export class ImportService {
         dto as KetQuaGiaiDoanRowDto,
         importId,
       );
+    } else if (loai === 'tai_khoan_don_vi') {
+      const d = dto as TaiKhoanDonViRowDto;
+      const kq = await this.taiKhoanDonViService.taoTaiKhoan(
+        {
+          don_vi_id: d.don_vi_id,
+          ten_dang_nhap: d.ten_dang_nhap,
+          ho_ten: d.ho_ten,
+          email: d.email,
+          cach_cap: d.email ? 'email' : 'mat_khau_tam',
+        },
+        { id: nguoiImportId } as AuthenticatedUser,
+      );
+      return {
+        taiKhoanDonVi: {
+          ma_don_vi: d.ma_don_vi,
+          ten_don_vi: d.ten_don_vi,
+          ten_dang_nhap: kq.tai_khoan.ten_dang_nhap,
+          mat_khau_tam: kq.mat_khau_tam,
+          cach_cap: kq.mat_khau_tam ? 'mat_khau_tam' : 'email',
+        },
+      };
     } else if (loai === 'nhan_su_lop') {
       await this.khoaBoiDuongService.commitNhanSuLop(dto as NhanSuLopRowDto);
     } else {

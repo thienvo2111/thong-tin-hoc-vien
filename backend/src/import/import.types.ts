@@ -16,6 +16,8 @@ export const SUPPORTED_IMPORT_TYPES = [
   'diem_danh',
   'ket_qua_giai_doan',
   'nhan_su_lop',
+  // Tài khoản đơn vị (ADR 0002) — xác nhận nạp trả file Excel mật khẩu tạm.
+  'tai_khoan_don_vi',
 ] as const satisfies readonly loai_danh_muc_import[];
 
 export type SupportedImportType = (typeof SUPPORTED_IMPORT_TYPES)[number];

@@ -6,6 +6,7 @@ import {
   Post,
   Query,
   Res,
+  StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -84,8 +85,23 @@ export class ImportController {
       .send(buffer);
   }
 
+  // Tài khoản đơn vị (ADR 0002): loại tai_khoan_don_vi trả file .xlsx mật
+  // khẩu tạm (tải 1 lần, không lưu); các loại khác trả JSON nhat_ky như cũ.
   @Post(':id/xac-nhan')
-  xacNhan(@Param('id', ParseUUIDPipe) id: string) {
-    return this.importService.xacNhan(id);
+  async xacNhan(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { nhat_ky, file_mat_khau } =
+      await this.importService.xacNhanVoiFile(id);
+    if (!file_mat_khau) return nhat_ky;
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="mat-khau-tam-${id}.xlsx"`,
+      'Cache-Control': 'no-store',
+      'X-So-Dong-Thanh-Cong': String(nhat_ky.so_dong_thanh_cong),
+    });
+    return new StreamableFile(file_mat_khau);
   }
 }
