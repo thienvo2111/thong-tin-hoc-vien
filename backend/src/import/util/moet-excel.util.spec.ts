@@ -143,18 +143,7 @@ describe('moet-excel.util', () => {
         'Ghi chú',
       ]);
       sheet.mergeCells(1, 4, 1, 6); // D1:F1 gộp cho "Ngày tháng năm sinh"
-      sheet.addRow([
-        '',
-        '',
-        '',
-        'Ngày',
-        'Tháng',
-        'Năm',
-        '',
-        '',
-        '',
-        '',
-      ]);
+      sheet.addRow(['', '', '', 'Ngày', 'Tháng', 'Năm', '', '', '', '']);
       sheet.addRow([
         'Trường C',
         'MOET-003',
@@ -363,8 +352,26 @@ describe('moet-excel.util', () => {
       'nhận diện alias cột CCCD: "%s"',
       async (tieuDe) => {
         const buffer = await toBuffer([
-          ['Đơn vị', tieuDe, 'Họ và tên', 'Ngày', 'Tháng', 'Năm', 'Chuyên môn', 'Số điện thoại'],
-          ['Trường I', '123456789013', 'Mai Thị M', 5, 5, 1996, 'Toán', '0900000000'],
+          [
+            'Đơn vị',
+            tieuDe,
+            'Họ và tên',
+            'Ngày',
+            'Tháng',
+            'Năm',
+            'Chuyên môn',
+            'Số điện thoại',
+          ],
+          [
+            'Trường I',
+            '123456789013',
+            'Mai Thị M',
+            5,
+            5,
+            1996,
+            'Toán',
+            '0900000000',
+          ],
         ]);
         const rows = await readMoetWorkbookRows(buffer);
         expect(rows[0].values['Số định danh cá nhân']).toBe('123456789013');

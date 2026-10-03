@@ -161,9 +161,7 @@ export async function readMoetWorkbookRows(
   }
 
   const foundCanonical = new Set(columnMap.values());
-  const stillMissing = REQUIRED_CANONICAL.filter(
-    (k) => !foundCanonical.has(k),
-  );
+  const stillMissing = REQUIRED_CANONICAL.filter((k) => !foundCanonical.has(k));
   if (stillMissing.length > 0) {
     throw new ValidationException(
       `File thiếu cột bắt buộc: ${stillMissing.join(', ')}`,

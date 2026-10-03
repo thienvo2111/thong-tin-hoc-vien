@@ -1,4 +1,10 @@
-import { IsEnum, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import { trang_thai_diem_danh, nguon_diem_danh } from '@prisma/client';
 
 // Dòng đã dựng xong của import diem_danh (T12, mo-rong-nls-an-giang.md) — mỗi
