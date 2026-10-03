@@ -22,6 +22,8 @@ Công cụ phối hợp giữa **Sở GD&ĐT**, **Phòng Văn hóa - Xã hội**
 
 **Phân quyền scope-based suy ra động** qua cây `DonViCongTac.don_vi_cha_id` (`ScopeService`, BFS cycle-safe) — không có bảng phân quyền riêng. Cấp trên duyệt thay được cấp dưới.
 
+**R1/R2** (ADR 0001, 2026-10-03) — 2 quy tắc xem khóa bồi dưỡng cho `so_gddt`/`phong_vhxh`/`truong`, thay cơ chế "đơn vị theo dõi" đã xóa: **R1 (đặt hàng)** — `khoa.don_vi_dat_hang_id` nằm trong phạm vi của caller → thấy khóa + TOÀN BỘ học viên của khóa; **R2 (tham gia)** — không thỏa R1 nhưng có học viên thuộc phạm vi caller ghi danh vào khóa → thấy khóa, chỉ thấy học viên thuộc phạm vi mình. Thỏa cả 2 → theo R1. Cài đặt: `ScopeService.getKhoaIdsXemDuoc`/`getHocVienScopeTrongKhoa`.
+
 ## Thực thể cốt lõi (và tên gọi chuẩn — dùng đúng, đừng đổi từ đồng nghĩa)
 
 - **HocVien** (hồ sơ học viên) — `trang_thai`: `nhap → cho_duyet → da_duyet` (hoặc `tu_choi`). `nguon_tao`: `tu_dang_ky` (tự đăng ký) hoặc `import_moet` (import từ MOET).
@@ -29,7 +31,7 @@ Công cụ phối hợp giữa **Sở GD&ĐT**, **Phòng Văn hóa - Xã hội**
 - **DiaDanh** — địa danh (tỉnh/xã), dùng cho `noi_sinh`/`dia_ban`.
 - **NguoiDung** — tài khoản đăng nhập, gắn `vai_tro` + (`don_vi_id` hoặc `hoc_vien_id`).
 - **MonHoc**, **ChuyenMon** (text tự do có autocomplete, KHÔNG phải danh mục quản trị).
-- **KhoaBoiDuong** — khóa bồi dưỡng, do **Trường** tự tạo & quản lý; Sở/Phòng VHXH chỉ duyệt + xem thống kê. `trang_thai`: `nhap → cho_duyet → da_duyet` (+ `tu_choi`, `dong_dang_ky`). Duyệt khóa định tuyến theo `don_vi_cha_id` của Trường tổ chức (khác hẳn routing hồ sơ học viên).
+- **KhoaBoiDuong** — khóa bồi dưỡng. **Từ ADR 0001 (2026-10-03, `docs/adr/0001-don-vi-dat-hang.md`):** chỉ **Quản trị** (= **Đơn vị tổ chức (HCMUE)** — Trường ĐHSP TP.HCM, hằng số hiển thị, **không lưu** trong DB, mọi khóa đều do HCMUE tổ chức) tạo và quản lý khóa; Sở/Phòng VHXH/Trường chỉ xem (không còn Trường tự tạo, không còn luồng nộp duyệt/duyệt). Khóa có `trang_thai='da_duyet'` ngay khi tạo (enum `trang_thai_khoa` giữ nguyên `nhap`/`cho_duyet`/`tu_choi`/`da_duyet`/`dong_dang_ky` cho dữ liệu lịch sử, nhưng khóa mới chỉ dùng `da_duyet`/`dong_dang_ky`). Mỗi khóa có đúng 1 **Đơn vị đặt hàng** (`don_vi_dat_hang_id`, FK `DonViCongTac` loại `so_gddt`/`truong`/`khac` — không nhận `phong_vhxh`) — khác hẳn khái niệm "Đơn vị tổ chức": đơn vị đặt hàng là ai THUÊ/YÊU CẦU khóa (một Sở, một trường, hoặc 1 đơn vị khác đặt cho nhiều Sở), còn HCMUE luôn là bên tổ chức thực hiện.
 - **GiaiDoanKhoa** — giai đoạn của khóa = **hình thức × nhóm** (vd "Zoom – nhóm 1", "Trực tiếp – đợt 5"); không có thực thể "đợt" riêng. `link_hoac_dia_diem` / `huong_dan` (spec 2026-10-02) — thông tin chung hiện ở M7 cho học viên **không được gán lớp** ở giai đoạn đó (điển hình: đánh giá đầu vào/đầu ra).
 - **LopHoc** — `loai_lop` (`truc_tiep`|`zoom`|`vle`) là **3 loại lớp ĐỘC LẬP HOÀN TOÀN** (không phải lớp cha/con) — 1 học viên có thể cùng lúc ở 1 lớp trực tiếp + 1 lớp zoom + 1 "lớp" vle không liên quan thành viên nhau. Unique theo `(khoa_id, loai_lop, ten_lop)` — được phép trùng tên lớp giữa các loại khác nhau trong cùng khóa.
 - **LichHocLop** — 1 lớp có nhiều buổi (`buoi_so`) trong cùng giai đoạn; unique `(lop_id, giai_doan_id, buoi_so)`.

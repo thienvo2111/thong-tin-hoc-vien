@@ -88,10 +88,10 @@ Ngoài phạm vi: `/hoc-vien` (hồ sơ) và `/bao-cao/tong-quan` giữ lọc th
 
 ## 7. Migration và vận hành
 
-Migration Prisma mới (1 transaction):
+Migration Prisma mới (2 file migration triển khai cùng lúc — không phải 1 transaction, do Postgres không có aggregate `MIN`/`MAX` cho kiểu `uuid` nên bước 2 phải ép qua `text`):
 
 1. `RENAME COLUMN don_vi_to_chuc_id TO don_vi_dat_hang_id` (+ đổi tên FK/index).
-2. `UPDATE khoa_boi_duong k SET don_vi_dat_hang_id = t.don_vi_id FROM (SELECT khoa_id, MIN(don_vi_id) don_vi_id FROM khoa_don_vi_theo_doi GROUP BY khoa_id HAVING COUNT(*) = 1) t WHERE t.khoa_id = k.id`.
+2. `UPDATE khoa_boi_duong k SET don_vi_dat_hang_id = t.don_vi_id FROM (SELECT khoa_id, MIN(don_vi_id::text)::uuid don_vi_id FROM khoa_don_vi_theo_doi GROUP BY khoa_id HAVING COUNT(*) = 1) t WHERE t.khoa_id = k.id`.
 3. `DROP TABLE khoa_don_vi_theo_doi`.
 4. `UPDATE khoa_boi_duong SET trang_thai = 'da_duyet' WHERE trang_thai IN ('nhap','cho_duyet','tu_choi')`.
 

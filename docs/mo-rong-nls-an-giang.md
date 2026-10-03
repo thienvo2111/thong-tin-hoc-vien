@@ -18,7 +18,7 @@
 | # | Quyết định | Thay đổi so với thiết kế hiện hành |
 |---|---|---|
 | QĐ1 | Ghi danh vào khóa không đòi hồ sơ đầy đủ. Điều kiện "hồ sơ đầy đủ (T9) + đã xác nhận đợt 2" áp dụng tại **cổng làm đánh giá đầu vào** (T15) và lại được kiểm tra khi **cấp chứng nhận** (T13). | Sửa rule #36d |
-| QĐ2 | HCMUE là `don_vi_cong_tac` loại `khac`. **Quản trị** tạo khóa cho đơn vị này; khóa do Quản trị tạo được `da_duyet` ngay. Sở/Phòng VHXH/Trường được **xem khóa** qua danh sách "đơn vị theo dõi" gắn với khóa; dữ liệu cấp học viên vẫn lọc theo phạm vi hồ sơ như cũ. | Sửa rule #47, thêm bảng `khoa_don_vi_theo_doi` |
+| QĐ2 | **Đã thay thế bởi ADR 0001 (2026-10-03)**, xem `docs/adr/0001-don-vi-dat-hang.md`. HCMUE là `don_vi_cong_tac` loại `khac`. **Quản trị** tạo khóa cho đơn vị này; khóa do Quản trị tạo được `da_duyet` ngay. Sở/Phòng VHXH/Trường được **xem khóa** qua danh sách "đơn vị theo dõi" gắn với khóa; dữ liệu cấp học viên vẫn lọc theo phạm vi hồ sơ như cũ. | Sửa rule #47, thêm bảng `khoa_don_vi_theo_doi` |
 | QĐ3 | Một lớp có **nhiều buổi** trong cùng một giai đoạn (Zoom nhiều buổi; trực tiếp 3 ngày = 3 buổi). | Bỏ `uq_lich_hoc_lop_giai_doan`, thêm `buoi_so` |
 | QĐ4 | Mô hình giai đoạn = **hình thức × nhóm**, ví dụ "Zoom – nhóm 1", "VLE – nhóm 2", "Trực tiếp – đợt 5". Mỗi lớp thuộc 1 nhóm, chỉ có lịch ở giai đoạn của nhóm mình. Không thêm thực thể "đợt". | Không đổi schema giai đoạn |
 | QĐ5 | Chưa làm cổng đăng nhập cho giảng viên trong khóa này. Hệ thống lưu giảng viên + phân công để tổng hợp giờ dạy và xuất danh sách. | Không thêm vai trò mới |
@@ -89,6 +89,8 @@ ALTER TABLE nguoi_dung
 ---
 
 ## T2 — HCMUE là đơn vị tổ chức khóa — QĐ2
+
+> **Đã thay thế bởi ADR 0001 (2026-10-03)** — xem `docs/adr/0001-don-vi-dat-hang.md`. Giữ nguyên mục này làm lịch sử, không còn đúng với code hiện tại: `don_vi_to_chuc_id` đã đổi tên thành `don_vi_dat_hang_id`, bảng `khoa_don_vi_theo_doi` đã bị xóa, luồng nộp duyệt/duyệt khóa đã bị bỏ hẳn.
 
 > **(P1, trước 12/10) — tách 2 phần:** T2a = Quản trị tạo khóa cho đơn vị `khac` + tự duyệt + quyền chủ khóa cho Quản trị. T2b = bảng `khoa_don_vi_theo_doi` và phạm vi xem cho Sở/Phòng/Trường.
 
