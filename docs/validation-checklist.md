@@ -166,7 +166,19 @@ Ký hiệu: 🔴 lỗi chặn lưu · 🟡 cảnh báo không chặn (chỉ nh�
 | 55 | Sai tên đăng nhập và sai mật khẩu trả **cùng một thông báo** `UNAUTHORIZED` — không tiết lộ tài khoản có tồn tại hay không (ngoại lệ: `423` tự nó đã tiết lộ tài khoản tồn tại — đánh đổi chấp nhận theo spec) | 🔴 | API |
 | 56 | `POST /auth/doi-mat-khau`: mật khẩu mới ≥8 ký tự, có cả chữ và số, khác mật khẩu cũ, và (nếu tài khoản gắn hồ sơ học viên) khác chuỗi ngày sinh `ddmmyyyy` — vi phạm trả `VALIDATION_ERROR` kèm `fields` | 🔴 | API |
 | 57 | `POST /auth/dang-nhap` và `GET /hoc-vien/kiem-tra-trung`: giới hạn 10 request/phút/IP, vượt quá trả `429 RATE_LIMITED` (`@nestjs/throttler`, áp riêng 2 route này — không đăng ký guard toàn cục) | 🔴 | API |
-| 58 | `POST /nguoi-dung/{id}/dat-lai-mat-khau` (`quan_tri`): chỉ áp dụng tài khoản `vai_tro='hoc_vien'`; đặt mật khẩu về ngày sinh `ddmmyyyy`, `phai_doi_mat_khau=true`, xóa `khoa_den`/bộ đếm sai, ghi `nhat_ky_dat_lai_mat_khau` | 🔴 (quy trình) | API |
+| 58 | `POST /nguoi-dung/{id}/dat-lai-mat-khau` (`quan_tri`): chỉ áp dụng tài khoản `vai_tro='hoc_vien'` (tài khoản đơn vị dùng `POST /nguoi-dung/don-vi/{id}/cap-mat-khau-tam`, ADR 0002); đặt mật khẩu về ngày sinh `ddmmyyyy`, `phai_doi_mat_khau=true`, xóa `khoa_den`/bộ đếm sai, ghi `nhat_ky_dat_lai_mat_khau` | 🔴 (quy trình) | API |
+
+## Tài khoản đơn vị (ADR 0002, 2026-10-03)
+
+| # | Quy tắc | Mức | Nơi thực thi |
+|---|---|---|---|
+| 59 | Chỉ cấp cho đơn vị `active` loại `so_gddt`/`phong_vhxh`/`truong`; vai trò = `loai_don_vi`. Loại `khac` → "Loại đơn vị không được cấp tài khoản" | 🔴 | API (`TaiKhoanDonViService.chuanBiTao`) |
+| 60 | 1 tài khoản / đơn vị cho 3 vai trò trên | 🔴 | DB (`uq_nguoi_dung_don_vi_quan_ly`) + API (409 "Đơn vị đã có tài khoản") |
+| 61 | `ten_dang_nhap` tài khoản đơn vị: trim + chữ thường, regex `^[a-z0-9][a-z0-9._-]{2,49}$`; mặc định `lower(ma_don_vi)`; không trùng (không phân biệt hoa/thường) với BẤT KỲ `nguoi_dung` nào | 🔴 | API + DB (`uq_nguoi_dung_ten_dang_nhap`) |
+| 62 | Email tài khoản đơn vị tùy chọn (chỉ `quan_tri` bắt buộc — `chk_nguoi_dung_email_bat_buoc`), chữ thường, không trùng | 🔴 | DB + API |
+| 63 | Mật khẩu tạm: 10 ký tự, có chữ và số, không gồm `0 O o 1 l I L`; chỉ trả 1 lần (response / file `.xlsx` import), không lưu dạng rõ, `phai_doi_mat_khau=true` | 🔴 | API |
+| 64 | Link kích hoạt (`kich_hoat_tai_khoan`): 72 giờ, dùng 1 lần; cấp mật khẩu tạm ⇄ gửi link vô hiệu đường vào còn lại; xóa email vô hiệu link còn hạn | 🔴 | API |
+| 65 | Đăng nhập tài khoản đơn vị khớp `ten_dang_nhap` không phân biệt hoa/thường; học viên/Quản trị khớp chính xác (không đổi) | 🔴 | API (`AuthService.timTaiKhoanTheoTenDangNhap`) |
 
 ## Hồ sơ đầy đủ (T9, 2026-09-28 — mo-rong-nls-an-giang.md)
 
