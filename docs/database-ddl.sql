@@ -524,7 +524,7 @@ CREATE TABLE khoa_boi_duong (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     ma_khoa             varchar(30) NOT NULL,
     ten_khoa            varchar(255) NOT NULL,
-    don_vi_dat_hang_id   uuid NOT NULL REFERENCES don_vi_cong_tac(id),  -- = Trường tạo khóa
+    don_vi_dat_hang_id  uuid NOT NULL REFERENCES don_vi_cong_tac(id),  -- = Trường tạo khóa
     dia_diem            varchar(255),
     thoi_gian_bat_dau   date NOT NULL,
     thoi_gian_ket_thuc  date NOT NULL,
@@ -547,24 +547,6 @@ CREATE TABLE khoa_boi_duong (
 
 CREATE INDEX idx_khoa_don_vi ON khoa_boi_duong(don_vi_dat_hang_id);
 CREATE INDEX idx_khoa_trang_thai ON khoa_boi_duong(trang_thai);
-
--- T2 (mo-rong-nls-an-giang.md, QĐ2, 2026-09-29): khóa do quan_tri tạo cho
--- đơn vị loại 'khac' (vd. HCMUE — không thuộc cây đơn vị An Giang) không có
--- Trường/Sở/Phòng nào "sở hữu" theo cơ chế khoa_boi_duong.don_vi_dat_hang_id
--- sẵn có (routing/scope đi theo cây của chính đơn vị tổ chức). Bảng này là
--- danh sách đơn vị được GÁN THÊM quyền XEM khóa (metadata/giai đoạn/lớp/lịch)
--- mà không đổi đơn vị tổ chức thực sự — chỉ quan_tri thêm/bớt (POST/DELETE
--- /khoa-boi-duong/{id}/don-vi-theo-doi). Dữ liệu cấp học viên (dang_ky_hoc,
--- kết quả) KHÔNG mở rộng theo bảng này, vẫn lọc theo phạm vi hồ sơ hiện có
--- (hoc_vien.don_vi_cong_tac_id) — xem ScopeService.getKhoaIdsTheoDoi (đi LÊN
--- cây don_vi_cha_id từ đơn vị của caller, giao với danh sách theo dõi của
--- khóa — NGƯỢC hướng với collectDescendantIds dùng cho scope thông thường).
-CREATE TABLE khoa_don_vi_theo_doi (
-    khoa_id     uuid NOT NULL REFERENCES khoa_boi_duong(id) ON DELETE CASCADE,
-    don_vi_id   uuid NOT NULL REFERENCES don_vi_cong_tac(id),
-    PRIMARY KEY (khoa_id, don_vi_id)
-);
-CREATE INDEX idx_khoa_theo_doi_don_vi ON khoa_don_vi_theo_doi(don_vi_id);
 
 CREATE TABLE giai_doan_khoa (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),

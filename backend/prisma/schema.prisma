@@ -353,7 +353,6 @@ model don_vi_cong_tac {
   nguoi_dung     nguoi_dung[]
   hoc_vien       hoc_vien[]
   khoa_boi_duong khoa_boi_duong[]
-  khoa_theo_doi  khoa_don_vi_theo_doi[]
 
   @@index([loai_don_vi], map: "idx_don_vi_loai")
   @@index([dia_ban_id], map: "idx_don_vi_dia_ban")
@@ -695,7 +694,6 @@ model khoa_boi_duong {
   lop_hoc         lop_hoc[]
   dang_ky_hoc     dang_ky_hoc[]
   dot_xac_nhan    dot_xac_nhan[]
-  don_vi_theo_doi khoa_don_vi_theo_doi[]
   cau_hinh_khao_sat cau_hinh_khao_sat_khoa?
   // QĐ10: cụm học viên (nhóm Zalo hỗ trợ theo địa lý) — độc lập với cây đơn
   // vị công tác, thuộc trực tiếp về khóa.
@@ -703,24 +701,6 @@ model khoa_boi_duong {
 
   @@index([don_vi_dat_hang_id], map: "idx_khoa_don_vi")
   @@index([trang_thai], map: "idx_khoa_trang_thai")
-}
-
-// T2 (mo-rong-nls-an-giang.md, QĐ2, 2026-09-29): đơn vị "theo dõi" một khóa
-// do Quản trị tạo cho đơn vị loại 'khac' (HCMUE — không thuộc cây đơn vị An
-// Giang). Sở/Phòng VHXH/Trường xem được khóa (metadata/giai đoạn/lớp/lịch)
-// nếu đơn vị của họ là chính đơn vị theo dõi hoặc nằm dưới nó trong cây
-// don_vi_cha_id (xem ScopeService.getKhoaIdsTheoDoi) — dữ liệu cấp học viên
-// (dang_ky_hoc, kết quả) KHÔNG mở rộng theo bảng này, vẫn lọc theo phạm vi
-// hồ sơ hiện có (don_vi_cong_tac_id của hoc_vien).
-model khoa_don_vi_theo_doi {
-  khoa_id   String @db.Uuid
-  don_vi_id String @db.Uuid
-
-  khoa   khoa_boi_duong  @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  don_vi don_vi_cong_tac @relation(fields: [don_vi_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  @@id([khoa_id, don_vi_id])
-  @@index([don_vi_id], map: "idx_khoa_theo_doi_don_vi")
 }
 
 model giai_doan_khoa {
