@@ -1,0 +1,822 @@
+<title>Hướng dẫn học viên BDNLS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
+<style>
+/* Bố cục: cột mục lục cố định bên trái (desktop) + nội dung đọc; mỗi bước = hình minh họa điện thoại cạnh danh sách thao tác đánh số khớp. */
+:root{
+  --bg:#F3F6F9; --surface:#FFFFFF; --fg:#142235; --muted:#56677B; --line:#DAE2EB;
+  --navy:#124874; --navy-ink:#124874; --red:#CF373D; --hero:#124874; --hero-fg:#FFFFFF; --hero-muted:#C9D8E8;
+  --ok:#12805C; --ok-bg:#E7F5EF; --warn:#9A3E06; --warn-bg:#FEF3E6; --err:#B42318; --err-bg:#FDEEEC; --info-bg:#EAF1F8;
+  /* màn hình minh họa luôn ở giao diện sáng như hệ thống thật */
+  --m-bg:#F5F7FA; --m-surface:#FFFFFF; --m-fg:#1D2939; --m-muted:#667085; --m-line:#E4E7EC; --m-navy:#124874; --m-red:#CF373D;
+  --m-ok:#12805C; --m-warn-bg:#FEF3E6; --m-warn:#9A3E06; --m-info-bg:#EAF1F8; --m-err-bg:#FDEEEC;
+  --font:"Be Vietnam Pro", "Segoe UI", Roboto, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1822; --surface:#16222F; --fg:#E6EDF5; --muted:#9DAEC0; --line:#2A3A4C;
+  --navy:#2E6FA8; --navy-ink:#8DB9E2; --red:#F07378; --hero:#0F2942; --hero-fg:#F2F6FA; --hero-muted:#A9BED3;
+  --ok:#4CC497; --ok-bg:#123528; --warn:#F0A35E; --warn-bg:#3A2814; --err:#F28B82; --err-bg:#3B1D1F; --info-bg:#15283B;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1822; --surface:#16222F; --fg:#E6EDF5; --muted:#9DAEC0; --line:#2A3A4C;
+  --navy:#2E6FA8; --navy-ink:#8DB9E2; --red:#F07378; --hero:#0F2942; --hero-fg:#F2F6FA; --hero-muted:#A9BED3;
+  --ok:#4CC497; --ok-bg:#123528; --warn:#F0A35E; --warn-bg:#3A2814; --err:#F28B82; --err-bg:#3B1D1F; --info-bg:#15283B;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;line-height:1.65;margin:0}
+a{color:var(--navy-ink)}
+h1,h2,h3{text-wrap:balance;line-height:1.3;margin:0}
+h2{font-size:1.6rem;font-weight:700}
+h3{font-size:1.15rem;font-weight:600}
+p{margin:0}
+:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+html{scroll-behavior:smooth}
+
+.hero{background:var(--hero);color:var(--hero-fg);padding-inline:16px;padding-block:40px 36px}
+.hero-in{max-width:1120px;margin:0 auto;display:grid;gap:16px}
+.eyebrow{font-size:.78rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--hero-muted)}
+.hero h1{font-size:clamp(1.7rem,4vw,2.5rem);font-weight:700;max-width:22ch}
+.hero p{color:var(--hero-muted);max-width:62ch}
+.hero-facts{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}
+.fact{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);border-radius:10px;padding:10px 14px;min-width:0}
+.fact small{display:block;font-size:.75rem;color:var(--hero-muted);letter-spacing:.04em}
+.fact b{font-size:1rem;word-break:break-all}
+
+.wrap{max-width:1120px;margin:0 auto;padding-inline:16px;padding-block:32px 64px;display:grid;grid-template-columns:240px minmax(0,1fr);gap:40px}
+nav.toc{position:sticky;top:16px;align-self:start;font-size:.9rem}
+nav.toc b{display:block;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+nav.toc ol{list-style:none;margin:0;padding:0;display:grid;gap:2px;counter-reset:t}
+nav.toc li{counter-increment:t}
+nav.toc a{display:flex;gap:8px;padding:5px 8px;border-radius:6px;color:var(--fg);text-decoration:none}
+nav.toc a::before{content:counter(t);color:var(--muted);font-variant-numeric:tabular-nums;min-width:1.4em}
+nav.toc a:hover{background:var(--surface)}
+main{min-width:0;display:grid;gap:56px}
+section{display:grid;gap:20px;scroll-margin-top:16px}
+.sec-head{display:grid;gap:6px;border-bottom:2px solid var(--line);padding-bottom:12px}
+.sec-no{font-size:.8rem;font-weight:700;color:var(--red);letter-spacing:.1em;text-transform:uppercase}
+.lead{color:var(--muted);max-width:68ch}
+
+.note{border-radius:10px;padding:14px 16px;display:grid;gap:4px;max-width:72ch}
+.note b{font-weight:600}
+.note.info{background:var(--info-bg)}
+.note.warn{background:var(--warn-bg)}
+.note.warn b{color:var(--warn)}
+.note.ok{background:var(--ok-bg)}
+
+/* hành trình */
+.journey{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;counter-reset:j}
+.journey li{counter-increment:j;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:6px;align-content:start;position:relative}
+.journey li::before{content:"Giai đoạn " counter(j);font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--red)}
+.journey b{font-size:1rem;line-height:1.35}
+.journey span{font-size:.88rem;color:var(--muted);line-height:1.5}
+.tag{display:inline-block;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--info-bg);color:var(--navy-ink);justify-self:start}
+
+/* checklist chuẩn bị */
+.prep{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.prep div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:4px}
+.prep b{font-weight:600}
+.prep span{font-size:.9rem;color:var(--muted)}
+
+/* bước: minh họa + thao tác */
+.step{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:28px;align-items:start}
+.step.flip{grid-template-columns:330px minmax(0,1fr)}
+.step.flip .mock{order:-1}
+.do{display:grid;gap:14px;min-width:0}
+.do ol{margin:0;padding:0;list-style:none;display:grid;gap:12px}
+.do li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;align-items:start}
+.do li .pin{margin-top:2px}
+.pin{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--m-red);color:#fff;font-size:.78rem;font-weight:700;flex-shrink:0;font-variant-numeric:tabular-nums;box-shadow:0 0 0 3px rgba(207,55,61,.22)}
+kbd,.ui{font-family:var(--font);font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:.92em;white-space:nowrap}
+
+/* khung điện thoại minh họa */
+.mock{background:#1B2633;border-radius:28px;padding:10px;box-shadow:0 10px 30px rgba(16,32,52,.18);max-width:330px;width:100%;justify-self:center}
+.mock figcaption{color:#B8C6D6;font-size:.78rem;text-align:center;padding:8px 4px 2px}
+.screen{background:var(--m-bg);color:var(--m-fg);border-radius:20px;overflow:hidden;font-size:13px;line-height:1.45}
+.addr{background:var(--m-surface);border-bottom:1px solid var(--m-line);padding:8px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--m-muted)}
+.addr::before{content:"";width:9px;height:10px;border:1.6px solid var(--m-ok);border-radius:2px 2px 3px 3px;flex-shrink:0}
+.addr b{color:var(--m-fg);font-weight:600}
+.topbar{background:var(--m-navy);color:#fff;padding:10px 12px;display:flex;align-items:center;gap:10px;font-size:12px}
+.topbar .logo{font-weight:700;letter-spacing:.06em;margin-right:auto}
+.topbar .nav,.topbar .user{display:none}
+.burger{width:18px;height:12px;border-top:2px solid #fff;border-bottom:2px solid #fff;position:relative;flex-shrink:0}
+.burger::after{content:"";position:absolute;left:0;right:0;top:3px;border-top:2px solid #fff}
+.av{width:22px;height:22px;border-radius:50%;background:var(--m-red);display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:700}
+.user u{text-decoration:none;color:#B9C7D6;font-weight:500;margin-left:8px}
+.pc-only{display:none}
+
+/* chế độ minh họa MÁY TÍNH: khung cửa sổ trình duyệt, menu ngang, nội dung cột giữa như hệ thống thật */
+body.pc .step,body.pc .step.flip{grid-template-columns:minmax(0,1fr)}
+body.pc .step .mock{order:-1}
+body.pc .mock{max-width:780px;border-radius:12px;padding:32px 0 0;position:relative;background:#2A3542;overflow-x:auto}
+body.pc .mock::before{content:"";position:absolute;top:12px;left:14px;width:9px;height:9px;border-radius:50%;background:#FF5F57;box-shadow:15px 0 0 #FEBC2E,30px 0 0 #28C840}
+body.pc .screen{border-radius:0;min-width:600px}
+body.pc .addr{position:absolute;top:6px;left:66px;right:14px;border:0;border-radius:6px;padding:4px 10px}
+body.pc .topbar{padding:12px 20px;gap:14px}
+body.pc .topbar .logo{margin-right:0}
+body.pc .topbar .nav{display:flex;gap:2px;margin-right:auto}
+body.pc .nav span{padding:5px 10px;border-radius:6px;color:#B9C7D6;font-weight:600}
+body.pc .nav .on{background:rgba(255,255,255,.14);color:#fff}
+body.pc .topbar .user{display:flex;align-items:center;gap:8px;font-weight:600}
+body.pc .burger{display:none}
+body.pc .body{max-width:520px;width:100%;margin:0 auto;padding:22px 20px 26px}
+body.pc .body.wide{max-width:none;grid-template-columns:1fr 1fr;align-items:start;padding-inline:28px}
+body.pc .body.wide>.m-card:first-child{grid-row:span 2}
+body.pc .m-sticky{display:flex;justify-content:flex-end;padding:10px 28px}
+body.pc .m-sticky .m-btn{min-width:150px}
+body.pc .mock figcaption{padding:8px 4px 10px}
+body.pc .screen.login{display:grid;grid-template-columns:38% minmax(0,1fr)}
+body.pc .screen.login .body{align-content:center;max-width:380px}
+body.pc .side{display:flex;flex-direction:column;justify-content:center;gap:10px;min-height:400px;padding:28px 24px;color:#fff;background:linear-gradient(160deg,#124874,#0B2E4C)}
+.side .logo{font-weight:700;letter-spacing:.08em}
+.side small{color:#F4A5A8;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.side b{font-size:20px;line-height:1.25}
+.side span{color:#B9C7D6;font-size:11.5px}
+
+/* nút chọn kiểu hình minh họa */
+.view{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.view span{font-size:.8rem;font-weight:600;margin-right:2px}
+.view button{font:inherit;font-size:.85rem;font-weight:600;padding:6px 12px;border-radius:999px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--fg)}
+.view button[aria-pressed="true"]{background:var(--red);border-color:var(--red);color:#fff}
+.hero .view span{color:var(--hero-muted)}
+.hero .view button{background:transparent;border-color:rgba(255,255,255,.35);color:var(--hero-fg)}
+.hero .view button[aria-pressed="true"]{background:var(--red);border-color:var(--red)}
+nav.toc .view{margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.body{padding:14px 12px;display:grid;gap:10px}
+.m-h{font-size:16px;font-weight:700;color:var(--m-fg)}
+.m-sub{font-size:11.5px;color:var(--m-muted)}
+.m-card{background:var(--m-surface);border:1px solid var(--m-line);border-radius:10px;padding:10px;display:grid;gap:7px}
+.m-label{font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.m-input{background:#fff;border:1px solid #CBD2DB;border-radius:6px;padding:6px 8px;color:var(--m-fg);display:flex;justify-content:space-between;align-items:center;gap:6px;min-height:30px}
+.m-input.ro{background:#F2F4F7;color:var(--m-muted)}
+.m-input.bad{border-color:var(--m-red)}
+.m-input .eye{width:14px;height:9px;border:1.5px solid var(--m-muted);border-radius:50%;position:relative}
+.m-input .eye::after{content:"";position:absolute;inset:2px 4px;background:var(--m-muted);border-radius:50%}
+.m-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.m-row>.m-input{flex:1;min-width:0}
+.m-hint{font-size:10.5px;color:var(--m-muted)}
+.m-need{font-size:10.5px;color:var(--m-red);font-weight:600}
+.m-btn{background:var(--m-navy);color:#fff;border-radius:7px;padding:8px 10px;text-align:center;font-weight:600;display:flex;justify-content:center;align-items:center;gap:8px}
+.m-btn.red{background:var(--m-red)}
+.m-btn.red .pin{background:#fff;color:var(--m-red);box-shadow:0 0 0 3px rgba(255,255,255,.35)}
+.m-btn.ghost{background:#fff;color:var(--m-fg);border:1px solid #CBD2DB}
+.m-btn.off{background:#D0D5DD;color:#fff}
+.m-link{color:var(--m-navy);font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:6px}
+.m-banner{border-radius:8px;padding:9px 10px;display:grid;gap:4px;font-size:12px}
+.m-banner.warn{background:var(--m-warn-bg)}
+.m-banner.warn b{color:var(--m-warn)}
+.m-banner.info{background:var(--m-info-bg)}
+.m-banner.ok{background:#E7F5EF}
+.m-banner.ok b{color:var(--m-ok)}
+.m-banner ul{margin:0;padding-left:16px}
+.m-check{display:flex;align-items:center;gap:6px;font-size:11.5px}
+.m-check i{width:14px;height:14px;border-radius:50%;background:var(--m-ok);color:#fff;font-style:normal;font-size:9px;display:grid;place-items:center}
+.m-check i.no{background:#D0D5DD}
+.m-box{width:14px;height:14px;border:1.6px solid var(--m-navy);border-radius:3px;background:var(--m-navy);flex-shrink:0;position:relative}
+.m-box::after{content:"";position:absolute;left:3px;top:0;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.m-table{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:11.5px}
+.m-table span:nth-child(odd){color:var(--m-muted)}
+.m-badge{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--m-info-bg);color:var(--m-navy)}
+.m-badge.ok{background:#E7F5EF;color:var(--m-ok)}
+.m-sticky{position:relative;background:var(--m-surface);border-top:1px solid var(--m-line);padding:8px 12px}
+.m-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.m-tiles .m-card b{font-size:12px}
+
+/* trợ giúp mật khẩu */
+.tool{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:grid;gap:12px;max-width:560px}
+.tool-row{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.tool label{display:grid;gap:4px;font-size:.85rem;color:var(--muted)}
+.tool select{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+.pw{font-size:1.9rem;font-weight:700;letter-spacing:.14em;font-variant-numeric:tabular-nums;color:var(--navy-ink)}
+
+table.plain{border-collapse:collapse;width:100%;font-size:.95rem}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table.plain th,table.plain td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+table.plain th{font-size:.8rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600}
+table.plain tr:last-child td{border-bottom:0}
+
+/* lỗi thường gặp */
+.search{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.search input{font:inherit;flex:1;min-width:0;max-width:460px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--fg)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{font:inherit;font-size:.85rem;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.errs{display:grid;gap:10px}
+details.err{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+details.err summary{cursor:pointer;list-style:none;padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:start}
+details.err summary::-webkit-details-marker{display:none}
+details.err summary::after{content:"+";font-size:1.3rem;line-height:1;color:var(--muted);grid-column:2;grid-row:1}
+details.err[open] summary::after{content:"–"}
+.err-group{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);grid-column:1}
+.err-msg{font-weight:600;grid-column:1}
+.err-msg q{color:var(--err);quotes:"“" "”"}
+.err-body{padding:0 16px 16px;display:grid;gap:8px;max-width:72ch}
+.err-body .why{color:var(--muted)}
+.err-body ol{margin:0;padding-left:20px;display:grid;gap:4px}
+.empty{color:var(--muted)}
+
+/* liên hệ */
+.contact{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:grid;gap:10px;align-content:start;min-width:0}
+.mail{font-size:1.2rem;font-weight:700;color:var(--navy-ink);word-break:break-all;user-select:all}
+.copy{font:inherit;font-weight:600;font-size:.9rem;padding:8px 14px;border-radius:8px;border:0;background:var(--red);color:#fff;cursor:pointer;justify-self:start}
+pre.tpl{margin:0;white-space:pre-wrap;font-family:var(--font);font-size:.92rem;background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:12px;user-select:all}
+.safe{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.safe div{border-left:3px solid var(--ok);background:var(--surface);padding:12px 14px;border-radius:0 10px 10px 0}
+
+footer{border-top:1px solid var(--line);padding-inline:16px;padding-block:24px;text-align:center;color:var(--muted);font-size:.85rem}
+
+@media (max-width:980px){
+  .wrap{grid-template-columns:minmax(0,1fr)}
+  nav.toc{position:static;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+  nav.toc ol{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  .journey{grid-template-columns:minmax(0,1fr)}
+  .step,.step.flip{grid-template-columns:minmax(0,1fr)}
+  .step.flip .mock{order:0}
+}
+</style>
+
+<header class="hero">
+  <div class="hero-in">
+    <span class="eyebrow">Trường Đại học Sư phạm TP. Hồ Chí Minh · Tài liệu dành cho học viên</span>
+    <h1>Hướng dẫn sử dụng hệ thống Bồi dưỡng Năng lực số</h1>
+    <p>Dành cho giáo viên và cán bộ quản lý tham gia khóa bồi dưỡng. Tài liệu đi từng bước, có hình minh họa từng màn hình, và có mục tra cứu khi gặp lỗi. Hình minh họa có hai kiểu, máy tính và điện thoại: Thầy/Cô chọn đúng thiết bị mình đang dùng.</p>
+    <div class="hero-facts">
+      <div class="fact"><small>Địa chỉ hệ thống</small><b>boiduongnls.hcmue.edu.vn</b></div>
+      <div class="fact"><small>Email hỗ trợ</small><b>boiduongnls@hcmue.edu.vn</b></div>
+    </div>
+    <div class="view" role="group" aria-label="Kiểu hình minh họa"><span>Hình minh họa:</span><button type="button" data-v="pc" aria-pressed="true">Máy tính</button><button type="button" data-v="phone" aria-pressed="false">Điện thoại</button></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="toc" aria-label="Mục lục">
+    <div class="view" role="group" aria-label="Kiểu hình minh họa"><span>Hình minh họa:</span><button type="button" data-v="pc" aria-pressed="true">Máy tính</button><button type="button" data-v="phone" aria-pressed="false">Điện thoại</button></div>
+    <b>Mục lục</b>
+    <ol>
+      <li><a href="#tong-quan">Tổng quan các giai đoạn</a></li>
+      <li><a href="#chuan-bi">Chuẩn bị trước khi bắt đầu</a></li>
+      <li><a href="#dang-nhap">Đăng nhập lần đầu</a></li>
+      <li><a href="#doi-mat-khau">Đổi mật khẩu</a></li>
+      <li><a href="#trang-chu">Trang chủ của tôi</a></li>
+      <li><a href="#ho-so">Bổ sung hồ sơ</a></li>
+      <li><a href="#khao-sat">Làm khảo sát đầu vào</a></li>
+      <li><a href="#lop-hoc">Nhóm Zalo và lớp học</a></li>
+      <li><a href="#xac-nhan">Xác nhận thông tin cuối khóa</a></li>
+      <li><a href="#quen-mat-khau">Quên mật khẩu</a></li>
+      <li><a href="#ho-tro">Gửi yêu cầu hỗ trợ</a></li>
+      <li><a href="#loi">Lỗi thường gặp</a></li>
+      <li><a href="#lien-he">Liên hệ và an toàn tài khoản</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <!-- 1 -->
+    <section id="tong-quan">
+      <div class="sec-head"><span class="sec-no">Phần 1</span><h2>Tổng quan các giai đoạn</h2>
+        <p class="lead">Khóa bồi dưỡng đi qua các giai đoạn dưới đây. Ban tổ chức sẽ thông báo (qua nhà trường, nhóm Zalo hoặc email) khi mỗi giai đoạn mở. Thầy/Cô chỉ cần làm đúng việc của giai đoạn đang mở.</p></div>
+      <ol class="journey">
+        <li><b>Đăng nhập, bổ sung hồ sơ</b><span>Đăng nhập, đổi mật khẩu, bổ sung thông tin còn thiếu, đặc biệt là mục <b>Đối tượng</b>.</span><span class="tag">Làm ngay</span></li>
+        <li><b>Làm khảo sát đầu vào</b><span>Hồ sơ đủ thì khối khảo sát mở trên Trang chủ. Làm lần lượt 2 phiếu: khảo sát kĩ năng số, rồi đánh giá năng lực số.</span><span class="tag">Làm ngay</span></li>
+        <li><b>Học tập</b><span>Học qua Zoom, trên hệ thống học tập trực tuyến VLE và tập huấn trực tiếp theo lịch lớp.</span></li>
+        <li><b>Xác nhận thông tin</b><span>Cuối khóa, kiểm tra kỹ mã định danh, họ tên, ngày sinh rồi bấm xác nhận. Đây là thông tin in trên giấy chứng nhận.</span></li>
+        <li><b>Đánh giá đầu ra và chứng nhận</b><span>Làm bài đánh giá cuối khóa và phiếu khảo sát đánh giá khóa học (bắt buộc để hoàn tất).</span></li>
+      </ol>
+      <div class="note info"><b>Việc cần làm ngay bây giờ (khóa An Giang)</b><p>Đăng nhập (<a href="#dang-nhap">Phần 3</a>) → bổ sung hồ sơ, chọn đúng Đối tượng (<a href="#ho-so">Phần 6</a>) → làm 2 phiếu khảo sát (<a href="#khao-sat">Phần 7</a>).</p></div>
+      <div class="note ok"><b>Nhóm Zalo hỗ trợ theo cụm: tham gia bất cứ lúc nào sau khi đăng nhập</b><p>Việc này không thuộc giai đoạn nào. Ngay khi đăng nhập được, Thầy/Cô vào mục <b>Lớp học</b>, bấm <span class="ui">Vào nhóm Zalo</span> để nhận thông báo và được hỗ trợ suốt khóa học (<a href="#lop-hoc">Phần 8</a>).</p></div>
+    </section>
+    <!-- 2 -->
+    <section id="chuan-bi">
+      <div class="sec-head"><span class="sec-no">Phần 2</span><h2>Chuẩn bị trước khi bắt đầu</h2>
+        <p class="lead">Chuẩn bị sẵn những thứ sau để làm một lần là xong, không bị gián đoạn.</p></div>
+      <div class="prep">
+        <div><b>Thiết bị có mạng</b><span>Điện thoại hoặc máy tính. Nên dùng Chrome, Safari, Edge hoặc Cốc Cốc bản mới.</span></div>
+        <div><b>Mã định danh</b><span>Mã định danh trên cơ sở dữ liệu ngành (MOET). Nhà trường cung cấp. Đây là tên đăng nhập.</span></div>
+        <div><b>Ngày tháng năm sinh</b><span>Dùng làm mật khẩu lần đầu, viết liền 8 chữ số. Ví dụ: 08121983.</span></div>
+        <div><b>Số CCCD và email</b><span>Số căn cước công dân 12 số và một email cá nhân Thầy/Cô thường dùng.</span></div>
+        <div><b>Ứng dụng Zalo</b><span>Cài sẵn trên điện thoại để tham gia nhóm Zalo hỗ trợ của cụm.</span></div>
+        <div><b>Khoảng 30–45 phút</b><span>Làm ở nơi yên tĩnh, mạng ổn định. Phiếu đánh giá năng lực số cần làm liền một lần.</span></div>
+      </div>
+      <div class="note warn"><b>Mở đường dẫn từ Zalo</b><p>Nếu bấm đường dẫn trong Zalo mà trang hiện không đầy đủ, bấm biểu tượng <span class="ui">⋯</span> ở góc trên bên phải, chọn <span class="ui">Mở bằng trình duyệt</span>.</p></div>
+    </section>
+    <!-- 3 -->
+    <section id="dang-nhap">
+      <div class="sec-head"><span class="sec-no">Phần 3</span><h2>Đăng nhập lần đầu</h2>
+        <p class="lead">Mở <b>boiduongnls.hcmue.edu.vn</b>, bấm <span class="ui">Đăng nhập cổng học viên</span> (hoặc gõ thẳng boiduongnls.hcmue.edu.vn/dang-nhap). Mọi việc tiếp theo, kể cả làm khảo sát, đều thực hiện sau khi đăng nhập.</p></div>
+      <div class="step flip">
+        <figure class="mock" aria-label="Minh họa màn hình đăng nhập">
+          <div class="screen login">
+            <div class="addr"><b>boiduongnls.hcmue.edu.vn</b>/dang-nhap</div>
+            <div class="side pc-only"><span class="logo">HCMUE</span><small>Trường Đại học Sư phạm TP. Hồ Chí Minh</small><b>Bồi dưỡng Năng lực số</b><span>Chương trình bồi dưỡng năng lực số cho giáo viên và cán bộ quản lý.</span></div>
+            <div class="body">
+              <div class="m-h">Đăng nhập</div>
+              <div class="m-sub">Sử dụng mã định danh được cấp để truy cập hệ thống.</div>
+              <div class="m-label">Mã định danh hoặc số CCCD <span class="pin">1</span></div>
+              <div class="m-input">7900012345</div>
+              <div class="m-label">Mật khẩu <span class="pin">2</span></div>
+              <div class="m-input">••••••••<span class="eye" aria-hidden="true"></span></div>
+              <div class="m-hint">Lần đầu đăng nhập: mật khẩu là ngày sinh dạng ngày-tháng-năm viết liền, ví dụ 08121983.</div>
+              <div class="m-link" style="justify-content:flex-end">Quên mật khẩu?</div>
+              <div class="m-btn">Đăng nhập <span class="pin">3</span></div>
+              <div class="m-link" style="justify-content:center">Không biết mã định danh?</div>
+            </div>
+          </div>
+          <figcaption>Hình 1. Màn hình đăng nhập (số liệu minh họa)</figcaption>
+        </figure>
+        <div class="do">
+          <ol>
+            <li><span class="pin">1</span><p>Nhập <b>mã định danh</b> do nhà trường cung cấp. Chỉ gồm chữ số, không có dấu cách. Nếu đã bổ sung số CCCD vào hồ sơ, Thầy/Cô cũng có thể đăng nhập bằng số CCCD.</p></li>
+            <li><span class="pin">2</span><p>Nhập <b>mật khẩu</b>. Lần đầu là ngày sinh viết liền 8 chữ số. Bấm biểu tượng con mắt ở cuối ô để xem lại mình đã gõ đúng chưa.</p></li>
+            <li><span class="pin">3</span><p>Bấm <span class="ui">Đăng nhập</span>. Lần đầu, hệ thống sẽ chuyển sang màn hình đổi mật khẩu.</p></li>
+          </ol>
+          <div class="tool" aria-labelledby="pw-title">
+            <b id="pw-title">Tìm mật khẩu lần đầu từ ngày sinh</b>
+            <div class="tool-row">
+              <label for="pw-d">Ngày<select id="pw-d"></select></label>
+              <label for="pw-m">Tháng<select id="pw-m"></select></label>
+              <label for="pw-y">Năm<select id="pw-y"></select></label>
+            </div>
+            <div>Mật khẩu lần đầu: <span class="pw" id="pw-out">08121983</span></div>
+            <span class="m-hint" style="color:var(--muted)">Công cụ chỉ chạy trên máy của Thầy/Cô, không lưu và không gửi đi đâu.</span>
+          </div>
+          <div class="tablebox"><table class="plain">
+            <thead><tr><th>Ngày sinh</th><th>Gõ mật khẩu</th><th>Gõ sai thường gặp</th></tr></thead>
+            <tbody>
+              <tr><td>8/12/1983</td><td><b>08121983</b></td><td>8121983 (thiếu số 0)</td></tr>
+              <tr><td>25/3/1990</td><td><b>25031990</b></td><td>25/03/1990 (có dấu /)</td></tr>
+              <tr><td>1/1/1978</td><td><b>01011978</b></td><td>010178 (năm chỉ 2 số)</td></tr>
+            </tbody></table></div>
+        </div>
+      </div>
+    </section>
+    <!-- 4 -->
+    <section id="doi-mat-khau">
+      <div class="sec-head"><span class="sec-no">Phần 4</span><h2>Đổi mật khẩu lần đầu</h2>
+        <p class="lead">Hệ thống bắt buộc đặt mật khẩu mới ngay lần đầu, để người khác không thể đăng nhập bằng ngày sinh của Thầy/Cô.</p></div>
+      <div class="step">
+        <div class="do">
+          <ol>
+            <li><span class="pin">1</span><p>Gõ <b>mật khẩu mới</b>. Gợi ý cách đặt dễ nhớ: một từ quen thuộc kèm vài chữ số, ví dụ <b>hoahong2026</b>.</p></li>
+            <li><span class="pin">2</span><p>Gõ lại đúng mật khẩu đó vào ô <b>Nhập lại mật khẩu mới</b>.</p></li>
+            <li><span class="pin">3</span><p>Xem danh sách điều kiện. Khi cả 4 dòng chuyển sang dấu tích xanh, bấm <span class="ui">Đổi mật khẩu</span>.</p></li>
+          </ol>
+          <div class="note warn"><b>Ghi lại mật khẩu mới</b><p>Từ lần sau, Thầy/Cô dùng mật khẩu mới, không dùng ngày sinh nữa. Nên ghi vào sổ tay cá nhân.</p></div>
+        </div>
+        <figure class="mock" aria-label="Minh họa màn hình đổi mật khẩu">
+          <div class="screen">
+            <div class="addr"><b>boiduongnls.hcmue.edu.vn</b>/doi-mat-khau</div>
+            <div class="body">
+              <div class="m-row" style="justify-content:space-between"><span class="m-h">Đổi mật khẩu</span><span class="m-link">Đăng xuất</span></div>
+              <div class="m-sub">Đây là lần đầu Thầy/Cô đăng nhập. Vui lòng đặt mật khẩu mới trước khi tiếp tục.</div>
+              <div class="m-label">Mật khẩu mới <span class="pin">1</span></div>
+              <div class="m-input">•••••••••••<span class="eye" aria-hidden="true"></span></div>
+              <div class="m-label">Nhập lại mật khẩu mới <span class="pin">2</span></div>
+              <div class="m-input">•••••••••••<span class="eye" aria-hidden="true"></span></div>
+              <div class="m-check"><i>✓</i> Ít nhất 8 ký tự</div>
+              <div class="m-check"><i>✓</i> Có chữ và số</div>
+              <div class="m-check"><i>✓</i> Khác ngày sinh</div>
+              <div class="m-check"><i>✓</i> Hai ô mật khẩu mới trùng nhau</div>
+              <div class="m-btn">Đổi mật khẩu <span class="pin">3</span></div>
+            </div>
+          </div>
+          <figcaption>Hình 2. Đủ 4 dấu tích xanh mới đổi được</figcaption>
+        </figure>
+      </div>
+    </section>
+    <!-- 5 -->
+    <section id="trang-chu">
+      <div class="sec-head"><span class="sec-no">Phần 5</span><h2>Trang chủ của tôi</h2>
+        <p class="lead">Sau khi đăng nhập, Thầy/Cô vào trang chủ. Khung màu ở trên cùng cho biết việc cần làm tiếp theo.</p></div>
+      <div class="step flip">
+        <figure class="mock" aria-label="Minh họa trang chủ học viên">
+          <div class="screen">
+            <div class="addr"><b>boiduongnls.hcmue.edu.vn</b>/toi</div>
+            <div class="topbar"><span class="logo">HCMUE</span><span class="nav"><span class="on">Trang chủ</span><span>Hồ sơ</span><span>Lớp học</span><span>Xác nhận</span><span>Hỗ trợ</span></span><span class="user"><i class="av">N</i>Nguyễn Thị Lan<u>Đăng xuất</u></span><span class="burger" aria-label="Mở menu"></span><span class="pin">1</span></div>
+            <div class="body">
+              <div class="m-h">Chào Cô Lan</div>
+              <div class="m-banner warn"><div class="m-row"><b>Khảo sát đầu vào đã mở</b><span class="pin">2</span></div>
+                <span>Thầy/Cô cần hoàn thành cập nhật các thông tin sau trước khi bắt đầu làm khảo sát:</span>
+                <ul><li>Đối tượng</li><li>Số CCCD</li><li>Email</li></ul>
+                <div class="m-btn ghost">Cập nhật thông tin hồ sơ</div></div>
+              <div class="m-tiles"><span class="pin" style="grid-column:1/-1">3</span>
+                <div class="m-card"><b>Cập nhật hồ sơ</b><span class="m-hint">Xem và chỉnh sửa thông tin cá nhân</span></div>
+                <div class="m-card"><b>Thông tin lớp học</b><span class="m-hint">Lịch học, địa điểm, kết quả đánh giá</span></div>
+              </div>
+            </div>
+          </div>
+          <figcaption>Hình 3. Trang chủ (tên và nội dung minh họa)</figcaption>
+        </figure>
+        <div class="do">
+          <ol>
+            <li><span class="pin">1</span><p><b>Menu</b>: <i>Trang chủ</i>, <i>Hồ sơ</i>, <i>Lớp học</i>, <i>Xác nhận</i>, <i>Hỗ trợ</i>. Tùy giai đoạn, có thể có thêm mục <i>Đánh giá đầu vào</i>. <b>Trên máy tính</b>, menu nằm ngang trên thanh xanh ở đầu trang; tên Thầy/Cô và nút <span class="ui">Đăng xuất</span> ở góc phải. <b>Trên điện thoại</b>, bấm nút <span class="ui">☰</span> ở góc phải để mở menu và nút Đăng xuất.</p></li>
+            <li><span class="pin">2</span><p><b>Khung trạng thái</b>. Đọc kỹ khung này mỗi lần đăng nhập. Khung <b>vàng</b> liệt kê thông tin còn thiếu: bổ sung xong thì khung chuyển <b>xanh</b> và hiện nút làm khảo sát. Bảng dưới giải thích các trạng thái hay gặp.</p></li>
+            <li><span class="pin">3</span><p><b>Lối tắt</b> vào trang Hồ sơ và trang Lớp học. Vào <i>Thông tin lớp học</i> để tham gia nhóm Zalo của cụm ngay (<a href="#lop-hoc">Phần 8</a>).</p></li>
+          </ol>
+        </div>
+      </div>
+      <div class="tablebox"><table class="plain">
+        <thead><tr><th>Khung trạng thái báo</th><th>Ý nghĩa</th><th>Thầy/Cô cần làm</th></tr></thead>
+        <tbody>
+          <tr><td>Khảo sát đầu vào đã mở (khung vàng, có danh sách thông tin cần cập nhật)</td><td>Khảo sát đã mở nhưng hồ sơ còn thiếu, nên chưa làm được.</td><td>Bấm <span class="ui">Cập nhật thông tin hồ sơ</span>, xem <a href="#ho-so">Phần 6</a>.</td></tr>
+          <tr><td>Khảo sát đầu vào đã mở · Hồ sơ đã đầy đủ (khung xanh)</td><td>Đủ điều kiện làm khảo sát.</td><td>Bấm nút làm khảo sát, xem <a href="#khao-sat">Phần 7</a>.</td></tr>
+          <tr><td>Còn thông tin cần bổ sung · Hạn …</td><td>Đợt xác nhận đang mở, hồ sơ còn thiếu.</td><td>Bấm <span class="ui">Bổ sung thông tin</span>, xem <a href="#ho-so">Phần 6</a>.</td></tr>
+          <tr><td>Hồ sơ đã đủ, cần kiểm tra và xác nhận</td><td>Đã đủ thông tin nhưng chưa xác nhận.</td><td>Bấm <span class="ui">Xem lại &amp; xác nhận</span>, xem <a href="#xac-nhan">Phần 9</a>.</td></tr>
+          <tr><td>Đã xác nhận lúc …</td><td>Đã hoàn tất. Vẫn sửa được tới hạn, nhưng sửa xong phải xác nhận lại.</td><td>Không cần làm gì thêm.</td></tr>
+          <tr><td>Đợt … mở lúc …</td><td>Sắp đến thời gian chỉnh sửa hồ sơ.</td><td>Chờ đến giờ mở rồi quay lại.</td></tr>
+          <tr><td>Hiện không trong thời gian chỉnh sửa hồ sơ</td><td>Chỉ được xem, chưa được sửa.</td><td>Xem hồ sơ. Nếu thấy sai, gửi yêu cầu hỗ trợ.</td></tr>
+          <tr><td>Khảo sát đầu ra đã mở</td><td>Cuối khóa, có phiếu khảo sát đầu ra cần làm.</td><td>Nếu hồ sơ đủ, bấm nút làm bài trong khung. Nếu chưa đủ, bổ sung hồ sơ trước.</td></tr>
+        </tbody></table></div>
+    </section>
+    <!-- 6 -->
+    <section id="ho-so">
+      <div class="sec-head"><span class="sec-no">Phần 6</span><h2>Bổ sung hồ sơ</h2>
+        <p class="lead">Đây là bước <b>bắt buộc trước khi làm khảo sát</b>. Khối khảo sát chỉ mở khi hồ sơ đã đủ các thông tin bắt buộc. Hồ sơ sửa được trong thời gian Ban tổ chức mở cập nhật. Ngoài thời gian đó, các ô chỉ để xem, không có nút Lưu.</p></div>
+      <div class="note warn"><b>Chọn đúng “Đối tượng”: Giáo viên hay Cán bộ quản lý</b><p>Mục <b>Đối tượng</b> nằm trong nhóm <i>Công tác</i>. Hệ thống dựa vào mục này để mở đúng bộ phiếu khảo sát dành cho Thầy/Cô. Chọn <b>Cán bộ quản lý</b> nếu Thầy/Cô là hiệu trưởng, phó hiệu trưởng (hoặc tương đương). Chọn <b>Giáo viên</b> nếu Thầy/Cô đang trực tiếp giảng dạy. Chọn sai sẽ phải làm lại phiếu.</p></div>
+      <div class="step">
+        <div class="do">
+          <ol>
+            <li><span class="pin">1</span><p>Bấm <b>Hồ sơ</b> trên menu (trên điện thoại, bấm <span class="ui">☰</span> để mở menu). Hồ sơ chia thành các nhóm: Thông tin cá nhân, Nơi sinh và cư trú, Công tác, Liên hệ, Trình độ và chuyên môn. Nhóm nào còn thiếu có dấu chấm đỏ.</p></li>
+            <li><span class="pin">2</span><p>Ô có chữ đỏ <b>Cần bổ sung</b> là ô bắt buộc còn trống. Điền vào. Mã định danh là ô xám, không sửa được. Ở nhóm <i>Công tác</i>, tích chọn <b>Đối tượng</b>.</p></li>
+            <li><span class="pin">3</span><p>Kiểm tra thật kỹ <b>họ tên và ngày sinh</b>. Đây là thông tin in trên giấy chứng nhận. Viết hoa chữ cái đầu mỗi tiếng, có dấu đầy đủ.</p></li>
+            <li><span class="pin">4</span><p>Bấm <span class="ui">Lưu</span> ở cuối màn hình. Góc màn hình hiện chữ <i>“Đã lưu”</i> là thành công. Quay về <b>Trang chủ</b>: nếu khung khảo sát đã chuyển xanh là hồ sơ đủ, chuyển sang <a href="#khao-sat">Phần 7</a>.</p></li>
+          </ol>
+          <div class="tablebox"><table class="plain">
+            <thead><tr><th>Ô thông tin</th><th>Cách nhập đúng</th></tr></thead>
+            <tbody>
+              <tr><td>Ngày / Tháng / Năm sinh</td><td>3 ô riêng, chỉ gõ số. Ví dụ: 8 · 12 · 1983.</td></tr>
+              <tr><td>Số CCCD</td><td>Đủ 12 chữ số, không dấu cách. Hệ thống báo ngay nếu số đã có người dùng.</td></tr>
+              <tr><td>Nơi sinh, Phường/xã</td><td>Chọn <b>tỉnh/thành trước</b>, sau đó mới chọn được phường/xã.</td></tr>
+              <tr><td>Đơn vị công tác</td><td>Gõ ít nhất 2 chữ trong tên trường rồi chọn trong danh sách gợi ý.</td></tr>
+              <tr><td><b>Đối tượng</b></td><td><b>Bắt buộc.</b> Tích chọn <i>Giáo viên</i> hoặc <i>Cán bộ quản lý</i>. Quyết định bộ phiếu khảo sát Thầy/Cô nhận được.</td></tr>
+              <tr><td>Số điện thoại</td><td>10 chữ số, bắt đầu bằng số 0.</td></tr>
+              <tr><td>Email</td><td>Email cá nhân đang dùng. Sau khi lưu, mở hộp thư và bấm liên kết xác minh.</td></tr>
+              <tr><td>Chuyên môn</td><td>Gõ chuyên môn rồi nhấn Enter. Có thể thêm nhiều chuyên môn.</td></tr>
+              <tr><td>Cấp và môn giảng dạy</td><td>Không bắt buộc. Cán bộ quản lý, nhân viên có thể để trống.</td></tr>
+            </tbody></table></div>
+          <div class="note info"><b>Xác minh email để lấy lại mật khẩu khi quên</b><p>Cạnh ô Email có nhãn <i>Đã xác minh</i> hoặc <i>Chưa xác minh</i>. Nếu chưa xác minh, mở hộp thư (xem cả mục Thư rác/Quảng cáo), bấm liên kết trong thư. Không thấy thư thì bấm <span class="ui">Gửi lại email xác minh</span>.</p></div>
+        </div>
+        <figure class="mock" aria-label="Minh họa trang hồ sơ">
+          <div class="screen">
+            <div class="addr"><b>boiduongnls.hcmue.edu.vn</b>/toi/ho-so</div>
+            <div class="topbar"><span class="logo">HCMUE</span><span class="nav"><span>Trang chủ</span><span class="on">Hồ sơ</span><span>Lớp học</span><span>Xác nhận</span><span>Hỗ trợ</span></span><span class="user"><i class="av">N</i>Nguyễn Thị Lan<u>Đăng xuất</u></span><span class="burger" aria-label="Mở menu"></span></div>
+            <div class="body wide">
+              <div class="m-card">
+                <div class="m-row" style="justify-content:space-between"><b>Thông tin cá nhân <span style="color:var(--m-red)">●</span></b><span class="pin">1</span></div>
+                <div class="m-label">Mã định danh</div><div class="m-input ro">7900012345</div>
+                <div class="m-label">Họ và tên <span class="pin">3</span></div><div class="m-input">Nguyễn Thị Lan</div>
+                <div class="m-label">Ngày / Tháng / Năm sinh</div>
+                <div class="m-row"><div class="m-input">8</div><div class="m-input">12</div><div class="m-input">1983</div></div>
+                <div class="m-label">Số CCCD <span class="pin">2</span></div>
+                <div class="m-input bad">&nbsp;</div><span class="m-need">Cần bổ sung</span>
+                <span class="m-hint">Thông tin này sẽ in trên giấy chứng nhận.</span>
+              </div>
+              <div class="m-card"><b>Công tác <span style="color:var(--m-red)">●</span></b>
+                <div class="m-label">Đối tượng <span class="pin">2</span></div>
+                <div class="m-row"><span class="m-check"><i class="no">&nbsp;</i> Giáo viên</span><span class="m-check"><i class="no">&nbsp;</i> Cán bộ quản lý</span></div>
+                <span class="m-need">Cần bổ sung</span></div>
+              <div class="m-card"><b>Liên hệ</b><div class="m-label">Email <span class="m-badge">Chưa xác minh</span></div><div class="m-input">lan.nguyen@gmail.com</div><div class="m-link">Gửi lại email xác minh</div></div>
+            </div>
+            <div class="m-sticky"><div class="m-btn">Lưu <span class="pin">4</span></div></div>
+          </div>
+          <figcaption>Hình 4. Trang hồ sơ (số liệu minh họa)</figcaption>
+        </figure>
+      </div>
+    </section>
+    <!-- 7 -->
+    <section id="khao-sat">
+      <div class="sec-head"><span class="sec-no">Phần 7</span><h2>Làm khảo sát đầu vào</h2>
+        <p class="lead">Khảo sát làm ngay trên hệ thống, sau khi đăng nhập. Khối khảo sát trên Trang chủ <b>chỉ mở khi hồ sơ đã đủ thông tin</b>. Phải làm phiếu 1 xong rồi mới làm phiếu 2.</p></div>
+      <div class="step flip">
+        <div class="do">
+          <ol>
+            <li><span class="pin">1</span><p>Vào <b>Trang chủ</b>, tìm khung <b>Khảo sát đầu vào đã mở</b>. Nếu khung màu vàng còn liệt kê thông tin cần cập nhật, quay lại <a href="#ho-so">Phần 6</a> để bổ sung.</p></li>
+            <li><span class="pin">2</span><p>Khi khung chuyển màu xanh với dòng <i>“Hồ sơ đã đầy đủ. Thầy/Cô có thể bắt đầu làm khảo sát đầu vào.”</i>, bấm nút làm khảo sát trong khung.</p></li>
+            <li><span class="pin">3</span><p>Làm <b>Phiếu 1 – Khảo sát kĩ năng số</b>. Trả lời hết các câu, bấm gửi ở cuối phiếu.</p></li>
+            <li><span class="pin">4</span><p>Quay lại hệ thống (bấm nút Quay lại của trình duyệt hoặc mở lại boiduongnls.hcmue.edu.vn), làm tiếp <b>Phiếu 2 – Đánh giá năng lực số</b> và bấm gửi.</p></li>
+          </ol>
+          <div class="note info"><b>Không cần tài khoản khác</b><p>Hệ thống tự chuyển Thầy/Cô sang trang làm phiếu, kèm thông tin đã khai trong hồ sơ (họ tên, đơn vị, đối tượng). Thầy/Cô không phải đăng ký hay nhập lại các thông tin này. Tùy cách Ban tổ chức thiết lập, sau khi bấm có thể hiện thêm một trang với các nút <span class="ui">Làm phiếu khảo sát kĩ năng số</span>, <span class="ui">Làm phiếu đánh giá năng lực số</span>.</p></div>
+          <div class="note ok"><b>Sau khi làm xong 2 phiếu</b><p>Ban tổ chức tổng hợp kết quả, xếp mức năng lực (Cơ bản, Thành thạo hoặc Nâng cao) và chia lớp theo trình độ. Thầy/Cô theo dõi nhóm Zalo của cụm để nhận thông báo (<a href="#lop-hoc">Phần 8</a>).</p></div>
+        </div>
+        <figure class="mock" aria-label="Minh họa khối khảo sát đầu vào trên Trang chủ khi hồ sơ đã đầy đủ">
+          <div class="screen">
+            <div class="addr"><b>boiduongnls.hcmue.edu.vn</b>/toi</div>
+            <div class="topbar"><span class="logo">HCMUE</span><span class="nav"><span class="on">Trang chủ</span><span>Hồ sơ</span><span>Lớp học</span><span>Xác nhận</span><span>Hỗ trợ</span></span><span class="user"><i class="av">N</i>Nguyễn Thị Lan<u>Đăng xuất</u></span><span class="burger" aria-label="Mở menu"></span></div>
+            <div class="body">
+              <div class="m-banner ok"><div class="m-row"><b>Khảo sát đầu vào đã mở</b><span class="pin">1</span></div>
+                <span>Hồ sơ đã đầy đủ. Thầy/Cô có thể bắt đầu làm khảo sát đầu vào. <span class="pin">2</span></span>
+                <b style="color:var(--m-fg)">1. Phiếu khảo sát kĩ năng số</b>
+                <div class="m-btn">Mở phiếu khảo sát <span class="pin">3</span></div>
+                <b style="color:var(--m-fg)">2. Phiếu đánh giá năng lực số</b>
+                <div class="m-btn">Mở phiếu đánh giá <span class="pin">4</span></div>
+              </div>
+              <div class="m-tiles">
+                <div class="m-card"><b>Cập nhật hồ sơ</b><span class="m-hint">Xem và chỉnh sửa thông tin cá nhân</span></div>
+                <div class="m-card"><b>Thông tin lớp học</b><span class="m-hint">Lịch học, nhóm Zalo, kết quả đánh giá</span></div>
+              </div>
+            </div>
+          </div>
+          <figcaption>Hình 5. Hồ sơ đủ thì khung chuyển xanh và hiện nút làm phiếu</figcaption>
+        </figure>
+      </div>
+    </section>
+    <!-- 8 -->
+    <section id="lop-hoc">
+      <div class="sec-head"><span class="sec-no">Phần 8</span><h2>Nhóm Zalo hỗ trợ và thông tin lớp học</h2>
+        <p class="lead">Mỗi học viên được xếp vào một <b>cụm hỗ trợ</b> theo địa bàn. Mỗi cụm có một nhóm Zalo để nhận thông báo và hỏi đáp. Thầy/Cô <b>tham gia được ngay khi đăng nhập</b>, không cần chờ làm xong hồ sơ hay khảo sát. Lớp học theo trình độ sẽ được chia sau khi có kết quả khảo sát.</p></div>
+      <div class="step flip">
+        <figure class="mock" aria-label="Minh họa trang lớp học khi đã có cụm Zalo, chưa chia lớp">
+          <div class="screen">
+            <div class="addr"><b>boiduongnls.hcmue.edu.vn</b>/toi/lop-hoc</div>
+            <div class="topbar"><span class="logo">HCMUE</span><span class="nav"><span>Trang chủ</span><span>Hồ sơ</span><span class="on">Lớp học</span><span>Xác nhận</span><span>Hỗ trợ</span></span><span class="user"><i class="av">N</i>Nguyễn Thị Lan<u>Đăng xuất</u></span><span class="burger" aria-label="Mở menu"></span></div>
+            <div class="body">
+              <div class="m-h">Thông tin lớp học</div>
+              <div class="m-card"><b>Khóa Bồi dưỡng Năng lực số</b><span class="m-hint">Thời gian khóa học: từ … đến …</span>
+                <div style="background:#F2F4F7;border-radius:8px;padding:8px;display:grid;gap:5px">
+                  <div class="m-row" style="justify-content:space-between"><b>Cụm hỗ trợ Zalo: Cụm Long Xuyên 2</b><span class="pin">1</span></div>
+                  <span class="m-hint">Ghi chú của Ban tổ chức (nếu có)</span>
+                  <div class="m-btn" style="justify-self:start;padding:5px 10px">Vào nhóm Zalo <span class="pin">2</span></div>
+                </div>
+                <div class="m-card"><div class="m-row" style="justify-content:space-between"><b>GĐ1 · Đánh giá đầu vào</b><span class="pin">3</span></div><span class="m-hint">Thời gian giai đoạn</span></div>
+                <div class="m-card"><div class="m-row"><b>GĐ2 · Học trực tuyến</b><span class="m-badge">Trực tuyến</span></div><span class="m-hint">Thời gian giai đoạn</span></div>
+                <div class="m-banner info"><div class="m-row"><span class="pin">4</span><span>Lưu ý: Danh sách lớp, giảng viên và lịch học chi tiết của từng giai đoạn sẽ được phân chia và cập nhật sau.</span></div></div>
+                <div class="m-row"><span class="m-badge">Đầu vào: Chưa có kết quả</span><span class="m-badge">Đầu ra: Chưa có kết quả</span></div>
+              </div>
+            </div>
+          </div>
+          <figcaption>Hình 6. Có cụm Zalo, chưa chia lớp (tên cụm là ví dụ)</figcaption>
+        </figure>
+        <div class="do">
+          <ol>
+            <li><span class="pin">1</span><p>Bấm <b>Lớp học</b> trên menu. Ngay dưới tên khóa là khối <b>Cụm hỗ trợ Zalo</b> với tên cụm của Thầy/Cô.</p></li>
+            <li><span class="pin">2</span><p>Bấm <span class="ui">Vào nhóm Zalo</span>. Trên điện thoại, Zalo mở ra, bấm <span class="ui">Tham gia nhóm</span>. Trên máy tính, Zalo hiện mã QR: mở Zalo trên điện thoại, chọn biểu tượng quét mã QR để quét.</p></li>
+            <li><span class="pin">3</span><p>Bên dưới là <b>các giai đoạn</b> của khóa học và thời gian của từng giai đoạn.</p></li>
+            <li><span class="pin">4</span><p>Khung <i>“Danh sách lớp… sẽ được phân chia và cập nhật sau”</i> cho biết <b>chưa chia lớp theo trình độ</b>. Đây là bình thường ở giai đoạn này. Theo dõi nhóm Zalo để biết khi nào có lớp.</p></li>
+          </ol>
+          <div class="note ok"><b>Khi đã chia lớp</b><p>Mỗi giai đoạn sẽ hiện tên lớp, giảng viên, người hỗ trợ (kèm số điện thoại nếu có), lịch từng buổi và điểm danh. Phần <i>Kết quả đánh giá</i> hiện mức đầu vào: Cơ bản, Thành thạo hoặc Nâng cao.</p></div>
+          <div class="note info"><b>Mẹo khi dùng nhóm Zalo</b><p>Đặt tên Zalo dễ nhận biết (họ tên, trường) để cán bộ hỗ trợ dễ trao đổi. Đọc tin ghim của nhóm trước khi hỏi. Không gửi mật khẩu hay số CCCD lên nhóm.</p></div>
+        </div>
+      </div>
+    </section>
+    <!-- 9 -->
+    <section id="xac-nhan">
+      <div class="sec-head"><span class="sec-no">Phần 9</span><h2>Xác nhận thông tin cuối khóa</h2>
+        <p class="lead">Thực hiện khi Ban tổ chức mở <b>đợt xác nhận</b> (thường ở cuối khóa, trước khi cấp chứng nhận). Xác nhận là lời cam kết thông tin đúng. Phải xác nhận trong thời hạn của đợt thì hồ sơ mới được ghi nhận.</p></div>
+      <div class="step flip">
+        <figure class="mock" aria-label="Minh họa màn hình xác nhận">
+          <div class="screen">
+            <div class="addr"><b>boiduongnls.hcmue.edu.vn</b>/toi/xac-nhan</div>
+            <div class="topbar"><span class="logo">HCMUE</span><span class="nav"><span>Trang chủ</span><span>Hồ sơ</span><span>Lớp học</span><span class="on">Xác nhận</span><span>Hỗ trợ</span></span><span class="user"><i class="av">N</i>Nguyễn Thị Lan<u>Đăng xuất</u></span><span class="burger" aria-label="Mở menu"></span></div>
+            <div class="body">
+              <div class="m-h">Xem lại &amp; xác nhận</div>
+              <div class="m-card"><div class="m-row"><b>Toàn bộ hồ sơ</b><span class="pin">1</span></div>
+                <div class="m-table"><span>Họ và tên</span><span>Nguyễn Thị Lan</span><span>Ngày sinh</span><span>08/12/1983</span><span>Mã định danh</span><span>7900012345</span><span>Đơn vị</span><span>Trường THCS …</span><span>Email</span><span>lan.nguyen@gmail.com</span></div></div>
+              <div class="m-banner warn"><b>Cảnh báo (không bắt buộc sửa)</b><span>Họ tên nên viết hoa chữ cái đầu.</span></div>
+              <div class="m-check" style="align-items:flex-start"><span class="m-box" aria-hidden="true"></span><span>Tôi xác nhận các thông tin trên là chính xác và chịu trách nhiệm về thông tin đã khai. <span class="pin">2</span></span></div>
+              <div class="m-btn red">Xác nhận <span class="pin">3</span></div>
+            </div>
+          </div>
+          <figcaption>Hình 7. Màn hình xác nhận</figcaption>
+        </figure>
+        <div class="do">
+          <ol>
+            <li><span class="pin">1</span><p>Bấm <b>Xác nhận</b> trên menu. Đọc lại toàn bộ thông tin. Nếu có khung <b>đỏ</b> (lỗi), bấm nút <span class="ui">Sửa</span> cạnh lỗi để quay về đúng ô cần sửa. Khung <b>vàng</b> chỉ là gợi ý, không bắt buộc.</p></li>
+            <li><span class="pin">2</span><p>Tích vào ô cam kết.</p></li>
+            <li><span class="pin">3</span><p>Bấm <span class="ui">Xác nhận</span>. Màn hình báo <i>“Đã xác nhận lúc …”</i> và hệ thống gửi bản sao hồ sơ vào email của Thầy/Cô.</p></li>
+          </ol>
+          <div class="note warn"><b>Sửa hồ sơ sau khi đã xác nhận</b><p>Nếu sửa và lưu lại sau khi xác nhận, lần xác nhận cũ bị hủy. Hệ thống hiện hộp thông báo <i>“Cần xác nhận lại”</i>. Thầy/Cô bấm <span class="ui">Xác nhận lại</span> và làm lại các bước trên trước hạn chót.</p></div>
+        </div>
+      </div>
+    </section>
+    <!-- 10 -->
+    <section id="quen-mat-khau">
+      <div class="sec-head"><span class="sec-no">Phần 10</span><h2>Quên mật khẩu</h2>
+        <p class="lead">Có hai cách, tùy việc email của Thầy/Cô đã được xác minh hay chưa.</p></div>
+      <div class="tablebox"><table class="plain">
+        <thead><tr><th>Trường hợp</th><th>Cách làm</th></tr></thead>
+        <tbody>
+          <tr><td><b>Email đã xác minh</b></td><td>
+            <ol style="margin:0;padding-left:18px">
+              <li>Ở màn hình đăng nhập, bấm <span class="ui">Quên mật khẩu?</span></li>
+              <li>Nhập mã định danh hoặc số CCCD, bấm <span class="ui">Gửi yêu cầu</span>.</li>
+              <li>Mở email (xem cả Thư rác), bấm liên kết đặt lại mật khẩu, đặt mật khẩu mới.</li>
+            </ol></td></tr>
+          <tr><td><b>Email chưa xác minh</b> hoặc không nhận được thư sau 15 phút</td><td>Gửi email tới <b>boiduongnls@hcmue.edu.vn</b> theo mẫu ở <a href="#lien-he">Phần 13</a>. Sau khi xác minh, cán bộ hỗ trợ đặt lại mật khẩu về ngày sinh để Thầy/Cô đăng nhập và đổi lại.</td></tr>
+        </tbody></table></div>
+      <div class="note info"><b>Vì sao màn hình luôn báo đã gửi?</b><p>Để bảo vệ tài khoản, hệ thống luôn hiện cùng một thông báo, kể cả khi mã không đúng hoặc email chưa xác minh. Nếu không nhận được thư, hãy làm theo dòng thứ hai của bảng trên.</p></div>
+    </section>
+    <!-- 11 -->
+    <section id="ho-tro">
+      <div class="sec-head"><span class="sec-no">Phần 11</span><h2>Gửi yêu cầu hỗ trợ trên hệ thống</h2>
+        <p class="lead">Khi đã đăng nhập được, cách nhanh nhất là gửi yêu cầu ngay trên hệ thống. Câu trả lời hiện lại ở cùng trang.</p></div>
+      <div class="step flip">
+        <figure class="mock" aria-label="Minh họa trang hỗ trợ">
+          <div class="screen">
+            <div class="addr"><b>boiduongnls.hcmue.edu.vn</b>/toi/yeu-cau-ho-tro</div>
+            <div class="topbar"><span class="logo">HCMUE</span><span class="nav"><span>Trang chủ</span><span>Hồ sơ</span><span>Lớp học</span><span>Xác nhận</span><span class="on">Hỗ trợ</span></span><span class="user"><i class="av">N</i>Nguyễn Thị Lan<u>Đăng xuất</u></span><span class="burger" aria-label="Mở menu"></span></div>
+            <div class="body">
+              <div class="m-label">Loại vấn đề <span class="pin">1</span></div>
+              <div class="m-input">Thông tin hồ sơ <span>▾</span></div>
+              <div class="m-banner info"><div class="m-row"><b>Gợi ý · Câu hỏi thường gặp</b><span class="pin">2</span></div><span>Thông tin của tôi trên hệ thống chưa đúng?</span></div>
+              <div class="m-label">Nội dung cần hỗ trợ <span class="pin">3</span></div>
+              <div class="m-input" style="min-height:52px;align-items:flex-start">Ngày sinh trên hồ sơ bị sai, đúng là 08/12/1983…</div>
+              <div class="m-btn">Gửi yêu cầu</div>
+              <div class="m-card"><div class="m-row" style="justify-content:space-between"><b>Yêu cầu của tôi</b><span class="pin">4</span></div><span class="m-badge ok">Đã có trả lời</span></div>
+            </div>
+          </div>
+          <figcaption>Hình 8. Trang hỗ trợ (nội dung minh họa)</figcaption>
+        </figure>
+        <div class="do">
+          <ol>
+            <li><span class="pin">1</span><p>Bấm <b>Hỗ trợ</b> trên menu, chọn <b>loại vấn đề</b>.</p></li>
+            <li><span class="pin">2</span><p>Đọc phần <b>gợi ý</b>. Nhiều vấn đề đã có cách giải quyết sẵn.</p></li>
+            <li><span class="pin">3</span><p>Nếu chưa giải quyết được, mô tả rõ vấn đề: đang làm gì, màn hình báo gì. Bấm <span class="ui">Gửi yêu cầu</span>.</p></li>
+            <li><span class="pin">4</span><p>Quay lại trang này sau để xem trạng thái: <i>Đang chờ xử lý</i>, <i>Đã có trả lời</i> hoặc <i>Đã đóng</i>.</p></li>
+          </ol>
+          <div class="note warn"><b>Không đăng nhập được?</b><p>Hãy gửi email tới <b>boiduongnls@hcmue.edu.vn</b> theo mẫu ở <a href="#lien-he">Phần 13</a>.</p></div>
+        </div>
+      </div>
+    </section>
+    <!-- 12 -->
+    <section id="loi">
+      <div class="sec-head"><span class="sec-no">Phần 12</span><h2>Lỗi thường gặp và cách khắc phục</h2>
+        <p class="lead">Gõ vài chữ của thông báo đang thấy trên màn hình để tìm nhanh, hoặc chọn nhóm vấn đề. Bấm vào từng dòng để xem cách xử lý.</p></div>
+      <div class="search">
+        <label for="q" class="ui" style="border:0;background:none;padding:0">Tìm lỗi</label>
+        <input id="q" type="search" placeholder="Ví dụ: mật khẩu, tạm khóa, CCCD…" autocomplete="off">
+      </div>
+      <div class="chips" role="group" aria-label="Lọc theo nhóm">
+        <button type="button" data-g="" aria-pressed="true">Tất cả</button>
+        <button type="button" data-g="truy-cap" aria-pressed="false">Mở trang</button>
+        <button type="button" data-g="dang-nhap" aria-pressed="false">Đăng nhập, mật khẩu</button>
+        <button type="button" data-g="ho-so" aria-pressed="false">Hồ sơ, xác nhận</button>
+        <button type="button" data-g="khao-sat" aria-pressed="false">Khảo sát, Zalo, lớp học</button>
+        <button type="button" data-g="email" aria-pressed="false">Email</button>
+      </div>
+      <div class="errs" id="errs">
+
+        <details class="err" data-g="truy-cap"><summary><span class="err-group">Mở trang</span><span class="err-msg">Gõ địa chỉ nhưng không vào được trang, hoặc ra trang khác</span></summary>
+          <div class="err-body"><p class="why">Thường do gõ vào ô tìm kiếm Google, gõ sai địa chỉ, hoặc mạng yếu.</p><ol><li>Gõ chính xác <b>boiduongnls.hcmue.edu.vn</b> vào <b>ô địa chỉ</b> trên cùng của trình duyệt, không có dấu cách.</li><li>Kiểm tra Wi-Fi hoặc 4G, thử mở một trang khác (ví dụ báo điện tử).</li><li>Thử trình duyệt khác: Chrome, Safari, Edge, Cốc Cốc.</li></ol></div></details>
+
+        <details class="err" data-g="truy-cap"><summary><span class="err-group">Mở trang</span><span class="err-msg">Mở đường dẫn từ Zalo bị trắng trang, không bấm được nút</span></summary>
+          <div class="err-body"><p class="why">Trình duyệt bên trong Zalo đôi khi không hiển thị đầy đủ.</p><ol><li>Bấm biểu tượng <span class="ui">⋯</span> ở góc trên bên phải.</li><li>Chọn <span class="ui">Mở bằng trình duyệt</span> (Chrome hoặc Safari).</li></ol></div></details>
+
+        <details class="err" data-g="truy-cap"><summary><span class="err-group">Mở trang</span><span class="err-msg"><q>Không kết nối được máy chủ. Kiểm tra mạng và thử lại.</q></span></summary>
+          <div class="err-body"><p class="why">Mạng bị ngắt hoặc chập chờn trong lúc thao tác.</p><ol><li>Kiểm tra kết nối mạng.</li><li>Chờ 1–2 phút rồi bấm lại nút vừa bấm.</li><li>Vẫn lỗi sau 30 phút: gửi email hỗ trợ, ghi rõ thời điểm gặp lỗi.</li></ol></div></details>
+
+        <details class="err" data-g="truy-cap"><summary><span class="err-group">Mở trang</span><span class="err-msg">Trang hiển thị lộn xộn hoặc vẫn là nội dung cũ</span></summary>
+          <div class="err-body"><p class="why">Trình duyệt đang dùng bản lưu tạm cũ.</p><ol><li>Tải lại trang: trên máy tính nhấn <kbd>Ctrl</kbd> + <kbd>F5</kbd>; trên điện thoại kéo màn hình xuống hoặc bấm biểu tượng tải lại.</li><li>Nếu chưa được, đóng hẳn trình duyệt rồi mở lại.</li></ol></div></details>
+
+        <details class="err" data-g="dang-nhap"><summary><span class="err-group">Đăng nhập</span><span class="err-msg"><q>Mã định danh hoặc mật khẩu không đúng</q></span></summary>
+          <div class="err-body"><p class="why">Sai mã hoặc sai mật khẩu. Vì lý do bảo mật, hệ thống không nói rõ sai phần nào.</p><ol><li>Kiểm tra mã định danh: chỉ chữ số, không dấu cách, đúng mã nhà trường gửi.</li><li>Lần đầu: mật khẩu là ngày sinh đủ 8 số, có số 0 ở đầu ngày/tháng (dùng <a href="#dang-nhap">công cụ ở Phần 3</a>).</li><li>Nếu đã đổi mật khẩu trước đó: dùng mật khẩu mới, không dùng ngày sinh.</li><li>Bấm biểu tượng con mắt để xem lại mật khẩu đã gõ; chú ý chữ hoa, chữ thường.</li><li>Đừng thử quá 5 lần liên tiếp. Nếu vẫn không được, xem <a href="#quen-mat-khau">Phần 10</a>.</li></ol></div></details>
+
+        <details class="err" data-g="dang-nhap"><summary><span class="err-group">Đăng nhập</span><span class="err-msg"><q>Tài khoản tạm khóa do nhập sai nhiều lần. Thử lại sau …</q></span></summary>
+          <div class="err-body"><p class="why">Nhập sai mật khẩu 5 lần liên tiếp, tài khoản bị khóa 15 phút để chống người lạ dò mật khẩu.</p><ol><li>Chờ đến giờ ghi trong thông báo. Trong lúc khóa, nhập đúng mật khẩu cũng không vào được.</li><li>Kiểm tra lại mật khẩu trước khi thử lần nữa.</li><li>Không nhớ mật khẩu: làm theo <a href="#quen-mat-khau">Phần 10</a>.</li></ol></div></details>
+
+        <details class="err" data-g="dang-nhap"><summary><span class="err-group">Đăng nhập</span><span class="err-msg"><q>Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút</q></span></summary>
+          <div class="err-body"><p class="why">Bấm nút đăng nhập quá nhiều lần trong một phút.</p><ol><li>Chờ khoảng 1 phút rồi thử lại.</li><li>Mỗi lần chỉ bấm nút một lần và chờ kết quả.</li></ol></div></details>
+
+        <details class="err" data-g="dang-nhap"><summary><span class="err-group">Đăng nhập</span><span class="err-msg">Không biết mã định danh của mình</span></summary>
+          <div class="err-body"><p class="why">Mã định danh là mã của Thầy/Cô trên cơ sở dữ liệu ngành giáo dục.</p><ol><li>Liên hệ cán bộ phụ trách của nhà trường.</li><li>Hoặc gửi email hỗ trợ kèm họ tên, ngày sinh, trường công tác.</li></ol></div></details>
+
+        <details class="err" data-g="dang-nhap"><summary><span class="err-group">Mật khẩu</span><span class="err-msg">Không đổi được mật khẩu mới, nút không có tác dụng</span></summary>
+          <div class="err-body"><p class="why">Mật khẩu mới chưa đạt đủ 4 điều kiện.</p><ol><li>Ít nhất 8 ký tự.</li><li>Có cả chữ và số, ví dụ <b>hoahong2026</b>.</li><li>Không được là ngày sinh và không trùng mật khẩu cũ.</li><li>Hai ô mật khẩu mới phải gõ giống hệt nhau.</li></ol></div></details>
+
+        <details class="err" data-g="dang-nhap"><summary><span class="err-group">Đăng nhập</span><span class="err-msg"><q>Phiên đăng nhập đã hết hạn</q></span></summary>
+          <div class="err-body"><p class="why">Để trang mở quá lâu không thao tác, hoặc đã đăng xuất ở thẻ khác.</p><ol><li>Đăng nhập lại.</li><li>Nếu đang sửa hồ sơ dở, kiểm tra và nhập lại các ô chưa kịp lưu.</li></ol></div></details>
+
+        <details class="err" data-g="ho-so"><summary><span class="err-group">Hồ sơ</span><span class="err-msg"><q>Hiện không trong thời gian chỉnh sửa hồ sơ</q> · các ô không sửa được</span></summary>
+          <div class="err-body"><p class="why">Ban tổ chức chưa mở đợt xác nhận, hoặc đợt đã kết thúc.</p><ol><li>Chờ thông báo mở đợt xác nhận.</li><li>Nếu thông tin sai cần sửa gấp, gửi yêu cầu hỗ trợ kèm thông tin đúng.</li></ol></div></details>
+
+        <details class="err" data-g="ho-so"><summary><span class="err-group">Hồ sơ</span><span class="err-msg">Số CCCD báo đã có người sử dụng</span></summary>
+          <div class="err-body"><p class="why">Số CCCD gõ nhầm, hoặc đã có hồ sơ khác dùng số này.</p><ol><li>Đối chiếu lại từng số với thẻ căn cước, đủ 12 số.</li><li>Nếu chắc chắn đúng, gửi yêu cầu hỗ trợ. Không tự tạo thêm tài khoản khác.</li></ol></div></details>
+
+        <details class="err" data-g="ho-so"><summary><span class="err-group">Hồ sơ</span><span class="err-msg">Số điện thoại báo không hợp lệ</span></summary>
+          <div class="err-body"><p class="why">Số điện thoại phải có 10 chữ số và bắt đầu bằng số 0.</p><ol><li>Gõ liền, không dấu cách hay dấu chấm, ví dụ <b>0912345678</b>.</li><li>Không ghi mã quốc gia +84.</li></ol></div></details>
+
+        <details class="err" data-g="ho-so"><summary><span class="err-group">Hồ sơ</span><span class="err-msg">Không chọn được phường/xã, hoặc phường/xã bị xóa</span></summary>
+          <div class="err-body"><p class="why">Danh sách phường/xã phụ thuộc tỉnh/thành đã chọn. Đổi tỉnh thì phường/xã cũ bị xóa.</p><ol><li>Chọn tỉnh/thành trước.</li><li>Sau đó mở ô phường/xã và chọn lại.</li></ol></div></details>
+
+        <details class="err" data-g="ho-so"><summary><span class="err-group">Hồ sơ</span><span class="err-msg">Không tìm thấy trường công tác trong danh sách</span></summary>
+          <div class="err-body"><p class="why">Cần gõ đủ chữ để hệ thống gợi ý. Tên trường có thể khác cách gọi quen thuộc.</p><ol><li>Gõ phần tên riêng của trường, ví dụ “Nguyễn Du” thay vì “Trường THCS”.</li><li>Gõ có dấu tiếng Việt.</li><li>Vẫn không có: gửi yêu cầu hỗ trợ, ghi tên trường và xã/phường.</li></ol></div></details>
+
+        <details class="err" data-g="ho-so"><summary><span class="err-group">Hồ sơ</span><span class="err-msg">Họ tên hiện cảnh báo vàng về viết hoa</span></summary>
+          <div class="err-body"><p class="why">Họ tên chưa viết hoa chữ cái đầu mỗi tiếng.</p><ol><li>Bấm nút <span class="ui">Dùng dạng chuẩn</span> ngay dưới ô để hệ thống sửa giúp.</li><li>Kiểm tra lại dấu thanh, rồi bấm Lưu.</li></ol></div></details>
+
+        <details class="err" data-g="ho-so"><summary><span class="err-group">Xác nhận</span><span class="err-msg">Nút <q>Xác nhận</q> bị mờ, không bấm được</span></summary>
+          <div class="err-body"><p class="why">Hồ sơ còn lỗi (khung đỏ), hoặc chưa tích ô cam kết.</p><ol><li>Xem khung đỏ, bấm <span class="ui">Sửa</span> cạnh từng lỗi, sửa xong bấm Lưu.</li><li>Quay lại trang Xác nhận, tích ô cam kết rồi bấm Xác nhận.</li></ol></div></details>
+
+        <details class="err" data-g="ho-so"><summary><span class="err-group">Xác nhận</span><span class="err-msg">Hộp thông báo <q>Cần xác nhận lại</q></span></summary>
+          <div class="err-body"><p class="why">Thầy/Cô đã sửa hồ sơ sau khi xác nhận, nên lần xác nhận cũ không còn hiệu lực.</p><ol><li>Bấm <span class="ui">Xác nhận lại</span>.</li><li>Làm lại các bước ở <a href="#xac-nhan">Phần 9</a> trước hạn chót.</li></ol></div></details>
+
+        <details class="err" data-g="khao-sat"><summary><span class="err-group">Khảo sát</span><span class="err-msg">Nút phiếu màu xám, ghi <q>Đường dẫn đang được cập nhật</q></span></summary>
+          <div class="err-body"><p class="why">Ban tổ chức chưa mở phiếu này.</p><ol><li>Chờ thông báo, sau đó tải lại trang.</li></ol></div></details>
+
+        <details class="err" data-g="khao-sat"><summary><span class="err-group">Khảo sát</span><span class="err-msg">Không thấy nút làm khảo sát, chỉ thấy <q>Thầy/Cô cần hoàn thành cập nhật các thông tin sau…</q></span></summary>
+          <div class="err-body"><p class="why">Hồ sơ còn thiếu thông tin bắt buộc. Khảo sát chỉ mở khi hồ sơ đầy đủ. Hay thiếu nhất là mục Đối tượng.</p><ol><li>Bấm <span class="ui">Cập nhật thông tin hồ sơ</span>.</li><li>Bổ sung đúng các mục được liệt kê trong khung vàng, nhớ chọn <b>Đối tượng</b>.</li><li>Bấm <span class="ui">Lưu</span>, quay về Trang chủ và tải lại trang. Khung chuyển xanh là làm được.</li></ol></div></details>
+
+        <details class="err" data-g="khao-sat"><summary><span class="err-group">Khảo sát</span><span class="err-msg">Đã chọn sai Đối tượng (Giáo viên / Cán bộ quản lý)</span></summary>
+          <div class="err-body"><p class="why">Bộ phiếu khảo sát mở theo Đối tượng đã chọn trong hồ sơ.</p><ol><li><b>Chưa làm phiếu:</b> vào Hồ sơ, chọn lại Đối tượng, bấm Lưu rồi mới làm khảo sát.</li><li><b>Đã làm phiếu:</b> vẫn sửa lại Đối tượng trong Hồ sơ, sau đó gửi email hỗ trợ ghi rõ họ tên, mã định danh, đối tượng đúng để được hướng dẫn làm lại.</li></ol></div></details>
+
+        <details class="err" data-g="khao-sat"><summary><span class="err-group">Khảo sát</span><span class="err-msg">Bấm nút làm khảo sát nhưng báo lỗi, không chuyển trang</span></summary>
+          <div class="err-body"><p class="why">Mạng chập chờn hoặc phiên đăng nhập đã hết hạn.</p><ol><li>Tải lại trang, đăng nhập lại nếu được yêu cầu.</li><li>Bấm lại nút làm khảo sát (mỗi lần chỉ bấm một lần).</li><li>Vẫn lỗi: gửi yêu cầu hỗ trợ, chụp màn hình thông báo lỗi.</li></ol></div></details>
+
+        <details class="err" data-g="khao-sat"><summary><span class="err-group">Khảo sát</span><span class="err-msg">Lỡ làm phiếu 2 trước phiếu 1, hoặc trả lời nhầm trong phiếu</span></summary>
+          <div class="err-body"><p class="why">Phiếu đã gửi không tự sửa được.</p><ol><li>Nếu chưa làm phiếu 1, làm ngay phiếu 1.</li><li>Gửi email hỗ trợ, ghi rõ đã làm nhầm phiếu nào, lúc nào.</li></ol></div></details>
+
+        <details class="err" data-g="khao-sat"><summary><span class="err-group">Zalo</span><span class="err-msg">Không thấy khối <q>Cụm hỗ trợ Zalo</q> trong trang Lớp học</span></summary>
+          <div class="err-body"><p class="why">Ban tổ chức chưa xếp Thầy/Cô vào cụm hỗ trợ.</p><ol><li>Tải lại trang sau ít giờ.</li><li>Nếu đồng nghiệp cùng trường đã có cụm mà Thầy/Cô chưa có, gửi yêu cầu hỗ trợ.</li></ol></div></details>
+
+        <details class="err" data-g="khao-sat"><summary><span class="err-group">Zalo</span><span class="err-msg">Bấm <q>Vào nhóm Zalo</q> nhưng không mở được nhóm</span></summary>
+          <div class="err-body"><p class="why">Máy chưa cài Zalo, hoặc đang mở trên máy tính.</p><ol><li>Trên điện thoại: cài Zalo, đăng nhập Zalo rồi bấm lại nút.</li><li>Trên máy tính: Zalo mở trang có mã QR. Mở Zalo trên điện thoại, chọn biểu tượng quét mã QR và quét mã đó.</li><li>Nếu nhóm yêu cầu duyệt, chờ trưởng nhóm duyệt.</li></ol></div></details>
+
+        <details class="err" data-g="khao-sat"><summary><span class="err-group">Đánh giá</span><span class="err-msg"><q>Đã hết thời gian xác nhận để làm bài đánh giá</q></span></summary>
+          <div class="err-body"><p class="why">Đợt xác nhận đã đóng khi hồ sơ chưa đủ điều kiện.</p><ol><li>Gửi email hỗ trợ ngay, ghi họ tên, mã định danh, trường công tác để được hướng dẫn.</li></ol></div></details>
+
+        <details class="err" data-g="khao-sat"><summary><span class="err-group">Lớp học</span><span class="err-msg"><q>Thầy/Cô chưa được ghi danh vào khóa bồi dưỡng nào</q></span></summary>
+          <div class="err-body"><p class="why">Ban tổ chức chưa xếp lớp xong.</p><ol><li>Chờ thông báo xếp lớp.</li><li>Nếu bạn bè cùng trường đã có lớp mà Thầy/Cô chưa có, gửi yêu cầu hỗ trợ.</li></ol></div></details>
+
+        <details class="err" data-g="email"><summary><span class="err-group">Email</span><span class="err-msg">Không nhận được email từ hệ thống</span></summary>
+          <div class="err-body"><p class="why">Thư có thể vào mục Thư rác/Quảng cáo, hoặc email trong hồ sơ bị gõ sai.</p><ol><li>Mở hộp thư, xem cả <b>Thư rác (Spam)</b>, <b>Quảng cáo</b>, <b>Cập nhật</b>.</li><li>Kiểm tra lại email trong trang Hồ sơ.</li><li>Đánh dấu thư từ hệ thống là “Không phải thư rác” để lần sau nhận bình thường.</li></ol></div></details>
+
+        <details class="err" data-g="email"><summary><span class="err-group">Email</span><span class="err-msg"><q>Liên kết không hợp lệ hoặc đã hết hạn</q> khi bấm liên kết trong thư</span></summary>
+          <div class="err-body"><p class="why">Liên kết đã dùng rồi, hoặc đã quá thời hạn.</p><ol><li>Xác minh email: vào Hồ sơ, bấm <span class="ui">Gửi lại email xác minh</span>, dùng thư mới nhất.</li><li>Đặt lại mật khẩu: làm lại bước <span class="ui">Quên mật khẩu?</span>.</li></ol></div></details>
+
+        <p class="empty" id="empty" hidden>Chưa tìm thấy lỗi phù hợp. Thầy/Cô gửi email tới boiduongnls@hcmue.edu.vn theo mẫu ở Phần 13.</p>
+      </div>
+    </section>
+    <!-- 13 -->
+    <section id="lien-he">
+      <div class="sec-head"><span class="sec-no">Phần 13</span><h2>Liên hệ hỗ trợ và an toàn tài khoản</h2>
+        <p class="lead">Viết email đủ thông tin theo mẫu dưới đây giúp cán bộ hỗ trợ xử lý ngay, không phải hỏi lại.</p></div>
+      <div class="contact">
+        <div class="box">
+          <b>Email hỗ trợ</b>
+          <span class="mail" id="mail">boiduongnls@hcmue.edu.vn</span>
+          <button class="copy" type="button" data-copy="mail">Sao chép địa chỉ email</button>
+          <span style="color:var(--muted);font-size:.9rem">Gửi từ email cá nhân Thầy/Cô đã khai trong hồ sơ (nếu có).</span>
+        </div>
+        <div class="box">
+          <b>Mẫu email</b>
+<pre class="tpl" id="tpl">Tiêu đề: [Hỗ trợ BDNLS] Họ tên – vấn đề gặp phải
+
+Họ và tên:
+Ngày sinh:
+Mã định danh (nếu biết):
+Trường công tác, xã/phường, tỉnh/thành:
+Số điện thoại:
+Vấn đề gặp phải (đang làm bước nào, màn hình báo gì):
+Thời điểm gặp lỗi:
+(Đính kèm ảnh chụp màn hình nếu có)</pre>
+          <button class="copy" type="button" data-copy="tpl">Sao chép mẫu email</button>
+        </div>
+      </div>
+      <div class="note warn"><b>Không bao giờ gửi mật khẩu</b><p>Cán bộ hỗ trợ không bao giờ hỏi mật khẩu của Thầy/Cô. Không ghi mật khẩu trong email hay tin nhắn.</p></div>
+      <h3>Giữ an toàn tài khoản</h3>
+      <div class="safe">
+        <div>Chỉ đăng nhập tại <b>boiduongnls.hcmue.edu.vn</b>. Cảnh giác với trang có địa chỉ na ná.</div>
+        <div>Thư chính thức gửi từ địa chỉ có đuôi <b>@hcmue.edu.vn</b>.</div>
+        <div>Bấm <span class="ui">Đăng xuất</span> khi dùng máy tính chung ở trường hoặc quán.</div>
+        <div>Không chia sẻ mật khẩu, kể cả với đồng nghiệp làm hộ.</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer>Trường Đại học Sư phạm Thành phố Hồ Chí Minh · Hệ thống Bồi dưỡng Năng lực số · boiduongnls.hcmue.edu.vn · boiduongnls@hcmue.edu.vn<br>Hình minh họa mô phỏng giao diện, tên và số liệu trong hình là ví dụ.</footer>
+
+<script>
+(function(){
+  // Công cụ mật khẩu lần đầu
+  var d=document.getElementById('pw-d'),m=document.getElementById('pw-m'),y=document.getElementById('pw-y'),out=document.getElementById('pw-out');
+  function opts(el,a,b,sel){for(var i=a;i<=b;i++){var o=document.createElement('option');o.value=i;o.textContent=i;if(i===sel)o.selected=true;el.appendChild(o);}}
+  opts(d,1,31,8);opts(m,1,12,12);opts(y,1950,2008,1983);
+  function p2(n){return (n<10?'0':'')+n;}
+  function upd(){out.textContent=p2(+d.value)+p2(+m.value)+y.value;}
+  [d,m,y].forEach(function(el){el.addEventListener('change',upd);});upd();
+
+  // Kiểu hình minh họa: máy tính / điện thoại
+  var nutView=[].slice.call(document.querySelectorAll('.view button'));
+  function datView(v){document.body.classList.toggle('pc',v==='pc');nutView.forEach(function(b){b.setAttribute('aria-pressed',b.dataset.v===v?'true':'false');});try{localStorage.setItem('hinh',v);}catch(e){}}
+  var vDau=null;try{vDau=localStorage.getItem('hinh');}catch(e){}
+  if(vDau!=='pc'&&vDau!=='phone')vDau=window.matchMedia('(min-width: 980px)').matches?'pc':'phone';
+  datView(vDau);
+  nutView.forEach(function(b){b.addEventListener('click',function(){datView(b.dataset.v);});});
+
+  // Lọc lỗi
+  var q=document.getElementById('q'),items=[].slice.call(document.querySelectorAll('details.err')),chips=[].slice.call(document.querySelectorAll('.chips button')),empty=document.getElementById('empty'),g='';
+  function bo(s){return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d');}
+  function loc(){var k=bo(q.value.trim()),n=0;items.forEach(function(it){var ok=(!g||it.dataset.g===g)&&(!k||bo(it.textContent).indexOf(k)>-1);it.hidden=!ok;if(ok)n++;if(k&&ok&&n<=3)it.open=true;});empty.hidden=n>0;}
+  q.addEventListener('input',loc);
+  chips.forEach(function(c){c.addEventListener('click',function(){g=c.dataset.g;chips.forEach(function(x){x.setAttribute('aria-pressed',x===c?'true':'false');});loc();});});
+
+  // Sao chép
+  document.querySelectorAll('[data-copy]').forEach(function(b){b.addEventListener('click',function(){
+    var el=document.getElementById(b.dataset.copy),txt=el.textContent,goc=b.textContent;
+    function xong(t){b.textContent=t;setTimeout(function(){b.textContent=goc;},2000);}
+    function chon(){var r=document.createRange();r.selectNodeContents(el);var s=getSelection();s.removeAllRanges();s.addRange(r);xong('Đã chọn, nhấn giữ để sao chép');}
+    try{navigator.clipboard.writeText(txt).then(function(){xong('Đã sao chép');},chon);}catch(e){chon();}
+  });});
+})();
+</script>

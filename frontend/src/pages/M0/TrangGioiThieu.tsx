@@ -102,10 +102,13 @@ export default function TrangGioiThieu() {
     (viSao.hien || noiDung.hien) && { href: viSao.hien ? '#vi-sao' : '#chuong-trinh', label: 'Chương trình' },
     loTrinh.hien && { href: '#lo-trinh', label: 'Lộ trình học' },
     doiTuong.hien && { href: '#doi-tuong', label: 'Đối tượng' },
-    hienHuongDan && { href: '#huong-dan', label: 'Hướng dẫn' },
+    // "Bắt đầu" (khối 4 bước, #huong-dan) tách khỏi mục "Hướng dẫn sử dụng" (/huong-dan, M9) bên dưới,
+    // tránh 2 mục trùng nhãn trên cùng thanh menu.
+    hienHuongDan && { href: '#huong-dan', label: 'Bắt đầu' },
     hoiDap.hien && { href: '#faq', label: 'Hỏi đáp' },
     lienHe.hien && { href: '#lien-he', label: 'Liên hệ' },
     hopTac.hien && { href: '#hop-tac', label: 'Hợp tác' },
+    { href: '/huong-dan', label: gioiThieu.huongDanSuDung.nhanMenu },
   ].filter((m): m is { href: string; label: string } => Boolean(m));
 
   const hasHeroPanel = noiDung.hien && noiDung.danhSachMuc.length > 0;
@@ -166,6 +169,11 @@ export default function TrangGioiThieu() {
             <Box maw={640} mx="auto" w="100%">
               <DanhSachBuocSo buoc={huongDan.buoc} mau="accent" />
             </Box>
+            <Group justify="center">
+              <Button component={Link} to="/huong-dan" variant="outline" color="accent">
+                {gioiThieu.huongDanSuDung.nutChiTiet}
+              </Button>
+            </Group>
           </Stack>
         </KhoiTrang>
       )}
@@ -298,20 +306,25 @@ function HeaderCongKhai({ mucLuc, cta }: { mucLuc: { href: string; label: string
   );
 }
 
-/** Mục menu ngang (desktop) — đổi màu chữ sang primary khi hover, để biết đang trỏ vào mục nào. */
+/** Mục menu ngang (desktop) — đổi màu chữ sang primary khi hover, để biết đang trỏ vào mục nào.
+ * href bắt đầu bằng "#" là neo trong trang (thẻ a thường); còn lại là route nội bộ (vd /huong-dan, dùng Link). */
 function MucLucLinkDesktop({ href, label }: { href: string; label: string }) {
   const [hovered, setHovered] = useState(false);
-  return (
-    <Anchor
-      href={href}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      fz={13.5}
-      fw={600}
-      c={hovered ? 'primary.6' : 'gray.7'}
-      underline="never"
-      style={{ whiteSpace: 'nowrap', transition: 'color .15s ease' }}
-    >
+  const chung = {
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+    fz: 13.5,
+    fw: 600,
+    c: hovered ? 'primary.6' : 'gray.7',
+    underline: 'never' as const,
+    style: { whiteSpace: 'nowrap' as const, transition: 'color .15s ease' },
+  };
+  return href.startsWith('#') ? (
+    <Anchor href={href} {...chung}>
+      {label}
+    </Anchor>
+  ) : (
+    <Anchor component={Link} to={href} {...chung}>
       {label}
     </Anchor>
   );
@@ -320,23 +333,27 @@ function MucLucLinkDesktop({ href, label }: { href: string; label: string }) {
 /** Mục menu trong Drawer (mobile) — nền primary nhạt + chữ primary khi hover/chạm. */
 function MucLucLinkDrawer({ href, label, onClick }: { href: string; label: string; onClick: () => void }) {
   const [hovered, setHovered] = useState(false);
-  return (
-    <Anchor
-      href={href}
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      px="md"
-      py={10}
-      fw={600}
-      c={hovered ? 'primary.7' : 'dark'}
-      style={{
-        borderRadius: 8,
-        textDecoration: 'none',
-        background: hovered ? 'var(--mantine-color-primary-0)' : 'transparent',
-        transition: 'background .15s ease, color .15s ease',
-      }}
-    >
+  const chung = {
+    onClick,
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+    px: 'md' as const,
+    py: 10,
+    fw: 600,
+    c: hovered ? 'primary.7' : 'dark',
+    style: {
+      borderRadius: 8,
+      textDecoration: 'none',
+      background: hovered ? 'var(--mantine-color-primary-0)' : 'transparent',
+      transition: 'background .15s ease, color .15s ease',
+    },
+  };
+  return href.startsWith('#') ? (
+    <Anchor href={href} {...chung}>
+      {label}
+    </Anchor>
+  ) : (
+    <Anchor component={Link} to={href} {...chung}>
       {label}
     </Anchor>
   );
@@ -1023,7 +1040,7 @@ function KhoiHopTac({ hopTac }: { hopTac: typeof gioiThieu.hopTac }) {
 function FooterCongKhai({ donVi }: { donVi: typeof gioiThieu.donVi }) {
   const doiTacHien = donVi.hien ? donVi.phoiHop.filter((p) => p.hien) : [];
   return (
-    <Box bg="#0F2942" py={{ base: 20, sm: 24 }} px={{ base: 'md', sm: 'xl' }}>
+    <Box component="footer" bg="#0F2942" py={{ base: 20, sm: 24 }} px={{ base: 'md', sm: 'xl' }}>
       <Container size="lg" p={0}>
         <Stack gap={4} ta="center">
           <Text fz={13} c="gray.3">
@@ -1044,6 +1061,12 @@ function FooterCongKhai({ donVi }: { donVi: typeof gioiThieu.donVi }) {
           <Group justify="center" gap="xs" mt={4}>
             <Anchor component={Link} to="/dang-nhap" fz={12.5} c="gray.3">
               Đăng nhập hệ thống
+            </Anchor>
+            <Text fz={11.5} c="gray.5">
+              ·
+            </Text>
+            <Anchor component={Link} to="/huong-dan" fz={12.5} c="gray.3">
+              {gioiThieu.huongDanSuDung.lienKetChanTrang}
             </Anchor>
             <Text fz={11.5} c="gray.5">
               · © {new Date().getFullYear()}

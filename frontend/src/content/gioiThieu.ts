@@ -41,6 +41,8 @@ export interface NoiDungGioiThieu {
     }[];
   };
   huongDan: Khoi & { tieuDe: string; buoc: { ten: string; moTa: string }[] };
+  /** Lối vào trang Hướng dẫn sử dụng (M9, /huong-dan) — luôn hiện, không phụ thuộc chế độ triển khai. */
+  huongDanSuDung: { nhanMenu: string; nutChiTiet: string; lienKetChanTrang: string };
   hoiDap: Khoi & { tieuDe: string; cau: { hoi: string; dap: string; cheDo?: CheDoHocVien }[] };
   lienHe: Khoi & { tieuDe: string; hotline: string; zalo: string; email: string; gioHoTro: string };
   hopTac: Khoi & { tieuDe: string; moTa: string; hotline: string; email: string };
@@ -293,6 +295,12 @@ export const gioiThieu: NoiDungGioiThieu = {
       { ten: 'Bổ sung và xác nhận hồ sơ', moTa: 'Kiểm tra thông tin, sửa nếu chưa đúng, bổ sung phần còn thiếu, rồi bấm Xác nhận trong thời gian quy định.' },
       { ten: 'Làm bài đánh giá đầu vào', moTa: 'Khi hồ sơ đã đầy đủ và được xác nhận, đường dẫn làm bài sẽ hiện trên trang của thầy cô.' },
     ],
+  },
+
+  huongDanSuDung: {
+    nhanMenu: 'Hướng dẫn sử dụng',
+    nutChiTiet: 'Xem hướng dẫn chi tiết từng bước',
+    lienKetChanTrang: 'Hướng dẫn sử dụng',
   },
 
   hoiDap: {

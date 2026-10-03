@@ -107,7 +107,6 @@ if [ ! -f .env ]; then
   cp .env.example .env
   sed -i "s#^VITE_API_BASE_URL=.*#VITE_API_BASE_URL=https://${DOMAIN}#" .env
   sed -i "s#^VITE_SITE_URL=.*#VITE_SITE_URL=https://${DOMAIN}#" .env
-  echo "    -> Nho dien VITE_HOTRO_LIEN_HE that trong ${APP_DIR}/frontend/.env"
 else
   echo "==> frontend/.env da ton tai, giu nguyen"
 fi

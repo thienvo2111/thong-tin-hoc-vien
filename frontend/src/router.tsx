@@ -9,6 +9,12 @@ export const router = createBrowserRouter([
     lazy: () => import('@/pages/M0/TrangGioiThieu').then((m) => ({ Component: m.default })),
   },
   {
+    // Công khai, ngoài RequireAuth — M9 (dac-ta-cong-hoc-vien.md § M9). Route riêng (lazy) nên không
+    // kéo nội dung/ảnh của M9 vào chunk M0.
+    path: '/huong-dan',
+    lazy: () => import('@/pages/M9/HuongDan').then((m) => ({ Component: m.default })),
+  },
+  {
     lazy: () => import('@/app/KhungNoiBo').then((m) => ({ Component: m.default })),
     children: [
       {

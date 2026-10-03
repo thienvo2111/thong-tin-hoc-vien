@@ -68,11 +68,27 @@ export default function TrangChinh() {
               {mucDo && cauHinh.khaoSatDauRaMo && <KhoiKhaoSatDauRa mucDo={mucDo} />}
             </Stack>
 
+            <TheHuongDan />
+
             <MenuChinh />
           </>
         )}
       </Stack>
     </Container>
+  );
+}
+
+/** Lối tắt sang Hướng dẫn sử dụng (M9, /huong-dan) — công khai, ngoài RequireAuth. */
+function TheHuongDan() {
+  return (
+    <Card padding="md" radius="md" withBorder>
+      <Group justify="space-between" wrap="wrap" gap="sm">
+        <Text size="sm">Lần đầu sử dụng hệ thống? Xem hướng dẫn từng bước có hình minh họa</Text>
+        <Button component={Link} to="/huong-dan" variant="light" size="xs">
+          Xem hướng dẫn
+        </Button>
+      </Group>
+    </Card>
   );
 }
 

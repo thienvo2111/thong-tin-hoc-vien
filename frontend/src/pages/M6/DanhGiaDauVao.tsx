@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Box, Button, Center, Container, CopyButton, Group, List, Loader, Stack, Text, TextInput, Title } from '@mantine/core';
+import { EMAIL_HO_TRO } from '@/content/hoTro';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { capMaSso, useDanhGiaDauVao, type SsoTarget } from '@/api/hocVien';
@@ -42,7 +43,7 @@ function NoiDung({ data }: { data: DanhGiaDauVao }) {
   if (data.du_dieu_kien) return data.kenh === 'sso' ? <KhoiSso /> : <KhoiDuDieuKien data={data} />;
 
   if (data.het_han) {
-    const hoTro = import.meta.env.VITE_HOTRO_LIEN_HE || 'bộ phận hỗ trợ';
+    const hoTro = `email ${EMAIL_HO_TRO}`;
     return (
       <StatusBanner loai="warning">
         Đã hết thời gian xác nhận để làm bài đánh giá. Thầy/Cô liên hệ {hoTro} để được hướng dẫn.

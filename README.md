@@ -132,7 +132,7 @@ Swagger UI có tại http://localhost:3000/api sau khi chạy backend.
 ```bash
 cd frontend
 npm install
-cp .env.example .env   # chỉnh VITE_API_BASE_URL, VITE_HOTRO_LIEN_HE
+cp .env.example .env   # chỉnh VITE_API_BASE_URL
 npm run dev
 ```
 

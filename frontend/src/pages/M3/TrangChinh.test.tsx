@@ -89,6 +89,11 @@ describe('M3 — Trang chính', () => {
     expect(await screen.findByRole('link', { name: /Cập nhật hồ sơ/ })).toHaveAttribute('href', '/toi/ho-so');
     expect(screen.getByRole('link', { name: /Thông tin lớp học/ })).toHaveAttribute('href', '/toi/lop-hoc');
   });
+
+  it('có thẻ lối tắt sang Hướng dẫn sử dụng (M9)', async () => {
+    renderDaDangNhap();
+    expect(await screen.findByRole('link', { name: 'Xem hướng dẫn' })).toHaveAttribute('href', '/huong-dan');
+  });
 });
 
 describe('M3 — lời chào theo giới tính', () => {

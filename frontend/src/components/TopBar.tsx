@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Avatar, Box, Burger, Button, Drawer, Group, Image, Stack, Text } from '@mantine/core';
+import { Anchor, Avatar, Box, Burger, Button, Drawer, Group, Image, Stack, Text } from '@mantine/core';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useToi } from '@/auth/AuthContext';
 import { useHoSoToi } from '@/api/hocVien';
 import logoHcmue from '@/assets/logo-hcmue.png';
 import { useCauHinhTrienKhai } from '@/content/trienKhai';
+import { EMAIL_HO_TRO } from '@/content/hoTro';
 
 function taoMenu(danhGiaDauVaoTrongCong: boolean) {
   return [
@@ -15,6 +16,8 @@ function taoMenu(danhGiaDauVaoTrongCong: boolean) {
     // Ẩn khi đánh giá đầu vào làm qua phiếu khảo sát ngoài (cấu hình tại /admin/cau-hinh-khao-sat).
     ...(danhGiaDauVaoTrongCong ? [{ toi: '/toi/danh-gia-dau-vao', nhan: 'Đánh giá đầu vào' }] : []),
     { toi: '/toi/yeu-cau-ho-tro', nhan: 'Hỗ trợ' },
+    // Trang công khai (M9, ngoài RequireAuth) — mở cùng tab, không thuộc cây route /toi.
+    { toi: '/huong-dan', nhan: 'Hướng dẫn' },
   ];
 }
 
@@ -26,7 +29,6 @@ export function TopBar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: hoSo } = useHoSoToi();
-  const hoTro = import.meta.env.VITE_HOTRO_LIEN_HE;
   const [menuMoDt, setMenuMoDt] = useState(false);
 
   async function xuLyDangXuat() {
@@ -67,11 +69,12 @@ export function TopBar() {
         </Group>
 
         <Group gap="md" wrap="nowrap" visibleFrom="sm">
-          {hoTro && (
-            <Text size="sm" c="gray.4">
-              Hỗ trợ: {hoTro}
-            </Text>
-          )}
+          <Text size="sm" c="gray.4">
+            Hỗ trợ:{' '}
+            <Anchor href={`mailto:${EMAIL_HO_TRO}`} c="gray.3" size="sm">
+              {EMAIL_HO_TRO}
+            </Anchor>
+          </Text>
           <Group gap="xs" wrap="nowrap">
             <Avatar radius="xl" color="accent" size={36}>
               {chuCaiDau}
@@ -109,11 +112,12 @@ export function TopBar() {
               {m.nhan}
             </Text>
           ))}
-          {hoTro && (
-            <Text size="sm" c="dimmed" px="md">
-              Hỗ trợ: {hoTro}
-            </Text>
-          )}
+          <Text size="sm" c="dimmed" px="md">
+            Email hỗ trợ:{' '}
+            <Anchor href={`mailto:${EMAIL_HO_TRO}`} size="sm">
+              {EMAIL_HO_TRO}
+            </Anchor>
+          </Text>
           <Button variant="light" onClick={xuLyDangXuat}>
             Đăng xuất
           </Button>

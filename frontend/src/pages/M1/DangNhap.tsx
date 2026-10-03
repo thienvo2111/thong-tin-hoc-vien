@@ -9,6 +9,7 @@ import { useToi } from '@/auth/AuthContext';
 import { dangNhapSchema, type DangNhapForm } from '@/schemas/dangNhap';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { gioiThieu } from '@/content/gioiThieu';
+import { EMAIL_HO_TRO } from '@/content/hoTro';
 import { StatusBanner } from '@/components/StatusBanner';
 import { trangChuTheoVaiTro } from '@/lib/trangChuTheoVaiTro';
 import logoHcmue from '@/assets/logo-hcmue.png';
@@ -113,6 +114,10 @@ export default function DangNhap() {
               </Text>
             </Box>
 
+            <Anchor component={Link} to="/huong-dan#dang-nhap" size="sm">
+              Lần đầu sử dụng? Xem hướng dẫn từng bước có hình minh họa
+            </Anchor>
+
             {loiChung && <StatusBanner loai="error">{loiChung}</StatusBanner>}
 
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -152,8 +157,10 @@ export default function DangNhap() {
                 </Anchor>
                 <Collapse in={hienHuongDan}>
                   <StatusBanner loai="info">
-                    Thầy/Cô liên hệ bộ phận phụ trách của nhà trường, hoặc số hỗ trợ:{' '}
-                    {import.meta.env.VITE_HOTRO_LIEN_HE}
+                    Thầy/Cô liên hệ bộ phận phụ trách của nhà trường, hoặc gửi email tới{' '}
+                    <Anchor href={`mailto:${EMAIL_HO_TRO}`} size="sm">
+                      {EMAIL_HO_TRO}
+                    </Anchor>
                   </StatusBanner>
                 </Collapse>
               </Stack>

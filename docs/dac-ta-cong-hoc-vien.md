@@ -15,9 +15,9 @@
 | 5 | M6 Làm bài đánh giá đầu vào | Mở đợt 2 (05/10) |
 | 6 | M0 Trang giới thiệu — **bản đầy đủ** (mục 2–5, 9) | Sau 05/10, khi có nội dung chính thức |
 
-**Route:** `/` = M0 (công khai) · `/dang-nhap` = M1 · `/doi-mat-khau` = M2 · `/toi` = M3 · `/toi/ho-so` = M4 · `/toi/xac-nhan` = M5 · `/toi/danh-gia-dau-vao` = M6.
+**Route:** `/` = M0 (công khai) · `/dang-nhap` = M1 · `/doi-mat-khau` = M2 · `/toi` = M3 · `/toi/ho-so` = M4 · `/toi/xac-nhan` = M5 · `/toi/danh-gia-dau-vao` = M6 · `/huong-dan` = M9 (công khai).
 
-Mọi màn hình sau đăng nhập có thanh trên: tên học viên, nút "Đăng xuất", số điện thoại/Zalo hỗ trợ (lấy từ `VITE_HOTRO_LIEN_HE`).
+Mọi màn hình sau đăng nhập có thanh trên: tên học viên, nút "Đăng xuất", email hỗ trợ (`EMAIL_HO_TRO` trong `src/content/hoTro.ts`), mục "Hướng dẫn" (M9).
 
 ### Chế độ triển khai (cập nhật 2026-10-02)
 
@@ -213,6 +213,33 @@ Chân trang: tên đơn vị tổ chức, địa chỉ, liên kết "Đăng nh�
 - Chế độ dev in danh sách khối `tam: true`.
 - Dán link vào Zalo → hiện ảnh xem trước, tiêu đề và mô tả đúng.
 - Lighthouse (mobile) cho `/`: Performance ≥ 90, Accessibility ≥ 95.
+
+---
+
+## M9 — Hướng dẫn sử dụng (công khai)
+
+**Route:** `/huong-dan` — ngoài `RequireAuth`, chunk riêng (lazy), sibling của `/` trong `router.tsx`.
+
+**Mục đích:** hướng dẫn từng bước có hình minh họa cho học viên (đăng nhập, đổi mật khẩu, hồ sơ, khảo sát,
+lớp học/Zalo, xác nhận, quên mật khẩu, gửi yêu cầu hỗ trợ) và mục tra cứu "Lỗi thường gặp" (tìm kiếm không
+dấu + lọc theo nhóm). Dùng chung nhiều tỉnh — không ghi tên tỉnh nào.
+
+**Nguồn nội dung:** `src/content/huongDan.ts` (chữ, bảng, danh sách lỗi — kiểu `NoiDungHuongDan`) và
+`src/content/huongDanHinh.ts` (ảnh minh họa `src/assets/huong-dan/*.webp`, 2 biến thể máy tính/điện thoại
+mỗi phần). Component (`src/pages/M9/HuongDan.tsx`) chỉ hiển thị, không chứa nội dung cứng — cùng quy ước
+với M0.
+
+`../huong-dan-hoc-vien.html` và file `.docx` kèm theo trong `design/` là bản in/chia sẻ phái sinh của
+`src/content/huongDan.ts` (cùng nội dung, trình bày lại để gửi qua Zalo/in giấy) — sửa nội dung ở
+`huongDan.ts`, không sửa trực tiếp các bản phái sinh.
+
+**Lối vào:** menu M0 ("Hướng dẫn sử dụng") + nút dưới khối "Bắt đầu trong 4 bước" + chân trang; dòng
+gợi ý ở M1 (`#dang-nhap`); mục "Hướng dẫn" trên `TopBar` (mọi màn hình sau đăng nhập); thẻ gợi ý ở M3; liên
+kết "Xem lỗi thường gặp" (`#loi`) ở M8.
+
+**Nghiệm thu:** mở `/huong-dan` độc lập (không cần đăng nhập); đổi kiểu hình Máy tính/Điện thoại đổi ảnh ở
+mọi phần; tìm "tạm khóa" (không dấu) vẫn ra đúng mục lỗi tài khoản tạm khóa; không có tên tỉnh nào trong
+trang.
 
 ---
 

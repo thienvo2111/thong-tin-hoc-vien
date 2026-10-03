@@ -94,6 +94,14 @@ describe('M1 — Đăng nhập', () => {
     await user.click(screen.getByRole('link', { name: 'Quên mật khẩu?' }));
     expect(await screen.findByText('Màn hình quên mật khẩu')).toBeInTheDocument();
   });
+
+  it('có lối vào Hướng dẫn sử dụng (M9) ngay tại phần đăng nhập', async () => {
+    renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
+    expect(screen.getByRole('link', { name: /Xem hướng dẫn từng bước có hình minh họa/ })).toHaveAttribute(
+      'href',
+      '/huong-dan#dang-nhap',
+    );
+  });
 });
 
 describe('M1 — Đăng nhập không phụ thuộc chế độ triển khai', () => {

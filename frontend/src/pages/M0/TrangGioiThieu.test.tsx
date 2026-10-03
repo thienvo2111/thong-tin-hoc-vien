@@ -106,6 +106,18 @@ describe('M0 — Trang giới thiệu: nội dung chung', () => {
     expect(screen.getByRole('heading', { name: gioiThieu.hopTac.tieuDe })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: gioiThieu.lienHe.tieuDe })).toBeInTheDocument();
   });
+
+  it('có lối vào trang Hướng dẫn sử dụng (M9): mục menu + liên kết chân trang, luôn hiện', async () => {
+    renderTrang(<TrangGioiThieu />);
+    await choTrang();
+    const header = screen.getByRole('banner');
+    const footer = screen.getByRole('contentinfo');
+    expect(within(header).getByRole('link', { name: gioiThieu.huongDanSuDung.nhanMenu })).toHaveAttribute('href', '/huong-dan');
+    expect(within(footer).getByRole('link', { name: gioiThieu.huongDanSuDung.lienKetChanTrang })).toHaveAttribute(
+      'href',
+      '/huong-dan',
+    );
+  });
 });
 
 describe('M0 — quản trị chưa lưu cấu hình / API lỗi -> dùng mặc định', () => {
@@ -210,6 +222,13 @@ describe('M0 — chế độ "dang_nhap" (đã mở cổng học viên / địa 
     hoiTheoCheDo('dang_nhap').forEach((h) => expect(screen.getByText(h)).toBeInTheDocument());
     hoiTheoCheDo('khao_sat').forEach((h) => expect(screen.queryByText(h)).not.toBeInTheDocument());
     tenTheoCheDo('khao_sat').forEach((t) => expect(screen.queryByText(t)).not.toBeInTheDocument());
+  });
+
+  it('có nút "Xem hướng dẫn chi tiết từng bước" dưới khối 4 bước, trỏ /huong-dan', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ che_do_hoc_vien: 'dang_nhap' }));
+    renderTrang(<TrangGioiThieu />);
+    await screen.findByRole('heading', { name: gioiThieu.huongDan.tieuDe });
+    expect(screen.getByRole('link', { name: gioiThieu.huongDanSuDung.nutChiTiet })).toHaveAttribute('href', '/huong-dan');
   });
 
   it('tắt khối khảo sát -> không render khối và không có mục menu', async () => {
