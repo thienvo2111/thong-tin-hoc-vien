@@ -10,7 +10,7 @@ import {
   nguon_diem_danh,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { ScopeService } from '../auth/scope/scope.service';
+import { DonViScope, ScopeService } from '../auth/scope/scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { normalizeNfcName } from '../common/utils/normalize-text.util';
@@ -338,49 +338,40 @@ export class KhoaBoiDuongService {
   async findAll(query: QueryKhoaBoiDuongDto, caller: AuthenticatedUser) {
     const page = query.page ?? 1;
     const pageSize = query.page_size ?? 20;
-    const where: Prisma.khoa_boi_duongWhereInput = {};
+    // AND riêng từng điều kiện (thay vì gộp field trực tiếp vào where) để
+    // điều kiện "q" (tìm theo tên/mã) không thể vô tình ĐÈ/mở rộng điều
+    // kiện phạm vi xem (id ∈ getKhoaIdsXemDuoc) — cả hai đều dùng OR nội bộ
+    // nên gộp field sẽ mất 1 trong 2 OR.
+    const and: Prisma.khoa_boi_duongWhereInput[] = [];
 
     if (caller.vai_tro === 'hoc_vien') {
-      // Học viên chỉ xem khóa đã duyệt, không giới hạn theo đơn vị tổ chức
+      // Học viên chỉ xem khóa đã duyệt, không giới hạn theo đơn vị đặt hàng
       // (api-contract.md mục 3: "Học viên (chỉ khóa đã da_duyet)").
-      where.trang_thai = 'da_duyet';
+      and.push({ trang_thai: 'da_duyet' });
     } else {
-      const scope = await this.scopeService.getAccessibleDonViIds(caller);
-      if (scope !== 'ALL') {
-        if (query.don_vi_dat_hang_id) {
-          if (!scope.includes(query.don_vi_dat_hang_id)) {
-            throw new ForbiddenAppException(
-              'Đơn vị tổ chức nằm ngoài phạm vi quyền',
-            );
-          }
-          where.don_vi_dat_hang_id = query.don_vi_dat_hang_id;
-        } else {
-          // T2 (QĐ2): mở rộng thêm các khóa mà đơn vị của caller đang "theo
-          // dõi" (là chính đơn vị theo dõi hoặc nằm dưới nó trong cây) —
-          // ngoài phạm vi sở hữu don_vi_dat_hang_id như trước.
-          const theoDoiKhoaIds =
-            await this.scopeService.getKhoaIdsTheoDoi(caller);
-          where.OR =
-            theoDoiKhoaIds.length > 0
-              ? [
-                  { don_vi_dat_hang_id: { in: scope } },
-                  { id: { in: theoDoiKhoaIds } },
-                ]
-              : undefined;
-          if (!where.OR) where.don_vi_dat_hang_id = { in: scope };
-        }
-      } else if (query.don_vi_dat_hang_id) {
-        where.don_vi_dat_hang_id = query.don_vi_dat_hang_id;
+      // Spec mục 5 (R1 ∪ R2): id ∈ getKhoaIdsXemDuoc. don_vi_dat_hang_id là
+      // BỘ LỌC THUẦN giao với tập xem được — không còn 403 khi ngoài scope.
+      const khoaIdsXemDuoc = await this.scopeService.getKhoaIdsXemDuoc(caller);
+      if (khoaIdsXemDuoc !== 'ALL') {
+        and.push({ id: { in: khoaIdsXemDuoc } });
       }
-      if (query.trang_thai) where.trang_thai = query.trang_thai;
+      if (query.don_vi_dat_hang_id) {
+        and.push({ don_vi_dat_hang_id: query.don_vi_dat_hang_id });
+      }
+      if (query.trang_thai) and.push({ trang_thai: query.trang_thai });
     }
 
     if (query.q) {
-      where.OR = [
-        { ten_khoa: { contains: query.q, mode: 'insensitive' } },
-        { ma_khoa: { contains: query.q, mode: 'insensitive' } },
-      ];
+      and.push({
+        OR: [
+          { ten_khoa: { contains: query.q, mode: 'insensitive' } },
+          { ma_khoa: { contains: query.q, mode: 'insensitive' } },
+        ],
+      });
     }
+
+    const where: Prisma.khoa_boi_duongWhereInput =
+      and.length > 0 ? { AND: and } : {};
 
     const [data, total] = await Promise.all([
       this.prisma.khoa_boi_duong.findMany({
@@ -412,35 +403,48 @@ export class KhoaBoiDuongService {
     });
     if (!khoa) throw new NotFoundAppException('Không tìm thấy khóa bồi dưỡng');
 
+    // pham_vi_hoc_vien ('toan_bo' | 'don_vi'): học viên luôn xem khóa đã
+    // duyệt với phạm vi "toàn bộ" (giữ hành vi hiện có — họ chỉ xem thông
+    // tin công khai của khóa, không có khái niệm "phạm vi học viên" riêng).
+    // Vai trò khác: R1/R2 (spec mục 5) qua getHocVienScopeTrongKhoa.
+    let hocVienScope: DonViScope;
     if (caller.vai_tro === 'hoc_vien') {
       if (khoa.trang_thai !== 'da_duyet') {
         throw new ForbiddenAppException(
           'Khóa này chưa được duyệt, chưa thể xem',
         );
       }
+      hocVienScope = 'ALL';
     } else {
-      const coQuyen = await this.scopeService.canAccessDonVi(
-        caller,
-        khoa.don_vi_dat_hang_id,
-      );
-      if (!coQuyen) {
-        // T2 (QĐ2): chưa sở hữu don_vi_dat_hang_id — vẫn xem được nếu đơn vị
-        // của caller là/nằm dưới một đơn vị đang "theo dõi" khóa này.
-        const theoDoiKhoaIds =
-          await this.scopeService.getKhoaIdsTheoDoi(caller);
-        if (!theoDoiKhoaIds.includes(khoa.id)) {
-          throw new ForbiddenAppException(
-            'Khóa này nằm ngoài phạm vi quyền của tài khoản hiện tại',
-          );
-        }
+      const khoaIdsXemDuoc = await this.scopeService.getKhoaIdsXemDuoc(caller);
+      if (khoaIdsXemDuoc !== 'ALL' && !khoaIdsXemDuoc.includes(khoa.id)) {
+        throw new ForbiddenAppException(
+          'Khóa này nằm ngoài phạm vi quyền của tài khoản hiện tại',
+        );
       }
+      hocVienScope = await this.scopeService.getHocVienScopeTrongKhoa(
+        caller,
+        khoa,
+      );
     }
+    const phamViHocVien: 'toan_bo' | 'don_vi' =
+      hocVienScope === 'ALL' ? 'toan_bo' : 'don_vi';
 
     // Sĩ số hiện tại = số đăng ký khác nhau đang được gán vào lớp ở bất kỳ
-    // giai đoạn nào (1 học viên học cùng lớp ở 2 giai đoạn chỉ tính 1).
+    // giai đoạn nào (1 học viên học cùng lớp ở 2 giai đoạn chỉ tính 1), chỉ
+    // tính học viên thuộc hocVienScope (R2: caller chỉ đếm đơn vị của mình).
     const capLopDangKy = await this.prisma.phan_lop_giai_doan.groupBy({
       by: ['lop_id', 'dang_ky_hoc_id'],
-      where: { lop: { khoa_id: id } },
+      where: {
+        lop: { khoa_id: id },
+        ...(hocVienScope === 'ALL'
+          ? {}
+          : {
+              dang_ky_hoc: {
+                hoc_vien: { don_vi_cong_tac_id: { in: hocVienScope } },
+              },
+            }),
+      },
     });
     const siSoTheoLop = new Map<string, number>();
     for (const r of capLopDangKy) {
@@ -448,6 +452,7 @@ export class KhoaBoiDuongService {
     }
     return {
       ...khoa,
+      pham_vi_hoc_vien: phamViHocVien,
       lop_hoc: khoa.lop_hoc.map((l) => ({
         ...l,
         si_so_hien_tai: siSoTheoLop.get(l.id) ?? 0,
