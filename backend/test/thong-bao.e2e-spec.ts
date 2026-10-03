@@ -47,13 +47,11 @@ describe('Dịch vụ Thông báo (e2e)', () => {
 
   let quanTri: Awaited<ReturnType<typeof taoNguoiDungTest>>;
   let soAccount: Awaited<ReturnType<typeof taoNguoiDungTest>>;
-  let truongAccount: Awaited<ReturnType<typeof taoNguoiDungTest>>;
   let tokenQuanTri: string;
   let tokenSo: string;
 
   const hocVienIds: string[] = [];
   const nguoiDungHocVienIds: string[] = [];
-  const khoaIds: string[] = [];
 
   async function dangNhap(ten_dang_nhap: string, mat_khau: string) {
     const res = await request(app.getHttpServer())
@@ -179,11 +177,6 @@ describe('Dịch vụ Thông báo (e2e)', () => {
       don_vi_id: soGddt.id,
       mat_khau: 'MatKhau123',
     });
-    truongAccount = await taoNguoiDungTest({
-      vai_tro: 'truong',
-      don_vi_id: truong.id,
-      mat_khau: 'MatKhau123',
-    });
 
     tokenQuanTri = await dangNhap(quanTri.ten_dang_nhap, 'MatKhau123');
     tokenSo = await dangNhap(soAccount.ten_dang_nhap, 'MatKhau123');
@@ -191,22 +184,11 @@ describe('Dịch vụ Thông báo (e2e)', () => {
 
   afterAll(async () => {
     await prisma.hang_doi_email.deleteMany({
-      where: {
-        OR: [
-          { hoc_vien_id: { in: hocVienIds } },
-          { email_nguoi_nhan: truongAccount.ten_dang_nhap },
-        ],
-      },
+      where: { hoc_vien_id: { in: hocVienIds } },
     });
     await prisma.nhat_ky_thong_bao.deleteMany({
-      where: {
-        OR: [
-          { hoc_vien_id: { in: hocVienIds } },
-          { email_nguoi_nhan: truongAccount.ten_dang_nhap },
-        ],
-      },
+      where: { hoc_vien_id: { in: hocVienIds } },
     });
-    await prisma.khoa_boi_duong.deleteMany({ where: { id: { in: khoaIds } } });
     if (hocVienIds.length > 0) {
       await prisma.hoc_vien.updateMany({
         where: { id: { in: hocVienIds } },
@@ -224,7 +206,6 @@ describe('Dịch vụ Thông báo (e2e)', () => {
     }
     await xoaNguoiDungTest(quanTri.nguoiDung.id);
     await xoaNguoiDungTest(soAccount.nguoiDung.id);
-    await xoaNguoiDungTest(truongAccount.nguoiDung.id);
     await xoaDonViTest([truong.id, soGddt.id], [xaTruong.id, xaSo.id, tinh.id]);
     await prisma.$disconnect();
     await app.close();
@@ -326,101 +307,6 @@ describe('Dịch vụ Thông báo (e2e)', () => {
       expect(thongBao).toHaveLength(1);
       expect(thongBao[0].trang_thai).toBe('that_bai');
       expect(thongBao[0].loi).toBeTruthy();
-    });
-  });
-
-  describe('khoa_boi_duong_duyet — người nhận là tài khoản Trường, KHÔNG phải hoc_vien', () => {
-    it('duyệt khóa -> ghi nhat_ky_thong_bao với hoc_vien_id=NULL, email_nguoi_nhan = tài khoản truong', async () => {
-      const tokenTruong = await dangNhap(
-        truongAccount.ten_dang_nhap,
-        'MatKhau123',
-      );
-      const suf = uniqueSuffix();
-      const khoa = await request(app.getHttpServer())
-        .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong}`)
-        .send({
-          ma_khoa: `K-TB-${suf}`,
-          ten_khoa: `Khóa Thông Báo ${suf}`,
-          thoi_gian_bat_dau: '2026-01-01',
-          thoi_gian_ket_thuc: '2026-01-31',
-        })
-        .expect(201);
-      khoaIds.push(khoa.body.id);
-
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoa.body.id}/nop-duyet`)
-        .set('Authorization', `Bearer ${tokenTruong}`)
-        .expect(201);
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoa.body.id}/duyet`)
-        .set('Authorization', `Bearer ${tokenSo}`)
-        .send({ ket_qua: 'da_duyet' })
-        .expect(201);
-      await drainHangDoi();
-
-      const thongBao = await prisma.nhat_ky_thong_bao.findMany({
-        where: {
-          loai_su_kien: 'khoa_boi_duong_duyet',
-          email_nguoi_nhan: truongAccount.ten_dang_nhap,
-        },
-      });
-      expect(thongBao).toHaveLength(1);
-      expect(thongBao[0].hoc_vien_id).toBeNull();
-      expect(thongBao[0].trang_thai).toBe('thanh_cong');
-    });
-
-    // Gap 4 (2026-09-28): created_by=NULL chỉ còn xảy ra với dữ liệu tạo TRƯỚC
-    // migration này — mô phỏng bằng cách null hóa thủ công qua Prisma ngay
-    // sau khi tạo (API luôn set created_by, không có đường nào tạo khóa mới
-    // với created_by=NULL). Xác nhận fallback về heuristic cũ vẫn hoạt động,
-    // không panic/500 khi thiếu created_by.
-    it('created_by=NULL (dữ liệu cũ, trước migration) -> fallback tìm tài khoản Trường trong đơn vị, vẫn gửi được', async () => {
-      const tokenTruong = await dangNhap(
-        truongAccount.ten_dang_nhap,
-        'MatKhau123',
-      );
-      const suf = uniqueSuffix();
-      const khoa = await request(app.getHttpServer())
-        .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong}`)
-        .send({
-          ma_khoa: `K-TB-LEGACY-${suf}`,
-          ten_khoa: `Khóa Thông Báo Legacy ${suf}`,
-          thoi_gian_bat_dau: '2026-01-01',
-          thoi_gian_ket_thuc: '2026-01-31',
-        })
-        .expect(201);
-      khoaIds.push(khoa.body.id);
-      expect(khoa.body.created_by).toBe(truongAccount.nguoiDung.id);
-
-      // Mô phỏng dữ liệu tạo trước migration này (created_by chưa từng có).
-      await prisma.khoa_boi_duong.update({
-        where: { id: khoa.body.id },
-        data: { created_by: null },
-      });
-
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoa.body.id}/nop-duyet`)
-        .set('Authorization', `Bearer ${tokenTruong}`)
-        .expect(201);
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoa.body.id}/duyet`)
-        .set('Authorization', `Bearer ${tokenSo}`)
-        .send({ ket_qua: 'da_duyet' })
-        .expect(201);
-      await drainHangDoi();
-
-      const thongBao = await prisma.nhat_ky_thong_bao.findMany({
-        where: {
-          loai_su_kien: 'khoa_boi_duong_duyet',
-          email_nguoi_nhan: truongAccount.ten_dang_nhap,
-          hoc_vien_id: null,
-        },
-        orderBy: { gui_luc: 'desc' },
-      });
-      expect(thongBao.length).toBeGreaterThanOrEqual(1);
-      expect(thongBao[0].trang_thai).toBe('thanh_cong');
     });
   });
 

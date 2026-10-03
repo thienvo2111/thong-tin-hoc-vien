@@ -7,11 +7,11 @@ import {
   MinLength,
 } from 'class-validator';
 
-// Body của POST /khoa-boi-duong — docs/api-contract.md mục 3. Khi Trường gọi,
-// don_vi_dat_hang_id luôn suy ra từ caller.don_vi_id (rule #47) — trường này
-// trong body bị bỏ qua. Khi Quản trị gọi (T2, QĐ2), don_vi_dat_hang_id BẮT
-// BUỘC có trong body (Quản trị không gắn với đơn vị nào để suy ra) — validate
-// đơn vị active + loai_don_vi ∈ {khac, truong} ở service.
+// Body của POST /khoa-boi-duong — docs/api-contract.md mục 3. Chỉ quan_tri
+// tạo khóa (D1/D6) — don_vi_dat_hang_id BẮT BUỘC có trong body; thiếu/không
+// hợp lệ/sai loại đơn vị được validateDonViDatHang() ở service báo lỗi field
+// rõ ràng (giữ @IsOptional() ở DTO để lọt qua đây, không chặn bằng lỗi
+// class-validator chung).
 export class CreateKhoaBoiDuongDto {
   @IsString()
   @MinLength(1)

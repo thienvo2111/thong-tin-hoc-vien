@@ -12,6 +12,7 @@ import {
 import { HangDoiEmailProcessor } from '../src/thong-bao/hang-doi-email.processor';
 
 const NAM_HOP_LE = new Date().getUTCFullYear() - 20;
+const FAKE_ID = '00000000-0000-0000-0000-000000000000';
 
 function soDinhDanhNgauNhien(): string {
   const t = Date.now().toString().slice(-6);
@@ -290,78 +291,21 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     await app.close();
   });
 
-  describe('POST /khoa-boi-duong', () => {
-    it('truong tạo khóa -> 201, trang_thai=nhap, don_vi_dat_hang_id=own, created_by=tài khoản gọi (gap 4)', async () => {
+  describe('Đơn vị đặt hàng — ghi (chỉ quan_tri, D1/D2/D6)', () => {
+    it('quan_tri thiếu don_vi_dat_hang_id -> 400, field don_vi_dat_hang_id = Bắt buộc', async () => {
       const res = await request(app.getHttpServer())
-        .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send(baseKhoaBody())
-        .expect(201);
-      expect(res.body.trang_thai).toBe('nhap');
-      expect(res.body.don_vi_dat_hang_id).toBe(truong1.id);
-      expect(res.body.created_by).toBe(truong1Account.nguoiDung.id);
-      khoaIds.push(res.body.id);
-    });
-
-    it('thiếu field bắt buộc -> 400', async () => {
-      const body = baseKhoaBody();
-      delete (body as Record<string, unknown>).ten_khoa;
-      await request(app.getHttpServer())
-        .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send(body)
-        .expect(400);
-    });
-
-    it('thoi_gian_ket_thuc < thoi_gian_bat_dau -> 400 (rule #49)', async () => {
-      await request(app.getHttpServer())
-        .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send(
-          baseKhoaBody({
-            thoi_gian_bat_dau: '2026-02-01',
-            thoi_gian_ket_thuc: '2026-01-01',
-          }),
-        )
-        .expect(400);
-    });
-
-    it('trùng ma_khoa -> 409', async () => {
-      const body = baseKhoaBody();
-      const first = await request(app.getHttpServer())
-        .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send(body)
-        .expect(201);
-      khoaIds.push(first.body.id);
-
-      await request(app.getHttpServer())
-        .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send(body)
-        .expect(409);
-    });
-
-    it('vai_tro phong_vhxh gọi -> 403 (chỉ Trường tạo khóa, rule #47)', async () => {
-      await request(app.getHttpServer())
-        .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenPhong}`)
-        .send(baseKhoaBody())
-        .expect(403);
-    });
-  });
-
-  describe('POST /khoa-boi-duong — quan_tri tạo khóa cho đơn vị "khac" (T2, QĐ2)', () => {
-    it('quan_tri thiếu don_vi_dat_hang_id -> 400', async () => {
-      await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send(baseKhoaBody())
         .expect(400);
+      expect(res.body.error.fields[0]).toEqual({
+        field: 'don_vi_dat_hang_id',
+        message: 'Bắt buộc',
+      });
     });
 
-    it('quan_tri chỉ định đơn vị không tồn tại -> 400', async () => {
-      await request(app.getHttpServer())
+    it('quan_tri chỉ định đơn vị không tồn tại -> 400, Không hợp lệ', async () => {
+      const res = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send(
@@ -370,17 +314,66 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
           }),
         )
         .expect(400);
+      expect(res.body.error.fields[0]).toEqual({
+        field: 'don_vi_dat_hang_id',
+        message: 'Không hợp lệ',
+      });
     });
 
-    it('quan_tri chỉ định đơn vị loại phong_vhxh -> 400 (chỉ khac/truong)', async () => {
-      await request(app.getHttpServer())
+    it('quan_tri chỉ định đơn vị ngung hoạt động -> 400, Không hợp lệ', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(baseKhoaBody({ don_vi_dat_hang_id: truongMoCoi.id }))
+        .expect(201);
+      khoaIds.push(res.body.id);
+
+      await prisma.don_vi_cong_tac.update({
+        where: { id: truongMoCoi.id },
+        data: { trang_thai: 'ngung' },
+      });
+      try {
+        const res2 = await request(app.getHttpServer())
+          .post('/khoa-boi-duong')
+          .set('Authorization', `Bearer ${tokenQuanTri}`)
+          .send(baseKhoaBody({ don_vi_dat_hang_id: truongMoCoi.id }))
+          .expect(400);
+        expect(res2.body.error.fields[0]).toEqual({
+          field: 'don_vi_dat_hang_id',
+          message: 'Không hợp lệ',
+        });
+      } finally {
+        await prisma.don_vi_cong_tac.update({
+          where: { id: truongMoCoi.id },
+          data: { trang_thai: 'active' },
+        });
+      }
+    });
+
+    it('quan_tri chỉ định đơn vị loại phong_vhxh -> 400, Sai loại đơn vị (D2)', async () => {
+      const res = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send(baseKhoaBody({ don_vi_dat_hang_id: phongVhxh.id }))
         .expect(400);
+      expect(res.body.error.fields[0]).toEqual({
+        field: 'don_vi_dat_hang_id',
+        message: 'Sai loại đơn vị',
+      });
     });
 
-    it('quan_tri tạo khóa cho HCMUE (loại "khac") -> 201, da_duyet ngay, ghi nguoi_duyet_id/cap_duyet_thuc_te/ngay_duyet', async () => {
+    it('quan_tri tạo khóa cho Sở GD&ĐT -> 201, da_duyet ngay', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(baseKhoaBody({ don_vi_dat_hang_id: soGddt.id }))
+        .expect(201);
+      expect(res.body.don_vi_dat_hang_id).toBe(soGddt.id);
+      expect(res.body.trang_thai).toBe('da_duyet');
+      khoaIds.push(res.body.id);
+    });
+
+    it('quan_tri tạo khóa cho đơn vị loại "khac" (HCMUE) -> 201, da_duyet ngay, ghi nguoi_duyet_id/cap_duyet_thuc_te/ngay_duyet', async () => {
       const res = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
@@ -403,183 +396,76 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       expect(res.body.trang_thai).toBe('da_duyet');
       khoaIds.push(res.body.id);
     });
-  });
 
-  describe('POST/DELETE /khoa-boi-duong/{id}/don-vi-theo-doi (T2, QĐ2)', () => {
-    let khoaHcmueId: string;
+    it.each([
+      ['truong', () => tokenTruong1],
+      ['so_gddt', () => tokenSo],
+      ['phong_vhxh', () => tokenPhong],
+    ])('%s gọi POST /khoa-boi-duong -> 403', async (_vaiTro, layToken) => {
+      await request(app.getHttpServer())
+        .post('/khoa-boi-duong')
+        .set('Authorization', `Bearer ${layToken()}`)
+        .send(baseKhoaBody({ don_vi_dat_hang_id: truong1.id }))
+        .expect(403);
+    });
 
-    beforeAll(async () => {
-      const res = await request(app.getHttpServer())
+    it('thoi_gian_ket_thuc < thoi_gian_bat_dau -> 400 (rule #49)', async () => {
+      await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .send(baseKhoaBody({ don_vi_dat_hang_id: hcmue.id }))
-        .expect(201);
-      khoaHcmueId = res.body.id;
-      khoaIds.push(khoaHcmueId);
-    });
-
-    it('truong gọi -> 403 (chỉ quan_tri)', async () => {
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send({ don_vi_id: soGddt.id })
-        .expect(403);
-    });
-
-    it('so_gddt gọi -> 403 (chỉ quan_tri)', async () => {
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi`)
-        .set('Authorization', `Bearer ${tokenSo}`)
-        .send({ don_vi_id: soGddt.id })
-        .expect(403);
-    });
-
-    it('don_vi_id không tồn tại -> 400', async () => {
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi`)
-        .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .send({ don_vi_id: '00000000-0000-0000-0000-000000000000' })
+        .send(
+          baseKhoaBody({
+            don_vi_dat_hang_id: truong1.id,
+            thoi_gian_bat_dau: '2026-02-01',
+            thoi_gian_ket_thuc: '2026-01-01',
+          }),
+        )
         .expect(400);
     });
 
-    it('quan_tri thêm Sở An Giang (soGddt) theo dõi -> 201', async () => {
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi`)
+    it('trùng ma_khoa -> 409', async () => {
+      const body = baseKhoaBody({ don_vi_dat_hang_id: truong1.id });
+      const first = await request(app.getHttpServer())
+        .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .send({ don_vi_id: soGddt.id })
+        .send(body)
         .expect(201);
-    });
+      khoaIds.push(first.body.id);
 
-    it('thêm lại cùng đơn vị -> 409 (đã theo dõi)', async () => {
       await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi`)
+        .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .send({ don_vi_id: soGddt.id })
+        .send(body)
         .expect(409);
     });
 
-    it('DELETE đơn vị theo dõi không tồn tại -> 404', async () => {
-      await request(app.getHttpServer())
-        .delete(
-          `/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi/${phongKhac.id}`,
-        )
+    it.each([
+      ['nop-duyet', () => request(app.getHttpServer()).post(`/khoa-boi-duong/${FAKE_ID}/nop-duyet`)],
+      [
+        'duyet',
+        () =>
+          request(app.getHttpServer())
+            .post(`/khoa-boi-duong/${FAKE_ID}/duyet`)
+            .send({ ket_qua: 'da_duyet' }),
+      ],
+      [
+        'don-vi-theo-doi POST',
+        () =>
+          request(app.getHttpServer())
+            .post(`/khoa-boi-duong/${FAKE_ID}/don-vi-theo-doi`)
+            .send({ don_vi_id: soGddt.id }),
+      ],
+      [
+        'don-vi-theo-doi DELETE',
+        () =>
+          request(app.getHttpServer()).delete(
+            `/khoa-boi-duong/${FAKE_ID}/don-vi-theo-doi/${soGddt.id}`,
+          ),
+      ],
+    ])('endpoint đã xóa (%s) -> 404', async (_ten, lamRequest) => {
+      await lamRequest()
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .expect(404);
-    });
-
-    it('DELETE đơn vị theo dõi tồn tại -> 200, da_xoa=true', async () => {
-      const res = await request(app.getHttpServer())
-        .delete(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi/${soGddt.id}`)
-        .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .expect(200);
-      expect(res.body.da_xoa).toBe(true);
-    });
-  });
-
-  describe('Phạm vi xem khóa qua đơn vị theo dõi (T2, QĐ2 — nghiệm thu)', () => {
-    let khoaHcmueId: string;
-    let hocVienTruong1Id: string;
-    let dangKyHcmueId: string;
-
-    beforeAll(async () => {
-      const suf = uniqueSuffix();
-      const res = await request(app.getHttpServer())
-        .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .send(baseKhoaBody({ don_vi_dat_hang_id: hcmue.id }))
-        .expect(201);
-      khoaHcmueId = res.body.id;
-      khoaIds.push(khoaHcmueId);
-
-      // Sở An Giang theo dõi khóa HCMUE.
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaHcmueId}/don-vi-theo-doi`)
-        .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .send({ don_vi_id: soGddt.id })
-        .expect(201);
-
-      // Học viên thuộc truong1 (nằm dưới soGddt) ghi danh vào khóa HCMUE —
-      // đơn vị TỔ CHỨC khóa (HCMUE) khác hẳn đơn vị CÔNG TÁC của học viên
-      // (truong1) — đúng bối cảnh T2 (giáo viên An Giang học khóa do HCMUE
-      // tổ chức).
-      const hv = await prisma.hoc_vien.create({
-        data: {
-          ho_ten: 'Học Viên Theo Dõi',
-          so_dinh_danh_ca_nhan: soDinhDanhNgauNhien(),
-          ngay_sinh: 5,
-          thang_sinh: 5,
-          nam_sinh: NAM_HOP_LE,
-          don_vi_cong_tac_id: truong1.id,
-          so_dien_thoai_lien_he: '0900000001',
-          email_lien_he: `theodoi-${suf}@test.local`,
-          trang_thai: 'da_duyet',
-          nguoi_duyet_id: quanTri.nguoiDung.id,
-          cap_duyet_thuc_te: 'quan_tri',
-          ngay_duyet: new Date(),
-        },
-      });
-      hocVienTruong1Id = hv.id;
-      hocVienIds.push(hocVienTruong1Id);
-
-      const dk = await prisma.dang_ky_hoc.create({
-        data: {
-          hoc_vien_id: hocVienTruong1Id,
-          khoa_id: khoaHcmueId,
-          trang_thai: 'da_duyet',
-        },
-      });
-      dangKyHcmueId = dk.id;
-    });
-
-    it('Sở An Giang (đơn vị theo dõi) thấy khóa HCMUE trong GET /khoa-boi-duong', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenSo}`)
-        .expect(200);
-      const ids = res.body.data.map((k: { id: string }) => k.id);
-      expect(ids).toContain(khoaHcmueId);
-    });
-
-    it('Phòng VHXH dưới Sở An Giang cũng thấy khóa HCMUE (nằm dưới đơn vị theo dõi)', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenPhong}`)
-        .expect(200);
-      const ids = res.body.data.map((k: { id: string }) => k.id);
-      expect(ids).toContain(khoaHcmueId);
-
-      const chiTiet = await request(app.getHttpServer())
-        .get(`/khoa-boi-duong/${khoaHcmueId}`)
-        .set('Authorization', `Bearer ${tokenPhong}`)
-        .expect(200);
-      expect(chiTiet.body.id).toBe(khoaHcmueId);
-    });
-
-    it('Đơn vị khác cây (không theo dõi, không sở hữu — tái dùng phongKhac) không thấy khóa HCMUE', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenPhongKhac}`)
-        .expect(200);
-      const ids = res.body.data.map((k: { id: string }) => k.id);
-      expect(ids).not.toContain(khoaHcmueId);
-
-      await request(app.getHttpServer())
-        .get(`/khoa-boi-duong/${khoaHcmueId}`)
-        .set('Authorization', `Bearer ${tokenPhongKhac}`)
-        .expect(403);
-    });
-
-    it('dữ liệu học viên vẫn theo phạm vi hồ sơ hiện có: Phòng VHXH KHÔNG tự nhiên có quyền cập nhật kết quả của dang_ky_hoc thuộc khóa HCMUE dù thấy được khóa qua theo dõi', async () => {
-      await request(app.getHttpServer())
-        .patch(`/dang-ky-hoc/${dangKyHcmueId}/ket-qua`)
-        .set('Authorization', `Bearer ${tokenPhong}`)
-        .send({ ket_qua: 'dat' })
-        .expect(403);
-      await request(app.getHttpServer())
-        .patch(`/dang-ky-hoc/${dangKyHcmueId}/ket-qua`)
-        .set('Authorization', `Bearer ${tokenSo}`)
-        .send({ ket_qua: 'dat' })
-        .expect(403);
     });
   });
 
@@ -606,133 +492,59 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     });
   });
 
-  describe('PATCH /khoa-boi-duong/{id} + POST .../nop-duyet + POST .../duyet', () => {
+  describe('PATCH /khoa-boi-duong/{id} (chỉ quan_tri, mọi trạng thái — D6)', () => {
     let khoaId: string;
 
     beforeAll(async () => {
       const res = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send(baseKhoaBody())
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(baseKhoaBody({ don_vi_dat_hang_id: truong1.id }))
         .expect(201);
       khoaId = res.body.id;
       khoaIds.push(khoaId);
     });
 
-    it('chủ khóa sửa khi nhap -> 200', async () => {
+    it('quan_tri sửa khóa đã da_duyet -> 200 (bỏ ràng buộc chỉ nhap/tu_choi)', async () => {
       const res = await request(app.getHttpServer())
         .patch(`/khoa-boi-duong/${khoaId}`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({ ten_khoa: 'Tên đã sửa' })
         .expect(200);
       expect(res.body.ten_khoa).toBe('Tên đã sửa');
     });
 
-    it('không phải chủ khóa (truong2) -> 403', async () => {
+    it('quan_tri đổi don_vi_dat_hang_id sang Sở khác -> 200', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/khoa-boi-duong/${khoaId}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ don_vi_dat_hang_id: soGddt.id })
+        .expect(200);
+      expect(res.body.don_vi_dat_hang_id).toBe(soGddt.id);
+    });
+
+    it('quan_tri đổi don_vi_dat_hang_id sang phong_vhxh -> 400, Sai loại đơn vị', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/khoa-boi-duong/${khoaId}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ don_vi_dat_hang_id: phongVhxh.id })
+        .expect(400);
+      expect(res.body.error.fields[0]).toEqual({
+        field: 'don_vi_dat_hang_id',
+        message: 'Sai loại đơn vị',
+      });
+    });
+
+    it.each([
+      ['truong', () => tokenTruong1],
+      ['so_gddt', () => tokenSo],
+      ['phong_vhxh', () => tokenPhong],
+    ])('%s gọi PATCH /khoa-boi-duong/:id -> 403', async (_vaiTro, layToken) => {
       await request(app.getHttpServer())
         .patch(`/khoa-boi-duong/${khoaId}`)
-        .set('Authorization', `Bearer ${tokenTruong2}`)
+        .set('Authorization', `Bearer ${layToken()}`)
         .send({ ten_khoa: 'X' })
         .expect(403);
-    });
-
-    it('nộp duyệt: nhap -> cho_duyet -> 201', async () => {
-      const res = await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaId}/nop-duyet`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .expect(201);
-      expect(res.body.trang_thai).toBe('cho_duyet');
-    });
-
-    it('nộp duyệt lần 2 khi đã cho_duyet -> 409', async () => {
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaId}/nop-duyet`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .expect(409);
-    });
-
-    it('PATCH khi đã cho_duyet -> 409', async () => {
-      await request(app.getHttpServer())
-        .patch(`/khoa-boi-duong/${khoaId}`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send({ ten_khoa: 'Y' })
-        .expect(409);
-    });
-
-    it('duyệt bởi vai_tro truong -> 403 (RolesGuard, không nằm trong "Ai gọi")', async () => {
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaId}/duyet`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send({ ket_qua: 'da_duyet' })
-        .expect(403);
-    });
-
-    it('Phòng VHXH khác (ngoài phạm vi — routing trỏ tới phongVhxh, không phải phongKhac) -> 403', async () => {
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaId}/duyet`)
-        .set('Authorization', `Bearer ${tokenPhongKhac}`)
-        .send({ ket_qua: 'da_duyet' })
-        .expect(403);
-    });
-
-    it('đúng Phòng VHXH quản lý (routing theo don_vi_cha_id của Trường) -> 201, ghi nguoi_duyet_id/cap_duyet_thuc_te/ngay_duyet', async () => {
-      const res = await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaId}/duyet`)
-        .set('Authorization', `Bearer ${tokenPhong}`)
-        .send({ ket_qua: 'da_duyet' })
-        .expect(201);
-      expect(res.body.trang_thai).toBe('da_duyet');
-      expect(res.body.nguoi_duyet_id).toBe(phongAccount.nguoiDung.id);
-      expect(res.body.cap_duyet_thuc_te).toBe('phong_vhxh');
-      expect(res.body.ngay_duyet).toBeDefined();
-    });
-
-    it('duyệt lần 2 khi đã da_duyet -> 409', async () => {
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaId}/duyet`)
-        .set('Authorization', `Bearer ${tokenPhong}`)
-        .send({ ket_qua: 'da_duyet' })
-        .expect(409);
-    });
-
-    it('Sở duyệt thay được (escalation) một khóa khác cùng cây', async () => {
-      const another = await request(app.getHttpServer())
-        .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send(baseKhoaBody())
-        .expect(201);
-      khoaIds.push(another.body.id);
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${another.body.id}/nop-duyet`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .expect(201);
-
-      const res = await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${another.body.id}/duyet`)
-        .set('Authorization', `Bearer ${tokenSo}`)
-        .send({ ket_qua: 'tu_choi', ly_do: 'Thiếu thông tin' })
-        .expect(201);
-      expect(res.body.trang_thai).toBe('tu_choi');
-      expect(res.body.cap_duyet_thuc_te).toBe('so_gddt');
-    });
-
-    it('Trường không có don_vi_cha_id -> duyệt -> 404 (không xác định được đơn vị duyệt)', async () => {
-      const khoaMoCoi = await request(app.getHttpServer())
-        .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruongMoCoi}`)
-        .send(baseKhoaBody())
-        .expect(201);
-      khoaIds.push(khoaMoCoi.body.id);
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaMoCoi.body.id}/nop-duyet`)
-        .set('Authorization', `Bearer ${tokenTruongMoCoi}`)
-        .expect(201);
-
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaMoCoi.body.id}/duyet`)
-        .set('Authorization', `Bearer ${tokenSo}`)
-        .send({ ket_qua: 'da_duyet' })
-        .expect(404);
     });
   });
 
@@ -743,16 +555,16 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     beforeAll(async () => {
       const k1 = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send(baseKhoaBody())
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(baseKhoaBody({ don_vi_dat_hang_id: truong1.id }))
         .expect(201);
       khoaTruong1Id = k1.body.id;
       khoaIds.push(khoaTruong1Id);
 
       const k2 = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong2}`)
-        .send(baseKhoaBody())
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(baseKhoaBody({ don_vi_dat_hang_id: truong2.id }))
         .expect(201);
       khoaTruong2Id = k2.body.id;
       khoaIds.push(khoaTruong2Id);
@@ -812,23 +624,23 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     beforeAll(async () => {
       const k = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .send(baseKhoaBody())
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(baseKhoaBody({ don_vi_dat_hang_id: truong1.id }))
         .expect(201);
       khoaId = k.body.id;
       khoaIds.push(khoaId);
 
       const kKhac = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong2}`)
-        .send(baseKhoaBody())
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send(baseKhoaBody({ don_vi_dat_hang_id: truong2.id }))
         .expect(201);
       khoaKhacId = kKhac.body.id;
       khoaIds.push(khoaKhacId);
 
       const gdKhac = await request(app.getHttpServer())
         .post(`/khoa-boi-duong/${khoaKhacId}/giai-doan`)
-        .set('Authorization', `Bearer ${tokenTruong2}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({
           thu_tu: 1,
           ten_giai_doan: 'GĐ khóa khác',
@@ -840,10 +652,41 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       giaiDoanKhacKhoaId = gdKhac.body.id;
     });
 
+    it.each([
+      ['truong', () => tokenTruong1],
+      ['so_gddt', () => tokenSo],
+      ['phong_vhxh', () => tokenPhong],
+    ])(
+      '%s gọi POST .../giai-doan, .../lop, .../cum -> 403',
+      async (_vaiTro, layToken) => {
+        await request(app.getHttpServer())
+          .post(`/khoa-boi-duong/${khoaId}/giai-doan`)
+          .set('Authorization', `Bearer ${layToken()}`)
+          .send({
+            thu_tu: 1,
+            ten_giai_doan: 'X',
+            hinh_thuc: 'truc_tiep',
+            thoi_gian_bat_dau: '2026-01-01',
+            thoi_gian_ket_thuc: '2026-01-10',
+          })
+          .expect(403);
+        await request(app.getHttpServer())
+          .post(`/khoa-boi-duong/${khoaId}/lop`)
+          .set('Authorization', `Bearer ${layToken()}`)
+          .send({ loai_lop: 'truc_tiep', ten_lop: 'Lớp lạ' })
+          .expect(403);
+        await request(app.getHttpServer())
+          .post(`/khoa-boi-duong/${khoaId}/cum`)
+          .set('Authorization', `Bearer ${layToken()}`)
+          .send({ ten_cum: 'Cụm lạ' })
+          .expect(403);
+      },
+    );
+
     it('POST giai-doan hợp lệ -> 201', async () => {
       const res = await request(app.getHttpServer())
         .post(`/khoa-boi-duong/${khoaId}/giai-doan`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({
           thu_tu: 1,
           ten_giai_doan: 'Giai đoạn 1 - Trực tiếp',
@@ -858,7 +701,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     it('trùng thu_tu trong cùng khóa -> 409 (uq_giai_doan_thu_tu)', async () => {
       await request(app.getHttpServer())
         .post(`/khoa-boi-duong/${khoaId}/giai-doan`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({
           thu_tu: 1,
           ten_giai_doan: 'Giai đoạn trùng',
@@ -872,7 +715,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     it('thoi_gian_ket_thuc < thoi_gian_bat_dau -> 400 (chk_giai_doan_thoi_gian)', async () => {
       await request(app.getHttpServer())
         .post(`/khoa-boi-duong/${khoaId}/giai-doan`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({
           thu_tu: 2,
           ten_giai_doan: 'Giai đoạn sai thời gian',
@@ -886,25 +729,17 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     it('POST lop hợp lệ -> 201', async () => {
       const res = await request(app.getHttpServer())
         .post(`/khoa-boi-duong/${khoaId}/lop`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({ loai_lop: 'truc_tiep', ten_lop: 'Lớp A', si_so_toi_da: 30 })
         .expect(201);
       lopId = res.body.id;
       expect(res.body.khoa_id).toBe(khoaId);
     });
 
-    it('không phải chủ khóa tạo lớp -> 403', async () => {
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaId}/lop`)
-        .set('Authorization', `Bearer ${tokenTruong2}`)
-        .send({ loai_lop: 'truc_tiep', ten_lop: 'Lớp lạ' })
-        .expect(403);
-    });
-
     it('POST /lop/{id}/lich-hoc với giai_doan_id thuộc khóa KHÁC -> 400 (rule #50)', async () => {
       await request(app.getHttpServer())
         .post(`/lop/${lopId}/lich-hoc`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({
           giai_doan_id: giaiDoanKhacKhoaId,
           thoi_gian_bat_dau: '2026-01-02T08:00:00.000Z',
@@ -916,7 +751,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     it('thoi_gian_ket_thuc <= thoi_gian_bat_dau -> 400 (chk_lich_hoc_thoi_gian, strict >)', async () => {
       await request(app.getHttpServer())
         .post(`/lop/${lopId}/lich-hoc`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({
           giai_doan_id: giaiDoan1Id,
           thoi_gian_bat_dau: '2026-01-02T08:00:00.000Z',
@@ -928,7 +763,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     it('lich-hoc hợp lệ (cùng khóa) -> 201', async () => {
       await request(app.getHttpServer())
         .post(`/lop/${lopId}/lich-hoc`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({
           giai_doan_id: giaiDoan1Id,
           thoi_gian_bat_dau: '2026-01-02T08:00:00.000Z',
@@ -941,7 +776,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     it('lich-hoc trùng (lop_id, giai_doan_id) -> 409', async () => {
       await request(app.getHttpServer())
         .post(`/lop/${lopId}/lich-hoc`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({
           giai_doan_id: giaiDoan1Id,
           thoi_gian_bat_dau: '2026-01-03T08:00:00.000Z',
@@ -953,19 +788,19 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     it('POST /lop/{id}/nhan-su -> 201, DELETE -> xóa được, xóa lần 2 -> 404', async () => {
       const res = await request(app.getHttpServer())
         .post(`/lop/${lopId}/nhan-su`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({ ho_ten: 'Giảng viên A', vai_tro: 'giang_vien' })
         .expect(201);
       const nhanSuId = res.body.id;
 
       await request(app.getHttpServer())
         .delete(`/lop/${lopId}/nhan-su/${nhanSuId}`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .expect(200);
 
       await request(app.getHttpServer())
         .delete(`/lop/${lopId}/nhan-su/${nhanSuId}`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .expect(404);
     });
   });
@@ -982,29 +817,20 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
 
     beforeAll(async () => {
       const suf = uniqueSuffix();
-      const kBody = baseKhoaBody();
+      const kBody = baseKhoaBody({ don_vi_dat_hang_id: truong1.id });
       maKhoa = kBody.ma_khoa;
       const k = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send(kBody)
         .expect(201);
       khoaId = k.body.id;
       khoaIds.push(khoaId);
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaId}/nop-duyet`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
-        .expect(201);
-      await request(app.getHttpServer())
-        .post(`/khoa-boi-duong/${khoaId}/duyet`)
-        .set('Authorization', `Bearer ${tokenPhong}`)
-        .send({ ket_qua: 'da_duyet' })
-        .expect(201);
 
       tenLop = `Lớp phân ${suf}`;
       const lop = await request(app.getHttpServer())
         .post(`/khoa-boi-duong/${khoaId}/lop`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({ loai_lop: 'truc_tiep', ten_lop: tenLop })
         .expect(201);
       lopId = lop.body.id;
@@ -1629,10 +1455,10 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       dangKyId = dk.id;
     });
 
-    it('chủ khóa (truong1) cập nhật kết quả -> 200, ghi ket_qua/ngay_hoan_thanh, bắn sự kiện dang_ky_hoc_ket_qua', async () => {
+    it('quan_tri cập nhật kết quả -> 200, ghi ket_qua/ngay_hoan_thanh, bắn sự kiện dang_ky_hoc_ket_qua', async () => {
       const res = await request(app.getHttpServer())
         .patch(`/dang-ky-hoc/${dangKyId}/ket-qua`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({ ket_qua: 'dat', ngay_hoan_thanh: '2026-01-31' })
         .expect(200);
       expect(res.body.ket_qua).toBe('dat');
@@ -1651,18 +1477,14 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       expect(thongBao[0].trang_thai).toBe('thanh_cong');
     });
 
-    it('Phòng VHXH quản lý (escalation, theo don_vi_id trực tiếp của Trường tổ chức) cũng cập nhật được -> 200', async () => {
+    it.each([
+      ['truong', () => tokenTruong1],
+      ['so_gddt', () => tokenSo],
+      ['phong_vhxh', () => tokenPhong],
+    ])('%s gọi PATCH .../ket-qua -> 403 (D6: chỉ quan_tri)', async (_vaiTro, layToken) => {
       await request(app.getHttpServer())
         .patch(`/dang-ky-hoc/${dangKyId}/ket-qua`)
-        .set('Authorization', `Bearer ${tokenPhong}`)
-        .send({ ket_qua: 'khong_dat' })
-        .expect(200);
-    });
-
-    it('truong2 (không liên quan) -> 403', async () => {
-      await request(app.getHttpServer())
-        .patch(`/dang-ky-hoc/${dangKyId}/ket-qua`)
-        .set('Authorization', `Bearer ${tokenTruong2}`)
+        .set('Authorization', `Bearer ${layToken()}`)
         .send({ ket_qua: 'dat' })
         .expect(403);
     });
@@ -1670,7 +1492,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     it('ket_qua ngoài enum ket_qua_hoc -> 400', async () => {
       await request(app.getHttpServer())
         .patch(`/dang-ky-hoc/${dangKyId}/ket-qua`)
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({ ket_qua: 'gioi' })
         .expect(400);
     });
@@ -1678,7 +1500,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     it('id không tồn tại -> 404', async () => {
       await request(app.getHttpServer())
         .patch('/dang-ky-hoc/00000000-0000-0000-0000-000000000000/ket-qua')
-        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({ ket_qua: 'dat' })
         .expect(404);
     });

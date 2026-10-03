@@ -136,91 +136,6 @@ describe('ThongBaoService', () => {
     });
   });
 
-  describe('guiKhoaBoiDuongDuyet', () => {
-    const khoa = {
-      id: 'khoa-1',
-      ten_khoa: 'Khóa A',
-      ma_khoa: 'K1',
-      don_vi_dat_hang_id: 'truong-1',
-    };
-
-    // Gap 4 (2026-09-28): created_by nay là nguồn CHÍNH — findFirst chỉ là
-    // fallback cho dữ liệu cũ (created_by=NULL). Tách rõ 2 nhánh để không lẫn
-    // lộn — nhánh created_by phải THẮNG kể cả khi findFirst sẽ trả về một
-    // tài khoản khác (chứng minh không còn đoán mò).
-    it('khoa.created_by_user có -> dùng trực tiếp, KHÔNG gọi findFirst (gap 4, nguồn chính)', async () => {
-      prisma.khoa_boi_duong.findUnique.mockResolvedValue({
-        ...khoa,
-        created_by_user: { id: 'nd-creator', email: 'creator@test.local' },
-      });
-      // Nếu code vẫn lỡ dùng heuristic, findFirst sẽ trả về 1 tài khoản KHÁC —
-      // giúp phát hiện ngay nếu nhánh created_by không thực sự được ưu tiên.
-      prisma.nguoi_dung.findFirst.mockResolvedValue({
-        id: 'nd-heuristic-sai',
-        email: 'sai@test.local',
-      });
-
-      await service.guiKhoaBoiDuongDuyet('khoa-1', 'da_duyet');
-
-      expect(prisma.khoa_boi_duong.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ include: { created_by_user: true } }),
-      );
-      expect(prisma.nguoi_dung.findFirst).not.toHaveBeenCalled();
-      expect(prisma.hang_doi_email.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          loai_su_kien: 'khoa_boi_duong_duyet',
-          hoc_vien_id: null,
-          email_nguoi_nhan: 'creator@test.local',
-        }),
-      });
-    });
-
-    it('khoa.created_by_user = null (dữ liệu cũ) -> fallback tìm tài khoản Trường có email', async () => {
-      prisma.khoa_boi_duong.findUnique.mockResolvedValue({
-        ...khoa,
-        created_by_user: null,
-      });
-      prisma.nguoi_dung.findFirst.mockResolvedValue({
-        id: 'nd-1',
-        email: 'truong@test.local',
-      });
-      await service.guiKhoaBoiDuongDuyet('khoa-1', 'da_duyet');
-
-      expect(prisma.nguoi_dung.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { vai_tro: 'truong', don_vi_id: 'truong-1' },
-        }),
-      );
-      expect(prisma.hang_doi_email.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          loai_su_kien: 'khoa_boi_duong_duyet',
-          hoc_vien_id: null,
-          email_nguoi_nhan: 'truong@test.local',
-        }),
-      });
-    });
-
-    it('created_by_user = null VÀ không tìm được tài khoản Trường nào -> bỏ qua', async () => {
-      prisma.khoa_boi_duong.findUnique.mockResolvedValue({
-        ...khoa,
-        created_by_user: null,
-      });
-      prisma.nguoi_dung.findFirst.mockResolvedValue(null);
-      await service.guiKhoaBoiDuongDuyet('khoa-1', 'da_duyet');
-      expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
-    });
-
-    it('created_by_user có nhưng thiếu email -> bỏ qua, KHÔNG rơi xuống fallback', async () => {
-      prisma.khoa_boi_duong.findUnique.mockResolvedValue({
-        ...khoa,
-        created_by_user: { id: 'nd-creator', email: null },
-      });
-      await service.guiKhoaBoiDuongDuyet('khoa-1', 'da_duyet');
-      expect(prisma.nguoi_dung.findFirst).not.toHaveBeenCalled();
-      expect(prisma.hang_doi_email.create).not.toHaveBeenCalled();
-    });
-  });
-
   describe('guiDangKyHocPhanLop (phân lớp theo giai đoạn)', () => {
     it('chưa gán lớp nào -> bỏ qua (không được gọi cho nhánh chỉ ghi danh)', async () => {
       prisma.dang_ky_hoc.findUnique.mockResolvedValue({
@@ -647,20 +562,6 @@ describe('ThongBaoService', () => {
         expect(tieuDeHangDoi()).toBe('[HCMUE-BDNLS] Kết quả duyệt hồ sơ');
       },
     );
-
-    it('guiKhoaBoiDuongDuyet', async () => {
-      prisma.khoa_boi_duong.findUnique.mockResolvedValue({
-        id: 'khoa-1',
-        ten_khoa: 'Khóa A',
-        ma_khoa: 'KA',
-        don_vi_dat_hang_id: 'truong-1',
-        created_by_user: { id: 'nd-1', email: 'truong@hcmue.edu.vn' },
-      });
-      await service.guiKhoaBoiDuongDuyet('khoa-1', 'da_duyet');
-      expect(tieuDeHangDoi()).toBe(
-        '[HCMUE-BDNLS] Kết quả duyệt khóa bồi dưỡng',
-      );
-    });
 
     it('guiYeuCauHoTroTraLoi', async () => {
       prisma.yeu_cau_ho_tro.findUnique.mockResolvedValue({

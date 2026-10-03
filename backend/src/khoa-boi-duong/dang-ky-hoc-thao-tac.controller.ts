@@ -15,15 +15,13 @@ import { GanLopGiaiDoanDto } from './dto/gan-lop-giai-doan.dto';
 
 // PUT /dang-ky-hoc/{id}/giai-doan/{giaiDoanId}/lop (phân lớp theo giai đoạn,
 // spec 2026-10-02), PATCH /dang-ky-hoc/{id}/cum — thao tác thủ công từng đăng
-// ký học một ở màn admin chi tiết học viên.
-// Controller riêng (không chung với DangKyHocKetQuaController) vì phạm vi
-// quyền khác — ở đây chỉ Trường (chủ khóa) + Quản trị được thao tác, không
-// có Phòng VHXH/Sở như PATCH ket-qua.
+// ký học một ở màn admin chi tiết học viên. D6 (2026-10-03-don-vi-dat-hang):
+// chỉ quan_tri thao tác.
 @Controller('dang-ky-hoc')
 export class DangKyHocThaoTacController {
   constructor(private readonly khoaBoiDuongService: KhoaBoiDuongService) {}
 
-  @Roles('truong', 'quan_tri')
+  @Roles('quan_tri')
   @Patch(':id/cum')
   capNhatCum(
     @Param('id', ParseUUIDPipe) id: string,
@@ -35,7 +33,7 @@ export class DangKyHocThaoTacController {
 
   // Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.3): gán/thay/gỡ lớp của 1
   // giai đoạn; lop_id null = gỡ.
-  @Roles('truong', 'quan_tri')
+  @Roles('quan_tri')
   @Put(':id/giai-doan/:giaiDoanId/lop')
   ganLopGiaiDoan(
     @Param('id', ParseUUIDPipe) id: string,

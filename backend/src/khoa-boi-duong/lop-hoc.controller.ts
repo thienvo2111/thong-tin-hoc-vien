@@ -21,7 +21,7 @@ import { CreateNhanSuDto } from './dto/create-nhan-su.dto';
 export class LopHocController {
   constructor(private readonly khoaBoiDuongService: KhoaBoiDuongService) {}
 
-  @Roles('truong', 'quan_tri')
+  @Roles('quan_tri')
   @Post(':id/lich-hoc')
   themLichHoc(
     @Param('id', ParseUUIDPipe) id: string,
@@ -32,7 +32,7 @@ export class LopHocController {
   }
 
   // Thêm 2026-09-30: sửa 1 phần lịch học (buổi) đã tạo.
-  @Roles('truong', 'quan_tri')
+  @Roles('quan_tri')
   @Patch(':id/lich-hoc/:lichHocId')
   capNhatLichHoc(
     @Param('id', ParseUUIDPipe) id: string,
@@ -43,7 +43,7 @@ export class LopHocController {
     return this.khoaBoiDuongService.capNhatLichHoc(id, lichHocId, dto, user);
   }
 
-  @Roles('truong', 'quan_tri')
+  @Roles('quan_tri')
   @Post(':id/nhan-su')
   themNhanSu(
     @Param('id', ParseUUIDPipe) id: string,
@@ -53,7 +53,7 @@ export class LopHocController {
     return this.khoaBoiDuongService.themNhanSu(id, dto, user);
   }
 
-  @Roles('truong', 'quan_tri')
+  @Roles('quan_tri')
   @Delete(':id/nhan-su/:nhanSuId')
   xoaNhanSu(
     @Param('id', ParseUUIDPipe) id: string,

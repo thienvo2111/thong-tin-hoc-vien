@@ -52,8 +52,8 @@ function layGioiHanHangNgay(): number {
 //     không bị chặn dù hạn mức/ngày đã hết — nhưng VẪN ghi nhat_ky_thong_bao
 //     (khác hành vi cũ trước M9) để hạn mức đếm đúng toàn bộ email thực sự
 //     gửi qua tài khoản.
-//   - "Hàng loạt" (guiHocVienXacNhan, guiHocVienDuyet, guiKhoaBoiDuongDuyet,
-//     guiDangKyHocPhanLop, guiDangKyHocKetQua): chỉ INSERT 1 dòng
+//   - "Hàng loạt" (guiHocVienXacNhan, guiHocVienDuyet, guiDangKyHocPhanLop,
+//     guiDangKyHocKetQua, guiYeuCauHoTroTraLoi): chỉ INSERT 1 dòng
 //     hang_doi_email (trang_thai='cho_gui') qua themVaoHangDoiEmail(), trả
 //     về ngay — việc gửi SMTP thật do HangDoiEmailProcessor (cron mỗi phút,
 //     cùng thư mục) đảm nhiệm, tự trải qua nhiều ngày khi vượt hạn mức.
@@ -179,63 +179,6 @@ export class ThongBaoService {
       hocVienId: hocVien.id,
       email: hocVien.email_lien_he,
       tieuDe: '[HCMUE-BDNLS] Kết quả duyệt hồ sơ',
-      html,
-    });
-  }
-
-  // Người nhận: KHÔNG phải hoc_vien (nhat_ky_thong_bao.hoc_vien_id = NULL,
-  // đúng ghi chú api-contract.md mục 8) mà là tài khoản nguoi_dung của Trường
-  // tổ chức khóa. Gap 4 (2026-09-28): khoa_boi_duong.created_by nay ghi rõ
-  // đúng tài khoản đã gọi POST /khoa-boi-duong — dùng trực tiếp, đơn giản hơn
-  // hẳn heuristic cũ. Fallback về heuristic cũ (findFirst tài khoản truong
-  // trong đơn vị) CHỈ khi created_by = NULL (dữ liệu cũ tạo trước migration
-  // này, không truy ngược được) để không phá test/dữ liệu có sẵn.
-  async guiKhoaBoiDuongDuyet(
-    khoaId: string,
-    ketQua: 'da_duyet' | 'tu_choi',
-  ): Promise<void> {
-    const khoa = await this.prisma.khoa_boi_duong.findUnique({
-      where: { id: khoaId },
-      include: { created_by_user: true },
-    });
-    if (!khoa) return;
-
-    const nguoiDungTruong =
-      khoa.created_by_user ??
-      (await this.prisma.nguoi_dung.findFirst({
-        where: { vai_tro: 'truong', don_vi_id: khoa.don_vi_dat_hang_id },
-        orderBy: { created_at: 'asc' },
-      }));
-    if (!nguoiDungTruong?.email) {
-      console.warn(
-        `[thong-bao] Bỏ qua gửi email khoa_boi_duong_duyet cho khoa_id=${khoaId}: không tìm thấy tài khoản Trường có email`,
-      );
-      return;
-    }
-
-    const daDuyet = ketQua === 'da_duyet';
-    const html = boCucEmail({
-      xemTruoc: `Khóa ${khoa.ten_khoa} ${daDuyet ? 'đã được duyệt' : 'bị từ chối'}.`,
-      nhan: 'KHÓA BỒI DƯỠNG',
-      tieuDe: 'Kết quả duyệt khóa bồi dưỡng',
-      noiDung: [
-        doanVan('Kính gửi Quý Đơn vị,'),
-        khoiNoiBat(
-          daDuyet ? 'thanh_cong' : 'loi',
-          `Khóa bồi dưỡng <b>${e(khoa.ten_khoa)}</b> (mã ${e(khoa.ma_khoa)}) ${daDuyet ? 'đã được <b>DUYỆT</b>' : 'đã bị <b>TỪ CHỐI</b>'}.`,
-        ),
-        nutBam(
-          'Xem khóa bồi dưỡng',
-          `${layFrontendUrl()}/admin/khoa-boi-duong/${khoa.id}`,
-        ),
-      ].join(''),
-    });
-
-    await this.themVaoHangDoiEmail({
-      loaiSuKien: 'khoa_boi_duong_duyet',
-      hocVienId: null,
-      email: nguoiDungTruong.email,
-      tieuDe: '[HCMUE-BDNLS] Kết quả duyệt khóa bồi dưỡng',
       html,
     });
   }

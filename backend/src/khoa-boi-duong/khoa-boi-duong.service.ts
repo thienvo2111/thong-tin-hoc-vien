@@ -24,7 +24,6 @@ import {
 import { CreateKhoaBoiDuongDto } from './dto/create-khoa-boi-duong.dto';
 import { UpdateKhoaBoiDuongDto } from './dto/update-khoa-boi-duong.dto';
 import { QueryKhoaBoiDuongDto } from './dto/query-khoa-boi-duong.dto';
-import { DuyetKhoaDto } from './dto/duyet-khoa.dto';
 import { CreateGiaiDoanDto } from './dto/create-giai-doan.dto';
 import { UpdateGiaiDoanDto } from './dto/update-giai-doan.dto';
 import { CreateLopHocDto } from './dto/create-lop-hoc.dto';
@@ -32,7 +31,6 @@ import { UpdateLopHocDto } from './dto/update-lop-hoc.dto';
 import { CreateLichHocDto } from './dto/create-lich-hoc.dto';
 import { UpdateLichHocDto } from './dto/update-lich-hoc.dto';
 import { CreateNhanSuDto } from './dto/create-nhan-su.dto';
-import { ThemDonViTheoDoiDto } from './dto/them-don-vi-theo-doi.dto';
 import { CreateCumHocVienDto } from './dto/create-cum-hoc-vien.dto';
 import { UpdateCumHocVienDto } from './dto/update-cum-hoc-vien.dto';
 import { CapNhatCumDangKyDto } from './dto/capnhat-cum-dang-ky.dto';
@@ -67,9 +65,9 @@ export function taoBoNhoPhanLop(): BoNhoPhanLop {
 }
 
 // Dịch vụ Khóa bồi dưỡng & Lớp học — docs/api-contract.md mục 3 +
-// docs/validation-checklist.md rule #47-52. Trường tạo/sở hữu khóa; Sở/Phòng
-// VHXH chỉ duyệt (routing theo don_vi_cha_id của Trường tổ chức — KHÁC hẳn
-// routing hồ sơ học viên, vốn theo cap_giang_day, xem hoc-vien.service.ts).
+// docs/validation-checklist.md rule #47-52. D1/D6 (2026-10-03-don-vi-dat-
+// hang): chỉ quan_tri (HCMUE) ghi; khóa tạo ra da_duyet ngay, không còn luồng
+// nộp duyệt/duyệt hay danh sách đơn vị theo dõi.
 @Injectable()
 export class KhoaBoiDuongService {
   constructor(
@@ -160,20 +158,33 @@ export class KhoaBoiDuongService {
     }
   }
 
-  // Rule #47: chỉ Trường tổ chức (chủ khóa) mới thao tác được trên khóa của
-  // mình. quan_tri được phép thao tác thay (superuser override, cùng quyết
-  // định đã áp dụng cho hoc-vien.service.ts#duyet — flagged trong self-review,
-  // không có trong bảng "Ai gọi" của api-contract.md).
-  private assertChuKhoa(
-    khoa: { don_vi_dat_hang_id: string },
-    caller: AuthenticatedUser,
-  ) {
-    if (caller.vai_tro === 'quan_tri') return;
-    if (caller.don_vi_id !== khoa.don_vi_dat_hang_id) {
-      throw new ForbiddenAppException(
-        'Chỉ Trường tổ chức khóa này mới được thao tác',
+  // D1/D2/D6 (spec mục 2+4): validate don_vi_dat_hang_id dùng chung cho
+  // taoKhoa (luôn bắt buộc) và capNhatKhoa (chỉ gọi khi dto có truyền giá
+  // trị — undefined ở update nghĩa là "không đổi", không phải "thiếu").
+  private async validateDonViDatHang(
+    id: string | undefined,
+  ): Promise<{ id: string }> {
+    if (!id) {
+      throw new ValidationException('Thiếu đơn vị đặt hàng', [
+        { field: 'don_vi_dat_hang_id', message: 'Bắt buộc' },
+      ]);
+    }
+    const donVi = await this.prisma.don_vi_cong_tac.findUnique({
+      where: { id },
+    });
+    if (!donVi || donVi.trang_thai !== 'active') {
+      throw new ValidationException(
+        'don_vi_dat_hang_id không tồn tại hoặc đã ngừng hoạt động',
+        [{ field: 'don_vi_dat_hang_id', message: 'Không hợp lệ' }],
       );
     }
+    if (donVi.loai_don_vi === 'phong_vhxh') {
+      throw new ValidationException(
+        'don_vi_dat_hang_id không được là Phòng VHXH (D2)',
+        [{ field: 'don_vi_dat_hang_id', message: 'Sai loại đơn vị' }],
+      );
+    }
+    return donVi;
   }
 
   // Rule #49: thoi_gian_ket_thuc >= thoi_gian_bat_dau cho khóa/giai đoạn
@@ -208,12 +219,8 @@ export class KhoaBoiDuongService {
   // ---------------------------------------------------------------------
   // POST /khoa-boi-duong, PATCH /khoa-boi-duong/{id}
   // ---------------------------------------------------------------------
-  // T2 (QĐ2, 2026-09-29): quan_tri tạo khóa thay cho đơn vị loại 'khac'
-  // (vd. HCMUE — không thuộc cây đơn vị An Giang, không có tài khoản 'truong'
-  // riêng) hoặc 'truong' bất kỳ; khóa tạo ra được da_duyet NGAY (đơn vị tổ
-  // chức khóa đã "được xác thực" bởi chính Quản trị, không cần quy trình
-  // nộp duyệt/duyệt như Trường tự tạo). Trường tự gọi endpoint này vẫn theo
-  // luồng cũ (trang_thai=nhap, don_vi_dat_hang_id suy từ caller.don_vi_id).
+  // D1/D6 (2026-10-03-don-vi-dat-hang): chỉ quan_tri tạo khóa (RolesGuard ở
+  // controller) — khóa tạo ra da_duyet NGAY, không còn luồng nộp duyệt/duyệt.
   async taoKhoa(dto: CreateKhoaBoiDuongDto, caller: AuthenticatedUser) {
     this.assertThoiGianHopLe(
       dto.thoi_gian_bat_dau,
@@ -221,65 +228,21 @@ export class KhoaBoiDuongService {
       'khóa',
       true,
     );
-
-    if (caller.vai_tro === 'quan_tri') {
-      if (!dto.don_vi_dat_hang_id) {
-        throw new ValidationException(
-          'Quản trị tạo khóa phải chỉ định đơn vị tổ chức',
-          [{ field: 'don_vi_dat_hang_id', message: 'Bắt buộc' }],
-        );
-      }
-      const donVi = await this.prisma.don_vi_cong_tac.findUnique({
-        where: { id: dto.don_vi_dat_hang_id },
-      });
-      if (!donVi || donVi.trang_thai !== 'active') {
-        throw new ValidationException(
-          'don_vi_dat_hang_id không tồn tại hoặc đã ngừng hoạt động',
-          [{ field: 'don_vi_dat_hang_id', message: 'Không hợp lệ' }],
-        );
-      }
-      if (donVi.loai_don_vi !== 'khac' && donVi.loai_don_vi !== 'truong') {
-        throw new ValidationException(
-          'don_vi_dat_hang_id phải thuộc loại "khac" hoặc "truong"',
-          [{ field: 'don_vi_dat_hang_id', message: 'Sai loại đơn vị' }],
-        );
-      }
-      try {
-        return await this.prisma.khoa_boi_duong.create({
-          data: {
-            ma_khoa: dto.ma_khoa.trim(),
-            ten_khoa: normalizeNfcName(dto.ten_khoa),
-            don_vi_dat_hang_id: donVi.id,
-            dia_diem: dto.dia_diem,
-            thoi_gian_bat_dau: new Date(dto.thoi_gian_bat_dau),
-            thoi_gian_ket_thuc: new Date(dto.thoi_gian_ket_thuc),
-            created_by: caller.id,
-            trang_thai: 'da_duyet',
-            nguoi_duyet_id: caller.id,
-            cap_duyet_thuc_te: 'quan_tri',
-            ngay_duyet: new Date(),
-          },
-        });
-      } catch (e) {
-        throw this.mapUniqueViolation(e, 'Mã khóa đã tồn tại');
-      }
-    }
-
-    if (!caller.don_vi_id) {
-      throw new ForbiddenAppException(
-        'Tài khoản hiện tại không gắn với đơn vị công tác nào',
-      );
-    }
+    const donVi = await this.validateDonViDatHang(dto.don_vi_dat_hang_id);
     try {
       return await this.prisma.khoa_boi_duong.create({
         data: {
           ma_khoa: dto.ma_khoa.trim(),
           ten_khoa: normalizeNfcName(dto.ten_khoa),
-          don_vi_dat_hang_id: caller.don_vi_id,
+          don_vi_dat_hang_id: donVi.id,
           dia_diem: dto.dia_diem,
           thoi_gian_bat_dau: new Date(dto.thoi_gian_bat_dau),
           thoi_gian_ket_thuc: new Date(dto.thoi_gian_ket_thuc),
           created_by: caller.id,
+          trang_thai: 'da_duyet',
+          nguoi_duyet_id: caller.id,
+          cap_duyet_thuc_te: 'quan_tri',
+          ngay_duyet: new Date(),
         },
       });
     } catch (e) {
@@ -287,17 +250,19 @@ export class KhoaBoiDuongService {
     }
   }
 
+  // D6/spec mục 4: quan_tri sửa được ở mọi trạng thái (bỏ ràng buộc chỉ
+  // nhap/tu_choi); don_vi_dat_hang_id tùy chọn — chỉ validate lại khi dto có
+  // truyền giá trị mới.
   async capNhatKhoa(
     id: string,
     dto: UpdateKhoaBoiDuongDto,
     caller: AuthenticatedUser,
   ) {
     const khoa = await this.getKhoaOrThrow(id);
-    this.assertChuKhoa(khoa, caller);
-    if (khoa.trang_thai !== 'nhap' && khoa.trang_thai !== 'tu_choi') {
-      throw new ConflictAppException(
-        `Khóa đang ở trạng thái "${khoa.trang_thai}", không thể sửa`,
-      );
+
+    let donViId: string | undefined;
+    if (dto.don_vi_dat_hang_id !== undefined) {
+      donViId = (await this.validateDonViDatHang(dto.don_vi_dat_hang_id)).id;
     }
 
     const batDau =
@@ -313,6 +278,7 @@ export class KhoaBoiDuongService {
           ma_khoa: dto.ma_khoa?.trim(),
           ten_khoa: dto.ten_khoa ? normalizeNfcName(dto.ten_khoa) : undefined,
           dia_diem: dto.dia_diem,
+          don_vi_dat_hang_id: donViId,
           thoi_gian_bat_dau: dto.thoi_gian_bat_dau
             ? new Date(dto.thoi_gian_bat_dau)
             : undefined,
@@ -326,99 +292,11 @@ export class KhoaBoiDuongService {
     }
   }
 
-  async nopDuyet(id: string, caller: AuthenticatedUser) {
-    const khoa = await this.getKhoaOrThrow(id);
-    this.assertChuKhoa(khoa, caller);
-    if (khoa.trang_thai !== 'nhap' && khoa.trang_thai !== 'tu_choi') {
-      throw new ConflictAppException(
-        `Khóa đang ở trạng thái "${khoa.trang_thai}", không thể nộp duyệt`,
-      );
-    }
-    return this.prisma.khoa_boi_duong.update({
-      where: { id },
-      data: { trang_thai: 'cho_duyet' },
-    });
-  }
-
-  // ---------------------------------------------------------------------
-  // POST /khoa-boi-duong/{id}/duyet — routing theo don_vi_cha_id của Trường
-  // tổ chức (KHÁC hồ sơ học viên, vốn routing theo cap_giang_day — xem
-  // api-contract.md mục 3 "đơn vị duyệt xác định theo don_vi_cha_id của
-  // Trường tổ chức"). Escalation (Sở duyệt thay Phòng VHXH) đã có sẵn miễn
-  // phí qua ScopeService.canAccessDonVi (đi XUỐNG từ caller) — không cần
-  // logic escalation riêng ở đây.
-  // ---------------------------------------------------------------------
-  async duyet(id: string, dto: DuyetKhoaDto, caller: AuthenticatedUser) {
-    const khoa = await this.getKhoaOrThrow(id);
-    if (khoa.trang_thai !== 'cho_duyet') {
-      throw new ConflictAppException(
-        `Khóa đang ở trạng thái "${khoa.trang_thai}", không thể duyệt`,
-      );
-    }
-
-    const donViDuyet = await this.resolveDonViDuyetKhoa(khoa.don_vi_dat_hang_id);
-    const coQuyen = await this.scopeService.canAccessDonVi(
-      caller,
-      donViDuyet.id,
-    );
-    if (!coQuyen) {
-      throw new ForbiddenAppException(
-        'Không có quyền duyệt khóa này — nằm ngoài phạm vi đơn vị duyệt phụ trách',
-      );
-    }
-
-    const updated = await this.prisma.khoa_boi_duong.update({
-      where: { id },
-      data: {
-        trang_thai: dto.ket_qua,
-        nguoi_duyet_id: caller.id,
-        cap_duyet_thuc_te: caller.vai_tro,
-        ngay_duyet: new Date(),
-      },
-    });
-    await this.thongBaoService.guiKhoaBoiDuongDuyet(id, dto.ket_qua);
-    return updated;
-  }
-
-  // don_vi_cha_id trực tiếp của Trường tổ chức = đơn vị duyệt (không đi lên
-  // nhiều cấp) — theo đúng văn bản api-contract.md, KHÁC với routing hồ sơ
-  // học viên (đi theo cây địa lý dia_danh). Nếu Trường chưa được gán
-  // don_vi_cha_id trong danh mục, không xác định được đơn vị duyệt — báo lỗi
-  // rõ ràng thay vì suy đoán, flagged trong self-review: api-contract.md
-  // không nói rõ phải làm gì nếu don_vi_cha_id trống.
-  private async resolveDonViDuyetKhoa(
-    donViToChucId: string,
-  ): Promise<{ id: string }> {
-    const truong = await this.prisma.don_vi_cong_tac.findUnique({
-      where: { id: donViToChucId },
-    });
-    if (!truong) {
-      throw new NotFoundAppException(
-        'Không tìm thấy đơn vị tổ chức khóa trong danh mục',
-      );
-    }
-    if (!truong.don_vi_cha_id) {
-      throw new NotFoundAppException(
-        'Đơn vị tổ chức khóa chưa được gán đơn vị quản lý cấp trên (don_vi_cha_id) — không xác định được đơn vị duyệt',
-      );
-    }
-    const donViDuyet = await this.prisma.don_vi_cong_tac.findUnique({
-      where: { id: truong.don_vi_cha_id },
-    });
-    if (!donViDuyet) {
-      throw new NotFoundAppException(
-        'Đơn vị duyệt (don_vi_cha_id của Trường tổ chức) không tồn tại trong danh mục',
-      );
-    }
-    return donViDuyet;
-  }
-
   // ---------------------------------------------------------------------
   // PATCH /dang-ky-hoc/{id}/ket-qua — docs/api-contract.md mục 3 (thêm
-  // 2026-09-25). Phạm vi theo Trường tổ chức khóa TRỰC TIẾP (khác duyet()
-  // khóa ở trên, vốn routing lên don_vi_cha_id của Trường — ở đây chính
-  // Trường tổ chức là người nhập kết quả, Phòng VHXH/Sở chỉ escalation lên
-  // được nhờ ScopeService.canAccessDonVi đã bao gồm cây con của họ).
+  // 2026-09-25). D6 (2026-10-03-don-vi-dat-hang): RolesGuard ở controller
+  // đã chặn chỉ quan_tri gọi được — canAccessDonVi() dưới đây vô hại cho
+  // quan_tri (scope luôn 'ALL'), giữ nguyên để không động tới logic đã có.
   // ---------------------------------------------------------------------
   async capNhatKetQua(
     id: string,
@@ -586,7 +464,6 @@ export class KhoaBoiDuongService {
     caller: AuthenticatedUser,
   ) {
     const khoa = await this.getKhoaOrThrow(khoaId);
-    this.assertChuKhoa(khoa, caller);
     this.assertThoiGianHopLe(
       dto.thoi_gian_bat_dau,
       dto.thoi_gian_ket_thuc,
@@ -627,7 +504,6 @@ export class KhoaBoiDuongService {
     caller: AuthenticatedUser,
   ) {
     const khoa = await this.getKhoaOrThrow(khoaId);
-    this.assertChuKhoa(khoa, caller);
     const giaiDoan = await this.getGiaiDoanTrongKhoaOrThrow(khoaId, giaiDoanId);
     this.assertCoTruongSua(dto);
 
@@ -684,7 +560,6 @@ export class KhoaBoiDuongService {
     caller: AuthenticatedUser,
   ) {
     const khoa = await this.getKhoaOrThrow(khoaId);
-    this.assertChuKhoa(khoa, caller);
     return this.prisma.lop_hoc.create({
       data: {
         khoa_id: khoaId,
@@ -711,7 +586,6 @@ export class KhoaBoiDuongService {
     caller: AuthenticatedUser,
   ) {
     const khoa = await this.getKhoaOrThrow(khoaId);
-    this.assertChuKhoa(khoa, caller);
     const lop = await this.getLopTrongKhoaOrThrow(khoaId, lopId);
     this.assertCoTruongSua(dto);
 
@@ -753,8 +627,7 @@ export class KhoaBoiDuongService {
 
   // ---------------------------------------------------------------------
   // POST /khoa-boi-duong/{id}/cum — QĐ10 (mo-rong-nls-an-giang.md,
-  // 2026-09-30): cụm học viên, cùng quyền thao tác với themLop (chủ khóa +
-  // quan_tri).
+  // 2026-09-30): cụm học viên, cùng quyền thao tác với themLop (D6: quan_tri).
   // ---------------------------------------------------------------------
   async themCum(
     khoaId: string,
@@ -762,7 +635,6 @@ export class KhoaBoiDuongService {
     caller: AuthenticatedUser,
   ) {
     const khoa = await this.getKhoaOrThrow(khoaId);
-    this.assertChuKhoa(khoa, caller);
     try {
       return await this.prisma.cum_hoc_vien.create({
         data: {
@@ -791,7 +663,6 @@ export class KhoaBoiDuongService {
     caller: AuthenticatedUser,
   ) {
     const khoa = await this.getKhoaOrThrow(khoaId);
-    this.assertChuKhoa(khoa, caller);
     await this.getCumTrongKhoaOrThrow(khoaId, cumId);
     this.assertCoTruongSua(dto);
 
@@ -815,42 +686,6 @@ export class KhoaBoiDuongService {
   }
 
   // ---------------------------------------------------------------------
-  // POST/DELETE /khoa-boi-duong/{id}/don-vi-theo-doi — T2 (QĐ2): chỉ quan_tri
-  // (RolesGuard đã chặn ở controller, không cần assertChuKhoa ở đây — khác
-  // các thao tác "chủ khóa" khác vì Trường không quản lý danh sách này).
-  // ---------------------------------------------------------------------
-  async themDonViTheoDoi(khoaId: string, dto: ThemDonViTheoDoiDto) {
-    await this.getKhoaOrThrow(khoaId);
-    const donVi = await this.prisma.don_vi_cong_tac.findUnique({
-      where: { id: dto.don_vi_id },
-    });
-    if (!donVi) {
-      throw new ValidationException('don_vi_id không tồn tại', [
-        { field: 'don_vi_id', message: 'Không tồn tại' },
-      ]);
-    }
-    try {
-      return await this.prisma.khoa_don_vi_theo_doi.create({
-        data: { khoa_id: khoaId, don_vi_id: dto.don_vi_id },
-      });
-    } catch (e) {
-      throw this.mapUniqueViolation(e, 'Đơn vị này đã theo dõi khóa này');
-    }
-  }
-
-  async xoaDonViTheoDoi(khoaId: string, donViId: string) {
-    const result = await this.prisma.khoa_don_vi_theo_doi.deleteMany({
-      where: { khoa_id: khoaId, don_vi_id: donViId },
-    });
-    if (result.count === 0) {
-      throw new NotFoundAppException(
-        'Không tìm thấy đơn vị theo dõi này trong khóa',
-      );
-    }
-    return { da_xoa: true };
-  }
-
-  // ---------------------------------------------------------------------
   // POST /lop/{id}/lich-hoc — rule #50: giai_doan_id phải cùng khoa_id với
   // lop_id (kiểm tra chéo ở tầng API, DB không ràng buộc được vì 2 FK khác
   // bảng — đúng như validation-checklist.md ghi).
@@ -861,7 +696,6 @@ export class KhoaBoiDuongService {
     caller: AuthenticatedUser,
   ) {
     const lop = await this.getLopOrThrow(lopId);
-    this.assertChuKhoa(lop.khoa, caller);
 
     const giaiDoan = await this.prisma.giai_doan_khoa.findUnique({
       where: { id: dto.giai_doan_id },
@@ -920,7 +754,6 @@ export class KhoaBoiDuongService {
     caller: AuthenticatedUser,
   ) {
     const lop = await this.getLopOrThrow(lopId);
-    this.assertChuKhoa(lop.khoa, caller);
     const lich = await this.getLichHocTrongLopOrThrow(lopId, lichHocId);
     this.assertCoTruongSua(dto);
 
@@ -965,7 +798,6 @@ export class KhoaBoiDuongService {
     caller: AuthenticatedUser,
   ) {
     const lop = await this.getLopOrThrow(lopId);
-    this.assertChuKhoa(lop.khoa, caller);
     return this.prisma.lop_hoc_nhan_su.create({
       data: {
         lop_id: lopId,
@@ -978,7 +810,6 @@ export class KhoaBoiDuongService {
 
   async xoaNhanSu(lopId: string, nhanSuId: string, caller: AuthenticatedUser) {
     const lop = await this.getLopOrThrow(lopId);
-    this.assertChuKhoa(lop.khoa, caller);
     const result = await this.prisma.lop_hoc_nhan_su.deleteMany({
       where: { id: nhanSuId, lop_id: lopId },
     });
@@ -1181,8 +1012,7 @@ export class KhoaBoiDuongService {
   // ---------------------------------------------------------------------
   // PUT /dang-ky-hoc/{id}/giai-doan/{giaiDoanId}/lop, PATCH
   // /dang-ky-hoc/{id}/cum — thao tác thủ công từng đăng ký học một (màn admin
-  // chi tiết học viên). Quyền: Trường (chủ khóa của dang_ky_hoc.khoa_id) +
-  // quan_tri — dùng lại assertChuKhoa() sẵn có.
+  // chi tiết học viên). D6: chỉ quan_tri (RolesGuard ở controller).
   // ---------------------------------------------------------------------
   private async getDangKyOrThrow(id: string) {
     const dangKy = await this.prisma.dang_ky_hoc.findUnique({
@@ -1224,7 +1054,6 @@ export class KhoaBoiDuongService {
     caller: AuthenticatedUser,
   ) {
     const dangKy = await this.getDangKyOrThrow(dangKyHocId);
-    this.assertChuKhoa(dangKy.khoa, caller);
     const giaiDoan = await this.prisma.giai_doan_khoa.findUnique({
       where: { id: giaiDoanId },
     });
@@ -1280,7 +1109,6 @@ export class KhoaBoiDuongService {
     caller: AuthenticatedUser,
   ) {
     const dangKy = await this.getDangKyOrThrow(id);
-    this.assertChuKhoa(dangKy.khoa, caller);
 
     const cumId = dto.cum_id ?? null;
     if (cumId) {

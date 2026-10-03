@@ -18,7 +18,8 @@ import {
 describe('KhoaBoiDuongService', () => {
   let service: KhoaBoiDuongService;
   let prisma: {
-    khoa_boi_duong: { findUnique: jest.Mock };
+    khoa_boi_duong: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
+    don_vi_cong_tac: { findUnique: jest.Mock };
     lop_hoc: {
       create: jest.Mock;
       findUnique: jest.Mock;
@@ -70,23 +71,16 @@ describe('KhoaBoiDuongService', () => {
     jti: 'jti-1',
     exp: 0,
   };
-  const truongKhac: AuthenticatedUser = {
-    ...truong,
-    id: 'nd-truong-2',
-    don_vi_id: 'dv-truong-khac',
-  };
-  const quanTri: AuthenticatedUser = {
-    ...truong,
-    id: 'nd-qt-1',
-    vai_tro: 'quan_tri',
-    don_vi_id: null,
-  };
-
   const khoa1 = { id: 'khoa-1', don_vi_dat_hang_id: 'dv-truong-1' };
 
   beforeEach(() => {
     prisma = {
-      khoa_boi_duong: { findUnique: jest.fn() },
+      khoa_boi_duong: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      don_vi_cong_tac: { findUnique: jest.fn() },
       lop_hoc: {
         create: jest.fn(),
         findUnique: jest.fn(),
@@ -139,6 +133,215 @@ describe('KhoaBoiDuongService', () => {
     );
   });
 
+  // D1/D2/D6 (2026-10-03-don-vi-dat-hang): chỉ quan_tri tạo khóa, luôn
+  // da_duyet ngay — validateDonViDatHang() dùng chung với capNhatKhoa.
+  describe('taoKhoa', () => {
+    const quanTri: AuthenticatedUser = {
+      id: 'nd-qt-1',
+      ten_dang_nhap: 'qt1',
+      vai_tro: 'quan_tri',
+      don_vi_id: null,
+      hoc_vien_id: null,
+      phai_doi_mat_khau: false,
+      jti: 'jti-qt',
+      exp: 0,
+    };
+    const donViSoGddt = {
+      id: 'dv-so-1',
+      loai_don_vi: 'so_gddt',
+      trang_thai: 'active',
+    };
+    const dtoHopLe = {
+      ma_khoa: 'K1',
+      ten_khoa: 'Khóa 1',
+      thoi_gian_bat_dau: '2026-01-01',
+      thoi_gian_ket_thuc: '2026-01-31',
+      don_vi_dat_hang_id: 'dv-so-1',
+    };
+
+    async function layFieldsLoi(
+      promise: Promise<unknown>,
+    ): Promise<{ field: string; message: string }[]> {
+      try {
+        await promise;
+      } catch (e) {
+        expect(e).toBeInstanceOf(ValidationException);
+        const body = (e as ValidationException).getResponse() as {
+          error: { fields: { field: string; message: string }[] };
+        };
+        return body.error.fields;
+      }
+      throw new Error('Không throw như mong đợi');
+    }
+
+    it('thiếu don_vi_dat_hang_id -> field Bắt buộc', async () => {
+      const fields = await layFieldsLoi(
+        service.taoKhoa(
+          { ...dtoHopLe, don_vi_dat_hang_id: undefined } as never,
+          quanTri,
+        ),
+      );
+      expect(fields).toContainEqual({
+        field: 'don_vi_dat_hang_id',
+        message: 'Bắt buộc',
+      });
+      expect(prisma.don_vi_cong_tac.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('don_vi_dat_hang_id không tồn tại -> field Không hợp lệ', async () => {
+      prisma.don_vi_cong_tac.findUnique.mockResolvedValue(null);
+      const fields = await layFieldsLoi(
+        service.taoKhoa(dtoHopLe as never, quanTri),
+      );
+      expect(fields).toContainEqual({
+        field: 'don_vi_dat_hang_id',
+        message: 'Không hợp lệ',
+      });
+    });
+
+    it('don_vi_dat_hang_id ngừng hoạt động -> Không hợp lệ', async () => {
+      prisma.don_vi_cong_tac.findUnique.mockResolvedValue({
+        ...donViSoGddt,
+        trang_thai: 'ngung',
+      });
+      const fields = await layFieldsLoi(
+        service.taoKhoa(dtoHopLe as never, quanTri),
+      );
+      expect(fields).toContainEqual({
+        field: 'don_vi_dat_hang_id',
+        message: 'Không hợp lệ',
+      });
+    });
+
+    it('don_vi_dat_hang_id loại phong_vhxh -> Sai loại đơn vị', async () => {
+      prisma.don_vi_cong_tac.findUnique.mockResolvedValue({
+        id: 'dv-phong-1',
+        loai_don_vi: 'phong_vhxh',
+        trang_thai: 'active',
+      });
+      const fields = await layFieldsLoi(
+        service.taoKhoa(dtoHopLe as never, quanTri),
+      );
+      expect(fields).toContainEqual({
+        field: 'don_vi_dat_hang_id',
+        message: 'Sai loại đơn vị',
+      });
+    });
+
+    it.each(['so_gddt', 'truong', 'khac'])(
+      'don_vi_dat_hang_id loại %s -> tạo khóa da_duyet ngay',
+      async (loai) => {
+        prisma.don_vi_cong_tac.findUnique.mockResolvedValue({
+          id: 'dv-1',
+          loai_don_vi: loai,
+          trang_thai: 'active',
+        });
+        prisma.khoa_boi_duong.create.mockResolvedValue({ id: 'khoa-1' });
+
+        await service.taoKhoa(dtoHopLe as never, quanTri);
+
+        expect(prisma.khoa_boi_duong.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            don_vi_dat_hang_id: 'dv-1',
+            trang_thai: 'da_duyet',
+            nguoi_duyet_id: quanTri.id,
+            cap_duyet_thuc_te: 'quan_tri',
+            ngay_duyet: expect.any(Date),
+          }),
+        });
+      },
+    );
+  });
+
+  describe('capNhatKhoa', () => {
+    const quanTri: AuthenticatedUser = {
+      id: 'nd-qt-1',
+      ten_dang_nhap: 'qt1',
+      vai_tro: 'quan_tri',
+      don_vi_id: null,
+      hoc_vien_id: null,
+      phai_doi_mat_khau: false,
+      jti: 'jti-qt',
+      exp: 0,
+    };
+    const khoaDaDuyet = {
+      id: 'khoa-1',
+      don_vi_dat_hang_id: 'dv-truong-1',
+      trang_thai: 'da_duyet',
+      thoi_gian_bat_dau: new Date('2026-01-01'),
+      thoi_gian_ket_thuc: new Date('2026-01-31'),
+    };
+
+    it('không truyền don_vi_dat_hang_id -> giữ nguyên, không tra đơn vị', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoaDaDuyet);
+      prisma.khoa_boi_duong.update.mockResolvedValue(khoaDaDuyet);
+
+      await service.capNhatKhoa(
+        'khoa-1',
+        { ten_khoa: 'Tên mới' } as never,
+        quanTri,
+      );
+
+      expect(prisma.don_vi_cong_tac.findUnique).not.toHaveBeenCalled();
+      expect(prisma.khoa_boi_duong.update).toHaveBeenCalledWith({
+        where: { id: 'khoa-1' },
+        data: expect.objectContaining({ don_vi_dat_hang_id: undefined }),
+      });
+    });
+
+    it('khóa đã da_duyet vẫn sửa được (D6: mọi trạng thái)', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoaDaDuyet);
+      prisma.khoa_boi_duong.update.mockResolvedValue(khoaDaDuyet);
+
+      await expect(
+        service.capNhatKhoa(
+          'khoa-1',
+          { ten_khoa: 'Tên mới' } as never,
+          quanTri,
+        ),
+      ).resolves.toBeDefined();
+    });
+
+    it('đổi don_vi_dat_hang_id sang Sở khác -> validate + update', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoaDaDuyet);
+      prisma.don_vi_cong_tac.findUnique.mockResolvedValue({
+        id: 'dv-so-2',
+        loai_don_vi: 'so_gddt',
+        trang_thai: 'active',
+      });
+      prisma.khoa_boi_duong.update.mockResolvedValue(khoaDaDuyet);
+
+      await service.capNhatKhoa(
+        'khoa-1',
+        { don_vi_dat_hang_id: 'dv-so-2' } as never,
+        quanTri,
+      );
+
+      expect(prisma.khoa_boi_duong.update).toHaveBeenCalledWith({
+        where: { id: 'khoa-1' },
+        data: expect.objectContaining({ don_vi_dat_hang_id: 'dv-so-2' }),
+      });
+    });
+
+    it('đổi don_vi_dat_hang_id sang phong_vhxh -> ValidationException, không update', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoaDaDuyet);
+      prisma.don_vi_cong_tac.findUnique.mockResolvedValue({
+        id: 'dv-phong-1',
+        loai_don_vi: 'phong_vhxh',
+        trang_thai: 'active',
+      });
+
+      await expect(
+        service.capNhatKhoa(
+          'khoa-1',
+          { don_vi_dat_hang_id: 'dv-phong-1' } as never,
+          quanTri,
+        ),
+      ).rejects.toBeInstanceOf(ValidationException);
+      expect(prisma.khoa_boi_duong.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('themLop', () => {
     it('tạo lớp với đúng loai_lop truyền vào', async () => {
       prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoa1);
@@ -158,30 +361,6 @@ describe('KhoaBoiDuongService', () => {
           si_so_toi_da: undefined,
         },
       });
-    });
-
-    it('không phải chủ khóa -> ForbiddenAppException', async () => {
-      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoa1);
-      await expect(
-        service.themLop(
-          'khoa-1',
-          { loai_lop: 'truc_tiep', ten_lop: 'Lớp 1' } as never,
-          truongKhac,
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenAppException);
-    });
-
-    it('quan_tri tạo lớp thay cho bất kỳ khóa nào (superuser override)', async () => {
-      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoa1);
-      prisma.lop_hoc.create.mockResolvedValue({ id: 'lop-1' });
-
-      await service.themLop(
-        'khoa-1',
-        { loai_lop: 'vle', ten_lop: 'Lớp VLE 1' } as never,
-        quanTri,
-      );
-
-      expect(prisma.lop_hoc.create).toHaveBeenCalled();
     });
   });
 
@@ -708,19 +887,6 @@ describe('KhoaBoiDuongService', () => {
       ).rejects.toBeInstanceOf(NotFoundAppException);
     });
 
-    it('không phải chủ khóa -> ForbiddenAppException', async () => {
-      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoa1);
-      prisma.giai_doan_khoa.findUnique.mockResolvedValue(giaiDoan1);
-
-      await expect(
-        service.capNhatGiaiDoan(
-          'khoa-1',
-          'gd-1',
-          { ten_giai_doan: 'X' } as never,
-          truongKhac,
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenAppException);
-    });
   });
 
   describe('capNhatLop', () => {
@@ -799,19 +965,6 @@ describe('KhoaBoiDuongService', () => {
       ).rejects.toBeInstanceOf(NotFoundAppException);
     });
 
-    it('không phải chủ khóa -> ForbiddenAppException', async () => {
-      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoa1);
-      prisma.lop_hoc.findUnique.mockResolvedValue(lop1);
-
-      await expect(
-        service.capNhatLop(
-          'khoa-1',
-          'lop-1',
-          { ten_lop: 'X' } as never,
-          truongKhac,
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenAppException);
-    });
   });
 
   describe('capNhatCum', () => {
@@ -870,19 +1023,6 @@ describe('KhoaBoiDuongService', () => {
       ).rejects.toBeInstanceOf(NotFoundAppException);
     });
 
-    it('không phải chủ khóa -> ForbiddenAppException', async () => {
-      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoa1);
-      prisma.cum_hoc_vien.findUnique.mockResolvedValue(cum1);
-
-      await expect(
-        service.capNhatCum(
-          'khoa-1',
-          'cum-1',
-          { ten_cum: 'X' } as never,
-          truongKhac,
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenAppException);
-    });
   });
 
   describe('capNhatLichHoc', () => {
@@ -948,20 +1088,6 @@ describe('KhoaBoiDuongService', () => {
           truong,
         ),
       ).rejects.toBeInstanceOf(NotFoundAppException);
-    });
-
-    it('không phải chủ khóa -> ForbiddenAppException', async () => {
-      prisma.lop_hoc.findUnique.mockResolvedValue(lop1ConKhoa);
-      prisma.lich_hoc_lop.findUnique.mockResolvedValue(lich1);
-
-      await expect(
-        service.capNhatLichHoc(
-          'lop-1',
-          'lich-1',
-          { dia_diem_hoac_link: 'X' } as never,
-          truongKhac,
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenAppException);
     });
 
     it('thời gian kết thúc <= bắt đầu (sau khi hợp nhất với dữ liệu cũ) -> ValidationException', async () => {

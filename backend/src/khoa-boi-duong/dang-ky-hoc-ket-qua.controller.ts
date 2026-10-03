@@ -8,14 +8,13 @@ import { KetQuaDangKyDto } from './dto/ket-qua-dang-ky.dto';
 // PATCH /dang-ky-hoc/{id}/ket-qua — docs/api-contract.md mục 3 (thêm
 // 2026-09-25). Controller riêng (không phải DangKyHocController, vốn sống ở
 // prefix "hoc-vien/toi") vì URL ở đây là "/dang-ky-hoc/{id}/ket-qua", một
-// resource riêng — Trường tổ chức khóa (hoặc Phòng VHXH/Sở/QuảnTrị qua
-// escalation) mới có quyền nhập kết quả, KHÁC hẳn 2 endpoint GET của học
-// viên tự xem trong DangKyHocController.
+// resource riêng — D6 (2026-10-03-don-vi-dat-hang): chỉ quan_tri nhập kết
+// quả, KHÁC hẳn 2 endpoint GET của học viên tự xem trong DangKyHocController.
 @Controller('dang-ky-hoc')
 export class DangKyHocKetQuaController {
   constructor(private readonly khoaBoiDuongService: KhoaBoiDuongService) {}
 
-  @Roles('truong', 'phong_vhxh', 'so_gddt', 'quan_tri')
+  @Roles('quan_tri')
   @Patch(':id/ket-qua')
   capNhatKetQua(
     @Param('id', ParseUUIDPipe) id: string,
