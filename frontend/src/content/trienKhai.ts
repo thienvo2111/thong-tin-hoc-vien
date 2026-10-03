@@ -11,7 +11,13 @@
 // - Địa phương bổ sung thông tin trên hệ thống trước khi đánh giá: 'dang_nhap' + danhGiaDauVaoTrongCong.
 
 import { useEffect, useState } from 'react';
-import { layCauHinhKhaoSat, type CauHinhKhaoSat, type CheDoHocVien } from '@/api/cauHinhKhaoSat';
+import {
+  layCauHinhCuaToi,
+  layCauHinhKhaoSat,
+  type CauHinhKhaoSat,
+  type CheDoHocVien,
+  type PhamViCauHinh,
+} from '@/api/cauHinhKhaoSat';
 
 export type { CheDoHocVien } from '@/api/cauHinhKhaoSat';
 
@@ -56,19 +62,36 @@ export function tuCauHinhApi(c: CauHinhKhaoSat | null): CauHinhTrienKhai {
   };
 }
 
-/** Đọc cấu hình từ API (công khai). Trả mặc định ngay, thay bằng dữ liệu thật khi tải xong; lỗi thì giữ mặc định. */
-export function useCauHinhTrienKhai(): { cauHinh: CauHinhTrienKhai; daTai: boolean } {
-  const [trangThai, setTrangThai] = useState({ cauHinh: cauHinhMacDinh, daTai: false });
+/** Nguồn cấu hình: trang công khai (có thể theo tỉnh người xem chọn) hay học viên đã đăng nhập. */
+export type NguonCauHinh = { loai: 'cong_khai'; tinh?: string | null } | { loai: 'cua_toi' };
+
+const PHAM_VI_CHUNG: PhamViCauHinh = { loai: 'chung' };
+
+/** Đọc cấu hình từ API. Trả mặc định ngay, thay bằng dữ liệu thật khi tải xong; lỗi thì giữ mặc định.
+ * 2026-10-02: mỗi khóa có thể có cấu hình riêng — công khai lấy theo tỉnh, đã đăng nhập lấy theo khóa ghi danh. */
+export function useCauHinhTrienKhai(nguon: NguonCauHinh = { loai: 'cong_khai' }): {
+  cauHinh: CauHinhTrienKhai;
+  phamVi: PhamViCauHinh;
+  daTai: boolean;
+} {
+  const [trangThai, setTrangThai] = useState({ cauHinh: cauHinhMacDinh, phamVi: PHAM_VI_CHUNG, daTai: false });
+  const khoa = nguon.loai === 'cua_toi' ? 'cua_toi' : `tinh:${nguon.tinh ?? ''}`;
 
   useEffect(() => {
     let huy = false;
-    layCauHinhKhaoSat()
-      .then((kq) => !huy && setTrangThai({ cauHinh: tuCauHinhApi(kq.cau_hinh), daTai: true }))
+    const goi = nguon.loai === 'cua_toi' ? layCauHinhCuaToi() : layCauHinhKhaoSat(nguon.tinh);
+    goi
+      .then(
+        (kq) =>
+          !huy &&
+          setTrangThai({ cauHinh: tuCauHinhApi(kq.cau_hinh), phamVi: kq.pham_vi ?? PHAM_VI_CHUNG, daTai: true }),
+      )
       .catch(() => !huy && setTrangThai((s) => ({ ...s, daTai: true })));
     return () => {
       huy = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [khoa]);
 
   return trangThai;
 }

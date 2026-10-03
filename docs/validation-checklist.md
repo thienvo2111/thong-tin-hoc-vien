@@ -261,3 +261,12 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 104 | `POST /sso/cap-ma`: chỉ `hoc_vien`; chỉ khi `kenh_danh_gia = sso` **và** hồ sơ đầy đủ (dùng chung cổng M6); `target` ∈ {`khao-sat`, `danh-gia`} hoặc bỏ trống | 🔴 | API |
 | 105 | Mã SSO: 32 byte ngẫu nhiên, DB chỉ lưu SHA-256, hết hạn 5 phút, đổi được đúng 1 lần (UPDATE nguyên tử), sai API key **không** đốt mã | 🔴 | API (`SsoService`) + DB (`UNIQUE(ma_hash)`) |
 | 106 | `POST /sso/doi-ma` không trả CCCD/ngày sinh/email/SĐT; thiếu `SSO_KHAO_SAT_API_KEY` → 503 | 🔴 | API |
+
+## Cấu hình khảo sát theo khóa (2026-10-02 — api-contract.md mục 9)
+
+| # | Quy tắc | Mức | Nơi thực thi |
+|---|---|---|---|
+| 107 | Cấu hình riêng của khóa dùng **cùng** quy tắc với cấu hình chung (#95–99) | 🔴 | API (`CauHinhKhaoSatService.chuanHoa` dùng chung) |
+| 108 | `tinh_id` (tùy chọn) phải là địa danh cấp `tinh_thanh`; mỗi tỉnh gắn tối đa 1 khóa — gắn tỉnh đã thuộc khóa khác → 409, nêu mã khóa đang giữ | 🔴 | API + DB (`UNIQUE(tinh_id)` = `uq_cau_hinh_khao_sat_khoa_tinh`) |
+| 109 | Cấu hình cho học viên = khóa **đã duyệt** đã ghi danh có cấu hình riêng, nhiều khóa → `ngay_duyet` gần nhất; không có → cấu hình chung. Trang chủ/danh sách tỉnh chỉ tính khóa đã duyệt | 🔴 | API (`layChoHocVien`, `layTheoTinh`, `danhSachTinh`) |
+| 110 | Xóa cấu hình riêng không ảnh hưởng cấu hình chung; khóa bị xóa → cấu hình riêng xóa theo | 🔴 | API + DB (`ON DELETE CASCADE`) |

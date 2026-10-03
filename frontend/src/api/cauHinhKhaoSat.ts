@@ -31,14 +31,61 @@ export interface CauHinhKhaoSat {
   phieu: PhieuKhaoSat[];
 }
 
+/** Cấu hình đến từ đâu (2026-10-02): cấu hình chung, hay cấu hình riêng của 1 khóa. */
+export type PhamViCauHinh =
+  | { loai: 'chung' }
+  | {
+      loai: 'khoa';
+      khoa_id: string;
+      ma_khoa: string;
+      ten_khoa: string;
+      tinh_id: string | null;
+      ten_tinh: string | null;
+    };
+
 export interface KetQuaCauHinhKhaoSat {
-  /** null = quản trị chưa lưu lần nào — dùng giá trị mặc định trong content/trienKhai.ts. */
+  /** null = chưa lưu lần nào — dùng giá trị mặc định trong content/trienKhai.ts. */
   cau_hinh: CauHinhKhaoSat | null;
   cap_nhat_luc: string | null;
+  /** Thiếu ở backend cũ -> coi như cấu hình chung. */
+  pham_vi?: PhamViCauHinh;
 }
 
-export function layCauHinhKhaoSat() {
-  return apiFetch<KetQuaCauHinhKhaoSat>('/cau-hinh-khao-sat', { coXacThuc: false });
+export interface TinhCoCauHinh {
+  tinh_id: string;
+  ten_tinh: string;
+}
+
+/** Công khai: cấu hình chung, hoặc của khóa gắn tỉnh `tinh` (tỉnh không gắn khóa -> chung). */
+export function layCauHinhKhaoSat(tinh?: string | null) {
+  const q = tinh ? `?tinh=${encodeURIComponent(tinh)}` : '';
+  return apiFetch<KetQuaCauHinhKhaoSat>(`/cau-hinh-khao-sat${q}`, { coXacThuc: false });
+}
+
+/** Công khai: các tỉnh có khóa dùng cấu hình riêng (ô "Chọn tỉnh/thành" ở trang chủ). */
+export function layDanhSachTinhKhaoSat() {
+  return apiFetch<TinhCoCauHinh[]>('/cau-hinh-khao-sat/tinh', { coXacThuc: false });
+}
+
+/** Học viên đã đăng nhập: cấu hình theo khóa đã ghi danh (không có -> chung). */
+export function layCauHinhCuaToi() {
+  return apiFetch<KetQuaCauHinhKhaoSat>('/cau-hinh-khao-sat/cua-toi');
+}
+
+// ---- Quản trị: cấu hình riêng theo khóa ----
+export function layCauHinhKhoa(khoaId: string) {
+  return apiFetch<KetQuaCauHinhKhaoSat>(`/cau-hinh-khao-sat/khoa/${khoaId}`);
+}
+
+export function luuCauHinhKhoa(khoaId: string, cauHinh: CauHinhKhaoSat, tinhId: string | null) {
+  return apiFetch<KetQuaCauHinhKhaoSat>(`/cau-hinh-khao-sat/khoa/${khoaId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ ...cauHinh, tinh_id: tinhId }),
+  });
+}
+
+export function xoaCauHinhKhoa(khoaId: string) {
+  return apiFetch<void>(`/cau-hinh-khao-sat/khoa/${khoaId}`, { method: 'DELETE' });
 }
 
 export function luuCauHinhKhaoSat(cauHinh: CauHinhKhaoSat) {

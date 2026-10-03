@@ -507,7 +507,8 @@ CREATE TABLE chung_nhan (
 **Biến thể "khảo sát trước" (An Giang GĐ1, 2026-10-02)** — thay các bước 5–11 bên dưới:
 1. Vào `/admin/cau-hinh-khao-sat`: chọn chế độ "Khảo sát", tắt "Đánh giá đầu vào" trong cổng, nhập đường dẫn 2 phiếu → Lưu (không cần deploy).
 2. Gửi link trang chủ qua Sở → trường → giáo viên; học viên làm Phiếu 1 rồi Phiếu 2.
-3. Đóng khảo sát → import `ho_so_nhan_su_moet` (thông tin đã bổ sung) → tạo khóa → import `ket_qua_danh_gia` → `lop_va_lich_hoc` → `phan_lop_hoc_vien`.
+3. Đóng khảo sát → import `ho_so_nhan_su_moet` (thông tin đã bổ sung) → tạo khóa → **ghi danh** (`phan_lop_hoc_vien` chỉ có `ma_khoa`, để trống cột lớp) → import `ket_qua_danh_gia` → `lop_va_lich_hoc` → `phan_lop_hoc_vien` lần 2 (điền cột `GĐ<n>`).
+   *Địa phương khác* (2026-10-02): nếu tỉnh mới chọn phương án khác An Giang, tạo khóa trước, ghi danh học viên ngay sau import MOET, rồi tạo **cấu hình riêng cho khóa** ở `/admin/cau-hinh-khao-sat` (ô "Áp dụng cho") và gắn tỉnh để trang chủ hiện đúng khi người xem chọn tỉnh.
 4. Ở `/admin/cau-hinh-khao-sat`: chọn "Đăng nhập cổng học viên", tắt khối khảo sát → Lưu → thông báo học viên đăng nhập xem hồ sơ/lớp. **Không mở Đợt xác nhận** ở giai đoạn này.
 5. Giai đoạn kết quả cuối: mở Đợt xác nhận để học viên kiểm tra, điều chỉnh hồ sơ trước khi cấp chứng nhận.
 

@@ -20,7 +20,7 @@ function taoMenu(danhGiaDauVaoTrongCong: boolean) {
 
 /** Thanh trên mọi màn hình sau đăng nhập — menu điều hướng, tên học viên, Đăng xuất, liên hệ hỗ trợ (dac-ta § "Route"). */
 export function TopBar() {
-  const { cauHinh } = useCauHinhTrienKhai();
+  const { cauHinh } = useCauHinhTrienKhai({ loai: 'cua_toi' });
   const MUC_MENU = taoMenu(cauHinh.danhGiaDauVaoTrongCong);
   const { dangXuat } = useToi();
   const navigate = useNavigate();

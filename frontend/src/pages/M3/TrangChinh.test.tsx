@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { datCauHinhKhaoSatMock } from '@/test/mocks/cauHinhKhaoSat';
+import { datCauHinhCuaToiMock, datCauHinhKhaoSatMock, datCauHinhKhoaMock } from '@/test/mocks/cauHinhKhaoSat';
 import type { CauHinhKhaoSat } from '@/api/cauHinhKhaoSat';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
@@ -199,6 +199,32 @@ describe('M3 — khảo sát đầu vào / đầu ra', () => {
     datDayDu();
     renderDaDangNhap();
     expect(await screen.findByText('Khảo sát đầu vào đã mở')).toBeInTheDocument();
+    expect(await screen.findByText('Khảo sát đầu ra đã mở')).toBeInTheDocument();
+  });
+});
+
+describe('M3 — cấu hình theo khóa học viên đã ghi danh (2026-10-02)', () => {
+  it('cấu hình chung chưa mở đầu ra nhưng khóa của học viên mở -> hiện khối khảo sát đầu ra', async () => {
+    db.dotXacNhan.day_du = true;
+    db.dotXacNhan.thieu = [];
+    const chung: CauHinhKhaoSat = {
+      che_do_hoc_vien: 'dang_nhap',
+      danh_gia_dau_vao_trong_cong: false,
+      hien_khao_sat: false,
+      kenh_danh_gia: 'sso',
+      khao_sat_dau_ra_mo: false,
+      phieu: [],
+    };
+    datCauHinhKhaoSatMock(chung);
+    datCauHinhKhoaMock({
+      khoa_id: 'k-hv',
+      ma_khoa: 'K-HV',
+      ten_khoa: 'Khóa của học viên',
+      tinh: null,
+      cau_hinh: { ...chung, khao_sat_dau_ra_mo: true },
+    });
+    datCauHinhCuaToiMock('k-hv');
+    renderDaDangNhap();
     expect(await screen.findByText('Khảo sát đầu ra đã mở')).toBeInTheDocument();
   });
 });

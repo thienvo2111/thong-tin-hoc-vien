@@ -978,10 +978,12 @@ export class HocVienService {
   // 2026-10-02: rẽ nhánh theo kênh trong cấu hình khảo sát. Kênh 'sso' chỉ cần
   // hồ sơ đầy đủ — link thật được cấp lúc bấm (POST /sso/cap-ma, mã dùng 1
   // lần), endpoint này KHÔNG trả link để mã không bị tạo thừa/hết hạn sẵn.
+  // Kênh lấy theo cấu hình áp dụng cho CHÍNH học viên này (khóa đã ghi danh có
+  // cấu hình riêng, không thì cấu hình chung — CauHinhKhaoSatService.layChoHocVien).
   async danhGiaDauVaoCuaToi(caller: AuthenticatedUser) {
-    const kenh = await this.cauHinhKhaoSatService.layKenhDanhGia();
+    const hocVien = await this.getHocVienCuaToi(caller);
+    const kenh = await this.cauHinhKhaoSatService.layKenhDanhGia(hocVien.id);
     if (kenh === 'sso') {
-      const hocVien = await this.getHocVienCuaToi(caller);
       const { day_du, thieu } = await this.danhGiaDayDu(hocVien);
       return day_du
         ? { kenh, du_dieu_kien: true }
@@ -993,10 +995,10 @@ export class HocVienService {
   // Khảo sát đầu ra qua SSO (target 'dau-ra'): quản trị bật ở cấu hình khảo sát,
   // điều kiện giống kênh sso đầu vào — chỉ cần hồ sơ đầy đủ (T9).
   async khaoSatDauRaCuaToi(caller: AuthenticatedUser) {
-    if (!(await this.cauHinhKhaoSatService.khaoSatDauRaDangMo())) {
+    const hocVien = await this.getHocVienCuaToi(caller);
+    if (!(await this.cauHinhKhaoSatService.khaoSatDauRaDangMo(hocVien.id))) {
       return { mo: false as const };
     }
-    const hocVien = await this.getHocVienCuaToi(caller);
     const { day_du, thieu } = await this.danhGiaDayDu(hocVien);
     return day_du
       ? { mo: true as const, du_dieu_kien: true }

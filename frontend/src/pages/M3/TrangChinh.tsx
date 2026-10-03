@@ -26,7 +26,7 @@ function xungHo(gioiTinh: HocVien['gioi_tinh'] | undefined) {
 export default function TrangChinh() {
   const { data, isLoading, isError, error } = useDotXacNhan();
   const { data: hoSo } = useHoSoToi();
-  const { cauHinh } = useCauHinhTrienKhai();
+  const { cauHinh } = useCauHinhTrienKhai({ loai: 'cua_toi' });
   const coKhaoSat = cauHinh.danhGiaDauVaoTrongCong || cauHinh.khaoSatDauRaMo;
   const { data: mucDo } = useMucDoDayDu(coKhaoSat);
 
