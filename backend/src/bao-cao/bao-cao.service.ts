@@ -74,14 +74,15 @@ export class BaoCaoService {
     query: TongHopQueryDto,
     user: AuthenticatedUser,
   ): Promise<TongHopResult> {
-    const scope = await this.scopeService.getAccessibleDonViIds(user);
     let rows: TongHopResult['rows'];
     if (query.theo === 'don_vi') {
+      const scope = await this.scopeService.getAccessibleDonViIds(user);
       rows = await this.tongHopTheoDonVi(scope, query);
     } else if (query.theo === 'dia_ban') {
+      const scope = await this.scopeService.getAccessibleDonViIds(user);
       rows = await this.tongHopTheoDiaBan(scope, query);
     } else {
-      rows = await this.tongHopTheoKhoa(scope, query);
+      rows = await this.tongHopTheoKhoa(user, query);
     }
     return {
       theo: query.theo,
@@ -198,14 +199,22 @@ export class BaoCaoService {
     );
   }
 
+  // Spec mục 5 (R1 ∪ R2): khóa hiện ra khi id ∈ getKhoaIdsXemDuoc; số đăng ký
+  // đếm trong mỗi khóa theo getHocVienScopeTrongKhoa CỦA KHÓA đó — R1 (chủ
+  // khóa trong phạm vi) đếm TOÀN BỘ đăng ký, R2 chỉ đếm đăng ký của học viên
+  // thuộc phạm vi hồ sơ của caller. Đánh giá don_vi_dat_hang_id ∈ scope TRONG
+  // BỘ NHỚ (resolveHocVienScopeChoKhoa) thay vì gọi getHocVienScopeTrongKhoa
+  // cho từng khóa — tránh N+1 truy vấn getAccessibleDonViIds.
   private async tongHopTheoKhoa(
-    scope: DonViScope,
+    caller: AuthenticatedUser,
     query: TongHopQueryDto,
   ): Promise<TongHopKhoaRow[]> {
-    if (scope !== 'ALL' && scope.length === 0) return [];
+    const khoaIdsXemDuoc = await this.scopeService.getKhoaIdsXemDuoc(caller);
+    if (khoaIdsXemDuoc !== 'ALL' && khoaIdsXemDuoc.length === 0) return [];
+
     const where: Prisma.khoa_boi_duongWhereInput = {};
-    if (scope !== 'ALL') {
-      where.don_vi_dat_hang_id = { in: scope };
+    if (khoaIdsXemDuoc !== 'ALL') {
+      where.id = { in: khoaIdsXemDuoc };
     }
     if (query.tu_ngay || query.den_ngay) {
       where.thoi_gian_bat_dau = {};
@@ -221,13 +230,33 @@ export class BaoCaoService {
         ma_khoa: true,
         ten_khoa: true,
         trang_thai: true,
+        don_vi_dat_hang_id: true,
         don_vi_dat_hang: { select: { ten_don_vi: true } },
-        dang_ky_hoc: { select: { trang_thai: true, ket_qua: true } },
+        dang_ky_hoc: {
+          select: {
+            trang_thai: true,
+            ket_qua: true,
+            hoc_vien: { select: { don_vi_cong_tac_id: true } },
+          },
+        },
       },
       orderBy: { ma_khoa: 'asc' },
     });
 
+    const scope = await this.scopeService.getAccessibleDonViIds(caller);
+
     return khoas.map((k) => {
+      const hocVienScope = this.resolveHocVienScopeChoKhoa(
+        scope,
+        k.don_vi_dat_hang_id,
+      );
+      const dangKyHopLe =
+        hocVienScope === 'ALL'
+          ? k.dang_ky_hoc
+          : k.dang_ky_hoc.filter((dk) =>
+              hocVienScope.includes(dk.hoc_vien.don_vi_cong_tac_id),
+            );
+
       const theo_trang_thai_dang_ky = Object.fromEntries(
         TRANG_THAI_DANG_KY.map((t) => [t, 0]),
       ) as Record<string, number>;
@@ -236,7 +265,7 @@ export class BaoCaoService {
         [CHUA_CO_KET_QUA]: 0,
       } as Record<string, number>;
 
-      for (const dk of k.dang_ky_hoc) {
+      for (const dk of dangKyHopLe) {
         theo_trang_thai_dang_ky[dk.trang_thai] += 1;
         theo_ket_qua[dk.ket_qua ?? CHUA_CO_KET_QUA] += 1;
       }
@@ -247,11 +276,24 @@ export class BaoCaoService {
         ten_khoa: k.ten_khoa,
         don_vi_dat_hang: k.don_vi_dat_hang.ten_don_vi,
         trang_thai_khoa: k.trang_thai,
-        tong_dang_ky: k.dang_ky_hoc.length,
+        tong_dang_ky: dangKyHopLe.length,
         theo_trang_thai_dang_ky,
         theo_ket_qua,
       };
     });
+  }
+
+  // Dùng chung cho tongHopTheoKhoa + baoCaoVanHanh: R1 nếu don_vi_dat_hang_id
+  // của khóa nằm trong scope của caller -> xem/đếm TOÀN BỘ; ngược lại chỉ
+  // trong phạm vi scope (R2) — cùng logic ScopeService.getHocVienScopeTrongKhoa
+  // nhưng đánh giá TRONG BỘ NHỚ (scope đã có sẵn) để tránh N+1 khi áp dụng
+  // cho nhiều khóa/lớp trong 1 request.
+  private resolveHocVienScopeChoKhoa(
+    scope: DonViScope,
+    donViDatHangId: string,
+  ): DonViScope {
+    if (scope === 'ALL' || scope.includes(donViDatHangId)) return 'ALL';
+    return scope;
   }
 
   // -------------------------------------------------------------------
@@ -456,22 +498,25 @@ export class BaoCaoService {
   }
 
   // -------------------------------------------------------------------
-  // T7 — GET /bao-cao/van-hanh?khoa_id=&nhom_hoc_vien=&lop_id=. Mỗi dòng =
-  // 1 lop_hoc. 2 lớp phạm vi KHÁC NHAU áp dụng đồng thời (T2, QĐ2):
-  //  - Phạm vi XEM lớp (khóa nào hiện ra): chủ khóa (don_vi_dat_hang_id
-  //    trong scope) HOẶC khóa đang được đơn vị của caller "theo dõi"
-  //    (getKhoaIdsTheoDoi) — giống GET /khoa-boi-duong.
-  //  - Phạm vi ĐẾM học viên bên trong mỗi lớp: LUÔN theo scope hồ sơ
-  //    (getAccessibleDonViIds), KHÔNG mở rộng theo "theo dõi" — đúng ghi chú
-  //    T2 "dữ liệu cấp học viên vẫn chỉ gồm học viên trong phạm vi hồ sơ của
-  //    họ". Vì vậy 1 lớp có thể hiện ra (do theo dõi khóa) nhưng si_so/
-  //    so_co_email/... chỉ đếm đúng phần học viên thuộc phạm vi của caller.
+  // T7/T5 (spec 2026-10-03-don-vi-dat-hang mục 5) — GET
+  // /bao-cao/van-hanh?khoa_id=&nhom_hoc_vien=&lop_id=. Mỗi dòng = 1 lop_hoc.
+  //  - Phạm vi XEM lớp (khóa nào hiện ra): id ∈ getKhoaIdsXemDuoc (R1 ∪ R2),
+  //    giống GET /khoa-boi-duong — đã bỏ khối "chủ khóa HOẶC theo dõi".
+  //  - Phạm vi ĐẾM học viên bên trong mỗi lớp: getHocVienScopeTrongKhoa CỦA
+  //    KHÓA chứa lớp đó — R1 (chủ khóa trong phạm vi) đếm TOÀN BỘ học viên
+  //    của lớp, R2 chỉ đếm học viên thuộc phạm vi hồ sơ của caller. Đánh giá
+  //    don_vi_dat_hang_id ∈ scope TRONG BỘ NHỚ (resolveHocVienScopeChoKhoa)
+  //    thay vì gọi getHocVienScopeTrongKhoa cho từng khóa/lớp — tránh N+1.
   // -------------------------------------------------------------------
   async baoCaoVanHanh(
     query: VanHanhQueryDto,
     caller: AuthenticatedUser,
   ): Promise<VanHanhResult> {
     const where: Prisma.lop_hocWhereInput = {};
+    const scope =
+      caller.vai_tro === 'quan_tri'
+        ? ('ALL' as const)
+        : await this.scopeService.getAccessibleDonViIds(caller);
 
     if (query.khoa_id) {
       const khoa = await this.prisma.khoa_boi_duong.findUnique({
@@ -481,38 +526,23 @@ export class BaoCaoService {
       if (!khoa)
         throw new NotFoundAppException('Không tìm thấy khóa bồi dưỡng');
       if (caller.vai_tro !== 'quan_tri') {
-        const coQuyen = await this.scopeService.canAccessDonVi(
-          caller,
-          khoa.don_vi_dat_hang_id,
-        );
-        if (!coQuyen) {
-          const theoDoiKhoaIds =
-            await this.scopeService.getKhoaIdsTheoDoi(caller);
-          if (!theoDoiKhoaIds.includes(khoa.id)) {
-            throw new ForbiddenAppException(
-              'Khóa này nằm ngoài phạm vi quyền của tài khoản hiện tại',
-            );
-          }
+        const khoaIdsXemDuoc =
+          await this.scopeService.getKhoaIdsXemDuoc(caller);
+        if (khoaIdsXemDuoc !== 'ALL' && !khoaIdsXemDuoc.includes(khoa.id)) {
+          throw new ForbiddenAppException(
+            'Khóa này nằm ngoài phạm vi quyền của tài khoản hiện tại',
+          );
         }
       }
       where.khoa_id = query.khoa_id;
     } else if (caller.vai_tro !== 'quan_tri') {
-      const scope = await this.scopeService.getAccessibleDonViIds(caller);
-      const scopeIds = scope === 'ALL' ? [] : scope;
-      const theoDoiKhoaIds = await this.scopeService.getKhoaIdsTheoDoi(caller);
-      if (scopeIds.length === 0 && theoDoiKhoaIds.length === 0) {
-        return { khoa_id: null, rows: [], tong: this.emptyVanHanhTong() };
+      const khoaIdsXemDuoc = await this.scopeService.getKhoaIdsXemDuoc(caller);
+      if (khoaIdsXemDuoc !== 'ALL') {
+        if (khoaIdsXemDuoc.length === 0) {
+          return { khoa_id: null, rows: [], tong: this.emptyVanHanhTong() };
+        }
+        where.khoa = { id: { in: khoaIdsXemDuoc } };
       }
-      where.khoa = {
-        OR: [
-          ...(scopeIds.length > 0
-            ? [{ don_vi_dat_hang_id: { in: scopeIds } }]
-            : []),
-          ...(theoDoiKhoaIds.length > 0
-            ? [{ id: { in: theoDoiKhoaIds } }]
-            : []),
-        ],
-      };
     }
 
     if (query.nhom_hoc_vien !== undefined) {
@@ -520,18 +550,10 @@ export class BaoCaoService {
     }
     if (query.lop_id) where.id = query.lop_id;
 
-    const hocVienScope =
-      caller.vai_tro === 'quan_tri'
-        ? 'ALL'
-        : await this.scopeService.getAccessibleDonViIds(caller);
-    const dangKyHocWhere: Prisma.dang_ky_hocWhereInput | undefined =
-      hocVienScope === 'ALL'
-        ? undefined
-        : { hoc_vien: { don_vi_cong_tac_id: { in: hocVienScope } } };
-
     // Phân lớp theo giai đoạn (spec 2026-10-02): đi qua phan_lop_giai_doan,
-    // lọc theo dang_ky_hoc lồng bên trong đúng phạm vi như trước; 1 học viên
-    // học cùng lớp ở nhiều giai đoạn chỉ tính 1 (khử trùng theo đăng ký).
+    // không lọc hoc_vien ở tầng truy vấn nữa (R1/R2 khác nhau giữa các khóa)
+    // — lọc TRONG BỘ NHỚ bên dưới theo hocVienScope của từng khóa; 1 học
+    // viên học cùng lớp ở nhiều giai đoạn chỉ tính 1 (khử trùng theo đăng ký).
     const lops = await this.prisma.lop_hoc.findMany({
       where,
       select: {
@@ -539,8 +561,8 @@ export class BaoCaoService {
         ten_lop: true,
         nhom_hoc_vien: true,
         muc_nang_luc: true,
+        khoa: { select: { don_vi_dat_hang_id: true } },
         phan_lop_giai_doan: {
-          where: dangKyHocWhere ? { dang_ky_hoc: dangKyHocWhere } : undefined,
           select: {
             dang_ky_hoc: {
               select: {
@@ -558,6 +580,10 @@ export class BaoCaoService {
     const tong = this.emptyVanHanhTong();
     const rows: VanHanhRow[] = [];
     for (const lop of lops) {
+      const hocVienScope = this.resolveHocVienScopeChoKhoa(
+        scope,
+        lop.khoa.don_vi_dat_hang_id,
+      );
       const row: VanHanhRow = {
         lop_id: lop.id,
         ten_lop: lop.ten_lop,
@@ -571,6 +597,12 @@ export class BaoCaoService {
       const daDem = new Set<string>();
       for (const pl of lop.phan_lop_giai_doan) {
         const dk = pl.dang_ky_hoc;
+        if (
+          hocVienScope !== 'ALL' &&
+          !hocVienScope.includes(dk.hoc_vien.don_vi_cong_tac_id)
+        ) {
+          continue;
+        }
         if (daDem.has(dk.id)) continue;
         daDem.add(dk.id);
         row.si_so += 1;

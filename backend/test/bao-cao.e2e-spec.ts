@@ -734,6 +734,317 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
     });
   });
 
+  // Task 5 (spec 2026-10-03-don-vi-dat-hang mục 5) — R1/R2 áp dụng cho báo
+  // cáo theo khóa (tong-hop?theo=khoa, van-hanh). Cây RIÊNG, mirror fixture
+  // Task 4 (test/khoa-boi-duong.e2e-spec.ts, describe "Phạm vi xem khóa"):
+  //   Sở A -> Phòng P1 -> Trường T1, Trường T2
+  //   Sở B -> Trường T3
+  //   Đơn vị X (loại 'khac', ngoài 2 cây trên)
+  // K1 đặt hàng Sở A, học viên T1 + T3 (R1 cho Sở A; R2 cho Sở B qua T3).
+  // K2 đặt hàng X, học viên T1 (R2 cho Sở A qua T1).
+  // K3 đặt hàng T2, chưa có học viên (chỉ R1 cho Sở A/P1/T2).
+  describe('Báo cáo theo khóa (R1/R2) — tong-hop?theo=khoa, van-hanh (spec mục 5, task 5)', () => {
+    let soA: { id: string };
+    let soB: { id: string };
+    let p1: { id: string };
+    let t1: { id: string };
+    let t2: { id: string };
+    let t3: { id: string };
+    let x: { id: string };
+    let soAAccount: Awaited<ReturnType<typeof taoNguoiDungTest>>;
+    let soBAccount: Awaited<ReturnType<typeof taoNguoiDungTest>>;
+    let t1Account: Awaited<ReturnType<typeof taoNguoiDungTest>>;
+    let tokenSoA: string;
+    let tokenSoB: string;
+    let tokenT1: string;
+    let k1Id: string;
+    let k2Id: string;
+    let k3Id: string;
+    let lopK1Id: string;
+    const donViR1R2Ids: string[] = [];
+    const hvR1R2Ids: string[] = [];
+    const khoaR1R2Ids: string[] = [];
+    const dangKyR1R2Ids: string[] = [];
+
+    beforeAll(async () => {
+      const suf = uniqueSuffix();
+      soA = await prisma.don_vi_cong_tac.create({
+        data: {
+          ma_don_vi: `DV-bc-soA-${suf}`,
+          ten_don_vi: `Sở A BC ${suf}`,
+          loai_don_vi: 'so_gddt',
+          dia_ban_id: xaTruong1.id,
+        },
+      });
+      soB = await prisma.don_vi_cong_tac.create({
+        data: {
+          ma_don_vi: `DV-bc-soB-${suf}`,
+          ten_don_vi: `Sở B BC ${suf}`,
+          loai_don_vi: 'so_gddt',
+          dia_ban_id: xaTruong1.id,
+        },
+      });
+      p1 = await prisma.don_vi_cong_tac.create({
+        data: {
+          ma_don_vi: `DV-bc-p1-${suf}`,
+          ten_don_vi: `Phòng P1 BC ${suf}`,
+          loai_don_vi: 'phong_vhxh',
+          dia_ban_id: xaTruong1.id,
+          don_vi_cha_id: soA.id,
+        },
+      });
+      t1 = await prisma.don_vi_cong_tac.create({
+        data: {
+          ma_don_vi: `DV-bc-t1-${suf}`,
+          ten_don_vi: `Trường T1 BC ${suf}`,
+          loai_don_vi: 'truong',
+          dia_ban_id: xaTruong1.id,
+          don_vi_cha_id: p1.id,
+        },
+      });
+      t2 = await prisma.don_vi_cong_tac.create({
+        data: {
+          ma_don_vi: `DV-bc-t2-${suf}`,
+          ten_don_vi: `Trường T2 BC ${suf}`,
+          loai_don_vi: 'truong',
+          dia_ban_id: xaTruong1.id,
+          don_vi_cha_id: p1.id,
+        },
+      });
+      t3 = await prisma.don_vi_cong_tac.create({
+        data: {
+          ma_don_vi: `DV-bc-t3-${suf}`,
+          ten_don_vi: `Trường T3 BC ${suf}`,
+          loai_don_vi: 'truong',
+          dia_ban_id: xaTruong1.id,
+          don_vi_cha_id: soB.id,
+        },
+      });
+      x = await prisma.don_vi_cong_tac.create({
+        data: {
+          ma_don_vi: `DV-bc-x-${suf}`,
+          ten_don_vi: `Đơn vị X BC ${suf}`,
+          loai_don_vi: 'khac',
+          dia_ban_id: xaTruong1.id,
+        },
+      });
+      donViR1R2Ids.push(soA.id, soB.id, p1.id, t1.id, t2.id, t3.id, x.id);
+
+      soAAccount = await taoNguoiDungTest({
+        vai_tro: 'so_gddt',
+        don_vi_id: soA.id,
+        mat_khau: 'MatKhau123',
+      });
+      soBAccount = await taoNguoiDungTest({
+        vai_tro: 'so_gddt',
+        don_vi_id: soB.id,
+        mat_khau: 'MatKhau123',
+      });
+      t1Account = await taoNguoiDungTest({
+        vai_tro: 'truong',
+        don_vi_id: t1.id,
+        mat_khau: 'MatKhau123',
+      });
+      tokenSoA = await dangNhap(soAAccount.ten_dang_nhap, 'MatKhau123');
+      tokenSoB = await dangNhap(soBAccount.ten_dang_nhap, 'MatKhau123');
+      tokenT1 = await dangNhap(t1Account.ten_dang_nhap, 'MatKhau123');
+
+      const k1 = await prisma.khoa_boi_duong.create({
+        data: {
+          ma_khoa: `K1-bc-r1r2-${suf}`,
+          ten_khoa: 'Khóa K1 R1R2 BC',
+          don_vi_dat_hang_id: soA.id,
+          thoi_gian_bat_dau: new Date('2026-05-01'),
+          thoi_gian_ket_thuc: new Date('2026-05-10'),
+          trang_thai: 'da_duyet',
+        },
+      });
+      k1Id = k1.id;
+      const k2 = await prisma.khoa_boi_duong.create({
+        data: {
+          ma_khoa: `K2-bc-r1r2-${suf}`,
+          ten_khoa: 'Khóa K2 R1R2 BC',
+          don_vi_dat_hang_id: x.id,
+          thoi_gian_bat_dau: new Date('2026-05-01'),
+          thoi_gian_ket_thuc: new Date('2026-05-10'),
+          trang_thai: 'da_duyet',
+        },
+      });
+      k2Id = k2.id;
+      const k3 = await prisma.khoa_boi_duong.create({
+        data: {
+          ma_khoa: `K3-bc-r1r2-${suf}`,
+          ten_khoa: 'Khóa K3 R1R2 BC',
+          don_vi_dat_hang_id: t2.id,
+          thoi_gian_bat_dau: new Date('2026-05-01'),
+          thoi_gian_ket_thuc: new Date('2026-05-10'),
+          trang_thai: 'da_duyet',
+        },
+      });
+      k3Id = k3.id;
+      khoaR1R2Ids.push(k1Id, k2Id, k3Id);
+
+      const hvT1 = await prisma.hoc_vien.create({
+        data: {
+          nguon_tao: 'import_moet',
+          ma_dinh_danh_moet: `M-bc-t1-${suf}`,
+          ho_ten: 'Học viên BC R1R2 T1',
+          ngay_sinh: 1,
+          thang_sinh: 1,
+          nam_sinh: NAM_HOP_LE,
+          don_vi_cong_tac_id: t1.id,
+        },
+      });
+      const hvT3 = await prisma.hoc_vien.create({
+        data: {
+          nguon_tao: 'import_moet',
+          ma_dinh_danh_moet: `M-bc-t3-${suf}`,
+          ho_ten: 'Học viên BC R1R2 T3',
+          ngay_sinh: 2,
+          thang_sinh: 2,
+          nam_sinh: NAM_HOP_LE,
+          don_vi_cong_tac_id: t3.id,
+        },
+      });
+      hvR1R2Ids.push(hvT1.id, hvT3.id);
+
+      const dkT1K1 = await prisma.dang_ky_hoc.create({
+        data: { hoc_vien_id: hvT1.id, khoa_id: k1Id },
+      });
+      const dkT3K1 = await prisma.dang_ky_hoc.create({
+        data: { hoc_vien_id: hvT3.id, khoa_id: k1Id },
+      });
+      const dkT1K2 = await prisma.dang_ky_hoc.create({
+        data: { hoc_vien_id: hvT1.id, khoa_id: k2Id },
+      });
+      dangKyR1R2Ids.push(dkT1K1.id, dkT3K1.id, dkT1K2.id);
+
+      // van-hanh cần lop_hoc + phan_lop_giai_doan thật để tính si_so — gán cả
+      // 2 đăng ký của K1 vào cùng 1 lớp (khác pham_vi_hoc_vien 'toan_bo' với
+      // 'don_vi' chỉ lộ ra khi lớp có ĐỦ 2 học viên khác đơn vị).
+      const giaiDoanK1 = await prisma.giai_doan_khoa.create({
+        data: {
+          khoa_id: k1Id,
+          thu_tu: 1,
+          ten_giai_doan: 'GĐ1',
+          hinh_thuc: 'truc_tiep',
+          thoi_gian_bat_dau: new Date('2026-01-01'),
+          thoi_gian_ket_thuc: new Date('2026-12-31'),
+        },
+      });
+      const lopK1 = await prisma.lop_hoc.create({
+        data: {
+          khoa_id: k1Id,
+          loai_lop: 'truc_tiep',
+          ten_lop: `Lớp K1 BC ${suf}`,
+        },
+      });
+      lopK1Id = lopK1.id;
+      await prisma.phan_lop_giai_doan.createMany({
+        data: [
+          {
+            dang_ky_hoc_id: dkT1K1.id,
+            giai_doan_id: giaiDoanK1.id,
+            lop_id: lopK1.id,
+          },
+          {
+            dang_ky_hoc_id: dkT3K1.id,
+            giai_doan_id: giaiDoanK1.id,
+            lop_id: lopK1.id,
+          },
+        ],
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.dang_ky_hoc.deleteMany({
+        where: { id: { in: dangKyR1R2Ids } },
+      });
+      await prisma.hoc_vien.deleteMany({ where: { id: { in: hvR1R2Ids } } });
+      await prisma.khoa_boi_duong.deleteMany({
+        where: { id: { in: khoaR1R2Ids } },
+      });
+      await xoaNguoiDungTest(soAAccount.nguoiDung.id);
+      await xoaNguoiDungTest(soBAccount.nguoiDung.id);
+      await xoaNguoiDungTest(t1Account.nguoiDung.id);
+      await xoaDonViTest(donViR1R2Ids, []);
+    });
+
+    it('Sở A: dòng K1 đếm cả T1+T3 (R1 — chủ khóa), dòng K2 chỉ đếm T1 (R2)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/bao-cao/tong-hop?theo=khoa')
+        .set('Authorization', `Bearer ${tokenSoA}`)
+        .expect(200);
+      const rows = res.body.rows as Array<{
+        khoa_id: string;
+        tong_dang_ky: number;
+      }>;
+      expect(rows.find((r) => r.khoa_id === k1Id)?.tong_dang_ky).toBe(2);
+      expect(rows.find((r) => r.khoa_id === k2Id)?.tong_dang_ky).toBe(1);
+    });
+
+    it('Sở B: chỉ thấy dòng K1 (R2 qua T3), đếm chỉ T3 (=1)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/bao-cao/tong-hop?theo=khoa')
+        .set('Authorization', `Bearer ${tokenSoB}`)
+        .expect(200);
+      const rows = res.body.rows as Array<{
+        khoa_id: string;
+        tong_dang_ky: number;
+      }>;
+      const ids = rows.map((r) => r.khoa_id);
+      expect(ids).toContain(k1Id);
+      expect(ids).not.toContain(k2Id);
+      expect(ids).not.toContain(k3Id);
+      expect(rows.find((r) => r.khoa_id === k1Id)?.tong_dang_ky).toBe(1);
+    });
+
+    it('xuất-excel theo khóa: tiêu đề cột "Đơn vị đặt hàng"', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/bao-cao/xuat-excel?theo=khoa')
+        .set('Authorization', `Bearer ${tokenSoA}`)
+        .buffer(true)
+        .parse(binaryParser)
+        .expect(200);
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(res.body as unknown as ExcelJS.Buffer);
+      const sheet = workbook.worksheets[0];
+      const header = (sheet.getRow(1).values as unknown[]).slice(1);
+      expect(header[2]).toBe('Đơn vị đặt hàng');
+    });
+
+    it('Sở B không khoa_id -> chỉ lớp của K1, si_so chỉ T3 (=1)', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/bao-cao/van-hanh')
+        .set('Authorization', `Bearer ${tokenSoB}`)
+        .expect(200);
+      const rows = res.body.rows as Array<{ lop_id: string; si_so: number }>;
+      expect(rows.every((r) => r.lop_id === lopK1Id)).toBe(true);
+      const row = rows.find((r) => r.lop_id === lopK1Id);
+      expect(row).toBeDefined();
+      expect(row!.si_so).toBe(1);
+    });
+
+    it('Sở A khoa_id=K1 -> si_so gồm cả T3 (=2, R1 — chủ khóa)', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/bao-cao/van-hanh?khoa_id=${k1Id}`)
+        .set('Authorization', `Bearer ${tokenSoA}`)
+        .expect(200);
+      const row = (
+        res.body.rows as Array<{ lop_id: string; si_so: number }>
+      ).find((r) => r.lop_id === lopK1Id);
+      expect(row).toBeDefined();
+      expect(row!.si_so).toBe(2);
+    });
+
+    it('T1 khoa_id=K3 -> 403 (ngoài phạm vi — K3 không đặt hàng T1, chưa có học viên)', async () => {
+      await request(app.getHttpServer())
+        .get(`/bao-cao/van-hanh?khoa_id=${k3Id}`)
+        .set('Authorization', `Bearer ${tokenT1}`)
+        .expect(403);
+    });
+  });
+
   describe('GET /bao-cao/xuat-excel', () => {
     it('trả file .xlsx đúng content-type, đọc lại đúng số liệu + giữ dấu tiếng Việt', async () => {
       const res = await request(app.getHttpServer())
@@ -806,7 +1117,12 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
       expect(lopIds).toContain(lopVanHanh.id);
     });
 
-    it('phong_vhxh: xem được lớp (chủ truong3 trong phạm vi) nhưng CHỈ đếm học viên thuộc đơn vị mình, không tính hvVhKhac (truongKhac, phòng khác)', async () => {
+    // Spec mục 5 (R1/R2, task 5): truong3 (chủ khóa khoaVanHanh) là con cháu
+    // của phongVhxh -> R1 áp dụng (don_vi_dat_hang_id ∈ scope của phongVhxh)
+    // -> đếm TOÀN BỘ học viên của khóa, KỂ CẢ hvVhKhac (truongKhac, phòng
+    // khác) — khác hành vi cũ (chỉ đếm theo scope hồ sơ của phongVhxh, không
+    // mở rộng theo quyền chủ khóa).
+    it('phong_vhxh: chủ khóa (truong3) trong phạm vi -> R1, đếm TOÀN BỘ học viên kể cả hvVhKhac (truongKhac, phòng khác)', async () => {
       const res = await request(app.getHttpServer())
         .get(`/bao-cao/van-hanh?khoa_id=${khoaVanHanh}`)
         .set('Authorization', `Bearer ${tokenPhong}`)
@@ -820,11 +1136,11 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
         }>
       ).find((r) => r.lop_id === lopVanHanh.id);
       expect(row).toBeDefined();
-      expect(row!.si_so).toBe(1); // chỉ hvVh1 — hvVhKhac (truongKhac) không được tính dù cùng lớp
-      expect(row!.so_co_email).toBe(1);
+      expect(row!.si_so).toBe(2);
+      expect(row!.so_co_email).toBe(2);
       expect(row!.theo_muc_dau_vao).toMatchObject({
         co_ban: 1,
-        thanh_thao: 0,
+        thanh_thao: 1,
         nang_cao: 0,
         khong_xac_dinh: 0,
       });
