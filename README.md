@@ -104,6 +104,27 @@ In ra `ten_dang_nhap` + mật khẩu (tự sinh nếu không đặt `SEED_QUAN_T
 
 Nhớ đặt `JWT_SECRET` riêng (đủ dài/ngẫu nhiên) trong `backend/.env` trước khi deploy thật — xem `backend/.env.example`.
 
+### Chạy test e2e (DB riêng)
+
+e2e dùng DB riêng `thong_tin_hoc_vien_test` (không đụng DB dev `thong_tin_hoc_vien_ddh`/`thong_tin_hoc_vien`), cấu hình qua `backend/.env.test` (git-ignored, tự tạo, không commit):
+
+```bash
+cd backend
+cp .env.test.example .env.test   # chỉnh DATABASE_URL nếu cần
+
+# Tạo database (1 lần)
+psql -U postgres -h localhost -c "CREATE DATABASE thong_tin_hoc_vien_test"
+
+# Migration + seed vào DB test (override DATABASE_URL trong biến môi trường lệnh)
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/thong_tin_hoc_vien_test?schema=public" npx prisma migrate deploy
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/thong_tin_hoc_vien_test?schema=public" npm run seed
+
+# Chạy từng file e2e
+npx jest --config ./test/jest-e2e.json --runInBand --forceExit test/auth.e2e-spec.ts
+```
+
+`test/setup-e2e-env.ts` tự nạp `backend/.env.test` (nếu tồn tại) với `override: true` trước khi Nest khởi động, nên `DATABASE_URL` trong `.env.test` luôn thắng giá trị trong `backend/.env`.
+
 ### Chạy dev server
 
 ```bash
