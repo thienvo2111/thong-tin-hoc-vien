@@ -150,6 +150,8 @@ enum loai_danh_muc_import {
   // Import nhân sự lớp (giảng viên/hỗ trợ) — cùng lý do như trên: thêm SAU
   // CÙNG, migration riêng (xem migration *_nhan_su_lop_import_enum).
   nhan_su_lop
+  // Tài khoản đơn vị (2026-10-03) — migration riêng như các giá trị trên.
+  tai_khoan_don_vi
 }
 
 // T5 (mo-rong-nls-an-giang.md, 2026-09-29): mức năng lực đầu vào/đầu ra của
@@ -183,6 +185,8 @@ enum loai_su_kien_thong_bao {
   // ưu tiên cao gửi ngay không qua hàng đợi. Cùng ràng buộc ALTER TYPE ADD
   // VALUE migration riêng như trên.
   email_xac_minh
+  // Tài khoản đơn vị (2026-10-03): email link kích hoạt — migration riêng.
+  kich_hoat_tai_khoan
   dat_lai_mat_khau
 }
 
@@ -230,6 +234,8 @@ enum loai_dot_xac_nhan {
 enum loai_token_xac_thuc {
   xac_minh_email
   dat_lai_mat_khau
+  // Tài khoản đơn vị (2026-10-03): link kích hoạt 72 giờ, gắn nguoi_dung_id.
+  kich_hoat_tai_khoan
 }
 
 // T12 (mo-rong-nls-an-giang.md, 2026-09-30): điểm danh nhập qua IMPORT EXCEL
@@ -321,12 +327,12 @@ model dia_danh {
   nguon_import nhat_ky_import? @relation(fields: [nguon_import_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   don_vi_cong_tac           don_vi_cong_tac[]
-  hoc_vien_noi_sinh         hoc_vien[]        @relation("hoc_vien_noi_sinh")
-  hoc_vien_phuong_xa        hoc_vien[]        @relation("hoc_vien_phuong_xa")
+  hoc_vien_noi_sinh         hoc_vien[]               @relation("hoc_vien_noi_sinh")
+  hoc_vien_phuong_xa        hoc_vien[]               @relation("hoc_vien_phuong_xa")
   // Thêm 2026-09-30: "Cư trú" — dùng địa giới hành chính HIỆN TẠI (khác
   // noi_sinh/phuong_xa ở trên vốn là nơi sinh theo địa giới có thể đã cũ).
-  hoc_vien_cu_tru_tinh      hoc_vien[]        @relation("hoc_vien_cu_tru_tinh")
-  hoc_vien_cu_tru_phuong_xa hoc_vien[]        @relation("hoc_vien_cu_tru_phuong_xa")
+  hoc_vien_cu_tru_tinh      hoc_vien[]               @relation("hoc_vien_cu_tru_tinh")
+  hoc_vien_cu_tru_phuong_xa hoc_vien[]               @relation("hoc_vien_cu_tru_phuong_xa")
   cau_hinh_khao_sat_khoa    cau_hinh_khao_sat_khoa[]
 
   @@index([parent_id], map: "idx_dia_danh_parent")
@@ -415,6 +421,7 @@ model nguoi_dung {
   dot_xac_nhan_created_by            dot_xac_nhan[]             @relation("dot_xac_nhan_created_by")
   lich_su_thay_doi_thuc_hien         lich_su_thay_doi_ho_so[]   @relation("lich_su_thay_doi_nguoi_sua")
   yeu_cau_ho_tro_tra_loi_boi         yeu_cau_ho_tro[]           @relation("yeu_cau_ho_tro_tra_loi_boi")
+  token_xac_thuc                     token_xac_thuc[]
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -459,14 +466,14 @@ model hoc_vien {
   id        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   nguon_tao nguon_tao_ho_so @default(tu_dang_ky)
 
-  ho_ten               String  @db.VarChar(255)
-  so_dinh_danh_ca_nhan String? @unique(map: "uq_hoc_vien_ddcn") @db.Char(12)
-  ma_dinh_danh_moet    String? @unique(map: "uq_hoc_vien_ma_moet") @db.VarChar(20)
-  ngay_sinh            Int     @db.SmallInt
-  thang_sinh           Int     @db.SmallInt
-  nam_sinh             Int     @db.SmallInt
-  gioi_tinh            String? @db.VarChar(20)
-  chuc_vu              String? @db.VarChar(100)
+  ho_ten               String              @db.VarChar(255)
+  so_dinh_danh_ca_nhan String?             @unique(map: "uq_hoc_vien_ddcn") @db.Char(12)
+  ma_dinh_danh_moet    String?             @unique(map: "uq_hoc_vien_ma_moet") @db.VarChar(20)
+  ngay_sinh            Int                 @db.SmallInt
+  thang_sinh           Int                 @db.SmallInt
+  nam_sinh             Int                 @db.SmallInt
+  gioi_tinh            String?             @db.VarChar(20)
+  chuc_vu              String?             @db.VarChar(100)
   doi_tuong            doi_tuong_hoc_vien?
 
   // Deprecated 2026-09-30: thay bởi "noi_sinh" (text tự do, xem bên dưới) —
@@ -555,17 +562,22 @@ model hoc_vien {
 // token gốc (chỉ token gốc nằm trong email gửi đi, DB không bao giờ lưu bản
 // rõ) — tra theo token_hash (UNIQUE) khi xác thực, không cần hoc_vien_id.
 model token_xac_thuc {
-  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  hoc_vien_id String              @db.Uuid
-  loai        loai_token_xac_thuc
-  token_hash  String              @unique(map: "uq_token_xac_thuc_hash") @db.VarChar(64)
-  het_han_luc DateTime            @db.Timestamptz(6)
-  da_dung_luc DateTime?           @db.Timestamptz(6)
-  tao_luc     DateTime            @default(now()) @db.Timestamptz(6)
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hoc_vien_id   String?             @db.Uuid
+  // Tài khoản đơn vị (2026-10-03): token gắn ĐÚNG 1 trong hoc_vien_id /
+  // nguoi_dung_id (CHECK chk_token_xac_thuc_chu_the trong migration).
+  nguoi_dung_id String?             @db.Uuid
+  loai          loai_token_xac_thuc
+  token_hash    String              @unique(map: "uq_token_xac_thuc_hash") @db.VarChar(64)
+  het_han_luc   DateTime            @db.Timestamptz(6)
+  da_dung_luc   DateTime?           @db.Timestamptz(6)
+  tao_luc       DateTime            @default(now()) @db.Timestamptz(6)
 
-  hoc_vien hoc_vien @relation(fields: [hoc_vien_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  hoc_vien   hoc_vien?   @relation(fields: [hoc_vien_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  nguoi_dung nguoi_dung? @relation(fields: [nguoi_dung_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([hoc_vien_id], map: "idx_token_xac_thuc_hoc_vien")
+  @@index([nguoi_dung_id], map: "idx_token_xac_thuc_nguoi_dung")
 }
 
 model hoc_vien_chuyen_mon {
@@ -690,14 +702,14 @@ model khoa_boi_duong {
   nguoi_duyet     nguoi_dung?     @relation("khoa_boi_duong_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   created_by_user nguoi_dung?     @relation("khoa_boi_duong_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  giai_doan       giai_doan_khoa[]
-  lop_hoc         lop_hoc[]
-  dang_ky_hoc     dang_ky_hoc[]
-  dot_xac_nhan    dot_xac_nhan[]
+  giai_doan         giai_doan_khoa[]
+  lop_hoc           lop_hoc[]
+  dang_ky_hoc       dang_ky_hoc[]
+  dot_xac_nhan      dot_xac_nhan[]
   cau_hinh_khao_sat cau_hinh_khao_sat_khoa?
   // QĐ10: cụm học viên (nhóm Zalo hỗ trợ theo địa lý) — độc lập với cây đơn
   // vị công tác, thuộc trực tiếp về khóa.
-  cum_hoc_vien    cum_hoc_vien[]
+  cum_hoc_vien      cum_hoc_vien[]
 
   @@index([don_vi_dat_hang_id], map: "idx_khoa_don_vi")
   @@index([trang_thai], map: "idx_khoa_trang_thai")
@@ -1048,11 +1060,11 @@ model ma_sso_mot_lan {
 /// trang chủ khi người xem chọn đúng tỉnh. Shape gia_tri giống cấu hình chung.
 /// tinh_id = tỉnh hiển thị ở trang chủ; mỗi tỉnh gắn tối đa 1 khóa.
 model cau_hinh_khao_sat_khoa {
-  khoa_id      String    @id @db.Uuid
-  tinh_id      String?   @unique(map: "uq_cau_hinh_khao_sat_khoa_tinh") @db.Uuid
+  khoa_id      String   @id @db.Uuid
+  tinh_id      String?  @unique(map: "uq_cau_hinh_khao_sat_khoa_tinh") @db.Uuid
   gia_tri      Json
-  cap_nhat_luc DateTime  @default(now()) @db.Timestamptz(6)
-  cap_nhat_boi String?   @db.Uuid
+  cap_nhat_luc DateTime @default(now()) @db.Timestamptz(6)
+  cap_nhat_boi String?  @db.Uuid
 
   khoa khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   tinh dia_danh?      @relation(fields: [tinh_id], references: [id], onDelete: NoAction, onUpdate: NoAction)

@@ -77,7 +77,8 @@ CREATE TYPE loai_danh_muc_import AS ENUM (
     'ho_so_nhan_su_moet',
     'tai_khoan_vle',  -- T15 (mo-rong-nls-an-giang.md, 2026-09-28) — thêm SAU CÙNG (migration riêng)
     'ket_qua_danh_gia',  -- T5 (mo-rong-nls-an-giang.md, 2026-09-29) — thêm SAU CÙNG (migration riêng)
-    'lop_va_lich_hoc'  -- T6 (mo-rong-nls-an-giang.md, 2026-09-29) — thêm SAU CÙNG (migration riêng)
+    'lop_va_lich_hoc',  -- T6 (mo-rong-nls-an-giang.md, 2026-09-29) — thêm SAU CÙNG (migration riêng)
+    'tai_khoan_don_vi'  -- Tài khoản đơn vị (2026-10-03, ADR 0002) — migration riêng
 );
 
 -- T5 (mo-rong-nls-an-giang.md, 2026-09-29): mức năng lực đầu vào/đầu ra của
@@ -99,7 +100,8 @@ CREATE TYPE loai_su_kien_thong_bao AS ENUM (
     'dang_ky_hoc_phan_lop',   -- thông báo lớp/lịch học sau khi được phân lớp
     'dang_ky_hoc_ket_qua',    -- thông báo kết quả khóa học
     'email_xac_minh',         -- M9: xác minh email liên hệ (làn ưu tiên cao)
-    'dat_lai_mat_khau'        -- M9: đặt lại mật khẩu (làn ưu tiên cao)
+    'dat_lai_mat_khau',       -- M9: đặt lại mật khẩu (làn ưu tiên cao)
+    'kich_hoat_tai_khoan'     -- 2026-10-03 (ADR 0002): link kích hoạt tài khoản đơn vị
 );
 
 CREATE TYPE trang_thai_gui_thong_bao AS ENUM ('thanh_cong', 'that_bai');
@@ -240,12 +242,22 @@ CREATE TABLE nguoi_dung (
         OR
         (vai_tro NOT IN ('hoc_vien', 'quan_tri') AND don_vi_id IS NOT NULL AND hoc_vien_id IS NULL)
     ),
+    -- 2026-10-03 (ADR 0002): chỉ quan_tri bắt buộc email; tài khoản đơn vị
+    -- (so_gddt/phong_vhxh/truong) có thể chưa có email (cấp mật khẩu tạm).
     CONSTRAINT chk_nguoi_dung_email_bat_buoc
-        CHECK (vai_tro = 'hoc_vien' OR email IS NOT NULL)
+        CHECK (vai_tro <> 'quan_tri' OR email IS NOT NULL)
 );
 
 CREATE INDEX idx_nguoi_dung_vai_tro ON nguoi_dung(vai_tro);
 CREATE INDEX idx_nguoi_dung_don_vi ON nguoi_dung(don_vi_id);
+-- 2026-10-03 (ADR 0002): 1 tài khoản quản lý / đơn vị.
+CREATE UNIQUE INDEX uq_nguoi_dung_don_vi_quan_ly ON nguoi_dung(don_vi_id)
+    WHERE vai_tro IN ('so_gddt', 'phong_vhxh', 'truong');
+-- token_xac_thuc (M9, chưa có trong file này — lệch pha đã biết, xem
+-- CONTEXT.md): từ 2026-10-03 có thêm nguoi_dung_id (nullable, FK
+-- nguoi_dung ON DELETE CASCADE), hoc_vien_id nullable, CHECK
+-- chk_token_xac_thuc_chu_the: num_nonnulls(hoc_vien_id, nguoi_dung_id) = 1;
+-- enum loai_token_xac_thuc thêm 'kich_hoat_tai_khoan'.
 
 ALTER TABLE nhat_ky_import
     ADD CONSTRAINT fk_import_nguoi_import
