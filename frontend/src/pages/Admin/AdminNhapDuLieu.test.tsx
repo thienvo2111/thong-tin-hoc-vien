@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -22,11 +22,12 @@ const CAC_GIA_TRI_ENUM_LOAI_DANH_MUC_IMPORT = [
   'diem_danh',
   'ket_qua_giai_doan',
   'nhan_su_lop',
+  'tai_khoan_don_vi',
 ] as const;
 
-function renderTrang() {
+function renderTrang(initialEntries = ['/admin/nhap-du-lieu']) {
   datToken('token-gia-lap');
-  return renderVoiRouter([{ path: '/admin/nhap-du-lieu', element: <AdminNhapDuLieu /> }], { initialEntries: ['/admin/nhap-du-lieu'] });
+  return renderVoiRouter([{ path: '/admin/nhap-du-lieu', element: <AdminNhapDuLieu /> }], { initialEntries });
 }
 
 describe('Admin — Nhập dữ liệu', () => {
@@ -192,5 +193,39 @@ describe('Admin — Nhập dữ liệu', () => {
 
   it('giá trị enum lạ (chưa kịp cập nhật nhãn) hiện nguyên giá trị thô, không để trống', () => {
     expect(nhanLoaiImport('gia_tri_enum_moi_chua_co_nhan')).toBe('gia_tri_enum_moi_chua_co_nhan');
+  });
+
+  it('?loai=tai_khoan_don_vi: chọn sẵn loại "Tài khoản đơn vị"', async () => {
+    renderTrang(['/admin/nhap-du-lieu?loai=tai_khoan_don_vi']);
+    await screen.findByRole('table');
+    expect(screen.getByDisplayValue('Tài khoản đơn vị')).toBeInTheDocument();
+  });
+
+  it('tài khoản đơn vị: xác nhận nạp tự tải file mật khẩu tạm, giữ panel với tóm tắt + nút tải lại', async () => {
+    let soLanXacNhan = 0;
+    server.use(
+      http.post('/import/:id/xac-nhan', () => {
+        soLanXacNhan++;
+        return new HttpResponse(new Blob(['xlsx']), {
+          headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    const { container } = renderTrang(['/admin/nhap-du-lieu?loai=tai_khoan_don_vi']);
+    await screen.findByRole('table');
+    const oFile = container.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(oFile, new File(['x'], 'tai-khoan.xlsx'));
+    await user.click(screen.getByRole('button', { name: 'Tải lên & kiểm tra' }));
+    await user.click(await screen.findByRole('button', { name: 'Xác nhận nạp dữ liệu' }));
+
+    expect(await screen.findByText(/Đã tạo 4 tài khoản/)).toBeInTheDocument();
+    expect(screen.getByText('File mật khẩu tạm chỉ tải được trong phiên màn hình này. Đóng lại sẽ không lấy lại được.')).toBeInTheDocument();
+    expect(vi.mocked(URL.createObjectURL)).toHaveBeenCalled();
+    const soLanTaiDau = vi.mocked(URL.createObjectURL).mock.calls.length;
+    await user.click(screen.getByRole('button', { name: 'Tải file mật khẩu tạm' }));
+    expect(vi.mocked(URL.createObjectURL).mock.calls.length).toBe(soLanTaiDau + 1);
+    expect(soLanXacNhan).toBe(1);
+    expect(screen.getByText('Kết quả kiểm tra')).toBeInTheDocument();
   });
 });

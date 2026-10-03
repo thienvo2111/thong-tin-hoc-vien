@@ -1,7 +1,14 @@
 import { useMutation } from '@tanstack/react-query';
 import { Alert, Box, Button, Group, Paper, Skeleton, Stack, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { taiFileLoiImport, useImportChiTiet, useXacNhanImport } from '@/api/nhapDuLieu';
+import { useState } from 'react';
+import {
+  taiFileLoiImport,
+  useImportChiTiet,
+  useXacNhanImport,
+  useXacNhanImportTaiKhoan,
+} from '@/api/nhapDuLieu';
+import type { LoaiDanhMucImport } from '@/api/types';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { taiFileTuBlob } from '@/lib/taiFile';
 
@@ -39,16 +46,24 @@ function BangDong({ mau, danhSach }: { mau: 'loi' | 'canh_bao'; danhSach: { dong
  * nạp chính thức (POST /import/{id}/xac-nhan) — bước 2 của luồng 2 bước thật, KHÔNG gộp thành 1 bước. */
 export function PanelXemTruocImport({
   importId,
+  loai,
   onXongViec,
   onDaNap,
 }: {
   importId: string;
+  /** tai_khoan_don_vi: xác nhận nạp trả file mật khẩu tạm, panel giữ lại để tải lại trong phiên. */
+  loai?: LoaiDanhMucImport;
   onXongViec: () => void;
   /** Gọi sau khi xác nhận nạp thành công (trước onXongViec) — để nơi gọi làm mới dữ liệu của mình. */
   onDaNap?: () => void;
 }) {
   const ketQua = useImportChiTiet(importId);
   const xacNhan = useXacNhanImport();
+  const xacNhanTaiKhoan = useXacNhanImportTaiKhoan();
+  // Blob mật khẩu tạm chỉ giữ ở state cục bộ — mất khi panel đóng (ADR 0002).
+  const [fileMatKhau, setFileMatKhau] = useState<Blob | null>(null);
+  const laTaiKhoan = loai === 'tai_khoan_don_vi';
+  const tenFileMatKhau = `mat-khau-tam-${importId}.xlsx`;
   const taiFileLoi = useMutation({
     mutationFn: () => taiFileLoiImport(importId),
     onSuccess: (blob) => taiFileTuBlob(blob, `loi-import-${importId}.xlsx`),
@@ -56,6 +71,17 @@ export function PanelXemTruocImport({
   });
 
   function xuLyXacNhan() {
+    if (laTaiKhoan) {
+      xacNhanTaiKhoan.mutate(importId, {
+        onSuccess: (blob) => {
+          setFileMatKhau(blob);
+          taiFileTuBlob(blob, tenFileMatKhau);
+          onDaNap?.();
+        },
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+      });
+      return;
+    }
     xacNhan.mutate(importId, {
       onSuccess: () => {
         notifications.show({ color: 'green', message: 'Đã nạp dữ liệu chính thức vào hệ thống.' });
@@ -80,7 +106,27 @@ export function PanelXemTruocImport({
       {ketQua.isLoading && <Skeleton height={100} />}
       {ketQua.isError && <Alert color="red">{thongDiepLoiChung(ketQua.error)}</Alert>}
 
-      {ketQua.data && (
+      {fileMatKhau && ketQua.data && (
+        <Stack gap="md">
+          <Alert color="green" variant="light">
+            Đã tạo {ketQua.data.so_dong_thanh_cong} tài khoản. Tài khoản có email được gửi link kích hoạt; tài
+            khoản không email có mật khẩu tạm trong file vừa tải về.
+          </Alert>
+          <Alert color="red" variant="light">
+            File mật khẩu tạm chỉ tải được trong phiên màn hình này. Đóng lại sẽ không lấy lại được.
+          </Alert>
+          <Group gap={10}>
+            <Button color="accent" onClick={() => taiFileTuBlob(fileMatKhau, tenFileMatKhau)}>
+              Tải file mật khẩu tạm
+            </Button>
+            <Button variant="default" onClick={onXongViec}>
+              Đã lưu, đóng
+            </Button>
+          </Group>
+        </Stack>
+      )}
+
+      {ketQua.data && !fileMatKhau && (
         <Stack gap="md">
           {/* trang_thai='dang_xu_ly' bao gồm CẢ 2 pha: đang validate (chưa có kết quả) LẪN đã validate
            * xong nhưng chưa bấm "Xác nhận" (mở lại từ Lịch sử) — backend chỉ chuyển sang 'hoan_thanh'
@@ -115,7 +161,7 @@ export function PanelXemTruocImport({
               <Group gap={10}>
                 <Button
                   color="accent"
-                  loading={xacNhan.isPending}
+                  loading={xacNhan.isPending || xacNhanTaiKhoan.isPending}
                   disabled={ketQua.data.so_dong_thanh_cong === 0}
                   onClick={xuLyXacNhan}
                 >

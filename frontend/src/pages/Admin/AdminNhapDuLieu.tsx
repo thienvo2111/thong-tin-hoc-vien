@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import {
   Alert,
@@ -42,6 +43,7 @@ export const NHAN_LOAI_IMPORT: Record<LoaiDanhMucImport, string> = {
   diem_danh: 'Điểm danh',
   ket_qua_giai_doan: 'Kết quả giai đoạn',
   nhan_su_lop: 'Nhân sự lớp (giảng viên/hỗ trợ)',
+  tai_khoan_don_vi: 'Tài khoản đơn vị',
 };
 
 const TUY_CHON_LOAI_IMPORT: { value: LoaiDanhMucImport; label: string }[] = Object.entries(NHAN_LOAI_IMPORT).map(
@@ -66,9 +68,16 @@ function BadgeTrangThaiImport({ trangThai, soDongLoi }: { trangThai: string; soD
 /** Nhập dữ liệu (Phase 5 redesign) — luồng 2 bước thật (docs/api-contract.md mục 5): tải file lên +
  * kiểm tra (POST /import/{loai}) rồi mới xác nhận nạp chính thức (POST /import/{id}/xac-nhan). */
 export default function AdminNhapDuLieu() {
-  const [loai, setLoai] = useState<LoaiDanhMucImport>('ho_so_nhan_su_moet');
+  // ?loai=... (vd. nút "Nhập từ Excel" ở trang Người dùng) chọn sẵn loại import.
+  const [searchParams] = useSearchParams();
+  const loaiTuUrl = searchParams.get('loai');
+  const [loai, setLoai] = useState<LoaiDanhMucImport>(
+    loaiTuUrl && loaiTuUrl in NHAN_LOAI_IMPORT ? (loaiTuUrl as LoaiDanhMucImport) : 'ho_so_nhan_su_moet',
+  );
   const [file, setFile] = useState<File | null>(null);
   const [importId, setImportId] = useState<string | undefined>();
+  // Loại của LƯỢT import đang xem/xác nhận (khác `loai` đang chọn khi mở lại job cũ từ Lịch sử).
+  const [loaiDangXacNhan, setLoaiDangXacNhan] = useState<LoaiDanhMucImport | undefined>();
   // Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.5): mẫu + file phân lớp sinh theo giai đoạn của
   // 1 khóa -> bắt buộc chọn khóa trước khi tải mẫu/tải lên.
   const [maKhoa, setMaKhoa] = useState<string | null>(null);
@@ -97,6 +106,7 @@ export default function AdminNhapDuLieu() {
       {
         onSuccess: (res) => {
           setImportId(res.import_id);
+          setLoaiDangXacNhan(loai);
           notifications.show({ color: 'blue', message: 'Đã tải file lên, đang kiểm tra dữ liệu...' });
         },
         onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
@@ -113,8 +123,9 @@ export default function AdminNhapDuLieu() {
   // Mở lại panel xác nhận cho 1 job đã validate xong (trang_thai='dang_xu_ly' + so_dong_thanh_cong>0)
   // từ bảng lịch sử — dùng thẳng id job cũ, không cần upload lại file (dữ liệu preview đã có sẵn ở
   // GET /import/{id}, xem PanelXemTruoc).
-  function moLaiXacNhan(id: string) {
+  function moLaiXacNhan(id: string, loaiJob: LoaiDanhMucImport) {
     setImportId(id);
+    setLoaiDangXacNhan(loaiJob);
     requestAnimationFrame(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
 
@@ -223,7 +234,7 @@ export default function AdminNhapDuLieu() {
                                   fw={700}
                                   c="danger.6"
                                   style={{ background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                                  onClick={() => moLaiXacNhan(i.id)}
+                                  onClick={() => moLaiXacNhan(i.id, i.loai_danh_muc)}
                                 >
                                   Xác nhận →
                                 </Text>
@@ -254,7 +265,7 @@ export default function AdminNhapDuLieu() {
 
         {importId && (
           <div ref={panelRef}>
-            <PanelXemTruocImport importId={importId} onXongViec={dongXongViec} />
+            <PanelXemTruocImport importId={importId} loai={loaiDangXacNhan} onXongViec={dongXongViec} />
           </div>
         )}
       </Container>

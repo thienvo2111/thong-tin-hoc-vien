@@ -55,7 +55,7 @@ export default function QuenMatKhau() {
               <form onSubmit={handleSubmit(onSubmit)} noValidate>
                 <Stack gap="md">
                   <TextInput
-                    label="Mã định danh hoặc số CCCD"
+                    label="Tên đăng nhập, mã định danh hoặc số CCCD"
                     inputMode="numeric"
                     autoComplete="username"
                     error={errors.ten_dang_nhap?.message}

@@ -430,7 +430,8 @@ export type LoaiDanhMucImport =
   | 'mon_hoc'
   | 'diem_danh'
   | 'ket_qua_giai_doan'
-  | 'nhan_su_lop';
+  | 'nhan_su_lop'
+  | 'tai_khoan_don_vi';
 
 export interface TaoImportResponse {
   import_id: string;

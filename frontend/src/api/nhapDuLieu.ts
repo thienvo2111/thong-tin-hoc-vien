@@ -71,6 +71,20 @@ export function useXacNhanImport() {
   });
 }
 
+/** Tài khoản đơn vị (ADR 0002): xác nhận nạp trả FILE Excel mật khẩu tạm (tải 1 lần, server không
+ * lưu) thay vì JSON. gcTime: 0 — Blob chứa mật khẩu không nằm lại trong cache TanStack. */
+export function useXacNhanImportTaiKhoan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetchBlob(`/import/${id}/xac-nhan`, { method: 'POST' }),
+    onSuccess: (_blob, id) => {
+      queryClient.invalidateQueries({ queryKey: importChiTietKey(id) });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'import', 'lich-su'] });
+    },
+    gcTime: 0,
+  });
+}
+
 export function taiFileLoiImport(id: string) {
   return apiFetchBlob(`/import/${id}/file-loi`);
 }

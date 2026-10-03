@@ -62,16 +62,17 @@ export async function apiFetch<T>(path: string, tuyChon: TuyChon = {}): Promise<
   return data as T;
 }
 
-/** Tải file nhị phân (Excel) — dùng cho các endpoint `/xuat-excel`, `/file-loi`, `/mau-excel`.
- * Khác apiFetch: không set Content-Type, trả về Blob thay vì JSON. */
-export async function apiFetchBlob(path: string): Promise<Blob> {
+/** Tải file nhị phân (Excel) — dùng cho các endpoint `/xuat-excel`, `/file-loi`, `/mau-excel`, và
+ * POST xác nhận nạp tài khoản đơn vị (trả file mật khẩu tạm). Khác apiFetch: không set Content-Type,
+ * trả về Blob thay vì JSON. */
+export async function apiFetchBlob(path: string, init: Pick<RequestInit, 'method'> = {}): Promise<Blob> {
   const headers = new Headers();
   const token = layToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}${path}`, { headers });
+    res = await fetch(`${BASE_URL}${path}`, { ...init, headers });
   } catch {
     throw new ApiError(0, { code: 'NETWORK_ERROR', message: 'Không kết nối được máy chủ. Kiểm tra mạng và thử lại.' });
   }
