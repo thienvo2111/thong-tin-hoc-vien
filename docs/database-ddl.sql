@@ -524,7 +524,7 @@ CREATE TABLE khoa_boi_duong (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     ma_khoa             varchar(30) NOT NULL,
     ten_khoa            varchar(255) NOT NULL,
-    don_vi_dat_hang_id  uuid NOT NULL REFERENCES don_vi_cong_tac(id),  -- = Trường tạo khóa
+    don_vi_dat_hang_id  uuid NOT NULL REFERENCES don_vi_cong_tac(id),  -- đơn vị đặt hàng (Sở/Trường/đơn vị khác); HCMUE luôn tổ chức
     dia_diem            varchar(255),
     thoi_gian_bat_dau   date NOT NULL,
     thoi_gian_ket_thuc  date NOT NULL,
