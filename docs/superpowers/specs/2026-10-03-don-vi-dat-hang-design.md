@@ -98,7 +98,7 @@ Migration Prisma mới (2 file migration triển khai cùng lúc — không ph�
 Trước khi deploy VPS:
 
 - Sao lưu DB (`backend/backups/`).
-- Chạy script chỉ đọc `scripts/kiem_tra_don_vi_dat_hang.sql` liệt kê: khóa sẽ đổi đơn vị đặt hàng (bước 2), khóa có 0 hoặc ≥2 đơn vị theo dõi (cần gán tay), khóa sẽ đổi trạng thái (bước 4). Người dùng duyệt danh sách trước khi migrate.
+- Chạy script chỉ đọc `scripts/kiem_tra_don_vi_dat_hang.sql` **trên DB chưa migrate** (script dùng tên cột/bảng cũ `don_vi_to_chuc_id`/`khoa_don_vi_theo_doi` — chạy sau khi migrate sẽ lỗi vì cột đã đổi tên) liệt kê: khóa sẽ đổi đơn vị đặt hàng (bước 2), khóa có 0 hoặc ≥2 đơn vị theo dõi (cần gán tay), khóa sẽ đổi trạng thái (bước 4). Người dùng duyệt danh sách trước khi migrate; việc gán tay các khóa (b) làm SAU khi `prisma migrate deploy` (lúc đó cột mới mang tên `don_vi_dat_hang_id`) bằng `UPDATE khoa_boi_duong SET don_vi_dat_hang_id = ...`.
 - Rollback: SQL đảo bước 1; bảng theo dõi và trạng thái cũ khôi phục từ bản sao lưu.
 
 ## 8. Tài liệu

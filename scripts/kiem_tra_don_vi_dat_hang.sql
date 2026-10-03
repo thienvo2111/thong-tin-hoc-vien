@@ -1,6 +1,12 @@
--- Script CHỈ ĐỌC — chạy TRƯỚC migration
--- 20261003130000_don_vi_dat_hang_du_lieu để người dùng duyệt danh sách thay
--- đổi (spec §7 "Trước khi deploy VPS"). Không ghi dữ liệu.
+-- Chạy TRƯỚC `prisma migrate deploy` (schema cũ: don_vi_to_chuc_id).
+--
+-- Script CHỈ ĐỌC — chạy TRƯỚC 2 migration
+-- 20261003120000_don_vi_dat_hang_rename / 20261003130000_don_vi_dat_hang_du_lieu
+-- để người dùng duyệt danh sách thay đổi (spec §7 "Trước khi deploy VPS").
+-- Tại thời điểm chạy, cột VẪN còn tên don_vi_to_chuc_id và bảng
+-- khoa_don_vi_theo_doi VẪN còn tồn tại (chưa migrate) — script dùng đúng tên
+-- cũ đó, KHÔNG dùng don_vi_dat_hang_id/don_vi_dat_hang (final-review.md fix #1).
+-- Không ghi dữ liệu.
 -- Dùng: psql -d thong_tin_hoc_vien -f scripts/kiem_tra_don_vi_dat_hang.sql
 
 -- (a) Khóa có đúng 1 đơn vị theo dõi -> migration bước 2 sẽ tự đổi
@@ -10,7 +16,7 @@ SELECT
     dv_hien_tai.ten_don_vi AS don_vi_dat_hang_hien_tai,
     dv_moi.ten_don_vi      AS don_vi_se_doi_sang
 FROM khoa_boi_duong k
-JOIN don_vi_cong_tac dv_hien_tai ON dv_hien_tai.id = k.don_vi_dat_hang_id
+JOIN don_vi_cong_tac dv_hien_tai ON dv_hien_tai.id = k.don_vi_to_chuc_id
 JOIN (
     -- Ép qua text rồi ép lại uuid vì Postgres không có aggregate MIN cho
     -- uuid; do COUNT(*) = 1 nên MIN chỉ trả về giá trị duy nhất của nhóm.
@@ -40,6 +46,6 @@ SELECT
     k.trang_thai,
     dv.ten_don_vi AS don_vi_dat_hang
 FROM khoa_boi_duong k
-JOIN don_vi_cong_tac dv ON dv.id = k.don_vi_dat_hang_id
+JOIN don_vi_cong_tac dv ON dv.id = k.don_vi_to_chuc_id
 WHERE k.trang_thai IN ('nhap', 'cho_duyet', 'tu_choi')
 ORDER BY k.ma_khoa;

@@ -52,7 +52,17 @@ Cùng với đó: bỏ email "Kết quả duyệt khóa bồi dưỡng" (`thongB
 1. `20261003120000_don_vi_dat_hang_rename` — `RENAME COLUMN don_vi_to_chuc_id TO don_vi_dat_hang_id` + đổi tên FK.
 2. `20261003130000_don_vi_dat_hang_du_lieu` — gán `don_vi_dat_hang_id` từ đơn vị theo dõi duy nhất của mỗi khóa có đúng 1 dòng trong `khoa_don_vi_theo_doi` (`MIN(don_vi_id::text)::uuid`, dùng `text` vì không ép kiểu `uuid` trực tiếp được), `DROP TABLE khoa_don_vi_theo_doi`, và chuyển mọi khóa `nhap`/`cho_duyet`/`tu_choi` còn lại sang `da_duyet`.
 
-Khóa có 0 hoặc ≥2 đơn vị theo dõi không tự chuyển được — cần rà soát bằng `scripts/kiem_tra_don_vi_dat_hang.sql` và gán tay trước khi migrate trên DB thật (xem mục "Triển khai VPS" trong kế hoạch).
+Khóa có 0 hoặc ≥2 đơn vị theo dõi không tự chuyển được — cần rà soát bằng `scripts/kiem_tra_don_vi_dat_hang.sql` và gán tay sau khi migrate (xem "Triển khai" ngay dưới và mục "Triển khai VPS" trong kế hoạch).
+
+### Triển khai (sửa 2026-10-03, fix #1 final-review — thứ tự đúng)
+
+`scripts/kiem_tra_don_vi_dat_hang.sql` dùng tên cột/bảng CŨ (`don_vi_to_chuc_id`, `khoa_don_vi_theo_doi`) vì nó phải chạy TRƯỚC khi migration đổi tên cột và xóa bảng — chạy sau khi đã `migrate deploy` sẽ lỗi `column "don_vi_to_chuc_id" does not exist`. Thứ tự triển khai đúng:
+
+1. Sao lưu DB (`backend/backups/`).
+2. Chạy `scripts/kiem_tra_don_vi_dat_hang.sql` trên DB **chưa migrate** (schema cũ, cột vẫn là `don_vi_to_chuc_id`) — liệt kê (a) khóa sẽ tự đổi đơn vị đặt hàng, (b) khóa có 0 hoặc ≥2 đơn vị theo dõi (migration GIỮ NGUYÊN đơn vị đặt hàng hiện tại của các khóa này), (c) khóa sẽ đổi trạng thái sang `da_duyet`. Người dùng duyệt danh sách (b) trước khi đi tiếp.
+3. `prisma migrate deploy` (áp cả 2 migration — không tách bước, Postgres không hỗ trợ `MIN`/`MAX(uuid)` nên bước 2 (gán dữ liệu) phải nằm trong 1 migration riêng chạy ngay sau bước 1 (đổi tên cột), nhưng cả 2 vẫn nằm trong cùng 1 lần `migrate deploy`).
+4. Với các khóa ở tập (b) mà đơn vị đặt hàng giữ nguyên là SAI (Quản trị xác định qua danh sách ở bước 2) — gán tay bằng `UPDATE khoa_boi_duong SET don_vi_dat_hang_id = '<id đơn vị đúng>' WHERE id = '<id khóa>'` (chạy SAU migrate, vì lúc này cột đã mang tên mới).
+5. Deploy backend + frontend cùng lúc (đổi tên field API, xem "Rủi ro").
 
 **Đổi tên field API** phá mọi client cũ dùng `don_vi_to_chuc_id` — chỉ có frontend của chính dự án này dùng, nên **phải deploy backend và frontend cùng lúc**, không rolling deploy từng phần.
 

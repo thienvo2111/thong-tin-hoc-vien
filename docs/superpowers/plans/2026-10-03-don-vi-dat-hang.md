@@ -208,6 +208,15 @@
 
 ### Triển khai VPS (sau khi mọi task PASS — người dùng thực hiện/duyệt)
 
+> **Sửa 2026-10-03 (fix #1 final-review):** thứ tự dưới đây đã đúng với cách
+> `scripts/kiem_tra_don_vi_dat_hang.sql` hoạt động — script dùng tên cột/bảng
+> CŨ (`don_vi_to_chuc_id`, `khoa_don_vi_theo_doi`) nên PHẢI chạy TRƯỚC
+> `prisma migrate deploy` (chạy sau sẽ lỗi vì cột đã đổi tên); việc gán tay
+> các khóa ở tập (b) thì ngược lại PHẢI làm SAU migrate (cột lúc đó mới mang
+> tên `don_vi_dat_hang_id`). Xem thêm ADR 0001 mục "Triển khai".
+
 - [ ] Sao lưu DB vào `backend/backups/`.
-- [ ] Chạy `scripts/kiem_tra_don_vi_dat_hang.sql` trên DB thật, gửi kết quả cho người dùng duyệt; gán tay các khóa ở tập (b) nếu cần.
-- [ ] `prisma migrate deploy` + deploy backend và frontend cùng lúc.
+- [ ] Chạy `scripts/kiem_tra_don_vi_dat_hang.sql` trên DB thật **chưa migrate**, gửi kết quả cho người dùng duyệt — đặc biệt tập (b) (0 hoặc ≥2 đơn vị theo dõi).
+- [ ] `prisma migrate deploy` (áp cả 2 migration `..._rename` + `..._du_lieu` trong 1 lần chạy).
+- [ ] Với các khóa ở tập (b) mà đơn vị đặt hàng cần sửa lại — gán tay bằng `UPDATE khoa_boi_duong SET don_vi_dat_hang_id = '<id đơn vị đúng>' WHERE id = '<id khóa>'` (chạy sau migrate).
+- [ ] Deploy backend và frontend cùng lúc.
