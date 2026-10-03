@@ -22,7 +22,8 @@ function xayQueryString(params: object): string {
 // --- Phía học viên ---
 
 export interface TaoYeuCauHoTroDto {
-  loai_van_de_id: string;
+  /** Tình huống chọn ở mục "Lỗi thường gặp" (content/huongDan.ts) hoặc "Khác". */
+  tinh_huong: string;
   noi_dung_hoi: string;
 }
 
@@ -80,7 +81,6 @@ export function useDanhGiaYeuCauHoTro() {
 
 export interface DanhSachYeuCauHoTroQuanTriParams {
   trang_thai?: TrangThaiYeuCauHoTro;
-  loai_van_de_id?: string;
   page?: number;
   page_size?: number;
 }

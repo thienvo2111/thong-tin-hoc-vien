@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Anchor,
   Badge,
   Button,
   Center,
@@ -12,9 +13,10 @@ import {
   Textarea,
   Title,
 } from '@mantine/core';
+import { Link } from 'react-router-dom';
+import type { ComboboxItem, ComboboxParsedItem, OptionsFilter } from '@mantine/core';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useLoaiVanDeHoTro } from '@/api/danhMuc';
 import {
   useDanhGiaYeuCauHoTro,
   useDanhSachYeuCauHoTroCuaToi,
@@ -22,6 +24,9 @@ import {
   useTaoYeuCauHoTro,
 } from '@/api/yeuCauHoTro';
 import type { TrangThaiYeuCauHoTro } from '@/api/types';
+import { huongDan, NHAN_NHOM_LOI, type NhomLoi, type TinhHuongLoi } from '@/content/huongDan';
+import { TextMarkup } from '@/components/TextMarkup';
+import { khopTimKiem } from '@/lib/timKiemTiengViet';
 import { taoYeuCauHoTroSchema, type TaoYeuCauHoTroForm } from '@/schemas/yeuCauHoTro';
 import { StatusBanner } from '@/components/StatusBanner';
 import { thongDiepLoiChung } from '@/lib/loiApi';
@@ -38,7 +43,39 @@ const NHAN_TRANG_THAI: Record<TrangThaiYeuCauHoTro, string> = {
   da_dong: 'Đã đóng',
 };
 
-/** M8 — Yêu cầu hỗ trợ: gợi ý FAQ theo loại vấn đề, học viên gửi ticket nếu gợi ý chưa giải quyết được. */
+// Danh sách vấn đề lấy thẳng từ mục "Lỗi thường gặp và cách khắc phục" của trang Hướng dẫn
+// (content/huongDan.ts) — sửa nội dung ở đó, trang này tự cập nhật. Value = tên tình huống, được
+// lưu vào yeu_cau_ho_tro.tinh_huong khi gửi.
+const TINH_HUONG_KHAC = 'Khác';
+
+const TINH_HUONG_THEO_TEN = new Map<string, TinhHuongLoi>(
+  huongDan.troubleshooting.map((t) => [t.tinhHuong, t]),
+);
+
+const TUY_CHON_TINH_HUONG = [
+  ...(Object.keys(NHAN_NHOM_LOI) as NhomLoi[])
+    .map((nhom) => ({
+      group: NHAN_NHOM_LOI[nhom],
+      items: huongDan.troubleshooting.filter((t) => t.nhom === nhom).map((t) => t.tinhHuong),
+    }))
+    .filter((g) => g.items.length > 0),
+  { group: 'Khác', items: [{ value: TINH_HUONG_KHAC, label: 'Vấn đề khác (không có trong danh sách)' }] },
+];
+
+// Tìm không phân biệt dấu (gõ "mat khau" vẫn ra "Quên mật khẩu"), giữ nguyên nhóm.
+const locTinhHuong: OptionsFilter = ({ options, search }) => {
+  if (!search.trim()) return options;
+  return options
+    .map((o: ComboboxParsedItem) =>
+      'group' in o
+        ? { ...o, items: o.items.filter((it: ComboboxItem) => khopTimKiem(it.label, search)) }
+        : o,
+    )
+    .filter((o) => ('group' in o ? o.items.length > 0 : khopTimKiem((o as ComboboxItem).label, search)));
+};
+
+/** M8 — Yêu cầu hỗ trợ: chọn vấn đề trong danh sách "Lỗi thường gặp" -> đọc nguyên nhân + cách khắc
+ * phục; vẫn còn thắc mắc thì gõ nội dung gửi yêu cầu. Chọn "Khác" thì gõ nội dung gửi ngay. */
 export default function YeuCauHoTroPage() {
   return (
     <Container size="sm" py="xl">
@@ -46,6 +83,9 @@ export default function YeuCauHoTroPage() {
         <Title order={1} size="h2">
           Yêu cầu hỗ trợ
         </Title>
+        <Anchor component={Link} to="/huong-dan#loi" size="sm">
+          Xem lỗi thường gặp và cách khắc phục
+        </Anchor>
         <FormTaoTicket />
         <DanhSachCuaToi />
       </Stack>
@@ -53,10 +93,28 @@ export default function YeuCauHoTroPage() {
   );
 }
 
+function CachKhacPhuc({ tinhHuong }: { tinhHuong: TinhHuongLoi }) {
+  return (
+    <StatusBanner loai="info" tieuDe="Cách khắc phục">
+      <Stack gap={8}>
+        <Text fz={13} c="dimmed">
+          <TextMarkup text={tinhHuong.nguyenNhan} />
+        </Text>
+        <Stack gap={6} component="ol" m={0} pl={20}>
+          {tinhHuong.cachXuLy.map((b, i) => (
+            <Text key={i} component="li" fz={14} lh={1.5}>
+              <TextMarkup text={b} />
+            </Text>
+          ))}
+        </Stack>
+      </Stack>
+    </StatusBanner>
+  );
+}
+
 function FormTaoTicket() {
-  const { data: loaiVanDe, isLoading } = useLoaiVanDeHoTro();
   const taoTicket = useTaoYeuCauHoTro();
-  const [hienFormGui, setHienFormGui] = useState(false);
+  const [conThacMac, setConThacMac] = useState(false);
   const {
     control,
     register,
@@ -66,61 +124,66 @@ function FormTaoTicket() {
     formState: { errors },
   } = useForm<TaoYeuCauHoTroForm>({
     resolver: zodResolver(taoYeuCauHoTroSchema),
-    defaultValues: { loai_van_de_id: '', noi_dung_hoi: '' },
+    defaultValues: { tinh_huong: '', noi_dung_hoi: '' },
   });
 
-  if (isLoading) return <Loader />;
-
-  const loaiVanDeId = watch('loai_van_de_id');
-  const loaiChon = loaiVanDe?.data.find((l) => l.id === loaiVanDeId);
+  const tinhHuongChon = watch('tinh_huong');
+  const chiTiet = TINH_HUONG_THEO_TEN.get(tinhHuongChon);
+  const laKhac = tinhHuongChon === TINH_HUONG_KHAC;
+  const hienForm = laKhac || (!!chiTiet && conThacMac);
 
   function guiTicket(values: TaoYeuCauHoTroForm) {
-    taoTicket.mutate(values, {
-      onSuccess: () => {
-        reset();
-        setHienFormGui(false);
+    taoTicket.mutate(
+      { tinh_huong: values.tinh_huong.normalize('NFC'), noi_dung_hoi: values.noi_dung_hoi.normalize('NFC') },
+      {
+        onSuccess: () => {
+          reset();
+          setConThacMac(false);
+        },
       },
-    });
+    );
   }
 
   return (
     <Stack gap="md">
       <Controller
-        name="loai_van_de_id"
+        name="tinh_huong"
         control={control}
         render={({ field }) => (
           <Select
-            label="Loại vấn đề"
-            placeholder="Chọn loại vấn đề cần hỗ trợ"
-            data={(loaiVanDe?.data ?? []).map((l) => ({ value: l.id, label: l.ten }))}
+            label="Vấn đề Thầy/Cô đang gặp"
+            placeholder="Chọn hoặc gõ vài chữ để tìm, ví dụ: mật khẩu"
+            data={TUY_CHON_TINH_HUONG}
+            filter={locTinhHuong}
+            searchable
+            nothingFoundMessage="Không thấy? Chọn mục Vấn đề khác"
+            maxDropdownHeight={320}
             value={field.value || null}
             onChange={(v) => {
               field.onChange(v ?? '');
-              setHienFormGui(false);
+              setConThacMac(false);
             }}
-            error={errors.loai_van_de_id?.message}
+            error={errors.tinh_huong?.message}
           />
         )}
       />
 
-      {loaiChon && (
-        <StatusBanner loai="info" tieuDe="Gợi ý">
-          {loaiChon.noi_dung_goi_y}
-        </StatusBanner>
-      )}
+      {chiTiet && <CachKhacPhuc tinhHuong={chiTiet} />}
 
-      {loaiChon && !hienFormGui && (
-        <Button variant="default" onClick={() => setHienFormGui(true)}>
-          Vẫn cần hỗ trợ, gửi yêu cầu
+      {chiTiet && !conThacMac && (
+        <Button variant="default" onClick={() => setConThacMac(true)}>
+          Vẫn còn thắc mắc, gửi câu hỏi
         </Button>
       )}
 
-      {loaiChon && hienFormGui && (
+      {hienForm && (
         <form onSubmit={handleSubmit(guiTicket)} noValidate>
           <Stack gap="sm">
             <Textarea
-              label="Nội dung cần hỗ trợ"
+              label={laKhac ? 'Nội dung cần hỗ trợ' : 'Nội dung thắc mắc'}
+              description="Mô tả cụ thể Thầy/Cô đã làm gì và thấy thông báo gì trên màn hình."
               minRows={3}
+              autosize
               error={errors.noi_dung_hoi?.message}
               {...register('noi_dung_hoi')}
             />
@@ -165,7 +228,7 @@ function DanhSachCuaToi() {
           style={{ border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8 }}
         >
           <Group justify="space-between">
-            <Text fw={600}>{yc.loai_van_de_ten}</Text>
+            <Text fw={600}>{yc.chu_de}</Text>
             <Badge color={MAU_TRANG_THAI[yc.trang_thai]}>{NHAN_TRANG_THAI[yc.trang_thai]}</Badge>
           </Group>
           <Text size="sm">{yc.noi_dung_hoi}</Text>

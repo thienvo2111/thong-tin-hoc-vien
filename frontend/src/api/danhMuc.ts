@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { DiaDanh, DonViCongTac, LoaiVanDeHoTro, MonHoc, PaginatedResult } from './types';
+import type { DiaDanh, DonViCongTac, MonHoc, PaginatedResult } from './types';
 
 // Backend phân trang server-side (mặc định page_size=20, tối đa 200 — PaginationQueryDto @Max(200)),
 // trong khi SelectDiaDanh cần TOÀN BỘ danh sách để tự lọc phía client (searchable Select). Một số
@@ -101,16 +101,4 @@ export function layMonHoc(cap_hoc: string) {
 export function goiYChuyenMon(q: string) {
   const qs = new URLSearchParams({ q });
   return apiFetch<{ data: string[] }>(`/danh-muc/chuyen-mon-dao-tao/goi-y?${qs.toString()}`);
-}
-
-// M8 (2026-10-01): Yêu cầu hỗ trợ — học viên đọc để chọn loại vấn đề khi tạo ticket.
-export function layDanhSachLoaiVanDeHoTro() {
-  return apiFetch<PaginatedResult<LoaiVanDeHoTro>>('/danh-muc/loai-van-de-ho-tro?page_size=100');
-}
-
-export function useLoaiVanDeHoTro() {
-  return useQuery({
-    queryKey: ['danh-muc', 'loai-van-de-ho-tro'],
-    queryFn: layDanhSachLoaiVanDeHoTro,
-  });
 }

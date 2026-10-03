@@ -558,21 +558,17 @@ export interface NhatKyImportItem {
 }
 
 // M8 (2026-10-01): Yêu cầu hỗ trợ.
-export interface LoaiVanDeHoTro {
-  id: string;
-  ten: string;
-  noi_dung_goi_y: string;
-  trang_thai: 'active' | 'ngung';
-}
-
 export type TrangThaiYeuCauHoTro = 'cho_xu_ly' | 'da_phan_hoi' | 'da_dong';
 export type DanhGiaYeuCauHoTro = 'hai_long' | 'chua_hai_long';
 
 export interface YeuCauHoTro {
   id: string;
   hoc_vien_id: string;
-  loai_van_de_id: string;
-  loai_van_de_ten: string;
+  /** Ticket cũ (trước 2026-10-03) gắn loại vấn đề; ticket mới gắn tinh_huong. */
+  loai_van_de_id: string | null;
+  tinh_huong: string | null;
+  /** Tên hiển thị: tinh_huong, hoặc tên loại vấn đề với ticket cũ. */
+  chu_de: string;
   noi_dung_hoi: string;
   noi_dung_tra_loi: string | null;
   trang_thai: TrangThaiYeuCauHoTro;
@@ -585,4 +581,6 @@ export interface YeuCauHoTro {
 
 export interface YeuCauHoTroQuanTri extends YeuCauHoTro {
   hoi_lai: boolean;
+  hoc_vien_ho_ten: string;
+  nguoi_tra_loi_ten: string | null;
 }

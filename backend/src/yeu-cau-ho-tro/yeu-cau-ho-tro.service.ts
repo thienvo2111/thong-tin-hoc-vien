@@ -16,11 +16,29 @@ import { QueryYeuCauHoTroDto } from './dto/query-yeu-cau-ho-tro.dto';
 import { SO_NGAY_HOI_LAI, SO_NGAY_TU_DONG_DONG } from './yeu-cau-ho-tro.constants';
 
 export type YeuCauHoTroResponse = yeu_cau_ho_tro & {
-  loai_van_de_ten: string;
+  // Tên hiển thị của vấn đề: tinh_huong (ticket mới) hoặc tên loại vấn đề (ticket cũ).
+  chu_de: string;
   da_dong_hieu_luc: boolean;
 };
 
+type CoLoaiVanDe = { loai_van_de: { ten: string } | null };
+
 const INCLUDE_LOAI_VAN_DE = { loai_van_de: true } satisfies Prisma.yeu_cau_ho_troInclude;
+
+// Phía quan_tri cần thêm tên học viên + người trả lời để tra cứu/đánh giá lịch sử xử lý.
+const INCLUDE_QUAN_TRI = {
+  loai_van_de: true,
+  hoc_vien: { select: { ho_ten: true } },
+  tra_loi_boi_user: { select: { ho_ten: true } },
+} satisfies Prisma.yeu_cau_ho_troInclude;
+
+type YeuCauHoTroQuanTriRow = Prisma.yeu_cau_ho_troGetPayload<{ include: typeof INCLUDE_QUAN_TRI }>;
+
+export type YeuCauHoTroQuanTriResponse = YeuCauHoTroResponse & {
+  hoi_lai: boolean;
+  hoc_vien_ho_ten: string;
+  nguoi_tra_loi_ten: string | null;
+};
 
 @Injectable()
 export class YeuCauHoTroService {
@@ -37,19 +55,16 @@ export class YeuCauHoTroService {
     hocVienId: string,
     dto: TaoYeuCauHoTroDto,
   ): Promise<YeuCauHoTroResponse> {
-    const loaiVanDe = await this.prisma.loai_van_de_ho_tro.findUniqueOrThrow({
-      where: { id: dto.loai_van_de_id },
-    });
-
     const created = await this.prisma.yeu_cau_ho_tro.create({
       data: {
         hoc_vien_id: hocVienId,
-        loai_van_de_id: dto.loai_van_de_id,
-        noi_dung_hoi: dto.noi_dung_hoi,
+        tinh_huong: dto.tinh_huong.trim().normalize('NFC'),
+        noi_dung_hoi: dto.noi_dung_hoi.trim().normalize('NFC'),
       },
+      include: INCLUDE_LOAI_VAN_DE,
     });
 
-    return this.toResponse({ ...created, loai_van_de: loaiVanDe });
+    return this.toResponse(created);
   }
 
   async danhSachCuaToi(hocVienId: string): Promise<YeuCauHoTroResponse[]> {
@@ -128,7 +143,7 @@ export class YeuCauHoTroService {
     const [data, total] = await Promise.all([
       this.prisma.yeu_cau_ho_tro.findMany({
         where,
-        include: INCLUDE_LOAI_VAN_DE,
+        include: INCLUDE_QUAN_TRI,
         orderBy: { thoi_gian_tao: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -142,7 +157,7 @@ export class YeuCauHoTroService {
   async chiTietQuanTri(id: string) {
     const yeuCau = await this.prisma.yeu_cau_ho_tro.findUnique({
       where: { id },
-      include: INCLUDE_LOAI_VAN_DE,
+      include: INCLUDE_QUAN_TRI,
     });
     if (!yeuCau) throw new NotFoundAppException('Không tìm thấy yêu cầu hỗ trợ');
     return this.voiHoiLai(yeuCau);
@@ -178,12 +193,15 @@ export class YeuCauHoTroService {
   }
 
   // Quyết định #8: "hỏi lại" = có >= 1 ticket KHÁC của CÙNG học viên, CÙNG
-  // loai_van_de_id, tạo trong SO_NGAY_HOI_LAI ngày SAU khi ticket này được
+  // tinh_huong (ticket cũ không có tinh_huong: CÙNG loai_van_de_id), tạo trong SO_NGAY_HOI_LAI ngày SAU khi ticket này được
   // trả lời (dấu hiệu câu trả lời chưa giải quyết được vấn đề).
-  private async voiHoiLai(
-    yeuCau: yeu_cau_ho_tro & { loai_van_de: { ten: string } },
-  ): Promise<YeuCauHoTroResponse & { hoi_lai: boolean }> {
-    const response = this.toResponse(yeuCau);
+  private async voiHoiLai(yeuCauDayDu: YeuCauHoTroQuanTriRow): Promise<YeuCauHoTroQuanTriResponse> {
+    const { hoc_vien, tra_loi_boi_user, ...yeuCau } = yeuCauDayDu;
+    const response = {
+      ...this.toResponse(yeuCau),
+      hoc_vien_ho_ten: hoc_vien.ho_ten,
+      nguoi_tra_loi_ten: tra_loi_boi_user?.ho_ten ?? null,
+    };
     if (!yeuCau.thoi_gian_phan_hoi) return { ...response, hoi_lai: false };
 
     const han = new Date(yeuCau.thoi_gian_phan_hoi);
@@ -193,20 +211,20 @@ export class YeuCauHoTroService {
       where: {
         id: { not: yeuCau.id },
         hoc_vien_id: yeuCau.hoc_vien_id,
-        loai_van_de_id: yeuCau.loai_van_de_id,
+        ...(yeuCau.tinh_huong
+          ? { tinh_huong: yeuCau.tinh_huong }
+          : { loai_van_de_id: yeuCau.loai_van_de_id }),
         thoi_gian_tao: { gt: yeuCau.thoi_gian_phan_hoi, lte: han },
       },
     });
     return { ...response, hoi_lai: soLuong > 0 };
   }
 
-  private toResponse(
-    yeuCau: yeu_cau_ho_tro & { loai_van_de: { ten: string } },
-  ): YeuCauHoTroResponse {
+  private toResponse(yeuCau: yeu_cau_ho_tro & CoLoaiVanDe): YeuCauHoTroResponse {
     const { loai_van_de, ...rest } = yeuCau;
     return {
       ...rest,
-      loai_van_de_ten: loai_van_de.ten,
+      chu_de: rest.tinh_huong ?? loai_van_de?.ten ?? 'Khác',
       da_dong_hieu_luc: this.tinhDaDongHieuLuc(rest),
     };
   }

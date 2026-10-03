@@ -1013,7 +1013,10 @@ model loai_van_de_ho_tro {
 model yeu_cau_ho_tro {
   id                 String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   hoc_vien_id        String                    @db.Uuid
-  loai_van_de_id     String                    @db.Uuid
+  // Ticket cũ (trước 2026-10-03) gắn loại vấn đề; ticket mới gắn tình huống chọn từ mục
+  // "Lỗi thường gặp" (frontend/src/content/huongDan.ts) hoặc "Khác".
+  loai_van_de_id     String?                   @db.Uuid
+  tinh_huong         String?                   @db.VarChar(255)
   noi_dung_hoi       String                    @db.Text
   noi_dung_tra_loi   String?                   @db.Text
   trang_thai         trang_thai_yeu_cau_ho_tro @default(cho_xu_ly)
@@ -1023,9 +1026,9 @@ model yeu_cau_ho_tro {
   thoi_gian_phan_hoi DateTime?                 @db.Timestamptz(6)
   thoi_gian_dong     DateTime?                 @db.Timestamptz(6)
 
-  hoc_vien         hoc_vien           @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  loai_van_de      loai_van_de_ho_tro @relation(fields: [loai_van_de_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  tra_loi_boi_user nguoi_dung?        @relation("yeu_cau_ho_tro_tra_loi_boi", fields: [tra_loi_boi], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  hoc_vien         hoc_vien            @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  loai_van_de      loai_van_de_ho_tro? @relation(fields: [loai_van_de_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tra_loi_boi_user nguoi_dung?         @relation("yeu_cau_ho_tro_tra_loi_boi", fields: [tra_loi_boi], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([trang_thai], map: "idx_yeu_cau_ho_tro_trang_thai")
   @@index([hoc_vien_id], map: "idx_yeu_cau_ho_tro_hoc_vien")

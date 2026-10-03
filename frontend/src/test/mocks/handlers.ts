@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { ImportChiTiet, KhoaBoiDuong, LoaiLop, YeuCauHoTro } from '@/api/types';
-import { DIA_DANH, DON_VI, LOAI_VAN_DE_HO_TRO, MON_HOC, db } from './db';
+import { DIA_DANH, DON_VI, MON_HOC, db } from './db';
 
 // QĐ10 (2026-09-30): dang_ky_hoc mẫu nằm rải trong db.khoaHocCuaHocVien (map theo hoc_vien_id) — tìm
 // theo id đăng ký học (không phải hoc_vien_id) để dùng chung cho PUT/PATCH /dang-ky-hoc/{id}/*.
@@ -696,18 +696,14 @@ export const handlers = [
   ),
 
   // --- Yêu cầu hỗ trợ (M8) ---
-  http.get('/danh-muc/loai-van-de-ho-tro', () =>
-    HttpResponse.json({ data: LOAI_VAN_DE_HO_TRO, total: LOAI_VAN_DE_HO_TRO.length, page: 1, page_size: 100 }),
-  ),
-
   http.post('/yeu-cau-ho-tro/toi', async ({ request }) => {
-    const body = (await request.json()) as { loai_van_de_id: string; noi_dung_hoi: string };
-    const loaiVanDe = LOAI_VAN_DE_HO_TRO.find((l) => l.id === body.loai_van_de_id);
+    const body = (await request.json()) as { tinh_huong: string; noi_dung_hoi: string };
     const moi: YeuCauHoTro = {
       id: `yc-${db.danhSachYeuCauHoTro.length + 1}`,
       hoc_vien_id: db.hoSo.id,
-      loai_van_de_id: body.loai_van_de_id,
-      loai_van_de_ten: loaiVanDe?.ten ?? '',
+      loai_van_de_id: null,
+      tinh_huong: body.tinh_huong,
+      chu_de: body.tinh_huong,
       noi_dung_hoi: body.noi_dung_hoi,
       noi_dung_tra_loi: null,
       trang_thai: 'cho_xu_ly',
@@ -733,7 +729,7 @@ export const handlers = [
     if (trangThai) items = items.filter((y) => y.trang_thai === trangThai);
     const total = items.length;
     const start = (page - 1) * pageSize;
-    const data = items.slice(start, start + pageSize).map((y) => ({ ...y, hoi_lai: false }));
+    const data = items.slice(start, start + pageSize).map((y) => ({ hoc_vien_ho_ten: 'Học viên mẫu', nguoi_tra_loi_ten: null, ...y, hoi_lai: false }));
     return HttpResponse.json({ data, total, page, page_size: pageSize });
   }),
 
