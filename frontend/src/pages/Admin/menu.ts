@@ -7,6 +7,8 @@ export interface MucMenuAdmin {
   nhan: string;
   icon: string;
   sapRaMat?: boolean;
+  /** Chỉ hiện với quan_tri (ADR 0002 — trang Người dùng). */
+  chiQuanTri?: boolean;
 }
 
 export const MENU_ADMIN: MucMenuAdmin[] = [
@@ -19,5 +21,5 @@ export const MENU_ADMIN: MucMenuAdmin[] = [
   { to: '/admin/cau-hinh-khao-sat', nhan: 'Cấu hình khảo sát', icon: '📝' },
   { to: '/admin/yeu-cau-ho-tro', nhan: 'Yêu cầu hỗ trợ', icon: '💬' },
   { to: '/admin/danh-muc-truong', nhan: 'Danh mục trường', icon: '🏫' },
-  { to: '/admin/nguoi-dung', nhan: 'Người dùng', icon: '🔑', sapRaMat: true },
+  { to: '/admin/nguoi-dung', nhan: 'Người dùng', icon: '🔑', chiQuanTri: true },
 ];

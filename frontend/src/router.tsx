@@ -124,8 +124,13 @@ export const router = createBrowserRouter([
                     lazy: () => import('@/pages/Admin/AdminDanhMucTruong').then((m) => ({ Component: m.default })),
                   },
                   {
-                    path: '/admin/nguoi-dung',
-                    lazy: () => import('@/pages/Admin/AdminNguoiDung').then((m) => ({ Component: m.default })),
+                    lazy: () => import('@/auth/RequireQuanTri').then((m) => ({ Component: m.RequireQuanTri })),
+                    children: [
+                      {
+                        path: '/admin/nguoi-dung',
+                        lazy: () => import('@/pages/Admin/AdminNguoiDung').then((m) => ({ Component: m.default })),
+                      },
+                    ],
                   },
                 ],
               },

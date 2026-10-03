@@ -740,6 +740,47 @@ export const handlers = [
     found.thoi_gian_phan_hoi = new Date().toISOString();
     return HttpResponse.json({ ...found, hoi_lai: false });
   }),
+
+  // Tài khoản đơn vị (ADR 0002).
+  http.get('/nguoi-dung/don-vi/chua-cap', () => HttpResponse.json(db.donViChuaCap)),
+  http.get('/nguoi-dung/don-vi', ({ request }) => {
+    const url = new URL(request.url);
+    const vaiTro = url.searchParams.get('vai_tro');
+    const data = db.taiKhoanDonVi.filter((t) => !vaiTro || t.vai_tro === vaiTro);
+    return HttpResponse.json({ data, total: data.length, page: 1, page_size: 20 });
+  }),
+  http.post('/nguoi-dung/don-vi', async ({ request }) => {
+    const body = (await request.json()) as { don_vi_id: string; ten_dang_nhap?: string; ho_ten?: string; email?: string; cach_cap?: string };
+    const dv = db.donViChuaCap.find((d) => d.id === body.don_vi_id)!;
+    const tk = {
+      id: `tk-${dv.id}`,
+      ten_dang_nhap: (body.ten_dang_nhap || dv.ma_don_vi).trim().toLowerCase(),
+      ho_ten: body.ho_ten || dv.ten_don_vi,
+      email: body.email || null,
+      vai_tro: dv.loai_don_vi,
+      trang_thai: 'active' as const,
+      dang_nhap_lan_cuoi: null,
+      don_vi: { id: dv.id, ma_don_vi: dv.ma_don_vi, ten_don_vi: dv.ten_don_vi, loai_don_vi: dv.loai_don_vi, trang_thai: 'active' as const },
+    };
+    db.taiKhoanDonVi.push(tk);
+    db.donViChuaCap = db.donViChuaCap.filter((d) => d.id !== dv.id);
+    return HttpResponse.json(
+      body.cach_cap === 'email' ? { tai_khoan: tk } : { tai_khoan: tk, mat_khau_tam: 'Ab3dEf7hJk' },
+      { status: 201 },
+    );
+  }),
+  http.patch('/nguoi-dung/don-vi/:id', async ({ params, request }) => {
+    const tk = db.taiKhoanDonVi.find((t) => t.id === params.id);
+    if (!tk) return loi(404, 'NOT_FOUND', 'Không tìm thấy tài khoản đơn vị');
+    Object.assign(tk, (await request.json()) as object);
+    return HttpResponse.json(tk);
+  }),
+  http.post('/nguoi-dung/don-vi/:id/cap-mat-khau-tam', ({ params }) => {
+    const tk = db.taiKhoanDonVi.find((t) => t.id === params.id);
+    if (!tk) return loi(404, 'NOT_FOUND', 'Không tìm thấy tài khoản đơn vị');
+    return HttpResponse.json({ ten_dang_nhap: tk.ten_dang_nhap, mat_khau_tam: 'Qw7eRt3yUp' });
+  }),
+  http.post('/nguoi-dung/don-vi/:id/gui-email-kich-hoat', () => HttpResponse.json({ da_gui: true })),
 ];
 
 export { loi };

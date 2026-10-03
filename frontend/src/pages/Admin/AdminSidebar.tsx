@@ -33,7 +33,7 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
           <Text fz={11} fw={700} c="#5E7A9B" tt="uppercase" style={{ letterSpacing: '.08em' }} px={10} mb={4}>
             Quản trị hệ thống
           </Text>
-          {MENU_ADMIN.map((m) => {
+          {MENU_ADMIN.filter((m) => !m.chiQuanTri || nguoiDung?.vai_tro === 'quan_tri').map((m) => {
             const active = location.pathname === m.to || location.pathname.startsWith(`${m.to}/`);
             return (
               <Text

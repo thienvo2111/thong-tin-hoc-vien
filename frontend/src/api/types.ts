@@ -587,3 +587,55 @@ export interface YeuCauHoTroQuanTri extends YeuCauHoTro {
   hoc_vien_ho_ten: string;
   nguoi_tra_loi_ten: string | null;
 }
+
+// Tài khoản đơn vị (ADR 0002) — /nguoi-dung/don-vi, chỉ quan_tri.
+export type VaiTroDonVi = 'so_gddt' | 'phong_vhxh' | 'truong';
+
+export interface TaiKhoanDonVi {
+  id: string;
+  ten_dang_nhap: string;
+  ho_ten: string;
+  email: string | null;
+  vai_tro: VaiTroDonVi;
+  trang_thai: TrangThaiActive;
+  dang_nhap_lan_cuoi: string | null;
+  don_vi: {
+    id: string;
+    ma_don_vi: string;
+    ten_don_vi: string;
+    loai_don_vi: string;
+    trang_thai: TrangThaiActive;
+  } | null;
+}
+
+export interface DonViChuaCap {
+  id: string;
+  ma_don_vi: string;
+  ten_don_vi: string;
+  loai_don_vi: VaiTroDonVi;
+}
+
+export interface TaoTaiKhoanDonViDto {
+  don_vi_id: string;
+  ten_dang_nhap?: string;
+  ho_ten?: string;
+  email?: string;
+  cach_cap?: 'mat_khau_tam' | 'email';
+}
+
+export interface SuaTaiKhoanDonViDto {
+  ten_dang_nhap?: string;
+  ho_ten?: string;
+  email?: string;
+  trang_thai?: TrangThaiActive;
+}
+
+export interface KetQuaTaoTaiKhoanDonVi {
+  tai_khoan: TaiKhoanDonVi;
+  mat_khau_tam?: string;
+}
+
+export interface MatKhauTamResponse {
+  ten_dang_nhap: string;
+  mat_khau_tam: string;
+}

@@ -2,6 +2,7 @@ import type {
   BaoCaoRow,
   DanhGiaDauVao,
   DiaDanh,
+  DonViChuaCap,
   DonViCongTac,
   DotXacNhan,
   DotXacNhanDanhMuc,
@@ -14,6 +15,7 @@ import type {
   KhoaHocDangKy,
   MonHoc,
   NhatKyImportItem,
+  TaiKhoanDonVi,
   TongHopDonViRow,
   TongQuanResult,
   YeuCauHoTro,
@@ -630,6 +632,39 @@ export function taoDanhSachYeuCauHoTroMau(): YeuCauHoTro[] {
   return [];
 }
 
+// Tài khoản đơn vị (ADR 0002) — /nguoi-dung/don-vi.
+export function taoDanhSachTaiKhoanDonViMau(): TaiKhoanDonVi[] {
+  return [
+    {
+      id: 'tk-sgd',
+      ten_dang_nhap: 'sgd-angiang',
+      ho_ten: 'Phòng Tổ chức cán bộ',
+      email: 'tccb@angiang.edu.vn',
+      vai_tro: 'so_gddt',
+      trang_thai: 'active',
+      dang_nhap_lan_cuoi: null,
+      don_vi: { id: 'dv-sgd', ma_don_vi: 'SGD-AG', ten_don_vi: 'Sở GD&ĐT An Giang', loai_don_vi: 'so_gddt', trang_thai: 'active' },
+    },
+    {
+      id: 'tk-tr001',
+      ten_dang_nhap: 'tr-ag-001',
+      ho_ten: 'Trường THPT Thoại Ngọc Hầu',
+      email: null,
+      vai_tro: 'truong',
+      trang_thai: 'active',
+      dang_nhap_lan_cuoi: '2026-10-02T03:00:00.000Z',
+      don_vi: { id: 'dv-tr001', ma_don_vi: 'TR-AG-001', ten_don_vi: 'Trường THPT Thoại Ngọc Hầu', loai_don_vi: 'truong', trang_thai: 'active' },
+    },
+  ];
+}
+
+export function taoDonViChuaCapMau(): DonViChuaCap[] {
+  return [
+    { id: 'dv-tr032', ma_don_vi: 'TR-AG-032', ten_don_vi: 'Trường THPT Long Xuyên', loai_don_vi: 'truong' },
+    { id: 'dv-ph01', ma_don_vi: 'PH-AG-01', ten_don_vi: 'Phòng VHXH Long Xuyên', loai_don_vi: 'phong_vhxh' },
+  ];
+}
+
 export const db = {
   hoSo: taoHoSoMoi(),
   dotXacNhan: taoDotXacNhanDangMoThieu(),
@@ -653,6 +688,8 @@ export const db = {
   khoaHocToi: taoKhoaHocToiMau(),
   khoaHocCuaHocVien: taoKhoaHocCuaHocVienMau(),
   danhSachYeuCauHoTro: taoDanhSachYeuCauHoTroMau(),
+  taiKhoanDonVi: taoDanhSachTaiKhoanDonViMau(),
+  donViChuaCap: taoDonViChuaCapMau(),
 };
 
 export function resetDb(): void {
@@ -677,4 +714,6 @@ export function resetDb(): void {
   db.khoaHocToi = taoKhoaHocToiMau();
   db.khoaHocCuaHocVien = taoKhoaHocCuaHocVienMau();
   db.danhSachYeuCauHoTro = taoDanhSachYeuCauHoTroMau();
+  db.taiKhoanDonVi = taoDanhSachTaiKhoanDonViMau();
+  db.donViChuaCap = taoDonViChuaCapMau();
 }
