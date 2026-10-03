@@ -29,9 +29,12 @@ export const DIA_DANH: DiaDanh[] = [TINH_AN_GIANG, TINH_KHAC, PHUONG_1, PHUONG_2
 
 export const DON_VI: DonViCongTac[] = [
   { id: 'dv-1', ma_don_vi: 'THPT01', ten_don_vi: 'THPT Long Xuyên', loai_don_vi: 'truong', dia_ban_id: 'phuong-1', dia_ban_ten: 'Phường Long Xuyên', tinh_id: 'tinh-1', tinh_ten: 'An Giang', trang_thai: 'active' },
-  // dv-2: đơn vị KHÁC đơn vị tổ chức của khoa-1 (dv-1) — dùng để test "+ Thêm đơn vị theo dõi"
-  // (AdminKhoaChiTiet), vì đơn vị tổ chức chính không nằm trong danh sách chọn để theo dõi thêm.
   { id: 'dv-2', ma_don_vi: 'THPT02', ten_don_vi: 'THPT Châu Đốc', loai_don_vi: 'truong', dia_ban_id: 'phuong-2', dia_ban_ten: 'Phường Châu Đốc', tinh_id: 'tinh-2', tinh_ten: 'Cần Thơ', trang_thai: 'active' },
+  // dv-so-1 (so_gddt) + dv-hcmue (khac) — 2 loại đơn vị còn lại hợp lệ làm "đơn vị đặt hàng" của khóa
+  // (2026-10-03-don-vi-dat-hang; chỉ loại phong_vhxh bị chặn), dùng cho Select nhóm theo loại ở form
+  // tạo khóa (AdminKhoaBoiDuong) và header "Đặt hàng: ..." (AdminKhoaChiTiet).
+  { id: 'dv-so-1', ma_don_vi: 'SOGDDT-AG', ten_don_vi: 'Sở GD&ĐT An Giang', loai_don_vi: 'so_gddt', dia_ban_id: 'tinh-1', dia_ban_ten: 'An Giang', tinh_id: 'tinh-1', tinh_ten: 'An Giang', trang_thai: 'active' },
+  { id: 'dv-hcmue', ma_don_vi: 'HCMUE', ten_don_vi: 'Trường Đại học Sư phạm TP.HCM', loai_don_vi: 'khac', dia_ban_id: 'tinh-1', dia_ban_ten: 'An Giang', tinh_id: 'tinh-1', tinh_ten: 'An Giang', trang_thai: 'active' },
 ];
 
 export const MON_HOC: MonHoc[] = [
@@ -177,7 +180,7 @@ export function taoDanhSachKhoaMau(): KhoaBoiDuong[] {
       id: 'khoa-1',
       ma_khoa: 'AG-2026-014',
       ten_khoa: 'Bồi dưỡng NLS – Mức cơ bản',
-      don_vi_to_chuc_id: 'dv-1',
+      don_vi_dat_hang_id: 'dv-so-1',
       dia_diem: null,
       thoi_gian_bat_dau: '2026-10-05',
       thoi_gian_ket_thuc: '2026-11-20',
@@ -193,7 +196,7 @@ export function taoDanhSachKhoaMau(): KhoaBoiDuong[] {
       id: 'khoa-2',
       ma_khoa: 'AG-2026-015',
       ten_khoa: 'Bồi dưỡng NLS – Mức thành thạo',
-      don_vi_to_chuc_id: 'dv-1',
+      don_vi_dat_hang_id: 'dv-1',
       dia_diem: null,
       thoi_gian_bat_dau: '2026-10-12',
       thoi_gian_ket_thuc: '2026-11-28',
@@ -263,6 +266,9 @@ export function taoChiTietKhoaMau(danhSach: KhoaBoiDuong[]): Record<string, Khoa
   const out: Record<string, KhoaBoiDuongChiTiet> = {};
   out[danhSach[0].id] = {
     ...danhSach[0],
+    // pham_vi_hoc_vien mặc định 'toan_bo' (R1 — caller/khóa đặt hàng cùng đơn vị); test riêng của
+    // AdminKhoaChiTiet override 'don_vi' qua server.use() khi cần kiểm tra Alert phạm vi hiện ra.
+    pham_vi_hoc_vien: 'toan_bo',
     giai_doan: taoGiaiDoanKhoa1(danhSach[0].id),
     lop_hoc: [
       {
@@ -315,7 +321,13 @@ export function taoChiTietKhoaMau(danhSach: KhoaBoiDuong[]): Record<string, Khoa
       },
     ],
   };
-  out[danhSach[1].id] = { ...danhSach[1], giai_doan: [], lop_hoc: [], cum_hoc_vien: [] };
+  out[danhSach[1].id] = {
+    ...danhSach[1],
+    pham_vi_hoc_vien: 'toan_bo',
+    giai_doan: [],
+    lop_hoc: [],
+    cum_hoc_vien: [],
+  };
   return out;
 }
 

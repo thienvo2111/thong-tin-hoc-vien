@@ -281,7 +281,7 @@ export interface KhoaBoiDuong {
   id: string;
   ma_khoa: string;
   ten_khoa: string;
-  don_vi_to_chuc_id: string;
+  don_vi_dat_hang_id: string;
   dia_diem: string | null;
   thoi_gian_bat_dau: string;
   thoi_gian_ket_thuc: string;
@@ -371,21 +371,24 @@ export interface CumHocVien {
 // lấy từ backend/src/khoa-boi-duong/khoa-boi-duong.service.ts#findOne (include giai_doan, lop_hoc
 // kèm nhan_su + lich_hoc.giai_doan, cum_hoc_vien) chứ không có trong api-contract.md — improvised,
 // đúng theo code. Sửa 2026-09-30 (QĐ10): thêm cum_hoc_vien (song song với giai_doan/lop_hoc).
+// Sửa 2026-10-03 (đơn vị đặt hàng): thêm pham_vi_hoc_vien — phạm vi học viên caller được xem trong
+// khóa này ('toan_bo' nếu thuộc R1, 'don_vi' nếu chỉ R2 — xem findOne#phamViHocVien).
 export interface KhoaBoiDuongChiTiet extends KhoaBoiDuong {
   giai_doan: GiaiDoanKhoa[];
   lop_hoc: LopHoc[];
   cum_hoc_vien: CumHocVien[];
+  pham_vi_hoc_vien: 'toan_bo' | 'don_vi';
 }
 
-// Body POST /khoa-boi-duong — backend/src/khoa-boi-duong/dto/create-khoa-boi-duong.dto.ts.
-// don_vi_to_chuc_id: bỏ qua nếu caller là truong (suy ra từ tài khoản), bắt buộc nếu quan_tri.
+// Body POST /khoa-boi-duong — backend/src/khoa-boi-duong/dto/create-khoa-boi-duong.dto.ts. Chỉ
+// quan_tri tạo khóa (2026-10-03, mọi endpoint ghi chỉ quan_tri) — don_vi_dat_hang_id luôn bắt buộc.
 export interface TaoKhoaBoiDuongDto {
   ma_khoa: string;
   ten_khoa: string;
   dia_diem?: string;
   thoi_gian_bat_dau: string;
   thoi_gian_ket_thuc: string;
-  don_vi_to_chuc_id?: string;
+  don_vi_dat_hang_id: string;
 }
 
 // Phase 5 redesign — Trung tâm báo cáo (docs/api-contract.md mục 7 + mục "Đợt xác nhận" mục 2). Hàng

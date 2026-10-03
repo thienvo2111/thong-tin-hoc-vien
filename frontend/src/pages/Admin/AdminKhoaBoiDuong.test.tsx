@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
-import { DON_VI, db } from '@/test/mocks/db';
+import { db } from '@/test/mocks/db';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import AdminKhoaBoiDuong from './AdminKhoaBoiDuong';
@@ -31,7 +31,7 @@ describe('Admin — Danh sách khóa bồi dưỡng', () => {
     expect(await screen.findByText('Không kết nối được máy chủ. Kiểm tra mạng và thử lại.')).toBeInTheDocument();
   });
 
-  it('có dữ liệu: hiện đủ các khóa, badge trạng thái, tổng số kết quả', async () => {
+  it('có dữ liệu: hiện đủ các khóa, badge trạng thái, tổng số kết quả, cột "Đơn vị đặt hàng"', async () => {
     renderTrang();
     expect(await screen.findByText('Bồi dưỡng NLS – Mức cơ bản')).toBeInTheDocument();
     expect(screen.getByText('Bồi dưỡng NLS – Mức thành thạo')).toBeInTheDocument();
@@ -39,6 +39,8 @@ describe('Admin — Danh sách khóa bồi dưỡng', () => {
     const bang = screen.getByRole('table');
     expect(within(bang).getByText('Chờ duyệt')).toBeInTheDocument();
     expect(within(bang).getByText('Nháp')).toBeInTheDocument();
+    expect(within(bang).getByRole('columnheader', { name: 'Đơn vị đặt hàng' })).toBeInTheDocument();
+    expect(within(bang).getByText('Sở GD&ĐT An Giang')).toBeInTheDocument();
   });
 
   it('không có kết quả khớp bộ lọc → hiện thông báo trống, không phải bảng rỗng im lặng', async () => {
@@ -55,29 +57,50 @@ describe('Admin — Danh sách khóa bồi dưỡng', () => {
     expect(await screen.findByText('Màn hình chi tiết khóa')).toBeInTheDocument();
   });
 
-  it('tạo khóa mới (Trường): điền form hợp lệ → gọi API, điều hướng sang trang chi tiết khóa vừa tạo', async () => {
+  it('bộ lọc trạng thái chỉ còn "Tất cả trạng thái", "Đang mở", "Đóng đăng ký" (bỏ nhap/cho_duyet/tu_choi)', async () => {
+    const user = userEvent.setup();
+    renderTrang();
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+
+    await user.click(screen.getByDisplayValue('Tất cả trạng thái'));
+    expect(await screen.findByRole('option', { name: 'Đang mở' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Đóng đăng ký' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Nháp' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Chờ duyệt' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Từ chối' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Đã duyệt' })).not.toBeInTheDocument();
+  });
+
+  it('vai_tro=so_gddt: không thấy nút "+ Tạo khóa mới"', async () => {
+    db.nguoiDung.vai_tro = 'so_gddt';
+    renderTrang();
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+    expect(screen.queryByRole('button', { name: '+ Tạo khóa mới' })).not.toBeInTheDocument();
+  });
+
+  it('vai_tro=truong: không thấy nút "+ Tạo khóa mới"', async () => {
     db.nguoiDung.vai_tro = 'truong';
+    renderTrang();
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+    expect(screen.queryByRole('button', { name: '+ Tạo khóa mới' })).not.toBeInTheDocument();
+  });
+
+  it('vai_tro=quan_tri: thấy nút "+ Tạo khóa mới"; mở modal không còn chữ "Đơn vị tổ chức"', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();
     renderTrang();
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
 
     await user.click(screen.getByRole('button', { name: '+ Tạo khóa mới' }));
-    // Mantine TextInput required render nhãn dạng "Mã khóa *" (dấu * nằm trong <span> con của <label>,
-    // vẫn tính vào textContent dùng để so khớp accessible name dù aria-hidden) — khớp bằng regex tiền tố.
-    await user.type(await screen.findByLabelText(/^Mã khóa/), 'AG-2026-020');
-    await user.type(screen.getByLabelText(/^Tên khóa/), 'Bồi dưỡng kỹ năng số nâng cao');
-
-    const oNgayBatDau = screen.getByLabelText(/^Ngày bắt đầu/);
-    const oNgayKetThuc = screen.getByLabelText(/^Ngày kết thúc/);
-    await user.type(oNgayBatDau, '2026-11-01');
-    await user.type(oNgayKetThuc, '2026-12-01');
-
-    await user.click(screen.getByRole('button', { name: 'Tạo khóa' }));
-
-    expect(await screen.findByText('Màn hình chi tiết khóa')).toBeInTheDocument();
+    // getByRole('textbox', ...) thay vì getByLabelText: dropdown (role=listbox) của Select cũng mang
+    // aria-labelledby trỏ tới đúng label này — getByLabelText khớp cả 2, gây lỗi "multiple elements"
+    // (cùng quy ước đã ghi trong AdminKhoaChiTiet.test.tsx).
+    expect(await screen.findByRole('textbox', { name: /^Đơn vị đặt hàng/ })).toBeInTheDocument();
+    expect(screen.queryByText('Đơn vị tổ chức')).not.toBeInTheDocument();
+    expect(screen.queryByText('Bắt buộc khi tạo khóa với tài khoản Quản trị hệ thống')).not.toBeInTheDocument();
   });
 
-  it('tạo khóa (Quản trị): thiếu đơn vị tổ chức → nút Tạo khóa bị vô hiệu hóa', async () => {
+  it('tạo khóa (Quản trị): thiếu đơn vị đặt hàng → nút Tạo khóa bị vô hiệu hóa', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();
     renderTrang();
@@ -94,75 +117,54 @@ describe('Admin — Danh sách khóa bồi dưỡng', () => {
     });
   });
 
-  it('tạo khóa (Quản trị): đúng 1 đơn vị loại "khác" → tự động điền sẵn đơn vị tổ chức', async () => {
+  it('tạo khóa (Quản trị): điền đủ form + chọn đơn vị đặt hàng → gọi API, điều hướng sang trang chi tiết', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
-    server.use(
-      http.get('/danh-muc/don-vi-cong-tac', ({ request }) => {
-        const loaiDonVi = new URL(request.url).searchParams.get('loai_don_vi');
-        if (loaiDonVi === 'khac') {
-          return HttpResponse.json({
-            data: [
-              {
-                id: 'dv-hcmue',
-                ma_don_vi: 'HCMUE',
-                ten_don_vi: 'Trường Đại học Sư phạm TP.HCM',
-                loai_don_vi: 'khac',
-                dia_ban_id: null,
-                trang_thai: 'active',
-              },
-            ],
-          });
-        }
-        return HttpResponse.json({ data: DON_VI });
-      }),
-    );
     const user = userEvent.setup();
     renderTrang();
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
 
     await user.click(screen.getByRole('button', { name: '+ Tạo khóa mới' }));
-    await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: /^Đơn vị tổ chức/ })).toHaveValue('Trường Đại học Sư phạm TP.HCM');
-    });
+    await user.type(await screen.findByLabelText(/^Mã khóa/), 'AG-2026-020');
+    await user.type(screen.getByLabelText(/^Tên khóa/), 'Bồi dưỡng kỹ năng số nâng cao');
+    await user.type(screen.getByLabelText(/^Ngày bắt đầu/), '2026-11-01');
+    await user.type(screen.getByLabelText(/^Ngày kết thúc/), '2026-12-01');
+
+    await user.click(screen.getByRole('textbox', { name: /^Đơn vị đặt hàng/ }));
+    await user.click(await screen.findByRole('option', { name: 'Sở GD&ĐT An Giang' }));
+    await user.click(screen.getByRole('button', { name: 'Tạo khóa' }));
+
+    expect(await screen.findByText('Màn hình chi tiết khóa')).toBeInTheDocument();
   });
 
-  it('tạo khóa (Quản trị): từ 2 đơn vị loại "khác" trở lên → vẫn để trống đơn vị tổ chức', async () => {
-    db.nguoiDung.vai_tro = 'quan_tri';
+  it('tạo khóa (Quản trị): API trả 400 "Sai loại đơn vị" → hiện lỗi dưới Select', async () => {
     server.use(
-      http.get('/danh-muc/don-vi-cong-tac', ({ request }) => {
-        const loaiDonVi = new URL(request.url).searchParams.get('loai_don_vi');
-        if (loaiDonVi === 'khac') {
-          return HttpResponse.json({
-            data: [
-              {
-                id: 'dv-hcmue',
-                ma_don_vi: 'HCMUE',
-                ten_don_vi: 'Trường Đại học Sư phạm TP.HCM',
-                loai_don_vi: 'khac',
-                dia_ban_id: null,
-                trang_thai: 'active',
-              },
-              {
-                id: 'dv-khac-2',
-                ma_don_vi: 'DHKHAC',
-                ten_don_vi: 'Trường Đại học khác',
-                loai_don_vi: 'khac',
-                dia_ban_id: null,
-                trang_thai: 'active',
-              },
-            ],
-          });
-        }
-        return HttpResponse.json({ data: DON_VI });
-      }),
+      http.post('/khoa-boi-duong', () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'don_vi_dat_hang_id không được là Phòng VHXH',
+              fields: [{ field: 'don_vi_dat_hang_id', message: 'Sai loại đơn vị' }],
+            },
+          },
+          { status: 400 },
+        ),
+      ),
     );
+    db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();
     renderTrang();
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
 
     await user.click(screen.getByRole('button', { name: '+ Tạo khóa mới' }));
-    await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: /^Đơn vị tổ chức/ })).toHaveValue('');
-    });
+    await user.type(await screen.findByLabelText(/^Mã khóa/), 'AG-2026-022');
+    await user.type(screen.getByLabelText(/^Tên khóa/), 'Khóa test lỗi đơn vị');
+    await user.type(screen.getByLabelText(/^Ngày bắt đầu/), '2026-11-01');
+    await user.type(screen.getByLabelText(/^Ngày kết thúc/), '2026-12-01');
+    await user.click(screen.getByRole('textbox', { name: /^Đơn vị đặt hàng/ }));
+    await user.click(await screen.findByRole('option', { name: 'Sở GD&ĐT An Giang' }));
+    await user.click(screen.getByRole('button', { name: 'Tạo khóa' }));
+
+    expect(await screen.findByText('Sai loại đơn vị')).toBeInTheDocument();
   });
 });

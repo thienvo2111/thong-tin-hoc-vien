@@ -253,18 +253,18 @@ export const handlers = [
 
   http.get('/danh-muc/chuyen-mon-dao-tao/goi-y', () => HttpResponse.json({ data: ['Tin học', 'Toán', 'Vật lý'] })),
 
-  // --- Khóa bồi dưỡng (Phase 4 redesign) ---
+  // --- Khóa bồi dưỡng (Phase 4 redesign; đổi don_vi_to_chuc_id -> don_vi_dat_hang_id 2026-10-03) ---
   http.get('/khoa-boi-duong', ({ request }) => {
     const url = new URL(request.url);
     const trangThai = url.searchParams.get('trang_thai');
-    const donViId = url.searchParams.get('don_vi_to_chuc_id');
+    const donViId = url.searchParams.get('don_vi_dat_hang_id');
     const q = url.searchParams.get('q')?.toLowerCase();
     const page = Number(url.searchParams.get('page') ?? '1');
     const pageSize = Number(url.searchParams.get('page_size') ?? '20');
 
     let items = db.danhSachKhoa;
     if (trangThai) items = items.filter((k) => k.trang_thai === trangThai);
-    if (donViId) items = items.filter((k) => k.don_vi_to_chuc_id === donViId);
+    if (donViId) items = items.filter((k) => k.don_vi_dat_hang_id === donViId);
     if (q) {
       items = items.filter((k) => k.ten_khoa.toLowerCase().includes(q) || k.ma_khoa.toLowerCase().includes(q));
     }
@@ -280,46 +280,53 @@ export const handlers = [
     return HttpResponse.json(found);
   }),
 
+  // Chỉ quan_tri tạo khóa (2026-10-03) — khóa tạo ra da_duyet NGAY, don_vi_dat_hang_id bắt buộc
+  // (xem validateDonViDatHang() ở backend — 'Bắt buộc' | 'Không hợp lệ' | 'Sai loại đơn vị').
   http.post('/khoa-boi-duong', async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
+    const donViDatHangId = body.don_vi_dat_hang_id as string | undefined;
+    if (!donViDatHangId) {
+      return loi(400, 'VALIDATION_ERROR', 'Thiếu đơn vị đặt hàng', {
+        fields: [{ field: 'don_vi_dat_hang_id', message: 'Bắt buộc' }],
+      });
+    }
+    const donVi = DON_VI.find((d) => d.id === donViDatHangId);
+    if (!donVi) {
+      return loi(400, 'VALIDATION_ERROR', 'don_vi_dat_hang_id không tồn tại', {
+        fields: [{ field: 'don_vi_dat_hang_id', message: 'Không hợp lệ' }],
+      });
+    }
     const id = `khoa-moi-${db.danhSachKhoa.length + 1}`;
     const moi: KhoaBoiDuong = {
       id,
       ma_khoa: String(body.ma_khoa ?? ''),
       ten_khoa: String(body.ten_khoa ?? ''),
-      don_vi_to_chuc_id: String(body.don_vi_to_chuc_id ?? 'dv-1'),
+      don_vi_dat_hang_id: donViDatHangId,
       dia_diem: (body.dia_diem as string) ?? null,
       thoi_gian_bat_dau: String(body.thoi_gian_bat_dau ?? ''),
       thoi_gian_ket_thuc: String(body.thoi_gian_ket_thuc ?? ''),
-      trang_thai: 'nhap',
-      nguoi_duyet_id: null,
-      cap_duyet_thuc_te: null,
-      ngay_duyet: null,
+      trang_thai: 'da_duyet',
+      nguoi_duyet_id: 'nd-1',
+      cap_duyet_thuc_te: 'quan_tri',
+      ngay_duyet: new Date().toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       created_by: 'nd-1',
     };
     db.danhSachKhoa = [moi, ...db.danhSachKhoa];
-    db.chiTietKhoa[id] = { ...moi, giai_doan: [], lop_hoc: [], cum_hoc_vien: [] };
+    db.chiTietKhoa[id] = { ...moi, pham_vi_hoc_vien: 'toan_bo', giai_doan: [], lop_hoc: [], cum_hoc_vien: [] };
     return HttpResponse.json(moi);
   }),
 
-  http.post('/khoa-boi-duong/:id/nop-duyet', ({ params }) => {
+  // Chỉ quan_tri sửa khóa (2026-10-03) — sửa được ở mọi trạng thái, don_vi_dat_hang_id tùy chọn
+  // (không gửi = giữ nguyên).
+  http.patch('/khoa-boi-duong/:id', async ({ params, request }) => {
     const id = params.id as string;
     const khoa = db.chiTietKhoa[id];
     if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
-    khoa.trang_thai = 'cho_duyet';
-    db.danhSachKhoa = db.danhSachKhoa.map((k) => (k.id === id ? { ...k, trang_thai: 'cho_duyet' } : k));
-    return HttpResponse.json(khoa);
-  }),
-
-  http.post('/khoa-boi-duong/:id/duyet', async ({ params, request }) => {
-    const id = params.id as string;
-    const khoa = db.chiTietKhoa[id];
-    if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
-    const body = (await request.json()) as { ket_qua: 'da_duyet' | 'tu_choi' };
-    khoa.trang_thai = body.ket_qua;
-    db.danhSachKhoa = db.danhSachKhoa.map((k) => (k.id === id ? { ...k, trang_thai: body.ket_qua } : k));
+    const body = (await request.json()) as Record<string, unknown>;
+    Object.assign(khoa, body);
+    db.danhSachKhoa = db.danhSachKhoa.map((k) => (k.id === id ? { ...k, ...body } : k));
     return HttpResponse.json(khoa);
   }),
 
@@ -459,15 +466,6 @@ export const handlers = [
     Object.assign(cum, body);
     return HttpResponse.json(cum);
   }),
-
-  http.post('/khoa-boi-duong/:id/don-vi-theo-doi', async ({ params, request }) => {
-    const khoa = db.chiTietKhoa[params.id as string];
-    if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
-    const body = (await request.json()) as { don_vi_id: string };
-    return HttpResponse.json({ id: `kdvtd-${Date.now()}`, khoa_id: khoa.id, don_vi_id: body.don_vi_id });
-  }),
-
-  http.delete('/khoa-boi-duong/:id/don-vi-theo-doi/:donViId', () => HttpResponse.json({ da_xoa: true })),
 
   // Route riêng /lop/{id}/... (không dưới /khoa-boi-duong) — tìm khoa chứa lop qua toàn bộ chiTietKhoa.
   http.post('/lop/:id/lich-hoc', async ({ params, request }) => {

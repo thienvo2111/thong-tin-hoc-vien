@@ -21,9 +21,10 @@ import type {
   VaiTroNhanSuLop,
 } from './types';
 
-// don_vi_to_chuc_id của khóa có thể là đơn vị loại 'truong' hoặc 'khac' (T2, QĐ2 — vd. HCMUE không
-// thuộc cây đơn vị An Giang). layDonViCongTac() mặc định chỉ lọc loai_don_vi='truong' (dùng cho màn
-// học viên) nên ở đây gộp cả 2 loại để map id->tên không bị thiếu đơn vị 'khac'.
+// don_vi_dat_hang_id của khóa có thể là đơn vị loại 'so_gddt', 'truong' hoặc 'khac' (QĐ2 — vd. HCMUE
+// không thuộc cây đơn vị An Giang, không được là 'phong_vhxh' — xem validateDonViDatHang() ở backend).
+// layDonViCongTac() mặc định chỉ lọc loai_don_vi='truong' (dùng cho màn học viên) nên ở đây gộp đủ 3
+// loại để map id->tên không bị thiếu, và để Select "Đơn vị đặt hàng" (form tạo khóa) nhóm theo loại.
 // page_size: 200 (tối đa backend cho phép, xem PaginationQueryDto) — hook này lấy TOÀN BỘ danh sách
 // để xây dropdown/map id->tên, không phải search phân trang, nếu không đơn vị xếp sau trang 1 (vd.
 // HCMUE) sẽ bị rớt khỏi danh sách mặc định 20 dòng/trang.
@@ -31,18 +32,19 @@ export function useDonViChoKhoa() {
   return useQuery({
     queryKey: ['danh-muc', 'don-vi-cong-tac', 'khoa-boi-duong'],
     queryFn: async () => {
-      const [truong, khac] = await Promise.all([
-        layDonViCongTac({ loai_don_vi: 'truong', page_size: 200 }),
+      const [soGddt, khac, truong] = await Promise.all([
+        layDonViCongTac({ loai_don_vi: 'so_gddt', page_size: 200 }),
         layDonViCongTac({ loai_don_vi: 'khac', page_size: 200 }),
+        layDonViCongTac({ loai_don_vi: 'truong', page_size: 200 }),
       ]);
-      return [...truong.data, ...khac.data];
+      return [...soGddt.data, ...khac.data, ...truong.data];
     },
   });
 }
 
 export interface DanhSachKhoaParams {
   trang_thai?: TrangThaiKhoa | '';
-  don_vi_to_chuc_id?: string;
+  don_vi_dat_hang_id?: string;
   q?: string;
   page?: number;
   page_size?: number;
@@ -103,34 +105,25 @@ export function useTaoKhoa() {
   });
 }
 
-export function nopDuyetKhoa(id: string) {
-  return apiFetch<KhoaBoiDuong>(`/khoa-boi-duong/${id}/nop-duyet`, { method: 'POST' });
+// PATCH /khoa-boi-duong/{id} (2026-10-03, chỉ quan_tri) — sửa được ở mọi trạng thái; mọi field tùy
+// chọn, không gửi = giữ nguyên (xem UpdateKhoaBoiDuongDto ở backend).
+export interface CapNhatKhoaDto {
+  ma_khoa?: string;
+  ten_khoa?: string;
+  dia_diem?: string;
+  thoi_gian_bat_dau?: string;
+  thoi_gian_ket_thuc?: string;
+  don_vi_dat_hang_id?: string;
 }
 
-export function useNopDuyetKhoa(id: string) {
+export function capNhatKhoa(id: string, dto: CapNhatKhoaDto) {
+  return apiFetch<KhoaBoiDuong>(`/khoa-boi-duong/${id}`, { method: 'PATCH', body: JSON.stringify(dto) });
+}
+
+export function useCapNhatKhoa(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => nopDuyetKhoa(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: chiTietKhoaKey(id) });
-      queryClient.invalidateQueries({ queryKey: ['admin', 'khoa-boi-duong'] });
-    },
-  });
-}
-
-export interface DuyetKhoaDto {
-  ket_qua: 'da_duyet' | 'tu_choi';
-  ly_do?: string;
-}
-
-export function duyetKhoa(id: string, dto: DuyetKhoaDto) {
-  return apiFetch<KhoaBoiDuong>(`/khoa-boi-duong/${id}/duyet`, { method: 'POST', body: JSON.stringify(dto) });
-}
-
-export function useDuyetKhoa(id: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (dto: DuyetKhoaDto) => duyetKhoa(id, dto),
+    mutationFn: (dto: CapNhatKhoaDto) => capNhatKhoa(id, dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: chiTietKhoaKey(id) });
       queryClient.invalidateQueries({ queryKey: ['admin', 'khoa-boi-duong'] });
@@ -330,38 +323,6 @@ export function useCapNhatCum(khoaId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ cumId, dto }: { cumId: string; dto: UpdateCumDto }) => capNhatCum(khoaId, cumId, dto),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: chiTietKhoaKey(khoaId) }),
-  });
-}
-
-// Đơn vị theo dõi (T2, QĐ2) — chỉ quan_tri gọi được. KHÔNG có GET để lấy danh sách hiện có (chỉ
-// POST/DELETE trong api-contract.md mục 3, GET /khoa-boi-duong/{id} KHÔNG include khoa_don_vi_theo_doi
-// — xem khoa-boi-duong.service.ts#findOne) — FE chỉ theo dõi được các đơn vị vừa thêm trong phiên làm
-// việc hiện tại, không phục hồi được danh sách đã lưu từ trước khi tải lại trang. Flag: giới hạn do
-// backend chưa có endpoint đọc, không tự bịa thêm.
-export function themDonViTheoDoi(khoaId: string, donViId: string) {
-  return apiFetch<{ id: string; khoa_id: string; don_vi_id: string }>(`/khoa-boi-duong/${khoaId}/don-vi-theo-doi`, {
-    method: 'POST',
-    body: JSON.stringify({ don_vi_id: donViId }),
-  });
-}
-
-export function useThemDonViTheoDoi(khoaId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (donViId: string) => themDonViTheoDoi(khoaId, donViId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: chiTietKhoaKey(khoaId) }),
-  });
-}
-
-export function xoaDonViTheoDoi(khoaId: string, donViId: string) {
-  return apiFetch<{ da_xoa: true }>(`/khoa-boi-duong/${khoaId}/don-vi-theo-doi/${donViId}`, { method: 'DELETE' });
-}
-
-export function useXoaDonViTheoDoi(khoaId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (donViId: string) => xoaDonViTheoDoi(khoaId, donViId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: chiTietKhoaKey(khoaId) }),
   });
 }

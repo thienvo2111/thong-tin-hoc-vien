@@ -28,12 +28,11 @@ import { AdminPageHeader } from './AdminPageHeader';
 
 const KICH_THUOC_TRANG = 20;
 
+// 2026-10-03 (đơn vị đặt hàng): bỏ nhap/cho_duyet/tu_choi — mọi khóa tạo mới đã da_duyet ngay,
+// migration cũng chuyển khóa cũ ở 3 trạng thái này về da_duyet (xem spec mục 7).
 const TUY_CHON_TRANG_THAI = [
   { value: '', label: 'Tất cả trạng thái' },
-  { value: 'nhap', label: 'Nháp' },
-  { value: 'cho_duyet', label: 'Chờ duyệt' },
-  { value: 'da_duyet', label: 'Đã duyệt' },
-  { value: 'tu_choi', label: 'Từ chối' },
+  { value: 'da_duyet', label: 'Đang mở' },
   { value: 'dong_dang_ky', label: 'Đóng đăng ký' },
 ];
 
@@ -43,7 +42,7 @@ interface FormTaoKhoa {
   dia_diem: string;
   thoi_gian_bat_dau: string;
   thoi_gian_ket_thuc: string;
-  don_vi_to_chuc_id: string;
+  don_vi_dat_hang_id: string;
 }
 
 const FORM_RONG: FormTaoKhoa = {
@@ -52,7 +51,7 @@ const FORM_RONG: FormTaoKhoa = {
   dia_diem: '',
   thoi_gian_bat_dau: '',
   thoi_gian_ket_thuc: '',
-  don_vi_to_chuc_id: '',
+  don_vi_dat_hang_id: '',
 };
 
 /** Danh sách khóa bồi dưỡng (quản trị) — Phase 4 redesign. GET /khoa-boi-duong trả bản ghi thô
@@ -62,6 +61,7 @@ const FORM_RONG: FormTaoKhoa = {
 export default function AdminKhoaBoiDuong() {
   const navigate = useNavigate();
   const { nguoiDung } = useToi();
+  const laQuanTri = nguoiDung?.vai_tro === 'quan_tri';
 
   const [q, setQ] = useState('');
   const [qDebounced] = useDebouncedValue(q, 300);
@@ -76,7 +76,7 @@ export default function AdminKhoaBoiDuong() {
     () => ({
       q: qDebounced.trim() ? chuanHoaNfc(qDebounced.trim()) : undefined,
       trang_thai: (trangThai || undefined) as never,
-      don_vi_to_chuc_id: donViId || undefined,
+      don_vi_dat_hang_id: donViId || undefined,
       page,
       page_size: KICH_THUOC_TRANG,
     }),
@@ -87,16 +87,24 @@ export default function AdminKhoaBoiDuong() {
   const donVi = useDonViChoKhoa();
   const donViMap = new Map((donVi.data ?? []).map((d) => [d.id, d.ten_don_vi]));
   const tuyChonDonVi = [
-    { value: '', label: 'Tất cả đơn vị tổ chức' },
+    { value: '', label: 'Tất cả đơn vị đặt hàng' },
     ...(donVi.data?.map((d) => ({ value: d.id, label: d.ten_don_vi })) ?? []),
   ];
 
-  const taoKhoa = useTaoKhoa();
+  // Select "Đơn vị đặt hàng" (form tạo khóa) — nhóm theo loại, đúng thứ tự spec mục 6: Sở GD&ĐT →
+  // Đơn vị khác → Trường (phong_vhxh không hợp lệ làm đơn vị đặt hàng nên không có nhóm riêng).
+  const nhomDonViDatHang = useMemo(() => {
+    const list = donVi.data ?? [];
+    const nhom = (loai: string, group: string) => ({
+      group,
+      items: list.filter((d) => d.loai_don_vi === loai).map((d) => ({ value: d.id, label: d.ten_don_vi })),
+    });
+    return [nhom('so_gddt', 'Sở GD&ĐT'), nhom('khac', 'Đơn vị khác'), nhom('truong', 'Trường')].filter(
+      (n) => n.items.length > 0,
+    );
+  }, [donVi.data]);
 
-  const donViKhac = useMemo(
-    () => (donVi.data ?? []).filter((d) => d.loai_don_vi === 'khac'),
-    [donVi.data],
-  );
+  const taoKhoa = useTaoKhoa();
 
   function datBoLoc<T>(setter: (v: T) => void) {
     return (v: T) => {
@@ -106,9 +114,7 @@ export default function AdminKhoaBoiDuong() {
   }
 
   function moModalTao() {
-    const donViToChucId =
-      nguoiDung?.vai_tro === 'quan_tri' && donViKhac.length === 1 ? donViKhac[0].id : '';
-    setForm({ ...FORM_RONG, don_vi_to_chuc_id: donViToChucId });
+    setForm(FORM_RONG);
     setLoiField({});
     setModalMoTao(true);
   }
@@ -122,7 +128,7 @@ export default function AdminKhoaBoiDuong() {
         dia_diem: form.dia_diem || undefined,
         thoi_gian_bat_dau: form.thoi_gian_bat_dau,
         thoi_gian_ket_thuc: form.thoi_gian_ket_thuc,
-        don_vi_to_chuc_id: form.don_vi_to_chuc_id || undefined,
+        don_vi_dat_hang_id: form.don_vi_dat_hang_id,
       },
       {
         onSuccess: (khoa) => {
@@ -145,16 +151,18 @@ export default function AdminKhoaBoiDuong() {
     form.ten_khoa.trim() &&
     form.thoi_gian_bat_dau &&
     form.thoi_gian_ket_thuc &&
-    (nguoiDung?.vai_tro !== 'quan_tri' || form.don_vi_to_chuc_id);
+    form.don_vi_dat_hang_id;
 
   return (
     <>
       <AdminPageHeader
         title="Khóa bồi dưỡng"
         actions={
-          <Button color="accent" onClick={moModalTao}>
-            + Tạo khóa mới
-          </Button>
+          laQuanTri ? (
+            <Button color="accent" onClick={moModalTao}>
+              + Tạo khóa mới
+            </Button>
+          ) : undefined
         }
       />
       <Container size="xl" py="lg" px={{ base: 'md', md: 28 }}>
@@ -208,7 +216,7 @@ export default function AdminKhoaBoiDuong() {
                   <Table.Tr>
                     <Table.Th>Mã khóa</Table.Th>
                     <Table.Th>Tên khóa</Table.Th>
-                    <Table.Th>Đơn vị tổ chức</Table.Th>
+                    <Table.Th>Đơn vị đặt hàng</Table.Th>
                     <Table.Th>Thời gian</Table.Th>
                     <Table.Th>Trạng thái</Table.Th>
                     <Table.Th />
@@ -232,7 +240,7 @@ export default function AdminKhoaBoiDuong() {
                     >
                       <Table.Td fw={600}>{khoa.ma_khoa}</Table.Td>
                       <Table.Td>{khoa.ten_khoa}</Table.Td>
-                      <Table.Td>{donViMap.get(khoa.don_vi_to_chuc_id) ?? '—'}</Table.Td>
+                      <Table.Td>{donViMap.get(khoa.don_vi_dat_hang_id) ?? '—'}</Table.Td>
                       <Table.Td style={{ whiteSpace: 'nowrap' }}>
                         {dinhDangNgay(khoa.thoi_gian_bat_dau)} – {dinhDangNgay(khoa.thoi_gian_ket_thuc)}
                       </Table.Td>
@@ -302,22 +310,16 @@ export default function AdminKhoaBoiDuong() {
               onChange={(e) => setForm((f) => ({ ...f, thoi_gian_ket_thuc: e.currentTarget.value }))}
             />
           </Group>
-          {nguoiDung?.vai_tro === 'quan_tri' &&
-            (donViKhac.length === 1 ? (
-              <TextInput label="Đơn vị tổ chức" value={donViKhac[0].ten_don_vi} readOnly disabled />
-            ) : (
-              <Select
-                label="Đơn vị tổ chức"
-                description="Bắt buộc khi tạo khóa với tài khoản Quản trị hệ thống"
-                required
-                searchable
-                filter={locTiengViet}
-                data={(donVi.data ?? []).map((d) => ({ value: d.id, label: d.ten_don_vi }))}
-                value={form.don_vi_to_chuc_id || null}
-                error={loiField.don_vi_to_chuc_id}
-                onChange={(v) => setForm((f) => ({ ...f, don_vi_to_chuc_id: v ?? '' }))}
-              />
-            ))}
+          <Select
+            label="Đơn vị đặt hàng"
+            required
+            searchable
+            filter={locTiengViet}
+            data={nhomDonViDatHang}
+            value={form.don_vi_dat_hang_id || null}
+            error={loiField.don_vi_dat_hang_id}
+            onChange={(v) => setForm((f) => ({ ...f, don_vi_dat_hang_id: v ?? '' }))}
+          />
 
           <Button mt="sm" loading={taoKhoa.isPending} disabled={!formHopLe} onClick={xuLyTao} fullWidth>
             Tạo khóa
