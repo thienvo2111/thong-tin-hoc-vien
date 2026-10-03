@@ -761,6 +761,8 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
     let k2Id: string;
     let k3Id: string;
     let lopK1Id: string;
+    let hvT1Id: string;
+    let hvT3Id: string;
     const donViR1R2Ids: string[] = [];
     const hvR1R2Ids: string[] = [];
     const khoaR1R2Ids: string[] = [];
@@ -907,6 +909,8 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
         },
       });
       hvR1R2Ids.push(hvT1.id, hvT3.id);
+      hvT1Id = hvT1.id;
+      hvT3Id = hvT3.id;
 
       const dkT1K1 = await prisma.dang_ky_hoc.create({
         data: { hoc_vien_id: hvT1.id, khoa_id: k1Id },
@@ -1042,6 +1046,88 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
         .get(`/bao-cao/van-hanh?khoa_id=${k3Id}`)
         .set('Authorization', `Bearer ${tokenT1}`)
         .expect(403);
+    });
+
+    // Fix #2 (final-review.md) — GET /bao-cao/xac-nhan áp R1 khi đợt gắn
+    // khoa_id và caller thỏa R1 cho khóa đó (K1 đặt hàng Sở A).
+    describe('GET /bao-cao/xac-nhan — áp R1/R2 khi đợt gắn khoa_id (fix #2 final-review)', () => {
+      let dotK1Id: string;
+      let dotGlobalId: string;
+
+      beforeAll(async () => {
+        const now = new Date();
+        const dotK1 = await prisma.dot_xac_nhan.create({
+          data: {
+            ten: 'Đợt xác nhận K1 R1R2',
+            loai: 'kiem_tra_bo_sung',
+            khoa_id: k1Id,
+            mo_luc: new Date(now.getTime() - 1000),
+            dong_luc: new Date(now.getTime() + 3600_000),
+          },
+        });
+        dotK1Id = dotK1.id;
+        const dotGlobal = await prisma.dot_xac_nhan.create({
+          data: {
+            ten: 'Đợt xác nhận toàn cục R1R2',
+            loai: 'kiem_tra_bo_sung',
+            khoa_id: null,
+            mo_luc: new Date(now.getTime() - 1000),
+            dong_luc: new Date(now.getTime() + 3600_000),
+          },
+        });
+        dotGlobalId = dotGlobal.id;
+      });
+
+      afterAll(async () => {
+        await prisma.dot_xac_nhan.deleteMany({
+          where: { id: { in: [dotK1Id, dotGlobalId] } },
+        });
+      });
+
+      it('Sở A (R1 — đặt hàng K1): thấy cả học viên T1 lẫn T3', async () => {
+        const res = await request(app.getHttpServer())
+          .get(`/bao-cao/xac-nhan?dot_id=${dotK1Id}`)
+          .set('Authorization', `Bearer ${tokenSoA}`)
+          .expect(200);
+        const ids = (res.body.rows as { hoc_vien_id: string }[]).map(
+          (r) => r.hoc_vien_id,
+        );
+        expect(ids).toEqual(expect.arrayContaining([hvT1Id, hvT3Id]));
+      });
+
+      it('Sở B (không đặt hàng K1, R2 qua T3): chỉ thấy học viên T3', async () => {
+        const res = await request(app.getHttpServer())
+          .get(`/bao-cao/xac-nhan?dot_id=${dotK1Id}`)
+          .set('Authorization', `Bearer ${tokenSoB}`)
+          .expect(200);
+        const ids = (res.body.rows as { hoc_vien_id: string }[]).map(
+          (r) => r.hoc_vien_id,
+        );
+        expect(ids).toEqual([hvT3Id]);
+      });
+
+      it('T1: chỉ thấy học viên T1', async () => {
+        const res = await request(app.getHttpServer())
+          .get(`/bao-cao/xac-nhan?dot_id=${dotK1Id}`)
+          .set('Authorization', `Bearer ${tokenT1}`)
+          .expect(200);
+        const ids = (res.body.rows as { hoc_vien_id: string }[]).map(
+          (r) => r.hoc_vien_id,
+        );
+        expect(ids).toEqual([hvT1Id]);
+      });
+
+      it('Đợt không gắn khoa_id -> giữ hành vi cũ (lọc theo đơn vị công tác, không áp R1)', async () => {
+        const res = await request(app.getHttpServer())
+          .get(`/bao-cao/xac-nhan?dot_id=${dotGlobalId}`)
+          .set('Authorization', `Bearer ${tokenSoA}`)
+          .expect(200);
+        const ids = (res.body.rows as { hoc_vien_id: string }[]).map(
+          (r) => r.hoc_vien_id,
+        );
+        expect(ids).toContain(hvT1Id);
+        expect(ids).not.toContain(hvT3Id);
+      });
     });
   });
 

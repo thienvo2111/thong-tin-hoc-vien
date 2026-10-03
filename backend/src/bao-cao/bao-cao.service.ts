@@ -300,6 +300,12 @@ export class BaoCaoService {
   // T14 — GET /bao-cao/xac-nhan?dot_id=&trang_thai=&don_vi_cong_tac_id=
   // Phạm vi: Trường/Phòng/Sở chỉ thấy giáo viên trong phạm vi đơn vị mình
   // (ScopeService, giống mọi báo cáo khác) — quan_tri thấy toàn bộ.
+  //
+  // Fix #2 (final-review.md 2026-10-03) — đợt gắn 1 khóa cụ thể (dot.khoa_id)
+  // áp thêm R1 (spec §5): nếu khóa đó do đơn vị trong phạm vi caller đặt
+  // hàng, caller xem TOÀN BỘ học viên ghi danh khóa (không giới hạn
+  // don_vi_cong_tac_id) — giống R1 của bao-cao theo khóa khác. Không thỏa
+  // R1 -> giữ nguyên hành vi cũ (lọc theo đơn vị công tác, tương đương R2).
   // -------------------------------------------------------------------
   async baoCaoXacNhan(
     query: XacNhanQueryDto,
@@ -311,13 +317,31 @@ export class BaoCaoService {
     if (!dot) throw new NotFoundAppException('Không tìm thấy đợt xác nhận');
 
     const scope = await this.scopeService.getAccessibleDonViIds(caller);
+
+    let apDungR1 = false;
+    if (dot.khoa_id) {
+      const khoa = await this.prisma.khoa_boi_duong.findUnique({
+        where: { id: dot.khoa_id },
+        select: { don_vi_dat_hang_id: true },
+      });
+      apDungR1 =
+        !!khoa &&
+        (scope === 'ALL' || scope.includes(khoa.don_vi_dat_hang_id));
+    }
+
     const where: Prisma.hoc_vienWhereInput = { nguon_tao: 'import_moet' };
-    if (scope !== 'ALL') {
-      if (scope.length === 0) return { dot_id: dot.id, rows: [] };
-      where.don_vi_cong_tac_id = { in: scope };
+    if (!apDungR1) {
+      if (scope !== 'ALL') {
+        if (scope.length === 0) return { dot_id: dot.id, rows: [] };
+        where.don_vi_cong_tac_id = { in: scope };
+      }
     }
     if (query.don_vi_cong_tac_id) {
-      if (scope !== 'ALL' && !scope.includes(query.don_vi_cong_tac_id)) {
+      if (
+        !apDungR1 &&
+        scope !== 'ALL' &&
+        !scope.includes(query.don_vi_cong_tac_id)
+      ) {
         throw new ForbiddenAppException(
           'Đơn vị công tác nằm ngoài phạm vi quyền',
         );
