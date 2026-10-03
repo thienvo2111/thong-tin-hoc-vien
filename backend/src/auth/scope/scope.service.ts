@@ -68,6 +68,54 @@ export class ScopeService {
     return caller.hoc_vien_id === targetHocVienId;
   }
 
+  // Phạm vi khóa bồi dưỡng người dùng (không phải quan_tri) xem được, hợp của
+  // R1 (don_vi_dat_hang_id của khóa nằm trong phạm vi) và R2 (có học viên
+  // thuộc đơn vị trong phạm vi đăng ký học khóa đó).
+  async getKhoaIdsXemDuoc(caller: {
+    vai_tro: AuthenticatedUser['vai_tro'];
+    don_vi_id: string | null;
+  }): Promise<DonViScope> {
+    const scope = await this.getAccessibleDonViIds(caller);
+    if (scope === 'ALL') {
+      return 'ALL';
+    }
+    if (scope.length === 0) {
+      return [];
+    }
+    const rows = await this.prisma.khoa_boi_duong.findMany({
+      where: {
+        OR: [
+          { don_vi_dat_hang_id: { in: scope } },
+          {
+            dang_ky_hoc: {
+              some: { hoc_vien: { don_vi_cong_tac_id: { in: scope } } },
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
+  }
+
+  // Phạm vi học viên xem được trong 1 khóa cụ thể — R1: nếu khóa do đơn vị
+  // trong phạm vi của caller đặt hàng (don_vi_dat_hang_id ∈ scope), caller
+  // xem được TẤT CẢ học viên của khóa (vd. Sở đặt khóa cho cả cây của mình);
+  // ngược lại chỉ xem học viên thuộc phạm vi của chính mình.
+  async getHocVienScopeTrongKhoa(
+    caller: {
+      vai_tro: AuthenticatedUser['vai_tro'];
+      don_vi_id: string | null;
+    },
+    khoa: { don_vi_dat_hang_id: string },
+  ): Promise<DonViScope> {
+    const scope = await this.getAccessibleDonViIds(caller);
+    if (scope === 'ALL' || scope.includes(khoa.don_vi_dat_hang_id)) {
+      return 'ALL';
+    }
+    return scope;
+  }
+
   // T2 (mo-rong-nls-an-giang.md, QĐ2, 2026-09-29): khóa do quan_tri tạo cho
   // đơn vị loại 'khac' (vd. HCMUE, ngoài cây An Giang) gắn 1 danh sách đơn vị
   // "theo dõi" (khoa_don_vi_theo_doi — mỗi dòng là 1 đơn vị được xem khóa).

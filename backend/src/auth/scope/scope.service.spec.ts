@@ -6,14 +6,17 @@ describe('ScopeService', () => {
   let findMany: jest.Mock;
   let findUniqueDonVi: jest.Mock;
   let findManyTheoDoi: jest.Mock;
+  let findManyKhoa: jest.Mock;
 
   beforeEach(() => {
     findMany = jest.fn();
     findUniqueDonVi = jest.fn();
     findManyTheoDoi = jest.fn();
+    findManyKhoa = jest.fn();
     const prisma = {
       don_vi_cong_tac: { findMany, findUnique: findUniqueDonVi },
       khoa_don_vi_theo_doi: { findMany: findManyTheoDoi },
+      khoa_boi_duong: { findMany: findManyKhoa },
     } as unknown as PrismaService;
     service = new ScopeService(prisma);
   });
@@ -209,6 +212,133 @@ describe('ScopeService', () => {
         where: { don_vi_id: { in: ['don-A', 'don-B'] } },
         select: { khoa_id: true },
       });
+    });
+  });
+
+  describe('getKhoaIdsXemDuoc (R1 + R2)', () => {
+    it('quan_tri -> ALL, không query khoa_boi_duong', async () => {
+      const scope = await service.getKhoaIdsXemDuoc({
+        vai_tro: 'quan_tri',
+        don_vi_id: null,
+      });
+      expect(scope).toBe('ALL');
+      expect(findManyKhoa).not.toHaveBeenCalled();
+    });
+
+    it('truong không có don_vi_id -> [], không query khoa_boi_duong', async () => {
+      const scope = await service.getKhoaIdsXemDuoc({
+        vai_tro: 'truong',
+        don_vi_id: null,
+      });
+      expect(scope).toEqual([]);
+      expect(findManyKhoa).not.toHaveBeenCalled();
+    });
+
+    it('truong don_vi_id=T1 -> query khoa theo R1 (don_vi_dat_hang_id) OR R2 (hoc_vien.don_vi_cong_tac_id)', async () => {
+      findManyKhoa.mockResolvedValueOnce([{ id: 'k1' }, { id: 'k2' }]);
+
+      const scope = await service.getKhoaIdsXemDuoc({
+        vai_tro: 'truong',
+        don_vi_id: 'T1',
+      });
+
+      expect(scope).toEqual(['k1', 'k2']);
+      expect(findManyKhoa).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { don_vi_dat_hang_id: { in: ['T1'] } },
+            {
+              dang_ky_hoc: {
+                some: { hoc_vien: { don_vi_cong_tac_id: { in: ['T1'] } } },
+              },
+            },
+          ],
+        },
+        select: { id: true },
+      });
+    });
+
+    it('so_gddt -> in là danh sách cây con (bao gồm chính mình)', async () => {
+      findMany
+        .mockResolvedValueOnce([{ id: 'truong-C' }])
+        .mockResolvedValueOnce([]);
+      findManyKhoa.mockResolvedValueOnce([{ id: 'k1' }]);
+
+      const scope = await service.getKhoaIdsXemDuoc({
+        vai_tro: 'so_gddt',
+        don_vi_id: 'so-A',
+      });
+
+      expect(scope).toEqual(['k1']);
+      const callArg = findManyKhoa.mock.calls[0][0];
+      expect(callArg.where.OR[0].don_vi_dat_hang_id.in).toEqual(
+        expect.arrayContaining(['so-A', 'truong-C']),
+      );
+      expect(callArg.where.OR[0].don_vi_dat_hang_id.in.length).toBe(2);
+    });
+  });
+
+  describe('getHocVienScopeTrongKhoa (R1)', () => {
+    it('quan_tri -> ALL', async () => {
+      const scope = await service.getHocVienScopeTrongKhoa(
+        { vai_tro: 'quan_tri', don_vi_id: null },
+        { don_vi_dat_hang_id: 'bat-ky' },
+      );
+      expect(scope).toBe('ALL');
+    });
+
+    it('so_gddt so-A + khóa đặt bởi chính so-A -> ALL', async () => {
+      findMany.mockResolvedValueOnce([]);
+      const scope = await service.getHocVienScopeTrongKhoa(
+        { vai_tro: 'so_gddt', don_vi_id: 'so-A' },
+        { don_vi_dat_hang_id: 'so-A' },
+      );
+      expect(scope).toBe('ALL');
+    });
+
+    it('so_gddt so-A + khóa đặt bởi trường con T1 (thuộc cây) -> ALL', async () => {
+      findMany
+        .mockResolvedValueOnce([{ id: 'T1' }])
+        .mockResolvedValueOnce([]);
+      const scope = await service.getHocVienScopeTrongKhoa(
+        { vai_tro: 'so_gddt', don_vi_id: 'so-A' },
+        { don_vi_dat_hang_id: 'T1' },
+      );
+      expect(scope).toBe('ALL');
+    });
+
+    it('so_gddt so-A + khóa đặt bởi so-B (ngoài cây) -> cây so-A', async () => {
+      findMany.mockResolvedValueOnce([]);
+      const scope = await service.getHocVienScopeTrongKhoa(
+        { vai_tro: 'so_gddt', don_vi_id: 'so-A' },
+        { don_vi_dat_hang_id: 'so-B' },
+      );
+      expect(scope).toEqual(['so-A']);
+    });
+
+    it('truong T1 + khóa đặt bởi T1 -> ALL', async () => {
+      const scope = await service.getHocVienScopeTrongKhoa(
+        { vai_tro: 'truong', don_vi_id: 'T1' },
+        { don_vi_dat_hang_id: 'T1' },
+      );
+      expect(scope).toBe('ALL');
+    });
+
+    it('truong T1 + khóa đặt bởi so-A -> [T1]', async () => {
+      const scope = await service.getHocVienScopeTrongKhoa(
+        { vai_tro: 'truong', don_vi_id: 'T1' },
+        { don_vi_dat_hang_id: 'so-A' },
+      );
+      expect(scope).toEqual(['T1']);
+    });
+
+    it('phong_vhxh P1 + khóa đặt bởi so-A -> cây P1', async () => {
+      findMany.mockResolvedValueOnce([]);
+      const scope = await service.getHocVienScopeTrongKhoa(
+        { vai_tro: 'phong_vhxh', don_vi_id: 'P1' },
+        { don_vi_dat_hang_id: 'so-A' },
+      );
+      expect(scope).toEqual(['P1']);
     });
   });
 
