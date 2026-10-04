@@ -23,6 +23,17 @@ apt-get install -y \
 echo "==> Cau hinh timezone Asia/Ho_Chi_Minh"
 timedatectl set-timezone Asia/Ho_Chi_Minh || true
 
+# Dong ho lech -> moi moc thoi gian (dang nhap, nhat ky, khoa tam) sai.
+# Da gap 2026-10-04: VPS cham ~1 gio. Mang HCMUE chan NTP (UDP 123) nen
+# systemd-timesyncd khong nhan duoc goi nao -> dong bo qua header Date HTTP
+# bang htpdate. Tat timesyncd de 2 dich vu khong gianh chinh gio.
+echo "==> Dong bo gio qua HTTP (htpdate)"
+timedatectl set-ntp false || true
+NEEDRESTART_MODE=l apt-get install -y htpdate
+htpdate -s www.google.com www.cloudflare.com || true
+systemctl enable --now htpdate
+date
+
 echo "==> Cau hinh UFW (chi mo port THUC TE tren VPS: 22, 80 - NAT ben ngoai"
 echo "    tu forward 2463/2464 vao day, xem ghi chu trong 00-config.sh)"
 ufw allow OpenSSH

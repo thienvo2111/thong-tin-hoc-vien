@@ -25,6 +25,10 @@ echo "===== Swap ====="
 swapon --show || echo "Khong co swap"
 
 echo
+echo "===== Dong ho (htpdate phai active; so voi gio thuc) ====="
+date; systemctl is-active htpdate || true
+
+echo
 echo "===== Ports dang nghe ====="
 (ss -tulpn 2>/dev/null || netstat -tulpn 2>/dev/null) | grep LISTEN || true
 
