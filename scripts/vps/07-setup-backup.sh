@@ -47,6 +47,8 @@ cat > "${BACKUP_SCRIPT}" <<EOF
 #!/usr/bin/env bash
 # Tu dong sinh boi 07-setup-backup.sh - dung sua tay, sua roi chay lai script goc.
 set -euo pipefail
+# Dump chua CCCD/ngay sinh/SDT -> file chi chu so huu doc duoc (600).
+umask 077
 
 BACKUP_DIR="${BACKUP_DIR}"
 DB_NAME="${DB_NAME}"
