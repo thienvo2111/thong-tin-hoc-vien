@@ -56,8 +56,15 @@ async function bootstrap() {
     .setVersion(appVersion)
     .addBearerAuth()
     .build();
-  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api', app, swaggerDocument);
+  // Production mac dinh TAT (khong cong khai danh sach API); can thi dat
+  // SWAGGER_ENABLED=true trong .env roi restart.
+  const batSwagger = process.env.SWAGGER_ENABLED
+    ? process.env.SWAGGER_ENABLED === 'true'
+    : process.env.NODE_ENV !== 'production';
+  if (batSwagger) {
+    const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api', app, swaggerDocument);
+  }
 
   // Mac dinh chi nghe noi bo: Nginx proxy qua 127.0.0.1, khong mo API thang ra mang.
   await app.listen(process.env.PORT ?? 3000, process.env.HOST ?? '127.0.0.1');

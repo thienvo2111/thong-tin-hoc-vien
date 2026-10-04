@@ -57,6 +57,18 @@ set_sshd_option "PubkeyAuthentication" "yes"
 echo "==> Tat dang nhap SSH truc tiep bang root"
 set_sshd_option "PermitRootLogin" "no"
 
+# sshd_config "Include /etc/ssh/sshd_config.d/*.conf" o DAU file, gia tri dau
+# tien thang -> 50-cloud-init.conf ("PasswordAuthentication yes") de len cau
+# hinh chinh. Da gap 2026-10-04: chay script xong sshd -T van bao "yes".
+for f in /etc/ssh/sshd_config.d/*.conf; do
+  [ -e "$f" ] || continue
+  if grep -qiE "^[[:space:]]*(PasswordAuthentication|KbdInteractiveAuthentication)[[:space:]]+yes" "$f"; then
+    echo "==> Sua ${f} (dang bat dang nhap bang mat khau)"
+    cp "$f" "${f}.bak-$(date +%Y%m%d_%H%M%S)"
+    sed -i -E "s/^[[:space:]]*(PasswordAuthentication|KbdInteractiveAuthentication)[[:space:]]+yes/\1 no/I" "$f"
+  fi
+done
+
 if [ "${SSH_PORT}" != "22" ]; then
   echo "==> Doi port SSH sang ${SSH_PORT}"
   echo "==> Mo port moi tren UFW TRUOC (giu nguyen port 22 de fallback, tu xoa sau khi xac nhan)"
@@ -73,6 +85,14 @@ fi
 
 echo "==> Reload sshd (khong ngat session hien tai)"
 systemctl reload ssh || systemctl reload sshd
+
+# Kiem tra gia tri THUC TE sshd dang dung, khong tin vao file da sua.
+if ! sshd -T | grep -qx "passwordauthentication no"; then
+  echo "LOI: sshd -T van bao passwordauthentication khac 'no' - con file nao do de len." >&2
+  echo "Kiem tra: sudo grep -rni passwordauthentication /etc/ssh/sshd_config /etc/ssh/sshd_config.d/" >&2
+  exit 1
+fi
+echo "==> Xac nhan: sshd -T -> passwordauthentication no"
 
 echo
 echo "============================================================"
