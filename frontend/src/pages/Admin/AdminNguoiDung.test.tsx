@@ -168,6 +168,28 @@ describe('Admin — Người dùng (tài khoản đơn vị)', () => {
     expect(within(modal).getByText('Người dùng sẽ phải đăng nhập bằng tên mới')).toBeInTheDocument();
   });
 
+  it('tạo tài khoản: tìm được đơn vị nằm ngoài 50 kết quả đầu (gửi từ khóa lên server)', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    db.donViChuaCap = [
+      ...Array.from({ length: 60 }, (_, i) => ({
+        id: `dv-a${i}`,
+        ma_don_vi: `TR-A-${String(i).padStart(3, '0')}`,
+        ten_don_vi: `Trường A ${String(i).padStart(3, '0')}`,
+        loai_don_vi: 'truong' as const,
+      })),
+      { id: 'dv-cxd', ma_don_vi: 'TR-31-804', ten_don_vi: 'Chưa xác định', loai_don_vi: 'truong' as const },
+    ];
+    renderTrang();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: '+ Tạo tài khoản' }));
+    const modal = await screen.findByRole('dialog');
+    const o = within(modal).getByRole('textbox', { name: /^Đơn vị/ });
+    await user.click(o);
+    await user.type(o, 'Chưa xác');
+    await user.click(await screen.findByRole('option', { name: /Chưa xác định/ }));
+    expect(within(modal).getByRole('textbox', { name: /^Tên đăng nhập/ })).toHaveValue('tr-31-804');
+  });
+
   it('nút "Nhập từ Excel" chuyển sang trang nhập dữ liệu', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
     renderTrang();

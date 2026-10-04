@@ -48,6 +48,7 @@ export function useDonViChuaCap(params: { loai_don_vi?: VaiTroDonVi; q?: string 
     queryKey: [...KHOA, 'chua-cap', params],
     queryFn: () => apiFetch<DonViChuaCap[]>(`/nguoi-dung/don-vi/chua-cap${xayQueryString(params)}`),
     enabled,
+    placeholderData: keepPreviousData,
   });
 }
 

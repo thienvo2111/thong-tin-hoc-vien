@@ -29,7 +29,7 @@ import {
   useSuaTaiKhoanDonVi,
   useTaoTaiKhoanDonVi,
 } from '@/api/taiKhoanDonVi';
-import type { TaiKhoanDonVi, VaiTroDonVi } from '@/api/types';
+import type { DonViChuaCap, TaiKhoanDonVi, VaiTroDonVi } from '@/api/types';
 import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { chuanHoaNfc } from '@/lib/nfc';
@@ -100,7 +100,15 @@ export default function AdminNguoiDung() {
   const [moTao, setMoTao] = useState(false);
   const [formTao, setFormTao] = useState<FormTao>(FORM_TAO_RONG);
   const [loiTao, setLoiTao] = useState<Record<string, string>>({});
-  const donViChuaCap = useDonViChuaCap({}, moTao);
+  // Danh mục có hàng nghìn trường, API chua-cap trả tối đa 50 dòng -> tìm kiếm phải gửi lên server
+  // (không lọc trong 50 dòng đã tải). Giữ đơn vị đã chọn trong danh sách khi kết quả tìm đổi.
+  const [timDonVi, setTimDonVi] = useState('');
+  const [timDonViDebounced] = useDebouncedValue(timDonVi, 300);
+  const [donViDaChon, setDonViDaChon] = useState<DonViChuaCap | null>(null);
+  const donViChuaCap = useDonViChuaCap(
+    { q: timDonViDebounced.trim() ? chuanHoaNfc(timDonViDebounced.trim()) : undefined },
+    moTao,
+  );
   const taoTk = useTaoTaiKhoanDonVi();
 
   const [dangSua, setDangSua] = useState<TaiKhoanDonVi | null>(null);
@@ -120,8 +128,13 @@ export default function AdminNguoiDung() {
     };
   }
 
-  const nhomDonVi = useMemo(() => {
+  const dsDonVi = useMemo(() => {
     const ds = donViChuaCap.data ?? [];
+    return donViDaChon && !ds.some((d) => d.id === donViDaChon.id) ? [donViDaChon, ...ds] : ds;
+  }, [donViChuaCap.data, donViDaChon]);
+
+  const nhomDonVi = useMemo(() => {
+    const ds = dsDonVi;
     return (['so_gddt', 'phong_vhxh', 'truong'] as VaiTroDonVi[])
       .map((loai) => ({
         group: NHAN_LOAI[loai],
@@ -130,10 +143,11 @@ export default function AdminNguoiDung() {
           .map((d) => ({ value: d.id, label: `${d.ten_don_vi} (${d.ma_don_vi})` })),
       }))
       .filter((g) => g.items.length > 0);
-  }, [donViChuaCap.data]);
+  }, [dsDonVi]);
 
   function chonDonVi(id: string | null) {
-    const dv = donViChuaCap.data?.find((d) => d.id === id);
+    const dv = dsDonVi.find((d) => d.id === id) ?? null;
+    setDonViDaChon(dv);
     setFormTao((f) => ({
       ...f,
       don_vi_id: id ?? '',
@@ -253,6 +267,8 @@ export default function AdminNguoiDung() {
               onClick={() => {
                 setFormTao(FORM_TAO_RONG);
                 setLoiTao({});
+                setTimDonVi('');
+                setDonViDaChon(null);
                 setMoTao(true);
               }}
             >
@@ -399,9 +415,11 @@ export default function AdminNguoiDung() {
             label="Đơn vị"
             required
             searchable
+            searchValue={timDonVi}
+            onSearchChange={setTimDonVi}
             filter={locTiengViet}
-            placeholder={donViChuaCap.isLoading ? 'Đang tải...' : 'Chọn đơn vị chưa có tài khoản'}
-            nothingFoundMessage="Không còn đơn vị nào chưa có tài khoản"
+            placeholder={donViChuaCap.isLoading ? 'Đang tải...' : 'Gõ tên hoặc mã đơn vị để tìm'}
+            nothingFoundMessage={donViChuaCap.isFetching ? 'Đang tìm...' : 'Không tìm thấy đơn vị chưa có tài khoản'}
             data={nhomDonVi}
             value={formTao.don_vi_id || null}
             error={loiTao.don_vi_id}
