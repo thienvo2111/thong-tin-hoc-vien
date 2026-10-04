@@ -3,6 +3,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
+import { db } from '@/test/mocks/db';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import AdminHocVienChiTiet from './AdminHocVienChiTiet';
@@ -74,5 +75,39 @@ describe('Admin — Chi tiết hồ sơ học viên — Khóa & lớp (QĐ10)', 
     await user.click(screen.getAllByRole('button', { name: 'Lưu' })[1]);
 
     expect(await screen.findByText('Không kết nối được máy chủ. Kiểm tra mạng và thử lại.')).toBeInTheDocument();
+  });
+});
+
+describe('Admin — Chi tiết hồ sơ học viên — Nhật ký hoạt động (2026-10-04)', () => {
+  it('quản trị -> thấy mục Nhật ký hoạt động với dòng thời gian từ API', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    renderTrang('hv-duyet-1');
+    expect(await screen.findByText('Nhật ký hoạt động')).toBeInTheDocument();
+    expect(await screen.findByText('Đăng nhập thất bại')).toBeInTheDocument();
+    expect(screen.getByText('Được đặt lại mật khẩu')).toBeInTheDocument();
+  });
+
+  it('tài khoản đơn vị (trường) -> không hiện mục nhật ký, không gọi API', async () => {
+    db.nguoiDung.vai_tro = 'truong';
+    let daGoi = false;
+    server.use(
+      http.get('/hoc-vien/:id/nhat-ky', () => {
+        daGoi = true;
+        return HttpResponse.json(db.nhatKyHocVien);
+      }),
+    );
+    renderTrang('hv-duyet-1');
+    expect(await screen.findByText('Bồi dưỡng NLS – Mức cơ bản')).toBeInTheDocument();
+    expect(screen.queryByText('Nhật ký hoạt động')).not.toBeInTheDocument();
+    expect(daGoi).toBe(false);
+  });
+
+  it('API nhật ký lỗi -> báo lỗi trong mục, phần còn lại của trang vẫn dùng được', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    server.use(http.get('/hoc-vien/:id/nhat-ky', () => HttpResponse.error()));
+    renderTrang('hv-duyet-1');
+    expect(await screen.findByText('Nhật ký hoạt động')).toBeInTheDocument();
+    expect(await screen.findByText('Không kết nối được máy chủ. Kiểm tra mạng và thử lại.')).toBeInTheDocument();
+    expect(screen.getByText('Bồi dưỡng NLS – Mức cơ bản')).toBeInTheDocument();
   });
 });

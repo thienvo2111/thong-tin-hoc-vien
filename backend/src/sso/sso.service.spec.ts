@@ -11,6 +11,9 @@ import {
   SsoMaKhongHopLeException,
   UnauthorizedAppException,
 } from '../common/exceptions/app.exceptions';
+import { NhatKyService } from '../nhat-ky/nhat-ky.service';
+
+let nhatKy: { ghi: jest.Mock };
 
 describe('SsoService', () => {
   let service: SsoService;
@@ -53,10 +56,12 @@ describe('SsoService', () => {
         .mockResolvedValue({ mo: true, du_dieu_kien: true }),
     };
     ketQua = { ghiDaMo: jest.fn().mockResolvedValue(undefined) };
+    nhatKy = { ghi: jest.fn().mockResolvedValue(undefined) };
     service = new SsoService(
       prisma as unknown as PrismaService,
       hocVienService as unknown as HocVienService,
       ketQua as unknown as KetQuaKhaoSatService,
+      nhatKy as unknown as NhatKyService,
     );
     process.env.SSO_KHAO_SAT_URL = 'https://khaosat.test/sso/start';
     process.env.SSO_KHAO_SAT_API_KEY = 'khoa-bi-mat-dung';
@@ -318,6 +323,31 @@ describe('SsoService', () => {
         service.doiMa('khoa-bi-mat-dung', 'x'.repeat(43)),
       ).rejects.toBeInstanceOf(SsoMaKhongHopLeException);
       expect(ketQua.ghiDaMo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('nhật ký chuyển sang khảo sát', () => {
+    it('cấp mã đầu vào -> ghi chuyen_sang_khao_sat', async () => {
+      await service.capMa(caller, 'danh-gia');
+      expect(nhatKy.ghi).toHaveBeenCalledWith({
+        hanh_dong: 'chuyen_sang_khao_sat',
+        hoc_vien_id: 'hv-1',
+        mo_ta: 'Khảo sát / đánh giá đầu vào',
+      });
+    });
+
+    it('cấp mã đầu ra -> mô tả "Khảo sát đầu ra"', async () => {
+      await service.capMa(caller, 'dau-ra');
+      expect(nhatKy.ghi.mock.calls[0][0].mo_ta).toBe('Khảo sát đầu ra');
+    });
+
+    it('không đủ điều kiện -> không cấp mã, không ghi', async () => {
+      hocVienService.danhGiaDauVaoCuaToi.mockResolvedValue({
+        kenh: 'sso',
+        du_dieu_kien: false,
+      });
+      await expect(service.capMa(caller, 'danh-gia')).rejects.toBeDefined();
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
     });
   });
 });

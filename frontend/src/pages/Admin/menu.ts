@@ -23,4 +23,5 @@ export const MENU_ADMIN: MucMenuAdmin[] = [
   { to: '/admin/yeu-cau-ho-tro', nhan: 'Yêu cầu hỗ trợ', icon: '💬' },
   { to: '/admin/danh-muc-truong', nhan: 'Danh mục trường', icon: '🏫' },
   { to: '/admin/nguoi-dung', nhan: 'Người dùng', icon: '🔑', chiQuanTri: true },
+  { to: '/admin/tai-khoan-hoc-vien', nhan: 'Tài khoản học viên', icon: '🪪', chiQuanTri: true },
 ];

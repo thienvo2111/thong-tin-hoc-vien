@@ -1109,3 +1109,28 @@ model ket_qua_khao_sat {
   @@unique([hoc_vien_id, loai], map: "uq_ket_qua_khao_sat_hoc_vien_loai")
   @@index([loai, trang_thai], map: "idx_ket_qua_khao_sat_loai_trang_thai")
 }
+
+// =====================================================================
+// PHẦN 6 — NHẬT KÝ HOẠT ĐỘNG (2026-10-04)
+// =====================================================================
+
+/// Nhật ký để đối chiếu khi học viên khiếu nại — CHỈ THÊM: trigger DB chặn UPDATE/DELETE.
+/// Chỉ ghi những gì bảng khác chưa lưu (đăng nhập, IP/thiết bị, kết quả và lớp cũ -> mới);
+/// dòng thời gian ở admin gộp thêm lich_su_thay_doi_ho_so, xac_nhan_ho_so, ma_sso_mot_lan,
+/// nhat_ky_thong_bao, nhat_ky_dat_lai_mat_khau, yeu_cau_ho_tro. Không FK: giữ log kể cả khi
+/// bản ghi gốc bị xóa.
+model nhat_ky_hoat_dong {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  thoi_gian     DateTime            @default(now()) @db.Timestamptz(6)
+  hanh_dong     String              @db.VarChar(50)
+  hoc_vien_id   String?             @db.Uuid
+  nguoi_dung_id String?             @db.Uuid
+  vai_tro       vai_tro_nguoi_dung?
+  chi_tiet      Json?
+  ip            String?             @db.VarChar(64)
+  thiet_bi      String?             @db.VarChar(300)
+
+  @@index([hoc_vien_id, thoi_gian], map: "idx_nhat_ky_hd_hoc_vien")
+  @@index([nguoi_dung_id, thoi_gian], map: "idx_nhat_ky_hd_nguoi_dung")
+  @@index([hanh_dong, thoi_gian], map: "idx_nhat_ky_hd_hanh_dong")
+}

@@ -9,6 +9,9 @@ import {
   UnauthorizedAppException,
   ValidationException,
 } from '../common/exceptions/app.exceptions';
+import { NhatKyService } from '../nhat-ky/nhat-ky.service';
+
+let nhatKy: { ghi: jest.Mock };
 
 // Lỗi unique violation giả lập P2002 của Prisma — dùng để test nhánh
 // idempotent của dangXuat() (gọi 2 lần cùng jti không được throw).
@@ -106,11 +109,13 @@ describe('AuthService', () => {
     thongBaoService = {
       guiDatLaiMatKhau: jest.fn().mockResolvedValue(undefined),
     };
+    nhatKy = { ghi: jest.fn().mockResolvedValue(undefined) };
     service = new AuthService(
       prisma as unknown as PrismaService,
       jwtService as never,
       scopeService as unknown as ScopeService,
       thongBaoService as unknown as ThongBaoService,
+      nhatKy as unknown as NhatKyService,
     );
   });
 
@@ -715,6 +720,85 @@ describe('AuthService', () => {
         where: { id: 'tok-1' },
         data: { da_dung_luc: expect.any(Date) },
       });
+    });
+  });
+
+  describe('nhật ký đăng nhập', () => {
+    // Hàm (không phải hằng): mat_khau_hash của baseUser chỉ có sau beforeAll.
+    const hocVien = () => ({
+      ...baseUser,
+      vai_tro: 'hoc_vien' as const,
+      hoc_vien_id: 'hv-1',
+    });
+
+    it('đăng nhập đúng -> ghi dang_nhap_thanh_cong gắn học viên + tài khoản', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue(hocVien());
+      await service.dangNhap({
+        ten_dang_nhap: baseUser.ten_dang_nhap,
+        mat_khau: 'MatKhauGoc',
+      });
+      expect(nhatKy.ghi).toHaveBeenCalledWith({
+        hoc_vien_id: 'hv-1',
+        nguoi_dung: { id: 'user-1', vai_tro: 'hoc_vien' },
+        hanh_dong: 'dang_nhap_thanh_cong',
+      });
+    });
+
+    it('sai mật khẩu -> ghi dang_nhap_sai_mat_khau kèm số lần sai', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
+        ...hocVien(),
+        so_lan_dang_nhap_sai: 1,
+      });
+      await expect(
+        service.dangNhap({
+          ten_dang_nhap: baseUser.ten_dang_nhap,
+          mat_khau: 'sai',
+        }),
+      ).rejects.toBeInstanceOf(UnauthorizedAppException);
+      expect(nhatKy.ghi).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hanh_dong: 'dang_nhap_sai_mat_khau',
+          mo_ta: 'Lần sai thứ 2 liên tiếp',
+        }),
+      );
+    });
+
+    it('sai lần thứ 5 -> mô tả ghi rõ tài khoản bị tạm khóa', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
+        ...hocVien(),
+        so_lan_dang_nhap_sai: 4,
+      });
+      await expect(
+        service.dangNhap({
+          ten_dang_nhap: baseUser.ten_dang_nhap,
+          mat_khau: 'sai',
+        }),
+      ).rejects.toBeInstanceOf(UnauthorizedAppException);
+      expect(nhatKy.ghi.mock.calls[0][0].mo_ta).toContain('bị tạm khóa');
+    });
+
+    it('đang bị khóa -> ghi dang_nhap_bi_khoa', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
+        ...hocVien(),
+        khoa_den: new Date(Date.now() + 60_000),
+      });
+      await expect(
+        service.dangNhap({
+          ten_dang_nhap: baseUser.ten_dang_nhap,
+          mat_khau: 'MatKhauGoc',
+        }),
+      ).rejects.toBeInstanceOf(AccountLockedException);
+      expect(nhatKy.ghi).toHaveBeenCalledWith(
+        expect.objectContaining({ hanh_dong: 'dang_nhap_bi_khoa' }),
+      );
+    });
+
+    it('tên đăng nhập không tồn tại -> không ghi (không có chủ thể)', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue(null);
+      await expect(
+        service.dangNhap({ ten_dang_nhap: 'khong-co', mat_khau: 'x' }),
+      ).rejects.toBeInstanceOf(UnauthorizedAppException);
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
     });
   });
 });

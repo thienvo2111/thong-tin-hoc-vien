@@ -787,6 +787,36 @@ export const handlers = [
     return HttpResponse.json({ ten_dang_nhap: tk.ten_dang_nhap, mat_khau_tam: 'Qw7eRt3yUp' });
   }),
   http.post('/nguoi-dung/don-vi/:id/gui-email-kich-hoat', () => HttpResponse.json({ da_gui: true })),
+
+  // Tài khoản học viên — /nguoi-dung/hoc-vien.
+  http.get('/nguoi-dung/hoc-vien', () => {
+    const data = db.taiKhoanHocVien;
+    return HttpResponse.json({ data, total: data.length, page: 1, page_size: 20 });
+  }),
+  http.patch('/nguoi-dung/hoc-vien/:id', async ({ params, request }) => {
+    const tk = db.taiKhoanHocVien.find((t) => t.id === params.id);
+    if (!tk) return loi(404, 'NOT_FOUND', 'Không tìm thấy tài khoản');
+    const body = (await request.json()) as { trang_thai: 'active' | 'ngung' };
+    tk.trang_thai = body.trang_thai;
+    if (body.trang_thai === 'active') Object.assign(tk, { so_lan_dang_nhap_sai: 0, khoa_den: null });
+    return HttpResponse.json(tk);
+  }),
+  http.post('/nguoi-dung/hoc-vien/:id/mo-khoa-tam', ({ params }) => {
+    const tk = db.taiKhoanHocVien.find((t) => t.id === params.id);
+    if (!tk) return loi(404, 'NOT_FOUND', 'Không tìm thấy tài khoản');
+    Object.assign(tk, { so_lan_dang_nhap_sai: 0, khoa_den: null });
+    return HttpResponse.json(tk);
+  }),
+  http.post('/nguoi-dung/:id/dat-lai-mat-khau', ({ params }) => {
+    const tk = db.taiKhoanHocVien.find((t) => t.id === params.id);
+    if (!tk) return loi(404, 'NOT_FOUND', 'Không tìm thấy tài khoản');
+    Object.assign(tk, { phai_doi_mat_khau: true, so_lan_dang_nhap_sai: 0, khoa_den: null });
+    return HttpResponse.json({
+      nguoi_dung: { id: tk.id, ten_dang_nhap: tk.ten_dang_nhap },
+      luu_y: 'Mật khẩu đã đặt lại về ngày sinh (định dạng ddmmyyyy) — bắt buộc đổi khi đăng nhập lần đầu.',
+    });
+  }),
+  http.get('/hoc-vien/:id/nhat-ky', () => HttpResponse.json(db.nhatKyHocVien)),
 ];
 
 export { loi };

@@ -5,7 +5,6 @@ import type {
   GiaiDoanCuaToi,
   KhoaHocDangKy,
   LichHocLopToi,
-  MucNangLuc,
   TrangThaiDiemDanh,
   VaiTroNhanSuLop,
 } from '@/api/types';
@@ -13,16 +12,7 @@ import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 import { chuanHoaLienKet } from '@/lib/lienKet';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
-
-const NHAN_MUC_NANG_LUC: Record<MucNangLuc, string> = {
-  co_ban: 'Cơ bản',
-  thanh_thao: 'Thành thạo',
-  nang_cao: 'Nâng cao',
-};
-
-function nhanMucNangLuc(muc: MucNangLuc | null): string {
-  return muc ? NHAN_MUC_NANG_LUC[muc] : 'Chưa có kết quả';
-}
+import { nhanMucNangLuc } from '@/lib/mucNangLuc';
 
 // T12 (mo-rong-nls-an-giang.md, 2026-09-30) — điểm danh nhập qua IMPORT EXCEL, không có giao diện
 // chấm tay. null (chưa điểm danh) không hiện badge nào — tránh gây nhầm học viên nghĩ là "vắng".

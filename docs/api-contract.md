@@ -53,6 +53,9 @@ Thao tác Quản trị lên tài khoản **người khác** (khác `/auth/*`, lu
 |---|---|---|---|
 | POST | `/nguoi-dung/{id}/dat-lai-mat-khau` | Đặt lại mật khẩu về ngày sinh `ddmmyyyy` của hồ sơ, `phai_doi_mat_khau=true`, xóa `khoa_den`/bộ đếm sai (mở khóa ngay nếu đang khóa). Chỉ áp dụng tài khoản `vai_tro='hoc_vien'` (mật khẩu mặc định suy từ ngày sinh hồ sơ — không có khái niệm này cho Sở/Phòng/Trường/QuảnTrị) — gọi cho tài khoản khác trả `400 VALIDATION_ERROR`. Ghi 1 dòng `nhat_ky_dat_lai_mat_khau` (ai đặt lại, cho ai, lúc nào). Quy trình vận hành: N4 xác minh người gọi (họ tên + ngày sinh + đơn vị + SĐT khớp hồ sơ) trước khi gọi endpoint này | Quản trị |
 | GET | `/nguoi-dung?q=` | Tìm tài khoản theo mã định danh đăng nhập (`ten_dang_nhap`)/họ tên/SĐT (SĐT tra qua hồ sơ học viên liên kết). Trả tối đa 20 kết quả, kèm dữ liệu hồ sơ học viên (họ tên/ngày sinh/SĐT/đơn vị) để N4 đối chiếu xác minh danh tính. **Improvised** — `api-contract.md` không có sẵn shape response cho endpoint này | Quản trị |
+| GET | `/nguoi-dung/hoc-vien` | Tài khoản `vai_tro='hoc_vien'`, phân trang (`page`, `page_size` mặc định 20, tối đa 100), sắp `created_at` giảm dần. Lọc `trang_thai` (`active`/`ngung`), `tinh_trang` (`tam_khoa` = `khoa_den > now`, `chua_dang_nhap` = `dang_nhap_lan_cuoi` null, `phai_doi_mat_khau`), `q` (tên đăng nhập/họ tên không phân biệt hoa thường, CCCD, SĐT). Dòng: `{ id, ten_dang_nhap, trang_thai, phai_doi_mat_khau, so_lan_dang_nhap_sai, khoa_den, dang_nhap_lan_cuoi, created_at, hoc_vien: { id, ho_ten, so_dinh_danh_ca_nhan, ngay_sinh, thang_sinh, nam_sinh, so_dien_thoai_lien_he, email_lien_he, don_vi_cong_tac: { id, ten_don_vi } \| null } \| null }` | Quản trị |
+| PATCH | `/nguoi-dung/hoc-vien/{id}` | `{ trang_thai: 'active' \| 'ngung' }` → dòng như trên. `active` đồng thời xóa `khoa_den` + bộ đếm sai. `404` không có tài khoản, `400` nếu không phải tài khoản học viên | Quản trị |
+| POST | `/nguoi-dung/hoc-vien/{id}/mo-khoa-tam` | `200` → dòng như trên; xóa `khoa_den`, `so_lan_dang_nhap_sai=0`, mật khẩu giữ nguyên. `404`/`400` như PATCH | Quản trị |
 
 ---
 
@@ -455,3 +458,45 @@ Quy tắc gộp (dùng chung API + import):
 Giao diện: M6 hiện từng bài kèm nhãn trạng thái + nút "Làm bài"/"Làm tiếp"/"Mở lại trang khảo sát"; M3 hiện tóm tắt; admin `/admin/tinh-hinh-khao-sat` (thống kê theo loại, bấm ô để lọc, danh sách có điểm + nguồn). Mã mẫu phía khảo sát: `scripts/sso-demo/trang-khao-sat-gia-lap.mjs` bước [4].
 
 **Chưa làm (khi bên khảo sát cần):** dọn định kỳ bản ghi mã đã hết hạn (hiện chỉ tích lũy, mỗi lượt bấm 1 dòng nhỏ); giới hạn tần suất cấp mã theo học viên.
+
+## 11. Nhật ký hoạt động (2026-10-04)
+
+Mục đích: đối chiếu khi học viên phản ánh ("đã cập nhật", "đã làm khảo sát", "sao bị đổi lớp"…).
+
+**Bảng `nhat_ky_hoat_dong`** — chỉ thêm; trigger DB chặn `UPDATE`/`DELETE`. Chỉ ghi những gì bảng khác chưa lưu, kèm IP + thiết bị (User-Agent) lấy tự động từ request:
+
+| `hanh_dong` | Ghi khi |
+|---|---|
+| `dang_nhap_thanh_cong` / `dang_nhap_sai_mat_khau` / `dang_nhap_bi_khoa` | `POST /auth/dang-nhap` (tài khoản tồn tại; sai MK kèm số lần sai liên tiếp) |
+| `doi_mat_khau` / `dat_lai_mat_khau_qua_email` | `POST /auth/doi-mat-khau`, `POST /auth/dat-lai-mat-khau` |
+| `chuyen_sang_khao_sat` | `POST /sso/cap-ma` (đầu vào hoặc đầu ra) |
+| `cap_nhat_muc_danh_gia` | Import `ket_qua_danh_gia` khi mức **thay đổi** (cũ → mới) |
+| `cap_nhat_ket_qua_hoc` | `PATCH /dang-ky-hoc/{id}/ket-qua` khi kết quả thay đổi |
+| `phan_lop` / `doi_cum` | Gán/gỡ lớp, đổi cụm — thủ công hoặc import `phan_lop_hoc_vien` (cũ → mới, chỉ khi thay đổi) |
+
+Lỗi ghi nhật ký **không** làm hỏng thao tác chính (chỉ log lỗi phía server).
+
+**`GET /hoc-vien/{id}/nhat-ky`** (`quan_tri`) — dòng thời gian của 1 học viên, mới nhất trước, gộp: `nhat_ky_hoat_dong`, `lich_su_thay_doi_ho_so` (sửa hồ sơ từng trường), `xac_nhan_ho_so`, `ma_sso_mot_lan` (hệ thống khảo sát đã tiếp nhận), `tai_khoan_vle.lan_dau_xem_luc`, `nhat_ky_thong_bao` (email), `nhat_ky_dat_lai_mat_khau`, `yeu_cau_ho_tro`. Tối đa 300 bản ghi mỗi nguồn.
+
+```json
+{
+  "hoc_vien": { "id": "uuid", "ho_ten": "Nguyễn Văn A" },
+  "muc": [
+    {
+      "id": "uuid",
+      "thoi_gian": "2026-10-04T03:00:00.000Z",
+      "nhom": "tai_khoan | ho_so | khao_sat | hoc_tap | thong_bao | ho_tro",
+      "tieu_de": "Đăng nhập thành công",
+      "noi_dung": "Khóa A — GĐ2 \"Zoom\": Lớp 01 → Lớp 02 (nhập file)",
+      "truong": "so_dien_thoai_lien_he",
+      "nguoi_thuc_hien": "Nguyễn Văn A (học viên)",
+      "ip": "113.161.1.1",
+      "thiet_bi": "Mozilla/5.0 … Zalo"
+    }
+  ]
+}
+```
+
+`truong` chỉ có ở mục "Sửa hồ sơ" (tên field backend — frontend đổi sang nhãn). Lỗi: 403 nếu không phải `quan_tri`, 404 nếu học viên không tồn tại.
+
+**Chưa làm:** "đã làm xong khảo sát" cần bên khảo sát gửi kết quả về (import hoặc API); lưu hồ sơ thất bại (lỗi validate) chưa ghi.

@@ -6,6 +6,7 @@ import { Prisma, nguoi_dung, loai_token_xac_thuc } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService, DonViScope } from './scope/scope.service';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
+import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import {
   AccountLockedException,
   UnauthorizedAppException,
@@ -63,6 +64,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly scopeService: ScopeService,
     private readonly thongBaoService: ThongBaoService,
+    private readonly nhatKy: NhatKyService,
   ) {}
 
   // T4b (2026-09-29): mã định danh CSDL MOET và CCCD KHÔNG giả định trùng
@@ -103,7 +105,12 @@ export class AuthService {
     const now = new Date();
     // T1: đang trong thời gian khóa -> 423, KHÔNG kiểm tra mật khẩu (đúng
     // hay sai cũng bị chặn như nhau — spec mo-rong-nls-an-giang.md mục T1).
+    const chuThe = {
+      hoc_vien_id: nguoiDung.hoc_vien_id,
+      nguoi_dung: { id: nguoiDung.id, vai_tro: nguoiDung.vai_tro },
+    };
     if (nguoiDung.khoa_den && nguoiDung.khoa_den > now) {
+      await this.nhatKy.ghi({ ...chuThe, hanh_dong: 'dang_nhap_bi_khoa' });
       throw new AccountLockedException(nguoiDung.khoa_den);
     }
 
@@ -127,6 +134,14 @@ export class AuthService {
               : null,
         },
       });
+      await this.nhatKy.ghi({
+        ...chuThe,
+        hanh_dong: 'dang_nhap_sai_mat_khau',
+        mo_ta:
+          soLanMoi >= NGUONG_SO_LAN_SAI_KHOA
+            ? `Lần sai thứ ${soLanMoi} liên tiếp — tài khoản bị tạm khóa`
+            : `Lần sai thứ ${soLanMoi} liên tiếp`,
+      });
       throw new UnauthorizedAppException();
     }
 
@@ -140,6 +155,7 @@ export class AuthService {
     });
 
     const token = await this.signToken(updated);
+    await this.nhatKy.ghi({ ...chuThe, hanh_dong: 'dang_nhap_thanh_cong' });
 
     return {
       token,
@@ -200,6 +216,10 @@ export class AuthService {
     const updated = await this.prisma.nguoi_dung.update({
       where: { id: user.id },
       data: { mat_khau_hash: matKhauHashMoi, phai_doi_mat_khau: false },
+    });
+    await this.nhatKy.ghi({
+      hanh_dong: 'doi_mat_khau',
+      hoc_vien_id: nguoiDung.hoc_vien_id,
     });
 
     return { nguoi_dung: sanitizeNguoiDung(updated) };
@@ -492,6 +512,11 @@ export class AuthService {
         data: { da_dung_luc: now },
       }),
     ]);
+    await this.nhatKy.ghi({
+      hanh_dong: 'dat_lai_mat_khau_qua_email',
+      hoc_vien_id: nguoiDung.hoc_vien_id,
+      nguoi_dung: { id: nguoiDung.id, vai_tro: nguoiDung.vai_tro },
+    });
 
     return { da_dat_lai: true };
   }
@@ -499,7 +524,9 @@ export class AuthService {
   // POST /auth/xac-minh-email — token sai/hết hạn/đã dùng trả 1 thông báo lỗi
   // chung, không tiết lộ chi tiết.
   async xacMinhEmail(dto: XacMinhEmailDto): Promise<{ da_xac_minh: true }> {
-    const tokenRow = await this.timVaXacThucToken(dto.token, ['xac_minh_email']);
+    const tokenRow = await this.timVaXacThucToken(dto.token, [
+      'xac_minh_email',
+    ]);
     await this.prisma.$transaction([
       this.prisma.hoc_vien.update({
         where: { id: tokenRow.hoc_vien_id! },

@@ -18,6 +18,7 @@ import { DotXacNhanModule } from './dot-xac-nhan/dot-xac-nhan.module';
 import { YeuCauHoTroModule } from './yeu-cau-ho-tro/yeu-cau-ho-tro.module';
 import { CauHinhKhaoSatModule } from './cau-hinh-khao-sat/cau-hinh-khao-sat.module';
 import { SsoModule } from './sso/sso.module';
+import { NhatKyModule } from './nhat-ky/nhat-ky.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { SsoModule } from './sso/sso.module';
     // (xem 2 controller đó) để không ảnh hưởng các endpoint còn lại.
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60000, limit: 10 }]),
     PrismaModule,
+    NhatKyModule,
     AuthModule,
     HocVienModule,
     KhoaBoiDuongModule,

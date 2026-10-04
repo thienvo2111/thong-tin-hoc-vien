@@ -641,3 +641,54 @@ export interface MatKhauTamResponse {
   ten_dang_nhap: string;
   mat_khau_tam: string;
 }
+
+// Tài khoản học viên — /nguoi-dung/hoc-vien, chỉ quan_tri. Không bao giờ có mat_khau_hash.
+export type TinhTrangTaiKhoanHocVien = 'tam_khoa' | 'chua_dang_nhap' | 'phai_doi_mat_khau';
+
+export interface TaiKhoanHocVien {
+  id: string;
+  ten_dang_nhap: string;
+  trang_thai: TrangThaiActive;
+  phai_doi_mat_khau: boolean;
+  so_lan_dang_nhap_sai: number;
+  khoa_den: string | null;
+  dang_nhap_lan_cuoi: string | null;
+  created_at: string;
+  hoc_vien: {
+    id: string;
+    ho_ten: string | null;
+    so_dinh_danh_ca_nhan: string | null;
+    ngay_sinh: number | null;
+    thang_sinh: number | null;
+    nam_sinh: number | null;
+    so_dien_thoai_lien_he: string | null;
+    email_lien_he: string | null;
+    don_vi_cong_tac: { id: string; ten_don_vi: string } | null;
+  } | null;
+}
+
+/** POST /nguoi-dung/:id/dat-lai-mat-khau — mật khẩu về ngày sinh ddmmyyyy. */
+export interface DatLaiMatKhauHocVienResponse {
+  nguoi_dung: { id: string; ten_dang_nhap: string };
+  luu_y: string;
+}
+
+// GET /hoc-vien/:id/nhat-ky — dòng thời gian (backend nhat-ky.service.ts MucDongThoiGian).
+export type NhomNhatKy = 'tai_khoan' | 'ho_so' | 'khao_sat' | 'hoc_tap' | 'thong_bao' | 'ho_tro';
+
+export interface MucNhatKy {
+  id: string;
+  thoi_gian: string;
+  nhom: NhomNhatKy;
+  tieu_de: string;
+  noi_dung: string | null;
+  truong: string | null;
+  nguoi_thuc_hien: string | null;
+  ip: string | null;
+  thiet_bi: string | null;
+}
+
+export interface NhatKyHocVien {
+  hoc_vien: { id: string; ho_ten: string };
+  muc: MucNhatKy[];
+}

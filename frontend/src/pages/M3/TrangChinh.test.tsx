@@ -16,6 +16,7 @@ const routes = [
   { path: '/toi/ho-so', element: <div>Màn hình hồ sơ</div> },
   { path: '/toi/xac-nhan', element: <div>Màn hình xác nhận</div> },
   { path: '/toi/danh-gia-dau-vao', element: <div>Màn hình đánh giá</div> },
+  { path: '/toi/lop-hoc', element: <div>Màn hình lớp học</div> },
 ];
 
 function renderDaDangNhap() {
@@ -290,5 +291,177 @@ describe('M3 — cấu hình theo khóa học viên đã ghi danh (2026-10-02)',
     datCauHinhCuaToiMock('k-hv');
     renderDaDangNhap();
     expect(await screen.findByText('Khảo sát đầu ra đã mở')).toBeInTheDocument();
+  });
+});
+
+describe('M3 — thẻ Khảo sát đầu vào / Đánh giá đầu ra (khóa có lý do)', () => {
+  const cauHinh = (ghiDe: Partial<CauHinhKhaoSat>): CauHinhKhaoSat => ({
+    che_do_hoc_vien: 'dang_nhap',
+    danh_gia_dau_vao_trong_cong: false,
+    hien_khao_sat: false,
+    kenh_danh_gia: 'sso',
+    khao_sat_dau_ra_mo: false,
+    phieu: [],
+    ...ghiDe,
+  });
+  const datDayDu = () => {
+    db.dotXacNhan.day_du = true;
+    db.dotXacNhan.thieu = [];
+  };
+  const chuaCoKetQua = () => {
+    db.khoaHocToi[0].muc_dau_vao = null;
+    db.khoaHocToi[0].muc_dau_ra = null;
+  };
+  /** Thẻ = Card chứa tiêu đề; chờ ghi chú xuất hiện vì cấu hình/mức độ tải bất đồng bộ. */
+  async function theCo(tieuDe: string, ghiChu: RegExp) {
+    const layThe = () => screen.getByText(tieuDe).closest('.mantine-Card-root') as HTMLElement;
+    await waitFor(() => expect(within(layThe()).getByText(ghiChu)).toBeInTheDocument());
+    return layThe();
+  }
+
+  it('luôn hiện đủ 4 thẻ', async () => {
+    renderDaDangNhap();
+    for (const ten of ['Cập nhật hồ sơ', 'Thông tin lớp học', 'Khảo sát đầu vào', 'Đánh giá đầu ra']) {
+      expect(await screen.findByText(ten)).toBeInTheDocument();
+    }
+  });
+
+  it('đầu vào chưa mở -> thẻ khóa (mờ, không phải link) + lý do "Chưa mở"', async () => {
+    datCauHinhKhaoSatMock(cauHinh({}));
+    chuaCoKetQua();
+    renderDaDangNhap();
+    const the = await theCo('Khảo sát đầu vào', /Chưa mở/);
+    expect(the).toHaveAttribute('aria-disabled', 'true');
+    expect(the).not.toHaveAttribute('href');
+  });
+
+  it('đầu vào mở nhưng hồ sơ thiếu -> thẻ khóa + lý do chưa cập nhật đủ thông tin', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ danh_gia_dau_vao_trong_cong: true }));
+    chuaCoKetQua();
+    renderDaDangNhap();
+    const the = await theCo('Khảo sát đầu vào', /chưa kích hoạt được.*cập nhật đủ 2 thông tin hồ sơ/);
+    expect(the).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('đầu vào mở, hồ sơ đủ, kênh sso -> thẻ là link sang M6', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ hien_khao_sat: true, kenh_danh_gia: 'sso' }));
+    datDayDu();
+    chuaCoKetQua();
+    renderDaDangNhap();
+    const the = await theCo('Khảo sát đầu vào', /Đã mở — bấm để bắt đầu/);
+    expect(the).toHaveAttribute('href', '/toi/danh-gia-dau-vao');
+    expect(the).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('đầu vào mở, hồ sơ đủ, kênh vle phiếu ngoài -> thẻ cuộn tới khối phiếu trong trang', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ hien_khao_sat: true, kenh_danh_gia: 'vle' }));
+    datDayDu();
+    chuaCoKetQua();
+    renderDaDangNhap();
+    const the = await theCo('Khảo sát đầu vào', /Đã mở/);
+    expect(the).toHaveAttribute('href', '#khao-sat-dau-vao');
+    expect(document.getElementById('khao-sat-dau-vao')).toBeInTheDocument();
+  });
+
+  it('đã có kết quả đầu vào -> thẻ báo mức + link sang lớp học (dù khảo sát đã đóng)', async () => {
+    datCauHinhKhaoSatMock(cauHinh({}));
+    renderDaDangNhap();
+    const the = await theCo('Khảo sát đầu vào', /Đã có kết quả: Mức Cơ bản/);
+    expect(the).toHaveAttribute('href', '/toi/lop-hoc');
+  });
+
+  it('đầu ra chưa mở -> thẻ khóa + lý do mở khi hoàn thành khóa', async () => {
+    datCauHinhKhaoSatMock(cauHinh({}));
+    renderDaDangNhap();
+    const the = await theCo('Đánh giá đầu ra', /mở khi Thầy\/Cô hoàn thành khóa bồi dưỡng/);
+    expect(the).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('đầu ra mở, hồ sơ thiếu -> thẻ khóa + lý do thiếu thông tin', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ khao_sat_dau_ra_mo: true }));
+    renderDaDangNhap();
+    const the = await theCo('Đánh giá đầu ra', /cập nhật đủ 2 thông tin hồ sơ/);
+    expect(the).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('đầu ra mở, hồ sơ đủ -> thẻ cuộn tới khối Khảo sát đầu ra', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ khao_sat_dau_ra_mo: true }));
+    datDayDu();
+    renderDaDangNhap();
+    const the = await theCo('Đánh giá đầu ra', /Đã mở/);
+    expect(the).toHaveAttribute('href', '#khao-sat-dau-ra');
+  });
+
+  it('đã có kết quả đầu ra -> thẻ báo mức', async () => {
+    db.khoaHocToi[0].muc_dau_ra = 'thanh_thao';
+    renderDaDangNhap();
+    await theCo('Đánh giá đầu ra', /Đã có kết quả: Mức Thành thạo/);
+  });
+});
+
+describe('M3 — thông báo kết quả đánh giá / chia lớp đã cập nhật', () => {
+  it('có kết quả + lớp chưa xem -> hiện thông báo kèm chi tiết + nhãn Mới trên thẻ lớp học', async () => {
+    renderDaDangNhap();
+    expect(await screen.findByText('Có cập nhật mới')).toBeInTheDocument();
+    expect(screen.getByText('Kết quả đánh giá đầu vào đã được cập nhật:')).toBeInTheDocument();
+    expect(screen.getByText('Bồi dưỡng NLS – Mức cơ bản: Mức Cơ bản')).toBeInTheDocument();
+    expect(screen.getByText('Danh sách chia lớp đã được cập nhật:')).toBeInTheDocument();
+    expect(screen.getByText(/Lớp 01 – Nhóm cơ bản A, Lớp Zoom 01/)).toBeInTheDocument();
+    const theLop = screen.getByText('Thông tin lớp học').closest('.mantine-Card-root') as HTMLElement;
+    expect(within(theLop).getByText('Mới')).toBeInTheDocument();
+  });
+
+  it('bấm "Đã xem" -> ẩn thông báo, mở lại trang vẫn không hiện', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderDaDangNhap();
+    await user.click(await screen.findByRole('button', { name: 'Đã xem' }));
+    expect(screen.queryByText('Có cập nhật mới')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mới')).not.toBeInTheDocument();
+
+    unmount();
+    renderDaDangNhap();
+    expect(await screen.findByText('Thông tin lớp học')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Có cập nhật mới')).not.toBeInTheDocument());
+  });
+
+  it('bấm "Xem lớp học" -> đánh dấu đã xem và chuyển sang trang lớp học', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderDaDangNhap();
+    await user.click(await screen.findByRole('link', { name: 'Xem lớp học' }));
+    expect(await screen.findByText('Màn hình lớp học')).toBeInTheDocument();
+
+    unmount();
+    renderDaDangNhap();
+    expect(await screen.findByText('Thông tin lớp học')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Có cập nhật mới')).not.toBeInTheDocument());
+  });
+
+  it('đã xem rồi, sau đó quản trị đổi lớp -> chỉ báo danh sách chia lớp, không báo lại kết quả', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderDaDangNhap();
+    await user.click(await screen.findByRole('button', { name: 'Đã xem' }));
+    unmount();
+
+    db.khoaHocToi[0].giai_doan[1].lop!.id = 'lop-moi';
+    db.khoaHocToi[0].giai_doan[1].lop!.ten_lop = 'Lớp 05 – Nhóm cơ bản E';
+    renderDaDangNhap();
+    expect(await screen.findByText('Danh sách chia lớp đã được cập nhật:')).toBeInTheDocument();
+    expect(screen.getByText(/Lớp 05 – Nhóm cơ bản E/)).toBeInTheDocument();
+    expect(screen.queryByText('Kết quả đánh giá đầu vào đã được cập nhật:')).not.toBeInTheDocument();
+  });
+
+  it('chưa có kết quả, chưa chia lớp -> không có thông báo; thẻ lớp học ghi "Chưa có danh sách chia lớp"', async () => {
+    db.khoaHocToi[0].muc_dau_vao = null;
+    db.khoaHocToi[0].giai_doan = db.khoaHocToi[0].giai_doan.map((gd) => ({ ...gd, lop: null }));
+    renderDaDangNhap();
+    expect(await screen.findByText('Chưa có danh sách chia lớp')).toBeInTheDocument();
+    expect(screen.queryByText('Có cập nhật mới')).not.toBeInTheDocument();
+  });
+
+  it('lỗi tải khóa học -> trang chính vẫn hoạt động, không có thông báo', async () => {
+    server.use(http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.error()));
+    renderDaDangNhap();
+    expect(await screen.findByText(/Còn 2 thông tin cần bổ sung/)).toBeInTheDocument();
+    expect(screen.queryByText('Có cập nhật mới')).not.toBeInTheDocument();
   });
 });

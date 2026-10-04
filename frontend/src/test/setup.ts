@@ -44,6 +44,7 @@ afterEach(() => {
   datLaiCauHinhKhaoSatMock();
   datLaiTinhTrangKhaoSatMock();
   xoaToken();
+  localStorage.clear();
   cleanup();
 });
 afterAll(() => server.close());

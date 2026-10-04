@@ -8,6 +8,9 @@ import {
   NotFoundAppException,
   ValidationException,
 } from '../common/exceptions/app.exceptions';
+import { NhatKyService } from '../nhat-ky/nhat-ky.service';
+
+let nhatKy: { ghi: jest.Mock };
 
 // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30) + phân lớp theo giai đoạn (spec
 // 2026-10-02): test cho phân lớp (phan_lop_giai_doan) + cụm học viên trong
@@ -18,7 +21,11 @@ import {
 describe('KhoaBoiDuongService', () => {
   let service: KhoaBoiDuongService;
   let prisma: {
-    khoa_boi_duong: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
+    khoa_boi_duong: {
+      findUnique: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+    };
     don_vi_cong_tac: { findUnique: jest.Mock };
     lop_hoc: {
       create: jest.Mock;
@@ -29,6 +36,7 @@ describe('KhoaBoiDuongService', () => {
       upsert: jest.Mock;
     };
     cum_hoc_vien: {
+      findMany: jest.Mock;
       create: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
@@ -40,6 +48,7 @@ describe('KhoaBoiDuongService', () => {
       update: jest.Mock;
     };
     phan_lop_giai_doan: {
+      findUnique: jest.Mock;
       upsert: jest.Mock;
       deleteMany: jest.Mock;
       groupBy: jest.Mock;
@@ -90,6 +99,7 @@ describe('KhoaBoiDuongService', () => {
         upsert: jest.fn(),
       },
       cum_hoc_vien: {
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
@@ -101,6 +111,7 @@ describe('KhoaBoiDuongService', () => {
         update: jest.fn(),
       },
       phan_lop_giai_doan: {
+        findUnique: jest.fn().mockResolvedValue(null),
         upsert: jest.fn(),
         deleteMany: jest.fn(),
         groupBy: jest.fn().mockResolvedValue([]),
@@ -126,10 +137,12 @@ describe('KhoaBoiDuongService', () => {
     thongBaoService = {
       guiDangKyHocPhanLop: jest.fn().mockResolvedValue({ chuaCoEmail: false }),
     };
+    nhatKy = { ghi: jest.fn().mockResolvedValue(undefined) };
     service = new KhoaBoiDuongService(
       prisma as unknown as PrismaService,
       scopeService as unknown as ScopeService,
       thongBaoService as unknown as ThongBaoService,
+      nhatKy as unknown as NhatKyService,
     );
   });
 
@@ -886,7 +899,6 @@ describe('KhoaBoiDuongService', () => {
         ),
       ).rejects.toBeInstanceOf(NotFoundAppException);
     });
-
   });
 
   describe('capNhatLop', () => {
@@ -964,7 +976,6 @@ describe('KhoaBoiDuongService', () => {
         ),
       ).rejects.toBeInstanceOf(NotFoundAppException);
     });
-
   });
 
   describe('capNhatCum', () => {
@@ -1022,7 +1033,6 @@ describe('KhoaBoiDuongService', () => {
         ),
       ).rejects.toBeInstanceOf(NotFoundAppException);
     });
-
   });
 
   describe('capNhatLichHoc', () => {
@@ -1103,6 +1113,146 @@ describe('KhoaBoiDuongService', () => {
         ),
       ).rejects.toBeInstanceOf(ValidationException);
       expect(prisma.lich_hoc_lop.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('nhật ký kết quả / phân lớp (2026-10-04)', () => {
+    const gd2 = {
+      id: 'gd-2',
+      khoa_id: 'khoa-1',
+      thu_tu: 2,
+      ten_giai_doan: 'Zoom',
+    };
+
+    it('nhập kết quả đánh giá đổi mức -> ghi cũ → mới', async () => {
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        muc_dau_vao: null,
+        muc_dau_ra: null,
+        khoa: { ten_khoa: 'Khóa A' },
+      });
+      await service.commitKetQuaDanhGia({
+        hoc_vien_id: 'hv-1',
+        khoa_id: 'khoa-1',
+        loai: 'dau_vao',
+        muc: 'co_ban',
+      });
+      expect(nhatKy.ghi).toHaveBeenCalledWith({
+        hanh_dong: 'cap_nhat_muc_danh_gia',
+        hoc_vien_id: 'hv-1',
+        mo_ta: 'Khóa A — Đầu vào: (chưa có) → Cơ bản (nhập file)',
+      });
+    });
+
+    it('nhập lại cùng mức -> không ghi (tránh log rác khi chạy lại file)', async () => {
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        muc_dau_vao: 'co_ban',
+        muc_dau_ra: null,
+        khoa: { ten_khoa: 'Khóa A' },
+      });
+      await service.commitKetQuaDanhGia({
+        hoc_vien_id: 'hv-1',
+        khoa_id: 'khoa-1',
+        loai: 'dau_vao',
+        muc: 'co_ban',
+      });
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
+    });
+
+    it('nhập file phân lớp đổi lớp -> ghi lớp cũ → lớp mới', async () => {
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        cum_id: null,
+        phan_lop_giai_doan: [
+          {
+            giai_doan_id: 'gd-2',
+            lop_id: 'lop-cu',
+            lop: { ten_lop: 'Lớp cũ' },
+          },
+        ],
+      });
+      prisma.dang_ky_hoc.upsert.mockResolvedValue({ id: 'dk-1' });
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue({
+        ten_khoa: 'Khóa A',
+      });
+      prisma.giai_doan_khoa.findMany.mockResolvedValue([gd2]);
+      prisma.lop_hoc.findMany.mockResolvedValue([
+        { id: 'lop-moi', ten_lop: 'Lớp mới' },
+      ]);
+      prisma.lop_hoc.count.mockResolvedValue(0);
+
+      await service.commitPhanLop({
+        hoc_vien_id: 'hv-1',
+        khoa_id: 'khoa-1',
+        gan: [{ giai_doan_id: 'gd-2', lop_id: 'lop-moi' }],
+      });
+      expect(nhatKy.ghi).toHaveBeenCalledWith({
+        hanh_dong: 'phan_lop',
+        hoc_vien_id: 'hv-1',
+        mo_ta: 'Khóa A — GĐ2 "Zoom": Lớp cũ → Lớp mới (nhập file)',
+      });
+    });
+
+    it('nhập file phân lớp không đổi gì -> không ghi', async () => {
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        cum_id: 'cum-1',
+        phan_lop_giai_doan: [
+          {
+            giai_doan_id: 'gd-2',
+            lop_id: 'lop-cu',
+            lop: { ten_lop: 'Lớp cũ' },
+          },
+        ],
+      });
+      prisma.dang_ky_hoc.upsert.mockResolvedValue({ id: 'dk-1' });
+      prisma.lop_hoc.count.mockResolvedValue(0);
+      await service.commitPhanLop({
+        hoc_vien_id: 'hv-1',
+        khoa_id: 'khoa-1',
+        cum_id: 'cum-1',
+        gan: [{ giai_doan_id: 'gd-2', lop_id: 'lop-cu' }],
+      });
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
+    });
+
+    it('gỡ lớp thủ công -> ghi lớp cũ → (gỡ lớp)', async () => {
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        id: 'dk-1',
+        hoc_vien_id: 'hv-1',
+        khoa_id: 'khoa-1',
+        khoa: { ten_khoa: 'Khóa A' },
+      });
+      prisma.giai_doan_khoa.findUnique.mockResolvedValue(gd2);
+      prisma.phan_lop_giai_doan.findUnique.mockResolvedValue({
+        lop_id: 'lop-cu',
+        lop: { ten_lop: 'Lớp cũ' },
+      });
+
+      await service.ganLopGiaiDoan('dk-1', 'gd-2', null, {} as never);
+      expect(nhatKy.ghi).toHaveBeenCalledWith({
+        hanh_dong: 'phan_lop',
+        hoc_vien_id: 'hv-1',
+        mo_ta: 'Khóa A — GĐ2 "Zoom": Lớp cũ → (gỡ lớp)',
+      });
+    });
+
+    it('cập nhật kết quả khóa học -> ghi cũ → mới', async () => {
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        id: 'dk-1',
+        hoc_vien_id: 'hv-1',
+        ket_qua: 'dang_hoc',
+        khoa: { ten_khoa: 'Khóa A', don_vi_dat_hang_id: null },
+      });
+      scopeService.canAccessDonVi.mockResolvedValue(true);
+      prisma.dang_ky_hoc.update.mockResolvedValue({ ket_qua: 'dat' });
+      (
+        thongBaoService as unknown as Record<string, jest.Mock>
+      ).guiDangKyHocKetQua = jest.fn();
+
+      await service.capNhatKetQua('dk-1', { ket_qua: 'dat' }, {} as never);
+      expect(nhatKy.ghi).toHaveBeenCalledWith({
+        hanh_dong: 'cap_nhat_ket_qua_hoc',
+        hoc_vien_id: 'hv-1',
+        mo_ta: 'Khóa A: Đang học → Đạt',
+      });
     });
   });
 });

@@ -1,17 +1,11 @@
 import type { SsoTarget } from '@/api/hocVien';
 import type { TrangThaiKhaoSat } from '@/api/ketQuaKhaoSat';
-import type { MucNangLuc } from '@/api/types';
+export { NHAN_MUC_NANG_LUC } from '@/lib/mucNangLuc';
 
 export const TEN_BAI_KHAO_SAT: Record<SsoTarget, string> = {
   'khao-sat': 'Phiếu khảo sát kĩ năng số',
   'danh-gia': 'Phiếu đánh giá năng lực số',
   'dau-ra': 'Khảo sát đầu ra',
-};
-
-export const NHAN_MUC_NANG_LUC: Record<MucNangLuc, string> = {
-  co_ban: 'Cơ bản',
-  thanh_thao: 'Thành thạo',
-  nang_cao: 'Nâng cao',
 };
 
 const NHAN_TRANG_THAI: Record<TrangThaiKhaoSat, { nhan: string; mau: string }> = {
