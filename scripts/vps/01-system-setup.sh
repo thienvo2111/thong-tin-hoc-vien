@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cap nhat he thong, cai goi nen, cau hinh firewall + fail2ban co ban.
+# Cap nhat he thong, cai goi nen, cau hinh firewall + dong bo gio.
 # Chay: sudo bash 01-system-setup.sh
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -17,7 +17,7 @@ apt-get upgrade -y
 echo "==> Cai goi nen thiet yeu"
 apt-get install -y \
   curl wget git unzip build-essential \
-  ufw fail2ban \
+  ufw \
   ca-certificates gnupg lsb-release
 
 echo "==> Cau hinh timezone Asia/Ho_Chi_Minh"
@@ -41,7 +41,8 @@ ufw allow "${HTTP_PORT}/tcp"
 ufw --force enable
 ufw status verbose
 
-echo "==> Bat fail2ban (chong brute-force SSH)"
-systemctl enable --now fail2ban
+# KHONG dung fail2ban: SSH tu ngoai vao qua NAT HCMUE nen moi ket noi mang chung
+# 1 IP nguon (10.20.2.215) -> fail2ban khong phan biet duoc ke do mat khau va
+# se chan luon admin. Chong do mat khau bang 10-ssh-hardening.sh (chi SSH key).
 
 echo "==> Xong buoc 01. User van hanh: ${APP_USER}"

@@ -28,7 +28,8 @@ quyền `sudo`, nhóm `adm`/`sudo`).
    đều `source` file này.
 
 2. `sudo bash 01-system-setup.sh` — cập nhật apt, cài gói nền, UFW (mở đúng
-   port thật 22 + 80), fail2ban, timezone.
+   port thật 22 + 80), timezone, đồng bộ giờ (htpdate). Không dùng fail2ban:
+   NAT HCMUE gộp mọi kết nối SSH về 1 IP nguồn, chặn IP đó = khóa luôn admin.
 
 3. `sudo bash 02-install-node.sh` — Node.js 20.x (NodeSource) + PM2 global +
    `pm2 startup` để tự khởi động lại khi VPS reboot.
@@ -182,4 +183,4 @@ Từ 2026-10-02, `06-deploy.sh` tự so prefix `@Controller` với site config N
   chắc quy trình chạy được trước khi cần dùng thật).
 - Dashboard giám sát trực quan (Grafana/Uptime Kuma...) — bước 10 chỉ là
   healthcheck + alert đơn giản qua cron, không có UI.
-- Xoay vòng SSH key, audit log truy cập sâu hơn fail2ban mặc định.
+- Xoay vòng SSH key, audit log truy cập SSH.

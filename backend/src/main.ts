@@ -59,6 +59,7 @@ async function bootstrap() {
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api', app, swaggerDocument);
 
-  await app.listen(process.env.PORT ?? 3000);
+  // Mac dinh chi nghe noi bo: Nginx proxy qua 127.0.0.1, khong mo API thang ra mang.
+  await app.listen(process.env.PORT ?? 3000, process.env.HOST ?? '127.0.0.1');
 }
 bootstrap();
