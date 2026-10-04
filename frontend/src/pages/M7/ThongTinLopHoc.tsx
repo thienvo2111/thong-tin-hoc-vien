@@ -10,6 +10,7 @@ import type {
   VaiTroNhanSuLop,
 } from '@/api/types';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
+import { chuanHoaLienKet } from '@/lib/lienKet';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
 
@@ -141,10 +142,6 @@ function KhoiKhoaHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
   );
 }
 
-function laLink(s: string): boolean {
-  return s.startsWith('http://') || s.startsWith('https://');
-}
-
 // Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.2): 1 thẻ/giai đoạn. Có lớp -> lớp + nhân sự + buổi
 // của đúng giai đoạn; không lớp -> link/hướng dẫn chung của giai đoạn (vd đánh giá đầu vào/đầu ra).
 function TheGiaiDoan({ gd, chuaPhanLop }: { gd: GiaiDoanCuaToi; chuaPhanLop: boolean }) {
@@ -183,13 +180,16 @@ function TheGiaiDoan({ gd, chuaPhanLop }: { gd: GiaiDoanCuaToi; chuaPhanLop: boo
             </Text>
           )}
           {gd.link_hoac_dia_diem &&
-            (laLink(gd.link_hoac_dia_diem) ? (
-              <Button component="a" href={gd.link_hoac_dia_diem} size="xs" style={{ alignSelf: 'flex-start' }}>
-                Mở liên kết
-              </Button>
-            ) : (
-              <Text size="sm">Địa điểm: {gd.link_hoac_dia_diem}</Text>
-            ))}
+            (() => {
+              const href = chuanHoaLienKet(gd.link_hoac_dia_diem);
+              return href ? (
+                <Button component="a" href={href} size="xs" style={{ alignSelf: 'flex-start' }}>
+                  Mở liên kết
+                </Button>
+              ) : (
+                <Text size="sm">Địa điểm: {gd.link_hoac_dia_diem}</Text>
+              );
+            })()}
           {!gd.huong_dan && !gd.link_hoac_dia_diem && !chuaPhanLop && (
             <Text size="sm" c="dimmed">
               Thông tin lớp ở giai đoạn này sẽ được cập nhật sau.
@@ -215,6 +215,7 @@ function TheGiaiDoan({ gd, chuaPhanLop }: { gd: GiaiDoanCuaToi; chuaPhanLop: boo
 }
 
 function KhoiCum({ cum }: { cum: CumHocVien }) {
+  const hrefZalo = chuanHoaLienKet(cum.link_zalo);
   return (
     <Paper p="md" radius="md" style={{ background: 'var(--mantine-color-gray-0)' }}>
       <Text fw={700} size="sm">
@@ -225,8 +226,8 @@ function KhoiCum({ cum }: { cum: CumHocVien }) {
           {cum.ghi_chu}
         </Text>
       )}
-      {cum.link_zalo && (
-        <Button component="a" href={cum.link_zalo} size="xs" mt={6}>
+      {hrefZalo && (
+        <Button component="a" href={hrefZalo} size="xs" mt={6}>
           Vào nhóm Zalo
         </Button>
       )}
@@ -254,15 +255,18 @@ function DanhSachBuoi({ lichHoc }: { lichHoc: LichHocLopToi[] }) {
             {dinhDangNgayGio(buoi.thoi_gian_bat_dau)} – {dinhDangNgayGio(buoi.thoi_gian_ket_thuc)}
           </Text>
           {buoi.dia_diem_hoac_link &&
-            (laLink(buoi.dia_diem_hoac_link) ? (
-              <Button component="a" href={buoi.dia_diem_hoac_link} size="xs" mt={6}>
-                Vào học
-              </Button>
-            ) : (
-              <Text size="sm" mt={4}>
-                Địa điểm: {buoi.dia_diem_hoac_link}
-              </Text>
-            ))}
+            (() => {
+              const href = chuanHoaLienKet(buoi.dia_diem_hoac_link);
+              return href ? (
+                <Button component="a" href={href} size="xs" mt={6}>
+                  Vào học
+                </Button>
+              ) : (
+                <Text size="sm" mt={4}>
+                  Địa điểm: {buoi.dia_diem_hoac_link}
+                </Text>
+              );
+            })()}
         </Box>
       ))}
     </Stack>

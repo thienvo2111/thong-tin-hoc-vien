@@ -28,6 +28,7 @@ import { useToi } from '@/auth/AuthContext';
 import { gioiThieu } from '@/content/gioiThieu';
 import { hopCheDo, useCauHinhTrienKhai, type CauHinhTrienKhai } from '@/content/trienKhai';
 import { layDanhSachTinhKhaoSat, type TinhCoCauHinh } from '@/api/cauHinhKhaoSat';
+import { chuanHoaLienKet } from '@/lib/lienKet';
 import logoHcmue from '@/assets/logo-hcmue.png';
 import './trangGioiThieu.css';
 
@@ -794,8 +795,13 @@ function KhoiKhaoSat({ khaoSat, phieu }: { khaoSat: typeof gioiThieu.khaoSatDauV
                         {p.moTa}
                       </Text>
                       <Group gap="sm" wrap="wrap" mt={4}>
-                        {p.lienKet.map((lk) =>
-                          !lk.url || laNoiDungCho(lk.url) ? (
+                        {p.lienKet.map((lk) => {
+                          const href = !lk.url || laNoiDungCho(lk.url) ? null : chuanHoaLienKet(lk.url);
+                          return href ? (
+                            <Button key={lk.nhan} component="a" href={href} target="_blank" rel="noopener noreferrer">
+                              {lk.nhan}
+                            </Button>
+                          ) : (
                             <Stack key={lk.nhan} gap={4}>
                               <Button disabled variant="default">
                                 {lk.nhan}
@@ -804,12 +810,8 @@ function KhoiKhaoSat({ khaoSat, phieu }: { khaoSat: typeof gioiThieu.khaoSatDauV
                                 Đường dẫn đang được cập nhật
                               </Text>
                             </Stack>
-                          ) : (
-                            <Button key={lk.nhan} component="a" href={lk.url} target="_blank" rel="noopener noreferrer">
-                              {lk.nhan}
-                            </Button>
-                          ),
-                        )}
+                          );
+                        })}
                       </Group>
                     </Stack>
                   </Group>

@@ -5,6 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { capMaSso, useDanhGiaDauVao, type SsoTarget } from '@/api/hocVien';
 import type { DanhGiaDauVao, DanhGiaDauVaoDuDieuKien } from '@/api/types';
+import { chuanHoaLienKet } from '@/lib/lienKet';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
 
@@ -115,6 +116,7 @@ function KhoiSso() {
 
 function KhoiDuDieuKien({ data }: { data: DanhGiaDauVaoDuDieuKien }) {
   const [hien, setHien] = useState(false);
+  const hrefLamBai = chuanHoaLienKet(data.duong_dan);
 
   return (
     <Stack gap="md">
@@ -122,9 +124,13 @@ function KhoiDuDieuKien({ data }: { data: DanhGiaDauVaoDuDieuKien }) {
         Thầy/Cô dùng tài khoản VLE bên dưới để vào làm bài.
       </StatusBanner>
 
-      <Button component="a" href={data.duong_dan} size="lg" fullWidth>
-        Vào làm bài
-      </Button>
+      {hrefLamBai ? (
+        <Button component="a" href={hrefLamBai} size="lg" fullWidth>
+          Vào làm bài
+        </Button>
+      ) : (
+        <Text size="sm">{data.duong_dan}</Text>
+      )}
 
       <Box>
         <Text size="sm" c="dimmed" mb={4}>

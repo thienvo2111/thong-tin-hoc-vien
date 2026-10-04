@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { capMaSso, useDotXacNhan, useHoSoToi, useMucDoDayDu } from '@/api/hocVien';
 import type { HocVien, MucDoDayDu } from '@/api/types';
 import { useCauHinhTrienKhai, type CauHinhTrienKhai } from '@/content/trienKhai';
+import { chuanHoaLienKet } from '@/lib/lienKet';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { thongDiepLoiChung } from '@/lib/loiApi';
@@ -269,17 +270,18 @@ function DanhSachPhieu({ phieu }: { phieu: CauHinhTrienKhai['phieu'] }) {
           <Text fw={700} size="sm">
             {i + 1}. {p.ten}
           </Text>
-          {p.lienKet.map((lk) =>
-            lk.url ? (
-              <Button key={lk.nhan} component="a" href={lk.url}>
+          {p.lienKet.map((lk) => {
+            const href = chuanHoaLienKet(lk.url);
+            return href ? (
+              <Button key={lk.nhan} component="a" href={href}>
                 {lk.nhan}
               </Button>
             ) : (
               <Button key={lk.nhan} disabled>
                 Đường dẫn đang được cập nhật
               </Button>
-            ),
-          )}
+            );
+          })}
         </Stack>
       ))}
     </Stack>

@@ -52,6 +52,7 @@ import type {
   VaiTroNhanSuLop,
 } from '@/api/types';
 import { useToi } from '@/auth/AuthContext';
+import { chuanHoaLienKet } from '@/lib/lienKet';
 import { thongDiepLoiChung, loiFieldsThanhMap } from '@/lib/loiApi';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 import { locTiengViet } from '@/lib/timKiemTiengViet';
@@ -1108,48 +1109,57 @@ export default function AdminKhoaChiTiet() {
                             </Table.Td>
                           </Table.Tr>
                         )}
-                        {khoa.cum_hoc_vien.map((cum) => (
-                          <Table.Tr key={cum.id}>
-                            <Table.Td fw={600}>{cum.ten_cum}</Table.Td>
-                            <Table.Td>
-                              {cum.link_zalo ? (
-                                <Anchor href={cum.link_zalo} target="_blank" rel="noreferrer" fz={13.5}>
-                                  {cum.link_zalo}
-                                </Anchor>
-                              ) : (
-                                '—'
-                              )}
-                            </Table.Td>
-                            <Table.Td>{cum.ghi_chu ?? '—'}</Table.Td>
-                            <Table.Td>
-                              <BadgeHoatDong trangThai={cum.trang_thai} />
-                            </Table.Td>
-                            <Table.Td>
-                              {laQuanTri && (
-                                <Group gap={6} justify="flex-end" wrap="nowrap">
-                                  <Button variant="subtle" size="xs" onClick={() => moModalSuaCum(cum)}>
-                                    Sửa
-                                  </Button>
-                                  <Button
-                                    variant="subtle"
-                                    size="xs"
-                                    color={cum.trang_thai === 'active' ? 'red' : 'green'}
-                                    onClick={() =>
-                                      setXacNhanToggle({
-                                        loai: 'cum',
-                                        id: cum.id,
-                                        ten: cum.ten_cum,
-                                        dangHoatDong: cum.trang_thai === 'active',
-                                      })
-                                    }
-                                  >
-                                    {cum.trang_thai === 'active' ? 'Vô hiệu hóa' : 'Kích hoạt lại'}
-                                  </Button>
-                                </Group>
-                              )}
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
+                        {khoa.cum_hoc_vien.map((cum) => {
+                          const hrefZalo = cum.link_zalo ? chuanHoaLienKet(cum.link_zalo) : null;
+                          return (
+                            <Table.Tr key={cum.id}>
+                              <Table.Td fw={600}>{cum.ten_cum}</Table.Td>
+                              <Table.Td>
+                                {cum.link_zalo ? (
+                                  hrefZalo ? (
+                                    <Anchor href={hrefZalo} target="_blank" rel="noreferrer" fz={13.5}>
+                                      {cum.link_zalo}
+                                    </Anchor>
+                                  ) : (
+                                    <Text c="dimmed" fz={13.5}>
+                                      {cum.link_zalo}
+                                    </Text>
+                                  )
+                                ) : (
+                                  '—'
+                                )}
+                              </Table.Td>
+                              <Table.Td>{cum.ghi_chu ?? '—'}</Table.Td>
+                              <Table.Td>
+                                <BadgeHoatDong trangThai={cum.trang_thai} />
+                              </Table.Td>
+                              <Table.Td>
+                                {laQuanTri && (
+                                  <Group gap={6} justify="flex-end" wrap="nowrap">
+                                    <Button variant="subtle" size="xs" onClick={() => moModalSuaCum(cum)}>
+                                      Sửa
+                                    </Button>
+                                    <Button
+                                      variant="subtle"
+                                      size="xs"
+                                      color={cum.trang_thai === 'active' ? 'red' : 'green'}
+                                      onClick={() =>
+                                        setXacNhanToggle({
+                                          loai: 'cum',
+                                          id: cum.id,
+                                          ten: cum.ten_cum,
+                                          dangHoatDong: cum.trang_thai === 'active',
+                                        })
+                                      }
+                                    >
+                                      {cum.trang_thai === 'active' ? 'Vô hiệu hóa' : 'Kích hoạt lại'}
+                                    </Button>
+                                  </Group>
+                                )}
+                              </Table.Td>
+                            </Table.Tr>
+                          );
+                        })}
                       </Table.Tbody>
                     </Table>
                   </Paper>
