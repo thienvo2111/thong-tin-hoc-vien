@@ -742,7 +742,13 @@ export const handlers = [
   }),
 
   // Tài khoản đơn vị (ADR 0002).
-  http.get('/nguoi-dung/don-vi/chua-cap', () => HttpResponse.json(db.donViChuaCap)),
+  http.get('/nguoi-dung/don-vi/chua-cap', ({ request }) => {
+    const q = (new URL(request.url).searchParams.get('q') ?? '').toLowerCase();
+    const ds = db.donViChuaCap.filter(
+      (d) => !q || d.ma_don_vi.toLowerCase().includes(q) || d.ten_don_vi.toLowerCase().includes(q),
+    );
+    return HttpResponse.json(ds.slice(0, 50));
+  }),
   http.get('/nguoi-dung/don-vi', ({ request }) => {
     const url = new URL(request.url);
     const vaiTro = url.searchParams.get('vai_tro');

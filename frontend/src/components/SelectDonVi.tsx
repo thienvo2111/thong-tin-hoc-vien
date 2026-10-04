@@ -31,11 +31,12 @@ function nhanDonVi(d: DonViCongTac): string {
  * Autocomplete debounce 300ms, gõ ≥ 2 ký tự — dac-ta-cong-hoc-vien.md § M4 mục 3. Có thêm 2 Select
  * địa giới (tỉnh/thành → phường/xã) tùy chọn ở trên để thu hẹp phạm vi tìm kiếm qua dia_ban_id —
  * giá trị 2 Select này CHỈ để lọc, không phải giá trị gửi lên server (server chỉ cần don_vi_cong_tac_id).
+ * Đã chọn Phường/xã thì danh sách trường thuộc xã đó tự hiện ra, không cần gõ (xem duDieuKienTimKiem).
  */
 export function SelectDonVi({ label, nhanBanDau, idBanDau, onChange, error, required, disabled }: Props) {
   const [text, setText] = useState(nhanBanDau ?? '');
   const [debounced] = useDebouncedValue(text, 300);
-  const duDieuKienTimKiem = debounced.trim().length >= 2;
+  const daGoDuChu = debounced.trim().length >= 2;
 
   const [tinhId, setTinhId] = useState<string | null>(null);
   const [phuongXaId, setPhuongXaId] = useState<string | null>(null);
@@ -60,9 +61,19 @@ export function SelectDonVi({ label, nhanBanDau, idBanDau, onChange, error, requ
     }
   }, [donViBanDau]);
 
+  // Đã chọn Phường/xã -> tự hiện toàn bộ trường thuộc xã đó, không bắt gõ tay (bug UX đã báo): chạy
+  // truy vấn kể cả khi chưa gõ gì, lọc theo dia_ban_id, không gửi q, và xin page_size lớn hơn mức
+  // mặc định (20) vì một xã có thể có hơn 20 trường — 100 là mức an toàn dưới giới hạn @Max(200) của
+  // PaginationQueryDto. Đổi Tỉnh/thành (setPhuongXaId(null)) -> quay lại yêu cầu gõ ≥2 ký tự như cũ.
+  const duDieuKienTimKiem = daGoDuChu || !!phuongXaId;
   const { data, isFetching } = useQuery({
     queryKey: ['danh-muc', 'don-vi-cong-tac', debounced, phuongXaId],
-    queryFn: () => layDonViCongTac({ q: chuanHoaNfc(debounced.trim()), dia_ban_id: phuongXaId ?? undefined }),
+    queryFn: () =>
+      layDonViCongTac({
+        q: daGoDuChu ? chuanHoaNfc(debounced.trim()) : undefined,
+        dia_ban_id: phuongXaId ?? undefined,
+        page_size: !daGoDuChu && phuongXaId ? 100 : undefined,
+      }),
     enabled: duDieuKienTimKiem && !disabled,
   });
 
@@ -92,7 +103,8 @@ export function SelectDonVi({ label, nhanBanDau, idBanDau, onChange, error, requ
         disabled={disabled}
       />
       <Text size="xs" c="dimmed">
-        Chọn Tỉnh/thành và Phường/xã để thu hẹp danh sách kết quả (không bắt buộc).
+        Chọn Tỉnh/thành và Phường/xã để tự động hiện danh sách trường thuộc xã đó (không bắt buộc),
+        hoặc gõ trực tiếp tên trường vào ô dưới.
       </Text>
       <Autocomplete
         label={label}
