@@ -120,6 +120,15 @@ describe('M9 — công cụ tìm mật khẩu lần đầu từ ngày sinh', () 
   });
 });
 
+describe('M9 — mention "Phần N" trong nội dung thành liên kết trong trang', () => {
+  it('mọi mention "Phần 6" trong nội dung trỏ tới #ho-so (cuộn trong trang)', () => {
+    render();
+    const links = screen.getAllByRole('link', { name: 'Phần 6' });
+    expect(links.length).toBeGreaterThan(0);
+    links.forEach((link) => expect(link).toHaveAttribute('href', '#ho-so'));
+  });
+});
+
 describe('M9 — CTA đầu trang theo trạng thái đăng nhập', () => {
   it('chưa đăng nhập -> CTA "Đăng nhập" trỏ /dang-nhap', async () => {
     render();

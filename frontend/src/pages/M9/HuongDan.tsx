@@ -26,7 +26,9 @@ import { useToi } from '@/auth/AuthContext';
 import { StatusBanner } from '@/components/StatusBanner';
 import { TextMarkup } from '@/components/TextMarkup';
 import {
+  DANH_SACH_PHAN_THEO_THU_TU,
   huongDan,
+  idPhanTheoSo,
   NHAN_NHOM_LOI,
   type BangDuLieu,
   type HinhKey,
@@ -41,6 +43,12 @@ import { matKhauLanDau } from '@/lib/matKhauLanDau';
 import logoHcmue from '@/assets/logo-hcmue.png';
 
 type ThietBi = 'pc' | 'phone';
+
+/** Resolver cho TextMarkup: "Phần N" -> "#id" để trình duyệt tự cuộn tới phần đó trong trang này. */
+function lienKetPhanTrongTrang(so: number): string | undefined {
+  const id = idPhanTheoSo(so);
+  return id ? `#${id}` : undefined;
+}
 
 /** M9 — Hướng dẫn sử dụng (công khai, /huong-dan). Nội dung lấy từ src/content/huongDan.ts,
  * component chỉ hiển thị (dac-ta-cong-hoc-vien.md § M9). */
@@ -63,12 +71,6 @@ export default function HuongDan() {
     return () => window.removeEventListener('load', cuon);
   }, []);
 
-  const mucLuc = [
-    ...huongDan.parts.map((p) => ({ id: p.id, tieuDe: p.tieuDe })),
-    { id: 'loi', tieuDe: 'Lỗi thường gặp và cách khắc phục' },
-    { id: 'lien-he', tieuDe: 'Liên hệ hỗ trợ và an toàn tài khoản' },
-  ];
-
   return (
     <Box>
       <HeaderCongKhai />
@@ -88,7 +90,7 @@ export default function HuongDan() {
         </Group>
 
         <Box data-testid="hang-bo-cuc" style={{ display: 'flex', flexWrap: 'wrap', gap: 40, alignItems: 'flex-start' }}>
-          <MucLuc danhSach={mucLuc} />
+          <MucLuc danhSach={DANH_SACH_PHAN_THEO_THU_TU} />
 
           <Stack gap={56} style={{ flex: '1 1 280px', minWidth: 0 }}>
             {huongDan.parts.map((p, i) => (
@@ -224,7 +226,7 @@ function HeaderPhan({ soThuTu, tieuDe, moTa }: { soThuTu: number; tieuDe: string
         {tieuDe}
       </Title>
       <Text c="dimmed" fz={14} mt={6} lh={1.6}>
-        <TextMarkup text={moTa} />
+        <TextMarkup text={moTa} lienKetPhan={lienKetPhanTrongTrang} />
       </Text>
     </Box>
   );
@@ -253,7 +255,7 @@ function DanhSachBuoc({ buoc }: { buoc: string[] }) {
             {i + 1}
           </Box>
           <Text fz={14} lh={1.6} style={{ flex: 1, minWidth: 0 }}>
-            <TextMarkup text={b} />
+            <TextMarkup text={b} lienKetPhan={lienKetPhanTrongTrang} />
           </Text>
         </Group>
       ))}
@@ -311,7 +313,7 @@ function BangHuongDan({ bang }: { bang: BangDuLieu }) {
             <Table.Tr key={i}>
               {h.map((cell, j) => (
                 <Table.Td key={j}>
-                  <TextMarkup text={cell} />
+                  <TextMarkup text={cell} lienKetPhan={lienKetPhanTrongTrang} />
                 </Table.Td>
               ))}
             </Table.Tr>
@@ -336,7 +338,7 @@ function KhoiGiaiDoan() {
               {g.ten}
             </Text>
             <Text fz={13} c="dimmed" lh={1.5}>
-              <TextMarkup text={g.moTa} />
+              <TextMarkup text={g.moTa} lienKetPhan={lienKetPhanTrongTrang} />
             </Text>
             {g.nhan && (
               <Text
@@ -435,13 +437,13 @@ function PhanGenericSection({ phan, soThuTu, thietBi }: { phan: PhanHuongDan; so
 
         {phan.ghiChu?.map((g, i) => (
           <StatusBanner key={i} loai={g.loai} tieuDe={g.tieuDe}>
-            <TextMarkup text={g.noiDung} />
+            <TextMarkup text={g.noiDung} lienKetPhan={lienKetPhanTrongTrang} />
           </StatusBanner>
         ))}
 
         {phan.id === 'tong-quan' && (
           <StatusBanner loai={huongDan.zaloNote.loai} tieuDe={huongDan.zaloNote.tieuDe}>
-            <TextMarkup text={huongDan.zaloNote.noiDung} />
+            <TextMarkup text={huongDan.zaloNote.noiDung} lienKetPhan={lienKetPhanTrongTrang} />
           </StatusBanner>
         )}
       </Stack>
@@ -507,12 +509,12 @@ function LoiThuongGap({ troubleshooting, email }: { troubleshooting: TinhHuongLo
                 <Accordion.Panel>
                   <Stack gap={10}>
                     <Text fz={13} c="dimmed">
-                      <TextMarkup text={t.nguyenNhan} />
+                      <TextMarkup text={t.nguyenNhan} lienKetPhan={lienKetPhanTrongTrang} />
                     </Text>
                     <Stack gap={6} component="ol" m={0} pl={20}>
                       {t.cachXuLy.map((b, j) => (
                         <Text key={j} component="li" fz={13.5} lh={1.5}>
-                          <TextMarkup text={b} />
+                          <TextMarkup text={b} lienKetPhan={lienKetPhanTrongTrang} />
                         </Text>
                       ))}
                     </Stack>
@@ -605,7 +607,7 @@ function LienHeSection({ contact }: { contact: LienHeHoTro }) {
           {contact.anToan.map((a, i) => (
             <Paper key={i} p="md" radius={10} style={{ borderLeft: '3px solid var(--mantine-color-success-6)' }}>
               <Text fz={13.5}>
-                <TextMarkup text={a} />
+                <TextMarkup text={a} lienKetPhan={lienKetPhanTrongTrang} />
               </Text>
             </Paper>
           ))}

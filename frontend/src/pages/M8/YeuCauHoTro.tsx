@@ -24,7 +24,7 @@ import {
   useTaoYeuCauHoTro,
 } from '@/api/yeuCauHoTro';
 import type { TrangThaiYeuCauHoTro } from '@/api/types';
-import { huongDan, NHAN_NHOM_LOI, type NhomLoi, type TinhHuongLoi } from '@/content/huongDan';
+import { huongDan, idPhanTheoSo, NHAN_NHOM_LOI, type NhomLoi, type TinhHuongLoi } from '@/content/huongDan';
 import { TextMarkup } from '@/components/TextMarkup';
 import { khopTimKiem } from '@/lib/timKiemTiengViet';
 import { taoYeuCauHoTroSchema, type TaoYeuCauHoTroForm } from '@/schemas/yeuCauHoTro';
@@ -47,6 +47,13 @@ const NHAN_TRANG_THAI: Record<TrangThaiYeuCauHoTro, string> = {
 // (content/huongDan.ts) — sửa nội dung ở đó, trang này tự cập nhật. Value = tên tình huống, được
 // lưu vào yeu_cau_ho_tro.tinh_huong khi gửi.
 const TINH_HUONG_KHAC = 'Khác';
+
+/** Resolver cho TextMarkup: "Phần N" -> "/huong-dan#id" vì trang này không có các phần đó, phải
+ * điều hướng sang trang Hướng dẫn (M9). */
+function lienKetPhanSangHuongDan(so: number): string | undefined {
+  const id = idPhanTheoSo(so);
+  return id ? `/huong-dan#${id}` : undefined;
+}
 
 const TINH_HUONG_THEO_TEN = new Map<string, TinhHuongLoi>(
   huongDan.troubleshooting.map((t) => [t.tinhHuong, t]),
@@ -98,12 +105,12 @@ function CachKhacPhuc({ tinhHuong }: { tinhHuong: TinhHuongLoi }) {
     <StatusBanner loai="info" tieuDe="Cách khắc phục">
       <Stack gap={8}>
         <Text fz={13} c="dimmed">
-          <TextMarkup text={tinhHuong.nguyenNhan} />
+          <TextMarkup text={tinhHuong.nguyenNhan} lienKetPhan={lienKetPhanSangHuongDan} />
         </Text>
         <Stack gap={6} component="ol" m={0} pl={20}>
           {tinhHuong.cachXuLy.map((b, i) => (
             <Text key={i} component="li" fz={14} lh={1.5}>
-              <TextMarkup text={b} />
+              <TextMarkup text={b} lienKetPhan={lienKetPhanSangHuongDan} />
             </Text>
           ))}
         </Stack>

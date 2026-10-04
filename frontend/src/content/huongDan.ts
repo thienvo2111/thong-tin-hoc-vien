@@ -700,3 +700,19 @@ export const huongDan: NoiDungHuongDan = {
     ],
   },
 };
+
+/** Danh sách phần theo đúng thứ tự hiển thị ở trang Hướng dẫn (M9) — nguồn duy nhất cho việc đánh
+ * số "Phần N": parts[] rồi tới "Lỗi thường gặp" (Phần 12) và "Liên hệ hỗ trợ" (Phần 13). Dùng để
+ * build mục lục (HuongDan.tsx) và để tra id phần cho các mention "Phần N" trong nội dung (xem
+ * idPhanTheoSo). Nơi khác không tự đánh số lại. */
+export const DANH_SACH_PHAN_THEO_THU_TU: { id: string; tieuDe: string }[] = [
+  ...huongDan.parts.map((p) => ({ id: p.id, tieuDe: p.tieuDe })),
+  { id: 'loi', tieuDe: 'Lỗi thường gặp và cách khắc phục' },
+  { id: 'lien-he', tieuDe: 'Liên hệ hỗ trợ và an toàn tài khoản' },
+];
+
+/** Tra id phần theo số thứ tự "Phần N" (1-based) dùng trong nội dung. Trả về undefined nếu không
+ * có phần đó — TextMarkup giữ nguyên văn bản trong trường hợp này (xem lienKetPhan). */
+export function idPhanTheoSo(so: number): string | undefined {
+  return DANH_SACH_PHAN_THEO_THU_TU[so - 1]?.id;
+}

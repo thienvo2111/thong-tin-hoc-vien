@@ -55,6 +55,16 @@ describe('YeuCauHoTro (M8)', () => {
     options.forEach((o) => expect(o.textContent?.toLowerCase()).toMatch(/mật khẩu/));
   });
 
+  it('cách khắc phục có mention "Phần N" -> liên kết sang /huong-dan#id (vì trang này không có các phần đó)', async () => {
+    const user = userEvent.setup();
+    renderDaDangNhap();
+    await moDanhSach(user);
+    await user.click(await screen.findByRole('option', { name: TINH_HUONG.tinhHuong }));
+
+    expect(await screen.findByRole('link', { name: 'Phần 3' })).toHaveAttribute('href', '/huong-dan#dang-nhap');
+    expect(screen.getByRole('link', { name: 'Phần 10' })).toHaveAttribute('href', '/huong-dan#quen-mat-khau');
+  });
+
   it('chọn tình huống -> hiện cách khắc phục, chưa hiện ô nhập cho tới khi bấm "Vẫn còn thắc mắc"', async () => {
     const user = userEvent.setup();
     renderDaDangNhap();
