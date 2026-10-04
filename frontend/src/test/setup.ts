@@ -42,6 +42,7 @@ afterEach(() => {
   resetDb();
   datLaiCauHinhKhaoSatMock();
   xoaToken();
+  localStorage.clear();
   cleanup();
 });
 afterAll(() => server.close());

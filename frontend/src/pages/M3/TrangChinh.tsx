@@ -1,8 +1,8 @@
-import { Box, Button, Card, Center, Container, Group, List, Loader, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Badge, Box, Button, Card, Center, Container, Group, List, Loader, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { capMaSso, useDotXacNhan, useHoSoToi, useMucDoDayDu } from '@/api/hocVien';
-import type { HocVien, MucDoDayDu } from '@/api/types';
+import { capMaSso, useDotXacNhan, useHoSoToi, useKhoaHocToi, useMucDoDayDu } from '@/api/hocVien';
+import type { HocVien, KhoaHocDangKy, MucDoDayDu, MucNangLuc } from '@/api/types';
 import { useCauHinhTrienKhai, type CauHinhTrienKhai } from '@/content/trienKhai';
 import { chuanHoaLienKet } from '@/lib/lienKet';
 import { dinhDangNgayGio } from '@/lib/ngay';
@@ -10,11 +10,8 @@ import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
 import { CountdownTimer } from '@/components/CountdownTimer';
-
-const MUC_MENU_CHINH = [
-  { toi: '/toi/ho-so', bieuTuong: '📄', tieuDe: 'Cập nhật hồ sơ', moTa: 'Xem và chỉnh sửa thông tin cá nhân' },
-  { toi: '/toi/lop-hoc', bieuTuong: '🏫', tieuDe: 'Thông tin lớp học', moTa: 'Lịch học, địa điểm, kết quả đánh giá đầu vào' },
-];
+import { nhanMucNangLuc } from '@/lib/mucNangLuc';
+import { useCapNhatMoi, type CapNhatMoi } from './capNhatMoi';
 
 /** Xưng hô theo giới tính; chưa có giới tính -> "Thầy/Cô". */
 function xungHo(gioiTinh: HocVien['gioi_tinh'] | undefined) {
@@ -33,6 +30,10 @@ export default function TrangChinh() {
   const dauVaoMo = daTaiCauHinh && (cauHinh.hienKhaoSat || cauHinh.danhGiaDauVaoTrongCong);
   const dauRaMo = daTaiCauHinh && cauHinh.khaoSatDauRaMo;
   const { data: mucDo } = useMucDoDayDu(dauVaoMo || dauRaMo);
+  const { data: khoaHoc } = useKhoaHocToi();
+  const capNhat = useCapNhatMoi(khoaHoc);
+  const mucDauVao = khoaHoc?.find((dk) => dk.muc_dau_vao)?.muc_dau_vao ?? null;
+  const mucDauRa = khoaHoc?.find((dk) => dk.muc_dau_ra)?.muc_dau_ra ?? null;
 
   return (
     <Container size="sm" py="xl">
@@ -63,18 +64,73 @@ export default function TrangChinh() {
 
         {data && (
           <>
+            <ThongBaoCapNhat capNhat={capNhat} />
+
             <Stack gap="sm">
               <Text fw={700} size="sm">
                 Việc cần làm
               </Text>
-              {mucDo && dauVaoMo && <KhoiKhaoSatDauVao mucDo={mucDo} cauHinh={cauHinh} />}
-              {mucDo && dauRaMo && <KhoiKhaoSatDauRa mucDo={mucDo} />}
+              {mucDo && dauVaoMo && (
+                <Box id="khao-sat-dau-vao">
+                  <KhoiKhaoSatDauVao mucDo={mucDo} cauHinh={cauHinh} />
+                </Box>
+              )}
+              {mucDo && dauRaMo && (
+                <Box id="khao-sat-dau-ra">
+                  <KhoiKhaoSatDauRa mucDo={mucDo} />
+                </Box>
+              )}
               <KhoiTrangThai data={data} />
             </Stack>
 
             <TheHuongDan />
 
-            <MenuChinh />
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+              <TheChucNang
+                bieuTuong="📄"
+                tieuDe="Cập nhật hồ sơ"
+                moTa="Xem và chỉnh sửa thông tin cá nhân"
+                tt={{ loai: 'mo', toi: '/toi/ho-so' }}
+              />
+              <TheChucNang
+                bieuTuong="🏫"
+                tieuDe="Thông tin lớp học"
+                moTa="Lịch học, địa điểm, kết quả đánh giá đầu vào"
+                tt={{
+                  loai: 'mo',
+                  toi: '/toi/lop-hoc',
+                  ghiChu: khoaHoc && !coLop(khoaHoc) ? 'Chưa có danh sách chia lớp' : undefined,
+                }}
+                moi={capNhat.ketQua.length > 0 || capNhat.phanLop.length > 0}
+              />
+              <TheChucNang
+                bieuTuong="📝"
+                tieuDe="Khảo sát đầu vào"
+                moTa="Khảo sát kĩ năng số và đánh giá năng lực số trước khóa học"
+                tt={trangThaiKhaoSat({
+                  muc: mucDauVao,
+                  daTai: daTaiCauHinh,
+                  mo: dauVaoMo,
+                  mucDo,
+                  toi: laQuaM6(cauHinh) ? '/toi/danh-gia-dau-vao' : '#khao-sat-dau-vao',
+                  lyDoChuaMo: 'Chưa mở. Thông báo sẽ hiện tại trang này khi khảo sát được mở.',
+                })}
+                moi={capNhat.ketQua.length > 0}
+              />
+              <TheChucNang
+                bieuTuong="🎓"
+                tieuDe="Đánh giá đầu ra"
+                moTa="Đánh giá năng lực số sau khi hoàn thành khóa bồi dưỡng"
+                tt={trangThaiKhaoSat({
+                  muc: mucDauRa,
+                  daTai: daTaiCauHinh,
+                  mo: dauRaMo,
+                  mucDo,
+                  toi: '#khao-sat-dau-ra',
+                  lyDoChuaMo: 'Chưa mở. Đánh giá đầu ra mở khi Thầy/Cô hoàn thành khóa bồi dưỡng.',
+                })}
+              />
+            </SimpleGrid>
           </>
         )}
       </Stack>
@@ -96,33 +152,143 @@ function TheHuongDan() {
   );
 }
 
-function MenuChinh() {
+/** Trạng thái 1 thẻ chức năng: mở (bấm được), xong (đã có kết quả), khóa (mờ + lý do). */
+type TrangThaiThe =
+  | { loai: 'mo'; toi: string; ghiChu?: string }
+  | { loai: 'xong'; toi: string; ghiChu: string }
+  | { loai: 'khoa'; ghiChu?: string };
+
+function coLop(ds: KhoaHocDangKy[]) {
+  return ds.some((dk) => dk.giai_doan.some((gd) => gd.lop));
+}
+
+/** SSO hoặc mục M6 đang bật -> làm qua M6; còn lại (kênh VLE, chỉ dùng phiếu ngoài) -> mở thẳng phiếu. */
+function laQuaM6(cauHinh: CauHinhTrienKhai) {
+  return cauHinh.kenhDanhGia === 'sso' || cauHinh.danhGiaDauVaoTrongCong;
+}
+
+function trangThaiKhaoSat(p: {
+  muc: MucNangLuc | null;
+  daTai: boolean;
+  mo: boolean;
+  mucDo: MucDoDayDu | undefined;
+  toi: string;
+  lyDoChuaMo: string;
+}): TrangThaiThe {
+  if (p.muc) return { loai: 'xong', toi: '/toi/lop-hoc', ghiChu: `Đã có kết quả: Mức ${nhanMucNangLuc(p.muc)}` };
+  // Chưa tải xong cấu hình / mức độ đầy đủ -> khóa không ghi chú, tránh chớp sai lý do.
+  if (!p.daTai) return { loai: 'khoa' };
+  if (!p.mo) return { loai: 'khoa', ghiChu: p.lyDoChuaMo };
+  if (!p.mucDo) return { loai: 'khoa' };
+  if (!p.mucDo.day_du) {
+    return {
+      loai: 'khoa',
+      ghiChu: `Đã mở nhưng chưa kích hoạt được: Thầy/Cô cần cập nhật đủ ${p.mucDo.thieu.length} thông tin hồ sơ (xem mục Việc cần làm).`,
+    };
+  }
+  return { loai: 'mo', toi: p.toi, ghiChu: 'Đã mở — bấm để bắt đầu' };
+}
+
+const MAU_GHI_CHU: Record<TrangThaiThe['loai'], string> = { mo: 'primary.6', xong: 'green.8', khoa: 'dimmed' };
+
+function TheChucNang({
+  bieuTuong,
+  tieuDe,
+  moTa,
+  tt,
+  moi = false,
+}: {
+  bieuTuong: string;
+  tieuDe: string;
+  moTa: string;
+  tt: TrangThaiThe;
+  moi?: boolean;
+}) {
+  const khoa = tt.loai === 'khoa';
+  const noiDung = (
+    <Group gap="md" wrap="nowrap" align="flex-start">
+      <Text fz={28} lh={1} aria-hidden>
+        {khoa ? '🔒' : bieuTuong}
+      </Text>
+      <Box>
+        <Group gap="xs">
+          <Text fw={700} c={khoa ? 'dimmed' : undefined}>
+            {tieuDe}
+          </Text>
+          {moi && (
+            <Badge color="red" size="sm">
+              Mới
+            </Badge>
+          )}
+        </Group>
+        <Text size="sm" c="dimmed">
+          {moTa}
+        </Text>
+        {tt.ghiChu && (
+          <Text size="xs" mt={4} fw={600} c={MAU_GHI_CHU[tt.loai]}>
+            {tt.ghiChu}
+          </Text>
+        )}
+      </Box>
+    </Group>
+  );
+  const chung = { padding: 'lg', radius: 'md', withBorder: true } as const;
+
+  if (tt.loai === 'khoa') {
+    return (
+      <Card {...chung} aria-disabled bg="gray.0" style={{ opacity: 0.7 }}>
+        {noiDung}
+      </Card>
+    );
+  }
+  // Neo trong trang (#khao-sat-...) dùng thẻ a thường; route dùng Link của router.
+  if (tt.toi.startsWith('#')) {
+    return (
+      <Card {...chung} component="a" href={tt.toi} style={{ textDecoration: 'none' }}>
+        {noiDung}
+      </Card>
+    );
+  }
   return (
-    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-      {MUC_MENU_CHINH.map((m) => (
-        <Card
-          key={m.toi}
-          component={Link}
-          to={m.toi}
-          padding="lg"
-          radius="md"
-          withBorder
-          style={{ textDecoration: 'none' }}
-        >
-          <Group gap="md" wrap="nowrap" align="flex-start">
-            <Text fz={28} lh={1}>
-              {m.bieuTuong}
-            </Text>
-            <Box>
-              <Text fw={700}>{m.tieuDe}</Text>
-              <Text size="sm" c="dimmed">
-                {m.moTa}
-              </Text>
-            </Box>
-          </Group>
-        </Card>
-      ))}
-    </SimpleGrid>
+    <Card {...chung} component={Link} to={tt.toi} style={{ textDecoration: 'none' }}>
+      {noiDung}
+    </Card>
+  );
+}
+
+/** Chỉ hiện khi kết quả đánh giá / phân lớp khác lần xem trước — không có gì mới thì không chiếm chỗ. */
+function ThongBaoCapNhat({ capNhat }: { capNhat: CapNhatMoi }) {
+  const { ketQua, phanLop, danhDauDaXem } = capNhat;
+  if (ketQua.length === 0 && phanLop.length === 0) return null;
+
+  return (
+    <StatusBanner loai="success" tieuDe="Có cập nhật mới">
+      <Stack gap="xs">
+        {ketQua.length > 0 && <DanhSachCapNhat tieuDe="Kết quả đánh giá đầu vào đã được cập nhật:" dong={ketQua} />}
+        {phanLop.length > 0 && <DanhSachCapNhat tieuDe="Danh sách chia lớp đã được cập nhật:" dong={phanLop} />}
+        <Group gap="xs" mt="xs">
+          <Button component={Link} to="/toi/lop-hoc" onClick={danhDauDaXem}>
+            Xem lớp học
+          </Button>
+          <Button variant="subtle" color="gray" onClick={danhDauDaXem}>
+            Đã xem
+          </Button>
+        </Group>
+      </Stack>
+    </StatusBanner>
+  );
+}
+
+function DanhSachCapNhat({ tieuDe, dong }: { tieuDe: string; dong: string[] }) {
+  return (
+    <Box>
+      <Text size="sm">{tieuDe}</Text>
+      <List size="sm">
+        {dong.map((d) => (
+          <List.Item key={d}>{d}</List.Item>
+        ))}
+      </List>
+    </Box>
   );
 }
 
@@ -239,8 +405,7 @@ function DieuKienKhaoSat({ mucDo }: { mucDo: MucDoDayDu }) {
 }
 
 function KhoiKhaoSatDauVao({ mucDo, cauHinh }: { mucDo: MucDoDayDu; cauHinh: CauHinhTrienKhai }) {
-  // SSO hoặc mục M6 đang bật -> làm qua M6; còn lại (kênh VLE, chỉ dùng phiếu ngoài) -> mở thẳng phiếu.
-  const quaM6 = cauHinh.kenhDanhGia === 'sso' || cauHinh.danhGiaDauVaoTrongCong;
+  const quaM6 = laQuaM6(cauHinh);
   return (
     <StatusBanner loai={mucDo.day_du ? 'success' : 'warning'} tieuDe="Khảo sát đầu vào đã mở">
       {mucDo.day_du ? (
