@@ -4,6 +4,8 @@ import { EMAIL_HO_TRO } from '@/content/hoTro';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { capMaSso, useDanhGiaDauVao, type SsoTarget } from '@/api/hocVien';
+import { useTinhTrangKhaoSat } from '@/api/ketQuaKhaoSat';
+import { BaiKhaoSat } from '@/components/BaiKhaoSat';
 import type { DanhGiaDauVao, DanhGiaDauVaoDuDieuKien } from '@/api/types';
 import { chuanHoaLienKet } from '@/lib/lienKet';
 import { thongDiepLoiChung } from '@/lib/loiApi';
@@ -84,29 +86,44 @@ function NoiDung({ data }: { data: DanhGiaDauVao }) {
 }
 
 /** Kênh SSO (2026-10-02): bấm nút -> cổng cấp mã dùng 1 lần -> chuyển sang hệ thống khảo sát CÙNG TAB
- * (không mở cửa sổ mới — trình duyệt nhúng Zalo). Mã chỉ cấp lúc bấm vì hết hạn sau vài phút. */
+ * (không mở cửa sổ mới — trình duyệt nhúng Zalo). Mã chỉ cấp lúc bấm vì hết hạn sau vài phút.
+ * 2026-10-04: mỗi bài hiện trạng thái do hệ thống khảo sát báo về (chưa làm / đang làm / đã xong + mức). */
 function KhoiSso() {
   const chuyen = useMutation({
     mutationFn: capMaSso,
     onSuccess: ({ url }) => window.location.assign(url),
   });
+  const { data: tinhTrang } = useTinhTrangKhaoSat();
   const dangChuyen = (target?: SsoTarget) => chuyen.isPending && chuyen.variables === target;
+  const cuaBai = (loai: SsoTarget) => tinhTrang?.find((t) => t.loai === loai);
+  const xongHet = ['khao-sat', 'danh-gia'].every((l) => cuaBai(l as SsoTarget)?.trang_thai === 'hoan_thanh');
 
   return (
     <Stack gap="md">
-      <StatusBanner loai="success" tieuDe="Hồ sơ đã đầy đủ">
-        Thầy/Cô bấm vào bài cần làm. Hệ thống sẽ chuyển sang trang khảo sát và đăng nhập sẵn, không cần nhập lại mật
-        khẩu.
-      </StatusBanner>
+      {xongHet ? (
+        <StatusBanner loai="success" tieuDe="Thầy/Cô đã hoàn thành 2 bài khảo sát đầu vào">
+          Ban tổ chức sẽ xếp mức và chia lớp, Thầy/Cô theo dõi thông báo tiếp theo.
+        </StatusBanner>
+      ) : (
+        <StatusBanner loai="success" tieuDe="Hồ sơ đã đầy đủ">
+          Thầy/Cô làm lần lượt 2 bài bên dưới. Hệ thống sẽ chuyển sang trang khảo sát và đăng nhập sẵn, không cần nhập
+          lại mật khẩu.
+        </StatusBanner>
+      )}
 
       {chuyen.isError && <StatusBanner loai="error">{thongDiepLoiChung(chuyen.error)}</StatusBanner>}
 
-      <Button size="lg" fullWidth loading={dangChuyen('khao-sat')} disabled={chuyen.isPending} onClick={() => chuyen.mutate('khao-sat')}>
-        Làm phiếu khảo sát kĩ năng số
-      </Button>
-      <Button size="lg" fullWidth loading={dangChuyen('danh-gia')} disabled={chuyen.isPending} onClick={() => chuyen.mutate('danh-gia')}>
-        Làm phiếu đánh giá năng lực số
-      </Button>
+      {(['khao-sat', 'danh-gia'] as const).map((loai, i) => (
+        <BaiKhaoSat
+          key={loai}
+          loai={loai}
+          thuTu={i + 1}
+          tinhTrang={cuaBai(loai)}
+          dangChuyen={dangChuyen(loai)}
+          khoaNut={chuyen.isPending}
+          onLam={() => chuyen.mutate(loai)}
+        />
+      ))}
       <Button variant="subtle" loading={dangChuyen(undefined)} disabled={chuyen.isPending} onClick={() => chuyen.mutate(undefined)}>
         Xem tất cả bài cần làm
       </Button>

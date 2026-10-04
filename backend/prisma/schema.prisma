@@ -152,6 +152,18 @@ enum loai_danh_muc_import {
   nhan_su_lop
   // Tài khoản đơn vị (2026-10-03) — migration riêng như các giá trị trên.
   tai_khoan_don_vi
+  // Kết quả khảo sát từ hệ thống khảo sát (2026-10-04) — migration riêng.
+  ket_qua_khao_sat
+}
+
+/// Tình trạng 1 bài trên hệ thống khảo sát của 1 học viên (2026-10-04).
+/// "Chưa làm" = chưa có dòng ket_qua_khao_sat. da_mo = đã vào trang khảo sát
+/// (cổng tự ghi khi mã SSO được đổi); dang_lam/hoan_thanh do hệ thống khảo sát
+/// báo về (POST /sso/ket-qua) hoặc quản trị import Excel.
+enum trang_thai_khao_sat {
+  da_mo
+  dang_lam
+  hoan_thanh
 }
 
 // T5 (mo-rong-nls-an-giang.md, 2026-09-29): mức năng lực đầu vào/đầu ra của
@@ -546,6 +558,7 @@ model hoc_vien {
   lich_su_thay_doi   lich_su_thay_doi_ho_so[]
   tai_khoan_vle      tai_khoan_vle?
   ma_sso_mot_lan     ma_sso_mot_lan[]
+  ket_qua_khao_sat   ket_qua_khao_sat[]
 
   token_xac_thuc token_xac_thuc[]
 
@@ -1068,4 +1081,31 @@ model cau_hinh_khao_sat_khoa {
 
   khoa khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   tinh dia_danh?      @relation(fields: [tinh_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// Tình trạng + kết quả từng bài trên hệ thống khảo sát (2026-10-04) — mỗi học
+/// viên × mỗi loại bài ('khao-sat' | 'danh-gia' | 'dau-ra') 1 dòng. Kết quả
+/// CHỈ để hiển thị/theo dõi; KHÔNG tự đổi dang_ky_hoc.muc_dau_vao (quản trị chốt
+/// mức qua import ket_qua_danh_gia như cũ).
+model ket_qua_khao_sat {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hoc_vien_id     String              @db.Uuid
+  loai            String              @db.VarChar(20)
+  trang_thai      trang_thai_khao_sat
+  so_lan_mo       Int                 @default(0)
+  mo_lan_dau_luc  DateTime?           @db.Timestamptz(6)
+  mo_gan_nhat_luc DateTime?           @db.Timestamptz(6)
+  bat_dau_luc     DateTime?           @db.Timestamptz(6)
+  hoan_thanh_luc  DateTime?           @db.Timestamptz(6)
+  muc             muc_nang_luc?
+  diem            Decimal?            @db.Decimal(6, 2)
+  chi_tiet        Json?
+  /// 'sso' (cổng tự ghi khi vào bài) | 'api' (hệ thống khảo sát báo) | 'import'
+  nguon           String              @db.VarChar(10)
+  cap_nhat_luc    DateTime            @default(now()) @db.Timestamptz(6)
+
+  hoc_vien hoc_vien @relation(fields: [hoc_vien_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([hoc_vien_id, loai], map: "uq_ket_qua_khao_sat_hoc_vien_loai")
+  @@index([loai, trang_thai], map: "idx_ket_qua_khao_sat_loai_trang_thai")
 }

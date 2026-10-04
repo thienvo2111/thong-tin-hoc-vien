@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { datCauHinhCuaToiMock, datCauHinhKhaoSatMock, datCauHinhKhoaMock } from '@/test/mocks/cauHinhKhaoSat';
 import type { CauHinhKhaoSat } from '@/api/cauHinhKhaoSat';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
 import { db } from '@/test/mocks/db';
+import { datTinhTrangBai } from '@/test/mocks/sso';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import TrangChinh from './TrangChinh';
@@ -215,6 +216,28 @@ describe('M3 — khảo sát đầu vào / đầu ra', () => {
       'href',
       '/toi/danh-gia-dau-vao',
     );
+  });
+
+  it('kênh sso, hồ sơ đủ -> tóm tắt tình hình 2 bài (trạng thái, mức khi xong, nhắc kiểm tra)', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ hien_khao_sat: true, kenh_danh_gia: 'sso' }));
+    datDayDu();
+    datTinhTrangBai({ loai: 'khao-sat', trang_thai: 'hoan_thanh', muc: 'nang_cao' });
+    datTinhTrangBai({ loai: 'danh-gia', trang_thai: 'da_mo', can_kiem_tra: true });
+    renderDaDangNhap();
+    const tomTat = await screen.findByLabelText('Tình hình làm khảo sát');
+    expect(within(tomTat).getByText('Đã hoàn thành · Nâng cao')).toBeInTheDocument();
+    expect(within(tomTat).getByText('Cần kiểm tra lại')).toBeInTheDocument();
+    expect(within(tomTat).queryByText('Khảo sát đầu ra')).not.toBeInTheDocument();
+  });
+
+  it('đầu ra mở, hồ sơ đủ -> tóm tắt riêng bài đầu ra', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ khao_sat_dau_ra_mo: true }));
+    datDayDu();
+    datTinhTrangBai({ loai: 'dau-ra', trang_thai: 'dang_lam' });
+    renderDaDangNhap();
+    const tomTat = await screen.findByLabelText('Tình hình làm khảo sát');
+    expect(within(tomTat).getByText('Khảo sát đầu ra')).toBeInTheDocument();
+    expect(within(tomTat).getByText('Đang làm')).toBeInTheDocument();
   });
 
   it('bật khối khảo sát + kênh vle, hồ sơ đủ -> hiện phiếu ngoài theo thứ tự; chưa có đường dẫn -> nút khóa', async () => {

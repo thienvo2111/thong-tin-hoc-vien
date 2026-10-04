@@ -259,7 +259,7 @@ Tham số `?phien_ban=` ở `GET /danh-muc/dia-danh` là **tuỳ chọn**: khôn
 
 ## 5. Dịch vụ Import
 
-Dùng chung 1 luồng cho cả 10 loại (`loai_danh_muc_import`): `dia_danh`, `don_vi_cong_tac`, `mon_hoc`, `phan_lop_hoc_vien`, `ho_so_nhan_su_moet` (`POST /import/ho-so-nhan-su-moet` — chi tiết ở mục "Luồng import nhân sự từ CSDL MOET", mục 2), `tai_khoan_vle` (T15, 2026-09-28 — chi tiết ở mục "Cổng điều kiện làm đánh giá đầu vào & tài khoản VLE", mục 2), `ket_qua_danh_gia` (T5, 2026-09-29), `lop_va_lich_hoc` (T6, 2026-09-29 — chi tiết ngay dưới), `diem_danh`, `ket_qua_giai_doan` (T12, 2026-09-30 — chi tiết ngay dưới), `tai_khoan_don_vi` (ADR 0002, 2026-10-03 — chi tiết ngay dưới).
+Dùng chung 1 luồng cho cả 10 loại (`loai_danh_muc_import`): `dia_danh`, `don_vi_cong_tac`, `mon_hoc`, `phan_lop_hoc_vien`, `ho_so_nhan_su_moet` (`POST /import/ho-so-nhan-su-moet` — chi tiết ở mục "Luồng import nhân sự từ CSDL MOET", mục 2), `tai_khoan_vle` (T15, 2026-09-28 — chi tiết ở mục "Cổng điều kiện làm đánh giá đầu vào & tài khoản VLE", mục 2), `ket_qua_danh_gia` (T5, 2026-09-29), `lop_va_lich_hoc` (T6, 2026-09-29 — chi tiết ngay dưới), `diem_danh`, `ket_qua_giai_doan` (T12, 2026-09-30 — chi tiết ngay dưới), `tai_khoan_don_vi` (ADR 0002, 2026-10-03 — chi tiết ngay dưới), `ket_qua_khao_sat` (2026-10-04 — chi tiết ngay dưới).
 
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
@@ -279,6 +279,8 @@ Riêng `phan_lop_hoc_vien`: cột file = `so_dinh_danh_ca_nhan`, `ma_dinh_danh_m
 **T6 (2026-09-29) — `lop_va_lich_hoc`** (`POST /import/lop_va_lich_hoc`, QĐ3/QĐ4): mỗi dòng = **1 buổi học** của 1 lớp. Cột file = `ma_khoa`, `ten_lop`, `loai_lop` (**tùy chọn, thêm QĐ10 2026-09-30** — `truc_tiep`\|`zoom`\|`vle`, mặc định `truc_tiep` nếu để trống), `nhom_hoc_vien` (tùy chọn, số nguyên 1-20), `muc_nang_luc` (tùy chọn, `co_ban`\|`thanh_thao`\|`nang_cao`), `si_so_toi_da` (tùy chọn), `giai_doan_thu_tu` (khớp `giai_doan_khoa.thu_tu` trong đúng khóa), `buoi_so`, `bat_dau`, `ket_thuc` (giờ Việt Nam `dd/mm/yyyy hh:mm`, lưu UTC), `dia_diem_hoac_link` (tùy chọn), `ma_diem_hoc` (tùy chọn — **chưa sử dụng** ở phiên bản hiện tại, chờ T10 "điểm học"; điền vào sẽ bị bỏ qua, không báo lỗi vì cột lạ). Upsert `lop_hoc` theo `(khoa_id, loai_lop, ten_lop)` (`uq_lop_ten_trong_khoa`, **đổi QĐ10** — trước đó chỉ `(khoa_id, ten_lop)`); upsert `lich_hoc_lop` theo `(lop_id, giai_doan_id, buoi_so)` (`uq_lich_hoc_lop_giai_doan_buoi`, T6) — chạy lại file sửa giờ 1 buổi chỉ cập nhật đúng buổi đó, các buổi khác không đổi. Dòng lỗi điển hình: `ma_khoa`/`giai_doan_thu_tu` không tồn tại, `loai_lop` sai giá trị, `bat_dau`/`ket_thuc` sai định dạng hoặc `ket_thuc <= bat_dau` (rule #49), và **2 dòng cùng `(loai_lop, lớp, giai đoạn, buổi)` trong CÙNG FILE** (phát hiện ở bước preview, trước khi lớp/lịch thực sự tồn tại trong DB). **Cảnh báo 🟡 khi phân lớp** (import `phan_lop_hoc_vien`, T3, áp dụng cho cả 3 loại lớp từ QĐ10): nếu `lop_hoc.muc_nang_luc` (đặt qua import này) khác `dang_ky_hoc.muc_dau_vao` (đặt qua `ket_qua_danh_gia`, T5) của học viên được gán vào lớp đó, thêm cảnh báo vào `danh_sach_canh_bao` — **không chặn** dòng phân lớp.
 
 **T12 (2026-09-30) — `diem_danh`** (`POST /import/diem_danh`): điểm danh nhập qua **IMPORT EXCEL**, **không có** giao diện chấm tay từng buổi. Mỗi dòng = điểm danh của 1 học viên tại 1 buổi học cụ thể. Cột file = `so_dinh_danh_ca_nhan`, `ma_dinh_danh_moet` (**HocVienResolver dùng chung**), `ma_khoa`, `ten_lop`, `loai_lop` (**BẮT BUỘC**, khác `lop_va_lich_hoc` — `truc_tiep`\|`zoom`\|`vle`, không có mặc định vì điểm danh phải khớp đúng 1 buổi cụ thể trong số có thể nhiều lớp trùng tên khác loại, QĐ10), `giai_doan_thu_tu`, `buoi_so`, `trang_thai` (`co_mat`\|`vang`\|`vang_co_phep`), `nguon` (`zoom`\|`ky_ten`\|`qr`\|`thu_cong`), `ghi_chu` (tùy chọn — xem cảnh báo học bù dưới). Học viên xác định được phải đã ghi danh vào khóa đó; xác định buổi qua `(khoa_id, loai_lop, ten_lop)` → lớp, rồi `(lop_id, giai_doan_id, buoi_so)` → buổi — không tìm thấy thì dòng lỗi. Upsert theo `(dang_ky_hoc_id, lich_hoc_id)` (`uq_diem_danh`) — chạy lại file ghi đè. **Cảnh báo 🟡 "học bù"**: nếu buổi điểm danh thuộc lớp **KHÁC** lớp học viên đang được gán cho đúng `loai_lop` đó (kể cả khi chưa được gán lớp nào), dòng vẫn được lưu (không chặn) và thêm vào `danh_sach_canh_bao`, nhưng **bắt buộc** phải có `ghi_chu` trong trường hợp này — thiếu `ghi_chu` thì là **dòng lỗi 🔴** (chặn), không phải cảnh báo.
+
+**2026-10-04 — `ket_qua_khao_sat`** (`POST /import/ket_qua_khao_sat`): dự phòng cho `POST /sso/ket-qua` (mục 10.1) khi hệ thống khảo sát chỉ xuất được file. Cột = `so_dinh_danh_ca_nhan`, `ma_dinh_danh_moet` (**HocVienResolver dùng chung**), `loai` (`khao-sat`\|`danh-gia`\|`dau-ra`), `trang_thai` (`dang_lam`\|`hoan_thanh`), `thoi_diem` (tùy chọn, `dd/mm/yyyy hh:mm` giờ VN), `muc` (tùy chọn), `diem` (tùy chọn, chấp nhận dấu phẩy thập phân). Không cần ghi danh khóa. Cùng quy tắc gộp với API; ghi `nguon = 'import'`. 2 dòng cùng học viên + loại trong 1 file → dòng sau lỗi. **Không** đổi `muc_dau_vao`.
 
 **T12 (2026-09-30) — `ket_qua_giai_doan`** (`POST /import/ket_qua_giai_doan`): kết quả/tiến độ theo từng giai đoạn của khóa (vd tiến độ VLE, điểm đánh giá giai đoạn). Cột file = `so_dinh_danh_ca_nhan`, `ma_dinh_danh_moet` (**HocVienResolver dùng chung**), `ma_khoa`, `giai_doan_thu_tu`, `ty_le_hoan_thanh` (tùy chọn, 0–100), `diem` (tùy chọn). Học viên xác định được phải đã ghi danh vào khóa đó (cùng quy tắc `ket_qua_danh_gia`, T5) — nếu chưa, dòng lỗi yêu cầu chạy ghi danh trước. Upsert theo `(dang_ky_hoc_id, giai_doan_id)` (`uq_ket_qua_giai_doan`) — chạy lại file ghi đè.
 
@@ -423,5 +425,33 @@ Lỗi `POST /sso/doi-ma` (cùng thân lỗi chung `{ error: { code, message } }`
 | 503 | `SSO_CHUA_CAU_HINH` | Máy chủ cổng chưa đặt `SSO_KHAO_SAT_API_KEY` |
 
 Quy tắc bảo mật: đánh dấu đã dùng **nguyên tử** (`UPDATE … WHERE da_dung_luc IS NULL AND het_han > now()` — 2 lần đổi đồng thời chỉ 1 lần thắng); DB không lưu mã gốc; API key là bí mật dùng chung, đặt bằng biến môi trường ở **cả 2 phía**, đổi khóa = đổi biến môi trường rồi reload. Nginx phải proxy prefix `/sso` (đã có trong `scripts/vps/05-install-nginx.sh`).
+
+### 10.1 Báo trạng thái / kết quả về cổng (2026-10-04)
+
+Mục đích: học viên nhìn cổng biết từng bài **chưa làm / đã vào nhưng chưa nộp / đang làm / đã hoàn thành + mức**; quản trị rà soát người "đã vào mà chưa nộp". Lưu ở `ket_qua_khao_sat` (DDL PHẦN 8), mỗi học viên × loại bài 1 dòng. Loại bài (`loai`) = đúng giá trị `target` của SSO: `khao-sat` | `danh-gia` | `dau-ra`.
+
+3 nguồn ghi:
+
+1. **Cổng tự ghi `da_mo`** khi `POST /sso/doi-ma` thành công **và mã có `target`** (học viên đã thực sự tới trang khảo sát): tạo dòng `da_mo` hoặc tăng `so_lan_mo`; **không bao giờ hạ** trạng thái đang làm/hoàn thành. Lỗi ghi không làm hỏng đổi mã.
+2. **Hệ thống khảo sát báo về** — `POST /sso/ket-qua` (dưới đây). Khuyến nghị: báo `dang_lam` khi học viên bắt đầu, `hoan_thanh` khi nộp bài.
+3. **Quản trị import Excel** `ket_qua_khao_sat` (dự phòng khi bên khảo sát chưa gọi được API) — mục 5.
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| POST | `/sso/ket-qua` | Header `X-API-Key` (cùng khóa với `/sso/doi-ma`). Body `{ hoc_vien_id? \| ma_dinh_danh_moet?, loai, trang_thai: 'dang_lam' \| 'hoan_thanh', thoi_diem?, muc?, diem?, chi_tiet? }` → `200 { hoc_vien_id, loai, trang_thai, muc }` (trạng thái **sau khi gộp**). Lỗi: 401 sai key, 503 chưa cấu hình key, 400 thiếu cả 2 định danh / giá trị sai, 404 không tìm thấy học viên | Máy chủ khảo sát (không JWT) |
+| GET | `/sso/tinh-trang` | Đủ 3 loại bài: `[{ loai, trang_thai: 'chua_lam'\|'da_mo'\|'dang_lam'\|'hoan_thanh', can_kiem_tra, mo_gan_nhat_luc, hoan_thanh_luc, muc }]`. **Không** trả `diem`/`chi_tiet` | HọcViên (JWT) |
+| GET | `/sso/ket-qua/thong-ke?khoa_id=` | `{ tong_hoc_vien, theo_loai: [{ loai, chua_lam, da_mo, dang_lam, hoan_thanh, can_kiem_tra, theo_muc: { co_ban, thanh_thao, nang_cao, chua_xep_muc } }] }`. Bỏ `khoa_id` = mọi học viên; có = học viên đã ghi danh khóa đó | QuảnTrị |
+| GET | `/sso/ket-qua?khoa_id=&loai=&trang_thai=&q=&page=&page_size=` | Danh sách **học viên** (kể cả chưa làm) kèm `ket_qua: [{ loai, trang_thai, can_kiem_tra, so_lan_mo, mo_gan_nhat_luc, hoan_thanh_luc, muc, diem, nguon, cap_nhat_luc }]`. `trang_thai` lọc ∈ `chua_lam`\|`da_mo`\|`dang_lam`\|`hoan_thanh`\|`can_kiem_tra`, áp cho `loai` (mặc định `khao-sat`); `q` tìm họ tên / mã định danh. Phân trang chuẩn | QuảnTrị |
+
+Trường body `POST /sso/ket-qua`: `muc` ∈ `co_ban`\|`thanh_thao`\|`nang_cao` (tùy chọn); `diem` số 0–9999, tối đa 2 chữ số thập phân (chỉ quản trị xem); `chi_tiet` object JSON tùy ý (điểm từng miền…, chỉ lưu, chỉ quản trị dùng); `thoi_diem` ISO 8601, mặc định lúc nhận.
+
+Quy tắc gộp (dùng chung API + import):
+- `dang_lam` đến sau `hoan_thanh` → **bỏ qua** (báo trễ/trùng).
+- `hoan_thanh` **ghi đè** mức/điểm/chi tiết (cho phép làm lại), **trừ khi** `thoi_diem` cũ hơn lần hoàn thành đã ghi (gói tin đến lệch thứ tự).
+- Gọi lại cùng nội dung là an toàn (idempotent theo `(hoc_vien_id, loai)`).
+- `can_kiem_tra = true` khi `da_mo`/`dang_lam` mà **quá 24 giờ** không có cập nhật — học viên được nhắc "vào lại kiểm tra và bấm nộp bài".
+- Mức ở đây **chỉ để hiển thị/theo dõi**: **không** tự đổi `dang_ky_hoc.muc_dau_vao` — quản trị chốt mức qua import `ket_qua_danh_gia` (mục 5, T5).
+
+Giao diện: M6 hiện từng bài kèm nhãn trạng thái + nút "Làm bài"/"Làm tiếp"/"Mở lại trang khảo sát"; M3 hiện tóm tắt; admin `/admin/tinh-hinh-khao-sat` (thống kê theo loại, bấm ô để lọc, danh sách có điểm + nguồn). Mã mẫu phía khảo sát: `scripts/sso-demo/trang-khao-sat-gia-lap.mjs` bước [4].
 
 **Chưa làm (khi bên khảo sát cần):** dọn định kỳ bản ghi mã đã hết hạn (hiện chỉ tích lũy, mỗi lượt bấm 1 dòng nhỏ); giới hạn tần suất cấp mã theo học viên.

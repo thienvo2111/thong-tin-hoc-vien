@@ -282,3 +282,13 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 108 | `tinh_id` (tùy chọn) phải là địa danh cấp `tinh_thanh`; mỗi tỉnh gắn tối đa 1 khóa — gắn tỉnh đã thuộc khóa khác → 409, nêu mã khóa đang giữ | 🔴 | API + DB (`UNIQUE(tinh_id)` = `uq_cau_hinh_khao_sat_khoa_tinh`) |
 | 109 | Cấu hình cho học viên = khóa **đã duyệt** đã ghi danh có cấu hình riêng, nhiều khóa → `ngay_duyet` gần nhất; không có → cấu hình chung. Trang chủ/danh sách tỉnh chỉ tính khóa đã duyệt | 🔴 | API (`layChoHocVien`, `layTheoTinh`, `danhSachTinh`) |
 | 110 | Xóa cấu hình riêng không ảnh hưởng cấu hình chung; khóa bị xóa → cấu hình riêng xóa theo | 🔴 | API + DB (`ON DELETE CASCADE`) |
+
+## Kết quả khảo sát (2026-10-04 — api-contract.md mục 10.1)
+
+| # | Quy tắc | Mức | Nơi thực thi |
+|---|---|---|---|
+| 111 | `POST /sso/ket-qua` bắt buộc `X-API-Key` đúng (cùng khóa `/sso/doi-ma`, so khớp thời gian hằng); cần 1 trong `hoc_vien_id`/`ma_dinh_danh_moet`; `loai` ∈ {`khao-sat`, `danh-gia`, `dau-ra`}; `trang_thai` ∈ {`dang_lam`, `hoan_thanh`}; `muc` ∈ 3 mức; `diem` 0–9999 tối đa 2 số lẻ | 🔴 | API (DTO + `kiemTraApiKeyKhaoSat`) |
+| 112 | Mỗi học viên × loại bài tối đa 1 dòng; `dang_lam` không đè `hoan_thanh`; `hoan_thanh` cũ hơn lần hoàn thành đã ghi bị bỏ qua; đổi mã SSO chỉ tăng số lần mở, không hạ trạng thái | 🔴 | API (`KetQuaKhaoSatService.ghiKetQua/ghiDaMo`) + DB (`uq_ket_qua_khao_sat_hoc_vien_loai`) |
+| 113 | Học viên chỉ xem trạng thái + mức của mình, **không** thấy điểm/chi tiết; danh sách/thống kê chỉ `quan_tri` | 🔴 | API (`GET /sso/tinh-trang`, `@Roles('quan_tri')`) |
+| 114 | Kết quả khảo sát **không** tự đổi `dang_ky_hoc.muc_dau_vao` (chốt qua import `ket_qua_danh_gia`) | 🔴 | API |
+| 115 | Import `ket_qua_khao_sat`: cùng quy tắc #111–112; `thoi_diem` dạng `dd/mm/yyyy hh:mm` giờ VN; trùng học viên + loại trong 1 file → dòng lỗi | 🔴 | API (`ImportService.buildKetQuaKhaoSatDto`) |

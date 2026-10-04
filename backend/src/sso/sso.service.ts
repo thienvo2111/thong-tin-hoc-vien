@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { createHash, randomBytes, timingSafeEqual } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { HocVienService } from '../hoc-vien/hoc-vien.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
   ForbiddenAppException,
   NotFoundAppException,
-  SsoChuaCauHinhException,
   SsoMaKhongHopLeException,
-  UnauthorizedAppException,
 } from '../common/exceptions/app.exceptions';
 import { SsoTarget } from './dto/sso.dto';
+import { kiemTraApiKeyKhaoSat } from './sso-api-key';
+import { KetQuaKhaoSatService } from './ket-qua-khao-sat.service';
 
 // SSO sang hệ thống khảo sát (2026-10-02, docs/api-contract.md mục 10).
 // Luồng: học viên đã đăng nhập cổng bấm nút -> cổng cấp mã ngẫu nhiên dùng 1
@@ -23,13 +23,6 @@ const SSO_URL_MAC_DINH = 'https://khaosatnls.hcmue.edu.vn/sso/start';
 
 function bamMa(ma: string): string {
   return createHash('sha256').update(ma).digest('hex');
-}
-
-/** So khớp API key thời gian hằng (băm trước để 2 buffer luôn cùng độ dài). */
-function khopApiKey(guiLen: string, dung: string): boolean {
-  const a = createHash('sha256').update(guiLen).digest();
-  const b = createHash('sha256').update(dung).digest();
-  return timingSafeEqual(a, b);
 }
 
 export interface ThongTinSso {
@@ -54,6 +47,7 @@ export class SsoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly hocVienService: HocVienService,
+    private readonly ketQuaKhaoSat: KetQuaKhaoSatService,
   ) {}
 
   async capMa(
@@ -139,11 +133,7 @@ export class SsoService {
   }
 
   async doiMa(apiKey: string | undefined, ma: string): Promise<ThongTinSso> {
-    const khoaDung = process.env.SSO_KHAO_SAT_API_KEY;
-    if (!khoaDung) throw new SsoChuaCauHinhException();
-    if (!apiKey || !khopApiKey(apiKey, khoaDung)) {
-      throw new UnauthorizedAppException('API key không hợp lệ');
-    }
+    kiemTraApiKeyKhaoSat(apiKey);
 
     // Đánh dấu đã dùng NGUYÊN TỬ: 2 lần đổi cùng mã đồng thời chỉ 1 lần thắng.
     const now = new Date();
@@ -174,6 +164,10 @@ export class SsoService {
     });
     if (!ban) throw new SsoMaKhongHopLeException();
     const hv = ban.hoc_vien;
+    // Học viên đã thực sự tới trang khảo sát -> ghi "đã mở" cho bài tương ứng.
+    if (ban.target) {
+      await this.ketQuaKhaoSat.ghiDaMo(hv.id, ban.target as SsoTarget);
+    }
     const khoaGanNhat = hv.dang_ky_hoc
       .filter((dk) => dk.khoa.trang_thai === 'da_duyet')
       .sort(

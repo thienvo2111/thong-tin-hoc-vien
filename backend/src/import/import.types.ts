@@ -18,6 +18,8 @@ export const SUPPORTED_IMPORT_TYPES = [
   'nhan_su_lop',
   // Tài khoản đơn vị (ADR 0002) — xác nhận nạp trả file Excel mật khẩu tạm.
   'tai_khoan_don_vi',
+  // Kết quả khảo sát (2026-10-04) — dự phòng khi hệ thống khảo sát không báo qua API.
+  'ket_qua_khao_sat',
 ] as const satisfies readonly loai_danh_muc_import[];
 
 export type SupportedImportType = (typeof SUPPORTED_IMPORT_TYPES)[number];

@@ -6,7 +6,8 @@
 //   CONG_URL=http://localhost:3000 SSO_KHAO_SAT_API_KEY=<khóa> node scripts/sso-demo/trang-khao-sat-gia-lap.mjs
 // rồi đặt ở backend cổng: SSO_KHAO_SAT_URL=http://localhost:4000/sso/start (cùng SSO_KHAO_SAT_API_KEY).
 //
-// 3 việc bên khảo sát phải làm, đánh dấu [1] [2] [3] bên dưới.
+// Việc bên khảo sát phải làm, đánh dấu [1] [2] [3] bên dưới; [4] = báo trạng thái/kết quả về cổng
+// (POST /sso/ket-qua, 2026-10-04) để học viên thấy "đang làm / đã hoàn thành + mức" trên cổng.
 
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
@@ -22,7 +23,33 @@ if (!API_KEY) {
 // Phiên đăng nhập của RIÊNG trang khảo sát (demo: lưu trong bộ nhớ). Thực tế: session/DB của bạn.
 const phien = new Map();
 
-const TEN_BAI = { 'khao-sat': 'Phiếu khảo sát kĩ năng số', 'danh-gia': 'Phiếu đánh giá năng lực số' };
+const TEN_BAI = {
+  'khao-sat': 'Phiếu khảo sát kĩ năng số',
+  'danh-gia': 'Phiếu đánh giá năng lực số',
+  'dau-ra': 'Khảo sát đầu ra',
+};
+const CONG_FE = CONG_URL.replace(':3000', ':5173');
+
+function layPhien(req) {
+  const sid = /(?:^|;\s*)sid=([^;]+)/.exec(req.headers.cookie ?? '')?.[1];
+  return sid && phien.get(sid);
+}
+
+async function docForm(req) {
+  let raw = '';
+  for await (const chunk of req) raw += chunk;
+  return new URLSearchParams(raw);
+}
+
+// [4] Báo về cổng TỪ MÁY CHỦ (cùng X-API-Key). dang_lam: lúc bắt đầu làm; hoan_thanh: lúc nộp bài.
+async function baoKetQua(duLieu) {
+  const r = await fetch(`${CONG_URL}/sso/ket-qua`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+    body: JSON.stringify(duLieu),
+  });
+  return { ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) };
+}
 
 function trang(tieuDe, noiDung) {
   return `<!doctype html><html lang="vi"><head><meta charset="utf-8">
@@ -70,7 +97,7 @@ const server = createServer(async (req, res) => {
         trang(
           'Phiên đã hết hạn',
           `<div class="the loi"><p>Không xác nhận được (<code>${thoat(ma)}</code>): ${thoat(body?.error?.message)}</p>
-<p><a href="${thoat(CONG_URL.replace(':3000', ':5173'))}/toi/danh-gia-dau-vao">Quay lại cổng bồi dưỡng</a> và bấm lại.</p></div>`,
+<p><a href="${thoat(CONG_FE)}/toi/danh-gia-dau-vao">Quay lại cổng bồi dưỡng</a> và bấm lại.</p></div>`,
         ),
       );
     }
@@ -85,10 +112,17 @@ const server = createServer(async (req, res) => {
   }
 
   if (url.pathname === '/lam-bai') {
-    const sid = /(?:^|;\s*)sid=([^;]+)/.exec(req.headers.cookie ?? '')?.[1];
-    const hv = sid && phien.get(sid);
+    const hv = layPhien(req);
     if (!hv) return guiHtml(res, 401, trang('Chưa đăng nhập', '<p>Hãy vào từ cổng bồi dưỡng.</p>'));
 
+    const nopBai = hv.target
+      ? `<div class="the"><p><b>[4] Giả lập báo kết quả về cổng</b> (POST /sso/ket-qua)</p>
+<form method="post" action="/bao-ket-qua"><input type="hidden" name="trang_thai" value="dang_lam">
+<button>Bắt đầu làm (báo "đang làm")</button></form>
+<form method="post" action="/bao-ket-qua" style="margin-top:12px"><input type="hidden" name="trang_thai" value="hoan_thanh">
+Mức <select name="muc"><option value="co_ban">Cơ bản</option><option value="thanh_thao" selected>Thành thạo</option><option value="nang_cao">Nâng cao</option></select>
+Điểm <input name="diem" value="72.5" size="6"> <button>Nộp bài (báo "hoàn thành")</button></form></div>`
+      : '';
     const bai = hv.target ? `<p>Mở bài: <b>${thoat(TEN_BAI[hv.target] ?? hv.target)}</b></p>` : '<p>Không có target → hiện <b>danh sách bài cần làm</b>.</p>';
     return guiHtml(
       res,
@@ -101,13 +135,36 @@ const server = createServer(async (req, res) => {
 <p>Vai trò: <b>${hv.vai_tro === 'can_bo_quan_ly' ? 'Cán bộ quản lý' : hv.vai_tro === 'giao_vien' ? 'Giáo viên' : '(chưa chọn)'}</b> → chọn bộ câu hỏi tương ứng</p>
 <p>Đơn vị: ${thoat(hv.ten_don_vi)} <code>${thoat(hv.ma_don_vi ?? '—')}</code></p>
 <p>Lớp: ${hv.lop?.length ? hv.lop.map((l) => thoat(`${l.ten_lop} (${l.loai_lop}, ${l.giai_doan})`)).join(', ') : '(chưa phân lớp)'}</p>
-${bai}</div>
+${bai}</div>${nopBai}
 <details><summary>JSON nhận từ POST /sso/doi-ma</summary><pre>${thoat(JSON.stringify(hv, null, 2))}</pre></details>`,
       ),
     );
   }
 
-  guiHtml(res, 404, trang('Không tìm thấy', '<p>Trang giả lập chỉ có /sso/start và /lam-bai.</p>'));
+  if (url.pathname === '/bao-ket-qua' && req.method === 'POST') {
+    const hv = layPhien(req);
+    if (!hv?.target) return guiHtml(res, 401, trang('Chưa đăng nhập', '<p>Hãy vào từ cổng bồi dưỡng.</p>'));
+    const form = await docForm(req);
+    const trangThai = form.get('trang_thai');
+    const kq = await baoKetQua({
+      hoc_vien_id: hv.hoc_vien_id,
+      loai: hv.target,
+      trang_thai: trangThai,
+      thoi_diem: new Date().toISOString(),
+      ...(trangThai === 'hoan_thanh' ? { muc: form.get('muc'), diem: Number(form.get('diem')), chi_tiet: { nguon: 'gia-lap' } } : {}),
+    });
+    return guiHtml(
+      res,
+      kq.ok ? 200 : 502,
+      trang(
+        kq.ok ? 'Đã báo về cổng' : 'Báo về cổng thất bại',
+        `<div class="the${kq.ok ? '' : ' loi'}"><p>HTTP ${kq.status}</p><pre>${thoat(JSON.stringify(kq.body, null, 2))}</pre></div>
+<p><a href="/lam-bai">Quay lại bài</a> · <a href="${thoat(CONG_FE)}/toi/danh-gia-dau-vao">Về cổng bồi dưỡng xem trạng thái</a></p>`,
+      ),
+    );
+  }
+
+  guiHtml(res, 404, trang('Không tìm thấy', '<p>Trang giả lập chỉ có /sso/start, /lam-bai và /bao-ket-qua.</p>'));
 });
 
 server.listen(PORT, () => {

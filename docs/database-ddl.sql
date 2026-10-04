@@ -773,6 +773,36 @@ CREATE TABLE cau_hinh_khao_sat_khoa (
 
 
 -- =====================================================================
+-- PHẦN 8 — KẾT QUẢ KHẢO SÁT (2026-10-04, migration 20261004110000 + 20261004110100)
+-- =====================================================================
+-- Tình trạng + kết quả từng bài trên hệ thống khảo sát. "Chưa làm" = không có
+-- dòng. da_mo do cổng ghi khi đổi mã SSO; dang_lam/hoan_thanh do hệ thống khảo
+-- sát báo (POST /sso/ket-qua) hoặc import 'ket_qua_khao_sat' (giá trị enum
+-- loai_danh_muc_import thêm ở migration riêng). KHÔNG tự đổi muc_dau_vao.
+-- Xem docs/api-contract.md mục 10.1.
+CREATE TYPE trang_thai_khao_sat AS ENUM ('da_mo', 'dang_lam', 'hoan_thanh');
+
+CREATE TABLE ket_qua_khao_sat (
+    id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    hoc_vien_id      uuid NOT NULL REFERENCES hoc_vien(id) ON DELETE CASCADE,
+    loai             varchar(20) NOT NULL,     -- 'khao-sat' | 'danh-gia' | 'dau-ra' (= target SSO)
+    trang_thai       trang_thai_khao_sat NOT NULL,
+    so_lan_mo        int NOT NULL DEFAULT 0,
+    mo_lan_dau_luc   timestamptz,
+    mo_gan_nhat_luc  timestamptz,
+    bat_dau_luc      timestamptz,
+    hoan_thanh_luc   timestamptz,
+    muc              muc_nang_luc,
+    diem             numeric(6,2),
+    chi_tiet         jsonb,
+    nguon            varchar(10) NOT NULL,     -- 'sso' | 'api' | 'import' (nguồn ghi gần nhất)
+    cap_nhat_luc     timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_ket_qua_khao_sat_hoc_vien_loai UNIQUE (hoc_vien_id, loai)
+);
+CREATE INDEX idx_ket_qua_khao_sat_loai_trang_thai ON ket_qua_khao_sat(loai, trang_thai);
+
+
+-- =====================================================================
 -- updated_at TRIGGER DÙNG CHUNG
 -- =====================================================================
 CREATE OR REPLACE FUNCTION trg_set_updated_at() RETURNS trigger AS $$

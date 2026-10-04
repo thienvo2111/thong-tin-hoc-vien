@@ -1,9 +1,104 @@
 import { http, HttpResponse } from 'msw';
+import type { HocVienTinhHinhKhaoSat, TinhTrangBaiKhaoSat } from '@/api/ketQuaKhaoSat';
 
 // Mock POST /sso/cap-ma (2026-10-02) — tách khỏi handlers.ts. Ghi lại target đã yêu cầu để test kiểm.
 export const ssoDaYeuCau: (string | undefined)[] = [];
 
+// GET /sso/tinh-trang (2026-10-04) — test gán qua datTinhTrangBai; setup.ts đặt lại sau mỗi test.
+export const tinhTrangKhaoSatMock: { value: TinhTrangBaiKhaoSat[] } = { value: [] };
+
+function tinhTrangMacDinh(): TinhTrangBaiKhaoSat[] {
+  return (['khao-sat', 'danh-gia', 'dau-ra'] as const).map((loai) => ({
+    loai,
+    trang_thai: 'chua_lam',
+    can_kiem_tra: false,
+    mo_gan_nhat_luc: null,
+    hoan_thanh_luc: null,
+    muc: null,
+  }));
+}
+
+export function datLaiTinhTrangKhaoSatMock() {
+  tinhTrangKhaoSatMock.value = tinhTrangMacDinh();
+}
+datLaiTinhTrangKhaoSatMock();
+
+/** Gộp bản ghi 1 bài vào trạng thái mặc định (các bài khác "chưa làm"). */
+export function datTinhTrangBai(bai: Partial<TinhTrangBaiKhaoSat> & Pick<TinhTrangBaiKhaoSat, 'loai'>) {
+  tinhTrangKhaoSatMock.value = tinhTrangKhaoSatMock.value.map((t) => (t.loai === bai.loai ? { ...t, ...bai } : t));
+}
+
+export const hocVienTinhHinhMock: HocVienTinhHinhKhaoSat[] = [
+  {
+    id: 'hv-1',
+    ho_ten: 'Hà Thị Thanh',
+    ma_dinh_danh_moet: '9115131060',
+    doi_tuong: 'giao_vien',
+    ten_don_vi: 'Trường TH A',
+    ket_qua: [
+      {
+        loai: 'khao-sat',
+        trang_thai: 'hoan_thanh',
+        can_kiem_tra: false,
+        so_lan_mo: 1,
+        mo_gan_nhat_luc: '2026-10-04T01:00:00.000Z',
+        hoan_thanh_luc: '2026-10-04T01:30:00.000Z',
+        muc: 'thanh_thao',
+        diem: 72.5,
+        nguon: 'api',
+        cap_nhat_luc: '2026-10-04T01:30:00.000Z',
+      },
+      {
+        loai: 'danh-gia',
+        trang_thai: 'da_mo',
+        can_kiem_tra: true,
+        so_lan_mo: 2,
+        mo_gan_nhat_luc: '2026-10-02T01:00:00.000Z',
+        hoan_thanh_luc: null,
+        muc: null,
+        diem: null,
+        nguon: 'sso',
+        cap_nhat_luc: '2026-10-02T01:00:00.000Z',
+      },
+    ],
+  },
+  {
+    id: 'hv-2',
+    ho_ten: 'Lê Văn Bình',
+    ma_dinh_danh_moet: '9115131061',
+    doi_tuong: 'can_bo_quan_ly',
+    ten_don_vi: 'Trường THCS B',
+    ket_qua: [],
+  },
+];
+
+const THEO_MUC_RONG = { co_ban: 0, thanh_thao: 0, nang_cao: 0, chua_xep_muc: 0 };
+
 export const ssoHandlers = [
+  http.get('/sso/tinh-trang', () => HttpResponse.json(tinhTrangKhaoSatMock.value)),
+  http.get('/sso/ket-qua/thong-ke', () =>
+    HttpResponse.json({
+      tong_hoc_vien: 2,
+      theo_loai: [
+        { loai: 'khao-sat', chua_lam: 1, da_mo: 0, dang_lam: 0, hoan_thanh: 1, can_kiem_tra: 0, theo_muc: { ...THEO_MUC_RONG, thanh_thao: 1 } },
+        { loai: 'danh-gia', chua_lam: 1, da_mo: 1, dang_lam: 0, hoan_thanh: 0, can_kiem_tra: 1, theo_muc: THEO_MUC_RONG },
+        { loai: 'dau-ra', chua_lam: 2, da_mo: 0, dang_lam: 0, hoan_thanh: 0, can_kiem_tra: 0, theo_muc: THEO_MUC_RONG },
+      ],
+    }),
+  ),
+  http.get('/sso/ket-qua', ({ request }) => {
+    const url = new URL(request.url);
+    const trangThai = url.searchParams.get('trang_thai');
+    const loai = url.searchParams.get('loai') ?? 'khao-sat';
+    const data = hocVienTinhHinhMock.filter((hv) => {
+      if (!trangThai) return true;
+      const kq = hv.ket_qua.find((k) => k.loai === loai);
+      if (trangThai === 'chua_lam') return !kq;
+      if (trangThai === 'can_kiem_tra') return !!kq?.can_kiem_tra;
+      return kq?.trang_thai === trangThai;
+    });
+    return HttpResponse.json({ data, total: data.length, page: 1, page_size: 20 });
+  }),
   http.post('/sso/cap-ma', async ({ request }) => {
     const body = (await request.json()) as { target?: string };
     ssoDaYeuCau.push(body.target);

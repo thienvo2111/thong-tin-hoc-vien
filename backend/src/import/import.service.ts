@@ -64,6 +64,26 @@ import {
 } from './util/import-storage.util';
 import { buildValidatedDto } from './util/dto-validate.util';
 import { resolveHocVienImportRow } from './util/hoc-vien-resolver.util';
+import { KetQuaKhaoSatService } from '../sso/ket-qua-khao-sat.service';
+import {
+  LOAI_KHAO_SAT,
+  LoaiKhaoSat,
+  MUC_NANG_LUC,
+  MucNangLuc,
+  TRANG_THAI_BAO_VE,
+  TrangThaiBaoVe,
+} from '../sso/dto/ket-qua-khao-sat.dto';
+import { parseVnDateTime } from '../common/utils/vn-datetime.util';
+
+interface KetQuaKhaoSatRowDto {
+  hoc_vien_id: string;
+  loai: LoaiKhaoSat;
+  trang_thai: TrangThaiBaoVe;
+  /** ISO — dto được dựng lại ở bước xác nhận, giữ dạng chuỗi cho chắc. */
+  thoi_diem?: string;
+  muc?: MucNangLuc;
+  diem?: number;
+}
 import { encryptVleMatKhau } from '../common/utils/vle-crypto.util';
 import { LichSuImportQueryDto } from './dto/lich-su-import-query.dto';
 
@@ -89,12 +109,13 @@ export class ImportService {
     private readonly khoaBoiDuongService: KhoaBoiDuongService,
     private readonly dotXacNhanService: DotXacNhanService,
     private readonly taiKhoanDonViService: TaiKhoanDonViService,
+    private readonly ketQuaKhaoSatService: KetQuaKhaoSatService,
   ) {}
 
   assertSupported(loai: string): SupportedImportType {
     if (!isSupportedImportType(loai)) {
       throw new ValidationException(
-        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc, diem_danh, ket_qua_giai_doan, nhan_su_lop, tai_khoan_don_vi)`,
+        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc, diem_danh, ket_qua_giai_doan, nhan_su_lop, tai_khoan_don_vi, ket_qua_khao_sat)`,
       );
     }
     return loai;
@@ -590,6 +611,18 @@ export class ImportService {
           'mat_khau_tam',
           'duong_dan',
         ];
+      case 'ket_qua_khao_sat':
+        // 2026-10-04: file kết quả xuất từ hệ thống khảo sát (dự phòng cho
+        // POST /sso/ket-qua). Cùng quy tắc gộp với API.
+        return [
+          'so_dinh_danh_ca_nhan',
+          'ma_dinh_danh_moet',
+          'loai',
+          'trang_thai',
+          'thoi_diem',
+          'muc',
+          'diem',
+        ];
       case 'ket_qua_danh_gia':
         // T5 (mo-rong-nls-an-giang.md): mã học viên dùng chung HocVienResolver
         // (mục 2 quy tắc #3, cả 2 cột tùy chọn — xem getColumnNotes). ma_khoa
@@ -768,6 +801,20 @@ export class ImportService {
         muc: 'Bắt buộc — chỉ nhận "co_ban", "thanh_thao" hoặc "nang_cao". Chạy lại file với giá trị mới sẽ ghi đè giá trị cũ.',
       };
     }
+    if (loai === 'ket_qua_khao_sat') {
+      return {
+        so_dinh_danh_ca_nhan:
+          'Tùy chọn — phải có ít nhất 1 trong 2 cột so_dinh_danh_ca_nhan/ma_dinh_danh_moet để xác định học viên. Có cả 2 thì phải trỏ cùng 1 hồ sơ.',
+        ma_dinh_danh_moet: 'Tùy chọn — xem ghi chú cột so_dinh_danh_ca_nhan.',
+        loai: 'Bắt buộc — "khao-sat" (phiếu khảo sát kĩ năng số), "danh-gia" (phiếu đánh giá năng lực số) hoặc "dau-ra".',
+        trang_thai:
+          'Bắt buộc — "dang_lam" hoặc "hoan_thanh". "dang_lam" không ghi đè bài đã hoàn thành.',
+        thoi_diem:
+          'Tùy chọn — "dd/mm/yyyy hh:mm", giờ Việt Nam; để trống = lúc import. Dòng hoàn thành cũ hơn kết quả đã có sẽ bị bỏ qua.',
+        muc: 'Tùy chọn — "co_ban", "thanh_thao" hoặc "nang_cao". Chỉ để hiển thị, KHÔNG đổi mức đầu vào của học viên (dùng import ket_qua_danh_gia).',
+        diem: 'Tùy chọn — số từ 0 đến 9999, tối đa 2 chữ số thập phân. Chỉ quản trị xem được.',
+      };
+    }
     if (loai === 'lop_va_lich_hoc') {
       return {
         ma_khoa:
@@ -866,6 +913,7 @@ export class ImportService {
       | KetQuaGiaiDoanRowDto
       | NhanSuLopRowDto
       | TaiKhoanDonViRowDto
+      | KetQuaKhaoSatRowDto
     >
   > {
     switch (loai) {
@@ -955,6 +1003,8 @@ export class ImportService {
         });
       case 'tai_khoan_don_vi':
         return this.buildTaiKhoanDonViDto(raw, dupKeys);
+      case 'ket_qua_khao_sat':
+        return this.buildKetQuaKhaoSatDto(raw, dupKeys);
       case 'nhan_su_lop':
         return this.khoaBoiDuongService.resolveNhanSuLopRow(
           {
@@ -1014,7 +1064,10 @@ export class ImportService {
     const email = raw.email?.trim().toLowerCase() || undefined;
     const khoa: [string, string][] = [
       [`tkdv-ma:${donVi.id}`, 'mã đơn vị'],
-      [`tkdv-ten:${chuanHoaTenDangNhap(tenNhap ?? donVi.ma_don_vi)}`, 'tên đăng nhập'],
+      [
+        `tkdv-ten:${chuanHoaTenDangNhap(tenNhap ?? donVi.ma_don_vi)}`,
+        'tên đăng nhập',
+      ],
     ];
     if (email) khoa.push([`tkdv-email:${email}`, 'email']);
     const trung = khoa.find(([k]) => dupKeys?.has(k));
@@ -1055,7 +1108,8 @@ export class ImportService {
       | DiemDanhRowDto
       | KetQuaGiaiDoanRowDto
       | NhanSuLopRowDto
-      | TaiKhoanDonViRowDto,
+      | TaiKhoanDonViRowDto
+      | KetQuaKhaoSatRowDto,
     dupKeys?: Set<string>,
   ): Promise<string | undefined> {
     try {
@@ -1101,6 +1155,9 @@ export class ImportService {
       } else if (loai === 'tai_khoan_don_vi') {
         // Không cần kiểm tra thêm: buildTaiKhoanDonViDto() đã chạy
         // TaiKhoanDonViService.chuanBiTao() (cùng quy tắc với POST tạo lẻ).
+      } else if (loai === 'ket_qua_khao_sat') {
+        // Không cần kiểm tra thêm: buildKetQuaKhaoSatDto() đã tra học viên +
+        // validate giá trị + trùng lặp trong file rồi.
       } else if (loai === 'nhan_su_lop') {
         // Không cần kiểm tra thêm: resolveNhanSuLopRow() (buildDto) đã tra
         // cứu lớp + validate + trùng lặp trong file rồi.
@@ -1144,7 +1201,8 @@ export class ImportService {
       | DiemDanhRowDto
       | KetQuaGiaiDoanRowDto
       | NhanSuLopRowDto
-      | TaiKhoanDonViRowDto,
+      | TaiKhoanDonViRowDto
+      | KetQuaKhaoSatRowDto,
     importId: string,
     nguoiImportId: string,
     dupKeys?: Set<string>,
@@ -1169,6 +1227,19 @@ export class ImportService {
       return { hocVienChuaCoEmail };
     } else if (loai === 'tai_khoan_vle') {
       await this.commitTaiKhoanVle(dto as TaiKhoanVleRowDto, importId);
+    } else if (loai === 'ket_qua_khao_sat') {
+      const d = dto as KetQuaKhaoSatRowDto;
+      await this.ketQuaKhaoSatService.ghiKetQua(
+        d.hoc_vien_id,
+        {
+          loai: d.loai,
+          trang_thai: d.trang_thai,
+          thoi_diem: d.thoi_diem ? new Date(d.thoi_diem) : undefined,
+          muc: d.muc,
+          diem: d.diem,
+        },
+        'import',
+      );
     } else if (loai === 'ket_qua_danh_gia') {
       await this.khoaBoiDuongService.commitKetQuaDanhGia(
         dto as KetQuaDanhGiaRowDto,
@@ -1378,6 +1449,76 @@ export class ImportService {
       mat_khau_tam: raw.mat_khau_tam || undefined,
       duong_dan: raw.duong_dan,
     });
+  }
+
+  // 2026-10-04: import kết quả khảo sát (dự phòng cho POST /sso/ket-qua).
+  private async buildKetQuaKhaoSatDto(
+    raw: Record<string, string>,
+    dupKeys?: Set<string>,
+  ): Promise<RowBuildResult<KetQuaKhaoSatRowDto>> {
+    const loai = raw.loai?.trim() ?? '';
+    if (!(LOAI_KHAO_SAT as readonly string[]).includes(loai)) {
+      return {
+        error: 'Cột "loai" chỉ nhận "khao-sat", "danh-gia" hoặc "dau-ra"',
+      };
+    }
+    const trangThai = raw.trang_thai?.trim() ?? '';
+    if (!(TRANG_THAI_BAO_VE as readonly string[]).includes(trangThai)) {
+      return {
+        error: 'Cột "trang_thai" chỉ nhận "dang_lam" hoặc "hoan_thanh"',
+      };
+    }
+    let thoiDiem: string | undefined;
+    if (raw.thoi_diem?.trim()) {
+      const d = parseVnDateTime(raw.thoi_diem);
+      if (!d) {
+        return {
+          error: 'Cột "thoi_diem" sai định dạng — phải là "dd/mm/yyyy hh:mm"',
+        };
+      }
+      thoiDiem = d.toISOString();
+    }
+    const muc = raw.muc?.trim() || undefined;
+    if (muc && !(MUC_NANG_LUC as readonly string[]).includes(muc)) {
+      return {
+        error: 'Cột "muc" chỉ nhận "co_ban", "thanh_thao" hoặc "nang_cao"',
+      };
+    }
+    let diem: number | undefined;
+    if (raw.diem?.trim()) {
+      diem = Number(raw.diem.trim().replace(',', '.'));
+      const haiSoLe = Math.abs(Math.round(diem * 100) - diem * 100) < 1e-6;
+      if (!Number.isFinite(diem) || diem < 0 || diem > 9999 || !haiSoLe) {
+        return {
+          error:
+            'Cột "diem" phải là số từ 0 đến 9999, tối đa 2 chữ số thập phân',
+        };
+      }
+    }
+
+    const resolved = await resolveHocVienImportRow(this.prisma, {
+      so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
+      ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
+    });
+    if (resolved.error || !resolved.hocVien) {
+      return { error: resolved.error ?? 'Không xác định được học viên' };
+    }
+    const khoaTrung = `${resolved.hocVien.id}|${loai}`;
+    if (dupKeys?.has(khoaTrung)) {
+      return { error: 'Trùng học viên + loại bài với một dòng phía trên' };
+    }
+    dupKeys?.add(khoaTrung);
+
+    return {
+      dto: {
+        hoc_vien_id: resolved.hocVien.id,
+        loai: loai as LoaiKhaoSat,
+        trang_thai: trangThai as TrangThaiBaoVe,
+        thoi_diem: thoiDiem,
+        muc: muc as MucNangLuc | undefined,
+        diem,
+      },
+    };
   }
 
   private async buildDiaDanhDto(

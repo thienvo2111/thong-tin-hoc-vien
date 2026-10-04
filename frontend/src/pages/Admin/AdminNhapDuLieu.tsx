@@ -44,6 +44,7 @@ export const NHAN_LOAI_IMPORT: Record<LoaiDanhMucImport, string> = {
   ket_qua_giai_doan: 'Kết quả giai đoạn',
   nhan_su_lop: 'Nhân sự lớp (giảng viên/hỗ trợ)',
   tai_khoan_don_vi: 'Tài khoản đơn vị',
+  ket_qua_khao_sat: 'Kết quả khảo sát (từ hệ thống khảo sát)',
 };
 
 const TUY_CHON_LOAI_IMPORT: { value: LoaiDanhMucImport; label: string }[] = Object.entries(NHAN_LOAI_IMPORT).map(

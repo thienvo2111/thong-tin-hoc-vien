@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { SsoService, SSO_MA_HIEU_LUC_MS } from './sso.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { HocVienService } from '../hoc-vien/hoc-vien.service';
+import { KetQuaKhaoSatService } from './ket-qua-khao-sat.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
   ForbiddenAppException,
@@ -25,6 +26,7 @@ describe('SsoService', () => {
     danhGiaDauVaoCuaToi: jest.Mock;
     khaoSatDauRaCuaToi: jest.Mock;
   };
+  let ketQua: { ghiDaMo: jest.Mock };
   const envGoc = { ...process.env };
 
   const caller = {
@@ -50,9 +52,11 @@ describe('SsoService', () => {
         .fn()
         .mockResolvedValue({ mo: true, du_dieu_kien: true }),
     };
+    ketQua = { ghiDaMo: jest.fn().mockResolvedValue(undefined) };
     service = new SsoService(
       prisma as unknown as PrismaService,
       hocVienService as unknown as HocVienService,
+      ketQua as unknown as KetQuaKhaoSatService,
     );
     process.env.SSO_KHAO_SAT_URL = 'https://khaosat.test/sso/start';
     process.env.SSO_KHAO_SAT_API_KEY = 'khoa-bi-mat-dung';
@@ -289,6 +293,31 @@ describe('SsoService', () => {
         ],
       });
       expect(JSON.stringify(kq)).not.toContain('012345678901');
+    });
+
+    it('đổi mã thành công có target -> ghi "đã mở" cho đúng học viên + loại bài', async () => {
+      prisma.ma_sso_mot_lan.updateMany.mockResolvedValue({ count: 1 });
+      prisma.ma_sso_mot_lan.findUnique.mockResolvedValue(banGhi);
+      await service.doiMa('khoa-bi-mat-dung', 'm'.repeat(43));
+      expect(ketQua.ghiDaMo).toHaveBeenCalledWith('hv-1', 'khao-sat');
+    });
+
+    it('mã không có target -> không ghi "đã mở" (chưa biết học viên vào bài nào)', async () => {
+      prisma.ma_sso_mot_lan.updateMany.mockResolvedValue({ count: 1 });
+      prisma.ma_sso_mot_lan.findUnique.mockResolvedValue({
+        ...banGhi,
+        target: null,
+      });
+      await service.doiMa('khoa-bi-mat-dung', 'm'.repeat(43));
+      expect(ketQua.ghiDaMo).not.toHaveBeenCalled();
+    });
+
+    it('mã không hợp lệ -> không ghi "đã mở"', async () => {
+      prisma.ma_sso_mot_lan.updateMany.mockResolvedValue({ count: 0 });
+      await expect(
+        service.doiMa('khoa-bi-mat-dung', 'x'.repeat(43)),
+      ).rejects.toBeInstanceOf(SsoMaKhongHopLeException);
+      expect(ketQua.ghiDaMo).not.toHaveBeenCalled();
     });
   });
 });

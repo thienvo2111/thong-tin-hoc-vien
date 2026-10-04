@@ -6,6 +6,7 @@ import { HocVienModule } from '../hoc-vien/hoc-vien.module';
 import { KhoaBoiDuongModule } from '../khoa-boi-duong/khoa-boi-duong.module';
 import { DotXacNhanModule } from '../dot-xac-nhan/dot-xac-nhan.module';
 import { NguoiDungModule } from '../nguoi-dung/nguoi-dung.module';
+import { SsoModule } from '../sso/sso.module';
 
 // Dịch vụ Import — docs/api-contract.md mục 5. Tái sử dụng service của
 // DanhMucModule/HocVienModule/KhoaBoiDuongModule để đảm bảo cùng 1 bộ quy tắc
@@ -20,6 +21,7 @@ import { NguoiDungModule } from '../nguoi-dung/nguoi-dung.module';
     KhoaBoiDuongModule,
     DotXacNhanModule,
     NguoiDungModule,
+    SsoModule,
   ],
   controllers: [ImportController],
   providers: [ImportService],

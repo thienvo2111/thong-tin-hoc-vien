@@ -1,12 +1,14 @@
-import { Box, Button, Card, Center, Container, Group, List, Loader, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Badge, Box, Button, Card, Center, Container, Group, List, Loader, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { capMaSso, useDotXacNhan, useHoSoToi, useMucDoDayDu } from '@/api/hocVien';
+import { capMaSso, useDotXacNhan, useHoSoToi, useMucDoDayDu, type SsoTarget } from '@/api/hocVien';
+import { useTinhTrangKhaoSat } from '@/api/ketQuaKhaoSat';
 import type { HocVien, MucDoDayDu } from '@/api/types';
 import { useCauHinhTrienKhai, type CauHinhTrienKhai } from '@/content/trienKhai';
 import { chuanHoaLienKet } from '@/lib/lienKet';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
+import { NHAN_MUC_NANG_LUC, TEN_BAI_KHAO_SAT, nhanTrangThaiKhaoSat } from '@/lib/trangThaiKhaoSat';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
 import { CountdownTimer } from '@/components/CountdownTimer';
@@ -246,6 +248,7 @@ function KhoiKhaoSatDauVao({ mucDo, cauHinh }: { mucDo: MucDoDayDu; cauHinh: Cau
       {mucDo.day_du ? (
         <Stack gap="xs">
           <Text>Hồ sơ đã đầy đủ. Thầy/Cô có thể bắt đầu làm khảo sát đầu vào.</Text>
+          {cauHinh.kenhDanhGia === 'sso' && <TomTatKhaoSat loai={['khao-sat', 'danh-gia']} />}
           {quaM6 ? (
             <Button component={Link} to="/toi/danh-gia-dau-vao" mt="xs">
               Làm khảo sát đầu vào
@@ -258,6 +261,29 @@ function KhoiKhaoSatDauVao({ mucDo, cauHinh }: { mucDo: MucDoDayDu; cauHinh: Cau
         <DieuKienKhaoSat mucDo={mucDo} />
       )}
     </StatusBanner>
+  );
+}
+
+/** Tình hình từng bài trên hệ thống khảo sát (2026-10-04). Lỗi/đang tải -> không hiện gì (không chặn nút làm bài). */
+function TomTatKhaoSat({ loai }: { loai: SsoTarget[] }) {
+  const { data } = useTinhTrangKhaoSat();
+  if (!data) return null;
+  return (
+    <Stack gap={6} mt={4} aria-label="Tình hình làm khảo sát">
+      {loai.map((l) => {
+        const tt = data.find((t) => t.loai === l);
+        if (!tt) return null;
+        const badge = nhanTrangThaiKhaoSat(tt.trang_thai, tt.can_kiem_tra);
+        return (
+          <Group key={l} gap="xs" wrap="nowrap" justify="space-between">
+            <Text size="sm">{TEN_BAI_KHAO_SAT[l]}</Text>
+            <Badge color={badge.mau} variant="light" style={{ flexShrink: 0 }}>
+              {tt.trang_thai === 'hoan_thanh' && tt.muc ? `${badge.nhan} · ${NHAN_MUC_NANG_LUC[tt.muc]}` : badge.nhan}
+            </Badge>
+          </Group>
+        );
+      })}
+    </Stack>
   );
 }
 
@@ -300,6 +326,7 @@ function KhoiKhaoSatDauRa({ mucDo }: { mucDo: MucDoDayDu }) {
       {mucDo.day_du ? (
         <Stack gap="xs">
           <Text>Hồ sơ đã đầy đủ. Thầy/Cô có thể bắt đầu làm khảo sát đầu ra.</Text>
+          <TomTatKhaoSat loai={['dau-ra']} />
           {chuyen.isError && <Text c="red">{thongDiepLoiChung(chuyen.error)}</Text>}
           <Button mt="xs" loading={chuyen.isPending} onClick={() => chuyen.mutate()}>
             Làm khảo sát đầu ra

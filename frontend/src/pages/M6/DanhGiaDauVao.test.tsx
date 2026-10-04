@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
 import { db } from '@/test/mocks/db';
+import { datTinhTrangBai } from '@/test/mocks/sso';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import DanhGiaDauVao from './DanhGiaDauVao';
@@ -132,7 +133,7 @@ describe('M6 — kênh trang khảo sát (SSO, 2026-10-02)', () => {
     const user = userEvent.setup();
     renderDaDangNhap();
 
-    await user.click(await screen.findByRole('button', { name: 'Làm phiếu đánh giá năng lực số' }));
+    await user.click(within(await screen.findByLabelText('Phiếu đánh giá năng lực số')).getByRole('button', { name: 'Làm bài' }));
     await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
     const url = new URL(assign.mock.calls[0][0]);
     expect(url.searchParams.get('target')).toBe('danh-gia');
@@ -146,7 +147,7 @@ describe('M6 — kênh trang khảo sát (SSO, 2026-10-02)', () => {
     const user = userEvent.setup();
     renderDaDangNhap();
 
-    await user.click(await screen.findByRole('button', { name: 'Làm phiếu khảo sát kĩ năng số' }));
+    await user.click(within(await screen.findByLabelText('Phiếu khảo sát kĩ năng số')).getByRole('button', { name: 'Làm bài' }));
     await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
     expect(new URL(assign.mock.calls[0][0]).searchParams.get('target')).toBe('khao-sat');
 
@@ -169,7 +170,7 @@ describe('M6 — kênh trang khảo sát (SSO, 2026-10-02)', () => {
     const user = userEvent.setup();
     renderDaDangNhap();
 
-    await user.click(await screen.findByRole('button', { name: 'Làm phiếu đánh giá năng lực số' }));
+    await user.click(within(await screen.findByLabelText('Phiếu đánh giá năng lực số')).getByRole('button', { name: 'Làm bài' }));
     expect(await screen.findByText('Hồ sơ chưa đầy đủ, chưa thể chuyển sang trang khảo sát')).toBeInTheDocument();
     expect(assign).not.toHaveBeenCalled();
   });
@@ -184,6 +185,65 @@ describe('M6 — kênh trang khảo sát (SSO, 2026-10-02)', () => {
     expect(await screen.findByText('Chưa chọn đối tượng (giáo viên hoặc cán bộ quản lý)')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Bổ sung hồ sơ' })).toHaveAttribute('href', '/toi/ho-so');
     expect(screen.queryByRole('link', { name: /Xem lại/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Làm phiếu/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Làm bài' })).not.toBeInTheDocument();
+  });
+
+  describe('tình trạng từng bài (2026-10-04)', () => {
+    it('mặc định: cả 2 bài "Chưa làm" theo thứ tự 1, 2, nút "Làm bài"', async () => {
+      db.danhGiaDauVao = { kenh: 'sso', du_dieu_kien: true };
+      renderDaDangNhap();
+      const khaoSat = await screen.findByLabelText('Phiếu khảo sát kĩ năng số');
+      expect(await within(khaoSat).findByText('Chưa làm')).toBeInTheDocument();
+      expect(within(khaoSat).getByText('1. Phiếu khảo sát kĩ năng số')).toBeInTheDocument();
+      expect(screen.getByText('2. Phiếu đánh giá năng lực số')).toBeInTheDocument();
+    });
+
+    it('đang làm -> nút "Làm tiếp"; đã mở quá lâu -> "Cần kiểm tra lại" + lời nhắc nộp bài', async () => {
+      db.danhGiaDauVao = { kenh: 'sso', du_dieu_kien: true };
+      datTinhTrangBai({ loai: 'khao-sat', trang_thai: 'dang_lam' });
+      datTinhTrangBai({ loai: 'danh-gia', trang_thai: 'da_mo', can_kiem_tra: true });
+      renderDaDangNhap();
+
+      const khaoSat = await screen.findByLabelText('Phiếu khảo sát kĩ năng số');
+      expect(await within(khaoSat).findByText('Đang làm')).toBeInTheDocument();
+      expect(within(khaoSat).getByRole('button', { name: 'Làm tiếp' })).toBeInTheDocument();
+
+      const danhGia = screen.getByLabelText('Phiếu đánh giá năng lực số');
+      expect(within(danhGia).getByText('Cần kiểm tra lại')).toBeInTheDocument();
+      expect(within(danhGia).getByText(/chưa nhận được bài nộp/)).toBeInTheDocument();
+    });
+
+    it('hoàn thành -> hiện thời điểm + mức (không có điểm); xong cả 2 -> thông báo đã hoàn thành', async () => {
+      db.danhGiaDauVao = { kenh: 'sso', du_dieu_kien: true };
+      datTinhTrangBai({ loai: 'khao-sat', trang_thai: 'hoan_thanh', hoan_thanh_luc: '2026-10-04T01:30:00.000Z', muc: 'co_ban' });
+      datTinhTrangBai({ loai: 'danh-gia', trang_thai: 'hoan_thanh', hoan_thanh_luc: '2026-10-04T02:00:00.000Z', muc: 'thanh_thao' });
+      renderDaDangNhap();
+
+      expect(await screen.findByText('Thầy/Cô đã hoàn thành 2 bài khảo sát đầu vào')).toBeInTheDocument();
+      const danhGia = screen.getByLabelText('Phiếu đánh giá năng lực số');
+      expect(within(danhGia).getByText('Đã hoàn thành')).toBeInTheDocument();
+      expect(within(danhGia).getByText(/Hoàn thành lúc 04\/10\/2026 09:00/)).toBeInTheDocument();
+      expect(within(danhGia).getByText('Thành thạo')).toBeInTheDocument();
+      expect(within(danhGia).getByRole('button', { name: 'Mở lại trang khảo sát' })).toBeInTheDocument();
+    });
+
+    it('hoàn thành nhưng chưa có mức -> "Kết quả đang được tổng hợp"', async () => {
+      db.danhGiaDauVao = { kenh: 'sso', du_dieu_kien: true };
+      datTinhTrangBai({ loai: 'khao-sat', trang_thai: 'hoan_thanh' });
+      renderDaDangNhap();
+      const khaoSat = await screen.findByLabelText('Phiếu khảo sát kĩ năng số');
+      expect(await within(khaoSat).findByText('Kết quả đang được tổng hợp.')).toBeInTheDocument();
+    });
+
+    it('không tải được tình trạng -> vẫn cho làm bài, không hiện nhãn trạng thái', async () => {
+      db.danhGiaDauVao = { kenh: 'sso', du_dieu_kien: true };
+      server.use(
+        http.get('/sso/tinh-trang', () => HttpResponse.json({ error: { code: 'X', message: 'lỗi' } }, { status: 500 })),
+      );
+      renderDaDangNhap();
+      const khaoSat = await screen.findByLabelText('Phiếu khảo sát kĩ năng số');
+      expect(within(khaoSat).getByRole('button', { name: 'Làm bài' })).toBeEnabled();
+      expect(within(khaoSat).queryByText('Chưa làm')).not.toBeInTheDocument();
+    });
   });
 });
