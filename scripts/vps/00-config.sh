@@ -75,9 +75,14 @@ export PM2_APP_NAME="boiduongnls-backend"
 # --- Backup ---
 export BACKUP_DIR="/home/${APP_USER}/backups/postgres"
 export BACKUP_RETENTION_DAYS="14"
-# Tuy chon: bat sync backup ra remote qua rclone (vd. "gdrive:boiduongnls-backups").
-# Can tu chay `rclone config` truoc. De trong = chi giu backup local tren VPS.
+# 4 lan/ngay (02h, 08h, 14h, 20h gio VPS): mat toi da ~6 gio du lieu neu VPS hong.
+export BACKUP_CRON="0 2,8,14,20 * * *"
+# Day backup ra NGOAI VPS qua rclone. Dat ten remote CRYPT (ma hoa phia VPS, dich vu
+# luu tru chi thay file da ma hoa) - vd. "hocvien-crypt:" boc ngoai "gdrive:boiduongnls-backups".
+# Cach tao: README.md muc "Sao luu ra ngoai VPS". De trong = chi giu backup tren VPS.
 export RCLONE_REMOTE=""
+# So ngay giu ban sao luu tren remote (dai hon tren VPS vi dung luong remote re hon).
+export RCLONE_REMOTE_RETENTION_DAYS="90"
 
 # --- Giam sat / alert ---
 # Tuy chon: webhook nhan canh bao khi Nginx/Postgres/PM2 down (vd. topic ntfy.sh,

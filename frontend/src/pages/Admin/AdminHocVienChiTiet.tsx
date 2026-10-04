@@ -3,6 +3,9 @@ import { useParams } from 'react-router-dom';
 import { Alert, Box, Button, Container, Group, Paper, Select, Skeleton, Stack, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useHocVienTheoId } from '@/api/admin';
+import { useNhatKyHocVien } from '@/api/taiKhoanHocVien';
+import { useToi } from '@/auth/AuthContext';
+import { DongThoiGianNhatKy } from '@/components/DongThoiGianNhatKy';
 import {
   useCapNhatCumDangKy,
   useChiTietKhoa,
@@ -35,6 +38,7 @@ const TRUONG_HIEN_THI = [
 export default function AdminHocVienChiTiet() {
   const { id } = useParams<{ id: string }>();
   const { data, isLoading, isError, error } = useHocVienTheoId(id);
+  const { nguoiDung } = useToi();
 
   return (
     <>
@@ -85,9 +89,30 @@ export default function AdminHocVienChiTiet() {
             <KhoaVaLopCuaHocVien hocVienId={id} />
           </Paper>
         )}
+
+        {/* Chỉ quản trị: API trả 403 cho tài khoản đơn vị (có IP/thiết bị). */}
+        {id && nguoiDung?.vai_tro === 'quan_tri' && (
+          <Paper withBorder radius={14} p="lg" mt="lg">
+            <Text fz={16} fw={700} mb={4}>
+              Nhật ký hoạt động
+            </Text>
+            <Text fz={13} c="dimmed" mb="md">
+              Đăng nhập, sửa hồ sơ, xác nhận, khảo sát, kết quả, phân lớp, email, hỗ trợ — dùng để đối chiếu khi học
+              viên phản ánh.
+            </Text>
+            <NhatKyCuaHocVien hocVienId={id} />
+          </Paper>
+        )}
       </Container>
     </>
   );
+}
+
+function NhatKyCuaHocVien({ hocVienId }: { hocVienId: string }) {
+  const { data, isLoading, isError, error } = useNhatKyHocVien(hocVienId);
+  if (isLoading) return <Skeleton height={80} />;
+  if (isError) return <Alert color="red">{thongDiepLoiChung(error)}</Alert>;
+  return data ? <DongThoiGianNhatKy muc={data.muc} /> : null;
 }
 
 // Thêm 2026-09-30 (QĐ10, docs/api-contract.md mục 3) — sửa tay phân lớp theo giai đoạn (spec

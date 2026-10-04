@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import { HocVienService } from '../hoc-vien/hoc-vien.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
@@ -54,6 +55,7 @@ export class SsoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly hocVienService: HocVienService,
+    private readonly nhatKy: NhatKyService,
   ) {}
 
   async capMa(
@@ -67,6 +69,12 @@ export class SsoService {
     }
 
     const { url, het_han } = await this.taoMa(caller.hoc_vien_id!, target);
+    await this.nhatKy.ghi({
+      hanh_dong: 'chuyen_sang_khao_sat',
+      hoc_vien_id: caller.hoc_vien_id,
+      mo_ta:
+        target === 'dau-ra' ? 'Khảo sát đầu ra' : 'Khảo sát / đánh giá đầu vào',
+    });
     return { url, het_han };
   }
 

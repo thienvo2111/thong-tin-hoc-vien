@@ -63,11 +63,14 @@ quyền `sudo`, nhóm `adm`/`sudo`).
    `WEB_ROOT`, `prisma migrate deploy`, seed tài khoản `quan_tri` đầu tiên
    (idempotent — an toàn chạy lại), khởi động/reload PM2, reload Nginx.
 
-9. `bash 07-setup-backup.sh` (**không sudo**) — `pg_dump` hằng ngày (cron
-   02:00) nén gzip vào `~/backups/postgres`, tự xoá bản cũ hơn
-   `BACKUP_RETENTION_DAYS` (mặc định 14 ngày). Đặt `RCLONE_REMOTE` trong
-   `00-config.sh` (và tự `rclone config` trước) nếu muốn đồng bộ thêm ra
-   ngoài VPS — để trống thì chỉ giữ local (vẫn mất nếu VPS mất, cân nhắc bật).
+9. `bash 07-setup-backup.sh` (**không sudo**) — `pg_dump` theo `BACKUP_CRON`
+   (mặc định 4 lần/ngày: 02h, 08h, 14h, 20h) nén gzip vào `~/backups/postgres`,
+   kiểm tra file nén toàn vẹn, tự xoá bản cũ hơn `BACKUP_RETENTION_DAYS`
+   (14 ngày). Nếu đặt `RCLONE_REMOTE` thì mỗi bản được đẩy thêm ra ngoài VPS
+   (giữ `RCLONE_REMOTE_RETENTION_DAYS` = 90 ngày). Lỗi ở bất kỳ bước nào ->
+   ghi `backup.log` và gửi cảnh báo tới `ALERT_WEBHOOK_URL` (nếu có). Script
+   kiểm tra remote trước khi cài cron — cấu hình sai sẽ báo ngay. Xem mục
+   **Sao lưu ra ngoài VPS** bên dưới để bật (nên bật trước khi mở đợt).
 
 10. `sudo bash 08-setup-monitoring.sh` — cron mỗi 5 phút kiểm tra
     Postgres/Nginx/PM2/dung lượng disk, tự `restart` service hệ thống bị
@@ -122,6 +125,38 @@ deploy, khôi phục từ bản backup vừa tạo:
 ls -t ~/backups/postgres/*.sql.gz | head -1   # tim ban backup moi nhat
 gunzip -c ~/backups/postgres/<file>.sql.gz | psql -h 127.0.0.1 -U hocvien_app thong_tin_hoc_vien
 ```
+
+## Sao lưu ra ngoài VPS (làm 1 lần, ~10 phút)
+
+Bản sao lưu chứa CCCD, số điện thoại của ~9.000 học viên — **bắt buộc mã
+hoá** trước khi rời VPS. Dùng 2 remote rclone lồng nhau: `gdrive` (nơi lưu,
+vd. Google Drive tài khoản công việc của đơn vị) và `hocvien-crypt` (mã hoá
+bọc ngoài — Google chỉ thấy tên file/nội dung đã mã hoá).
+
+1. Trên VPS: `sudo apt-get install -y rclone`
+2. VPS không có trình duyệt nên lấy token Google trên **máy tính cá nhân**:
+   cài rclone (<https://rclone.org/downloads/>), chạy `rclone authorize "drive"`,
+   đăng nhập tài khoản Google sẽ chứa bản sao lưu, copy đoạn JSON token in ra.
+3. Trên VPS: `rclone config` -> `n` (new remote) -> tên `gdrive` -> loại
+   `drive` -> để trống client_id/secret -> scope `drive.file` -> "Use auto
+   config?" chọn **n** -> dán token ở bước 2 -> các câu còn lại Enter.
+4. Vẫn `rclone config` -> `n` -> tên `hocvien-crypt` -> loại `crypt` ->
+   remote `gdrive:boiduongnls-backups` -> filename encryption `standard` ->
+   chọn **tự nhập mật khẩu dài** (2 mật khẩu: password + salt).
+   **Lưu 2 mật khẩu này ở nơi an toàn ngoài VPS** (két mật khẩu của đơn vị) —
+   mất chúng là mất khả năng giải mã, mất VPS thì phải có chúng để khôi phục.
+5. Sửa `00-config.sh`: `export RCLONE_REMOTE="hocvien-crypt:"` (và nên đặt
+   `ALERT_WEBHOOK_URL` để nhận cảnh báo khi sao lưu lỗi).
+6. Chạy lại `bash 07-setup-backup.sh` — script kiểm tra remote, chạy thử 1
+   lần, in 5 bản mới nhất trên remote, rồi cài cron.
+
+Kiểm tra định kỳ: `tail ~/backups/postgres/backup.log` (mỗi lần chạy có
+dòng `OK ... ` và `OK da day len hocvien-crypt:`); `rclone lsl hocvien-crypt:`.
+
+Khôi phục khi mất VPS (máy mới đã cài rclone + Postgres): tạo lại 2 remote
+như bước 3-4 với **đúng 2 mật khẩu cũ**, rồi
+`rclone copy hocvien-crypt:<file>.sql.gz /tmp/` và
+`gunzip -c /tmp/<file>.sql.gz | psql -h 127.0.0.1 -U hocvien_app thong_tin_hoc_vien`.
 
 ## Lưu ý fragile: danh sách route proxy trong bước 7
 
