@@ -37,6 +37,9 @@ if [ ! -f .env ]; then
   sed -i "s#^DATABASE_URL=.*#DATABASE_URL=\"postgresql://${DB_USER}:${DB_PASSWORD}@localhost:5432/${DB_NAME}?schema=public\"#" .env
   sed -i "s#^PORT=.*#PORT=${BACKEND_PORT}#" .env
   sed -i "s#^CORS_ORIGIN=.*#CORS_ORIGIN=https://${DOMAIN}#" .env
+  # Link trong email (kich hoat tai khoan, dat lai mat khau, xac minh email) —
+  # .env.example de http://localhost:5173.
+  sed -i "s#^FRONTEND_URL=.*#FRONTEND_URL=https://${DOMAIN}#" .env
   sed -i "s#^JWT_SECRET=.*#JWT_SECRET=${JWT_SECRET_VAL}#" .env
   sed -i "s#^VLE_SECRET_KEY=.*#VLE_SECRET_KEY=${VLE_SECRET_VAL}#" .env
   echo "    -> Nho dien SMTP_HOST/SMTP_USER/SMTP_PASS/SMTP_FROM that trong ${APP_DIR}/backend/.env truoc khi dung that"

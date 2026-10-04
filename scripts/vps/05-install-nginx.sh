@@ -38,6 +38,12 @@ server {
     root ${FRONTEND_DIST};
     index index.html;
 
+    # HSTS (xem HSTS_MAX_AGE trong 00-config.sh). TLS terminate o cong HCMUE,
+    # header nay di kem moi response HTTPS toi trinh duyet. "always" de ap ca
+    # response loi. Location nao co add_header rieng KHONG ke thua dong nay —
+    # phai lap lai trong location do (xem khoi file tinh ben duoi).
+    add_header Strict-Transport-Security "max-age=${HSTS_MAX_AGE}" always;
+
     # Backend NestJS (khong co global prefix - xem backend/src/*.controller.ts)
     # /api la Swagger docs; cac path con lai la route API that su.
     # THEM CONTROLLER MOI -> them prefix vao day roi chay lai script nay (06-deploy.sh co canh bao neu thieu).
@@ -60,6 +66,7 @@ server {
     location ~* \.(js|css|svg|png|jpg|jpeg|gif|ico|woff2?)$ {
         expires 30d;
         add_header Cache-Control "public, immutable";
+        add_header Strict-Transport-Security "max-age=${HSTS_MAX_AGE}" always;
     }
 }
 EOF

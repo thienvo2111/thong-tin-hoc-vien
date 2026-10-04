@@ -64,6 +64,12 @@ else
 fi
 
 export BACKEND_PORT="3000"
+# HSTS: trinh duyet da vao bang HTTPS 1 lan se tu chuyen moi lan sau sang
+# HTTPS (khong con roi vao http:// -> 503 cua cong HAProxy HCMUE). Bat dau
+# 86400 (1 ngay); chay on dinh ~1 tuan thi nang len 31536000 (1 nam) roi chay
+# lai 05-install-nginx.sh. KHONG them includeSubDomains (subdomain khac cua
+# hcmue.edu.vn co the chi co HTTP). Dat "0" de tat HSTS.
+export HSTS_MAX_AGE="86400"
 export PM2_APP_NAME="boiduongnls-backend"
 
 # --- Backup ---
