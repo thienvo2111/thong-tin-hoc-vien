@@ -14,8 +14,10 @@ import type {
   KhoaBoiDuongChiTiet,
   KhoaHocDangKy,
   MonHoc,
+  NhatKyHocVien,
   NhatKyImportItem,
   TaiKhoanDonVi,
+  TaiKhoanHocVien,
   TongHopDonViRow,
   TongQuanResult,
   YeuCauHoTro,
@@ -665,6 +667,78 @@ export function taoDonViChuaCapMau(): DonViChuaCap[] {
   ];
 }
 
+// Tài khoản học viên — /nguoi-dung/hoc-vien. khoa_den tính lúc tạo để luôn ở tương lai.
+export function taoDanhSachTaiKhoanHocVienMau(): TaiKhoanHocVien[] {
+  const hv = (id: string, ho_ten: string, cccd: string, sdt: string | null): TaiKhoanHocVien['hoc_vien'] => ({
+    id,
+    ho_ten,
+    so_dinh_danh_ca_nhan: cccd,
+    ngay_sinh: 5,
+    thang_sinh: 3,
+    nam_sinh: 1985,
+    so_dien_thoai_lien_he: sdt,
+    email_lien_he: null,
+    don_vi_cong_tac: { id: 'dv-tr001', ten_don_vi: 'Trường THPT Thoại Ngọc Hầu' },
+  });
+  return [
+    {
+      id: 'nd-hv-1',
+      ten_dang_nhap: '089185000001',
+      trang_thai: 'active',
+      phai_doi_mat_khau: false,
+      so_lan_dang_nhap_sai: 5,
+      khoa_den: new Date(Date.now() + 30 * 60_000).toISOString(),
+      dang_nhap_lan_cuoi: '2026-10-02T03:00:00.000Z',
+      created_at: '2026-09-01T00:00:00.000Z',
+      hoc_vien: hv('hv-1', 'Nguyễn Văn An', '089185000001', '0912345678'),
+    },
+    {
+      id: 'nd-hv-2',
+      ten_dang_nhap: '089185000002',
+      trang_thai: 'ngung',
+      phai_doi_mat_khau: false,
+      so_lan_dang_nhap_sai: 0,
+      khoa_den: null,
+      dang_nhap_lan_cuoi: '2026-10-01T03:00:00.000Z',
+      created_at: '2026-09-01T00:00:00.000Z',
+      hoc_vien: hv('hv-2', 'Trần Thị Bình', '089185000002', null),
+    },
+    {
+      id: 'nd-hv-3',
+      ten_dang_nhap: '089185000003',
+      trang_thai: 'active',
+      phai_doi_mat_khau: true,
+      so_lan_dang_nhap_sai: 0,
+      khoa_den: null,
+      dang_nhap_lan_cuoi: null,
+      created_at: '2026-09-01T00:00:00.000Z',
+      hoc_vien: hv('hv-3', 'Lê Văn Cường', '089185000003', '0987654321'),
+    },
+  ];
+}
+
+export function taoNhatKyHocVienMau(): NhatKyHocVien {
+  const muc = (id: string, nhom: NhatKyHocVien['muc'][number]['nhom'], tieu_de: string, gio: string) => ({
+    id,
+    thoi_gian: `2026-10-02T${gio}:00.000Z`,
+    nhom,
+    tieu_de,
+    noi_dung: null,
+    truong: null,
+    nguoi_thuc_hien: null,
+    ip: null,
+    thiet_bi: null,
+  });
+  return {
+    hoc_vien: { id: 'hv-1', ho_ten: 'Nguyễn Văn An' },
+    muc: [
+      { ...muc('nk-1', 'tai_khoan', 'Đăng nhập thất bại', '03'), ip: '113.161.1.1', thiet_bi: 'Mozilla/5.0 Zalo' },
+      { ...muc('nk-2', 'ho_so', 'Sửa hồ sơ', '02'), truong: 'so_dien_thoai_lien_he', noi_dung: '0911 → 0912', nguoi_thuc_hien: 'Học viên' },
+      { ...muc('nk-3', 'tai_khoan', 'Được đặt lại mật khẩu', '01'), nguoi_thuc_hien: 'Quản trị viên' },
+    ],
+  };
+}
+
 export const db = {
   hoSo: taoHoSoMoi(),
   dotXacNhan: taoDotXacNhanDangMoThieu(),
@@ -690,6 +764,8 @@ export const db = {
   danhSachYeuCauHoTro: taoDanhSachYeuCauHoTroMau(),
   taiKhoanDonVi: taoDanhSachTaiKhoanDonViMau(),
   donViChuaCap: taoDonViChuaCapMau(),
+  taiKhoanHocVien: taoDanhSachTaiKhoanHocVienMau(),
+  nhatKyHocVien: taoNhatKyHocVienMau(),
 };
 
 export function resetDb(): void {
@@ -716,4 +792,6 @@ export function resetDb(): void {
   db.danhSachYeuCauHoTro = taoDanhSachYeuCauHoTroMau();
   db.taiKhoanDonVi = taoDanhSachTaiKhoanDonViMau();
   db.donViChuaCap = taoDonViChuaCapMau();
+  db.taiKhoanHocVien = taoDanhSachTaiKhoanHocVienMau();
+  db.nhatKyHocVien = taoNhatKyHocVienMau();
 }
