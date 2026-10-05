@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Autocomplete, Loader, Stack, Text } from '@mantine/core';
+import { Autocomplete, Loader, Stack, Text, type OptionsFilter } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useQuery } from '@tanstack/react-query';
 import { layDonViCongTac, layDonViCongTacTheoId } from '@/api/danhMuc';
@@ -35,8 +35,12 @@ function nhanDonVi(d: DonViCongTac): string {
  */
 export function SelectDonVi({ label, nhanBanDau, idBanDau, onChange, error, required, disabled }: Props) {
   const [text, setText] = useState(nhanBanDau ?? '');
+  // Nhãn của đơn vị ĐANG CHỌN (hồ sơ có sẵn hoặc vừa chọn) — ô tìm đang hiện nhãn này thì KHÔNG coi là
+  // từ khóa tìm kiếm (2026-10-05: trước đây nhãn "Trường X — Xã Y" bị gửi làm q nên đổi Phường/xã ra rỗng).
+  const [nhanDaChon, setNhanDaChon] = useState<string | null>(nhanBanDau ?? null);
   const [debounced] = useDebouncedValue(text, 300);
-  const daGoDuChu = debounced.trim().length >= 2;
+  const dangHienNhanDaChon = !!nhanDaChon && debounced === nhanDaChon;
+  const daGoDuChu = debounced.trim().length >= 2 && !dangHienNhanDaChon;
 
   const [tinhId, setTinhId] = useState<string | null>(null);
   const [phuongXaId, setPhuongXaId] = useState<string | null>(null);
@@ -79,6 +83,18 @@ export function SelectDonVi({ label, nhanBanDau, idBanDau, onChange, error, requ
 
   const danhSach = data?.data ?? [];
   const options = danhSach.map(nhanDonVi);
+  // Đang hiện nhãn đơn vị đã chọn -> mở danh sách thì hiện đủ trường trong xã, không lọc theo nhãn đó.
+  const locTheoChu: OptionsFilter = (input) =>
+    nhanDaChon && input.search === nhanDaChon ? input.options : locTiengViet(input);
+
+  // Đổi địa bàn = tìm trường khác: bỏ đơn vị đang chọn (có thể không thuộc địa bàn mới) để danh sách
+  // trường của xã mới hiện đầy đủ.
+  function boDonViDangChon() {
+    setText('');
+    setNhanDaChon(null);
+    nhanVuaChonRef.current = null;
+    onChange(null, null);
+  }
 
   return (
     <Stack gap="xs">
@@ -88,8 +104,10 @@ export function SelectDonVi({ label, nhanBanDau, idBanDau, onChange, error, requ
         phienBan="hien_tai"
         value={tinhId}
         onChange={(id) => {
+          if (id === tinhId) return;
           setTinhId(id);
           setPhuongXaId(null);
+          boDonViDangChon();
         }}
         disabled={disabled}
       />
@@ -99,7 +117,11 @@ export function SelectDonVi({ label, nhanBanDau, idBanDau, onChange, error, requ
         phienBan="hien_tai"
         parentId={tinhId}
         value={phuongXaId}
-        onChange={setPhuongXaId}
+        onChange={(id) => {
+          if (id === phuongXaId) return;
+          setPhuongXaId(id);
+          boDonViDangChon();
+        }}
         disabled={disabled}
       />
       <Text size="xs" c="dimmed">
@@ -118,16 +140,18 @@ export function SelectDonVi({ label, nhanBanDau, idBanDau, onChange, error, requ
             return;
           }
           nhanVuaChonRef.current = null;
+          setNhanDaChon(null);
           onChange(null, null);
         }}
         onOptionSubmit={(submitted) => {
           const found = danhSach.find((d) => nhanDonVi(d) === submitted);
           setText(submitted);
+          setNhanDaChon(submitted);
           nhanVuaChonRef.current = submitted;
           onChange(found?.id ?? null, submitted);
         }}
         rightSection={isFetching ? <Loader size="xs" /> : null}
-        filter={locTiengViet}
+        filter={locTheoChu}
         error={error}
         required={required}
         disabled={disabled}

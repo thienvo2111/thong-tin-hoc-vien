@@ -7,13 +7,22 @@ import { server } from '@/test/mocks/server';
 import { renderTrang } from '@/test/testUtils';
 import { SelectDonVi } from './SelectDonVi';
 
-function Bao({ disabled, idBanDau }: { disabled?: boolean; idBanDau?: string | null }) {
-  const [id, setId] = useState<string | null>(null);
+function Bao({
+  disabled,
+  idBanDau,
+  nhanBanDau,
+}: {
+  disabled?: boolean;
+  idBanDau?: string | null;
+  nhanBanDau?: string | null;
+}) {
+  const [id, setId] = useState<string | null>(idBanDau ?? null);
   return (
     <div>
       <SelectDonVi
         label="Đơn vị công tác"
         idBanDau={idBanDau}
+        nhanBanDau={nhanBanDau}
         onChange={(donViId) => setId(donViId)}
         disabled={disabled}
       />
@@ -172,7 +181,81 @@ describe('SelectDonVi', () => {
 
     await waitFor(() => expect(oTinh).toHaveValue('An Giang'));
     await waitFor(() => expect(oPhuong).toHaveValue('Phường Long Xuyên'));
-    // Chỉ điền sẵn 2 ô filter — KHÔNG tự chọn luôn đơn vị công tác (không ép người dùng phải dùng lại).
-    expect(screen.getByTestId('gia-tri')).toHaveTextContent('');
+    // Chỉ điền sẵn 2 ô filter — giữ nguyên đơn vị đang có, không tự đổi.
+    expect(screen.getByTestId('gia-tri')).toHaveTextContent('dv-1');
+  });
+
+  describe('hồ sơ đã có trường, đổi địa bàn (2026-10-05)', () => {
+    const NHAN = 'THPT Long Xuyên — Phường Long Xuyên';
+
+    it('chưa đổi gì: bấm ô trường -> hiện đủ trường trong xã, KHÔNG gửi nhãn trường đang chọn làm từ khóa', async () => {
+      const qNhan: (string | null)[] = [];
+      server.events.on('request:start', ({ request }) => {
+        const url = new URL(request.url);
+        if (url.pathname === '/danh-muc/don-vi-cong-tac' && !url.searchParams.get('id')) qNhan.push(url.searchParams.get('q'));
+      });
+      const user = userEvent.setup();
+      renderTrang(<Bao idBanDau="dv-1" nhanBanDau={NHAN} />);
+      const oPhuong = screen.getByLabelText('Phường/xã', { selector: 'input' });
+      await waitFor(() => expect(oPhuong).toHaveValue('Phường Long Xuyên'));
+
+      await user.click(screen.getByDisplayValue(NHAN));
+      expect(await screen.findByRole('option', { name: NHAN })).toBeInTheDocument();
+      expect(qNhan.every((q) => !q)).toBe(true);
+      server.events.removeAllListeners();
+    });
+
+    it('đổi Tỉnh/thành + Phường/xã -> bỏ trường cũ, hiện danh sách trường của xã mới để chọn lại', async () => {
+      const user = userEvent.setup();
+      renderTrang(<Bao idBanDau="dv-1" nhanBanDau={NHAN} />);
+      const oTinh = screen.getByLabelText('Tỉnh/thành', { selector: 'input' });
+      await waitFor(() => expect(oTinh).toHaveValue('An Giang'));
+
+      await user.click(oTinh);
+      await user.click(await screen.findByRole('option', { name: 'Cần Thơ' }));
+      expect(screen.getByTestId('gia-tri')).toHaveTextContent('');
+      expect(screen.queryByDisplayValue(NHAN)).not.toBeInTheDocument();
+
+      const oPhuong = screen.getByLabelText('Phường/xã', { selector: 'input' });
+      await user.click(oPhuong);
+      await user.click(await screen.findByRole('option', { name: 'Phường Châu Đốc' }));
+
+      const oTim = screen.getByPlaceholderText('Gõ tên trường (ít nhất 2 ký tự)');
+      await user.click(oTim);
+      await user.click(await screen.findByRole('option', { name: 'THPT Châu Đốc — Phường Châu Đốc' }));
+      expect(screen.getByTestId('gia-tri')).toHaveTextContent('dv-2');
+    });
+
+    it('đổi chỉ Phường/xã (cùng tỉnh) cũng bỏ trường cũ, hiện trường của xã mới', async () => {
+      server.use(
+        http.get('/danh-muc/dia-danh', ({ request }) => {
+          const url = new URL(request.url);
+          const ds =
+            url.searchParams.get('cap') === 'tinh_thanh'
+              ? [{ id: 'tinh-1', ma: '89', ten: 'An Giang', cap: 'tinh_thanh', parent_id: null, trang_thai: 'active' }]
+              : [
+                  { id: 'phuong-1', ma: '001', ten: 'Phường Long Xuyên', cap: 'phuong_xa_dac_khu', parent_id: 'tinh-1', trang_thai: 'active' },
+                  { id: 'xa-3', ma: '003', ten: 'Xã Cần Đăng', cap: 'phuong_xa_dac_khu', parent_id: 'tinh-1', trang_thai: 'active' },
+                ];
+          return HttpResponse.json({ data: ds, total: ds.length, page: 1, page_size: 20 });
+        }),
+      );
+      const yeuCau: (string | null)[] = [];
+      server.events.on('request:start', ({ request }) => {
+        const url = new URL(request.url);
+        if (url.pathname === '/danh-muc/don-vi-cong-tac' && !url.searchParams.get('id')) yeuCau.push(url.searchParams.get('dia_ban_id'));
+      });
+      const user = userEvent.setup();
+      renderTrang(<Bao idBanDau="dv-1" nhanBanDau={NHAN} />);
+      const oPhuong = screen.getByLabelText('Phường/xã', { selector: 'input' });
+      await waitFor(() => expect(oPhuong).toHaveValue('Phường Long Xuyên'));
+
+      await user.click(oPhuong);
+      await user.click(await screen.findByRole('option', { name: 'Xã Cần Đăng' }));
+      expect(screen.getByTestId('gia-tri')).toHaveTextContent('');
+      expect(screen.queryByDisplayValue(NHAN)).not.toBeInTheDocument();
+      await waitFor(() => expect(yeuCau).toContain('xa-3'));
+      server.events.removeAllListeners();
+    });
   });
 });
