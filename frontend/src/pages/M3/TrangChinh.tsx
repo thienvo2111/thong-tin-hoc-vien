@@ -295,7 +295,8 @@ function DanhSachCapNhat({ tieuDe, dong }: { tieuDe: string; dong: string[] }) {
 }
 
 function KhoiTrangThai({ data }: { data: NonNullable<ReturnType<typeof useDotXacNhan>['data']> }) {
-  const { dot, dot_sap_mo, da_xac_nhan, xac_nhan_luc, day_du, thieu } = data;
+  const { dot, dot_sap_mo, da_xac_nhan, xac_nhan_luc, can_xac_nhan_lai, xac_nhan_gan_nhat, ap_dung_dot, day_du, thieu } =
+    data;
 
   if (dot && !day_du) {
     return (
@@ -324,7 +325,12 @@ function KhoiTrangThai({ data }: { data: NonNullable<ReturnType<typeof useDotXac
     return (
       <StatusBanner loai="info" tieuDe={`Đợt ${dot.ten}`}>
         <Stack gap="xs">
-          <Text>Hồ sơ đã đủ. Thầy/Cô cần kiểm tra lại và xác nhận trước {dinhDangNgayGio(dot.dong_luc)}</Text>
+          <Text>
+            {can_xac_nhan_lai
+              ? 'Thông tin hồ sơ đã được điều chỉnh sau lần xác nhận trước. Thầy/Cô cần kiểm tra và xác nhận lại trước '
+              : 'Hồ sơ đã đủ. Thầy/Cô cần kiểm tra lại và xác nhận trước '}
+            {dinhDangNgayGio(dot.dong_luc)}
+          </Text>
           <CountdownTimer dongLuc={dot.dong_luc} />
           <Button component={Link} to="/toi/xac-nhan" mt="xs">
             Xem lại &amp; xác nhận
@@ -381,9 +387,26 @@ function KhoiTrangThai({ data }: { data: NonNullable<ReturnType<typeof useDotXac
     <StatusBanner loai="info">
       <Stack gap="xs">
         <Text>Hiện không trong thời gian chỉnh sửa hồ sơ</Text>
-        <Button component={Link} to="/toi/ho-so" variant="default" mt="xs">
-          Xem hồ sơ
-        </Button>
+        {xac_nhan_gan_nhat && (
+          <Text size="sm">
+            Thầy/Cô đã xác nhận hồ sơ lúc {dinhDangNgayGio(xac_nhan_gan_nhat.xac_nhan_luc)} (đợt {xac_nhan_gan_nhat.dot_ten}).
+          </Text>
+        )}
+        {ap_dung_dot && (
+          <Text size="sm">
+            Cần điều chỉnh hoặc xác nhận lại thông tin, Thầy/Cô gửi yêu cầu Hỗ trợ để Ban tổ chức xử lý.
+          </Text>
+        )}
+        <Group gap="sm" mt="xs">
+          <Button component={Link} to="/toi/ho-so" variant="default">
+            Xem hồ sơ
+          </Button>
+          {ap_dung_dot && (
+            <Button component={Link} to="/toi/yeu-cau-ho-tro" variant="default">
+              Gửi yêu cầu hỗ trợ
+            </Button>
+          )}
+        </Group>
       </Stack>
     </StatusBanner>
   );

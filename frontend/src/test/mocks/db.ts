@@ -79,8 +79,13 @@ export function taoDotXacNhanDangMoThieu(): DotXacNhan {
   return {
     dot: { id: 'dot-1', ten: 'Kiểm tra hồ sơ đợt 1', loai: 'kiem_tra_bo_sung', mo_luc: '2026-09-01T00:00:00.000Z', dong_luc: '2026-10-04T16:59:59.000Z' },
     dot_sap_mo: null,
+    dang_mo: true,
     da_xac_nhan: false,
     xac_nhan_luc: null,
+    can_xac_nhan_lai: false,
+    dieu_chinh_luc: null,
+    xac_nhan_gan_nhat: null,
+    ap_dung_dot: true,
     day_du: false,
     thieu: [
       { field: 'so_dinh_danh_ca_nhan', message: 'Chưa có số CCCD' },

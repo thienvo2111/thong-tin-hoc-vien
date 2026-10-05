@@ -101,8 +101,21 @@ export const handlers = [
   http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json(db.khoaHocToi)),
 
   http.post('/hoc-vien/toi/xac-nhan', () => {
+    if (db.dotXacNhan.ap_dung_dot && !db.dotXacNhan.dot) {
+      return HttpResponse.json(
+        { error: { code: 'DOT_XAC_NHAN_DONG', message: 'Đợt xác nhận đã đóng' } },
+        { status: 403 },
+      );
+    }
+    if (db.dotXacNhan.da_xac_nhan) {
+      return HttpResponse.json(
+        { error: { code: 'CONFLICT', message: 'Thầy/Cô đã xác nhận hồ sơ ở đợt này. Chỉ cần xác nhận lại khi có điều chỉnh thông tin.' } },
+        { status: 409 },
+      );
+    }
     const xacNhanLuc = new Date().toISOString();
     db.dotXacNhan.da_xac_nhan = true;
+    db.dotXacNhan.can_xac_nhan_lai = false;
     db.dotXacNhan.xac_nhan_luc = xacNhanLuc;
     return HttpResponse.json({ xac_nhan_luc: xacNhanLuc, email_lien_he: db.hoSo.email_lien_he });
   }),

@@ -177,6 +177,31 @@ export class DotXacNhanService {
     return found !== null;
   }
 
+  // 2026-10-05: trạng thái xác nhận của học viên trong 1 đợt — xác nhận còn hiệu lực (nếu có) và lần
+  // xác nhận GẦN NHẤT đã bị hủy do sửa hồ sơ (để báo "thông tin có điều chỉnh, cần xác nhận lại").
+  async trangThaiXacNhanTrongDot(dotId: string, hocVienId: string) {
+    const [conHieuLuc, biHuyGanNhat] = await Promise.all([
+      this.prisma.xac_nhan_ho_so.findFirst({
+        where: { dot_id: dotId, hoc_vien_id: hocVienId, con_hieu_luc: true },
+      }),
+      this.prisma.xac_nhan_ho_so.findFirst({
+        where: { dot_id: dotId, hoc_vien_id: hocVienId, con_hieu_luc: false },
+        orderBy: { vo_hieu_luc_luc: 'desc' },
+      }),
+    ]);
+    return { conHieuLuc, biHuyGanNhat };
+  }
+
+  // Xác nhận còn hiệu lực gần nhất của học viên ở BẤT KỲ đợt nào — dùng khi không có đợt đang mở
+  // (đợt đã kết thúc) để vẫn cho học viên thấy mình đã xác nhận lúc nào.
+  async xacNhanConHieuLucGanNhat(hocVienId: string) {
+    return this.prisma.xac_nhan_ho_so.findFirst({
+      where: { hoc_vien_id: hocVienId, con_hieu_luc: true },
+      orderBy: { xac_nhan_luc: 'desc' },
+      include: { dot: { select: { ten: true } } },
+    });
+  }
+
   // Vô hiệu hóa xác nhận còn hiệu lực (nếu có) cho (dot, hoc_vien) — gọi khi
   // hồ sơ bị sửa tiếp sau khi đã xác nhận (rule T14). Trả về true nếu đã hủy
   // 1 xác nhận (dùng để trả xac_nhan_bi_huy trong response).

@@ -76,10 +76,11 @@ Mục nội dung trong `gioiThieu.ts` gắn `cheDo: 'khao_sat' | 'dang_nhap'` ch
 |---|---|---|
 | Đợt đang mở, hồ sơ thiếu | "Đợt {tên đợt}: còn {n} thông tin cần bổ sung. Hạn: {dong_luc}" + danh sách trường thiếu (nhãn tiếng Việt) | "Bổ sung thông tin" → M4 |
 | Đợt đang mở, đủ, chưa xác nhận | "Hồ sơ đã đủ. Thầy/Cô cần kiểm tra lại và xác nhận trước {dong_luc}" | "Xem lại & xác nhận" → M5 |
+| Đợt đang mở, đã xác nhận rồi sửa hồ sơ (`can_xac_nhan_lai`, 2026-10-05) | "Thông tin hồ sơ đã được điều chỉnh sau lần xác nhận trước. Thầy/Cô cần kiểm tra và xác nhận lại trước {dong_luc}" | "Xem lại & xác nhận" → M5 |
 | Đợt đang mở, đã xác nhận | "Đã xác nhận lúc {xac_nhan_luc}. Có thể sửa tới {dong_luc}, nhưng sửa xong phải xác nhận lại" | "Xem hồ sơ" → M4 |
 | Đợt 2 đang mở, đã xác nhận đợt 2 | Như trên + khối M6 | "Làm bài đánh giá" → M6 |
 | Chưa có đợt mở, có đợt sắp mở | "Đợt {tên} mở lúc {mo_luc}" | "Xem hồ sơ" (chỉ xem) |
-| Không có đợt mở | "Hiện không trong thời gian chỉnh sửa hồ sơ" | "Xem hồ sơ" (chỉ xem) |
+| Không có đợt mở | "Hiện không trong thời gian chỉnh sửa hồ sơ" (+ "Đã xác nhận hồ sơ lúc … (đợt …)" nếu có `xac_nhan_gan_nhat`; hồ sơ MOET thêm "Cần điều chỉnh hoặc xác nhận lại thông tin, gửi yêu cầu Hỗ trợ…", 2026-10-05) | "Xem hồ sơ" (chỉ xem) + "Gửi yêu cầu hỗ trợ" → M8 |
 
 - Đếm ngược thời gian còn lại khi dưới 24 giờ trước `dong_luc`.
 - Bảng nhãn tiếng Việt cho tên trường (`so_dinh_danh_ca_nhan` → "Số CCCD", `noi_sinh_id` → "Nơi sinh (tỉnh/thành)", …) đặt trong `src/lib/nhanTruong.ts`, dùng chung cho M3, M4, M5.
@@ -138,7 +139,13 @@ Mục nội dung trong `gioiThieu.ts` gắn `cheDo: 'khao_sat' | 'dang_nhap'` ch
 - Ô tích bắt buộc: "Tôi xác nhận các thông tin trên là chính xác và chịu trách nhiệm về thông tin đã khai."
 - Bấm "Xác nhận" → thành công: màn hình kết quả "Đã xác nhận lúc {giờ}. Bản sao hồ sơ đã gửi tới {email}." → nút "Về trang chính".
 
-**Nghiệm thu:** hồ sơ thiếu → không bấm được xác nhận; đủ → xác nhận xong M3 chuyển sang trạng thái "Đã xác nhận".
+**Khóa xác nhận lại & quá đợt (2026-10-05, hồ sơ import MOET):**
+- Đã xác nhận (còn hiệu lực) ở đợt đang mở → khung xanh "Thầy/Cô đã xác nhận hồ sơ — Đã xác nhận lúc {giờ}. Không cần xác nhận lại nếu thông tin không thay đổi…"; **ẩn** ô cam kết và nút xác nhận, vẫn có "Chỉnh sửa thông tin". API cũng chặn: `POST /hoc-vien/toi/xac-nhan` khi đã có xác nhận còn hiệu lực → 409.
+- Sửa hồ sơ sau khi xác nhận (xác nhận tự hủy) → khung vàng "Thông tin hồ sơ đã được điều chỉnh — … có điều chỉnh lúc {dieu_chinh_luc} … vui lòng kiểm tra lại và xác nhận lại"; nút đổi thành "Xác nhận lại".
+- Không có đợt mở (đã quá đợt) hoặc bấm xác nhận nhận `DOT_XAC_NHAN_DONG` → khung "Đã hết thời gian xác nhận" (kèm "đã xác nhận lúc …" nếu có) + "Đợt xác nhận đã kết thúc. Nếu cần điều chỉnh hoặc xác nhận lại thông tin, vui lòng gửi yêu cầu Hỗ trợ để Ban tổ chức xử lý" + nút "Gửi yêu cầu hỗ trợ" → M8; ẩn ô cam kết, nút xác nhận và link chỉnh sửa. Có đợt sắp mở → chỉ báo giờ mở.
+- Hồ sơ tự đăng ký (`ap_dung_dot=false`) giữ luồng cũ.
+
+**Nghiệm thu:** hồ sơ thiếu → không bấm được xác nhận; đủ → xác nhận xong M3 chuyển sang trạng thái "Đã xác nhận"; đã xác nhận → không xác nhận lần 2 được cho tới khi sửa hồ sơ; quá đợt → chỉ còn đường gửi Hỗ trợ.
 
 ---
 

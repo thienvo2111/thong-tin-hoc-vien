@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { Anchor, Box, Button, Card, Center, Checkbox, Container, Group, Loader, Stack, Table, Text, Title } from '@mantine/core';
 import { kiemTraTruocXacNhan, useDotXacNhan, useHoSoToi, xacNhanHoSo } from '@/api/hocVien';
-import type { HocVien, XacNhanResponse } from '@/api/types';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import type { DotXacNhan, HocVien, XacNhanResponse } from '@/api/types';
+import { laLoiDotDong, thongDiepLoiChung } from '@/lib/loiApi';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { CAP_GIANG_DAY_OPTIONS, DOI_TUONG_OPTIONS, GIOI_TINH_OPTIONS, TRINH_DO_OPTIONS, nhanTuTuyChon } from '@/lib/tuyChonHoSo';
@@ -91,6 +91,12 @@ export default function XacNhan() {
   }
 
   const dangTai = dangTaiHoSo || kiemTra.isLoading;
+  // 2026-10-05: hồ sơ import MOET gắn với đợt xác nhận. Đã xác nhận -> khóa (chỉ mở lại khi sửa hồ sơ);
+  // không có đợt mở (đã quá đợt) hoặc server báo đợt đóng -> không xác nhận được, hướng dẫn gửi Hỗ trợ.
+  const apDungDot = dotXacNhan?.ap_dung_dot ?? false;
+  const daQuaDot = (apDungDot && !dotXacNhan?.dot) || laLoiDotDong(xacNhanMutation.error);
+  const daKhoa = apDungDot && !!dotXacNhan?.dot && dotXacNhan.da_xac_nhan;
+  const choXacNhan = !dangTai && !daQuaDot && !daKhoa && (!apDungDot || !!dotXacNhan?.dot);
 
   return (
     <Container size="sm" py="xl">
@@ -99,7 +105,30 @@ export default function XacNhan() {
           Xem lại &amp; xác nhận
         </Title>
 
-        {dotXacNhan?.dot && (
+        {daQuaDot && dotXacNhan && <KhoiQuaDot dotXacNhan={dotXacNhan} />}
+
+        {daKhoa && dotXacNhan?.dot && (
+          <StatusBanner loai="success" tieuDe="Thầy/Cô đã xác nhận hồ sơ">
+            <Text size="sm">
+              Đã xác nhận lúc {dotXacNhan.xac_nhan_luc ? dinhDangNgayGio(dotXacNhan.xac_nhan_luc) : ''}. Không cần xác
+              nhận lại nếu thông tin không thay đổi. Nếu cần sửa, bấm <b>Chỉnh sửa thông tin</b>; sau khi sửa, Thầy/Cô
+              phải xác nhận lại trước {dinhDangNgayGio(dotXacNhan.dot.dong_luc)}.
+            </Text>
+          </StatusBanner>
+        )}
+
+        {!daKhoa && !daQuaDot && dotXacNhan?.can_xac_nhan_lai && (
+          <StatusBanner loai="warning" tieuDe="Thông tin hồ sơ đã được điều chỉnh">
+            <Text size="sm">
+              Hồ sơ của Thầy/Cô có điều chỉnh
+              {dotXacNhan.dieu_chinh_luc ? ` lúc ${dinhDangNgayGio(dotXacNhan.dieu_chinh_luc)}` : ''} sau lần xác nhận
+              trước, nên lần xác nhận đó không còn hiệu lực. Vui lòng kiểm tra lại thông tin bên dưới và{' '}
+              <b>xác nhận lại</b>.
+            </Text>
+          </StatusBanner>
+        )}
+
+        {!daKhoa && !daQuaDot && dotXacNhan?.dot && (
           <StatusBanner loai="warning">
             <Stack gap={4}>
               <Text size="sm">
@@ -162,15 +191,17 @@ export default function XacNhan() {
                 ))}
               </Table.Tbody>
             </Table>
-            <Box p="md" ta="right">
-              <Anchor component={Link} to="/toi/ho-so" fz="sm" fw={700}>
-                Chỉnh sửa thông tin →
-              </Anchor>
-            </Box>
+            {!daQuaDot && (
+              <Box p="md" ta="right">
+                <Anchor component={Link} to="/toi/ho-so" fz="sm" fw={700}>
+                  Chỉnh sửa thông tin →
+                </Anchor>
+              </Box>
+            )}
           </Card>
         )}
 
-        {!dangTai && (
+        {choXacNhan && (
           <>
             <Card withBorder radius="md">
               <Checkbox
@@ -180,7 +211,9 @@ export default function XacNhan() {
               />
             </Card>
 
-            {xacNhanMutation.isError && <StatusBanner loai="error">{thongDiepLoiChung(xacNhanMutation.error)}</StatusBanner>}
+            {xacNhanMutation.isError && !laLoiDotDong(xacNhanMutation.error) && (
+              <StatusBanner loai="error">{thongDiepLoiChung(xacNhanMutation.error)}</StatusBanner>
+            )}
 
             <Button
               size="lg"
@@ -189,11 +222,44 @@ export default function XacNhan() {
               loading={xacNhanMutation.isPending}
               onClick={() => xacNhanMutation.mutate()}
             >
-              Xác nhận
+              {dotXacNhan?.can_xac_nhan_lai ? 'Xác nhận lại' : 'Xác nhận'}
             </Button>
           </>
         )}
       </Stack>
     </Container>
+  );
+}
+
+/** Đã quá đợt xác nhận: không còn tự xác nhận/sửa được — hướng dẫn gửi Hỗ trợ cho Ban tổ chức xử lý. */
+function KhoiQuaDot({ dotXacNhan }: { dotXacNhan: DotXacNhan }) {
+  const { dot_sap_mo, xac_nhan_gan_nhat } = dotXacNhan;
+  if (dot_sap_mo) {
+    return (
+      <StatusBanner loai="info" tieuDe={`Đợt ${dot_sap_mo.ten}`}>
+        <Text size="sm">
+          Đợt xác nhận tiếp theo mở lúc {dinhDangNgayGio(dot_sap_mo.mo_luc)}. Thầy/Cô quay lại xác nhận khi đợt mở.
+        </Text>
+      </StatusBanner>
+    );
+  }
+  return (
+    <StatusBanner loai="warning" tieuDe="Đã hết thời gian xác nhận">
+      <Stack gap="xs">
+        {xac_nhan_gan_nhat && (
+          <Text size="sm">
+            Thầy/Cô đã xác nhận hồ sơ lúc {dinhDangNgayGio(xac_nhan_gan_nhat.xac_nhan_luc)} (đợt{' '}
+            {xac_nhan_gan_nhat.dot_ten}).
+          </Text>
+        )}
+        <Text size="sm">
+          Đợt xác nhận đã kết thúc. Nếu cần điều chỉnh hoặc xác nhận lại thông tin, Thầy/Cô vui lòng gửi yêu cầu Hỗ trợ
+          để Ban tổ chức xử lý.
+        </Text>
+        <Button component={Link} to="/toi/yeu-cau-ho-tro" variant="default" w="fit-content">
+          Gửi yêu cầu hỗ trợ
+        </Button>
+      </Stack>
+    </StatusBanner>
   );
 }

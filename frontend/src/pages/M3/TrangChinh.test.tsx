@@ -86,6 +86,23 @@ describe('M3 — Trang chính', () => {
     expect(await screen.findByText('Hiện không trong thời gian chỉnh sửa hồ sơ')).toBeInTheDocument();
   });
 
+  it('quá đợt, đã xác nhận trước đó -> hiện thời điểm xác nhận + nút gửi hỗ trợ', async () => {
+    db.dotXacNhan.dot = null;
+    db.dotXacNhan.dot_sap_mo = null;
+    db.dotXacNhan.xac_nhan_gan_nhat = { dot_ten: 'Kiểm tra hồ sơ đợt 1', xac_nhan_luc: '2026-10-03T02:00:00.000Z' };
+    renderDaDangNhap();
+    expect(await screen.findByText(/đã xác nhận hồ sơ lúc 03\/10\/2026 09:00/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Gửi yêu cầu hỗ trợ' })).toHaveAttribute('href', '/toi/yeu-cau-ho-tro');
+  });
+
+  it('đợt mở, xác nhận bị hủy do điều chỉnh -> nhắc xác nhận lại', async () => {
+    db.dotXacNhan.day_du = true;
+    db.dotXacNhan.thieu = [];
+    db.dotXacNhan.can_xac_nhan_lai = true;
+    renderDaDangNhap();
+    expect(await screen.findByText(/Thông tin hồ sơ đã được điều chỉnh sau lần xác nhận trước/)).toBeInTheDocument();
+  });
+
   it('luôn hiện menu 2 mục: Cập nhật hồ sơ và Thông tin lớp học', async () => {
     renderDaDangNhap();
     expect(await screen.findByRole('link', { name: /Cập nhật hồ sơ/ })).toHaveAttribute('href', '/toi/ho-so');

@@ -937,28 +937,63 @@ export class HocVienService {
     const hocVien = await this.getHocVienCuaToi(caller);
     const { day_du, thieu } = await this.danhGiaDayDu(hocVien);
 
+    const rong = {
+      dot: null,
+      dot_sap_mo: null,
+      dang_mo: false,
+      da_xac_nhan: false,
+      xac_nhan_luc: null,
+      can_xac_nhan_lai: false,
+      dieu_chinh_luc: null,
+      xac_nhan_gan_nhat: null,
+    };
     if (hocVien.nguon_tao !== 'import_moet') {
-      return { dot: null, dang_mo: false, da_xac_nhan: false, day_du, thieu };
+      return { ...rong, ap_dung_dot: false, day_du, thieu };
     }
 
+    // 2026-10-05: tách `dot` (CHỈ đợt đang mở) và `dot_sap_mo` — trước đây `dot` gộp cả đợt sắp mở
+    // nên FE hiểu nhầm là đang mở.
     const dotMo = await this.dotXacNhanService.dotDangMoCuaHocVien(hocVien.id);
-    const dot = dotMo ?? (await this.dotXacNhanService.dotSapMoCuaHocVien());
-    const daXacNhan = dotMo
-      ? await this.dotXacNhanService.coXacNhanConHieuLuc(dotMo.id, hocVien.id)
-      : false;
+    if (!dotMo) {
+      const [sapMo, ganNhat] = await Promise.all([
+        this.dotXacNhanService.dotSapMoCuaHocVien(),
+        this.dotXacNhanService.xacNhanConHieuLucGanNhat(hocVien.id),
+      ]);
+      return {
+        ...rong,
+        dot_sap_mo: sapMo ? { ten: sapMo.ten, mo_luc: sapMo.mo_luc } : null,
+        xac_nhan_gan_nhat: ganNhat
+          ? { dot_ten: ganNhat.dot.ten, xac_nhan_luc: ganNhat.xac_nhan_luc }
+          : null,
+        ap_dung_dot: true,
+        day_du,
+        thieu,
+      };
+    }
 
+    const { conHieuLuc, biHuyGanNhat } =
+      await this.dotXacNhanService.trangThaiXacNhanTrongDot(
+        dotMo.id,
+        hocVien.id,
+      );
     return {
-      dot: dot
-        ? {
-            id: dot.id,
-            ten: dot.ten,
-            loai: dot.loai,
-            mo_luc: dot.mo_luc,
-            dong_luc: dot.dong_luc,
-          }
+      ...rong,
+      dot: {
+        id: dotMo.id,
+        ten: dotMo.ten,
+        loai: dotMo.loai,
+        mo_luc: dotMo.mo_luc,
+        dong_luc: dotMo.dong_luc,
+      },
+      dang_mo: true,
+      da_xac_nhan: conHieuLuc !== null,
+      xac_nhan_luc: conHieuLuc?.xac_nhan_luc ?? null,
+      // Đã xác nhận rồi sửa hồ sơ (xác nhận tự hủy) -> cần xác nhận lại.
+      can_xac_nhan_lai: !conHieuLuc && biHuyGanNhat !== null,
+      dieu_chinh_luc: !conHieuLuc
+        ? (biHuyGanNhat?.vo_hieu_luc_luc ?? null)
         : null,
-      dang_mo: dotMo !== null,
-      da_xac_nhan: daXacNhan,
+      ap_dung_dot: true,
       day_du,
       thieu,
     };
@@ -1171,6 +1206,14 @@ export class HocVienService {
   private async xacNhanImportMoet(hocVien: HocVienDayDuVoiTen) {
     const dot = await this.dotXacNhanService.dotDangMoCuaHocVien(hocVien.id);
     if (!dot) throw new DotXacNhanDongException();
+
+    // 2026-10-05: đã xác nhận (còn hiệu lực) thì khóa — chỉ mở lại khi học viên sửa hồ sơ (sửa hồ sơ
+    // tự hủy xác nhận, xem suaHoSo).
+    if (await this.dotXacNhanService.coXacNhanConHieuLuc(dot.id, hocVien.id)) {
+      throw new ConflictAppException(
+        'Thầy/Cô đã xác nhận hồ sơ ở đợt này. Chỉ cần xác nhận lại khi có điều chỉnh thông tin.',
+      );
+    }
 
     const { day_du, thieu } = await this.danhGiaDayDu(hocVien);
     if (!day_du) {

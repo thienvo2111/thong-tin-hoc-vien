@@ -66,6 +66,8 @@ describe('HocVienService', () => {
     dotDangMoCuaHocVien: jest.Mock;
     dotSapMoCuaHocVien: jest.Mock;
     coXacNhanConHieuLuc: jest.Mock;
+    trangThaiXacNhanTrongDot: jest.Mock;
+    xacNhanConHieuLucGanNhat: jest.Mock;
     huyXacNhanNeuCo: jest.Mock;
     taoXacNhan: jest.Mock;
     coXacNhanTruocDanhGiaConHieuLuc: jest.Mock;
@@ -124,6 +126,10 @@ describe('HocVienService', () => {
       dotDangMoCuaHocVien: jest.fn().mockResolvedValue(null),
       dotSapMoCuaHocVien: jest.fn().mockResolvedValue(null),
       coXacNhanConHieuLuc: jest.fn().mockResolvedValue(false),
+      trangThaiXacNhanTrongDot: jest
+        .fn()
+        .mockResolvedValue({ conHieuLuc: null, biHuyGanNhat: null }),
+      xacNhanConHieuLucGanNhat: jest.fn().mockResolvedValue(null),
       huyXacNhanNeuCo: jest.fn().mockResolvedValue(false),
       taoXacNhan: jest.fn(),
       coXacNhanTruocDanhGiaConHieuLuc: jest.fn().mockResolvedValue(false),
@@ -1673,6 +1679,20 @@ describe('HocVienService', () => {
       });
     });
 
+    describe('POST /hoc-vien/toi/xac-nhan — import_moet đã xác nhận (2026-10-05)', () => {
+      it('đã có xác nhận còn hiệu lực ở đợt đang mở -> 409, không tạo xác nhận mới', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseImportMoetHocVien());
+        dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue({
+          id: 'dot-1',
+        });
+        dotXacNhanService.coXacNhanConHieuLuc.mockResolvedValue(true);
+        await expect(service.xacNhan(callerHocVien)).rejects.toBeInstanceOf(
+          ConflictAppException,
+        );
+        expect(dotXacNhanService.taoXacNhan).not.toHaveBeenCalled();
+      });
+    });
+
     describe('dotXacNhanCuaToi', () => {
       it('tu_dang_ky -> dot=null, dang_mo=false', async () => {
         prisma.hoc_vien.findUnique.mockResolvedValue({
@@ -1692,6 +1712,7 @@ describe('HocVienService', () => {
         } as AuthenticatedUser);
         expect(res.dot).toBeNull();
         expect(res.dang_mo).toBe(false);
+        expect(res.ap_dung_dot).toBe(false);
       });
 
       it('import_moet, có đợt đang mở, chưa xác nhận -> dang_mo=true, da_xac_nhan=false', async () => {
@@ -1703,15 +1724,73 @@ describe('HocVienService', () => {
           mo_luc: new Date('2026-10-01'),
           dong_luc: new Date('2026-10-05'),
         });
-        dotXacNhanService.coXacNhanConHieuLuc.mockResolvedValue(false);
 
         const res = await service.dotXacNhanCuaToi(callerHocVien);
         expect(res.dang_mo).toBe(true);
         expect(res.da_xac_nhan).toBe(false);
+        expect(res.can_xac_nhan_lai).toBe(false);
         expect(res.dot?.id).toBe('dot-1');
       });
 
-      it('import_moet, KHÔNG có đợt đang mở nhưng có đợt sắp mở -> dang_mo=false, dot=đợt sắp mở', async () => {
+      const dotMo = {
+        id: 'dot-1',
+        ten: 'Đợt 1',
+        loai: 'kiem_tra_bo_sung',
+        mo_luc: new Date('2026-10-01'),
+        dong_luc: new Date('2026-10-05'),
+      };
+
+      it('đã xác nhận (còn hiệu lực) -> da_xac_nhan=true kèm thời điểm, không cần xác nhận lại', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseImportMoetHocVien());
+        dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue(dotMo);
+        const luc = new Date('2026-10-03T02:00:00Z');
+        dotXacNhanService.trangThaiXacNhanTrongDot.mockResolvedValue({
+          conHieuLuc: { xac_nhan_luc: luc },
+          biHuyGanNhat: { vo_hieu_luc_luc: new Date('2026-10-02') },
+        });
+        const res = await service.dotXacNhanCuaToi(callerHocVien);
+        expect(res).toMatchObject({
+          da_xac_nhan: true,
+          xac_nhan_luc: luc,
+          can_xac_nhan_lai: false,
+          dieu_chinh_luc: null,
+        });
+      });
+
+      it('đã xác nhận rồi sửa hồ sơ (xác nhận bị hủy) -> can_xac_nhan_lai=true + thời điểm điều chỉnh', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseImportMoetHocVien());
+        dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue(dotMo);
+        const luc = new Date('2026-10-04T03:00:00Z');
+        dotXacNhanService.trangThaiXacNhanTrongDot.mockResolvedValue({
+          conHieuLuc: null,
+          biHuyGanNhat: { vo_hieu_luc_luc: luc },
+        });
+        const res = await service.dotXacNhanCuaToi(callerHocVien);
+        expect(res).toMatchObject({
+          da_xac_nhan: false,
+          can_xac_nhan_lai: true,
+          dieu_chinh_luc: luc,
+        });
+      });
+
+      it('không có đợt mở, đã xác nhận ở đợt trước -> dot=null, trả xac_nhan_gan_nhat', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseImportMoetHocVien());
+        dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue(null);
+        const luc = new Date('2026-10-03T02:00:00Z');
+        dotXacNhanService.xacNhanConHieuLucGanNhat.mockResolvedValue({
+          xac_nhan_luc: luc,
+          dot: { ten: 'Đợt 1' },
+        });
+        const res = await service.dotXacNhanCuaToi(callerHocVien);
+        expect(res).toMatchObject({
+          dot: null,
+          dang_mo: false,
+          ap_dung_dot: true,
+          xac_nhan_gan_nhat: { dot_ten: 'Đợt 1', xac_nhan_luc: luc },
+        });
+      });
+
+      it('import_moet, KHÔNG có đợt đang mở nhưng có đợt sắp mở -> dot=null, dot_sap_mo = đợt sắp mở', async () => {
         prisma.hoc_vien.findUnique.mockResolvedValue(baseImportMoetHocVien());
         dotXacNhanService.dotDangMoCuaHocVien.mockResolvedValue(null);
         dotXacNhanService.dotSapMoCuaHocVien.mockResolvedValue({
@@ -1725,7 +1804,11 @@ describe('HocVienService', () => {
         const res = await service.dotXacNhanCuaToi(callerHocVien);
         expect(res.dang_mo).toBe(false);
         expect(res.da_xac_nhan).toBe(false);
-        expect(res.dot?.id).toBe('dot-sap-mo');
+        expect(res.dot).toBeNull();
+        expect(res.dot_sap_mo).toEqual({
+          ten: 'Đợt 2',
+          mo_luc: new Date('2026-11-01'),
+        });
       });
     });
   });

@@ -131,8 +131,17 @@ export interface DotXacNhan {
     dong_luc: string;
   } | null;
   dot_sap_mo: { ten: string; mo_luc: string } | null;
+  dang_mo: boolean;
   da_xac_nhan: boolean;
   xac_nhan_luc: string | null;
+  /** 2026-10-05: đã xác nhận ở đợt đang mở rồi sửa hồ sơ (xác nhận tự hủy) -> phải xác nhận lại. */
+  can_xac_nhan_lai: boolean;
+  /** Thời điểm hồ sơ bị điều chỉnh làm hủy xác nhận (khi can_xac_nhan_lai). */
+  dieu_chinh_luc: string | null;
+  /** Không có đợt mở: xác nhận còn hiệu lực gần nhất ở đợt trước. */
+  xac_nhan_gan_nhat: { dot_ten: string; xac_nhan_luc: string } | null;
+  /** false = hồ sơ tự đăng ký, không áp dụng đợt xác nhận. */
+  ap_dung_dot: boolean;
   day_du: boolean;
   thieu: ApiFieldError[];
 }
