@@ -82,7 +82,8 @@ export default function TrangChinh() {
                   <KhoiKhaoSatDauRa mucDo={mucDo} />
                 </Box>
               )}
-              <KhoiTrangThai data={data} />
+              {/* Khối khảo sát đầu vào đã hiện thì không lặp khối "Đánh giá đầu vào" của đợt 2 (cùng đích M6). */}
+              <KhoiTrangThai data={data} anKhoiDanhGia={!!(mucDo && dauVaoMo)} />
             </Stack>
 
             <TheHuongDan />
@@ -294,7 +295,13 @@ function DanhSachCapNhat({ tieuDe, dong }: { tieuDe: string; dong: string[] }) {
   );
 }
 
-function KhoiTrangThai({ data }: { data: NonNullable<ReturnType<typeof useDotXacNhan>['data']> }) {
+function KhoiTrangThai({
+  data,
+  anKhoiDanhGia,
+}: {
+  data: NonNullable<ReturnType<typeof useDotXacNhan>['data']>;
+  anKhoiDanhGia: boolean;
+}) {
   const { dot, dot_sap_mo, da_xac_nhan, xac_nhan_luc, can_xac_nhan_lai, xac_nhan_gan_nhat, ap_dung_dot, day_du, thieu } =
     data;
 
@@ -341,7 +348,7 @@ function KhoiTrangThai({ data }: { data: NonNullable<ReturnType<typeof useDotXac
   }
 
   if (dot && day_du && da_xac_nhan) {
-    const laDotDanhGia = dot.loai === 'xac_nhan_truoc_danh_gia';
+    const laDotDanhGia = dot.loai === 'xac_nhan_truoc_danh_gia' && !anKhoiDanhGia;
     return (
       <Stack gap="lg">
         <StatusBanner loai="success" tieuDe={`Đợt ${dot.ten}`}>

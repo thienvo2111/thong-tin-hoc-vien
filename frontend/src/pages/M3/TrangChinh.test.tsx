@@ -71,6 +71,27 @@ describe('M3 — Trang chính', () => {
     expect(await screen.findByText('Làm bài đánh giá')).toBeInTheDocument();
   });
 
+  it('đợt 2 đã xác nhận + khối khảo sát đầu vào đang mở → KHÔNG lặp khối "Đánh giá đầu vào"', async () => {
+    datCauHinhKhaoSatMock({
+      che_do_hoc_vien: 'dang_nhap',
+      danh_gia_dau_vao_trong_cong: false,
+      hien_khao_sat: true,
+      kenh_danh_gia: 'sso',
+      khao_sat_dau_ra_mo: false,
+      phieu: [],
+    });
+    db.dotXacNhan.dot!.loai = 'xac_nhan_truoc_danh_gia';
+    db.dotXacNhan.day_du = true;
+    db.dotXacNhan.thieu = [];
+    db.dotXacNhan.da_xac_nhan = true;
+    db.dotXacNhan.xac_nhan_luc = '2026-10-06T03:00:00.000Z';
+    renderDaDangNhap();
+    expect(await screen.findByText('Khảo sát đầu vào đã mở')).toBeInTheDocument();
+    expect(screen.getByText(/Đã xác nhận lúc/)).toBeInTheDocument();
+    expect(screen.queryByText('Thầy/Cô đã xác nhận và có thể làm bài đánh giá đầu vào.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Làm bài đánh giá' })).not.toBeInTheDocument();
+  });
+
   it('không có đợt mở, có đợt sắp mở → hiện giờ mở + nút Xem hồ sơ (chỉ xem)', async () => {
     db.dotXacNhan.dot = null;
     db.dotXacNhan.dot_sap_mo = { ten: 'Kiểm tra hồ sơ đợt 2', mo_luc: '2026-10-05T00:00:00.000Z' };
