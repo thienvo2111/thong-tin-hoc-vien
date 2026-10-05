@@ -37,6 +37,9 @@ describe('KetQuaKhaoSatService', () => {
     hoan_thanh_luc: null,
     muc: null,
     diem: null,
+    diem_toi_da: null,
+    muc_goc: null,
+    url_ket_qua: null,
     chi_tiet: null,
     nguon: 'sso',
     cap_nhat_luc: new Date(),
@@ -167,7 +170,119 @@ describe('KetQuaKhaoSatService', () => {
         loai: 'danh-gia',
         trang_thai: 'hoan_thanh',
         muc: 'thanh_thao',
+        muc_goc: null,
       });
+    });
+  });
+
+  describe('ghiKetQua — điểm tối đa (2026-10-05)', () => {
+    it('hoàn thành kèm diem_toi_da -> lưu cả 2', async () => {
+      await service.ghiKetQua(
+        'hv-1',
+        {
+          loai: 'danh-gia',
+          trang_thai: 'hoan_thanh',
+          diem: 13.75,
+          diem_toi_da: 44,
+        },
+        'api',
+      );
+      const { update } = prisma.ket_qua_khao_sat.upsert.mock.calls[0][0];
+      expect(update).toMatchObject({ diem: 13.75, diem_toi_da: 44 });
+    });
+
+    it('điểm lớn hơn điểm tối đa -> 400, không ghi', async () => {
+      await expect(
+        service.ghiKetQua(
+          'hv-1',
+          {
+            loai: 'danh-gia',
+            trang_thai: 'hoan_thanh',
+            diem: 50,
+            diem_toi_da: 44,
+          },
+          'api',
+        ),
+      ).rejects.toBeInstanceOf(ValidationException);
+      expect(prisma.ket_qua_khao_sat.upsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ghiKetQua — mức gốc + đường dẫn kết quả (2026-10-05)', () => {
+    const envGoc = { ...process.env };
+    afterEach(() => {
+      process.env = { ...envGoc };
+    });
+
+    it('lưu nhãn mức gốc và url cùng tên miền hệ thống khảo sát', async () => {
+      process.env.SSO_KHAO_SAT_URL = 'https://khaosat.test/sso/start';
+      await service.ghiKetQua(
+        'hv-1',
+        {
+          loai: 'danh-gia',
+          trang_thai: 'hoan_thanh',
+          muc_goc: ' M1 – Chưa đạt ',
+          url_ket_qua: 'https://khaosat.test/ket-qua/abc',
+        },
+        'api',
+      );
+      const { update } = prisma.ket_qua_khao_sat.upsert.mock.calls[0][0];
+      expect(update).toMatchObject({
+        muc_goc: 'M1 – Chưa đạt',
+        url_ket_qua: 'https://khaosat.test/ket-qua/abc',
+      });
+    });
+
+    it.each([
+      'https://trang-la.example/ket-qua',
+      'javascript:alert(1)',
+      'khong-phai-url',
+    ])(
+      'url %p không thuộc tên miền khảo sát -> 400, không ghi',
+      async (url) => {
+        process.env.SSO_KHAO_SAT_URL = 'https://khaosat.test/sso/start';
+        await expect(
+          service.ghiKetQua(
+            'hv-1',
+            { loai: 'danh-gia', trang_thai: 'hoan_thanh', url_ket_qua: url },
+            'api',
+          ),
+        ).rejects.toBeInstanceOf(ValidationException);
+        expect(prisma.ket_qua_khao_sat.upsert).not.toHaveBeenCalled();
+      },
+    );
+
+    it('không đặt SSO_KHAO_SAT_URL -> chấp nhận tên miền mặc định khaosatnls.hcmue.edu.vn', async () => {
+      delete process.env.SSO_KHAO_SAT_URL;
+      await service.ghiKetQua(
+        'hv-1',
+        {
+          loai: 'danh-gia',
+          trang_thai: 'hoan_thanh',
+          url_ket_qua: 'https://khaosatnls.hcmue.edu.vn/surveys/x',
+        },
+        'api',
+      );
+      expect(prisma.ket_qua_khao_sat.upsert).toHaveBeenCalled();
+    });
+
+    it('học viên thấy mức gốc + url, vẫn không thấy điểm', async () => {
+      prisma.ket_qua_khao_sat.findMany.mockResolvedValue([
+        dong({
+          loai: 'danh-gia',
+          trang_thai: 'hoan_thanh',
+          muc: 'co_ban',
+          muc_goc: 'M1 – Chưa đạt',
+          url_ket_qua: 'https://khaosat.test/ket-qua/abc',
+          diem: new Prisma.Decimal('13.75'),
+        }),
+      ]);
+      const [, danhGia] = await service.tinhTrangCuaHocVien('hv-1');
+      expect(danhGia).toMatchObject({
+        muc_goc: 'M1 – Chưa đạt',
+        url_ket_qua: 'https://khaosat.test/ket-qua/abc',
+      });
+      expect(danhGia).not.toHaveProperty('diem');
     });
   });
 
@@ -388,6 +503,8 @@ describe('KetQuaKhaoSatService', () => {
             dong({
               trang_thai: 'hoan_thanh',
               diem: new Prisma.Decimal('72.5'),
+              diem_toi_da: new Prisma.Decimal('100'),
+              chi_tiet: { diem_loai_a: 5 },
               muc: 'thanh_thao',
             }),
           ],
@@ -409,7 +526,15 @@ describe('KetQuaKhaoSatService', () => {
       expect(kq.total).toBe(41);
       expect(kq.data[0]).toMatchObject({
         ten_don_vi: 'Trường A',
-        ket_qua: [{ loai: 'khao-sat', diem: 72.5, muc: 'thanh_thao' }],
+        ket_qua: [
+          {
+            loai: 'khao-sat',
+            diem: 72.5,
+            diem_toi_da: 100,
+            chi_tiet: { diem_loai_a: 5 },
+            muc: 'thanh_thao',
+          },
+        ],
       });
     });
   });

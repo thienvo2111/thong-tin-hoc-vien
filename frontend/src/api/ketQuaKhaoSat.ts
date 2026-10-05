@@ -17,6 +17,10 @@ export interface TinhTrangBaiKhaoSat {
   mo_gan_nhat_luc: string | null;
   hoan_thanh_luc: string | null;
   muc: MucNangLuc | null;
+  /** Nhãn mức theo thang hệ thống khảo sát (vd "M1 – Chưa đạt") — ưu tiên hiển thị hơn `muc`. */
+  muc_goc: string | null;
+  /** Trang kết quả chi tiết bên hệ thống khảo sát. */
+  url_ket_qua: string | null;
 }
 
 export const tinhTrangKhaoSatKey = ['sso', 'tinh-trang'] as const;
@@ -43,7 +47,10 @@ export interface KetQuaBaiQuanTri {
   mo_gan_nhat_luc: string | null;
   hoan_thanh_luc: string | null;
   muc: MucNangLuc | null;
+  muc_goc: string | null;
+  url_ket_qua: string | null;
   diem: number | null;
+  diem_toi_da: number | null;
   nguon: 'sso' | 'api' | 'import';
   cap_nhat_luc: string;
 }

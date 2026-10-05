@@ -1099,6 +1099,11 @@ model ket_qua_khao_sat {
   hoan_thanh_luc  DateTime?           @db.Timestamptz(6)
   muc             muc_nang_luc?
   diem            Decimal?            @db.Decimal(6, 2)
+  diem_toi_da     Decimal?            @db.Decimal(6, 2)
+  /// Nhãn mức theo thang của hệ thống khảo sát (vd "M1 – Chưa đạt") — học viên thấy nhãn này.
+  muc_goc         String?             @db.VarChar(50)
+  /// Trang kết quả chi tiết bên hệ thống khảo sát (cùng tên miền SSO_KHAO_SAT_URL).
+  url_ket_qua     String?             @db.VarChar(500)
   chi_tiet        Json?
   /// 'sso' (cổng tự ghi khi vào bài) | 'api' (hệ thống khảo sát báo) | 'import'
   nguon           String              @db.VarChar(10)

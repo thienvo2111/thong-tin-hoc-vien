@@ -30,8 +30,13 @@ describe('Admin — Tình hình khảo sát', () => {
 
     const dong = screen.getByText('Hà Thị Thanh').closest('tr')!;
     expect(within(dong).getByText('Đã hoàn thành')).toBeInTheDocument();
-    expect(within(dong).getByText('Thành thạo')).toBeInTheDocument();
-    expect(within(dong).getByText('72.5')).toBeInTheDocument();
+    expect(within(dong).getByText('M3 – Thành thạo')).toBeInTheDocument();
+    expect(within(dong).getByText('Quy đổi: Thành thạo')).toBeInTheDocument();
+    expect(within(dong).getByText('72,5 / 100 (72,5%)')).toBeInTheDocument();
+    expect(within(dong).getByRole('link', { name: 'Xem kết quả chi tiết' })).toHaveAttribute(
+      'href',
+      'https://khaosat.test/ket-qua/hv-1',
+    );
     expect(within(dong).getByText('Hệ thống khảo sát')).toBeInTheDocument();
     expect(within(screen.getByText('Lê Văn Bình').closest('tr')!).getByText('Chưa làm')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Hà Thị Thanh' })).toHaveAttribute('href', '/admin/hoc-vien/hv-1');

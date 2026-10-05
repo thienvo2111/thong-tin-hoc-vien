@@ -2,7 +2,8 @@ import { Badge, Button, Group, Paper, Stack, Text } from '@mantine/core';
 import type { SsoTarget } from '@/api/hocVien';
 import type { TinhTrangBaiKhaoSat } from '@/api/ketQuaKhaoSat';
 import { dinhDangNgayGio } from '@/lib/ngay';
-import { NHAN_MUC_NANG_LUC, TEN_BAI_KHAO_SAT, nhanTrangThaiKhaoSat } from '@/lib/trangThaiKhaoSat';
+import { chuanHoaLienKet } from '@/lib/lienKet';
+import { TEN_BAI_KHAO_SAT, nhanMucKetQua, nhanTrangThaiKhaoSat } from '@/lib/trangThaiKhaoSat';
 
 const NHAN_NUT: Record<TinhTrangBaiKhaoSat['trang_thai'], string> = {
   chua_lam: 'Làm bài',
@@ -31,6 +32,8 @@ export function BaiKhaoSat({
   const trangThai = tinhTrang?.trang_thai ?? 'chua_lam';
   const xong = trangThai === 'hoan_thanh';
   const badge = tinhTrang && nhanTrangThaiKhaoSat(trangThai, tinhTrang.can_kiem_tra);
+  const nhanMuc = tinhTrang && nhanMucKetQua(tinhTrang);
+  const hrefKetQua = xong ? chuanHoaLienKet(tinhTrang?.url_ket_qua) : null;
   const ten = thuTu ? `${thuTu}. ${TEN_BAI_KHAO_SAT[loai]}` : TEN_BAI_KHAO_SAT[loai];
 
   return (
@@ -48,11 +51,11 @@ export function BaiKhaoSat({
         {xong && tinhTrang && (
           <Text size="sm">
             {tinhTrang.hoan_thanh_luc && <>Hoàn thành lúc {dinhDangNgayGio(tinhTrang.hoan_thanh_luc)}. </>}
-            {tinhTrang.muc ? (
+            {nhanMuc ? (
               <>
-                Kết quả: mức{' '}
+                Kết quả:{' '}
                 <Text span fw={700}>
-                  {NHAN_MUC_NANG_LUC[tinhTrang.muc]}
+                  {nhanMuc}
                 </Text>
                 .
               </>
@@ -60,6 +63,12 @@ export function BaiKhaoSat({
               'Kết quả đang được tổng hợp.'
             )}
           </Text>
+        )}
+
+        {hrefKetQua && (
+          <Button component="a" href={hrefKetQua} variant="light" fullWidth>
+            Xem kết quả chi tiết
+          </Button>
         )}
 
         {tinhTrang?.can_kiem_tra && (

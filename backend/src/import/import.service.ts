@@ -83,6 +83,9 @@ interface KetQuaKhaoSatRowDto {
   thoi_diem?: string;
   muc?: MucNangLuc;
   diem?: number;
+  diem_toi_da?: number;
+  muc_goc?: string;
+  url_ket_qua?: string;
 }
 import { encryptVleMatKhau } from '../common/utils/vle-crypto.util';
 import { LichSuImportQueryDto } from './dto/lich-su-import-query.dto';
@@ -622,6 +625,9 @@ export class ImportService {
           'thoi_diem',
           'muc',
           'diem',
+          'diem_toi_da',
+          'muc_goc',
+          'url_ket_qua',
         ];
       case 'ket_qua_danh_gia':
         // T5 (mo-rong-nls-an-giang.md): mã học viên dùng chung HocVienResolver
@@ -813,6 +819,12 @@ export class ImportService {
           'Tùy chọn — "dd/mm/yyyy hh:mm", giờ Việt Nam; để trống = lúc import. Dòng hoàn thành cũ hơn kết quả đã có sẽ bị bỏ qua.',
         muc: 'Tùy chọn — "co_ban", "thanh_thao" hoặc "nang_cao". Chỉ để hiển thị, KHÔNG đổi mức đầu vào của học viên (dùng import ket_qua_danh_gia).',
         diem: 'Tùy chọn — số từ 0 đến 9999, tối đa 2 chữ số thập phân. Chỉ quản trị xem được.',
+        muc_goc:
+          'Tùy chọn — nhãn mức theo thang hệ thống khảo sát (vd "M1 – Chưa đạt"), tối đa 50 ký tự. Học viên thấy nhãn này.',
+        url_ket_qua:
+          'Tùy chọn — đường dẫn trang kết quả chi tiết, phải thuộc tên miền hệ thống khảo sát.',
+        diem_toi_da:
+          'Tùy chọn — điểm tối đa của bài (vd 44), lớn hơn 0 và không nhỏ hơn diem. Để hiển thị "điểm / tối đa (%)".',
       };
     }
     if (loai === 'lop_va_lich_hoc') {
@@ -1237,6 +1249,9 @@ export class ImportService {
           thoi_diem: d.thoi_diem ? new Date(d.thoi_diem) : undefined,
           muc: d.muc,
           diem: d.diem,
+          diem_toi_da: d.diem_toi_da,
+          muc_goc: d.muc_goc,
+          url_ket_qua: d.url_ket_qua,
         },
         'import',
       );
@@ -1496,6 +1511,23 @@ export class ImportService {
       }
     }
 
+    let diemToiDa: number | undefined;
+    if (raw.diem_toi_da?.trim()) {
+      diemToiDa = Number(raw.diem_toi_da.trim().replace(',', '.'));
+      if (!Number.isFinite(diemToiDa) || diemToiDa <= 0 || diemToiDa > 9999) {
+        return { error: 'Cột "diem_toi_da" phải là số lớn hơn 0, tối đa 9999' };
+      }
+      if (diem !== undefined && diem > diemToiDa) {
+        return { error: 'Cột "diem" lớn hơn "diem_toi_da"' };
+      }
+    }
+
+    const mucGoc = raw.muc_goc?.trim() || undefined;
+    if (mucGoc && mucGoc.length > 50) {
+      return { error: 'Cột "muc_goc" tối đa 50 ký tự' };
+    }
+    const urlKetQua = raw.url_ket_qua?.trim() || undefined;
+
     const resolved = await resolveHocVienImportRow(this.prisma, {
       so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
       ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
@@ -1517,6 +1549,9 @@ export class ImportService {
         thoi_diem: thoiDiem,
         muc: muc as MucNangLuc | undefined,
         diem,
+        diem_toi_da: diemToiDa,
+        muc_goc: mucGoc,
+        url_ket_qua: urlKetQua,
       },
     };
   }

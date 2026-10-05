@@ -227,6 +227,25 @@ describe('M6 — kênh trang khảo sát (SSO, 2026-10-02)', () => {
       expect(within(danhGia).getByRole('button', { name: 'Mở lại trang khảo sát' })).toBeInTheDocument();
     });
 
+    it('có mức gốc của hệ thống khảo sát -> hiện đúng nhãn đó (không quy đổi) + nút xem kết quả chi tiết', async () => {
+      db.danhGiaDauVao = { kenh: 'sso', du_dieu_kien: true };
+      datTinhTrangBai({
+        loai: 'danh-gia',
+        trang_thai: 'hoan_thanh',
+        muc: 'co_ban',
+        muc_goc: 'M1 – Chưa đạt',
+        url_ket_qua: 'https://khaosat.test/ket-qua/abc',
+      });
+      renderDaDangNhap();
+      const danhGia = await screen.findByLabelText('Phiếu đánh giá năng lực số');
+      expect(await within(danhGia).findByText('M1 – Chưa đạt')).toBeInTheDocument();
+      expect(within(danhGia).queryByText('Cơ bản')).not.toBeInTheDocument();
+      expect(within(danhGia).getByRole('link', { name: 'Xem kết quả chi tiết' })).toHaveAttribute(
+        'href',
+        'https://khaosat.test/ket-qua/abc',
+      );
+    });
+
     it('hoàn thành nhưng chưa có mức -> "Kết quả đang được tổng hợp"', async () => {
       db.danhGiaDauVao = { kenh: 'sso', du_dieu_kien: true };
       datTinhTrangBai({ loai: 'khao-sat', trang_thai: 'hoan_thanh' });

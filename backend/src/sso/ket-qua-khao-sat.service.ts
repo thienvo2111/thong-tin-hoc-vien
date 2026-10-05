@@ -21,6 +21,31 @@ import {
 // báo về POST /sso/ket-qua), 'import' (quản trị nhập Excel dự phòng).
 // Không tự cập nhật hoc_vien.muc_dau_vao — quản trị xác nhận riêng.
 
+const SSO_URL_MAC_DINH = 'https://khaosatnls.hcmue.edu.vn/sso/start';
+
+/** url_ket_qua phải là http(s) và CÙNG tên miền hệ thống khảo sát — học viên sẽ bấm mở link này. */
+function kiemTraUrlKetQua(url: string): string {
+  const loi = () =>
+    new ValidationException('Đường dẫn kết quả không hợp lệ', [
+      {
+        field: 'url_ket_qua',
+        message: 'Phải là http(s) thuộc tên miền hệ thống khảo sát',
+      },
+    ]);
+  let u: URL;
+  try {
+    u = new URL(url.trim());
+  } catch {
+    throw loi();
+  }
+  const mienKhaoSat = new URL(process.env.SSO_KHAO_SAT_URL || SSO_URL_MAC_DINH)
+    .host;
+  if (!['http:', 'https:'].includes(u.protocol) || u.host !== mienKhaoSat) {
+    throw loi();
+  }
+  return u.toString();
+}
+
 /** Đã mở / đang làm mà quá mốc này không có cập nhật -> "cần kiểm tra lại". */
 export const NGUONG_CAN_KIEM_TRA_MS = 24 * 60 * 60 * 1000;
 
@@ -32,6 +57,9 @@ export interface KetQuaVao {
   thoi_diem?: Date;
   muc?: MucNangLuc | null;
   diem?: number | null;
+  diem_toi_da?: number | null;
+  muc_goc?: string | null;
+  url_ket_qua?: string | null;
   chi_tiet?: Record<string, unknown> | null;
 }
 
@@ -42,6 +70,8 @@ export interface TinhTrangBai {
   mo_gan_nhat_luc: Date | null;
   hoan_thanh_luc: Date | null;
   muc: MucNangLuc | null;
+  muc_goc: string | null;
+  url_ket_qua: string | null;
 }
 
 function canKiemTra(
@@ -102,6 +132,9 @@ export class KetQuaKhaoSatService {
         thoi_diem: dto.thoi_diem ? new Date(dto.thoi_diem) : undefined,
         muc: dto.muc,
         diem: dto.diem,
+        diem_toi_da: dto.diem_toi_da,
+        muc_goc: dto.muc_goc,
+        url_ket_qua: dto.url_ket_qua,
         chi_tiet: dto.chi_tiet,
       },
       'api',
@@ -111,6 +144,7 @@ export class KetQuaKhaoSatService {
       loai: kq.loai,
       trang_thai: kq.trang_thai,
       muc: kq.muc,
+      muc_goc: kq.muc_goc,
     };
   }
 
@@ -143,6 +177,18 @@ export class KetQuaKhaoSatService {
     vao: KetQuaVao,
     nguon: NguonKetQua,
   ): Promise<ket_qua_khao_sat> {
+    if (
+      vao.diem != null &&
+      vao.diem_toi_da != null &&
+      vao.diem > vao.diem_toi_da
+    ) {
+      throw new ValidationException('Điểm lớn hơn điểm tối đa', [
+        { field: 'diem', message: 'Không được lớn hơn diem_toi_da' },
+      ]);
+    }
+    const urlKetQua = vao.url_ket_qua?.trim()
+      ? kiemTraUrlKetQua(vao.url_ket_qua)
+      : null;
     const now = new Date();
     const thoiDiem = vao.thoi_diem ?? now;
     const cu = await this.prisma.ket_qua_khao_sat.findUnique({
@@ -163,6 +209,9 @@ export class KetQuaKhaoSatService {
             hoan_thanh_luc: thoiDiem,
             muc: vao.muc ?? null,
             diem: vao.diem ?? null,
+            diem_toi_da: vao.diem_toi_da ?? null,
+            muc_goc: vao.muc_goc?.trim() || null,
+            url_ket_qua: urlKetQua,
             chi_tiet: (vao.chi_tiet ?? Prisma.DbNull) as
               Prisma.InputJsonValue | typeof Prisma.DbNull,
           }
@@ -200,6 +249,8 @@ export class KetQuaKhaoSatService {
           mo_gan_nhat_luc: null,
           hoan_thanh_luc: null,
           muc: null,
+          muc_goc: null,
+          url_ket_qua: null,
         };
       }
       return {
@@ -209,6 +260,8 @@ export class KetQuaKhaoSatService {
         mo_gan_nhat_luc: kq.mo_gan_nhat_luc,
         hoan_thanh_luc: kq.hoan_thanh_luc,
         muc: kq.muc,
+        muc_goc: kq.muc_goc,
+        url_ket_qua: kq.url_ket_qua,
       };
     });
   }
@@ -350,6 +403,10 @@ export class KetQuaKhaoSatService {
           hoan_thanh_luc: kq.hoan_thanh_luc,
           muc: kq.muc,
           diem: kq.diem === null ? null : Number(kq.diem),
+          diem_toi_da: kq.diem_toi_da === null ? null : Number(kq.diem_toi_da),
+          muc_goc: kq.muc_goc,
+          url_ket_qua: kq.url_ket_qua,
+          chi_tiet: kq.chi_tiet,
           nguon: kq.nguon,
           cap_nhat_luc: kq.cap_nhat_luc,
         })),

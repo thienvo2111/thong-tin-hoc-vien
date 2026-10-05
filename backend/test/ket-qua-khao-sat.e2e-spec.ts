@@ -32,6 +32,9 @@ async function buildXlsx(rows: (string | undefined)[][]): Promise<Buffer> {
     'thoi_diem',
     'muc',
     'diem',
+    'diem_toi_da',
+    'muc_goc',
+    'url_ket_qua',
   ]);
   rows.forEach((r) => sheet.addRow(r));
   return Buffer.from(await workbook.xlsx.writeBuffer());
@@ -255,6 +258,7 @@ describe('Kết quả khảo sát (e2e)', () => {
       loai: 'khao-sat',
       trang_thai: 'hoan_thanh',
       muc: 'thanh_thao',
+      muc_goc: null,
     });
 
     await baoKetQua({
@@ -307,6 +311,57 @@ describe('Kết quả khảo sát (e2e)', () => {
       ]) {
         await baoKetQua({ hoc_vien_id: hocVien.id, ...body }).expect(400);
       }
+    });
+
+    it('điểm tối đa + chi tiết được lưu; trường lạ bị bỏ qua và trả lại trong bo_qua', async () => {
+      const { hocVien } = await taoHocVien();
+      const res = await baoKetQua({
+        hoc_vien_id: hocVien.id,
+        loai: 'danh-gia',
+        trang_thai: 'hoan_thanh',
+        muc: 'co_ban',
+        diem: 13.75,
+        diem_toi_da: 44,
+        muc_goc: 'M1 – Chưa đạt',
+        url_ket_qua: 'https://khaosat.test/surveys/nls/ket-qua',
+        chi_tiet: { diem_loai_a: 5, diem_loai_b: 8.75 },
+        tong_diem: 13.75,
+      }).expect(200);
+      expect(res.body.bo_qua).toEqual(['tong_diem']);
+      expect(res.body.muc_goc).toBe('M1 – Chưa đạt');
+      const dong = await prisma.ket_qua_khao_sat.findUnique({
+        where: {
+          hoc_vien_id_loai: { hoc_vien_id: hocVien.id, loai: 'danh-gia' },
+        },
+      });
+      expect(Number(dong?.diem)).toBe(13.75);
+      expect(Number(dong?.diem_toi_da)).toBe(44);
+      expect(dong?.chi_tiet).toEqual({ diem_loai_a: 5, diem_loai_b: 8.75 });
+      expect(dong?.url_ket_qua).toBe(
+        'https://khaosat.test/surveys/nls/ket-qua',
+      );
+
+      await baoKetQua({
+        hoc_vien_id: hocVien.id,
+        loai: 'dau-ra',
+        trang_thai: 'hoan_thanh',
+        url_ket_qua: 'https://trang-la.example/x',
+      }).expect(400);
+
+      const sach = await baoKetQua({
+        hoc_vien_id: hocVien.id,
+        loai: 'khao-sat',
+        trang_thai: 'dang_lam',
+      }).expect(200);
+      expect(sach.body).not.toHaveProperty('bo_qua');
+
+      await baoKetQua({
+        hoc_vien_id: hocVien.id,
+        loai: 'khao-sat',
+        trang_thai: 'hoan_thanh',
+        diem: 50,
+        diem_toi_da: 44,
+      }).expect(400);
     });
 
     it('thiếu cả 2 định danh -> 400; mã MOET không tồn tại -> 404', async () => {
@@ -383,6 +438,7 @@ describe('Kết quả khảo sát (e2e)', () => {
           '04/10/2026 08:30',
           'nang_cao',
           '88,5',
+          '100',
         ],
         [undefined, b.tenDangNhap, 'danh-gia', 'xong_roi', '', '', ''],
         [undefined, a.tenDangNhap, 'danh-gia', 'dang_lam', '', '', ''],
@@ -415,6 +471,7 @@ describe('Kết quả khảo sát (e2e)', () => {
         nguon: 'import',
       });
       expect(Number(dong?.diem)).toBe(88.5);
+      expect(Number(dong?.diem_toi_da)).toBe(100);
       expect(dong?.hoan_thanh_luc?.toISOString()).toBe(
         '2026-10-04T01:30:00.000Z',
       );

@@ -5,8 +5,11 @@ import {
   Headers,
   HttpCode,
   Post,
+  Logger,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -19,12 +22,15 @@ import {
   BaoKetQuaDto,
   QueryTinhHinhKhaoSatDto,
   ThongKeKhaoSatDto,
+  TRUONG_BAO_KET_QUA,
 } from './dto/ket-qua-khao-sat.dto';
 
 // SSO sang hệ thống khảo sát (2026-10-02). @Roles đặt ở từng method — @Roles
 // cấp class sẽ chặn luôn route @Public() (xem cau-hinh-khao-sat.controller.ts).
 @Controller('sso')
 export class SsoController {
+  private readonly logger = new Logger(SsoController.name);
+
   constructor(
     private readonly ssoService: SsoService,
     private readonly ketQuaKhaoSat: KetQuaKhaoSatService,
@@ -56,9 +62,20 @@ export class SsoController {
   @Public()
   @Post('ket-qua')
   @HttpCode(200)
-  baoKetQua(@Body() dto: BaoKetQuaDto, @Headers('x-api-key') apiKey?: string) {
+  async baoKetQua(
+    @Body() dto: BaoKetQuaDto,
+    @Req() req: Request,
+    @Headers('x-api-key') apiKey?: string,
+  ) {
     kiemTraApiKeyKhaoSat(apiKey);
-    return this.ketQuaKhaoSat.nhanKetQua(dto);
+    const kq = await this.ketQuaKhaoSat.nhanKetQua(dto);
+    // Trường lạ (vd gửi "tong_diem" thay vì "diem") bị bỏ âm thầm -> trả lại + ghi log để 2 bên phát hiện.
+    const boQua = Object.keys((req.body ?? {}) as object).filter(
+      (k) => !(TRUONG_BAO_KET_QUA as readonly string[]).includes(k),
+    );
+    if (boQua.length === 0) return kq;
+    this.logger.warn(`POST /sso/ket-qua bỏ qua trường lạ: ${boQua.join(', ')}`);
+    return { ...kq, bo_qua: boQua };
   }
 
   // Học viên xem tình hình làm khảo sát của mình (không có điểm chi tiết).

@@ -28,6 +28,7 @@ const TEN_BAI = {
   'danh-gia': 'Phiếu đánh giá năng lực số',
   'dau-ra': 'Khảo sát đầu ra',
 };
+const MUC_GOC = { co_ban: 'M2 – Cơ bản', thanh_thao: 'M3 – Thành thạo', nang_cao: 'M4 – Nâng cao' };
 const CONG_FE = CONG_URL.replace(':3000', ':5173');
 
 function layPhien(req) {
@@ -121,7 +122,7 @@ const server = createServer(async (req, res) => {
 <button>Bắt đầu làm (báo "đang làm")</button></form>
 <form method="post" action="/bao-ket-qua" style="margin-top:12px"><input type="hidden" name="trang_thai" value="hoan_thanh">
 Mức <select name="muc"><option value="co_ban">Cơ bản</option><option value="thanh_thao" selected>Thành thạo</option><option value="nang_cao">Nâng cao</option></select>
-Điểm <input name="diem" value="72.5" size="6"> <button>Nộp bài (báo "hoàn thành")</button></form></div>`
+Điểm <input name="diem" value="13.75" size="6"> / 44 <button>Nộp bài (báo "hoàn thành")</button></form></div>`
       : '';
     const bai = hv.target ? `<p>Mở bài: <b>${thoat(TEN_BAI[hv.target] ?? hv.target)}</b></p>` : '<p>Không có target → hiện <b>danh sách bài cần làm</b>.</p>';
     return guiHtml(
@@ -151,7 +152,15 @@ ${bai}</div>${nopBai}
       loai: hv.target,
       trang_thai: trangThai,
       thoi_diem: new Date().toISOString(),
-      ...(trangThai === 'hoan_thanh' ? { muc: form.get('muc'), diem: Number(form.get('diem')), chi_tiet: { nguon: 'gia-lap' } } : {}),
+      ...(trangThai === 'hoan_thanh'
+        ? {
+            muc: form.get('muc'), // 3 mức của cổng (xếp lớp)
+            muc_goc: MUC_GOC[form.get('muc')], // nhãn thang riêng — học viên thấy nhãn này
+            diem: Number(form.get('diem')),
+            diem_toi_da: 44,
+            url_ket_qua: `http://localhost:${PORT}/ket-qua-gia-lap`, // cùng tên miền với /sso/start
+          }
+        : {}),
     });
     return guiHtml(
       res,
@@ -162,6 +171,10 @@ ${bai}</div>${nopBai}
 <p><a href="/lam-bai">Quay lại bài</a> · <a href="${thoat(CONG_FE)}/toi/danh-gia-dau-vao">Về cổng bồi dưỡng xem trạng thái</a></p>`,
       ),
     );
+  }
+
+  if (url.pathname === '/ket-qua-gia-lap') {
+    return guiHtml(res, 200, trang('Kết quả chi tiết (giả lập)', '<p>Trang kết quả thật của hệ thống khảo sát: miền, năng lực, khuyến nghị…</p>'));
   }
 
   guiHtml(res, 404, trang('Không tìm thấy', '<p>Trang giả lập chỉ có /sso/start, /lam-bai và /bao-ket-qua.</p>'));

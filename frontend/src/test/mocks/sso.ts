@@ -15,6 +15,8 @@ function tinhTrangMacDinh(): TinhTrangBaiKhaoSat[] {
     mo_gan_nhat_luc: null,
     hoan_thanh_luc: null,
     muc: null,
+    muc_goc: null,
+    url_ket_qua: null,
   }));
 }
 
@@ -44,7 +46,10 @@ export const hocVienTinhHinhMock: HocVienTinhHinhKhaoSat[] = [
         mo_gan_nhat_luc: '2026-10-04T01:00:00.000Z',
         hoan_thanh_luc: '2026-10-04T01:30:00.000Z',
         muc: 'thanh_thao',
+        muc_goc: 'M3 – Thành thạo',
+        url_ket_qua: 'https://khaosat.test/ket-qua/hv-1',
         diem: 72.5,
+        diem_toi_da: 100,
         nguon: 'api',
         cap_nhat_luc: '2026-10-04T01:30:00.000Z',
       },
@@ -56,7 +61,10 @@ export const hocVienTinhHinhMock: HocVienTinhHinhKhaoSat[] = [
         mo_gan_nhat_luc: '2026-10-02T01:00:00.000Z',
         hoan_thanh_luc: null,
         muc: null,
+        muc_goc: null,
+        url_ket_qua: null,
         diem: null,
+        diem_toi_da: null,
         nguon: 'sso',
         cap_nhat_luc: '2026-10-02T01:00:00.000Z',
       },

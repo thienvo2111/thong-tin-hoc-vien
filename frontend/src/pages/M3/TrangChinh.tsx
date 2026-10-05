@@ -8,7 +8,7 @@ import { useCauHinhTrienKhai, type CauHinhTrienKhai } from '@/content/trienKhai'
 import { chuanHoaLienKet } from '@/lib/lienKet';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
-import { NHAN_MUC_NANG_LUC, TEN_BAI_KHAO_SAT, nhanTrangThaiKhaoSat } from '@/lib/trangThaiKhaoSat';
+import { TEN_BAI_KHAO_SAT, nhanMucKetQua, nhanTrangThaiKhaoSat } from '@/lib/trangThaiKhaoSat';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
 import { CountdownTimer } from '@/components/CountdownTimer';
@@ -439,11 +439,12 @@ function TomTatKhaoSat({ loai }: { loai: SsoTarget[] }) {
         const tt = data.find((t) => t.loai === l);
         if (!tt) return null;
         const badge = nhanTrangThaiKhaoSat(tt.trang_thai, tt.can_kiem_tra);
+        const nhanMuc = tt.trang_thai === 'hoan_thanh' ? nhanMucKetQua(tt) : null;
         return (
           <Group key={l} gap="xs" wrap="nowrap" justify="space-between">
             <Text size="sm">{TEN_BAI_KHAO_SAT[l]}</Text>
             <Badge color={badge.mau} variant="light" style={{ flexShrink: 0 }}>
-              {tt.trang_thai === 'hoan_thanh' && tt.muc ? `${badge.nhan} · ${NHAN_MUC_NANG_LUC[tt.muc]}` : badge.nhan}
+              {nhanMuc ? `${badge.nhan} · ${nhanMuc}` : badge.nhan}
             </Badge>
           </Group>
         );

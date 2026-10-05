@@ -24,12 +24,14 @@ import {
   useDanhSachTinhHinhKhaoSat,
   useThongKeKhaoSat,
   type HocVienTinhHinhKhaoSat,
+  type KetQuaBaiQuanTri,
   type LocTinhHinhKhaoSat,
 } from '@/api/ketQuaKhaoSat';
 import { useDanhSachKhoa } from '@/api/khoaBoiDuong';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
-import { NHAN_MUC_NANG_LUC, TEN_BAI_KHAO_SAT, nhanTrangThaiKhaoSat } from '@/lib/trangThaiKhaoSat';
+import { NHAN_MUC_NANG_LUC, TEN_BAI_KHAO_SAT, dinhDangDiem, nhanTrangThaiKhaoSat } from '@/lib/trangThaiKhaoSat';
+import { chuanHoaLienKet } from '@/lib/lienKet';
 import { AdminPageHeader } from './AdminPageHeader';
 
 const PAGE_SIZE = 20;
@@ -233,8 +235,17 @@ function DongHocVien({ hocVien, loai }: { hocVien: HocVienTinhHinhKhaoSat; loai:
           {badge.nhan}
         </Badge>
       </Table.Td>
-      <Table.Td>{kq?.muc ? NHAN_MUC_NANG_LUC[kq.muc] : '—'}</Table.Td>
-      <Table.Td>{kq?.diem ?? '—'}</Table.Td>
+      <Table.Td>
+        <O_Muc kq={kq} />
+      </Table.Td>
+      <Table.Td>
+        <Text size="sm">{(kq && dinhDangDiem(kq.diem, kq.diem_toi_da)) ?? '—'}</Text>
+        {kq && chuanHoaLienKet(kq.url_ket_qua) && (
+          <Anchor href={chuanHoaLienKet(kq.url_ket_qua)!} target="_blank" rel="noopener noreferrer" size="xs">
+            Xem kết quả chi tiết
+          </Anchor>
+        )}
+      </Table.Td>
       <Table.Td>{kq ? kq.so_lan_mo : '—'}</Table.Td>
       <Table.Td>
         {kq ? (
@@ -249,5 +260,20 @@ function DongHocVien({ hocVien, loai }: { hocVien: HocVienTinhHinhKhaoSat; loai:
         )}
       </Table.Td>
     </Table.Tr>
+  );
+}
+
+/** Mức gốc của hệ thống khảo sát (vd "M1 – Chưa đạt") + mức 3 bậc của cổng (dùng xếp lớp) nếu có. */
+function O_Muc({ kq }: { kq?: KetQuaBaiQuanTri }) {
+  if (!kq || (!kq.muc_goc && !kq.muc)) return <>—</>;
+  return (
+    <>
+      <Text size="sm">{kq.muc_goc ?? NHAN_MUC_NANG_LUC[kq.muc!]}</Text>
+      {kq.muc_goc && kq.muc && (
+        <Text size="xs" c="dimmed">
+          Quy đổi: {NHAN_MUC_NANG_LUC[kq.muc]}
+        </Text>
+      )}
+    </>
   );
 }

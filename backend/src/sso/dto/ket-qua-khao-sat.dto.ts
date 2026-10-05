@@ -71,10 +71,46 @@ export class BaoKetQuaDto {
   @Max(9999)
   diem?: number;
 
+  // 2026-10-05: điểm tối đa của bài, để hiển thị "13,75 / 44 (31,25%)".
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  @Max(9999)
+  diem_toi_da?: number;
+
+  // 2026-10-05: nhãn mức theo thang riêng của hệ thống khảo sát (vd "M1 – Chưa đạt").
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  muc_goc?: string;
+
+  // 2026-10-05: trang kết quả chi tiết bên khảo sát — phải cùng tên miền SSO_KHAO_SAT_URL (kiểm ở service).
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  url_ket_qua?: string;
+
   @IsOptional()
   @IsObject()
   chi_tiet?: Record<string, unknown>;
 }
+
+/** Tên trường hợp lệ của POST /sso/ket-qua — trường khác bị ValidationPipe (whitelist) bỏ âm thầm,
+ * nên controller liệt kê lại cho bên khảo sát biết (`bo_qua`). */
+export const TRUONG_BAO_KET_QUA = [
+  'hoc_vien_id',
+  'ma_dinh_danh_moet',
+  'loai',
+  'trang_thai',
+  'thoi_diem',
+  'muc',
+  'diem',
+  'diem_toi_da',
+  'muc_goc',
+  'url_ket_qua',
+  'chi_tiet',
+] as const;
 
 // GET /ket-qua-khao-sat (quản trị).
 export class QueryTinhHinhKhaoSatDto extends PaginationQueryDto {
