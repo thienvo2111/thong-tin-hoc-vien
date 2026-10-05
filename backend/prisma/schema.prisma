@@ -1100,7 +1100,7 @@ model ket_qua_khao_sat {
   muc             muc_nang_luc?
   diem            Decimal?            @db.Decimal(6, 2)
   diem_toi_da     Decimal?            @db.Decimal(6, 2)
-  /// Nhãn mức theo thang của hệ thống khảo sát (vd "M1 – Chưa đạt") — học viên thấy nhãn này.
+  /// Mã mức theo thang của hệ thống khảo sát: M1..M4 (FE hiện "M1 – Chưa đạt"...).
   muc_goc         String?             @db.VarChar(50)
   /// Trang kết quả chi tiết bên hệ thống khảo sát (cùng tên miền SSO_KHAO_SAT_URL).
   url_ket_qua     String?             @db.VarChar(500)

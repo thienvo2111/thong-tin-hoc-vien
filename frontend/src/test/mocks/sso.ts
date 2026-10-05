@@ -46,7 +46,7 @@ export const hocVienTinhHinhMock: HocVienTinhHinhKhaoSat[] = [
         mo_gan_nhat_luc: '2026-10-04T01:00:00.000Z',
         hoan_thanh_luc: '2026-10-04T01:30:00.000Z',
         muc: 'thanh_thao',
-        muc_goc: 'M3 – Thành thạo',
+        muc_goc: 'M3',
         url_ket_qua: 'https://khaosat.test/ket-qua/hv-1',
         diem: 72.5,
         diem_toi_da: 100,

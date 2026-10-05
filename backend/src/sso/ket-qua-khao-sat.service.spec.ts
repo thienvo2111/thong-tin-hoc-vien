@@ -221,14 +221,14 @@ describe('KetQuaKhaoSatService', () => {
         {
           loai: 'danh-gia',
           trang_thai: 'hoan_thanh',
-          muc_goc: ' M1 – Chưa đạt ',
+          muc_goc: 'M1',
           url_ket_qua: 'https://khaosat.test/ket-qua/abc',
         },
         'api',
       );
       const { update } = prisma.ket_qua_khao_sat.upsert.mock.calls[0][0];
       expect(update).toMatchObject({
-        muc_goc: 'M1 – Chưa đạt',
+        muc_goc: 'M1',
         url_ket_qua: 'https://khaosat.test/ket-qua/abc',
       });
     });
@@ -272,14 +272,14 @@ describe('KetQuaKhaoSatService', () => {
           loai: 'danh-gia',
           trang_thai: 'hoan_thanh',
           muc: 'co_ban',
-          muc_goc: 'M1 – Chưa đạt',
+          muc_goc: 'M1',
           url_ket_qua: 'https://khaosat.test/ket-qua/abc',
           diem: new Prisma.Decimal('13.75'),
         }),
       ]);
       const [, danhGia] = await service.tinhTrangCuaHocVien('hv-1');
       expect(danhGia).toMatchObject({
-        muc_goc: 'M1 – Chưa đạt',
+        muc_goc: 'M1',
         url_ket_qua: 'https://khaosat.test/ket-qua/abc',
       });
       expect(danhGia).not.toHaveProperty('diem');

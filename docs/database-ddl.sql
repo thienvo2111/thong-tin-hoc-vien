@@ -795,7 +795,7 @@ CREATE TABLE ket_qua_khao_sat (
     muc              muc_nang_luc,
     diem             numeric(6,2),
     diem_toi_da      numeric(6,2),             -- 2026-10-05 (migration 20261005090000)
-    muc_goc          varchar(50),              -- nhãn thang hệ thống khảo sát, vd 'M1 – Chưa đạt'
+    muc_goc          varchar(50),              -- mã thang hệ thống khảo sát 'M1'..'M4' (nhãn hiển thị ở FE)
     url_ket_qua      varchar(500),             -- trang kết quả chi tiết, cùng tên miền SSO_KHAO_SAT_URL
     chi_tiet         jsonb,
     nguon            varchar(10) NOT NULL,     -- 'sso' | 'api' | 'import' (nguồn ghi gần nhất)

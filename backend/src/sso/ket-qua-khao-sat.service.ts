@@ -210,7 +210,7 @@ export class KetQuaKhaoSatService {
             muc: vao.muc ?? null,
             diem: vao.diem ?? null,
             diem_toi_da: vao.diem_toi_da ?? null,
-            muc_goc: vao.muc_goc?.trim() || null,
+            muc_goc: vao.muc_goc ?? null,
             url_ket_qua: urlKetQua,
             chi_tiet: (vao.chi_tiet ?? Prisma.DbNull) as
               Prisma.InputJsonValue | typeof Prisma.DbNull,

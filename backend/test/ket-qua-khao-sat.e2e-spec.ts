@@ -308,6 +308,12 @@ describe('Kết quả khảo sát (e2e)', () => {
         { loai: 'khao-sat', trang_thai: 'da_mo' },
         { loai: 'khao-sat', trang_thai: 'hoan_thanh', muc: 'gioi' },
         { loai: 'khao-sat', trang_thai: 'hoan_thanh', diem: -1 },
+        {
+          loai: 'khao-sat',
+          trang_thai: 'hoan_thanh',
+          muc_goc: 'M1 – Chưa đạt',
+        },
+        { loai: 'khao-sat', trang_thai: 'hoan_thanh', muc_goc: 'M5' },
       ]) {
         await baoKetQua({ hoc_vien_id: hocVien.id, ...body }).expect(400);
       }
@@ -322,13 +328,13 @@ describe('Kết quả khảo sát (e2e)', () => {
         muc: 'co_ban',
         diem: 13.75,
         diem_toi_da: 44,
-        muc_goc: 'M1 – Chưa đạt',
+        muc_goc: ' m1 ',
         url_ket_qua: 'https://khaosat.test/surveys/nls/ket-qua',
         chi_tiet: { diem_loai_a: 5, diem_loai_b: 8.75 },
         tong_diem: 13.75,
       }).expect(200);
       expect(res.body.bo_qua).toEqual(['tong_diem']);
-      expect(res.body.muc_goc).toBe('M1 – Chưa đạt');
+      expect(res.body.muc_goc).toBe('M1');
       const dong = await prisma.ket_qua_khao_sat.findUnique({
         where: {
           hoc_vien_id_loai: { hoc_vien_id: hocVien.id, loai: 'danh-gia' },
@@ -439,6 +445,7 @@ describe('Kết quả khảo sát (e2e)', () => {
           'nang_cao',
           '88,5',
           '100',
+          'm4',
         ],
         [undefined, b.tenDangNhap, 'danh-gia', 'xong_roi', '', '', ''],
         [undefined, a.tenDangNhap, 'danh-gia', 'dang_lam', '', '', ''],
@@ -472,6 +479,7 @@ describe('Kết quả khảo sát (e2e)', () => {
       });
       expect(Number(dong?.diem)).toBe(88.5);
       expect(Number(dong?.diem_toi_da)).toBe(100);
+      expect(dong?.muc_goc).toBe('M4');
       expect(dong?.hoan_thanh_luc?.toISOString()).toBe(
         '2026-10-04T01:30:00.000Z',
       );

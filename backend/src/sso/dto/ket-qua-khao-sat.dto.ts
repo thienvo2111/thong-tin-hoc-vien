@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsDateString,
   IsIn,
@@ -21,6 +21,16 @@ export type LoaiKhaoSat = SsoTarget;
 
 export const MUC_NANG_LUC = ['co_ban', 'thanh_thao', 'nang_cao'] as const;
 export type MucNangLuc = (typeof MUC_NANG_LUC)[number];
+
+// Mã mức theo thang của hệ thống khảo sát (2026-10-05) — CHỈ nhận mã, cổng tự hiện nhãn chuẩn
+// (M1 – Chưa đạt …). Tạm thời chỉ ghi nhận, KHÔNG tự quy đổi sang `muc` (xếp lớp xử lý sau).
+export const MUC_GOC = ['M1', 'M2', 'M3', 'M4'] as const;
+export type MucGoc = (typeof MUC_GOC)[number];
+
+/** "m1 " -> "M1": tha lỗi hoa/thường + khoảng trắng, còn lại phải đúng mã. */
+export function chuanHoaMucGoc(v: unknown): unknown {
+  return typeof v === 'string' ? v.trim().toUpperCase() : v;
+}
 
 // Trạng thái hệ thống khảo sát được phép báo về. `da_mo` do cổng tự ghi khi đổi mã SSO.
 export const TRANG_THAI_BAO_VE = ['dang_lam', 'hoan_thanh'] as const;
@@ -79,11 +89,11 @@ export class BaoKetQuaDto {
   @Max(9999)
   diem_toi_da?: number;
 
-  // 2026-10-05: nhãn mức theo thang riêng của hệ thống khảo sát (vd "M1 – Chưa đạt").
+  // 2026-10-05: mã mức theo thang của hệ thống khảo sát — "M1" | "M2" | "M3" | "M4".
   @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  muc_goc?: string;
+  @Transform(({ value }) => chuanHoaMucGoc(value))
+  @IsIn(MUC_GOC)
+  muc_goc?: MucGoc;
 
   // 2026-10-05: trang kết quả chi tiết bên khảo sát — phải cùng tên miền SSO_KHAO_SAT_URL (kiểm ở service).
   @IsOptional()

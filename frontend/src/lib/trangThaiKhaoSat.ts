@@ -23,10 +23,19 @@ export function nhanTrangThaiKhaoSat(trangThai: TrangThaiKhaoSat, canKiemTra: bo
   return NHAN_TRANG_THAI[trangThai];
 }
 
+/** Thang mức của hệ thống khảo sát — API chỉ nhận mã, nhãn hiển thị cố định ở đây. */
+export const NHAN_MUC_GOC: Record<string, string> = {
+  M1: 'M1 – Chưa đạt',
+  M2: 'M2 – Cơ bản',
+  M3: 'M3 – Thành thạo',
+  M4: 'M4 – Nâng cao',
+};
+
 /** Nhãn mức cho người xem: ưu tiên thang gốc của hệ thống khảo sát (vd "M1 – Chưa đạt") để khớp
  * với trang kết quả bên đó; không có thì dùng 3 mức của cổng. */
 export function nhanMucKetQua(kq: { muc: MucNangLuc | null; muc_goc: string | null }): string | null {
-  return kq.muc_goc ?? (kq.muc ? NHAN_MUC[kq.muc] : null);
+  if (kq.muc_goc) return NHAN_MUC_GOC[kq.muc_goc] ?? kq.muc_goc;
+  return kq.muc ? NHAN_MUC[kq.muc] : null;
 }
 
 const so = (n: number) => n.toLocaleString('vi-VN', { maximumFractionDigits: 2 });

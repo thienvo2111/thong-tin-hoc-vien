@@ -292,5 +292,5 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 113 | Học viên chỉ xem trạng thái + mức của mình, **không** thấy điểm/chi tiết; danh sách/thống kê chỉ `quan_tri` | 🔴 | API (`GET /sso/tinh-trang`, `@Roles('quan_tri')`) |
 | 114 | Kết quả khảo sát **không** tự đổi `dang_ky_hoc.muc_dau_vao` (chốt qua import `ket_qua_danh_gia`) | 🔴 | API |
 | 115 | Import `ket_qua_khao_sat`: cùng quy tắc #111–112; `thoi_diem` dạng `dd/mm/yyyy hh:mm` giờ VN; trùng học viên + loại trong 1 file → dòng lỗi | 🔴 | API (`ImportService.buildKetQuaKhaoSatDto`) |
-| 116 | (2026-10-05) `diem_toi_da` > 0, ≤ 9999 và ≥ `diem`; `muc_goc` ≤ 50 ký tự; `url_ket_qua` chỉ http(s) **cùng tên miền** `SSO_KHAO_SAT_URL` (học viên bấm mở link này — chặn link lạ/`javascript:`) | 🔴 | API (`KetQuaKhaoSatService.ghiKetQua`) + import |
+| 116 | (2026-10-05) `diem_toi_da` > 0, ≤ 9999 và ≥ `diem`; `muc_goc` chỉ nhận mã `M1`–`M4` (chuẩn hóa hoa/thường, khoảng trắng); `url_ket_qua` chỉ http(s) **cùng tên miền** `SSO_KHAO_SAT_URL` (học viên bấm mở link này — chặn link lạ/`javascript:`) | 🔴 | API (`KetQuaKhaoSatService.ghiKetQua`) + import |
 | 117 | (2026-10-05) Trường lạ trong `POST /sso/ket-qua` vẫn bị bỏ (whitelist) nhưng được trả lại trong `bo_qua` + ghi log cảnh báo, để phát hiện gửi sai tên trường | 🟡 | API (`SsoController.baoKetQua`) |

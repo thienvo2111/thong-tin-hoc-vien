@@ -30,7 +30,13 @@ import {
 import { useDanhSachKhoa } from '@/api/khoaBoiDuong';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
-import { NHAN_MUC_NANG_LUC, TEN_BAI_KHAO_SAT, dinhDangDiem, nhanTrangThaiKhaoSat } from '@/lib/trangThaiKhaoSat';
+import {
+  NHAN_MUC_NANG_LUC,
+  TEN_BAI_KHAO_SAT,
+  dinhDangDiem,
+  nhanMucKetQua,
+  nhanTrangThaiKhaoSat,
+} from '@/lib/trangThaiKhaoSat';
 import { chuanHoaLienKet } from '@/lib/lienKet';
 import { AdminPageHeader } from './AdminPageHeader';
 
@@ -268,7 +274,7 @@ function O_Muc({ kq }: { kq?: KetQuaBaiQuanTri }) {
   if (!kq || (!kq.muc_goc && !kq.muc)) return <>—</>;
   return (
     <>
-      <Text size="sm">{kq.muc_goc ?? NHAN_MUC_NANG_LUC[kq.muc!]}</Text>
+      <Text size="sm">{nhanMucKetQua(kq)}</Text>
       {kq.muc_goc && kq.muc && (
         <Text size="xs" c="dimmed">
           Quy đổi: {NHAN_MUC_NANG_LUC[kq.muc]}
