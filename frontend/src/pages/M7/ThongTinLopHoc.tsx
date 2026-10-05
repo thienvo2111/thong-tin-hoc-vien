@@ -1,5 +1,8 @@
 import { Anchor, Badge, Box, Button, Center, Container, Group, Loader, Paper, Stack, Text, Title } from '@mantine/core';
-import { useKhoaHocToi } from '@/api/hocVien';
+import { useMutation } from '@tanstack/react-query';
+import { capMaSso, useKhoaHocToi, type SsoTarget } from '@/api/hocVien';
+import { useCauHinhTrienKhai } from '@/content/trienKhai';
+import { BaiKhaoSat } from '@/components/BaiKhaoSat';
 import { useTinhTrangKhaoSat, type TinhTrangBaiKhaoSat } from '@/api/ketQuaKhaoSat';
 import { nhanMucKetQua } from '@/lib/trangThaiKhaoSat';
 import type {
@@ -55,6 +58,12 @@ export default function ThongTinLopHoc() {
   const { data, isLoading, isError, error } = useKhoaHocToi();
   // Kết quả bài trên hệ thống khảo sát (2026-10-05) — dùng khi quản trị chưa chốt mức của khóa.
   const { data: tinhTrang } = useTinhTrangKhaoSat();
+  const { cauHinh, daTai: daTaiCauHinh } = useCauHinhTrienKhai({ loai: 'cua_toi' });
+  // Kênh trang khảo sát: giai đoạn "Đánh giá" làm bài qua SSO thay cho link tĩnh (2026-10-05).
+  const baiTheoGiaiDoan = {
+    dauVao: daTaiCauHinh && cauHinh.kenhDanhGia === 'sso' ? (['khao-sat', 'danh-gia'] as SsoTarget[]) : null,
+    dauRa: daTaiCauHinh && cauHinh.khaoSatDauRaMo ? (['dau-ra'] as SsoTarget[]) : null,
+  };
 
   return (
     <Container size="sm" py="xl">
@@ -81,6 +90,8 @@ export default function ThongTinLopHoc() {
             dangKy={dangKy}
             baiDauVao={tinhTrang?.find((t) => t.loai === 'danh-gia')}
             baiDauRa={tinhTrang?.find((t) => t.loai === 'dau-ra')}
+            tinhTrang={tinhTrang}
+            baiTheoGiaiDoan={baiTheoGiaiDoan}
           />
         ))}
       </Stack>
@@ -92,13 +103,23 @@ function KhoiKhoaHoc({
   dangKy,
   baiDauVao,
   baiDauRa,
+  tinhTrang,
+  baiTheoGiaiDoan,
 }: {
   dangKy: KhoaHocDangKy;
   baiDauVao?: TinhTrangBaiKhaoSat;
   baiDauRa?: TinhTrangBaiKhaoSat;
+  tinhTrang?: TinhTrangBaiKhaoSat[];
+  baiTheoGiaiDoan: { dauVao: SsoTarget[] | null; dauRa: SsoTarget[] | null };
 }) {
   const { khoa, cum, giai_doan, muc_dau_vao, muc_dau_ra } = dangKy;
   const chuaCoLopNao = giai_doan.every((gd) => !gd.lop);
+  // Giai đoạn "Đánh giá" sớm nhất = đầu vào, các giai đoạn "Đánh giá" sau = đầu ra.
+  const thuTuDauVao = Math.min(...giai_doan.filter((g) => g.hinh_thuc === 'danh_gia').map((g) => g.thu_tu));
+  const baiCuaGiaiDoan = (gd: GiaiDoanCuaToi): SsoTarget[] | null => {
+    if (gd.hinh_thuc !== 'danh_gia' || gd.lop) return null;
+    return gd.thu_tu === thuTuDauVao ? baiTheoGiaiDoan.dauVao : baiTheoGiaiDoan.dauRa;
+  };
 
   return (
     <Box p="lg" style={{ borderRadius: 14, border: '1px solid var(--mantine-color-gray-3)', background: 'var(--mantine-color-white)' }}>
@@ -120,7 +141,13 @@ function KhoiKhoaHoc({
         {cum && <KhoiCum cum={cum} />}
 
         {giai_doan.map((gd) => (
-          <TheGiaiDoan key={gd.id} gd={gd} chuaPhanLop={chuaCoLopNao} />
+          <TheGiaiDoan
+            key={gd.id}
+            gd={gd}
+            chuaPhanLop={chuaCoLopNao}
+            baiKhaoSat={baiCuaGiaiDoan(gd)}
+            tinhTrang={tinhTrang}
+          />
         ))}
 
         {chuaCoLopNao && giai_doan.length > 0 && (
@@ -178,9 +205,45 @@ function DongKetQua({ nhan, mucChot, bai }: { nhan: string; mucChot: MucNangLuc 
   );
 }
 
+/** Giai đoạn đánh giá làm qua trang khảo sát (kênh SSO): chưa xong -> nút làm bài (cấp mã SSO, chuyển
+ * cùng tab như M6); xong -> chỉ hiện kết quả, không còn nút mở. */
+function BaiKhaoSatGiaiDoan({ loai, tinhTrang }: { loai: SsoTarget[]; tinhTrang?: TinhTrangBaiKhaoSat[] }) {
+  const chuyen = useMutation({
+    mutationFn: capMaSso,
+    onSuccess: ({ url }) => window.location.assign(url),
+  });
+  return (
+    <Stack gap="sm">
+      {chuyen.isError && <StatusBanner loai="error">{thongDiepLoiChung(chuyen.error)}</StatusBanner>}
+      {loai.map((l, i) => (
+        <BaiKhaoSat
+          key={l}
+          loai={l}
+          thuTu={loai.length > 1 ? i + 1 : undefined}
+          tinhTrang={tinhTrang?.find((t) => t.loai === l)}
+          dangChuyen={chuyen.isPending && chuyen.variables === l}
+          khoaNut={chuyen.isPending}
+          onLam={() => chuyen.mutate(l)}
+          anNutKhiXong
+        />
+      ))}
+    </Stack>
+  );
+}
+
 // Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.2): 1 thẻ/giai đoạn. Có lớp -> lớp + nhân sự + buổi
 // của đúng giai đoạn; không lớp -> link/hướng dẫn chung của giai đoạn (vd đánh giá đầu vào/đầu ra).
-function TheGiaiDoan({ gd, chuaPhanLop }: { gd: GiaiDoanCuaToi; chuaPhanLop: boolean }) {
+function TheGiaiDoan({
+  gd,
+  chuaPhanLop,
+  baiKhaoSat,
+  tinhTrang,
+}: {
+  gd: GiaiDoanCuaToi;
+  chuaPhanLop: boolean;
+  baiKhaoSat: SsoTarget[] | null;
+  tinhTrang?: TinhTrangBaiKhaoSat[];
+}) {
   return (
     <Paper p="md" radius="md" withBorder data-testid="the-giai-doan">
       <Group gap="xs" mb={2} wrap="wrap">
@@ -208,6 +271,8 @@ function TheGiaiDoan({ gd, chuaPhanLop }: { gd: GiaiDoanCuaToi; chuaPhanLop: boo
           )}
           <DanhSachBuoi lichHoc={gd.lop.lich_hoc} />
         </Stack>
+      ) : baiKhaoSat ? (
+        <BaiKhaoSatGiaiDoan loai={baiKhaoSat} tinhTrang={tinhTrang} />
       ) : (
         <Stack gap="xs">
           {gd.huong_dan && (

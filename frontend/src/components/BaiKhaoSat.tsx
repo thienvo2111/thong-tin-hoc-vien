@@ -21,6 +21,7 @@ export function BaiKhaoSat({
   dangChuyen,
   khoaNut,
   onLam,
+  anNutKhiXong = false,
 }: {
   loai: SsoTarget;
   thuTu?: number;
@@ -28,6 +29,8 @@ export function BaiKhaoSat({
   dangChuyen: boolean;
   khoaNut: boolean;
   onLam: () => void;
+  /** Đã hoàn thành thì chỉ hiện kết quả, không còn nút vào lại trang khảo sát (M7). */
+  anNutKhiXong?: boolean;
 }) {
   const trangThai = tinhTrang?.trang_thai ?? 'chua_lam';
   const xong = trangThai === 'hoan_thanh';
@@ -78,16 +81,18 @@ export function BaiKhaoSat({
           </Text>
         )}
 
-        <Button
-          size={xong ? 'sm' : 'lg'}
-          variant={xong ? 'default' : 'filled'}
-          fullWidth
-          loading={dangChuyen}
-          disabled={khoaNut}
-          onClick={onLam}
-        >
-          {NHAN_NUT[trangThai]}
-        </Button>
+        {!(xong && anNutKhiXong) && (
+          <Button
+            size={xong ? 'sm' : 'lg'}
+            variant={xong ? 'default' : 'filled'}
+            fullWidth
+            loading={dangChuyen}
+            disabled={khoaNut}
+            onClick={onLam}
+          >
+            {NHAN_NUT[trangThai]}
+          </Button>
+        )}
       </Stack>
     </Paper>
   );

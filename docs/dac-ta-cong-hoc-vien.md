@@ -149,6 +149,15 @@ Mục nội dung trong `gioiThieu.ts` gắn `cheDo: 'khao_sat' | 'dang_nhap'` ch
 
 ---
 
+## M7 — Thông tin lớp học (`/toi/lop-hoc`) — bổ sung 2026-10-05
+
+Bố cục theo giai đoạn: `docs/superpowers/specs/2026-10-02-phan-lop-theo-giai-doan-design.md` mục 5.2. Bổ sung:
+
+- **Giai đoạn "Đánh giá" chưa có lớp + kênh trang khảo sát** (`kenh_danh_gia = sso`): giai đoạn đánh giá sớm nhất = **đầu vào** (2 bài "Phiếu khảo sát kĩ năng số", "Phiếu đánh giá năng lực số"); giai đoạn đánh giá sau = **đầu ra** (bài `dau-ra`, chỉ khi `khao_sat_dau_ra_mo`). Thẻ giai đoạn **thay nút "Mở liên kết"** bằng từng bài như M6: trạng thái + nút "Làm bài"/"Làm tiếp" → `POST /sso/cap-ma` → chuyển cùng tab. Bài đã hoàn thành → chỉ hiện kết quả (mức `nhan_muc_goc`, thời điểm, "Xem kết quả chi tiết" nếu có), **không còn nút** vào lại. Kênh `vle` giữ nút "Mở liên kết" như cũ.
+- **Ô "Kết quả đánh giá"**: mức quản trị đã chốt (`muc_dau_vao`/`muc_dau_ra`) ưu tiên; chưa chốt mà bài trên hệ thống khảo sát đã hoàn thành → hiện mức theo thang khảo sát + link chi tiết.
+
+---
+
 ## M6 — Làm bài đánh giá đầu vào (đợt 2)
 
 **API:** `GET /hoc-vien/toi/danh-gia-dau-vao` (T15). Cấu hình query: `gcTime: 0`, không refetch nền.

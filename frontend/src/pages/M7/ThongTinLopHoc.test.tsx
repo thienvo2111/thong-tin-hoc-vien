@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
 import { db } from '@/test/mocks/db';
-import { datTinhTrangBai } from '@/test/mocks/sso';
+import { datTinhTrangBai, ssoDaYeuCau } from '@/test/mocks/sso';
+import { datCauHinhKhaoSatMock } from '@/test/mocks/cauHinhKhaoSat';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import type { KhoaHocDangKy } from '@/api/types';
@@ -184,5 +186,67 @@ describe('M7 — Thông tin lớp học', () => {
 
     expect(await screen.findByText('Lịch các giai đoạn của khóa học sẽ được cập nhật sau.')).toBeInTheDocument();
     expect(screen.queryByTestId('the-giai-doan')).not.toBeInTheDocument();
+  });
+
+  describe('giai đoạn đánh giá làm qua trang khảo sát (kênh sso, 2026-10-05)', () => {
+    const locationGoc = window.location;
+    afterEach(() => {
+      Object.defineProperty(window, 'location', { configurable: true, value: locationGoc });
+    });
+    const datKenhSso = () =>
+      datCauHinhKhaoSatMock({
+        che_do_hoc_vien: 'dang_nhap',
+        danh_gia_dau_vao_trong_cong: false,
+        hien_khao_sat: true,
+        kenh_danh_gia: 'sso',
+        khao_sat_dau_ra_mo: false,
+        phieu: [],
+      });
+
+    it('chưa làm -> GĐ1 hiện 2 bài với nút "Làm bài" (không còn "Mở liên kết"); bấm -> cấp mã SSO, chuyển cùng tab', async () => {
+      datKenhSso();
+      const assign = vi.fn();
+      Object.defineProperty(window, 'location', { configurable: true, value: { ...locationGoc, assign } });
+      const user = userEvent.setup();
+      renderDaDangNhap();
+      const gd1 = (await cacTheGiaiDoan())[0];
+      expect(await within(gd1).findByText('1. Phiếu khảo sát kĩ năng số')).toBeInTheDocument();
+      expect(within(gd1).getByText('2. Phiếu đánh giá năng lực số')).toBeInTheDocument();
+      expect(within(gd1).queryByRole('link', { name: 'Mở liên kết' })).not.toBeInTheDocument();
+
+      const daGui = ssoDaYeuCau.length;
+      await user.click(within(within(gd1).getByLabelText('Phiếu đánh giá năng lực số')).getByRole('button', { name: 'Làm bài' }));
+      await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+      expect(ssoDaYeuCau[daGui]).toBe('danh-gia');
+    });
+
+    it('đã làm xong -> GĐ1 chỉ hiện kết quả (mức + link chi tiết), không còn nút làm bài/mở lại', async () => {
+      datKenhSso();
+      datTinhTrangBai({ loai: 'khao-sat', trang_thai: 'hoan_thanh' });
+      datTinhTrangBai({
+        loai: 'danh-gia',
+        trang_thai: 'hoan_thanh',
+        hoan_thanh_luc: '2026-10-05T07:50:56.000Z',
+        muc_goc: 'M1',
+        nhan_muc_goc: 'M1 – Chưa đạt',
+        url_ket_qua: 'https://khaosat.test/ket-qua/abc',
+      });
+      renderDaDangNhap();
+      const gd1 = (await cacTheGiaiDoan())[0];
+      const danhGia = await within(gd1).findByLabelText('Phiếu đánh giá năng lực số');
+      expect(await within(danhGia).findByText('M1 – Chưa đạt')).toBeInTheDocument();
+      expect(within(danhGia).getByRole('link', { name: 'Xem kết quả chi tiết' })).toHaveAttribute(
+        'href',
+        'https://khaosat.test/ket-qua/abc',
+      );
+      expect(within(gd1).queryByRole('button')).not.toBeInTheDocument();
+      expect(within(gd1).queryByRole('link', { name: 'Mở liên kết' })).not.toBeInTheDocument();
+    });
+
+    it('kênh vle -> GĐ1 giữ nút "Mở liên kết" như cũ', async () => {
+      renderDaDangNhap();
+      const gd1 = (await cacTheGiaiDoan())[0];
+      expect(within(gd1).getByRole('link', { name: 'Mở liên kết' })).toBeInTheDocument();
+    });
   });
 });
