@@ -17,8 +17,10 @@ export interface TinhTrangBaiKhaoSat {
   mo_gan_nhat_luc: string | null;
   hoan_thanh_luc: string | null;
   muc: MucNangLuc | null;
-  /** Nhãn mức theo thang hệ thống khảo sát (vd "M1 – Chưa đạt") — ưu tiên hiển thị hơn `muc`. */
+  /** Mã mức theo thang hệ thống khảo sát (vd "M1"). */
   muc_goc: string | null;
+  /** Nhãn backend ghép theo thang quản trị cấu hình (vd "M1 – Chưa đạt") — ưu tiên hiển thị hơn `muc`. */
+  nhan_muc_goc: string | null;
   /** Trang kết quả chi tiết bên hệ thống khảo sát. */
   url_ket_qua: string | null;
 }
@@ -48,6 +50,7 @@ export interface KetQuaBaiQuanTri {
   hoan_thanh_luc: string | null;
   muc: MucNangLuc | null;
   muc_goc: string | null;
+  nhan_muc_goc: string | null;
   url_ket_qua: string | null;
   diem: number | null;
   diem_toi_da: number | null;
@@ -110,4 +113,24 @@ export function useDanhSachTinhHinhKhaoSat(params: DanhSachTinhHinhParams) {
     queryFn: () => apiFetch<PaginatedResult<HocVienTinhHinhKhaoSat>>(`/sso/ket-qua${xayQueryString(params)}`),
     placeholderData: (truoc) => truoc,
   });
+}
+
+// --- Thang mức kết quả (quản trị, 2026-10-05) ---
+
+export interface MucThang {
+  ma: string;
+  nhan: string;
+}
+
+export interface ThangMuc {
+  thang: MucThang[];
+  cap_nhat_luc: string | null;
+}
+
+export function layThangMuc() {
+  return apiFetch<ThangMuc>('/sso/thang-muc');
+}
+
+export function luuThangMuc(muc: MucThang[]) {
+  return apiFetch<ThangMuc>('/sso/thang-muc', { method: 'PUT', body: JSON.stringify({ muc }) });
 }

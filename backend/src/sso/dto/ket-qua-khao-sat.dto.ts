@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -22,10 +23,9 @@ export type LoaiKhaoSat = SsoTarget;
 export const MUC_NANG_LUC = ['co_ban', 'thanh_thao', 'nang_cao'] as const;
 export type MucNangLuc = (typeof MUC_NANG_LUC)[number];
 
-// Mã mức theo thang của hệ thống khảo sát (2026-10-05) — CHỈ nhận mã, cổng tự hiện nhãn chuẩn
-// (M1 – Chưa đạt …). Tạm thời chỉ ghi nhận, KHÔNG tự quy đổi sang `muc` (xếp lớp xử lý sau).
-export const MUC_GOC = ['M1', 'M2', 'M3', 'M4'] as const;
-export type MucGoc = (typeof MUC_GOC)[number];
+// Mã mức theo thang của hệ thống khảo sát (2026-10-05) — CHỈ nhận mã; danh sách mã + nhãn do quản
+// trị cấu hình (ThangMucService). Tạm thời chỉ ghi nhận, KHÔNG tự quy đổi sang `muc`.
+export const DINH_DANG_MA_MUC = /^[A-Z0-9]{1,10}$/;
 
 /** "m1 " -> "M1": tha lỗi hoa/thường + khoảng trắng, còn lại phải đúng mã. */
 export function chuanHoaMucGoc(v: unknown): unknown {
@@ -89,11 +89,12 @@ export class BaoKetQuaDto {
   @Max(9999)
   diem_toi_da?: number;
 
-  // 2026-10-05: mã mức theo thang của hệ thống khảo sát — "M1" | "M2" | "M3" | "M4".
+  // 2026-10-05: mã mức theo thang quản trị cấu hình (mặc định "M1".."M4"), kiểm danh sách ở service.
   @IsOptional()
   @Transform(({ value }) => chuanHoaMucGoc(value))
-  @IsIn(MUC_GOC)
-  muc_goc?: MucGoc;
+  @IsString()
+  @Matches(DINH_DANG_MA_MUC, { message: 'muc_goc phải là mã mức, vd "M1"' })
+  muc_goc?: string;
 
   // 2026-10-05: trang kết quả chi tiết bên khảo sát — phải cùng tên miền SSO_KHAO_SAT_URL (kiểm ở service).
   @IsOptional()

@@ -38,6 +38,7 @@ import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { AdminPageHeader } from './AdminPageHeader';
 import { TheThuSso } from './TheThuSso';
+import { TheThangMuc } from './TheThangMuc';
 
 const queryKey = (khoaId: string | null) => ['admin', 'cau-hinh-khao-sat', khoaId ?? 'chung'] as const;
 
@@ -100,6 +101,8 @@ export default function AdminCauHinhKhaoSat() {
           </Paper>
 
           <BieuMauCauHinh key={phamVi || 'chung'} khoaId={phamVi || null} />
+
+          <TheThangMuc />
 
           <TheThuSso />
         </Stack>

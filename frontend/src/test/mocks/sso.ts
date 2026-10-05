@@ -16,6 +16,7 @@ function tinhTrangMacDinh(): TinhTrangBaiKhaoSat[] {
     hoan_thanh_luc: null,
     muc: null,
     muc_goc: null,
+    nhan_muc_goc: null,
     url_ket_qua: null,
   }));
 }
@@ -47,6 +48,7 @@ export const hocVienTinhHinhMock: HocVienTinhHinhKhaoSat[] = [
         hoan_thanh_luc: '2026-10-04T01:30:00.000Z',
         muc: 'thanh_thao',
         muc_goc: 'M3',
+        nhan_muc_goc: 'M3 – Thành thạo',
         url_ket_qua: 'https://khaosat.test/ket-qua/hv-1',
         diem: 72.5,
         diem_toi_da: 100,
@@ -62,6 +64,7 @@ export const hocVienTinhHinhMock: HocVienTinhHinhKhaoSat[] = [
         hoan_thanh_luc: null,
         muc: null,
         muc_goc: null,
+        nhan_muc_goc: null,
         url_ket_qua: null,
         diem: null,
         diem_toi_da: null,
@@ -80,9 +83,27 @@ export const hocVienTinhHinhMock: HocVienTinhHinhKhaoSat[] = [
   },
 ];
 
+// GET/PUT /sso/thang-muc (2026-10-05).
+export const thangMucMock: { value: { ma: string; nhan: string }[] } = { value: [] };
+export function datLaiThangMucMock() {
+  thangMucMock.value = [
+    { ma: 'M1', nhan: 'Chưa đạt' },
+    { ma: 'M2', nhan: 'Cơ bản' },
+    { ma: 'M3', nhan: 'Thành thạo' },
+    { ma: 'M4', nhan: 'Nâng cao' },
+  ];
+}
+datLaiThangMucMock();
+
 const THEO_MUC_RONG = { co_ban: 0, thanh_thao: 0, nang_cao: 0, chua_xep_muc: 0 };
 
 export const ssoHandlers = [
+  http.get('/sso/thang-muc', () => HttpResponse.json({ thang: thangMucMock.value, cap_nhat_luc: null })),
+  http.put('/sso/thang-muc', async ({ request }) => {
+    const body = (await request.json()) as { muc: { ma: string; nhan: string }[] };
+    thangMucMock.value = body.muc;
+    return HttpResponse.json({ thang: body.muc, cap_nhat_luc: '2026-10-05T08:00:00.000Z' });
+  }),
   http.get('/sso/tinh-trang', () => HttpResponse.json(tinhTrangKhaoSatMock.value)),
   http.get('/sso/ket-qua/thong-ke', () =>
     HttpResponse.json({

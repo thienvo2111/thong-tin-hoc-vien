@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, ket_qua_khao_sat } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ThangMucService, nhanMucGoc } from './thang-muc.service';
 import {
   NotFoundAppException,
   ValidationException,
@@ -71,6 +72,8 @@ export interface TinhTrangBai {
   hoan_thanh_luc: Date | null;
   muc: MucNangLuc | null;
   muc_goc: string | null;
+  /** Nhãn hiển thị theo thang quản trị cấu hình, vd "M1 – Chưa đạt". */
+  nhan_muc_goc: string | null;
   url_ket_qua: string | null;
 }
 
@@ -88,7 +91,10 @@ function canKiemTra(
 export class KetQuaKhaoSatService {
   private readonly logger = new Logger(KetQuaKhaoSatService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly thangMuc: ThangMucService,
+  ) {}
 
   // Gọi từ SsoService.doiMa — học viên vừa thực sự tới trang khảo sát. Chỉ
   // tăng bộ đếm, KHÔNG hạ trạng thái (đang làm / hoàn thành giữ nguyên). Lỗi ở
@@ -186,6 +192,7 @@ export class KetQuaKhaoSatService {
         { field: 'diem', message: 'Không được lớn hơn diem_toi_da' },
       ]);
     }
+    if (vao.muc_goc) await this.thangMuc.kiemTraMa(vao.muc_goc);
     const urlKetQua = vao.url_ket_qua?.trim()
       ? kiemTraUrlKetQua(vao.url_ket_qua)
       : null;
@@ -235,9 +242,12 @@ export class KetQuaKhaoSatService {
 
   // GET /sso/tinh-trang (học viên) — đủ mọi loại bài, không lộ điểm/chi tiết.
   async tinhTrangCuaHocVien(hocVienId: string): Promise<TinhTrangBai[]> {
-    const rows = await this.prisma.ket_qua_khao_sat.findMany({
-      where: { hoc_vien_id: hocVienId },
-    });
+    const [rows, thang] = await Promise.all([
+      this.prisma.ket_qua_khao_sat.findMany({
+        where: { hoc_vien_id: hocVienId },
+      }),
+      this.thangMuc.thang(),
+    ]);
     const now = Date.now();
     return LOAI_KHAO_SAT.map((loai) => {
       const kq = rows.find((r) => r.loai === loai);
@@ -250,6 +260,7 @@ export class KetQuaKhaoSatService {
           hoan_thanh_luc: null,
           muc: null,
           muc_goc: null,
+          nhan_muc_goc: null,
           url_ket_qua: null,
         };
       }
@@ -261,6 +272,7 @@ export class KetQuaKhaoSatService {
         hoan_thanh_luc: kq.hoan_thanh_luc,
         muc: kq.muc,
         muc_goc: kq.muc_goc,
+        nhan_muc_goc: nhanMucGoc(kq.muc_goc, thang),
         url_ket_qua: kq.url_ket_qua,
       };
     });
@@ -390,6 +402,7 @@ export class KetQuaKhaoSatService {
     ]);
 
     const now = Date.now();
+    const thang = await this.thangMuc.thang();
     const data = rows.map(
       ({ ket_qua_khao_sat: kqs, don_vi_cong_tac, ...hv }) => ({
         ...hv,
@@ -405,6 +418,7 @@ export class KetQuaKhaoSatService {
           diem: kq.diem === null ? null : Number(kq.diem),
           diem_toi_da: kq.diem_toi_da === null ? null : Number(kq.diem_toi_da),
           muc_goc: kq.muc_goc,
+          nhan_muc_goc: nhanMucGoc(kq.muc_goc, thang),
           url_ket_qua: kq.url_ket_qua,
           chi_tiet: kq.chi_tiet,
           nguon: kq.nguon,

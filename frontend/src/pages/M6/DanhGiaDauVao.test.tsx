@@ -234,6 +234,7 @@ describe('M6 — kênh trang khảo sát (SSO, 2026-10-02)', () => {
         trang_thai: 'hoan_thanh',
         muc: 'co_ban',
         muc_goc: 'M1',
+        nhan_muc_goc: 'M1 – Chưa đạt',
         url_ket_qua: 'https://khaosat.test/ket-qua/abc',
       });
       renderDaDangNhap();

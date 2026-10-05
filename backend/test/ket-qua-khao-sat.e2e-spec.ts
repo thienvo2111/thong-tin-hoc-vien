@@ -432,6 +432,56 @@ describe('Kết quả khảo sát (e2e)', () => {
       expect(tk.body.tong_hoc_vien).toBeGreaterThanOrEqual(1);
     });
 
+    it('thang mức: chỉ quản trị đọc/sửa; sửa thang -> mã mới được nhận, nhãn mới trả cho học viên', async () => {
+      const { hocVien, token } = await taoHocVien(true);
+      await request(app.getHttpServer())
+        .get('/sso/thang-muc')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+      const macDinh = await request(app.getHttpServer())
+        .get('/sso/thang-muc')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(macDinh.body.thang[0]).toEqual({ ma: 'M1', nhan: 'Chưa đạt' });
+
+      await request(app.getHttpServer())
+        .put('/sso/thang-muc')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ muc: [{ ma: 'Mức 1', nhan: 'x' }] })
+        .expect(400);
+      await request(app.getHttpServer())
+        .put('/sso/thang-muc')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({
+          muc: [
+            { ma: 'm1', nhan: 'Chưa đạt' },
+            { ma: 'M5', nhan: 'Xuất sắc' },
+          ],
+        })
+        .expect(200);
+
+      await baoKetQua({
+        hoc_vien_id: hocVien.id,
+        loai: 'danh-gia',
+        trang_thai: 'hoan_thanh',
+        muc_goc: 'm5',
+      }).expect(200);
+      await baoKetQua({
+        hoc_vien_id: hocVien.id,
+        loai: 'khao-sat',
+        trang_thai: 'hoan_thanh',
+        muc_goc: 'M2',
+      }).expect(400);
+      expect((await tinhTrang(token))[1]).toMatchObject({
+        muc_goc: 'M5',
+        nhan_muc_goc: 'M5 – Xuất sắc',
+      });
+
+      await prisma.cau_hinh_he_thong.deleteMany({
+        where: { khoa: 'thang_muc_khao_sat' },
+      });
+    });
+
     it('import ket_qua_khao_sat: ghi kết quả nguồn import, quản trị thấy điểm; dòng sai báo lỗi', async () => {
       const a = await taoHocVien();
       const b = await taoHocVien();

@@ -65,10 +65,10 @@ import {
 import { buildValidatedDto } from './util/dto-validate.util';
 import { resolveHocVienImportRow } from './util/hoc-vien-resolver.util';
 import { KetQuaKhaoSatService } from '../sso/ket-qua-khao-sat.service';
+import { ThangMucService } from '../sso/thang-muc.service';
 import {
   LOAI_KHAO_SAT,
   LoaiKhaoSat,
-  MUC_GOC,
   MUC_NANG_LUC,
   MucNangLuc,
   chuanHoaMucGoc,
@@ -115,6 +115,7 @@ export class ImportService {
     private readonly dotXacNhanService: DotXacNhanService,
     private readonly taiKhoanDonViService: TaiKhoanDonViService,
     private readonly ketQuaKhaoSatService: KetQuaKhaoSatService,
+    private readonly thangMucService: ThangMucService,
   ) {}
 
   assertSupported(loai: string): SupportedImportType {
@@ -822,7 +823,7 @@ export class ImportService {
         muc: 'Tùy chọn — "co_ban", "thanh_thao" hoặc "nang_cao". Chỉ để hiển thị, KHÔNG đổi mức đầu vào của học viên (dùng import ket_qua_danh_gia).',
         diem: 'Tùy chọn — số từ 0 đến 9999, tối đa 2 chữ số thập phân. Chỉ quản trị xem được.',
         muc_goc:
-          'Tùy chọn — mã mức theo thang hệ thống khảo sát: "M1" (Chưa đạt), "M2" (Cơ bản), "M3" (Thành thạo), "M4" (Nâng cao). Học viên thấy nhãn tương ứng.',
+          'Tùy chọn — mã mức theo thang mức quản trị cấu hình (mặc định "M1" Chưa đạt, "M2" Cơ bản, "M3" Thành thạo, "M4" Nâng cao). Học viên thấy nhãn tương ứng.',
         url_ket_qua:
           'Tùy chọn — đường dẫn trang kết quả chi tiết, phải thuộc tên miền hệ thống khảo sát.',
         diem_toi_da:
@@ -1525,8 +1526,13 @@ export class ImportService {
     }
 
     const mucGoc = (chuanHoaMucGoc(raw.muc_goc ?? '') as string) || undefined;
-    if (mucGoc && !(MUC_GOC as readonly string[]).includes(mucGoc)) {
-      return { error: 'Cột "muc_goc" chỉ nhận "M1", "M2", "M3" hoặc "M4"' };
+    if (mucGoc) {
+      const thang = await this.thangMucService.thang();
+      if (!thang.some((m) => m.ma === mucGoc)) {
+        return {
+          error: `Cột "muc_goc" chỉ nhận: ${thang.map((m) => m.ma).join(', ')}`,
+        };
+      }
     }
     const urlKetQua = raw.url_ket_qua?.trim() || undefined;
 

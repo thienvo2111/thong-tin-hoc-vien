@@ -11,6 +11,7 @@ import {
   ValidationException,
 } from '../common/exceptions/app.exceptions';
 import { kiemTraApiKeyKhaoSat } from './sso-api-key';
+import { ThangMucService } from './thang-muc.service';
 
 describe('KetQuaKhaoSatService', () => {
   let service: KetQuaKhaoSatService;
@@ -23,6 +24,7 @@ describe('KetQuaKhaoSatService', () => {
     };
     hoc_vien: { findUnique: jest.Mock; findMany: jest.Mock; count: jest.Mock };
     $transaction: jest.Mock;
+    cau_hinh_he_thong: { findUnique: jest.Mock };
   };
 
   const dong = (over: Record<string, unknown> = {}) => ({
@@ -64,8 +66,12 @@ describe('KetQuaKhaoSatService', () => {
         count: jest.fn().mockResolvedValue(0),
       },
       $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
+      cau_hinh_he_thong: { findUnique: jest.fn().mockResolvedValue(null) },
     };
-    service = new KetQuaKhaoSatService(prisma as unknown as PrismaService);
+    service = new KetQuaKhaoSatService(
+      prisma as unknown as PrismaService,
+      new ThangMucService(prisma as unknown as PrismaService),
+    );
   });
 
   describe('ghiDaMo (khi đổi mã SSO)', () => {
@@ -283,6 +289,46 @@ describe('KetQuaKhaoSatService', () => {
         url_ket_qua: 'https://khaosat.test/ket-qua/abc',
       });
       expect(danhGia).not.toHaveProperty('diem');
+    });
+  });
+
+  describe('mức gốc theo thang quản trị cấu hình', () => {
+    it('mã không có trong thang -> 400, không ghi', async () => {
+      await expect(
+        service.ghiKetQua(
+          'hv-1',
+          { loai: 'danh-gia', trang_thai: 'hoan_thanh', muc_goc: 'M5' },
+          'api',
+        ),
+      ).rejects.toBeInstanceOf(ValidationException);
+      expect(prisma.ket_qua_khao_sat.upsert).not.toHaveBeenCalled();
+    });
+
+    it('thang tự cấu hình -> nhận mã mới, trả nhãn mới cho học viên', async () => {
+      prisma.cau_hinh_he_thong.findUnique.mockResolvedValue({
+        gia_tri: [{ ma: 'A', nhan: 'Tốt' }],
+        cap_nhat_luc: new Date(),
+      });
+      await service.ghiKetQua(
+        'hv-1',
+        { loai: 'danh-gia', trang_thai: 'hoan_thanh', muc_goc: 'A' },
+        'api',
+      );
+      expect(prisma.ket_qua_khao_sat.upsert).toHaveBeenCalled();
+
+      prisma.ket_qua_khao_sat.findMany.mockResolvedValue([
+        dong({ loai: 'danh-gia', trang_thai: 'hoan_thanh', muc_goc: 'A' }),
+      ]);
+      const [, danhGia] = await service.tinhTrangCuaHocVien('hv-1');
+      expect(danhGia.nhan_muc_goc).toBe('A – Tốt');
+    });
+
+    it('mặc định: học viên nhận nhãn "M1 – Chưa đạt"', async () => {
+      prisma.ket_qua_khao_sat.findMany.mockResolvedValue([
+        dong({ loai: 'khao-sat', trang_thai: 'hoan_thanh', muc_goc: 'M1' }),
+      ]);
+      const [khaoSat] = await service.tinhTrangCuaHocVien('hv-1');
+      expect(khaoSat.nhan_muc_goc).toBe('M1 – Chưa đạt');
     });
   });
 

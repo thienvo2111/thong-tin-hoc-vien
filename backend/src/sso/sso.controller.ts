@@ -5,6 +5,7 @@ import {
   Headers,
   HttpCode,
   Post,
+  Put,
   Logger,
   Query,
   Req,
@@ -17,6 +18,8 @@ import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { SsoService } from './sso.service';
 import { CapMaSsoDto, DoiMaSsoDto, MaThuSsoDto } from './dto/sso.dto';
 import { KetQuaKhaoSatService } from './ket-qua-khao-sat.service';
+import { ThangMucService } from './thang-muc.service';
+import { LuuThangMucDto } from './dto/thang-muc.dto';
 import { kiemTraApiKeyKhaoSat } from './sso-api-key';
 import {
   BaoKetQuaDto,
@@ -34,6 +37,7 @@ export class SsoController {
   constructor(
     private readonly ssoService: SsoService,
     private readonly ketQuaKhaoSat: KetQuaKhaoSatService,
+    private readonly thangMuc: ThangMucService,
   ) {}
 
   @Roles('hoc_vien')
@@ -95,5 +99,21 @@ export class SsoController {
   @Get('ket-qua')
   danhSach(@Query() query: QueryTinhHinhKhaoSatDto) {
     return this.ketQuaKhaoSat.danhSach(query);
+  }
+
+  // Thang mức kết quả khảo sát (2026-10-05) — mã + nhãn, quản trị sửa ở trang Cấu hình khảo sát.
+  @Roles('quan_tri')
+  @Get('thang-muc')
+  layThangMuc() {
+    return this.thangMuc.lay();
+  }
+
+  @Roles('quan_tri')
+  @Put('thang-muc')
+  luuThangMuc(
+    @Body() dto: LuuThangMucDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.thangMuc.luu(dto.muc, user.id);
   }
 }
