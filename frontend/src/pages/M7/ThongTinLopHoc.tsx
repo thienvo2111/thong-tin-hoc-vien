@@ -1,10 +1,13 @@
-import { Badge, Box, Button, Center, Container, Group, Loader, Paper, Stack, Text, Title } from '@mantine/core';
+import { Anchor, Badge, Box, Button, Center, Container, Group, Loader, Paper, Stack, Text, Title } from '@mantine/core';
 import { useKhoaHocToi } from '@/api/hocVien';
+import { useTinhTrangKhaoSat, type TinhTrangBaiKhaoSat } from '@/api/ketQuaKhaoSat';
+import { nhanMucKetQua } from '@/lib/trangThaiKhaoSat';
 import type {
   CumHocVien,
   GiaiDoanCuaToi,
   KhoaHocDangKy,
   LichHocLopToi,
+  MucNangLuc,
   TrangThaiDiemDanh,
   VaiTroNhanSuLop,
 } from '@/api/types';
@@ -50,6 +53,8 @@ const MAU_HINH_THUC: Record<string, string> = {
 /** M7 — Thông tin lớp học của học viên: lịch học, địa điểm/link, kết quả đánh giá đầu vào/đầu ra. */
 export default function ThongTinLopHoc() {
   const { data, isLoading, isError, error } = useKhoaHocToi();
+  // Kết quả bài trên hệ thống khảo sát (2026-10-05) — dùng khi quản trị chưa chốt mức của khóa.
+  const { data: tinhTrang } = useTinhTrangKhaoSat();
 
   return (
     <Container size="sm" py="xl">
@@ -70,13 +75,28 @@ export default function ThongTinLopHoc() {
           <StatusBanner loai="info">Thầy/Cô chưa được ghi danh vào khóa bồi dưỡng nào.</StatusBanner>
         )}
 
-        {data?.map((dangKy) => <KhoiKhoaHoc key={dangKy.id} dangKy={dangKy} />)}
+        {data?.map((dangKy) => (
+          <KhoiKhoaHoc
+            key={dangKy.id}
+            dangKy={dangKy}
+            baiDauVao={tinhTrang?.find((t) => t.loai === 'danh-gia')}
+            baiDauRa={tinhTrang?.find((t) => t.loai === 'dau-ra')}
+          />
+        ))}
       </Stack>
     </Container>
   );
 }
 
-function KhoiKhoaHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
+function KhoiKhoaHoc({
+  dangKy,
+  baiDauVao,
+  baiDauRa,
+}: {
+  dangKy: KhoaHocDangKy;
+  baiDauVao?: TinhTrangBaiKhaoSat;
+  baiDauRa?: TinhTrangBaiKhaoSat;
+}) {
   const { khoa, cum, giai_doan, muc_dau_vao, muc_dau_ra } = dangKy;
   const chuaCoLopNao = giai_doan.every((gd) => !gd.lop);
 
@@ -118,16 +138,42 @@ function KhoiKhoaHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
           <Text fw={700} size="sm" mb={4}>
             Kết quả đánh giá
           </Text>
-          <Group gap="xs">
-            <Badge variant="light" color="gray" size="lg">
-              Đầu vào: {nhanMucNangLuc(muc_dau_vao)}
-            </Badge>
-            <Badge variant="light" color="gray" size="lg">
-              Đầu ra: {nhanMucNangLuc(muc_dau_ra)}
-            </Badge>
-          </Group>
+          <Stack gap="xs">
+            <DongKetQua nhan="Đầu vào" mucChot={muc_dau_vao} bai={baiDauVao} />
+            <DongKetQua nhan="Đầu ra" mucChot={muc_dau_ra} bai={baiDauRa} />
+          </Stack>
         </Box>
       </Stack>
+    </Box>
+  );
+}
+
+/** Mức quản trị đã chốt cho khóa (import ket_qua_danh_gia) ưu tiên; chưa chốt mà học viên đã hoàn
+ * thành bài trên hệ thống khảo sát -> hiện mức theo thang khảo sát + link xem kết quả chi tiết. */
+function DongKetQua({ nhan, mucChot, bai }: { nhan: string; mucChot: MucNangLuc | null; bai?: TinhTrangBaiKhaoSat }) {
+  const tuKhaoSat = !mucChot && bai?.trang_thai === 'hoan_thanh' ? bai : undefined;
+  const hrefChiTiet = chuanHoaLienKet(tuKhaoSat?.url_ket_qua);
+  const giaTri = tuKhaoSat ? (nhanMucKetQua(tuKhaoSat) ?? 'Đã làm bài, kết quả đang được tổng hợp') : nhanMucNangLuc(mucChot);
+
+  return (
+    <Box>
+      <Badge variant="light" color={mucChot || tuKhaoSat ? 'blue' : 'gray'} size="lg" style={{ textTransform: 'none' }}>
+        {nhan}: {giaTri}
+      </Badge>
+      {tuKhaoSat && (
+        <Text size="xs" c="dimmed" mt={4}>
+          Theo bài làm trên hệ thống khảo sát
+          {tuKhaoSat.hoan_thanh_luc && <>, hoàn thành lúc {dinhDangNgayGio(tuKhaoSat.hoan_thanh_luc)}</>}.
+          {hrefChiTiet && (
+            <>
+              {' '}
+              <Anchor href={hrefChiTiet} size="xs">
+                Xem kết quả chi tiết
+              </Anchor>
+            </>
+          )}
+        </Text>
+      )}
     </Box>
   );
 }

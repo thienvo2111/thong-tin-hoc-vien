@@ -3,6 +3,7 @@ import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
 import { db } from '@/test/mocks/db';
+import { datTinhTrangBai } from '@/test/mocks/sso';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import type { KhoaHocDangKy } from '@/api/types';
@@ -100,6 +101,46 @@ describe('M7 — Thông tin lớp học', () => {
     );
     expect(screen.getByText(/Đầu vào: Cơ bản/)).toBeInTheDocument();
     expect(screen.getByText(/Đầu ra: Chưa có kết quả/)).toBeInTheDocument();
+  });
+
+  it('chưa chốt mức đầu vào nhưng đã hoàn thành bài đánh giá trên hệ thống khảo sát -> hiện mức theo thang khảo sát + link chi tiết', async () => {
+    server.use(
+      http.get('/hoc-vien/toi/khoa-hoc', () =>
+        HttpResponse.json([{ ...db.khoaHocToi[0], muc_dau_vao: null, muc_dau_ra: null }]),
+      ),
+    );
+    datTinhTrangBai({
+      loai: 'danh-gia',
+      trang_thai: 'hoan_thanh',
+      hoan_thanh_luc: '2026-10-05T07:50:56.000Z',
+      muc_goc: 'M1',
+      nhan_muc_goc: 'M1 – Chưa đạt',
+      url_ket_qua: 'https://khaosat.test/ket-qua/abc',
+    });
+    renderDaDangNhap();
+    expect(await screen.findByText(/Đầu vào: M1 – Chưa đạt/)).toBeInTheDocument();
+    expect(screen.getByText(/hoàn thành lúc 05\/10\/2026 14:50/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Xem kết quả chi tiết' })).toHaveAttribute(
+      'href',
+      'https://khaosat.test/ket-qua/abc',
+    );
+    expect(screen.getByText(/Đầu ra: Chưa có kết quả/)).toBeInTheDocument();
+  });
+
+  it('đã chốt mức đầu vào -> ưu tiên mức chốt, không lấy kết quả khảo sát', async () => {
+    datTinhTrangBai({ loai: 'danh-gia', trang_thai: 'hoan_thanh', muc_goc: 'M1', nhan_muc_goc: 'M1 – Chưa đạt' });
+    renderDaDangNhap();
+    expect(await screen.findByText(/Đầu vào: Cơ bản/)).toBeInTheDocument();
+    expect(screen.queryByText(/M1 – Chưa đạt/)).not.toBeInTheDocument();
+  });
+
+  it('đang làm (chưa hoàn thành) -> vẫn "Chưa có kết quả"', async () => {
+    server.use(
+      http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json([{ ...db.khoaHocToi[0], muc_dau_vao: null }])),
+    );
+    datTinhTrangBai({ loai: 'danh-gia', trang_thai: 'dang_lam' });
+    renderDaDangNhap();
+    expect(await screen.findByText(/Đầu vào: Chưa có kết quả/)).toBeInTheDocument();
   });
 
   it('chưa được phân lớp ở giai đoạn nào → vẫn hiện đủ thẻ giai đoạn + dòng nhắc sau cùng, không có buổi học, không cụm', async () => {

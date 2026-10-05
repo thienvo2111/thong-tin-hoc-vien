@@ -384,7 +384,7 @@ export default function HoSo() {
                       <Text fw={600}>Thông tin cá nhân</Text>
                     </Group>
 
-                <TextInput label="Mã định danh" value={hoSo?.ma_dinh_danh_moet ?? ''} disabled readOnly />
+                <TextInput label="Mã định danh trên CSDL MOET" value={hoSo?.ma_dinh_danh_moet ?? ''} disabled readOnly />
 
                 <TextInput
                   label="Họ và tên"

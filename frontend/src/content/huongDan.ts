@@ -267,7 +267,7 @@ export const huongDan: NoiDungHuongDan = {
       hinh: 'ho-so',
       buoc: [
         'Bấm **Hồ sơ** trên menu (trên điện thoại, bấm [[☰]] để mở menu). Hồ sơ chia thành các nhóm: Thông tin cá nhân, Nơi sinh và cư trú, Công tác, Liên hệ, Trình độ và chuyên môn. Nhóm nào còn thiếu có dấu chấm đỏ.',
-        'Ô có chữ đỏ **Cần bổ sung** là ô bắt buộc còn trống. Điền vào. Mã định danh là ô xám, không sửa được. Ở nhóm *Công tác*, tích chọn **Đối tượng**.',
+        'Ô có chữ đỏ **Cần bổ sung** là ô bắt buộc còn trống. Điền vào. Ô **Mã định danh trên CSDL MOET** màu xám, không sửa được. Ở nhóm *Công tác*, tích chọn **Đối tượng**.',
         'Kiểm tra thật kỹ **họ tên và ngày sinh**. Đây là thông tin in trên giấy chứng nhận. Viết hoa chữ cái đầu mỗi tiếng, có dấu đầy đủ.',
         'Bấm [[Lưu]] ở cuối màn hình. Góc màn hình hiện chữ *"Đã lưu"* là thành công. Quay về **Trang chủ**: nếu khung khảo sát đã chuyển xanh là hồ sơ đủ, chuyển sang Phần 7.',
       ],
