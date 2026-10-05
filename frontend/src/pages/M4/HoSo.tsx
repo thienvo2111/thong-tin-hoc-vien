@@ -587,7 +587,7 @@ export default function HoSo() {
                   render={({ field }) => (
                     <Radio.Group
                       label="Đối tượng"
-                      description="Chọn đúng để được làm bài khảo sát/đánh giá dành cho đối tượng của Thầy/Cô"
+                      description="Chọn đúng để được làm bài khảo sát/đánh giá dành cho đối tượng của Thầy/Cô. Nếu vừa giảng dạy vừa làm quản lý, chọn công việc Thầy/Cô đảm nhiệm thường xuyên nhất."
                       value={field.value ?? null}
                       onChange={field.onChange}
                       error={loiHoacThieu('doi_tuong', errors.doi_tuong?.message, field.value)}
@@ -724,6 +724,7 @@ export default function HoSo() {
                   render={({ field }) => (
                     <Select
                       label="Cấp giảng dạy"
+                      description="Dạy nhiều cấp (vd trường liên cấp THCS – THPT): chọn cấp Thầy/Cô dạy thường xuyên nhất (nhiều tiết nhất)."
                       data={CAP_GIANG_DAY_OPTIONS}
                       value={field.value ?? null}
                       onChange={(v) => {
@@ -743,6 +744,7 @@ export default function HoSo() {
                     render={({ field }) => (
                       <Select
                         label="Môn giảng dạy"
+                        description="Dạy nhiều môn: chọn môn Thầy/Cô dạy chính (nhiều tiết nhất)."
                         data={(monHocQuery.data?.data ?? []).map((m) => ({ value: m.id, label: m.ten_mon }))}
                         value={field.value ?? null}
                         onChange={field.onChange}
