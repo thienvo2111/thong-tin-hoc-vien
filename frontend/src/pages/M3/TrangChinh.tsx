@@ -27,9 +27,9 @@ export default function TrangChinh() {
   const { data, isLoading, isError, error } = useDotXacNhan();
   const { data: hoSo } = useHoSoToi();
   const { cauHinh, daTai: daTaiCauHinh } = useCauHinhTrienKhai({ loai: 'cua_toi' });
-  // Đầu vào "đã mở" khi quản trị bật khối khảo sát trên trang chủ HOẶC mục Đánh giá đầu vào.
-  // Chờ tải xong cấu hình thật, tránh chớp theo giá trị mặc định.
-  const dauVaoMo = daTaiCauHinh && (cauHinh.hienKhaoSat || cauHinh.danhGiaDauVaoTrongCong);
+  // Đầu vào "đã mở" theo công tắc riêng cho học viên đã đăng nhập (2026-10-05) — tắt khối khảo sát trên trang
+  // giới thiệu công khai không làm mất khối này. Chờ tải xong cấu hình thật, tránh chớp theo giá trị mặc định.
+  const dauVaoMo = daTaiCauHinh && cauHinh.khaoSatDauVaoMo;
   const dauRaMo = daTaiCauHinh && cauHinh.khaoSatDauRaMo;
   const { data: mucDo } = useMucDoDayDu(dauVaoMo || dauRaMo);
   const { data: khoaHoc } = useKhoaHocToi();

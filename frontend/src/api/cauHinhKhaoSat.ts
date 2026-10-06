@@ -26,9 +26,18 @@ export interface CauHinhKhaoSat {
   hien_khao_sat: boolean;
   /** Thiếu ở cấu hình lưu trước 2026-10-02 -> coi là 'vle'. Khi lưu (PUT) luôn bắt buộc. */
   kenh_danh_gia?: KenhDanhGia;
+  /** 2026-10-05: khối khảo sát đầu vào trên trang chủ học viên đã đăng nhập (tách khỏi hien_khao_sat — chỉ còn
+   * điều khiển trang giới thiệu công khai). Thiếu -> xem khaoSatDauVaoMo(). */
+  khao_sat_dau_vao_mo?: boolean;
   /** Mở khảo sát đầu ra (SSO target 'dau-ra'). Thiếu = chưa mở. */
   khao_sat_dau_ra_mo?: boolean;
   phieu: PhieuKhaoSat[];
+}
+
+/** Cấu hình lưu trước 2026-10-05 chưa có khao_sat_dau_vao_mo -> giữ hành vi cũ (bật khi hiện khối trang chủ
+ * hoặc bật mục Đánh giá đầu vào). */
+export function khaoSatDauVaoMo(c: Pick<CauHinhKhaoSat, 'khao_sat_dau_vao_mo' | 'hien_khao_sat' | 'danh_gia_dau_vao_trong_cong'>): boolean {
+  return c.khao_sat_dau_vao_mo ?? (c.hien_khao_sat || c.danh_gia_dau_vao_trong_cong);
 }
 
 /** Cấu hình đến từ đâu (2026-10-02): cấu hình chung, hay cấu hình riêng của 1 khóa. */

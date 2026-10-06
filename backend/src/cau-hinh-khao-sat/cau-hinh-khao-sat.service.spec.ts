@@ -148,6 +148,32 @@ describe('CauHinhKhaoSatService', () => {
       ).toBe(true);
     });
 
+    it('khao_sat_dau_vao_mo: thiếu -> suy từ hien_khao_sat||danh_gia_dau_vao_trong_cong; gửi rõ -> giữ nguyên, độc lập với hien_khao_sat', async () => {
+      prisma.cau_hinh_he_thong.upsert.mockResolvedValue({
+        cap_nhat_luc: new Date(),
+      });
+      const giaTri = (i: number) =>
+        prisma.cau_hinh_he_thong.upsert.mock.calls[i][0].update.gia_tri
+          .khao_sat_dau_vao_mo;
+      await service.luuCauHinh(hopLe(), 'qt-1');
+      expect(giaTri(0)).toBe(true);
+      await service.luuCauHinh(
+        {
+          ...hopLe(),
+          che_do_hoc_vien: 'dang_nhap',
+          hien_khao_sat: false,
+          khao_sat_dau_vao_mo: true,
+        },
+        'qt-1',
+      );
+      expect(giaTri(1)).toBe(true);
+      await service.luuCauHinh(
+        { ...hopLe(), khao_sat_dau_vao_mo: false },
+        'qt-1',
+      );
+      expect(giaTri(2)).toBe(false);
+    });
+
     it('hợp lệ -> upsert theo khóa, trim chuỗi, ghi người cập nhật', async () => {
       const luc = new Date();
       prisma.cau_hinh_he_thong.upsert.mockResolvedValue({ cap_nhat_luc: luc });

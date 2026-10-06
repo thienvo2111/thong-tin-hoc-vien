@@ -279,6 +279,20 @@ describe('M3 — khảo sát đầu vào / đầu ra', () => {
     expect(within(tomTat).getByText('Đang làm')).toBeInTheDocument();
   });
 
+  it('tắt khối trang giới thiệu nhưng bật "Mở khảo sát đầu vào cho học viên" -> trang chủ học viên vẫn có khối khảo sát đầu vào', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ hien_khao_sat: false, khao_sat_dau_vao_mo: true, kenh_danh_gia: 'sso' }));
+    datDayDu();
+    renderDaDangNhap();
+    expect(await screen.findByText('Khảo sát đầu vào đã mở')).toBeInTheDocument();
+  });
+
+  it('bật khối trang giới thiệu nhưng tắt công tắc học viên -> trang chủ học viên không có khối khảo sát đầu vào', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ hien_khao_sat: true, khao_sat_dau_vao_mo: false }));
+    renderDaDangNhap();
+    expect(await screen.findByText(/Còn 2 thông tin cần bổ sung/)).toBeInTheDocument();
+    expect(screen.queryByText('Khảo sát đầu vào đã mở')).not.toBeInTheDocument();
+  });
+
   it('bật khối khảo sát + kênh vle, hồ sơ đủ -> hiện phiếu ngoài theo thứ tự; chưa có đường dẫn -> nút khóa', async () => {
     datCauHinhKhaoSatMock(
       cauHinh({

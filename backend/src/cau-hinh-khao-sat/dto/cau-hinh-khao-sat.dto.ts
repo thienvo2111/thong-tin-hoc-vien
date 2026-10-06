@@ -75,6 +75,12 @@ export class CauHinhKhaoSatDto {
   @IsIn(KENH_DANH_GIA)
   kenh_danh_gia: KenhDanhGia;
 
+  // 2026-10-05: mở khảo sát đầu vào trên trang chủ học viên ĐÃ ĐĂNG NHẬP — tách khỏi hien_khao_sat
+  // (chỉ còn điều khiển trang giới thiệu công khai). Thiếu = suy từ hien_khao_sat || danh_gia_dau_vao_trong_cong.
+  @IsOptional()
+  @IsBoolean()
+  khao_sat_dau_vao_mo?: boolean;
+
   // Mở khảo sát đầu ra (SSO target 'dau-ra'). Thiếu = false (cấu hình trước 2026-10-02).
   @IsOptional()
   @IsBoolean()

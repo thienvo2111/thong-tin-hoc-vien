@@ -21,6 +21,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  khaoSatDauVaoMo,
   layCauHinhKhaoSat,
   layCauHinhKhoa,
   luuCauHinhKhaoSat,
@@ -47,9 +48,15 @@ const MAC_DINH_API: CauHinhKhaoSat = {
   danh_gia_dau_vao_trong_cong: cauHinhMacDinh.danhGiaDauVaoTrongCong,
   hien_khao_sat: cauHinhMacDinh.hienKhaoSat,
   kenh_danh_gia: 'vle',
+  khao_sat_dau_vao_mo: cauHinhMacDinh.khaoSatDauVaoMo,
   khao_sat_dau_ra_mo: cauHinhMacDinh.khaoSatDauRaMo,
   phieu: cauHinhMacDinh.phieu.map((p) => ({ ten: p.ten, mo_ta: p.moTa, lien_ket: p.lienKet })),
 };
+
+/** Điền các trường cấu hình cũ chưa có (kênh, công tắc khảo sát đầu vào cho học viên) theo đúng hành vi cũ. */
+function voiGiaTriSuyRa(c: CauHinhKhaoSat): CauHinhKhaoSat {
+  return { kenh_danh_gia: 'vle', ...structuredClone(c), khao_sat_dau_vao_mo: khaoSatDauVaoMo(c) };
+}
 
 const PHIEU_MOI = { ten: '', mo_ta: '', lien_ket: [{ nhan: 'Mở phiếu', url: '' }] };
 
@@ -128,13 +135,13 @@ function BieuMauCauHinh({ khoaId }: { khoaId: string | null }) {
     // Khóa chưa có cấu hình riêng: chờ quản trị bấm "Tạo cấu hình riêng".
     if (khoaId && !data.cau_hinh) return;
     // Cấu hình lưu trước khi có lựa chọn kênh -> 'vle' (đúng hành vi đang chạy).
-    setForm({ kenh_danh_gia: 'vle', ...structuredClone(data.cau_hinh ?? MAC_DINH_API) });
+    setForm(voiGiaTriSuyRa(data.cau_hinh ?? MAC_DINH_API));
     if (data.pham_vi?.loai === 'khoa') setTinhId(data.pham_vi.tinh_id);
   }, [data, form, khoaId]);
 
   const taoRieng = useMutation({
     mutationFn: () => layCauHinhKhaoSat(),
-    onSuccess: (chung) => setForm({ kenh_danh_gia: 'vle', ...structuredClone(chung.cau_hinh ?? MAC_DINH_API) }),
+    onSuccess: (chung) => setForm(voiGiaTriSuyRa(chung.cau_hinh ?? MAC_DINH_API)),
     onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
   });
 
@@ -315,6 +322,12 @@ function BieuMauCauHinh({ khoaId }: { khoaId: string | null }) {
                   description="Tắt khi đánh giá đầu vào làm qua phiếu khảo sát bên ngoài."
                 />
                 <Switch
+                  checked={form.khao_sat_dau_vao_mo ?? false}
+                  onChange={(e) => setForm({ ...form, khao_sat_dau_vao_mo: e.currentTarget.checked })}
+                  label="Mở khảo sát đầu vào cho học viên"
+                  description="Trang chủ của học viên (sau khi đăng nhập) hiện mục Khảo sát đầu vào. Độc lập với khối khảo sát trên trang giới thiệu bên dưới."
+                />
+                <Switch
                   checked={form.khao_sat_dau_ra_mo ?? false}
                   onChange={(e) => setForm({ ...form, khao_sat_dau_ra_mo: e.currentTarget.checked })}
                   label="Mở khảo sát đầu ra"
@@ -331,7 +344,8 @@ function BieuMauCauHinh({ khoaId }: { khoaId: string | null }) {
                 <Switch
                   checked={form.hien_khao_sat}
                   onChange={(e) => setForm({ ...form, hien_khao_sat: e.currentTarget.checked })}
-                  label="Hiện khối khảo sát trên trang chủ"
+                  label="Hiện khối khảo sát trên trang giới thiệu (công khai)"
+                  description="Chỉ áp dụng cho trang giới thiệu trước khi đăng nhập. Trang chủ của học viên theo công tắc Mở khảo sát đầu vào ở trên."
                   error={loi.hien_khao_sat}
                 />
                 <Text fz="sm" c="dimmed">

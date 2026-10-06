@@ -18,6 +18,7 @@ import {
   type CheDoHocVien,
   type KenhDanhGia,
   type PhamViCauHinh,
+  khaoSatDauVaoMo,
 } from '@/api/cauHinhKhaoSat';
 
 export type { CheDoHocVien } from '@/api/cauHinhKhaoSat';
@@ -26,8 +27,11 @@ export interface CauHinhTrienKhai {
   cheDoHocVien: CheDoHocVien;
   /** false = đánh giá đầu vào làm qua phiếu ngoài — ẩn menu M6 trong cổng học viên. */
   danhGiaDauVaoTrongCong: boolean;
+  /** true = trang chủ cổng học viên (đã đăng nhập) hiện khối "Khảo sát đầu vào". */
+  khaoSatDauVaoMo: boolean;
   /** true = trang chủ cổng học viên hiện khối "Khảo sát đầu ra" (SSO target 'dau-ra'). */
   khaoSatDauRaMo: boolean;
+  /** Chỉ trang giới thiệu công khai (M0). */
   hienKhaoSat: boolean;
   /** Kênh làm bài đánh giá đầu vào; cấu hình cũ không có -> 'vle'. */
   kenhDanhGia: KenhDanhGia;
@@ -38,6 +42,7 @@ export interface CauHinhTrienKhai {
 export const cauHinhMacDinh: CauHinhTrienKhai = {
   cheDoHocVien: 'khao_sat',
   danhGiaDauVaoTrongCong: false,
+  khaoSatDauVaoMo: true,
   khaoSatDauRaMo: false,
   hienKhaoSat: true,
   kenhDanhGia: 'vle',
@@ -60,6 +65,7 @@ export function tuCauHinhApi(c: CauHinhKhaoSat | null): CauHinhTrienKhai {
   return {
     cheDoHocVien: c.che_do_hoc_vien,
     danhGiaDauVaoTrongCong: c.danh_gia_dau_vao_trong_cong,
+    khaoSatDauVaoMo: khaoSatDauVaoMo(c),
     khaoSatDauRaMo: c.khao_sat_dau_ra_mo ?? false,
     hienKhaoSat: c.hien_khao_sat,
     kenhDanhGia: c.kenh_danh_gia ?? 'vle',

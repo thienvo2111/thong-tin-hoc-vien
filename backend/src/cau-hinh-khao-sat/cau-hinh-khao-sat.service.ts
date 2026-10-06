@@ -15,6 +15,8 @@ export interface CauHinhKhaoSat {
   hien_khao_sat: boolean;
   /** Thiếu ở cấu hình lưu trước 2026-10-02 — đọc qua layKenhDanhGia(). */
   kenh_danh_gia?: KenhDanhGia;
+  /** Khối khảo sát đầu vào trên trang chủ học viên đã đăng nhập. Thiếu = hien_khao_sat || danh_gia_dau_vao_trong_cong. */
+  khao_sat_dau_vao_mo?: boolean;
   /** Thiếu = chưa mở khảo sát đầu ra. */
   khao_sat_dau_ra_mo?: boolean;
   phieu: {
@@ -281,6 +283,9 @@ export class CauHinhKhaoSatService {
       danh_gia_dau_vao_trong_cong: dto.danh_gia_dau_vao_trong_cong,
       hien_khao_sat: dto.hien_khao_sat,
       kenh_danh_gia: dto.kenh_danh_gia,
+      khao_sat_dau_vao_mo:
+        dto.khao_sat_dau_vao_mo ??
+        (dto.hien_khao_sat || dto.danh_gia_dau_vao_trong_cong),
       khao_sat_dau_ra_mo: dto.khao_sat_dau_ra_mo ?? false,
       phieu: dto.phieu.map((p) => ({
         ten: p.ten.trim(),

@@ -377,6 +377,7 @@ Body `PUT` (cũng là shape `cau_hinh` của `GET`):
 - `che_do_hoc_vien`: `khao_sat` = học viên không đăng nhập, làm tuần tự các phiếu ở trang chủ; `dang_nhap` = mời đăng nhập cổng học viên (quyền sửa hồ sơ vẫn do Đợt xác nhận quyết định).
 - `danh_gia_dau_vao_trong_cong`: hiện/ẩn menu "Đánh giá đầu vào" (M6) trong cổng học viên.
 - `kenh_danh_gia` (2026-10-02, **bắt buộc khi PUT**): `sso` = M6 chuyển sang hệ thống khảo sát bằng mã dùng 1 lần (mục 10); `vle` = luồng T15 (tài khoản VLE). Cấu hình lưu trước ngày này không có trường → đọc là `vle`.
+- `khao_sat_dau_vao_mo` (2026-10-05, tùy chọn): khối "Khảo sát đầu vào" trên trang chủ học viên **đã đăng nhập** (M3) — tách khỏi `hien_khao_sat`, nay `hien_khao_sat` chỉ điều khiển khối khảo sát trên trang giới thiệu công khai (M0). Thiếu (cấu hình lưu trước) = `hien_khao_sat || danh_gia_dau_vao_trong_cong` (giữ hành vi cũ); khi lưu, server điền giá trị suy ra này nếu không gửi.
 - `khao_sat_dau_ra_mo` (2026-10-02, tùy chọn, thiếu = `false`): mở khảo sát đầu ra — trang chủ cổng học viên hiện khối "Khảo sát đầu ra" và cho cấp mã SSO `target=dau-ra` (mục 10). Điều kiện học viên: chỉ cần hồ sơ đầy đủ (T9), không phụ thuộc `kenh_danh_gia`.
 - `phieu`: thứ tự mảng = thứ tự làm. `url` rỗng = chưa có đường dẫn (trang chủ hiện nút bị khóa). Ràng buộc chi tiết: `validation-checklist.md` mục "Cấu hình khảo sát đầu vào".
 

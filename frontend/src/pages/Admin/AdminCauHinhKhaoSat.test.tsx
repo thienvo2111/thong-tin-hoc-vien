@@ -131,7 +131,7 @@ describe('Admin — Cấu hình khảo sát', () => {
   it('chế độ khảo sát mà tắt khối khảo sát -> báo lỗi, không gửi PUT', async () => {
     const user = userEvent.setup();
     renderTrang();
-    await user.click(await screen.findByRole('switch', { name: 'Hiện khối khảo sát trên trang chủ' }));
+    await user.click(await screen.findByRole('switch', { name: /Hiện khối khảo sát trên trang giới thiệu/ }));
     await user.click(screen.getByRole('button', { name: 'Lưu cấu hình' }));
     expect(await screen.findByText('Phải bật khi chế độ là Khảo sát')).toBeInTheDocument();
     expect(banDaLuu()).toBeNull();
@@ -144,7 +144,7 @@ describe('Admin — Cấu hình khảo sát', () => {
     await screen.findByDisplayValue('Phiếu A');
     await user.click(screen.getByRole('radio', { name: 'Đăng nhập cổng học viên' }));
     await user.click(screen.getByRole('switch', { name: /Đánh giá đầu vào/ }));
-    await user.click(screen.getByRole('switch', { name: 'Hiện khối khảo sát trên trang chủ' }));
+    await user.click(screen.getByRole('switch', { name: /Hiện khối khảo sát trên trang giới thiệu/ }));
     await user.click(screen.getByRole('button', { name: 'Lưu cấu hình' }));
 
     await waitFor(() =>
@@ -189,6 +189,20 @@ describe('Admin — Cấu hình khảo sát', () => {
       await user.click(congTac);
       await user.click(screen.getByRole('button', { name: 'Lưu cấu hình' }));
       await waitFor(() => expect(banDaLuu()?.khao_sat_dau_ra_mo).toBe(true));
+    });
+  });
+
+  describe('khảo sát đầu vào cho học viên tách khỏi trang giới thiệu (2026-10-05)', () => {
+    it('cấu hình cũ chưa có cờ -> công tắc suy theo khối trang giới thiệu (bật); tắt khối trang giới thiệu vẫn giữ công tắc học viên khi lưu', async () => {
+      datCauHinhKhaoSatMock({ ...DA_LUU, che_do_hoc_vien: 'dang_nhap' });
+      const user = userEvent.setup();
+      renderTrang();
+      const congTacHocVien = await screen.findByRole('switch', { name: /Mở khảo sát đầu vào cho học viên/ });
+      expect(congTacHocVien).toBeChecked();
+      await user.click(screen.getByRole('switch', { name: /Hiện khối khảo sát trên trang giới thiệu/ }));
+      await user.click(screen.getByRole('button', { name: 'Lưu cấu hình' }));
+      await waitFor(() => expect(banDaLuu()?.hien_khao_sat).toBe(false));
+      expect(banDaLuu()?.khao_sat_dau_vao_mo).toBe(true);
     });
   });
 
