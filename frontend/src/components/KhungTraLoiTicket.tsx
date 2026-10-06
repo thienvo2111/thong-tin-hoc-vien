@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert, Button, Group, Stack, Text, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { ApiError } from '@/api/client';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiXungDot } from '@/lib/loiApi';
 
 export interface TraLoiDaCo {
   noi_dung_tra_loi: string | null;
@@ -42,7 +42,7 @@ export function KhungTraLoiTicket({
           setTraLoiDaCo({ noi_dung_tra_loi: null, nguoi_tra_loi_ten: null });
         }
       } else {
-        notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+        notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
       }
     } finally {
       setDangGui(false);

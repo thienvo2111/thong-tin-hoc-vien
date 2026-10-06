@@ -4,7 +4,7 @@ import { notifications } from '@mantine/notifications';
 import { useSuaHoSoHoTro, type SuaHoSoHoTroDto } from '@/api/hoTro';
 import type { HocVienHoTroChiTiet } from '@/api/types';
 import { SelectDonVi } from '@/components/SelectDonVi';
-import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
+import { loiFieldsThanhMap, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { CAP_GIANG_DAY_OPTIONS, DOI_TUONG_OPTIONS, GIOI_TINH_OPTIONS, TRINH_DO_OPTIONS } from '@/lib/tuyChonHoSo';
 
@@ -84,7 +84,7 @@ export function ModalSuaHoSoHoTro({ hoSo, mo, onDong }: { hoSo: HoSo; mo: boolea
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoi(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );

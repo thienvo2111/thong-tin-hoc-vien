@@ -3,7 +3,7 @@ import { Button, Group, Select, Stack } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useGanLopGiaiDoan } from '@/api/khoaBoiDuong';
 import type { KhoaBoiDuongChiTiet, KhoaHocDangKy, LoaiLop } from '@/api/types';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiXungDot } from '@/lib/loiApi';
 
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 
@@ -36,7 +36,7 @@ export function PhanLopTheoGiaiDoan({
           notifications.show(
             res.canh_bao ? { color: 'yellow', message: res.canh_bao } : { color: 'green', message: 'Đã lưu phân lớp' },
           ),
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
       },
     );
   }

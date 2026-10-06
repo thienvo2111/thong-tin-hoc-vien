@@ -35,7 +35,7 @@ import { SelectDiaDanh } from '@/components/SelectDiaDanh';
 import { cauHinhMacDinh } from '@/content/trienKhai';
 import { cauHinhKhaoSatSchema } from '@/schemas/cauHinhKhaoSat';
 import { chuanHoaNfc } from '@/lib/nfc';
-import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
+import { loiFieldsThanhMap, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { AdminPageHeader } from './AdminPageHeader';
 import { TheThuSso } from './TheThuSso';
@@ -142,7 +142,7 @@ function BieuMauCauHinh({ khoaId }: { khoaId: string | null }) {
   const taoRieng = useMutation({
     mutationFn: () => layCauHinhKhaoSat(),
     onSuccess: (chung) => setForm(voiGiaTriSuyRa(chung.cau_hinh ?? MAC_DINH_API)),
-    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
   });
 
   const xoa = useMutation({
@@ -159,7 +159,7 @@ function BieuMauCauHinh({ khoaId }: { khoaId: string | null }) {
       queryClient.invalidateQueries({ queryKey: queryKey(khoaId) });
       notifications.show({ color: 'green', message: 'Khóa đã quay về dùng cấu hình chung' });
     },
-    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
   });
 
   const luu = useMutation({
@@ -171,7 +171,7 @@ function BieuMauCauHinh({ khoaId }: { khoaId: string | null }) {
     onError: (err) => {
       const fields = loiFieldsThanhMap(err);
       setLoi(fields);
-      notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+      notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
     },
   });
 

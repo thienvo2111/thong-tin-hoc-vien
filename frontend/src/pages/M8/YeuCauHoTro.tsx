@@ -29,7 +29,7 @@ import { TextMarkup } from '@/components/TextMarkup';
 import { khopTimKiem } from '@/lib/timKiemTiengViet';
 import { taoYeuCauHoTroSchema, type TaoYeuCauHoTroForm } from '@/schemas/yeuCauHoTro';
 import { StatusBanner } from '@/components/StatusBanner';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 
 const MAU_TRANG_THAI: Record<TrangThaiYeuCauHoTro, string> = {
@@ -196,7 +196,7 @@ function FormTaoTicket() {
               {...register('noi_dung_hoi')}
             />
             {taoTicket.isError && (
-              <StatusBanner loai="error">{thongDiepLoiChung(taoTicket.error)}</StatusBanner>
+              <StatusBanner loai="error">{thongDiepLoiXungDot(taoTicket.error)}</StatusBanner>
             )}
             <Button type="submit" loading={taoTicket.isPending}>
               Gửi yêu cầu

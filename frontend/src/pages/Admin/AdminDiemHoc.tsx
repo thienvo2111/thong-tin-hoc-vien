@@ -22,7 +22,7 @@ import { notifications } from '@mantine/notifications';
 import { useDiemHoc, useSuaDiemHoc, useTaoDiemHoc, type LuuDiemHocDto } from '@/api/diemHoc';
 import type { DiemHoc, TrangThaiActive } from '@/api/types';
 import { SelectDiaDanh } from '@/components/SelectDiaDanh';
-import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
+import { loiFieldsThanhMap, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { AdminPageHeader } from './AdminPageHeader';
 
@@ -119,7 +119,7 @@ export function DanhMucDiemHoc({ base, choNgung = true }: { base?: string; choNg
   function xuLyLoi(err: unknown) {
     const fields = loiFieldsThanhMap(err);
     if (Object.keys(fields).length > 0) setLoi(fields);
-    else notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+    else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
   }
 
   function xuLyLuu() {
@@ -161,7 +161,7 @@ export function DanhMucDiemHoc({ base, choNgung = true }: { base?: string; choNg
             color: 'green',
             message: moi === 'ngung' ? `Đã ngưng "${d.ten}"` : `Đã mở lại "${d.ten}"`,
           }),
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
       },
     );
   }

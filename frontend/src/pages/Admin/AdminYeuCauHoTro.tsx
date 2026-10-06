@@ -25,7 +25,7 @@ import {
 } from '@/api/yeuCauHoTro';
 import { KhungTraLoiTicket } from '@/components/KhungTraLoiTicket';
 import type { TrangThaiYeuCauHoTro, YeuCauHoTroQuanTri } from '@/api/types';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { AdminPageHeader } from './AdminPageHeader';
 
@@ -208,7 +208,7 @@ function DongTicket({
           setDangSua(false);
           notifications.show({ color: 'green', message: 'Đã sửa câu trả lời, học viên sẽ nhận email cập nhật' });
         },
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
       },
     );
   }

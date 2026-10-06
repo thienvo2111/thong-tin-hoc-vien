@@ -12,7 +12,7 @@ import {
   useKhoaHocCuaHocVien,
 } from '@/api/khoaBoiDuong';
 import type { KhoaHocDangKy } from '@/api/types';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { TrangThaiBadge } from '@/components/TrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
@@ -154,7 +154,7 @@ function KhoiDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHocD
       { dangKyHocId: dangKy.id, dto: { cum_id: chonCum || null } },
       {
         onSuccess: () => notifications.show({ color: 'green', message: 'Đã lưu cụm' }),
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
       },
     );
   }

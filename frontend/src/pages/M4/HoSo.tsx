@@ -47,7 +47,7 @@ import {
   type HoSoHocVienForm,
 } from '@/schemas/hoSoHocVien';
 import { chuanHoaObjectNfc } from '@/lib/nfc';
-import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
+import { loiFieldsThanhMap, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { CAP_GIANG_DAY_OPTIONS, DOI_TUONG_OPTIONS, GIOI_TINH_OPTIONS, TRINH_DO_OPTIONS } from '@/lib/tuyChonHoSo';
 import { StatusBanner } from '@/components/StatusBanner';
@@ -254,7 +254,7 @@ export default function HoSo() {
       notifications.show({ color: 'green', message: 'Đã gửi lại email xác minh, vui lòng kiểm tra hộp thư.' });
     },
     onError: (err) => {
-      notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+      notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
     },
   });
 

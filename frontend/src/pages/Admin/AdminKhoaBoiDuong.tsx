@@ -19,7 +19,7 @@ import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useDanhSachKhoa, useDonViChoKhoa, useTaoKhoa } from '@/api/khoaBoiDuong';
 import { useToi } from '@/auth/AuthContext';
-import { thongDiepLoiChung, loiFieldsThanhMap } from '@/lib/loiApi';
+import { thongDiepLoiChung, loiFieldsThanhMap, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgay } from '@/lib/ngay';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { locTiengViet } from '@/lib/timKiemTiengViet';
@@ -139,7 +139,7 @@ export default function AdminKhoaBoiDuong() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiField(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );

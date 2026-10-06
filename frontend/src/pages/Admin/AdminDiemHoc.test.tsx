@@ -115,4 +115,21 @@ describe('Admin — Điểm học', () => {
     await user.click(screen.getByRole('button', { name: 'Ngưng' }));
     await waitFor(() => expect(db.diemHoc[0].trang_thai).toBe('ngung'));
   });
+
+  it('409 không kèm fields (vd trùng mã do race) → thông báo đúng message server, không phải câu trùng CCCD', async () => {
+    server.use(
+      http.patch('/diem-hoc/:id', () =>
+        HttpResponse.json(
+          { error: { code: 'CONFLICT', message: 'Mã điểm học "AG-LX-01" đã tồn tại' } },
+          { status: 409 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    render();
+    await screen.findByText('THPT Long Xuyên');
+    await user.click(screen.getByRole('button', { name: 'Ngưng' }));
+    expect(await screen.findByText('Mã điểm học "AG-LX-01" đã tồn tại')).toBeInTheDocument();
+    expect(screen.queryByText(/Số CCCD này đã được dùng/)).not.toBeInTheDocument();
+  });
 });

@@ -9,7 +9,7 @@ import {
   useXacNhanImportTaiKhoan,
 } from '@/api/nhapDuLieu';
 import type { LoaiDanhMucImport } from '@/api/types';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { taiFileTuBlob } from '@/lib/taiFile';
 
 // Dùng chung cho trang Nhập dữ liệu và modal import trong trang chi tiết khóa.
@@ -67,7 +67,7 @@ export function PanelXemTruocImport({
   const taiFileLoi = useMutation({
     mutationFn: () => taiFileLoiImport(importId),
     onSuccess: (blob) => taiFileTuBlob(blob, `loi-import-${importId}.xlsx`),
-    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
   });
 
   function xuLyXacNhan() {
@@ -78,7 +78,7 @@ export function PanelXemTruocImport({
           taiFileTuBlob(blob, tenFileMatKhau);
           onDaNap?.();
         },
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
       });
       return;
     }
@@ -88,7 +88,7 @@ export function PanelXemTruocImport({
         onDaNap?.();
         onXongViec();
       },
-      onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+      onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
     });
   }
 

@@ -3,7 +3,7 @@ import { Alert, Anchor, Button, Code, CopyButton, Group, Paper, Select, Stack, T
 import { useMutation } from '@tanstack/react-query';
 import { taoMaThuSso } from '@/api/sso';
 import type { SsoTarget } from '@/api/hocVien';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 
 const TUY_CHON_TARGET = [
@@ -48,7 +48,7 @@ export function TheThuSso() {
           </Button>
         </Group>
 
-        {tao.isError && <Alert color="red">{thongDiepLoiChung(tao.error)}</Alert>}
+        {tao.isError && <Alert color="red">{thongDiepLoiXungDot(tao.error)}</Alert>}
 
         {tao.data && (
           <Stack gap="sm">

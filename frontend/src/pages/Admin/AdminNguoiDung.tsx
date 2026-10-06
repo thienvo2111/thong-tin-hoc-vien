@@ -30,7 +30,7 @@ import {
   useTaoTaiKhoanDonVi,
 } from '@/api/taiKhoanDonVi';
 import type { DonViChuaCap, TaiKhoanDonVi, VaiTroDonVi } from '@/api/types';
-import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
+import { loiFieldsThanhMap, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { locTiengViet } from '@/lib/timKiemTiengViet';
@@ -179,7 +179,7 @@ export default function AdminNguoiDung() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiTao(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -211,7 +211,7 @@ export default function AdminNguoiDung() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiSua(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -220,7 +220,7 @@ export default function AdminNguoiDung() {
   function xuLyXacNhan() {
     if (!xacNhan) return;
     const { loai, tk } = xacNhan;
-    const loiChung = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+    const loiChung = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
     if (loai === 'cap_mat_khau') {
       capMatKhau.mutate(tk.id, {
         onSuccess: (kq) => {
@@ -246,7 +246,7 @@ export default function AdminNguoiDung() {
   function xuLyGuiEmail(tk: TaiKhoanDonVi) {
     guiEmail.mutate(tk.id, {
       onSuccess: () => notifications.show({ color: 'green', message: `Đã gửi email kích hoạt tới ${tk.email}` }),
-      onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+      onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
     });
   }
 

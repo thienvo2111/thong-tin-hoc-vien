@@ -24,7 +24,7 @@ import {
 } from '@/api/hoTro';
 import type { HocVienHoTroChiTiet, LoaiLop } from '@/api/types';
 import { chuanHoaLienKet } from '@/lib/lienKet';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { TEN_BAI_KHAO_SAT } from '@/lib/trangThaiKhaoSat';
@@ -149,7 +149,7 @@ function ThaoTacTaiKhoan({ hocVienId, taiKhoan }: { hocVienId: string; taiKhoan:
   const moKhoa = useMoKhoaTamHoTro(hocVienId);
   const [matKhau, setMatKhau] = useState<{ ten_dang_nhap: string; mat_khau_tam: string } | null>(null);
   const [xacNhanCap, setXacNhanCap] = useState(false);
-  const loi = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+  const loi = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
 
   return (
     <Stack gap={6}>

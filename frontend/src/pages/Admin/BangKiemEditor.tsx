@@ -90,7 +90,7 @@ export function BangKiemEditor({ khoaId }: { khoaId: string | null }) {
   function doiTrangThai(m: MucKiemTra) {
     sua.mutate(
       { id: m.id, dto: { trang_thai: m.trang_thai === 'active' ? 'ngung' : 'active' } },
-      { onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }) },
+      { onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }) },
     );
   }
 

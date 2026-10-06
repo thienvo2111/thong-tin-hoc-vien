@@ -5,7 +5,7 @@ import { notifications } from '@mantine/notifications';
 import { taiMauExcel, useTaiLenImport } from '@/api/nhapDuLieu';
 import { chiTietKhoaKey } from '@/api/khoaBoiDuong';
 import type { LoaiDanhMucImport } from '@/api/types';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiXungDot } from '@/lib/loiApi';
 import { taiFileTuBlob } from '@/lib/taiFile';
 import { PanelXemTruocImport } from '@/components/PanelXemTruocImport';
 
@@ -39,7 +39,7 @@ export function ModalImportLopHoc({
   const taiMau = useMutation({
     mutationFn: () => taiMauExcel(loai, maKhoa),
     onSuccess: (blob) => taiFileTuBlob(blob, `mau-${loai}.xlsx`),
-    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
   });
 
   function dong() {
@@ -54,7 +54,7 @@ export function ModalImportLopHoc({
       { loai, file, maKhoa },
       {
         onSuccess: (res) => setImportId(res.import_id),
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
       },
     );
   }

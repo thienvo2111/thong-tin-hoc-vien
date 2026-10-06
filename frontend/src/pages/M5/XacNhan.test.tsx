@@ -86,6 +86,21 @@ describe('M5 — Xem lại & xác nhận', () => {
     expect(await screen.findByText('Trang của tôi')).toBeInTheDocument();
   });
 
+  it('409 khi xác nhận (đã xác nhận ở đợt này) → hiện đúng thông điệp server, không phải câu trùng CCCD', async () => {
+    const thongDiep = 'Thầy/Cô đã xác nhận hồ sơ ở đợt này. Chỉ cần xác nhận lại khi có điều chỉnh thông tin.';
+    server.use(
+      http.post('/hoc-vien/toi/xac-nhan', () =>
+        HttpResponse.json({ error: { code: 'CONFLICT', message: thongDiep } }, { status: 409 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderDaDangNhap();
+    await user.click(await screen.findByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Xác nhận' }));
+    expect(await screen.findByText(thongDiep)).toBeInTheDocument();
+    expect(screen.queryByText(/Số CCCD này đã được dùng/)).not.toBeInTheDocument();
+  });
+
   it('hiển thị hồ sơ dạng bảng 2 cột, dùng tên danh mục thay cho id', async () => {
     db.hoSo.noi_sinh_xa = 'Xã Long Xuyên';
     db.hoSo.noi_sinh_tinh = 'An Giang (cũ)';

@@ -15,11 +15,10 @@ import {
   TextInput,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { ApiError } from '@/api/client';
 import { useDanhSachDot, useTaoDot, useSuaDot } from '@/api/dotXacNhan';
 import type { DotXacNhan, LoaiDotXacNhan } from '@/api/dotXacNhan';
 import { useDanhSachKhoa } from '@/api/khoaBoiDuong';
-import { thongDiepLoiChung, loiFieldsThanhMap } from '@/lib/loiApi';
+import { thongDiepLoiChung, loiFieldsThanhMap, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { AdminPageHeader } from './AdminPageHeader';
@@ -58,14 +57,6 @@ const MAU_TRANG_THAI: Record<TrangThaiDot, string> = {
   dang_mo: 'success',
   da_dong: 'danger',
 };
-
-/** thongDiepLoiChung() hard-code case 'CONFLICT' thành thông báo trùng CCCD (dùng cho luồng hồ sơ học
- * viên) — không đúng ngữ cảnh cho lỗi trùng thời gian đợt (ConflictAppException từ kiemTraChongCheo()
- * trong dot-xac-nhan.service.ts). Dùng thẳng message thật từ backend khi là ApiError, chỉ fallback
- * thongDiepLoiChung() cho lỗi không phải ApiError (mạng/không xác định). */
-function thongDiepLoiDot(err: unknown): string {
-  return err instanceof ApiError ? err.message : thongDiepLoiChung(err);
-}
 
 interface FormTaoDot {
   ten: string;
@@ -129,7 +120,7 @@ export default function AdminDotXacNhan() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiField(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiDot(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -153,7 +144,7 @@ export default function AdminDotXacNhan() {
         },
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
-          setLoiGiaHan(fields.dong_luc || thongDiepLoiDot(err));
+          setLoiGiaHan(fields.dong_luc || thongDiepLoiXungDot(err));
         },
       },
     );

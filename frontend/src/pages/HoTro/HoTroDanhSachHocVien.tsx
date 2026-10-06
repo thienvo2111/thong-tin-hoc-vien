@@ -20,7 +20,7 @@ import {
 import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useCumCuaToi, useDanhSachHocVienHoTro, xuatDanhSachHoTro } from '@/api/hoTro';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { taiFileTuBlob } from '@/lib/taiFile';
 import { TEN_BAI_KHAO_SAT } from '@/lib/trangThaiKhaoSat';
@@ -89,7 +89,7 @@ export default function HoTroDanhSachHocVien() {
       const ngay = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       taiFileTuBlob(blob, `ds-cum-ho-tro-${ngay}.xlsx`);
     } catch (err) {
-      notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+      notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
     } finally {
       setDangXuat(false);
     }

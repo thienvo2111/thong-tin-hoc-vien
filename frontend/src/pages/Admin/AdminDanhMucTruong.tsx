@@ -6,7 +6,7 @@ import { notifications } from '@mantine/notifications';
 import { layDonViCongTacPhanTrang, useSuaDiaBanDonViCongTac } from '@/api/danhMuc';
 import type { DonViCongTac } from '@/api/types';
 import { SelectDiaDanh } from '@/components/SelectDiaDanh';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { AdminPageHeader } from './AdminPageHeader';
 
@@ -74,7 +74,7 @@ export default function AdminDanhMucTruong() {
           dongModal();
         },
         onError: (err) => {
-          notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+          notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );

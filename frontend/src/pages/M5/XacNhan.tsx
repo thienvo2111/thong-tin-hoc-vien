@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Anchor, Box, Button, Card, Center, Checkbox, Container, Group, Loader, Stack, Table, Text, Title } from '@mantine/core';
 import { kiemTraTruocXacNhan, useDotXacNhan, useHoSoToi, xacNhanHoSo } from '@/api/hocVien';
 import type { DotXacNhan, HocVien, XacNhanResponse } from '@/api/types';
-import { laLoiDotDong, thongDiepLoiChung } from '@/lib/loiApi';
+import { laLoiDotDong, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { CAP_GIANG_DAY_OPTIONS, DOI_TUONG_OPTIONS, GIOI_TINH_OPTIONS, TRINH_DO_OPTIONS, nhanTuTuyChon } from '@/lib/tuyChonHoSo';
@@ -212,7 +212,7 @@ export default function XacNhan() {
             </Card>
 
             {xacNhanMutation.isError && !laLoiDotDong(xacNhanMutation.error) && (
-              <StatusBanner loai="error">{thongDiepLoiChung(xacNhanMutation.error)}</StatusBanner>
+              <StatusBanner loai="error">{thongDiepLoiXungDot(xacNhanMutation.error)}</StatusBanner>
             )}
 
             <Button

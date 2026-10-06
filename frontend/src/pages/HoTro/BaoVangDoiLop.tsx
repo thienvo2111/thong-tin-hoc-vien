@@ -12,7 +12,7 @@ import {
   type BaoVangHocVien,
   type DeNghiDoiLopHocVien,
 } from '@/api/doiLop';
-import { loiFieldsThanhMap, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
+import { loiFieldsThanhMap, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 
 // ADR 0004 G13/G14 (issue #18): thao tác của người hỗ trợ học viên ở chi tiết học viên → Học tập.
@@ -46,7 +46,7 @@ export function BaoVangBuoi({
           onClick={() =>
             huy.mutate(buoi.id, {
               onSuccess: () => notifications.show({ color: 'green', message: 'Đã hủy báo vắng' }),
-              onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+              onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
             })
           }
         >
@@ -90,7 +90,7 @@ function ModalBaoVang({
         },
         onError: (err) => {
           setLoi(loiFieldsThanhMap(err).ly_do);
-          notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+          notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );

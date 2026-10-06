@@ -4,7 +4,7 @@ import { notifications } from '@mantine/notifications';
 import { useGanNguoiHoTroCum } from '@/api/khoaBoiDuong';
 import { useDanhSachTaiKhoanHoTro } from '@/api/taiKhoanHoTro';
 import type { CumHocVien } from '@/api/types';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiXungDot } from '@/lib/loiApi';
 import { locTiengViet } from '@/lib/timKiemTiengViet';
 
 /** Phân công người hỗ trợ học viên cho 1 cụm (ADR 0003 H4) — chỉ quan_tri. Đổi lựa chọn là lưu ngay
@@ -28,7 +28,7 @@ export function ChonNguoiHoTroCum({ khoaId, cum }: { khoaId: string; cum: CumHoc
       { cumId: cum.id, nguoiDungIds: ids },
       {
         onSuccess: () => notifications.show({ color: 'green', message: `Đã cập nhật người hỗ trợ "${cum.ten_cum}"` }),
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
       },
     );
   }

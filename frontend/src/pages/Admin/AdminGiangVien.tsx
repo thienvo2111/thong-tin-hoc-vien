@@ -28,7 +28,7 @@ import {
   type LuuGiangVienDto,
 } from '@/api/giangVien';
 import type { GiangVien, LichDayGiangVien, TrangThaiActive } from '@/api/types';
-import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
+import { loiFieldsThanhMap, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { AdminPageHeader } from './AdminPageHeader';
@@ -109,7 +109,7 @@ export function DanhMucGiangVien({ base, quanTri = true }: { base?: string; quan
       onError: (err: unknown) => {
         const fields = loiFieldsThanhMap(err);
         if (Object.keys(fields).length > 0) setLoi(fields);
-        else notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+        else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
       },
     };
     if (dangSua) suaGiangVien.mutate({ id: dangSua.id, dto }, xong);
@@ -123,7 +123,7 @@ export function DanhMucGiangVien({ base, quanTri = true }: { base?: string; quan
       {
         onSuccess: () =>
           notifications.show({ color: 'green', message: moi === 'ngung' ? `Đã ngưng "${gv.ho_ten}"` : `Đã mở lại "${gv.ho_ten}"` }),
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
       },
     );
   }
@@ -347,7 +347,7 @@ function DongPhanCong({ pc }: { pc: LichDayGiangVien['phan_cong'][number] }) {
       { phanCongId: pc.id, da_xac_nhan_gio: daXacNhan, so_gio: daXacNhan && soGio !== '' ? Number(soGio) : undefined },
       {
         onSuccess: () => notifications.show({ color: 'green', message: daXacNhan ? 'Đã xác nhận giờ dạy' : 'Đã bỏ xác nhận' }),
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
       },
     );
   }

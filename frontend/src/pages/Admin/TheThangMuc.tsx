@@ -4,7 +4,7 @@ import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { layThangMuc, luuThangMuc, type MucThang } from '@/api/ketQuaKhaoSat';
 import { chuanHoaNfc } from '@/lib/nfc';
-import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
+import { loiFieldsThanhMap, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 
 const MA_HOP_LE = /^[A-Z0-9]{1,10}$/;
@@ -108,7 +108,7 @@ export function TheThangMuc() {
             </Table>
 
             {(loiApi.muc || (luu.isError && !Object.keys(loiApi).length)) && (
-              <Alert color="red">{loiApi.muc ?? thongDiepLoiChung(luu.error)}</Alert>
+              <Alert color="red">{loiApi.muc ?? thongDiepLoiXungDot(luu.error)}</Alert>
             )}
 
             <Group justify="space-between">

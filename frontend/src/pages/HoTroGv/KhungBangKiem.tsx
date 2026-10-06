@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert, Badge, Button, Checkbox, Group, Paper, Skeleton, Stack, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useBangKiemDot, useDanhDauMuc, type MauDot, type MucDanhGia, type TrangThaiMuc } from '@/api/bangKiem';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 
 export const MAU_DOT: Record<MauDot, { mau: string; nhan: string }> = {
@@ -24,7 +24,7 @@ function DongThuCong({ lopId, gdId, m }: { lopId: string; gdId: string; m: MucDa
   function luu(daXong: boolean) {
     danhDau.mutate(
       { mucId: m.muc_id, da_xong: daXong, ghi_chu: ghiChu.trim() || null },
-      { onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }) },
+      { onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }) },
     );
   }
 

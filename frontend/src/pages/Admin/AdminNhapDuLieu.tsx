@@ -20,7 +20,7 @@ import { notifications } from '@mantine/notifications';
 import { taiFileLoiImport, taiMauExcel, useLichSuImport, useTaiLenImport } from '@/api/nhapDuLieu';
 import { useDanhSachKhoa } from '@/api/khoaBoiDuong';
 import type { LoaiDanhMucImport } from '@/api/types';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { taiFileTuBlob } from '@/lib/taiFile';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { mauTrangThaiImport, nhanTrangThaiImport } from '@/lib/trangThaiImport';
@@ -94,12 +94,12 @@ export default function AdminNhapDuLieu() {
   const taiMau = useMutation({
     mutationFn: () => taiMauExcel(loai, canKhoa ? (maKhoa ?? undefined) : undefined),
     onSuccess: (blob) => taiFileTuBlob(blob, `mau-${loai}.xlsx`),
-    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
   });
   const taiFileLoiTuLichSu = useMutation({
     mutationFn: (id: string) => taiFileLoiImport(id),
     onSuccess: (blob, id) => taiFileTuBlob(blob, `loi-import-${id}.xlsx`),
-    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
   });
 
   function xuLyTaiLen() {
@@ -112,7 +112,7 @@ export default function AdminNhapDuLieu() {
           setLoaiDangXacNhan(loai);
           notifications.show({ color: 'blue', message: 'Đã tải file lên, đang kiểm tra dữ liệu...' });
         },
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
       },
     );
   }

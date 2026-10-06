@@ -4,7 +4,7 @@ import { notifications } from '@mantine/notifications';
 import { useGanNhomHoTroGv } from '@/api/khoaBoiDuong';
 import { useDanhSachTaiKhoanHoTro } from '@/api/taiKhoanHoTro';
 import type { KhoaBoiDuongChiTiet } from '@/api/types';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiXungDot } from '@/lib/loiApi';
 import { locTiengViet } from '@/lib/timKiemTiengViet';
 
 /** Nhóm người hỗ trợ giảng viên của khóa (ADR 0004 G3, issue #14) — chỉ quan_tri; đổi lựa chọn là lưu
@@ -25,7 +25,7 @@ export function ChonNhomHoTroGv({ khoa }: { khoa: KhoaBoiDuongChiTiet }) {
   function luu(ids: string[]) {
     gan.mutate(ids, {
       onSuccess: () => notifications.show({ color: 'green', message: 'Đã cập nhật nhóm hỗ trợ giảng viên' }),
-      onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+      onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
     });
   }
 

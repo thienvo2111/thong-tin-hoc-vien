@@ -23,7 +23,6 @@ import {
   Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { ApiError } from '@/api/client';
 import {
   useCapNhatCum,
   useCapNhatGiaiDoan,
@@ -53,7 +52,7 @@ import type {
 } from '@/api/types';
 import { useToi } from '@/auth/AuthContext';
 import { chuanHoaLienKet } from '@/lib/lienKet';
-import { thongDiepLoiChung, loiFieldsThanhMap } from '@/lib/loiApi';
+import { thongDiepLoiChung, loiFieldsThanhMap, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { KhoaTrangThaiBadge } from '@/components/KhoaTrangThaiBadge';
@@ -108,14 +107,6 @@ function BadgeHoatDong({ trangThai }: { trangThai: TrangThaiActive }) {
       {trangThai === 'active' ? 'Đang hoạt động' : 'Đã vô hiệu hóa'}
     </Badge>
   );
-}
-
-/** thongDiepLoiChung() hard-code case 'CONFLICT' thành thông báo trùng CCCD (ngữ cảnh hồ sơ học
- * viên) — không đúng cho lỗi trùng tên lớp/giai đoạn/cụm/đơn vị theo dõi ở màn này (ConflictAppException
- * từ mapUniqueViolation()). Dùng thẳng message thật từ backend khi là ApiError, giống thongDiepLoiDot()
- * trong AdminDotXacNhan.tsx (cùng vấn đề, đã xử lý trước đó). */
-function thongDiepLoiKhoa(err: unknown): string {
-  return err instanceof ApiError ? err.message : thongDiepLoiChung(err);
 }
 
 interface FormTaoLop {
@@ -282,7 +273,7 @@ export default function AdminKhoaChiTiet() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiSuaKhoa(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -332,7 +323,7 @@ export default function AdminKhoaChiTiet() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiTaoLop(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -374,7 +365,7 @@ export default function AdminKhoaChiTiet() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiSuaLop(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -433,7 +424,7 @@ export default function AdminKhoaChiTiet() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiBuoi(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -483,7 +474,7 @@ export default function AdminKhoaChiTiet() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiSuaBuoi(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -522,7 +513,7 @@ export default function AdminKhoaChiTiet() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiNhanSu(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -565,7 +556,7 @@ export default function AdminKhoaChiTiet() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiTaoGiaiDoan(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -610,7 +601,7 @@ export default function AdminKhoaChiTiet() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiSuaGiaiDoan(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -649,7 +640,7 @@ export default function AdminKhoaChiTiet() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiTaoCum(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -682,7 +673,7 @@ export default function AdminKhoaChiTiet() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiSuaCum(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -701,7 +692,7 @@ export default function AdminKhoaChiTiet() {
       });
       setXacNhanToggle(null);
     };
-    const onError = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+    const onError = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
 
     if (xacNhanToggle.loai === 'lop') {
       capNhatLop.mutate({ lopId: xacNhanToggle.id, dto: { trang_thai: trangThaiMoi } }, { onSuccess, onError });
@@ -726,7 +717,7 @@ export default function AdminKhoaChiTiet() {
           notifications.show({ color: 'green', message: `Đã gỡ "${xacNhanXoa.ten}"` });
           setXacNhanXoa(null);
         },
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
       },
     );
   }

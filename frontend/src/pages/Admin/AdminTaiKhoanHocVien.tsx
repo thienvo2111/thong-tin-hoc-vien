@@ -32,7 +32,7 @@ import {
   useNhatKyHocVien,
 } from '@/api/taiKhoanHocVien';
 import type { TaiKhoanHocVien, TinhTrangTaiKhoanHocVien, TrangThaiActive } from '@/api/types';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangGio, dinhDangNgayGio } from '@/lib/ngay';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { AdminPageHeader } from './AdminPageHeader';
@@ -113,7 +113,7 @@ export default function AdminTaiKhoanHocVien() {
     };
   }
 
-  const loiChung = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+  const loiChung = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
 
   function xuLyXacNhan() {
     if (!xacNhan) return;

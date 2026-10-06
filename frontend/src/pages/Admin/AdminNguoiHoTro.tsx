@@ -31,7 +31,7 @@ import {
   useTaoTaiKhoanHoTro,
 } from '@/api/taiKhoanHoTro';
 import type { TaiKhoanHoTro, VaiTroHoTro } from '@/api/types';
-import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
+import { loiFieldsThanhMap, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { AdminPageHeader } from './AdminPageHeader';
@@ -98,7 +98,7 @@ export default function AdminNguoiHoTro() {
   const guiEmail = useGuiEmailKichHoatHoTro();
   const [matKhau, setMatKhau] = useState<{ ten_dang_nhap: string; mat_khau_tam: string } | null>(null);
 
-  const loiChung = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+  const loiChung = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
 
   function xuLyTao() {
     setLoiTao({});

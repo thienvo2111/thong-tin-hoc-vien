@@ -24,7 +24,7 @@ import { useDanhSachKhoa } from '@/api/khoaBoiDuong';
 import { layDonViCongTac } from '@/api/danhMuc';
 import type { KhaoSatMucRow, KetQuaTheoHinhThucRow, LoaiLop } from '@/api/types';
 import { SelectDonVi } from '@/components/SelectDonVi';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { taiFileTuBlob } from '@/lib/taiFile';
 import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { TrangThaiBadge } from '@/components/TrangThaiBadge';
@@ -198,7 +198,7 @@ function KhoiTongQuanMoRong() {
 
   const excel = useMutation({
     mutationFn: async () => taiFileTuBlob(await taiBaoCaoTongQuanExcel(params), 'bao-cao-tong-quan.xlsx'),
-    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+    onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
   });
 
   const tongThamGia = tongQuan.data?.tong_hoc_vien_tham_gia ?? 0;

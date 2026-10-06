@@ -12,7 +12,7 @@ import {
   type TrangLop,
 } from '@/api/hoTroGv';
 import { SelectDiemHoc } from '@/components/SelectDiemHoc';
-import { loiFieldsThanhMap, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
+import { loiFieldsThanhMap, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 
 type Buoi = TrangLop['buoi'][number];
@@ -64,7 +64,7 @@ export function ModalSuaBuoiGv({ buoi, onClose }: { buoi: Buoi | null; onClose: 
         onError: (err) => {
           const f = loiFieldsThanhMap(err);
           if (Object.keys(f).length) setLoi(f);
-          notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+          notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         },
       },
     );
@@ -253,7 +253,7 @@ export function KhungThucDia({ lopId, gdId, thucDia }: { lopId: string; gdId: st
         .map((d) => ({ ho_ten: d.ho_ten.trim(), so_dien_thoai: d.so_dien_thoai.trim(), nhiem_vu: d.nhiem_vu.trim() || undefined })),
       {
         onSuccess: () => notifications.show({ color: 'green', message: 'Đã lưu người hỗ trợ thực địa' }),
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) }),
       },
     );
   }
