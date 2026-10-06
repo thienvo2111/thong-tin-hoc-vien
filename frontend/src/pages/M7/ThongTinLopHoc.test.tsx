@@ -95,6 +95,10 @@ describe('M7 — Thông tin lớp học', () => {
                         {
                           ...buoiDau,
                           phong: 'P.101',
+                          giang_vien: [
+                            { ho_ten: 'Nguyễn Văn Long', vai_tro: 'giang_vien' },
+                            { ho_ten: 'Trần Thị Mai', vai_tro: 'ho_tro' },
+                          ],
                           diem_hoc: {
                             id: 'dh-1',
                             ma_diem_hoc: 'AG-LX-01',
@@ -119,6 +123,8 @@ describe('M7 — Thông tin lớp học', () => {
     expect(within(gd2).getByText('1 Trần Hưng Đạo')).toBeInTheDocument();
     expect(within(gd2).getByText(/Liên hệ: Cô Lan/)).toBeInTheDocument();
     expect(within(gd2).getByRole('link', { name: '0901000001' })).toHaveAttribute('href', 'tel:0901000001');
+    // T11 (issue #3): giảng viên theo buổi (chỉ họ tên + vai trò).
+    expect(within(gd2).getByText(/Nguyễn Văn Long, Trần Thị Mai \(hỗ trợ\)/)).toBeInTheDocument();
   });
 
   it('giai đoạn không lớp: hiện link + hướng dẫn chung của giai đoạn', async () => {

@@ -61,6 +61,7 @@ import { AdminPageHeader } from './AdminPageHeader';
 import { ModalImportLopHoc } from './ModalImportLopHoc';
 import { ChonNguoiHoTroCum } from './ChonNguoiHoTroCum';
 import { SelectDiemHoc } from '@/components/SelectDiemHoc';
+import { ModalPhanCongBuoi } from './ModalPhanCongBuoi';
 
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 const MAU_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'blue', zoom: 'grape', vle: 'teal' };
@@ -394,6 +395,8 @@ export default function AdminKhoaChiTiet() {
   const [loiBuoi, setLoiBuoi] = useState<Record<string, string>>({});
 
   const [buoiDangSua, setBuoiDangSua] = useState<{ lop: LopHoc; lich: LichHocLop } | null>(null);
+  // T11 (issue #3): phân công giảng viên vào buổi.
+  const [buoiPhanCong, setBuoiPhanCong] = useState<{ lop: LopHoc; lich: LichHocLop } | null>(null);
   const [formSuaBuoi, setFormSuaBuoi] = useState<FormSuaBuoiHoc | null>(null);
   const [loiSuaBuoi, setLoiSuaBuoi] = useState<Record<string, string>>({});
 
@@ -952,6 +955,7 @@ export default function AdminKhoaChiTiet() {
                                                 <Table.Th>Thời gian</Table.Th>
                                                 <Table.Th>Địa điểm/link</Table.Th>
                                                 <Table.Th>Điểm học</Table.Th>
+                                                <Table.Th>Giảng viên</Table.Th>
                                                 <Table.Th>Trạng thái</Table.Th>
                                                 <Table.Th />
                                               </Table.Tr>
@@ -983,12 +987,28 @@ export default function AdminKhoaChiTiet() {
                                                       '—'
                                                     )}
                                                   </Table.Td>
+                                                  <Table.Td>
+                                                    {(lich.phan_cong ?? []).length === 0
+                                                      ? '—'
+                                                      : (lich.phan_cong ?? []).map((p) => (
+                                                          <Text key={p.id} fz={13}>
+                                                            {p.giang_vien.ho_ten}
+                                                            {p.vai_tro === 'ho_tro' ? ' (hỗ trợ)' : ''}
+                                                            {p.da_xac_nhan_gio ? ' ✓' : ''}
+                                                          </Text>
+                                                        ))}
+                                                  </Table.Td>
                                                   <Table.Td>{NHAN_TRANG_THAI_LICH_HOC[lich.trang_thai]}</Table.Td>
-                                                  <Table.Td ta="right">
+                                                  <Table.Td ta="right" style={{ whiteSpace: 'nowrap' }}>
                                                     {laQuanTri && (
-                                                      <Button variant="subtle" size="xs" onClick={() => moModalSuaBuoi(lop, lich)}>
-                                                        Sửa
-                                                      </Button>
+                                                      <>
+                                                        <Button variant="subtle" size="xs" onClick={() => setBuoiPhanCong({ lop, lich })}>
+                                                          Giảng viên
+                                                        </Button>
+                                                        <Button variant="subtle" size="xs" onClick={() => moModalSuaBuoi(lop, lich)}>
+                                                          Sửa
+                                                        </Button>
+                                                      </>
                                                     )}
                                                   </Table.Td>
                                                 </Table.Tr>
@@ -1445,6 +1465,8 @@ export default function AdminKhoaChiTiet() {
           </Button>
         </Stack>
       </Modal>
+
+      <ModalPhanCongBuoi khoaId={khoaId} buoi={buoiPhanCong} onClose={() => setBuoiPhanCong(null)} />
 
       {/* ================= Modal: Sửa buổi học ================= */}
       <Modal opened={!!buoiDangSua} onClose={() => setBuoiDangSua(null)} title="Sửa buổi học" centered>

@@ -21,6 +21,7 @@ import { SsoModule } from './sso/sso.module';
 import { NhatKyModule } from './nhat-ky/nhat-ky.module';
 import { HoTroHocVienModule } from './ho-tro-hoc-vien/ho-tro-hoc-vien.module';
 import { DiemHocModule } from './diem-hoc/diem-hoc.module';
+import { GiangVienModule } from './giang-vien/giang-vien.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { DiemHocModule } from './diem-hoc/diem-hoc.module';
     HocVienModule,
     KhoaBoiDuongModule,
     DiemHocModule,
+    GiangVienModule,
     DanhMucModule,
     ImportModule,
     BaoCaoModule,

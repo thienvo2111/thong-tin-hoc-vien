@@ -18,6 +18,11 @@ import { XacNhanQueryDto } from './dto/xac-nhan-query.dto';
 import { KhoaIdQueryDto } from './dto/khoa-id-query.dto';
 import { VanHanhQueryDto } from './dto/van-hanh-query.dto';
 import { TongQuanQueryDto } from './dto/tong-quan-query.dto';
+import {
+  buildGioDayWorkbook,
+  GioDayQueryDto,
+  GioDayService,
+} from './gio-day.service';
 
 // Dịch vụ Báo cáo — docs/api-contract.md mục 7. hoc_vien không có phạm vi
 // nghiệp vụ (don_vi) để tổng hợp báo cáo -> không liệt kê trong @Roles(),
@@ -25,7 +30,41 @@ import { TongQuanQueryDto } from './dto/tong-quan-query.dto';
 @Roles('truong', 'phong_vhxh', 'so_gddt', 'quan_tri')
 @Controller('bao-cao')
 export class BaoCaoController {
-  constructor(private readonly baoCaoService: BaoCaoService) {}
+  constructor(
+    private readonly baoCaoService: BaoCaoService,
+    private readonly gioDayService: GioDayService,
+  ) {}
+
+  // T11 (issue #3): giờ dạy theo giảng viên × lớp — @Roles() của class; phạm
+  // vi + ẩn liên hệ giảng viên với vai trò khác Quản trị xử lý trong
+  // GioDayService.
+  @Get('gio-day')
+  gioDay(
+    @Query() query: GioDayQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.gioDayService.baoCao(query, user);
+  }
+
+  @Get('gio-day/xuat-excel')
+  async gioDayXuatExcel(
+    @Query() query: GioDayQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const result = await this.gioDayService.baoCao(query, user);
+    const buffer = await buildGioDayWorkbook(
+      result,
+      user.vai_tro === 'quan_tri',
+    );
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="bao-cao-gio-day.xlsx"',
+      })
+      .send(buffer);
+  }
 
   @Get('tong-hop')
   tongHop(

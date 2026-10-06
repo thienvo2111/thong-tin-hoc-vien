@@ -307,3 +307,15 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 123 | Không xóa cứng điểm học (rule #40) — chỉ `PATCH trang_thai='ngung'` | 🔴 | API (không expose DELETE) |
 | 124 | `lich_hoc_lop.cap_nhat_luc` chỉ đổi khi `thoi_gian_bat_dau`/`thoi_gian_ket_thuc`/`dia_diem_hoac_link`/`diem_hoc_id`/`phong` thật sự đổi (qua `LichHocThayDoiService` — điểm duy nhất sửa buổi đã tồn tại), kèm 1 dòng `nhat_ky_hoat_dong` `sua_lich_hoc`; chạy lại import y nguyên không đổi gì | 🔴 | API |
 | 125 | Import `lop_va_lich_hoc`: cột `phong` ở CUỐI và tùy chọn — file theo mẫu cũ (thiếu đúng cột cuối này) vẫn hợp lệ | 🔴 | API (`readWorkbookRows` tham số `cotCuoiTuyChon`) |
+
+## Giảng viên & phân công (T11, issue #3, 2026-10-07 — api-contract.md mục 4 "Giảng viên & phân công")
+
+| # | Quy tắc | Mức | Nơi thực thi |
+|---|---|---|---|
+| 126 | `giang_vien.so_dien_thoai` bắt buộc, duy nhất, đúng định dạng VN (chuẩn hóa: bỏ khoảng trắng/dấu chấm/gạch, 9 số đầu 3/5/7/8/9 tự thêm `0`); `email` tùy chọn, duy nhất, chữ thường | 🔴 | API (`lien-he.util`, `GiangVienService.chuanHoaVaKiemTraLienHe`) + DB (`uq_giang_vien_*`) |
+| 127 | Import `giang_vien`: khớp email trước rồi SĐT; email và SĐT trỏ 2 giảng viên khác nhau → dòng lỗi | 🔴 | API (`GiangVienImportService`) |
+| 128 | 1 giảng viên **không** được phân công vào 2 buổi chồng giờ (chạm biên không tính) — áp cho import, phân công tay, và khi đổi giờ buổi đã có phân công | 🔴 | API (`PhanCongGiangDayService` — điểm duy nhất) |
+| 129 | Phân công `da_xac_nhan_gio` không gỡ được và không đổi `so_gio` được (`409` / dòng lỗi) — bỏ xác nhận trước | 🔴 | API |
+| 130 | Xác nhận giờ cần có `so_gio`; `da_xac_nhan_gio=true` ⇒ có `xac_nhan_luc` + `nguoi_xac_nhan_id` | 🔴 | API + DB (`chk_phan_cong_xac_nhan`) |
+| 131 | Báo cáo giờ dạy chỉ cộng phân công đã xác nhận giờ; vai trò khác Quản trị không thấy SĐT/email giảng viên; học viên chỉ thấy họ tên + vai trò | 🔴 | API (`GioDayService`, `khoaHocTheoHocVienId`) |
+| 132 | Mọi endpoint `/giang-vien/*` và phân công tay chỉ Quản trị (dữ liệu cá nhân) | 🔴 | API (`@Roles('quan_tri')`) |

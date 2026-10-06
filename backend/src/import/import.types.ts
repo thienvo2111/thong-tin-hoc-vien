@@ -20,6 +20,9 @@ export const SUPPORTED_IMPORT_TYPES = [
   'tai_khoan_don_vi',
   // Kết quả khảo sát (2026-10-04) — dự phòng khi hệ thống khảo sát không báo qua API.
   'ket_qua_khao_sat',
+  // T11 (issue #3): danh mục giảng viên + phân công giảng dạy.
+  'giang_vien',
+  'phan_cong_giang_day',
 ] as const satisfies readonly loai_danh_muc_import[];
 
 export type SupportedImportType = (typeof SUPPORTED_IMPORT_TYPES)[number];

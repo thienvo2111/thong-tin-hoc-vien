@@ -232,6 +232,47 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     server.events.removeAllListeners();
   });
 
+  // T11 (issue #3): phân công giảng viên vào buổi.
+  it('buổi học: nút "Giảng viên" mở modal, chọn giảng viên + số giờ → PUT, bảng hiện tên', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const lop = db.chiTietKhoa['khoa-1'].lop_hoc[0];
+    lop.lich_hoc = [
+      {
+        id: 'lh-pc',
+        lop_id: lop.id,
+        giai_doan_id: 'gd-3',
+        buoi_so: 1,
+        thoi_gian_bat_dau: '2026-10-12T01:00:00.000Z',
+        thoi_gian_ket_thuc: '2026-10-12T04:00:00.000Z',
+        dia_diem_hoac_link: null,
+        trang_thai: 'chua_dien_ra',
+        phan_cong: [],
+      },
+    ];
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText('Lớp 01 – Nhóm cơ bản A');
+    const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
+    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết ▾' }));
+    await user.click(await screen.findByRole('button', { name: 'Giảng viên' }));
+
+    const modal = await screen.findByRole('dialog');
+    await user.click(within(modal).getByRole('button', { name: '+ Thêm giảng viên' }));
+    await user.click(within(modal).getByRole('textbox', { name: 'Giảng viên' }));
+    await user.click(await screen.findByRole('option', { name: /Nguyễn Văn Long/ }));
+    await user.type(within(modal).getByLabelText('Số giờ'), '3');
+    await user.click(within(modal).getByRole('button', { name: 'Lưu phân công' }));
+
+    await waitFor(() =>
+      expect(lop.lich_hoc?.[0].phan_cong).toEqual([
+        expect.objectContaining({ giang_vien: { id: 'gv-1', ho_ten: 'Nguyễn Văn Long' }, so_gio: 3 }),
+      ]),
+    );
+    // Modal đóng, bảng buổi học hiện tên giảng viên (cột "Giảng viên").
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect((await screen.findAllByText('Nguyễn Văn Long')).length).toBeGreaterThan(0);
+  });
+
   it('xem chi tiết lớp: mở rộng dòng → hiện nhân sự + thêm nhân sự mới thành công', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();

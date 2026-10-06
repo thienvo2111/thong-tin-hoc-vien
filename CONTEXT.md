@@ -51,7 +51,9 @@ Công cụ phối hợp giữa **Sở GD&ĐT**, **Phòng Văn hóa - Xã hội**
 - **DotXacNhan** / **XacNhanHoSo** / **LichSuThayDoiHoSo** — cửa sổ xác nhận hồ sơ theo đợt; mỗi lần sửa trường trong đợt mở ghi 1 dòng lịch sử; hồ sơ `import_moet` chỉ sửa được khi có đợt đang mở.
 - **TaiKhoanVLE** — tài khoản hệ thống học trực tuyến (VLE), `mat_khau_tam` mã hóa AES-256-GCM ở tầng ứng dụng — **không bao giờ lưu plaintext**, kể cả trong file lỗi import.
 - **NhatKyImport**, **NhatKyThongBao** — bảng nhật ký/audit trail.
-- **Chưa tồn tại (xác nhận 2026-10-01, không nhầm với đã code):** `DiemHoc` (địa điểm học trực tiếp), `GiangVien`/`PhanCongGiangDay`, `ChungNhan` — xem issue T10/T11/T13 trên GitHub Issues.
+- **DiemHoc** (T10, #2, 2026-10-07) — danh mục điểm học trực tiếp; buổi thuộc giai đoạn `truc_tiep` bắt buộc có `lich_hoc_lop.diem_hoc_id`. `lich_hoc_lop.cap_nhat_luc` chỉ đổi khi giờ/địa điểm/điểm học/phòng thật sự đổi — mọi sửa buổi đã có đi qua `LichHocThayDoiService`.
+- **GiangVien** / **PhanCongGiangDay** (T11, #3, 2026-10-07) — danh mục giảng viên (SĐT duy nhất bắt buộc, email duy nhất tùy chọn) và phân công vào từng buổi; luật (không trùng giờ, không gỡ phân công đã xác nhận giờ) chỉ ở `PhanCongGiangDayService`. Giờ dạy chỉ tính phân công `da_xac_nhan_gio`. `lop_hoc_nhan_su` vẫn giữ (text liên hệ cũ).
+- **Chưa tồn tại:** `ChungNhan` (T13, #6).
 
 ## Luồng nghiệp vụ chính
 

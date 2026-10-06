@@ -11,8 +11,10 @@ import {
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import { DiemHocService } from '../diem-hoc/diem-hoc.service';
 import { LichHocThayDoiService } from './lich-hoc-thay-doi.service';
+import { PhanCongGiangDayService } from '../giang-vien/phan-cong-giang-day.service';
 
 let nhatKy: { ghi: jest.Mock };
+let phanCongGiangDay: { xungDotKhiDoiGio: jest.Mock };
 let diemHocService: {
   layDiemHocDangHoatDong: jest.Mock;
   canhBaoVuotSoPhong: jest.Mock;
@@ -153,6 +155,9 @@ describe('KhoaBoiDuongService', () => {
       guiDangKyHocPhanLop: jest.fn().mockResolvedValue({ chuaCoEmail: false }),
     };
     nhatKy = { ghi: jest.fn().mockResolvedValue(undefined) };
+    phanCongGiangDay = {
+      xungDotKhiDoiGio: jest.fn().mockResolvedValue(null),
+    };
     diemHocService = {
       layDiemHocDangHoatDong: jest.fn().mockResolvedValue({ id: 'dh-1' }),
       canhBaoVuotSoPhong: jest.fn().mockResolvedValue([]),
@@ -167,6 +172,7 @@ describe('KhoaBoiDuongService', () => {
         prisma as unknown as PrismaService,
         nhatKy as unknown as NhatKyService,
       ),
+      phanCongGiangDay as unknown as PhanCongGiangDayService,
     );
   });
 
@@ -438,8 +444,14 @@ describe('KhoaBoiDuongService', () => {
         id: 'lop-zoom',
         ten_lop: 'Lớp Zoom',
         lich_hoc: [
-          { id: 'b-2', giai_doan_id: 'gd-2' },
-          { id: 'b-3', giai_doan_id: 'gd-3' },
+          {
+            id: 'b-2',
+            giai_doan_id: 'gd-2',
+            phan_cong: [
+              { vai_tro: 'giang_vien', giang_vien: { ho_ten: 'GV Một' } },
+            ],
+          },
+          { id: 'b-3', giai_doan_id: 'gd-3', phan_cong: [] },
         ],
       };
       prisma.dang_ky_hoc.findMany.mockResolvedValue([
@@ -467,6 +479,10 @@ describe('KhoaBoiDuongService', () => {
       expect(res[0].giai_doan.map((g) => g.lop?.id ?? null)).toEqual([
         null,
         'lop-zoom',
+      ]);
+      // T11: buổi kèm giảng viên (chỉ họ tên + vai trò, không SĐT/email).
+      expect(res[0].giai_doan[1].lop?.lich_hoc[0].giang_vien).toEqual([
+        { ho_ten: 'GV Một', vai_tro: 'giang_vien' },
       ]);
       expect(res[0].giai_doan[1].lop?.lich_hoc.map((b) => b.id)).toEqual([
         'b-2',

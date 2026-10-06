@@ -352,6 +352,48 @@ export interface LichHocLop {
   diem_hoc?: DiemHocTomTat | null;
   /** Chỉ có trong response tạo/sửa buổi: cảnh báo 🟡 vượt số phòng của điểm học (không chặn). */
   canh_bao?: string[];
+  // T11 (issue #3): giảng viên phân công vào buổi (GET /khoa-boi-duong/{id} — không có SĐT/email).
+  phan_cong?: PhanCongBuoi[];
+}
+
+export interface PhanCongBuoi {
+  id: string;
+  vai_tro: VaiTroNhanSuLop;
+  so_gio: string | number | null;
+  da_xac_nhan_gio: boolean;
+  giang_vien: { id: string; ho_ten: string };
+}
+
+// T11 (issue #3): danh mục giảng viên — GET /giang-vien (chỉ Quản trị).
+export interface GiangVien {
+  id: string;
+  ho_ten: string;
+  so_dien_thoai: string;
+  email: string | null;
+  don_vi_cong_tac: string | null;
+  ghi_chu: string | null;
+  trang_thai: TrangThaiActive;
+  so_buoi?: number;
+}
+
+export interface LichDayGiangVien {
+  giang_vien: GiangVien;
+  phan_cong: {
+    id: string;
+    vai_tro: VaiTroNhanSuLop;
+    so_gio: string | number | null;
+    da_xac_nhan_gio: boolean;
+    xac_nhan_luc: string | null;
+    lich_hoc: {
+      id: string;
+      buoi_so: number;
+      thoi_gian_bat_dau: string;
+      thoi_gian_ket_thuc: string;
+      giai_doan: { id: string; ten_giai_doan: string; hinh_thuc: string };
+      lop: { id: string; ten_lop: string; loai_lop: LoaiLop; khoa: { id: string; ma_khoa: string; ten_khoa: string } };
+      diem_hoc: { id: string; ten: string; dia_chi: string } | null;
+    };
+  }[];
 }
 
 // T10 (issue #2): danh mục điểm học trực tiếp — GET /diem-hoc.
@@ -478,7 +520,9 @@ export type LoaiDanhMucImport =
   | 'ket_qua_giai_doan'
   | 'nhan_su_lop'
   | 'tai_khoan_don_vi'
-  | 'ket_qua_khao_sat';
+  | 'ket_qua_khao_sat'
+  | 'giang_vien'
+  | 'phan_cong_giang_day';
 
 export interface TaoImportResponse {
   import_id: string;
@@ -534,6 +578,8 @@ export interface LichHocLopToi {
   // T10 (issue #2): điểm học + phòng của buổi trực tiếp (null/thiếu với buổi trực tuyến).
   diem_hoc?: DiemHocTomTat | null;
   phong?: string | null;
+  // T11 (issue #3): giảng viên của buổi — chỉ họ tên + vai trò.
+  giang_vien?: { ho_ten: string; vai_tro: VaiTroNhanSuLop }[];
 }
 
 export interface NhanSuLopToi {

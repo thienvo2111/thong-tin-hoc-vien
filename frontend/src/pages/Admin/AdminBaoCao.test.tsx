@@ -13,7 +13,7 @@ function renderTrang() {
 }
 
 describe('Admin — Trung tâm báo cáo', () => {
-  it('hiện đủ 6 thẻ báo cáo thật (khớp API docs/api-contract.md mục 7)', () => {
+  it('hiện đủ 7 thẻ báo cáo thật (khớp API docs/api-contract.md mục 7)', () => {
     renderTrang();
     expect(screen.getByText('Báo cáo tổng hợp')).toBeInTheDocument();
     expect(screen.getByText('Báo cáo xác nhận')).toBeInTheDocument();
@@ -21,6 +21,16 @@ describe('Admin — Trung tâm báo cáo', () => {
     expect(screen.getByText('Xuất cho VLE')).toBeInTheDocument();
     expect(screen.getByText('Điều kiện đánh giá đầu vào')).toBeInTheDocument();
     expect(screen.getByText('Vận hành theo lớp')).toBeInTheDocument();
+    expect(screen.getByText('Giờ dạy')).toBeInTheDocument();
+  });
+
+  // T11 (issue #3)
+  it('giờ dạy: Xem hiện dữ liệu giảng viên × lớp', async () => {
+    const user = userEvent.setup();
+    renderTrang();
+    const the = within(screen.getByTestId('the-bao-cao-gio-day'));
+    await user.click(the.getByRole('button', { name: 'Xem' }));
+    expect(await screen.findByText('Nguyễn Văn Long')).toBeInTheDocument();
   });
 
   it('báo cáo tổng hợp: không cần chọn tham số bắt buộc, Xem hiện đúng dữ liệu thật trả về', async () => {

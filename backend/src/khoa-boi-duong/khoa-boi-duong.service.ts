@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import { DiemHocService, DIEM_HOC_TOM_TAT } from '../diem-hoc/diem-hoc.service';
 import { LichHocThayDoiService } from './lich-hoc-thay-doi.service';
+import { PhanCongGiangDayService } from '../giang-vien/phan-cong-giang-day.service';
 import { DonViScope, ScopeService } from '../auth/scope/scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
@@ -95,6 +96,7 @@ export class KhoaBoiDuongService {
     private readonly nhatKy: NhatKyService,
     private readonly diemHocService: DiemHocService,
     private readonly lichHocThayDoi: LichHocThayDoiService,
+    private readonly phanCongGiangDay: PhanCongGiangDayService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -152,6 +154,13 @@ export class KhoaBoiDuongService {
       );
     }
     return cum;
+  }
+
+  // Dùng cho route con của buổi (phân công giảng viên) — 404 nếu buổi
+  // không thuộc lớp.
+  async layLichHocTrongLop(lopId: string, lichHocId: string) {
+    await this.getLopOrThrow(lopId);
+    return this.getLichHocTrongLopOrThrow(lopId, lichHocId);
   }
 
   private async getLichHocTrongLopOrThrow(lopId: string, lichHocId: string) {
@@ -455,6 +464,17 @@ export class KhoaBoiDuongService {
               include: {
                 giai_doan: true,
                 diem_hoc: { select: DIEM_HOC_TOM_TAT },
+                // T11: không kèm SĐT/email giảng viên (khóa xem được bởi Sở/Phòng/Trường).
+                phan_cong: {
+                  select: {
+                    id: true,
+                    vai_tro: true,
+                    so_gio: true,
+                    da_xac_nhan_gio: true,
+                    giang_vien: { select: { id: true, ho_ten: true } },
+                  },
+                  orderBy: { created_at: 'asc' },
+                },
               },
             },
           },
@@ -896,6 +916,16 @@ export class KhoaBoiDuongService {
       const ketThuc =
         dto.thoi_gian_ket_thuc ?? lich.thoi_gian_ket_thuc.toISOString();
       this.assertThoiGianHopLe(batDau, ketThuc, 'lịch học', false);
+      // T11: giờ mới không được làm giảng viên của buổi trùng giờ buổi khác.
+      const xungDot = await this.phanCongGiangDay.xungDotKhiDoiGio(lich.id, {
+        thoi_gian_bat_dau: new Date(batDau),
+        thoi_gian_ket_thuc: new Date(ketThuc),
+      });
+      if (xungDot) {
+        throw new ValidationException(xungDot, [
+          { field: 'thoi_gian_bat_dau', message: 'Giảng viên bị trùng giờ' },
+        ]);
+      }
     }
     // T10: buổi giai đoạn truc_tiep phải có điểm học sau khi sửa. Ngoại lệ:
     // PATCH chỉ đổi trang_thai (vận hành) trên buổi cũ chưa có điểm học.
@@ -1015,6 +1045,14 @@ export class KhoaBoiDuongService {
                   include: {
                     giai_doan: true,
                     diem_hoc: { select: DIEM_HOC_TOM_TAT },
+                    // T11: học viên chỉ thấy họ tên + vai trò giảng viên.
+                    phan_cong: {
+                      select: {
+                        vai_tro: true,
+                        giang_vien: { select: { ho_ten: true } },
+                      },
+                      orderBy: { created_at: 'asc' },
+                    },
                   },
                   orderBy: [
                     { buoi_so: 'asc' },
@@ -1090,8 +1128,12 @@ export class KhoaBoiDuongService {
                   ...lop,
                   lich_hoc: lop.lich_hoc
                     .filter((b) => b.giai_doan_id === gd.id)
-                    .map((b) => ({
+                    .map(({ phan_cong, ...b }) => ({
                       ...b,
+                      giang_vien: phan_cong.map((p) => ({
+                        ho_ten: p.giang_vien.ho_ten,
+                        vai_tro: p.vai_tro,
+                      })),
                       trang_thai_diem_danh:
                         diemDanhMap.get(`${dk.id}|${b.id}`) ?? null,
                     })),
@@ -1975,6 +2017,28 @@ export class KhoaBoiDuongService {
         };
       }
       dupKeys.add(key);
+    }
+
+    // T11: buổi đã có phân công giảng viên — giờ mới không được trùng buổi
+    // khác của giảng viên đó.
+    if (lopCu) {
+      const lichTonTai = await this.prisma.lich_hoc_lop.findUnique({
+        where: {
+          lop_id_giai_doan_id_buoi_so: {
+            lop_id: lopCu.id,
+            giai_doan_id: giaiDoan.id,
+            buoi_so: buoiSo,
+          },
+        },
+        select: { id: true },
+      });
+      const xungDot = lichTonTai
+        ? await this.phanCongGiangDay.xungDotKhiDoiGio(lichTonTai.id, {
+            thoi_gian_bat_dau: batDau,
+            thoi_gian_ket_thuc: ketThuc,
+          })
+        : null;
+      if (xungDot) return { error: xungDot };
     }
 
     const canhBaoPhong = diemHocId

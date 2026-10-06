@@ -45,6 +45,84 @@ function loi(status: number, code: string, message: string, extra: Record<string
 }
 
 export const handlers = [
+  // T11 (issue #3): giảng viên & phân công.
+  http.get('/giang-vien', ({ request }) => {
+    const url = new URL(request.url);
+    const q = url.searchParams.get('q')?.toLowerCase();
+    const trangThai = url.searchParams.get('trang_thai');
+    const items = db.giangVien.filter(
+      (g) => (!trangThai || g.trang_thai === trangThai) && (!q || `${g.ho_ten} ${g.so_dien_thoai}`.toLowerCase().includes(q)),
+    );
+    return HttpResponse.json({ data: items, total: items.length, page: 1, page_size: 20 });
+  }),
+
+  http.post('/giang-vien', async ({ request }) => {
+    const body = (await request.json()) as Record<string, string>;
+    if (db.giangVien.some((g) => g.so_dien_thoai === body.so_dien_thoai)) {
+      return loi(409, 'CONFLICT', 'Số điện thoại đã dùng', { fields: [{ field: 'so_dien_thoai', message: 'Đã tồn tại' }] });
+    }
+    const moi = {
+      id: `gv-${db.giangVien.length + 1}`,
+      email: null,
+      don_vi_cong_tac: null,
+      ghi_chu: null,
+      trang_thai: 'active' as const,
+      so_buoi: 0,
+      ...body,
+    } as (typeof db.giangVien)[number];
+    db.giangVien.push(moi);
+    return HttpResponse.json(moi, { status: 201 });
+  }),
+
+  http.patch('/giang-vien/phan-cong/:id/xac-nhan-gio', async ({ params, request }) => {
+    const body = (await request.json()) as { da_xac_nhan_gio: boolean; so_gio?: number };
+    for (const ld of Object.values(db.lichDay)) {
+      const pc = ld.phan_cong.find((p) => p.id === params.id);
+      if (pc) {
+        pc.da_xac_nhan_gio = body.da_xac_nhan_gio;
+        if (body.so_gio !== undefined) pc.so_gio = String(body.so_gio);
+        return HttpResponse.json(pc);
+      }
+    }
+    return loi(404, 'NOT_FOUND', 'Không tìm thấy phân công');
+  }),
+
+  http.patch('/giang-vien/:id', async ({ params, request }) => {
+    const found = db.giangVien.find((g) => g.id === params.id);
+    if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy giảng viên');
+    Object.assign(found, (await request.json()) as Record<string, unknown>);
+    return HttpResponse.json(found);
+  }),
+
+  http.get('/giang-vien/:id/lich-day', ({ params }) => {
+    const ld = db.lichDay[params.id as string];
+    return ld ? HttpResponse.json(ld) : loi(404, 'NOT_FOUND', 'Không tìm thấy giảng viên');
+  }),
+
+  http.put('/lop/:id/lich-hoc/:lichHocId/giang-vien', async ({ params, request }) => {
+    const body = (await request.json()) as { phan_cong: { giang_vien_id: string; vai_tro: 'giang_vien' | 'ho_tro'; so_gio?: number }[] };
+    const lich = Object.values(db.chiTietKhoa)
+      .flatMap((k) => k.lop_hoc)
+      .flatMap((l) => l.lich_hoc ?? [])
+      .find((l) => l.id === params.lichHocId);
+    if (!lich) return loi(404, 'NOT_FOUND', 'Không tìm thấy buổi học');
+    lich.phan_cong = body.phan_cong.map((p, i) => ({
+      id: `pc-moi-${i}`,
+      vai_tro: p.vai_tro,
+      so_gio: p.so_gio ?? null,
+      da_xac_nhan_gio: false,
+      giang_vien: { id: p.giang_vien_id, ho_ten: db.giangVien.find((g) => g.id === p.giang_vien_id)?.ho_ten ?? '' },
+    }));
+    return HttpResponse.json(lich.phan_cong);
+  }),
+
+  http.get('/bao-cao/gio-day', () =>
+    HttpResponse.json({
+      rows: [{ giang_vien_id: 'gv-1', ho_ten: 'Nguyễn Văn Long', ma_khoa: 'AG-2026-014', ten_lop: 'Lớp 01', so_buoi: 2, so_buoi_da_xac_nhan: 1, tong_gio_da_xac_nhan: 4 }],
+      tong: { so_buoi: 2, so_buoi_da_xac_nhan: 1, tong_gio_da_xac_nhan: 4 },
+    }),
+  ),
+
   // T10 (issue #2): danh mục điểm học.
   http.get('/diem-hoc', ({ request }) => {
     const url = new URL(request.url);

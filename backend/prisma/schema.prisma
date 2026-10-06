@@ -156,6 +156,9 @@ enum loai_danh_muc_import {
   tai_khoan_don_vi
   // Kết quả khảo sát từ hệ thống khảo sát (2026-10-04) — migration riêng.
   ket_qua_khao_sat
+  // T11 (issue #3, 2026-10-07) — migration enum RIÊNG.
+  giang_vien
+  phan_cong_giang_day
 }
 
 /// Tình trạng 1 bài trên hệ thống khảo sát của 1 học viên (2026-10-04).
@@ -317,6 +320,7 @@ model nhat_ky_import {
   tai_khoan_vle_import     tai_khoan_vle[]
   diem_danh_import         diem_danh[]
   ket_qua_giai_doan_import ket_qua_giai_doan[]
+  giang_vien_import        giang_vien[]
 
   @@index([nguoi_import_id], map: "idx_import_nguoi")
   @@index([loai_danh_muc], map: "idx_import_loai")
@@ -443,6 +447,8 @@ model nguoi_dung {
   token_xac_thuc                     token_xac_thuc[]
   phan_cong_ho_tro                   phan_cong_ho_tro[]
   diem_hoc_tao                       diem_hoc[]                 @relation("diem_hoc_tao_boi")
+  giang_vien_tao                     giang_vien[]               @relation("giang_vien_tao_boi")
+  phan_cong_xac_nhan                 phan_cong_giang_day[]      @relation("phan_cong_nguoi_xac_nhan")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -854,9 +860,11 @@ model lich_hoc_lop {
   phong              String?             @db.VarChar(100)
   cap_nhat_luc       DateTime            @default(now()) @db.Timestamptz(6)
 
-  lop       lop_hoc        @relation(fields: [lop_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  diem_hoc  diem_hoc?      @relation(fields: [diem_hoc_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  giai_doan giai_doan_khoa @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lop       lop_hoc               @relation(fields: [lop_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  diem_hoc  diem_hoc?             @relation(fields: [diem_hoc_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // T11 (issue #3): giảng viên được phân công vào buổi này.
+  phan_cong phan_cong_giang_day[]
+  giai_doan giai_doan_khoa        @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   // T12 (mo-rong-nls-an-giang.md, 2026-09-30): điểm danh của học viên tại
   // buổi này, nhập qua import diem_danh.
   diem_danh diem_danh[]
@@ -865,6 +873,47 @@ model lich_hoc_lop {
   @@index([lop_id], map: "idx_lich_hoc_lop")
   @@index([giai_doan_id], map: "idx_lich_hoc_giai_doan")
   @@index([diem_hoc_id], map: "idx_lich_hoc_diem_hoc")
+}
+
+// T11 (issue #3) + ADR 0004 (2026-10-07): danh mục giảng viên. Khóa khớp khi
+// import: email (nếu có) rồi SĐT. Không xóa cứng — ngưng bằng trang_thai.
+model giang_vien {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ho_ten          String            @db.VarChar(255)
+  email           String?           @unique(map: "uq_giang_vien_email") @db.VarChar(255)
+  so_dien_thoai   String            @unique(map: "uq_giang_vien_sdt") @db.VarChar(20)
+  don_vi_cong_tac String?           @db.VarChar(255)
+  ghi_chu         String?
+  trang_thai      trang_thai_active @default(active)
+  tao_boi         String?           @db.Uuid
+  nguon_import_id String?           @db.Uuid
+  created_at      DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
+
+  nguoi_tao    nguoi_dung?           @relation("giang_vien_tao_boi", fields: [tao_boi], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  nguon_import nhat_ky_import?       @relation(fields: [nguon_import_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  phan_cong    phan_cong_giang_day[]
+}
+
+// T11 (issue #3): phân công giảng viên vào từng buổi. Giờ dạy chỉ được cộng
+// vào báo cáo khi da_xac_nhan_gio (chk_phan_cong_xac_nhan ở migration).
+model phan_cong_giang_day {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lich_hoc_id       String              @db.Uuid
+  giang_vien_id     String              @db.Uuid
+  vai_tro           vai_tro_nhan_su_lop
+  so_gio            Decimal?            @db.Decimal(4, 1)
+  da_xac_nhan_gio   Boolean             @default(false)
+  xac_nhan_luc      DateTime?           @db.Timestamptz(6)
+  nguoi_xac_nhan_id String?             @db.Uuid
+  created_at        DateTime            @default(now()) @db.Timestamptz(6)
+
+  lich_hoc       lich_hoc_lop @relation(fields: [lich_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  giang_vien     giang_vien   @relation(fields: [giang_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nguoi_xac_nhan nguoi_dung?  @relation("phan_cong_nguoi_xac_nhan", fields: [nguoi_xac_nhan_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([lich_hoc_id, giang_vien_id], map: "uq_phan_cong")
+  @@index([giang_vien_id], map: "idx_phan_cong_gv")
 }
 
 // T10 (issue #2, 2026-10-07): danh mục điểm học trực tiếp. Không xóa cứng

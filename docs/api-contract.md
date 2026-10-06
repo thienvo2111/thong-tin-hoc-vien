@@ -304,6 +304,25 @@ Cài đặt: `ScopeService.getKhoaIdsXemDuoc(caller)` (tập `id` khóa xem đư
 | POST / PATCH | `/danh-muc/mon-hoc(/{id})` | Sửa/thêm thủ công | QuảnTrị |
 | GET | `/danh-muc/chuyen-mon-dao-tao/goi-y?q=` | **Sửa 2026-09-28** (bản trước còn tham chiếu cột `hoc_vien.chuyen_mon_dao_tao` cũ, đã tách thành bảng `hoc_vien_chuyen_mon` 1-nhiều từ đợt MOET): `SELECT DISTINCT chuyen_mon FROM hoc_vien_chuyen_mon WHERE chuyen_mon ILIKE '%q%' LIMIT 10` — **không phải danh mục quản lý**, chỉ gợi ý từ dữ liệu đã có | Học viên (khi điền form) |
 
+### Giảng viên & phân công (T11, issue #3, 2026-10-07)
+
+Dữ liệu cá nhân giảng viên → mọi endpoint dưới đây chỉ **Quản trị** (người hỗ trợ giảng viên thêm sau — ADR 0004 G12). QĐ5 "không làm cổng giảng viên" đã được ADR 0004 G8 đảo một phần (làm ở lát L7, không thuộc mục này).
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| GET | `/giang-vien` | `?q=&trang_thai=&khoa_id=&page=&page_size=` — `q` tìm họ tên/SĐT/email/đơn vị; `khoa_id` = chỉ GV có phân công trong khóa; mỗi dòng kèm `so_buoi` | QuảnTrị |
+| POST | `/giang-vien` | `{ ho_ten, so_dien_thoai, email?, don_vi_cong_tac?, ghi_chu? }` — SĐT chuẩn hóa (bỏ khoảng trắng, 9 số tự thêm `0`), email chữ thường; trùng SĐT/email → `409` (kèm `fields`); ghi `tao_boi` | QuảnTrị |
+| PATCH | `/giang-vien/{id}` | Sửa một phần (`email: null` = xóa), `trang_thai='ngung'` để ngưng — không có DELETE | QuảnTrị |
+| GET | `/giang-vien/{id}/lich-day` | `?tu_ngay=&den_ngay=` → `{ giang_vien, phan_cong: [{ id, vai_tro, so_gio, da_xac_nhan_gio, lich_hoc: { buoi_so, thoi_gian_*, giai_doan, lop: { ten_lop, khoa }, diem_hoc } }] }` sắp theo giờ | QuảnTrị |
+| PATCH | `/giang-vien/phan-cong/{id}/xac-nhan-gio` | `{ da_xac_nhan_gio, so_gio? }` — chốt (ghi `xac_nhan_luc`, `nguoi_xac_nhan_id`) hoặc bỏ chốt; chốt khi chưa có số giờ → `400`. (Issue ghi `/phan-cong/{id}/...` — đặt dưới `/giang-vien` để không mở thêm tiền tố Nginx.) | QuảnTrị |
+| PUT | `/lop/{id}/lich-hoc/{lich_hoc_id}/giang-vien` | `{ phan_cong: [{ giang_vien_id, vai_tro, so_gio? }] }` (≤ 20) **thay toàn bộ** phân công của buổi → danh sách sau khi lưu. Trùng giảng viên / giảng viên ngưng / **trùng giờ buổi khác** → `400`; gỡ hoặc đổi số giờ phân công **đã xác nhận giờ** → `409`; buổi không thuộc lớp → `404`. Dùng chung luật với import (`PhanCongGiangDayService`) | QuảnTrị |
+
+Đổi giờ buổi (`PATCH /lop/{id}/lich-hoc/{lich_hoc_id}` và import `lop_va_lich_hoc`) làm giảng viên đã phân công của buổi trùng giờ buổi khác của họ → `400` / dòng lỗi.
+
+`GET /khoa-boi-duong/{id}`: mỗi buổi kèm `phan_cong: [{ id, vai_tro, so_gio, da_xac_nhan_gio, giang_vien: { id, ho_ten } }]` (không SĐT/email). `GET /hoc-vien/toi/khoa-hoc`: mỗi buổi kèm `giang_vien: [{ ho_ten, vai_tro }]` — **không** SĐT/email.
+
+**Import** (mục 5): `giang_vien` — cột `ho_ten, so_dien_thoai, email, don_vi_cong_tac, ghi_chu`; khớp giảng viên đã có theo **email trước, rồi SĐT** (upsert); email thuộc GV A mà SĐT thuộc GV B → dòng lỗi; trùng email/SĐT trong file → dòng lỗi. `phan_cong_giang_day` — cột `ma_khoa, ten_lop, loai_lop, giai_doan_thu_tu, buoi_so, email, so_dien_thoai, vai_tro, so_gio` (thêm `loai_lop` so với spec gốc vì lớp duy nhất theo `(khoa, loai_lop, ten_lop)`); buổi và giảng viên phải đã có; trùng giờ với buổi khác trong DB hoặc trong cùng file → dòng lỗi; upsert theo `(lich_hoc_id, giang_vien_id)`.
+
 ### Điểm học trực tiếp (T10, issue #2, 2026-10-07)
 
 | Method | Endpoint | Mô tả | Ai gọi |
@@ -376,6 +395,7 @@ Chi tiết quy tắc: [`validation-checklist.md`](validation-checklist.md). Endp
 | GET | `/bao-cao/tong-hop?theo=don_vi\|dia_ban\|khoa&tu_ngay=&den_ngay=` | Số liệu tổng hợp trong phạm vi quyền. **Sửa 2026-10-03 (ADR 0001)**: `theo=khoa` áp R1/R2 (xem ghi chú dưới) — khóa hiện ra theo `getKhoaIdsXemDuoc`, `tong_dang_ky`/`theo_trang_thai_dang_ky`/`theo_ket_qua` của mỗi khóa đếm theo `getHocVienScopeTrongKhoa` của chính khóa đó (R1 → toàn bộ, R2 → chỉ đăng ký của học viên trong phạm vi); trả thêm `don_vi_dat_hang` (tên đơn vị) | Trường, Phòng VHXH, Sở, QuảnTrị |
 | GET | `/bao-cao/xuat-excel?...` (cùng query) | Xuất Excel/CSV UTF-8 (BOM), cùng bộ lọc | Trường, Phòng VHXH, Sở, QuảnTrị |
 | GET | `/bao-cao/van-hanh?khoa_id=&nhom_hoc_vien=&lop_id=` + `/xuat-excel` | **Thêm 2026-09-29 (T7)**: mỗi dòng 1 `lop_hoc` — `ten_lop`, `nhom_hoc_vien`, `muc_nang_luc`, `si_so`, `so_co_email`, `so_ho_so_day_du` (T9, `danhGiaDayDu`), `theo_muc_dau_vao` (đếm `dang_ky_hoc.muc_dau_vao`, kể cả `NULL`) + dòng `tong` cộng dồn kết quả đã lọc. Cả 3 query đều tùy chọn; bỏ `khoa_id` = gộp mọi khóa trong phạm vi xem. **Sửa 2026-10-03 (ADR 0001)**: áp R1/R2 — xem ghi chú dưới | Trường, Phòng VHXH, Sở, QuảnTrị |
+| GET | `/bao-cao/gio-day?khoa_id=&tu_ngay=&den_ngay=` + `/xuat-excel` | **Thêm 2026-10-07 (T11, issue #3)**: mỗi dòng = giảng viên × lớp — `ho_ten`, `ma_khoa`, `ten_lop`, `so_buoi`, `so_buoi_da_xac_nhan`, `tong_gio_da_xac_nhan` (**chỉ cộng** phân công `da_xac_nhan_gio`) + `tong`. Phạm vi khóa theo R1/R2 (`getKhoaIdsXemDuoc`), `khoa_id` ngoài phạm vi → `403`. Chỉ **Quản trị** có thêm `so_dien_thoai`, `email` (cả Excel) | Trường, Phòng VHXH, Sở, QuảnTrị |
 | GET | `/bao-cao/tong-quan?khoa_id=&don_vi_cong_tac_id=&tu_ngay=&den_ngay=` + `/xuat-excel` | **Thêm 2026-09-30**: dashboard "Tổng quan hệ thống" — `tong_hoc_vien_tham_gia` (số dòng `dang_ky_hoc` khớp bộ lọc), `da_dang_nhap`/`da_chinh_sua_ho_so` (tính trên tập `hoc_vien` phân biệt rút ra từ chính các dòng đó), `khao_sat.{dau_vao,dau_ra}` (phân bố `muc_dau_vao`/`muc_dau_ra`: `da_lam`/`co_ban`/`thanh_thao`/`nang_cao`), `ket_qua_theo_hinh_thuc` (mảng theo `loai_lop`, đếm `dang_ky_hoc.ket_qua` của các đăng ký có gán lớp loại đó qua `dang_ky_hoc_lop`). Tất cả query tùy chọn; `tu_ngay`/`den_ngay` lọc theo `dang_ky_hoc.ngay_dang_ky`. Improvised (chưa có trong đặc tả gốc) | Trường, Phòng VHXH, Sở, QuảnTrị |
 
 **Lưu ý (T7, sửa 2026-10-03 — ADR 0001):** 2 lớp phạm vi tách biệt, cùng cơ chế R1/R2 với `GET /khoa-boi-duong` (mục 3, thay hẳn cơ chế "đơn vị theo dõi" `khoa_don_vi_theo_doi` cũ của T2): lớp nào **hiện ra** theo phạm vi XEM khóa (`id ∈ getKhoaIdsXemDuoc`); nhưng học viên **đếm bên trong mỗi lớp** (`si_so`, `so_co_email`, `so_ho_so_day_du`, `theo_muc_dau_vao`) lọc theo `getHocVienScopeTrongKhoa` CỦA KHÓA chứa lớp đó — R1 (khóa do đơn vị trong phạm vi caller đặt hàng) đếm TOÀN BỘ; R2 (chỉ có học viên trong phạm vi tham gia) chỉ đếm đúng học viên thuộc phạm vi đó, không đếm nhầm học viên đơn vị khác trong cùng lớp/khóa.

@@ -1,4 +1,9 @@
 import { randomUUID } from 'crypto';
+import {
+  GiangVienImportService,
+  GiangVienRowDto,
+  PhanCongGiangDayRowDto,
+} from '../giang-vien/giang-vien-import.service';
 import { Injectable } from '@nestjs/common';
 import { Prisma, loai_danh_muc_import } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -116,12 +121,13 @@ export class ImportService {
     private readonly taiKhoanDonViService: TaiKhoanDonViService,
     private readonly ketQuaKhaoSatService: KetQuaKhaoSatService,
     private readonly thangMucService: ThangMucService,
+    private readonly giangVienImport: GiangVienImportService,
   ) {}
 
   assertSupported(loai: string): SupportedImportType {
     if (!isSupportedImportType(loai)) {
       throw new ValidationException(
-        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc, diem_danh, ket_qua_giai_doan, nhan_su_lop, tai_khoan_don_vi, ket_qua_khao_sat)`,
+        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc, diem_danh, ket_qua_giai_doan, nhan_su_lop, tai_khoan_don_vi, ket_qua_khao_sat, giang_vien, phan_cong_giang_day)`,
       );
     }
     return loai;
@@ -706,6 +712,28 @@ export class ImportService {
         ];
       case 'tai_khoan_don_vi':
         return ['ma_don_vi', 'ten_dang_nhap', 'ho_ten', 'email'];
+      case 'giang_vien':
+        // T11 (issue #3): khóa khớp email rồi SĐT (GiangVienImportService).
+        return [
+          'ho_ten',
+          'so_dien_thoai',
+          'email',
+          'don_vi_cong_tac',
+          'ghi_chu',
+        ];
+      case 'phan_cong_giang_day':
+        // T11: mỗi dòng = 1 giảng viên ở 1 buổi ĐÃ TỒN TẠI.
+        return [
+          'ma_khoa',
+          'ten_lop',
+          'loai_lop',
+          'giai_doan_thu_tu',
+          'buoi_so',
+          'email',
+          'so_dien_thoai',
+          'vai_tro',
+          'so_gio',
+        ];
       case 'nhan_su_lop':
         // Mỗi dòng = 1 nhân sự (giảng viên/hỗ trợ) của 1 lớp ĐÃ TỒN TẠI (xem
         // KhoaBoiDuongService.resolveNhanSuLopRow).
@@ -890,6 +918,33 @@ export class ImportService {
           'Tùy chọn — có email: hệ thống gửi link kích hoạt (72 giờ). Không email: mật khẩu tạm nằm trong file kết quả tải về 1 lần khi xác nhận nạp.',
       };
     }
+    if (loai === 'giang_vien') {
+      return {
+        ho_ten: 'Bắt buộc.',
+        so_dien_thoai:
+          'Bắt buộc, duy nhất — 10 số đầu 0 hoặc +84 (9 số thiếu 0 đầu tự thêm).',
+        email:
+          'Tùy chọn, duy nhất — dùng để khớp giảng viên đã có (ưu tiên trước SĐT) và cấp tài khoản sau này.',
+        don_vi_cong_tac: 'Tùy chọn — ghi tự do.',
+        ghi_chu: 'Tùy chọn.',
+      };
+    }
+    if (loai === 'phan_cong_giang_day') {
+      return {
+        ma_khoa:
+          'Bắt buộc — có thể để trống khi import từ trang chi tiết khóa (hệ thống tự gán khóa đang xem).',
+        loai_lop: 'Bắt buộc — "truc_tiep", "zoom" hoặc "vle".',
+        giai_doan_thu_tu:
+          'Bắt buộc — buổi phải đã có (import lớp và lịch học trước).',
+        buoi_so: 'Bắt buộc.',
+        email:
+          'Email HOẶC so_dien_thoai của giảng viên đã có trong danh mục (email ưu tiên).',
+        so_dien_thoai: 'Xem ghi chú cột email.',
+        vai_tro: 'Bắt buộc — "giang_vien" hoặc "ho_tro".',
+        so_gio:
+          'Tùy chọn — số giờ dạy của buổi (vd 4 hoặc 3,5). 1 giảng viên không được dạy 2 buổi chồng giờ.',
+      };
+    }
     if (loai === 'nhan_su_lop') {
       return {
         ma_khoa:
@@ -938,6 +993,8 @@ export class ImportService {
       | NhanSuLopRowDto
       | TaiKhoanDonViRowDto
       | KetQuaKhaoSatRowDto
+      | GiangVienRowDto
+      | PhanCongGiangDayRowDto
     >
   > {
     switch (loai) {
@@ -1031,6 +1088,10 @@ export class ImportService {
         return this.buildTaiKhoanDonViDto(raw, dupKeys);
       case 'ket_qua_khao_sat':
         return this.buildKetQuaKhaoSatDto(raw, dupKeys);
+      case 'giang_vien':
+        return this.giangVienImport.resolveGiangVienRow(raw, dupKeys);
+      case 'phan_cong_giang_day':
+        return this.giangVienImport.resolvePhanCongRow(raw, dupKeys);
       case 'nhan_su_lop':
         return this.khoaBoiDuongService.resolveNhanSuLopRow(
           {
@@ -1135,7 +1196,9 @@ export class ImportService {
       | KetQuaGiaiDoanRowDto
       | NhanSuLopRowDto
       | TaiKhoanDonViRowDto
-      | KetQuaKhaoSatRowDto,
+      | KetQuaKhaoSatRowDto
+      | GiangVienRowDto
+      | PhanCongGiangDayRowDto,
     dupKeys?: Set<string>,
   ): Promise<string | undefined> {
     try {
@@ -1184,6 +1247,9 @@ export class ImportService {
       } else if (loai === 'ket_qua_khao_sat') {
         // Không cần kiểm tra thêm: buildKetQuaKhaoSatDto() đã tra học viên +
         // validate giá trị + trùng lặp trong file rồi.
+      } else if (loai === 'giang_vien' || loai === 'phan_cong_giang_day') {
+        // Không cần kiểm tra thêm: GiangVienImportService.resolve*Row() đã
+        // tra cứu + kiểm trùng (DB và trong file) rồi.
       } else if (loai === 'nhan_su_lop') {
         // Không cần kiểm tra thêm: resolveNhanSuLopRow() (buildDto) đã tra
         // cứu lớp + validate + trùng lặp trong file rồi.
@@ -1228,7 +1294,9 @@ export class ImportService {
       | KetQuaGiaiDoanRowDto
       | NhanSuLopRowDto
       | TaiKhoanDonViRowDto
-      | KetQuaKhaoSatRowDto,
+      | KetQuaKhaoSatRowDto
+      | GiangVienRowDto
+      | PhanCongGiangDayRowDto,
     importId: string,
     nguoiImportId: string,
     dupKeys?: Set<string>,
@@ -1308,6 +1376,14 @@ export class ImportService {
           cach_cap: kq.mat_khau_tam ? 'mat_khau_tam' : 'email',
         },
       };
+    } else if (loai === 'giang_vien') {
+      await this.giangVienImport.commitGiangVien(
+        dto as GiangVienRowDto,
+        importId,
+        nguoiImportId,
+      );
+    } else if (loai === 'phan_cong_giang_day') {
+      await this.giangVienImport.commitPhanCong(dto as PhanCongGiangDayRowDto);
     } else if (loai === 'nhan_su_lop') {
       await this.khoaBoiDuongService.commitNhanSuLop(dto as NhanSuLopRowDto);
     } else {

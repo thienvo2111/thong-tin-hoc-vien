@@ -28,6 +28,8 @@ import {
   useBaoCaoSuaTruongMoet,
   useBaoCaoTongHopTrungTam,
   useBaoCaoVanHanh,
+  useBaoCaoGioDay,
+  taiBaoCaoGioDayExcel,
   useBaoCaoXacNhan,
   useDanhSachDotXacNhan,
 } from '@/api/baoCao';
@@ -459,6 +461,58 @@ function TheBaoCaoVanHanh() {
   );
 }
 
+// --- 7. Giờ dạy (T11, issue #3) — giảng viên × lớp, chỉ cộng giờ đã xác nhận; khoa_id tùy chọn ---
+function TheBaoCaoGioDay() {
+  const [khoaId, setKhoaId] = useState('');
+  const [modalMo, setModalMo] = useState(false);
+  const { dangTai, tuyChon } = useTuyChonKhoa();
+  const params = { khoa_id: khoaId || undefined };
+  const ketQua = useBaoCaoGioDay(params, modalMo);
+  const excel = useTaiExcel();
+
+  return (
+    <KhungTheBaoCao
+      testId="the-bao-cao-gio-day"
+      icon="⏱️"
+      iconBg="#F3EEE3"
+      title="Giờ dạy"
+      desc="Số buổi và tổng giờ dạy ĐÃ XÁC NHẬN theo giảng viên và lớp. Bỏ trống khóa để xem mọi khóa trong phạm vi quyền."
+    >
+      <Select
+        label="Khóa bồi dưỡng"
+        placeholder="Tất cả khóa"
+        size="xs"
+        searchable
+        filter={locTiengViet}
+        clearable
+        data={tuyChon}
+        value={khoaId || null}
+        onChange={(v) => setKhoaId(v ?? '')}
+        disabled={dangTai}
+      />
+      <Group gap={8} mt={4}>
+        <Button variant="default" size="xs" style={{ flex: 1 }} onClick={() => setModalMo(true)}>
+          Xem
+        </Button>
+        <Button
+          color="accent"
+          size="xs"
+          style={{ flex: 1 }}
+          loading={excel.isPending}
+          onClick={() =>
+            excel.mutate({ taiFn: () => taiBaoCaoGioDayExcel(params), tenFile: `bao-cao-gio-day${khoaId ? `-${khoaId}` : ''}.xlsx` })
+          }
+        >
+          ⇩ Xuất Excel
+        </Button>
+      </Group>
+      <Modal opened={modalMo} onClose={() => setModalMo(false)} title="Giờ dạy" size="xl">
+        <NoiDungXem isLoading={ketQua.isLoading} isError={ketQua.isError} error={ketQua.error} rows={ketQua.data?.rows} />
+      </Modal>
+    </KhungTheBaoCao>
+  );
+}
+
 /** Trung tâm báo cáo (Phase 5 redesign) — 6 thẻ, mỗi thẻ khớp đúng 1 nhóm báo cáo thật đang có API
  * (docs/api-contract.md mục 7 + mục "Đợt xác nhận" mục 2): tổng hợp, xác nhận, sửa trường MOET, xuất
  * cho VLE, điều kiện đánh giá đầu vào, vận hành theo lớp. Không bịa thêm báo cáo không có endpoint. */
@@ -478,6 +532,7 @@ export default function AdminBaoCao() {
             <TheBaoCaoXuatChoVle />
             <TheBaoCaoDieuKienDanhGia />
             <TheBaoCaoVanHanh />
+            <TheBaoCaoGioDay />
           </SimpleGrid>
         </Stack>
       </Container>

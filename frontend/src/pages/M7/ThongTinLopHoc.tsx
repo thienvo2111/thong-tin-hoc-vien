@@ -355,6 +355,12 @@ function DanhSachBuoi({ lichHoc }: { lichHoc: LichHocLopToi[] }) {
           <Text size="sm" c="dimmed">
             {dinhDangNgayGio(buoi.thoi_gian_bat_dau)} – {dinhDangNgayGio(buoi.thoi_gian_ket_thuc)}
           </Text>
+          {(buoi.giang_vien ?? []).length > 0 && (
+            <Text size="sm" mt={4}>
+              <b>Giảng viên:</b>{' '}
+              {(buoi.giang_vien ?? []).map((g) => `${g.ho_ten}${g.vai_tro === 'ho_tro' ? ' (hỗ trợ)' : ''}`).join(', ')}
+            </Text>
+          )}
           {buoi.diem_hoc && (
             <Box mt={4}>
               <Text size="sm">

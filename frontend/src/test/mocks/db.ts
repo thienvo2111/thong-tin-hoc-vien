@@ -1,5 +1,7 @@
 import type {
   DiemHoc,
+  GiangVien,
+  LichDayGiangVien,
   BaoCaoRow,
   DanhGiaDauVao,
   DiaDanh,
@@ -899,6 +901,60 @@ export function taoDanhSachDiemHocMau(): DiemHoc[] {
   ];
 }
 
+// T11 (issue #3): danh mục giảng viên + lịch dạy.
+export function taoDanhSachGiangVienMau(): GiangVien[] {
+  return [
+    {
+      id: 'gv-1',
+      ho_ten: 'Nguyễn Văn Long',
+      so_dien_thoai: '0909123456',
+      email: 'long@hcmue.edu.vn',
+      don_vi_cong_tac: 'HCMUE',
+      ghi_chu: null,
+      trang_thai: 'active',
+      so_buoi: 1,
+    },
+    {
+      id: 'gv-2',
+      ho_ten: 'Trần Thị Mai',
+      so_dien_thoai: '0909000002',
+      email: null,
+      don_vi_cong_tac: null,
+      ghi_chu: null,
+      trang_thai: 'active',
+      so_buoi: 0,
+    },
+  ];
+}
+
+export function taoLichDayMau(): Record<string, LichDayGiangVien> {
+  const gv = taoDanhSachGiangVienMau();
+  return {
+    'gv-1': {
+      giang_vien: gv[0],
+      phan_cong: [
+        {
+          id: 'pc-1',
+          vai_tro: 'giang_vien',
+          so_gio: '4',
+          da_xac_nhan_gio: false,
+          xac_nhan_luc: null,
+          lich_hoc: {
+            id: 'lh-1',
+            buoi_so: 1,
+            thoi_gian_bat_dau: '2026-10-05T01:00:00.000Z',
+            thoi_gian_ket_thuc: '2026-10-05T04:00:00.000Z',
+            giai_doan: { id: 'gd-2', ten_giai_doan: 'Học trực tiếp', hinh_thuc: 'truc_tiep' },
+            lop: { id: 'lop-1', ten_lop: 'Lớp 01 – Nhóm cơ bản A', loai_lop: 'truc_tiep', khoa: { id: 'khoa-1', ma_khoa: 'AG-2026-014', ten_khoa: 'Khóa mẫu' } },
+            diem_hoc: null,
+          },
+        },
+      ],
+    },
+    'gv-2': { giang_vien: gv[1], phan_cong: [] },
+  };
+}
+
 export const db = {
   hoSo: taoHoSoMoi(),
   dotXacNhan: taoDotXacNhanDangMoThieu(),
@@ -932,6 +988,8 @@ export const db = {
   taiKhoanHocVien: taoDanhSachTaiKhoanHocVienMau(),
   nhatKyHocVien: taoNhatKyHocVienMau(),
   diemHoc: taoDanhSachDiemHocMau(),
+  giangVien: taoDanhSachGiangVienMau(),
+  lichDay: taoLichDayMau(),
 };
 
 export function resetDb(): void {
@@ -966,4 +1024,6 @@ export function resetDb(): void {
   db.taiKhoanHocVien = taoDanhSachTaiKhoanHocVienMau();
   db.nhatKyHocVien = taoNhatKyHocVienMau();
   db.diemHoc = taoDanhSachDiemHocMau();
+  db.giangVien = taoDanhSachGiangVienMau();
+  db.lichDay = taoLichDayMau();
 }

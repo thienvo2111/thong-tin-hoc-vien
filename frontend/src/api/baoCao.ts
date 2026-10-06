@@ -130,3 +130,16 @@ export function useBaoCaoTongQuanTrungTam(params: BaoCaoTongQuanParams, enabled 
 export function taiBaoCaoTongQuanExcel(params: BaoCaoTongQuanParams) {
   return taiBaoCaoExcel('/bao-cao/tong-quan/xuat-excel', params);
 }
+
+// --- 8. Giờ dạy (T11, issue #3) — giảng viên × lớp, chỉ cộng giờ đã xác nhận ---
+export interface BaoCaoGioDayParams {
+  khoa_id?: string;
+}
+
+export function useBaoCaoGioDay(params: BaoCaoGioDayParams, enabled: boolean) {
+  return useBaoCaoView('gio-day', '/bao-cao/gio-day', params, enabled);
+}
+
+export function taiBaoCaoGioDayExcel(params: BaoCaoGioDayParams) {
+  return taiBaoCaoExcel('/bao-cao/gio-day/xuat-excel', params);
+}

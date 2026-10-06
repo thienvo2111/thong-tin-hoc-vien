@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { ThongBaoModule } from '../thong-bao/thong-bao.module';
 import { DiemHocModule } from '../diem-hoc/diem-hoc.module';
+import { GiangVienModule } from '../giang-vien/giang-vien.module';
 import { KhoaBoiDuongController } from './khoa-boi-duong.controller';
 import { LopHocController } from './lop-hoc.controller';
 import { DangKyHocController } from './dang-ky-hoc.controller';
@@ -20,7 +21,7 @@ import { LichHocThayDoiService } from './lich-hoc-thay-doi.service';
 // khoa-boi-duong.service.ts) — không vòng lặp vì ThongBaoModule không phụ
 // thuộc ngược lại module này.
 @Module({
-  imports: [AuthModule, ThongBaoModule, DiemHocModule],
+  imports: [AuthModule, ThongBaoModule, DiemHocModule, GiangVienModule],
   controllers: [
     KhoaBoiDuongController,
     LopHocController,

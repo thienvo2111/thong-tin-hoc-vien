@@ -651,6 +651,43 @@ CREATE INDEX idx_lich_hoc_lop ON lich_hoc_lop(lop_id);
 CREATE INDEX idx_lich_hoc_giai_doan ON lich_hoc_lop(giai_doan_id);
 CREATE INDEX idx_lich_hoc_diem_hoc ON lich_hoc_lop(diem_hoc_id);
 
+-- T11 (issue #3) + ADR 0004 (2026-10-07): danh mục giảng viên + phân công
+-- giảng viên vào từng buổi. lop_hoc_nhan_su (bên dưới) giữ nguyên để tương
+-- thích ngược. Enum loai_danh_muc_import += 'giang_vien',
+-- 'phan_cong_giang_day' (migration riêng).
+CREATE TABLE giang_vien (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    ho_ten          varchar(255) NOT NULL,
+    email           varchar(255),
+    so_dien_thoai   varchar(20)  NOT NULL,
+    don_vi_cong_tac varchar(255),
+    ghi_chu         text,
+    trang_thai      trang_thai_active NOT NULL DEFAULT 'active',
+    tao_boi         uuid REFERENCES nguoi_dung(id) ON DELETE SET NULL,
+    nguon_import_id uuid REFERENCES nhat_ky_import(id),
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_giang_vien_email UNIQUE (email),
+    CONSTRAINT uq_giang_vien_sdt UNIQUE (so_dien_thoai)
+);
+
+CREATE TABLE phan_cong_giang_day (
+    id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    lich_hoc_id         uuid NOT NULL REFERENCES lich_hoc_lop(id) ON DELETE CASCADE,
+    giang_vien_id       uuid NOT NULL REFERENCES giang_vien(id),
+    vai_tro             vai_tro_nhan_su_lop NOT NULL,
+    so_gio              numeric(4,1) CHECK (so_gio IS NULL OR so_gio > 0),
+    da_xac_nhan_gio     boolean NOT NULL DEFAULT false,
+    xac_nhan_luc        timestamptz,
+    nguoi_xac_nhan_id   uuid REFERENCES nguoi_dung(id),
+    created_at          timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_phan_cong UNIQUE (lich_hoc_id, giang_vien_id),
+    CONSTRAINT chk_phan_cong_xac_nhan CHECK (
+        (da_xac_nhan_gio AND xac_nhan_luc IS NOT NULL AND nguoi_xac_nhan_id IS NOT NULL)
+        OR NOT da_xac_nhan_gio)
+);
+CREATE INDEX idx_phan_cong_gv ON phan_cong_giang_day(giang_vien_id);
+
 CREATE TABLE lop_hoc_nhan_su (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     lop_id              uuid NOT NULL REFERENCES lop_hoc(id) ON DELETE CASCADE,

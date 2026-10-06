@@ -25,3 +25,10 @@ export function parseVnDateTime(raw: string): Date | undefined {
 
   return new Date(Date.UTC(year, month - 1, day, hour - 7, minute));
 }
+
+// Ngược của parseVnDateTime: Date (UTC) → "dd/mm/yyyy hh:mm" giờ Việt Nam.
+export function formatVnDateTime(d: Date): string {
+  const vn = new Date(d.getTime() + 7 * 3600 * 1000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(vn.getUTCDate())}/${p(vn.getUTCMonth() + 1)}/${vn.getUTCFullYear()} ${p(vn.getUTCHours())}:${p(vn.getUTCMinutes())}`;
+}
