@@ -319,3 +319,12 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 130 | Xác nhận giờ cần có `so_gio`; `da_xac_nhan_gio=true` ⇒ có `xac_nhan_luc` + `nguoi_xac_nhan_id` | 🔴 | API + DB (`chk_phan_cong_xac_nhan`) |
 | 131 | Báo cáo giờ dạy chỉ cộng phân công đã xác nhận giờ; vai trò khác Quản trị không thấy SĐT/email giảng viên; học viên chỉ thấy họ tên + vai trò | 🔴 | API (`GioDayService`, `khoaHocTheoHocVienId`) |
 | 132 | Mọi endpoint `/giang-vien/*` và phân công tay chỉ Quản trị (dữ liệu cá nhân) | 🔴 | API (`@Roles('quan_tri')`) |
+
+## Người hỗ trợ giảng viên (ADR 0004 L1, issue #14, 2026-10-07)
+
+| # | Quy tắc | Mức | Nơi thực thi |
+|---|---|---|---|
+| 133 | `ho_tro_giang_vien`: `don_vi_id` và `hoc_vien_id` NULL, email bắt buộc | 🔴 | DB (`chk_nguoi_dung_scope`, `chk_nguoi_dung_email_bat_buoc`) + API |
+| 134 | Nhóm hỗ trợ GV của khóa chỉ nhận tài khoản `ho_tro_giang_vien` đang hoạt động (400) | 🔴 | API (`KhoaBoiDuongService.ganNhomHoTroGv`) |
+| 135 | Phạm vi = lớp của các khóa trong nhóm, kiểm động mỗi request (gỡ phân công hiệu lực ngay); ngoài phạm vi → 404; chỉ `HoTroGiangVienScopeService` đọc `phan_cong_ho_tro_gv` | 🔴 | API |
+| 136 | `/ho-tro-giang-vien/*` chỉ `ho_tro_giang_vien` (403); người hỗ trợ giảng viên không vào `/ho-tro-hoc-vien/*` và `/admin` | 🔴 | API (`@Roles`) + FE (`RequireHoTroGv`, `RequireAdmin`) |

@@ -232,6 +232,28 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     server.events.removeAllListeners();
   });
 
+  // ADR 0004 L1 (issue #14): nhóm hỗ trợ giảng viên của khóa.
+  it('tab "Hỗ trợ giảng viên": khóa có GĐ trực tiếp chưa có ai → cảnh báo; chọn người → PUT nhóm', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText('Lớp 01 – Nhóm cơ bản A');
+    await user.click(screen.getByRole('tab', { name: 'Hỗ trợ giảng viên' }));
+    expect(await screen.findByText(/chưa có người hỗ trợ giảng viên/)).toBeInTheDocument();
+    await user.click(screen.getByRole('textbox', { name: 'Nhóm hỗ trợ giảng viên' }));
+    await user.click(await screen.findByRole('option', { name: 'Phạm Văn Giảng' }));
+    await waitFor(() =>
+      expect(db.chiTietKhoa['khoa-1'].nhom_ho_tro_gv).toEqual([{ id: 'htgv-1', ho_ten: 'Phạm Văn Giảng' }]),
+    );
+  });
+
+  it('vai_tro=truong → không có tab "Hỗ trợ giảng viên"', async () => {
+    db.nguoiDung.vai_tro = 'truong';
+    renderTrang('khoa-1');
+    await screen.findByText('Lớp 01 – Nhóm cơ bản A');
+    expect(screen.queryByRole('tab', { name: 'Hỗ trợ giảng viên' })).not.toBeInTheDocument();
+  });
+
   // T11 (issue #3): phân công giảng viên vào buổi.
   it('buổi học: nút "Giảng viên" mở modal, chọn giảng viên + số giờ → PUT, bảng hiện tên', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';

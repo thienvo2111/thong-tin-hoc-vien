@@ -19,6 +19,7 @@ import {
   Table,
   Text,
   TextInput,
+  SegmentedControl,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -29,7 +30,7 @@ import {
   useSuaTaiKhoanHoTro,
   useTaoTaiKhoanHoTro,
 } from '@/api/taiKhoanHoTro';
-import type { TaiKhoanHoTro } from '@/api/types';
+import type { TaiKhoanHoTro, VaiTroHoTro } from '@/api/types';
 import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { chuanHoaNfc } from '@/lib/nfc';
@@ -52,6 +53,12 @@ interface FormTao {
 }
 const FORM_TAO_RONG: FormTao = { ho_ten: '', email: '', ten_dang_nhap: '', cach_cap: 'email' };
 
+// ADR 0004 L1: 2 loại người hỗ trợ — học viên (theo cụm), giảng viên (nhóm theo khóa).
+const TUY_CHON_LOAI = [
+  { value: 'ho_tro_hoc_vien', label: 'Hỗ trợ học viên' },
+  { value: 'ho_tro_giang_vien', label: 'Hỗ trợ giảng viên' },
+];
+
 type XacNhan = { loai: 'cap_mat_khau' | 'khoa' | 'mo_khoa'; tk: TaiKhoanHoTro } | null;
 
 /** Trang Người hỗ trợ — tài khoản cán bộ HCMUE hỗ trợ học viên theo cụm (ADR 0003). Chỉ quan_tri (route
@@ -60,16 +67,19 @@ export default function AdminNguoiHoTro() {
   const [q, setQ] = useState('');
   const [qDebounced] = useDebouncedValue(q, 300);
   const [trangThai, setTrangThai] = useState('');
+  const [loai, setLoai] = useState<VaiTroHoTro>('ho_tro_hoc_vien');
+  const laHoTroGv = loai === 'ho_tro_giang_vien';
   const [page, setPage] = useState(1);
 
   const params = useMemo(
     () => ({
+      vai_tro: loai,
       q: qDebounced.trim() ? chuanHoaNfc(qDebounced.trim()) : undefined,
       trang_thai: (trangThai || undefined) as 'active' | 'ngung' | undefined,
       page,
       page_size: KICH_THUOC_TRANG,
     }),
-    [qDebounced, trangThai, page],
+    [loai, qDebounced, trangThai, page],
   );
   const { data, isLoading, isError, error, isFetching } = useDanhSachTaiKhoanHoTro(params);
 
@@ -98,6 +108,7 @@ export default function AdminNguoiHoTro() {
         email: formTao.email.trim(),
         ten_dang_nhap: formTao.ten_dang_nhap.trim() || undefined,
         cach_cap: formTao.cach_cap,
+        vai_tro: loai,
       },
       {
         onSuccess: (kq) => {
@@ -191,8 +202,19 @@ export default function AdminNguoiHoTro() {
       />
       <Container size="xl" py="lg" px={{ base: 'md', md: 28 }}>
         <Stack gap="md">
+          <SegmentedControl
+            data={TUY_CHON_LOAI}
+            value={loai}
+            onChange={(v) => {
+              setLoai(v as VaiTroHoTro);
+              setPage(1);
+            }}
+            w="fit-content"
+          />
           <Text fz="sm" c="dimmed">
-            Phân công người hỗ trợ cho từng cụm ở Khóa bồi dưỡng → chi tiết khóa → tab "Cụm hỗ trợ Zalo".
+            {laHoTroGv
+              ? 'Phân công nhóm hỗ trợ giảng viên ở Khóa bồi dưỡng → chi tiết khóa → mục "Nhóm hỗ trợ giảng viên".'
+              : 'Phân công người hỗ trợ cho từng cụm ở Khóa bồi dưỡng → chi tiết khóa → tab "Cụm hỗ trợ Zalo".'}
           </Text>
           <Group gap="sm" wrap="wrap">
             <TextInput
@@ -242,7 +264,7 @@ export default function AdminNguoiHoTro() {
                       <Table.Th>Họ tên</Table.Th>
                       <Table.Th>Tên đăng nhập</Table.Th>
                       <Table.Th>Email</Table.Th>
-                      <Table.Th>Cụm phụ trách</Table.Th>
+                      <Table.Th>{laHoTroGv ? 'Khóa phụ trách' : 'Cụm phụ trách'}</Table.Th>
                       <Table.Th>Lần đăng nhập cuối</Table.Th>
                       <Table.Th>Trạng thái</Table.Th>
                       <Table.Th aria-label="Thao tác" />
@@ -268,7 +290,21 @@ export default function AdminNguoiHoTro() {
                         </Table.Td>
                         <Table.Td>{tk.email}</Table.Td>
                         <Table.Td>
-                          {tk.cum.length === 0 ? (
+                          {laHoTroGv ? (
+                            (tk.khoa ?? []).length === 0 ? (
+                              <Badge color="yellow" variant="light">
+                                Chưa phân công
+                              </Badge>
+                            ) : (
+                              <Stack gap={2}>
+                                {(tk.khoa ?? []).map((k) => (
+                                  <Anchor key={k.khoa_id} component={Link} to={`/admin/khoa-boi-duong/${k.khoa_id}`} fz="sm">
+                                    {k.ma_khoa}
+                                  </Anchor>
+                                ))}
+                              </Stack>
+                            )
+                          ) : tk.cum.length === 0 ? (
                             <Badge color="yellow" variant="light">
                               Chưa phân công
                             </Badge>
@@ -344,7 +380,7 @@ export default function AdminNguoiHoTro() {
         </Stack>
       </Container>
 
-      <Modal opened={moTao} onClose={() => setMoTao(false)} title="Tạo tài khoản người hỗ trợ" centered>
+      <Modal opened={moTao} onClose={() => setMoTao(false)} title={laHoTroGv ? 'Tạo tài khoản người hỗ trợ giảng viên' : 'Tạo tài khoản người hỗ trợ học viên'} centered>
         <Stack gap="sm">
           <TextInput
             label="Họ tên"

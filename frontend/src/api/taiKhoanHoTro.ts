@@ -8,12 +8,15 @@ import type {
   TaiKhoanHoTro,
   TaoTaiKhoanHoTroDto,
   TrangThaiActive,
+  VaiTroHoTro,
 } from './types';
 
 // Người hỗ trợ học viên (ADR 0003) — /nguoi-dung/ho-tro, chỉ quan_tri. Mật khẩu tạm chỉ nằm trong kết
 // quả mutation (gcTime: 0) và state cục bộ của modal, như tài khoản đơn vị.
 
 export interface DanhSachTaiKhoanHoTroParams {
+  /** Mặc định (không truyền) = ho_tro_hoc_vien. */
+  vai_tro?: VaiTroHoTro;
   trang_thai?: TrangThaiActive;
   q?: string;
   page?: number;

@@ -21,11 +21,11 @@ import {
   QueryTaiKhoanHoTroDto,
   SuaTaiKhoanHoTroDto,
   TaoTaiKhoanHoTroDto,
+  VAI_TRO_HO_TRO,
 } from './dto/tai-khoan-ho-tro.dto';
 
 const BCRYPT_SALT_ROUNDS = 10;
-const VAI_TRO = 'ho_tro_hoc_vien' as const;
-const CAN_EMAIL = 'Người hỗ trợ học viên bắt buộc có email';
+const CAN_EMAIL = 'Người hỗ trợ bắt buộc có email';
 
 const SELECT_VIEW = {
   id: true,
@@ -47,14 +47,24 @@ const SELECT_VIEW = {
     },
     orderBy: { created_at: 'asc' },
   },
+  // ADR 0004 L1: khóa mà người hỗ trợ giảng viên thuộc nhóm.
+  phan_cong_ho_tro_gv: {
+    select: { khoa: { select: { id: true, ma_khoa: true, ten_khoa: true } } },
+    orderBy: { created_at: 'asc' },
+  },
 } satisfies Prisma.nguoi_dungSelect;
 
 type Row = Prisma.nguoi_dungGetPayload<{ select: typeof SELECT_VIEW }>;
 
 export function toTaiKhoanHoTroView(row: Row) {
-  const { phan_cong_ho_tro, ...rest } = row;
+  const { phan_cong_ho_tro, phan_cong_ho_tro_gv, ...rest } = row;
   return {
     ...rest,
+    khoa: phan_cong_ho_tro_gv.map(({ khoa }) => ({
+      khoa_id: khoa.id,
+      ma_khoa: khoa.ma_khoa,
+      ten_khoa: khoa.ten_khoa,
+    })),
     cum: phan_cong_ho_tro.map(({ cum }) => ({
       cum_id: cum.id,
       ten_cum: cum.ten_cum,
@@ -112,7 +122,7 @@ export class TaiKhoanHoTroService {
             ho_ten: hoTen,
             ten_dang_nhap: tenDangNhap,
             email,
-            vai_tro: VAI_TRO,
+            vai_tro: dto.vai_tro ?? 'ho_tro_hoc_vien',
             // cach_cap=email: mật khẩu ngẫu nhiên không ai biết — chỉ vào qua link.
             mat_khau_hash: hash,
             phai_doi_mat_khau: true,
@@ -146,7 +156,9 @@ export class TaiKhoanHoTroService {
   async danhSach(query: QueryTaiKhoanHoTroDto) {
     const page = query.page ?? 1;
     const pageSize = query.page_size ?? 20;
-    const where: Prisma.nguoi_dungWhereInput = { vai_tro: VAI_TRO };
+    const where: Prisma.nguoi_dungWhereInput = {
+      vai_tro: query.vai_tro ?? 'ho_tro_hoc_vien',
+    };
     if (query.trang_thai) where.trang_thai = query.trang_thai;
     const q = query.q?.trim();
     if (q) {
@@ -246,7 +258,7 @@ export class TaiKhoanHoTroService {
 
   private async timTaiKhoan(id: string): Promise<TaiKhoanHoTroView> {
     const row = await this.prisma.nguoi_dung.findFirst({
-      where: { id, vai_tro: VAI_TRO },
+      where: { id, vai_tro: { in: [...VAI_TRO_HO_TRO] } },
       select: SELECT_VIEW,
     });
     if (!row)

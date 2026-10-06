@@ -63,6 +63,8 @@ enum vai_tro_nguoi_dung {
   quan_tri
   // ADR 0003 (2026-10-06): người hỗ trợ học viên theo cụm — migration enum RIÊNG.
   ho_tro_hoc_vien
+  // ADR 0004 L1 (issue #14, 2026-10-07): người hỗ trợ giảng viên — migration enum RIÊNG.
+  ho_tro_giang_vien
 }
 
 enum trinh_do_chuyen_mon {
@@ -446,6 +448,7 @@ model nguoi_dung {
   yeu_cau_ho_tro_sua_tra_loi_boi     yeu_cau_ho_tro[]           @relation("yeu_cau_ho_tro_sua_tra_loi_boi")
   token_xac_thuc                     token_xac_thuc[]
   phan_cong_ho_tro                   phan_cong_ho_tro[]
+  phan_cong_ho_tro_gv                phan_cong_ho_tro_gv[]
   diem_hoc_tao                       diem_hoc[]                 @relation("diem_hoc_tao_boi")
   giang_vien_tao                     giang_vien[]               @relation("giang_vien_tao_boi")
   phan_cong_xac_nhan                 phan_cong_giang_day[]      @relation("phan_cong_nguoi_xac_nhan")
@@ -732,14 +735,16 @@ model khoa_boi_duong {
   nguoi_duyet     nguoi_dung?     @relation("khoa_boi_duong_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   created_by_user nguoi_dung?     @relation("khoa_boi_duong_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  giai_doan         giai_doan_khoa[]
-  lop_hoc           lop_hoc[]
-  dang_ky_hoc       dang_ky_hoc[]
-  dot_xac_nhan      dot_xac_nhan[]
-  cau_hinh_khao_sat cau_hinh_khao_sat_khoa?
+  giai_doan           giai_doan_khoa[]
+  lop_hoc             lop_hoc[]
+  dang_ky_hoc         dang_ky_hoc[]
+  dot_xac_nhan        dot_xac_nhan[]
+  cau_hinh_khao_sat   cau_hinh_khao_sat_khoa?
   // QĐ10: cụm học viên (nhóm Zalo hỗ trợ theo địa lý) — độc lập với cây đơn
   // vị công tác, thuộc trực tiếp về khóa.
-  cum_hoc_vien      cum_hoc_vien[]
+  cum_hoc_vien        cum_hoc_vien[]
+  // ADR 0004 G3: nhóm người hỗ trợ giảng viên của khóa.
+  phan_cong_ho_tro_gv phan_cong_ho_tro_gv[]
 
   @@index([don_vi_dat_hang_id], map: "idx_khoa_don_vi")
   @@index([trang_thai], map: "idx_khoa_trang_thai")
@@ -1255,4 +1260,20 @@ model nhat_ky_hoat_dong {
   @@index([hoc_vien_id, thoi_gian], map: "idx_nhat_ky_hd_hoc_vien")
   @@index([nguoi_dung_id, thoi_gian], map: "idx_nhat_ky_hd_nguoi_dung")
   @@index([hanh_dong, thoi_gian], map: "idx_nhat_ky_hd_hanh_dong")
+}
+
+// ADR 0004 G3 (issue #14, 2026-10-07): nhóm người hỗ trợ giảng viên theo KHÓA.
+// Chỉ HoTroGiangVienScopeService đọc bảng này — thu hẹp về lớp sau này =
+// thêm lop_id NULL + sửa đúng service đó.
+model phan_cong_ho_tro_gv {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nguoi_dung_id String   @db.Uuid
+  khoa_id       String   @db.Uuid
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  nguoi_dung nguoi_dung     @relation(fields: [nguoi_dung_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  khoa       khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([nguoi_dung_id, khoa_id], map: "uq_phan_cong_ho_tro_gv")
+  @@index([khoa_id], map: "idx_phan_cong_ho_tro_gv_khoa")
 }

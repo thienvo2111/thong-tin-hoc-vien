@@ -555,6 +555,10 @@ export class KhoaBoiDuongService {
         ...l,
         si_so_hien_tai: siSoTheoLop.get(l.id) ?? 0,
       })),
+      // ADR 0004 G3: nhóm hỗ trợ giảng viên — chỉ Quản trị thấy.
+      ...(caller.vai_tro === 'quan_tri'
+        ? { nhom_ho_tro_gv: await this.nhomHoTroGv(khoa.id) }
+        : {}),
     };
   }
 
@@ -760,6 +764,55 @@ export class KhoaBoiDuongService {
   // PUT /khoa-boi-duong/{id}/cum/{cumId}/nguoi-ho-tro — ADR 0003 H3/H4: thay
   // TOÀN BỘ người hỗ trợ của cụm (rỗng = gỡ hết). Chỉ nhận ho_tro_hoc_vien.
   // ---------------------------------------------------------------------
+  // PUT /khoa-boi-duong/{id}/nhom-ho-tro-gv — ADR 0004 G3: thay TOÀN BỘ
+  // nhóm người hỗ trợ giảng viên của khóa (rỗng = gỡ hết). Chỉ nhận tài
+  // khoản ho_tro_giang_vien đang hoạt động.
+  async ganNhomHoTroGv(khoaId: string, nguoiDungIds: string[]) {
+    const khoa = await this.prisma.khoa_boi_duong.findUnique({
+      where: { id: khoaId },
+      select: { id: true },
+    });
+    if (!khoa) throw new NotFoundAppException('Không tìm thấy khóa bồi dưỡng');
+    const ids = [...new Set(nguoiDungIds)];
+    const hopLe = await this.prisma.nguoi_dung.count({
+      where: {
+        id: { in: ids },
+        vai_tro: 'ho_tro_giang_vien',
+        trang_thai: 'active',
+      },
+    });
+    if (hopLe !== ids.length) {
+      throw new ValidationException(
+        'Chỉ phân công được tài khoản người hỗ trợ giảng viên đang hoạt động',
+        [
+          {
+            field: 'nguoi_dung_ids',
+            message: 'Có tài khoản không phải người hỗ trợ giảng viên',
+          },
+        ],
+      );
+    }
+    await this.prisma.$transaction([
+      this.prisma.phan_cong_ho_tro_gv.deleteMany({
+        where: { khoa_id: khoaId, nguoi_dung_id: { notIn: ids } },
+      }),
+      this.prisma.phan_cong_ho_tro_gv.createMany({
+        data: ids.map((nguoi_dung_id) => ({ nguoi_dung_id, khoa_id: khoaId })),
+        skipDuplicates: true,
+      }),
+    ]);
+    return { khoa_id: khoaId, nhom_ho_tro_gv: await this.nhomHoTroGv(khoaId) };
+  }
+
+  private async nhomHoTroGv(khoaId: string) {
+    const rows = await this.prisma.phan_cong_ho_tro_gv.findMany({
+      where: { khoa_id: khoaId },
+      select: { nguoi_dung: { select: { id: true, ho_ten: true } } },
+      orderBy: { created_at: 'asc' },
+    });
+    return rows.map((r) => r.nguoi_dung);
+  }
+
   async ganNguoiHoTroCum(
     khoaId: string,
     cumId: string,

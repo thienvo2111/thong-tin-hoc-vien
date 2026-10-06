@@ -348,6 +348,22 @@ export function useGanNguoiHoTroCum(khoaId: string) {
   });
 }
 
+// ADR 0004 G3 (issue #14): PUT thay toàn bộ nhóm người hỗ trợ giảng viên của khóa.
+export function useGanNhomHoTroGv(khoaId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (nguoiDungIds: string[]) =>
+      apiFetch(`/khoa-boi-duong/${khoaId}/nhom-ho-tro-gv`, {
+        method: 'PUT',
+        body: JSON.stringify({ nguoi_dung_ids: nguoiDungIds }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: chiTietKhoaKey(khoaId) });
+      queryClient.invalidateQueries({ queryKey: ['nguoi-dung', 'ho-tro'] });
+    },
+  });
+}
+
 export interface CreateLichHocDto {
   giai_doan_id: string;
   buoi_so?: number;

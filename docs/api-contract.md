@@ -128,6 +128,18 @@ Mô hình 1 hỏi – 1 đáp; hỏi tiếp = ticket mới (cờ `hoi_lai`). **T
 
 Frontend khi nhận `409` lúc trả lời: KHÔNG làm mới danh sách ngay, tải lại ticket (`GET .../{id}`) để hiện câu trả lời đã có, giữ nguyên nội dung đang soạn (`components/KhungTraLoiTicket.tsx`).
 
+### Người hỗ trợ giảng viên (ADR 0004 L1, issue #14, 2026-10-07)
+
+Vai trò `ho_tro_giang_vien` — cán bộ HCMUE, không gắn đơn vị, email bắt buộc (CHECK `chk_nguoi_dung_scope`, `chk_nguoi_dung_email_bat_buoc`); đăng nhập như tài khoản đơn vị (khớp không phân biệt hoa/thường, quên mật khẩu qua email). Trang frontend ở **`/ho-tro-gv`** — tiền tố API là `/ho-tro-giang-vien` (không trùng, xem bài học `/ho-tro` của ADR 0003).
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| GET / POST / PATCH | `/nguoi-dung/ho-tro` | Như ADR 0003, thêm `vai_tro` (`ho_tro_hoc_vien` \| `ho_tro_giang_vien`): POST nhận `vai_tro` (mặc định `ho_tro_hoc_vien`); GET lọc `?vai_tro=` (**mặc định `ho_tro_hoc_vien`** — giữ hành vi cũ của ô chọn người hỗ trợ cụm); mỗi dòng kèm `khoa: [{ khoa_id, ma_khoa, ten_khoa }]` (nhóm hỗ trợ GV) | QuảnTrị |
+| PUT | `/khoa-boi-duong/{id}/nhom-ho-tro-gv` | `{ nguoi_dung_ids: uuid[] }` (≤ 50) **thay toàn bộ** nhóm người hỗ trợ giảng viên của khóa (rỗng = gỡ hết) → `{ khoa_id, nhom_ho_tro_gv: [{ id, ho_ten }] }`. Tài khoản không phải `ho_tro_giang_vien` đang hoạt động → `400`. `GET /khoa-boi-duong/{id}` (Quản trị) kèm `nhom_ho_tro_gv` | QuảnTrị |
+| GET | `/ho-tro-giang-vien/lop-cua-toi` | Lớp trong phạm vi = mọi lớp của các khóa có người gọi trong nhóm (`{ id, ten_lop, loai_lop, trang_thai, khoa, _count.lich_hoc }`); chưa phân công → `[]` | `ho_tro_giang_vien` |
+
+Phạm vi kiểm tra động mỗi request qua `HoTroGiangVienScopeService` — **điểm duy nhất** đọc `phan_cong_ho_tro_gv`, chỉ lộ API cấp lớp/khóa (`whereLopTrongPhamVi`, `lopIdsCuaToi`, `damBaoLopTrongPhamVi`, `damBaoKhoaTrongPhamVi`) để sau này thu hẹp về lớp mà không sửa nơi khác. Ngoài phạm vi → `404`.
+
 ## 2. Dịch vụ Học viên
 
 | Method | Endpoint | Mô tả | Ai gọi |

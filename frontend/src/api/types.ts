@@ -466,6 +466,8 @@ export interface KhoaBoiDuongChiTiet extends KhoaBoiDuong {
   lop_hoc: LopHoc[];
   cum_hoc_vien: CumHocVien[];
   pham_vi_hoc_vien: 'toan_bo' | 'don_vi';
+  /** ADR 0004 G3 — chỉ có khi người xem là quan_tri. */
+  nhom_ho_tro_gv?: NguoiHoTroRutGon[];
 }
 
 // Body POST /khoa-boi-duong — backend/src/khoa-boi-duong/dto/create-khoa-boi-duong.dto.ts. Chỉ
@@ -765,17 +767,22 @@ export interface TaiKhoanHoTro {
   ten_dang_nhap: string;
   ho_ten: string;
   email: string;
-  vai_tro: 'ho_tro_hoc_vien';
+  vai_tro: VaiTroHoTro;
   trang_thai: TrangThaiActive;
   dang_nhap_lan_cuoi: string | null;
   cum: CumPhanCong[];
+  // ADR 0004 L1: khóa mà người hỗ trợ giảng viên thuộc nhóm.
+  khoa?: { khoa_id: string; ma_khoa: string; ten_khoa: string }[];
 }
+
+export type VaiTroHoTro = 'ho_tro_hoc_vien' | 'ho_tro_giang_vien';
 
 export interface TaoTaiKhoanHoTroDto {
   ho_ten: string;
   email: string;
   ten_dang_nhap?: string;
   cach_cap?: 'email' | 'mat_khau_tam';
+  vai_tro?: VaiTroHoTro;
 }
 
 export interface SuaTaiKhoanHoTroDto {

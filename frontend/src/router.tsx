@@ -71,6 +71,21 @@ export const router = createBrowserRouter([
             ],
           },
           {
+            // ADR 0004: khu người hỗ trợ giảng viên. Trang ở /ho-tro-gv — API ở /ho-tro-giang-vien.
+            lazy: () => import('@/auth/RequireHoTroGv').then((m) => ({ Component: m.RequireHoTroGv })),
+            children: [
+              {
+                lazy: () => import('@/pages/HoTroGv/HoTroGvLayout').then((m) => ({ Component: m.default })),
+                children: [
+                  {
+                    path: '/ho-tro-gv',
+                    lazy: () => import('@/pages/HoTroGv/HoTroGvLop').then((m) => ({ Component: m.default })),
+                  },
+                ],
+              },
+            ],
+          },
+          {
             // ADR 0003: khu làm việc người hỗ trợ học viên — layout riêng, không dùng chung /admin.
             lazy: () => import('@/auth/RequireHoTro').then((m) => ({ Component: m.RequireHoTro })),
             children: [

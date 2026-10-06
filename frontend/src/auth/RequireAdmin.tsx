@@ -29,8 +29,12 @@ export function RequireAdmin() {
     return <Navigate to="/doi-mat-khau" replace />;
   }
 
-  // Học viên và người hỗ trợ học viên (ADR 0003) không dùng layout admin.
-  if (nguoiDung?.vai_tro === 'hoc_vien' || nguoiDung?.vai_tro === 'ho_tro_hoc_vien') {
+  // Học viên và người hỗ trợ (ADR 0003, 0004) không dùng layout admin.
+  if (
+    nguoiDung?.vai_tro === 'hoc_vien' ||
+    nguoiDung?.vai_tro === 'ho_tro_hoc_vien' ||
+    nguoiDung?.vai_tro === 'ho_tro_giang_vien'
+  ) {
     return <Navigate to={trangChuTheoVaiTro(nguoiDung.vai_tro)} replace />;
   }
 

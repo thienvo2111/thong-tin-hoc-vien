@@ -20,6 +20,8 @@ export const VAI_TRO_DON_VI: VaiTroDonVi[] = ['so_gddt', 'phong_vhxh', 'truong']
 export const VAI_TRO_TAI_KHOAN_CAP: vai_tro_nguoi_dung[] = [
   ...VAI_TRO_DON_VI,
   'ho_tro_hoc_vien',
+  // ADR 0004 L1 (issue #14).
+  'ho_tro_giang_vien',
 ];
 
 export function sinhMatKhauTam(): string {

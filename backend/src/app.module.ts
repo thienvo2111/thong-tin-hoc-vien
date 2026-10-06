@@ -22,6 +22,7 @@ import { NhatKyModule } from './nhat-ky/nhat-ky.module';
 import { HoTroHocVienModule } from './ho-tro-hoc-vien/ho-tro-hoc-vien.module';
 import { DiemHocModule } from './diem-hoc/diem-hoc.module';
 import { GiangVienModule } from './giang-vien/giang-vien.module';
+import { HoTroGiangVienModule } from './ho-tro-giang-vien/ho-tro-giang-vien.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { GiangVienModule } from './giang-vien/giang-vien.module';
     KhoaBoiDuongModule,
     DiemHocModule,
     GiangVienModule,
+    HoTroGiangVienModule,
     DanhMucModule,
     ImportModule,
     BaoCaoModule,

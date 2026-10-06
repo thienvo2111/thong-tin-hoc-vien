@@ -77,7 +77,7 @@ describe('Admin — Người hỗ trợ học viên (ADR 0003)', () => {
     expect(within(modal).getByRole('textbox', { name: /Tên đăng nhập/ })).toHaveAttribute('placeholder', 'le.c');
     await user.click(nutTao);
     expect(await screen.findByText('Đã gửi email kích hoạt tới le.c@hcmue.edu.vn')).toBeInTheDocument();
-    expect(body).toEqual({ ho_ten: 'Lê Văn C', email: 'le.c@hcmue.edu.vn', cach_cap: 'email' });
+    expect(body).toEqual({ ho_ten: 'Lê Văn C', email: 'le.c@hcmue.edu.vn', cach_cap: 'email', vai_tro: 'ho_tro_hoc_vien' });
     expect(screen.queryByText('Mật khẩu tạm')).not.toBeInTheDocument();
   });
 

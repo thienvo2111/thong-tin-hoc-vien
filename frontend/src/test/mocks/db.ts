@@ -1,3 +1,4 @@
+import type { LopCuaToiGv } from '@/api/hoTroGv';
 import type {
   DiemHoc,
   GiangVien,
@@ -663,6 +664,17 @@ export function taoDanhSachTaiKhoanHoTroMau(): TaiKhoanHoTro[] {
       cum: [{ cum_id: 'cum-1', ten_cum: 'Cụm Long Xuyên', khoa_id: 'khoa-1', ma_khoa: 'KBD-AG-01', ten_khoa: 'Khóa An Giang' }],
     },
     {
+      id: 'htgv-1',
+      ten_dang_nhap: 'pham.g',
+      ho_ten: 'Phạm Văn Giảng',
+      email: 'pham.g@hcmue.edu.vn',
+      vai_tro: 'ho_tro_giang_vien',
+      trang_thai: 'active',
+      dang_nhap_lan_cuoi: null,
+      cum: [],
+      khoa: [],
+    },
+    {
       id: 'ht-2',
       ten_dang_nhap: 'tran.b',
       ho_ten: 'Trần Thị B',
@@ -955,6 +967,20 @@ export function taoLichDayMau(): Record<string, LichDayGiangVien> {
   };
 }
 
+// ADR 0004 L1: lớp trong phạm vi người hỗ trợ giảng viên.
+export function taoLopCuaToiGvMau(): LopCuaToiGv[] {
+  return [
+    {
+      id: 'lop-1',
+      ten_lop: 'Lớp 01 – Nhóm cơ bản A',
+      loai_lop: 'truc_tiep',
+      trang_thai: 'active',
+      khoa: { id: 'khoa-1', ma_khoa: 'AG-2026-014', ten_khoa: 'Khóa An Giang' },
+      _count: { lich_hoc: 3 },
+    },
+  ];
+}
+
 export const db = {
   hoSo: taoHoSoMoi(),
   dotXacNhan: taoDotXacNhanDangMoThieu(),
@@ -990,6 +1016,7 @@ export const db = {
   diemHoc: taoDanhSachDiemHocMau(),
   giangVien: taoDanhSachGiangVienMau(),
   lichDay: taoLichDayMau(),
+  lopCuaToiGv: taoLopCuaToiGvMau(),
 };
 
 export function resetDb(): void {
@@ -1026,4 +1053,5 @@ export function resetDb(): void {
   db.diemHoc = taoDanhSachDiemHocMau();
   db.giangVien = taoDanhSachGiangVienMau();
   db.lichDay = taoLichDayMau();
+  db.lopCuaToiGv = taoLopCuaToiGvMau();
 }

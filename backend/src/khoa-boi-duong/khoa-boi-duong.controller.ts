@@ -150,4 +150,14 @@ export class KhoaBoiDuongController {
       dto.nguoi_dung_ids,
     );
   }
+
+  // ADR 0004 G3 (issue #14): nhóm người hỗ trợ giảng viên của khóa.
+  @Roles('quan_tri')
+  @Put(':id/nhom-ho-tro-gv')
+  ganNhomHoTroGv(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: GanNguoiHoTroCumDto,
+  ) {
+    return this.khoaBoiDuongService.ganNhomHoTroGv(id, dto.nguoi_dung_ids);
+  }
 }

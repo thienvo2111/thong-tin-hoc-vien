@@ -45,6 +45,20 @@ function loi(status: number, code: string, message: string, extra: Record<string
 }
 
 export const handlers = [
+  // ADR 0004 L1 (issue #14): khu người hỗ trợ giảng viên + nhóm theo khóa.
+  http.get('/ho-tro-giang-vien/lop-cua-toi', () => HttpResponse.json(db.lopCuaToiGv)),
+
+  http.put('/khoa-boi-duong/:id/nhom-ho-tro-gv', async ({ params, request }) => {
+    const khoa = db.chiTietKhoa[params.id as string];
+    if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
+    const { nguoi_dung_ids } = (await request.json()) as { nguoi_dung_ids: string[] };
+    khoa.nhom_ho_tro_gv = nguoi_dung_ids.map((id) => ({
+      id,
+      ho_ten: db.taiKhoanHoTro.find((t) => t.id === id)?.ho_ten ?? id,
+    }));
+    return HttpResponse.json({ khoa_id: khoa.id, nhom_ho_tro_gv: khoa.nhom_ho_tro_gv });
+  }),
+
   // T11 (issue #3): giảng viên & phân công.
   http.get('/giang-vien', ({ request }) => {
     const url = new URL(request.url);
@@ -999,12 +1013,20 @@ export const handlers = [
   http.post('/nguoi-dung/don-vi/:id/gui-email-kich-hoat', () => HttpResponse.json({ da_gui: true })),
 
   // Người hỗ trợ học viên (ADR 0003) — /nguoi-dung/ho-tro.
-  http.get('/nguoi-dung/ho-tro', () => {
-    const data = db.taiKhoanHoTro;
+  http.get('/nguoi-dung/ho-tro', ({ request }) => {
+    // Như backend: mặc định chỉ người hỗ trợ học viên (ADR 0004 L1 thêm loại giảng viên).
+    const vaiTro = new URL(request.url).searchParams.get('vai_tro') ?? 'ho_tro_hoc_vien';
+    const data = db.taiKhoanHoTro.filter((t) => t.vai_tro === vaiTro);
     return HttpResponse.json({ data, total: data.length, page: 1, page_size: 20 });
   }),
   http.post('/nguoi-dung/ho-tro', async ({ request }) => {
-    const body = (await request.json()) as { ho_ten: string; email: string; ten_dang_nhap?: string; cach_cap?: string };
+    const body = (await request.json()) as {
+      ho_ten: string;
+      email: string;
+      ten_dang_nhap?: string;
+      cach_cap?: string;
+      vai_tro?: 'ho_tro_hoc_vien' | 'ho_tro_giang_vien';
+    };
     const email = body.email.trim().toLowerCase();
     if (db.taiKhoanHoTro.some((t) => t.email === email)) {
       return loi(409, 'CONFLICT', 'Email đã được dùng', { fields: [{ field: 'email', message: 'Email đã được dùng' }] });
@@ -1014,10 +1036,11 @@ export const handlers = [
       ten_dang_nhap: (body.ten_dang_nhap || email.split('@')[0]).toLowerCase(),
       ho_ten: body.ho_ten,
       email,
-      vai_tro: 'ho_tro_hoc_vien' as const,
+      vai_tro: body.vai_tro ?? ('ho_tro_hoc_vien' as const),
       trang_thai: 'active' as const,
       dang_nhap_lan_cuoi: null,
       cum: [],
+      khoa: [],
     };
     db.taiKhoanHoTro.push(tk);
     return HttpResponse.json(

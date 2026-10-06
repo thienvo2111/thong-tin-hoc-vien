@@ -5,5 +5,7 @@ export function trangChuTheoVaiTro(vaiTro: string | undefined): string {
   if (vaiTro === 'hoc_vien') return '/toi';
   // ADR 0003: người hỗ trợ học viên có khu làm việc riêng, không vào /admin.
   if (vaiTro === 'ho_tro_hoc_vien') return '/ho-tro';
+  // ADR 0004: người hỗ trợ giảng viên — trang /ho-tro-gv (API ở /ho-tro-giang-vien, không trùng tiền tố).
+  if (vaiTro === 'ho_tro_giang_vien') return '/ho-tro-gv';
   return '/admin/tong-quan';
 }

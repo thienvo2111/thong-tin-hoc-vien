@@ -299,7 +299,15 @@ describe('AuthService', () => {
             // ADR 0002/0003: chỉ tài khoản đơn vị + người hỗ trợ học viên
             // khớp không phân biệt hoa/thường.
             {
-              vai_tro: { in: ['so_gddt', 'phong_vhxh', 'truong', 'ho_tro_hoc_vien'] },
+              vai_tro: {
+                in: [
+                  'so_gddt',
+                  'phong_vhxh',
+                  'truong',
+                  'ho_tro_hoc_vien',
+                  'ho_tro_giang_vien',
+                ],
+              },
               ten_dang_nhap: { equals: '123456789012', mode: 'insensitive' },
             },
             { hoc_vien: { so_dinh_danh_ca_nhan: '123456789012' } },

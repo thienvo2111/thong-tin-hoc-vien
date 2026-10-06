@@ -163,7 +163,7 @@ Cài đặt: `TrangLopService.layTrangLop(lopId, giaiDoanId)` lấy đủ, rồi
 
 ## 6. Trang
 
-### 6.1 Khu `/ho-tro-giang-vien/*`
+### 6.1 Khu người hỗ trợ giảng viên — trang FE `/ho-tro-gv/*`, API `/ho-tro-giang-vien/*` (chốt khi code #14: không dùng chung tiền tố, xem bài học `/ho-tro` của ADR 0003; bảng route dưới đây đọc `/ho-tro-giang-vien` là FE `/ho-tro-gv`)
 
 | Route | Nội dung |
 |---|---|

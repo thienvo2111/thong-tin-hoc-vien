@@ -58,6 +58,7 @@ const NHAN_VAI_TRO: Record<vai_tro_nguoi_dung, string> = {
   phong_vhxh: 'Phòng VHXH',
   truong: 'trường',
   ho_tro_hoc_vien: 'người hỗ trợ học viên',
+  ho_tro_giang_vien: 'người hỗ trợ giảng viên',
 };
 
 export type NhomDongThoiGian =
