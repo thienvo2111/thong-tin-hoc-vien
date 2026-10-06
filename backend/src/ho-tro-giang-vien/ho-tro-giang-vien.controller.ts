@@ -38,6 +38,10 @@ import {
 } from '../diem-hoc/dto/diem-hoc.dto';
 import { DiemHocService } from '../diem-hoc/diem-hoc.service';
 import { ForbiddenAppException } from '../common/exceptions/app.exceptions';
+import { BangKiemService } from '../bang-kiem/bang-kiem.service';
+import { DanhDauMucDto } from '../bang-kiem/bang-kiem.controller';
+import { IsInt, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 // Ngưng/gộp danh mục là việc của Quản trị (ADR 0004 G12).
 function chanNgung(dto: { trang_thai?: unknown }) {
@@ -47,6 +51,17 @@ function chanNgung(dto: { trang_thai?: unknown }) {
 }
 
 const NGAY = /^\d{4}-\d{2}-\d{2}$/;
+
+export class ViecCanLamQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(90)
+  so_ngay?: number;
+}
+
+const MOT_NGAY_MS = 24 * 3600 * 1000;
 
 export class LichDayQueryDto {
   @IsOptional()
@@ -71,7 +86,95 @@ export class HoTroGiangVienController {
     private readonly vanHanh: VanHanhLopService,
     private readonly giangVien: GiangVienService,
     private readonly diemHoc: DiemHocService,
+    private readonly bangKiem: BangKiemService,
   ) {}
+
+  // ---------------- L4 (issue #17): bảng kiểm + Việc cần làm ----------------
+  @Get('lop/:lopId/giai-doan/:gdId/bang-kiem')
+  async bangKiemDot(
+    @Param('lopId', ParseUUIDPipe) lopId: string,
+    @Param('gdId', ParseUUIDPipe) gdId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.damBaoDotTrucTiep(user, lopId, gdId);
+    return this.bangKiem.danhGiaDot(lopId, gdId);
+  }
+
+  @Put('lop/:lopId/giai-doan/:gdId/bang-kiem/:mucId')
+  async danhDauMuc(
+    @Param('lopId', ParseUUIDPipe) lopId: string,
+    @Param('gdId', ParseUUIDPipe) gdId: string,
+    @Param('mucId', ParseUUIDPipe) mucId: string,
+    @Body() dto: DanhDauMucDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.damBaoDotTrucTiep(user, lopId, gdId);
+    return this.bangKiem.danhDauThuCong(user, lopId, gdId, mucId, dto);
+  }
+
+  // Đợt trực tiếp trong phạm vi có buổi đầu từ hôm nay tới so_ngay ngày tới
+  // (mặc định 21), kèm màu bảng kiểm — sắp theo buổi đầu.
+  @Get('viec-can-lam')
+  viecCanLam(
+    @Query() query: ViecCanLamQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.dsViecCanLam(user, query.so_ngay ?? 21);
+  }
+
+  @Get('viec-can-lam/dem')
+  async demViecCanLam(@CurrentUser() user: AuthenticatedUser) {
+    const ds = await this.dsViecCanLam(user, 21);
+    return { do: ds.filter((d) => d.mau === 'do').length };
+  }
+
+  private async dsViecCanLam(user: AuthenticatedUser, soNgay: number) {
+    const bayGio = new Date();
+    const cuoi = new Date(bayGio.getTime() + soNgay * MOT_NGAY_MS);
+    const buoi = await this.prisma.lich_hoc_lop.findMany({
+      where: {
+        lop: await this.scope.whereLopTrongPhamVi(user.id),
+        giai_doan: { hinh_thuc: 'truc_tiep' },
+        thoi_gian_bat_dau: { gte: bayGio, lte: cuoi },
+      },
+      select: { lop_id: true, giai_doan_id: true },
+      distinct: ['lop_id', 'giai_doan_id'],
+    });
+    const ds = await Promise.all(
+      buoi.map(async ({ lop_id, giai_doan_id }) => {
+        const dg = await this.bangKiem.danhGiaDot(lop_id, giai_doan_id, bayGio);
+        return {
+          lop: dg.lop,
+          giai_doan: dg.giai_doan,
+          buoi_dau: dg.buoi_dau,
+          mau: dg.mau,
+          so_qua_han: dg.muc.filter((m) => m.trang_thai === 'qua_han').length,
+          so_chua_dat: dg.muc.filter((m) => m.trang_thai !== 'dat').length,
+          muc_chua_dat: dg.muc
+            .filter((m) => m.trang_thai !== 'dat')
+            .map((m) => ({ ten: m.ten, trang_thai: m.trang_thai, han: m.han })),
+        };
+      }),
+    );
+    return ds.sort(
+      (a, b) => (a.buoi_dau?.getTime() ?? 0) - (b.buoi_dau?.getTime() ?? 0),
+    );
+  }
+
+  private async damBaoDotTrucTiep(
+    user: AuthenticatedUser,
+    lopId: string,
+    gdId: string,
+  ) {
+    await this.scope.damBaoLopTrongPhamVi(user.id, lopId);
+    const gd = await this.prisma.giai_doan_khoa.findUnique({
+      where: { id: gdId },
+      select: { hinh_thuc: true },
+    });
+    if (gd?.hinh_thuc !== 'truc_tiep') {
+      throw new NotFoundAppException('Không tìm thấy đợt học trực tiếp');
+    }
+  }
 
   // ---------------- L3 (issue #16): vận hành lớp/đợt ----------------
   @Patch('lich-hoc/:id')
@@ -240,7 +343,9 @@ export class HoTroGiangVienController {
     if (gd?.hinh_thuc !== 'truc_tiep') {
       throw new NotFoundAppException('Không tìm thấy đợt học trực tiếp');
     }
-    return this.trangLop.layTrangLop(lopId, gdId, { vai_tro: 'ho_tro_giang_vien' });
+    return this.trangLop.layTrangLop(lopId, gdId, {
+      vai_tro: 'ho_tro_giang_vien',
+    });
   }
 
   // Lịch dạy theo ngày của mọi lớp trong phạm vi (mặc định 14 ngày tới).

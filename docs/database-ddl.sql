@@ -987,3 +987,32 @@ CREATE TABLE nhan_su_thuc_dia (
     created_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_thuc_dia_dot ON nhan_su_thuc_dia(lop_id, giai_doan_id);
+
+-- ADR 0004 L4 (issue #17, 2026-10-07): bảng kiểm chuẩn bị đợt trực tiếp.
+CREATE TYPE loai_muc_kiem_tra AS ENUM ('tu_dong', 'thu_cong');
+CREATE TABLE muc_kiem_tra (
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    khoa_id        uuid REFERENCES khoa_boi_duong(id) ON DELETE CASCADE,  -- NULL = bộ mặc định
+    thu_tu         integer NOT NULL,
+    ten            varchar(255) NOT NULL,
+    mo_ta          text,
+    loai           loai_muc_kiem_tra NOT NULL,
+    ma_quy_tac     varchar(50),
+    han_truoc_ngay smallint,
+    trang_thai     trang_thai_active NOT NULL DEFAULT 'active',
+    created_at     timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT chk_muc_kiem_tra_quy_tac CHECK ((loai = 'tu_dong') = (ma_quy_tac IS NOT NULL)),
+    CONSTRAINT chk_muc_kiem_tra_han CHECK (han_truoc_ngay IS NULL OR han_truoc_ngay >= 0)
+);
+CREATE INDEX idx_muc_kiem_tra_khoa ON muc_kiem_tra(khoa_id);
+CREATE TABLE trang_thai_muc_kiem_tra (
+    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    muc_id       uuid NOT NULL REFERENCES muc_kiem_tra(id) ON DELETE CASCADE,
+    lop_id       uuid NOT NULL REFERENCES lop_hoc(id) ON DELETE CASCADE,
+    giai_doan_id uuid NOT NULL REFERENCES giai_doan_khoa(id) ON DELETE CASCADE,
+    da_xong      boolean NOT NULL DEFAULT false,
+    ghi_chu      text,
+    cap_nhat_boi uuid REFERENCES nguoi_dung(id) ON DELETE SET NULL,
+    cap_nhat_luc timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_trang_thai_muc_kiem_tra UNIQUE (muc_id, lop_id, giai_doan_id)
+);

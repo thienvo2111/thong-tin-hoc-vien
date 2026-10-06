@@ -42,27 +42,42 @@ export class VanHanhLopService {
   }
 
   // Đợt (lớp × giai đoạn trực tiếp cùng khóa) trong phạm vi.
-  private async damBaoDot(user: AuthenticatedUser, lopId: string, gdId: string) {
+  private async damBaoDot(
+    user: AuthenticatedUser,
+    lopId: string,
+    gdId: string,
+  ) {
     await this.scope.damBaoLopTrongPhamVi(user.id, lopId);
     const co = await this.prisma.giai_doan_khoa.count({
-      where: { id: gdId, hinh_thuc: 'truc_tiep', khoa: { lop_hoc: { some: { id: lopId } } } },
+      where: {
+        id: gdId,
+        hinh_thuc: 'truc_tiep',
+        khoa: { lop_hoc: { some: { id: lopId } } },
+      },
     });
     if (!co) throw new NotFoundAppException('Không tìm thấy đợt học trực tiếp');
   }
 
   // Sửa giờ/điểm học/phòng: chỉ buổi CHƯA diễn ra và CHƯA có điểm danh.
-  async suaBuoi(user: AuthenticatedUser, lichHocId: string, dto: SuaBuoiHoTroGvDto) {
+  async suaBuoi(
+    user: AuthenticatedUser,
+    lichHocId: string,
+    dto: SuaBuoiHoTroGvDto,
+  ) {
     const lich = await this.layBuoiTrongPhamVi(user, lichHocId);
     if (lich.thoi_gian_bat_dau <= new Date()) {
-      throw new ValidationException('Buổi học đã hoặc đang diễn ra — không sửa được', [
-        { field: 'thoi_gian_bat_dau', message: 'Buổi đã diễn ra' },
-      ]);
+      throw new ValidationException(
+        'Buổi học đã hoặc đang diễn ra — không sửa được',
+        [{ field: 'thoi_gian_bat_dau', message: 'Buổi đã diễn ra' }],
+      );
     }
     const daDiemDanh = await this.prisma.diem_danh.count({
       where: { lich_hoc_id: lichHocId },
     });
     if (daDiemDanh > 0) {
-      throw new ValidationException('Buổi học đã có điểm danh — không sửa được');
+      throw new ValidationException(
+        'Buổi học đã có điểm danh — không sửa được',
+      );
     }
     return this.khoaBoiDuong.capNhatLichHoc(
       lich.lop_id,
@@ -78,7 +93,11 @@ export class VanHanhLopService {
     );
   }
 
-  async phanCongBuoi(user: AuthenticatedUser, lichHocId: string, ds: MucPhanCong[]) {
+  async phanCongBuoi(
+    user: AuthenticatedUser,
+    lichHocId: string,
+    ds: MucPhanCong[],
+  ) {
     await this.layBuoiTrongPhamVi(user, lichHocId);
     return this.phanCong.thayPhanCongBuoi(lichHocId, ds);
   }
@@ -99,7 +118,9 @@ export class VanHanhLopService {
       },
     });
     if (!coPhanCong) {
-      throw new ValidationException('Giảng viên chưa được phân công buổi nào trong đợt này');
+      throw new ValidationException(
+        'Giảng viên chưa được phân công buổi nào trong đợt này',
+      );
     }
     if (dto.nhan_phong && dto.tra_phong && dto.tra_phong < dto.nhan_phong) {
       throw new ValidationException('Ngày trả phòng phải sau ngày nhận phòng', [
@@ -109,24 +130,51 @@ export class VanHanhLopService {
     const { cap_nhat_luc: daDoc, ...truong } = dto;
     const data: Prisma.hau_can_giang_vienUncheckedUpdateInput = {
       ...truong,
-      nhan_phong: dto.nhan_phong === undefined ? undefined : dto.nhan_phong ? new Date(dto.nhan_phong) : null,
-      tra_phong: dto.tra_phong === undefined ? undefined : dto.tra_phong ? new Date(dto.tra_phong) : null,
-      don_luc: dto.don_luc === undefined ? undefined : dto.don_luc ? new Date(dto.don_luc) : null,
+      nhan_phong:
+        dto.nhan_phong === undefined
+          ? undefined
+          : dto.nhan_phong
+            ? new Date(dto.nhan_phong)
+            : null,
+      tra_phong:
+        dto.tra_phong === undefined
+          ? undefined
+          : dto.tra_phong
+            ? new Date(dto.tra_phong)
+            : null,
+      don_luc:
+        dto.don_luc === undefined
+          ? undefined
+          : dto.don_luc
+            ? new Date(dto.don_luc)
+            : null,
       cap_nhat_boi: user.id,
       cap_nhat_luc: new Date(),
     };
-    const khoa = { lop_id: lopId, giai_doan_id: gdId, giang_vien_id: giangVienId };
+    const khoa = {
+      lop_id: lopId,
+      giai_doan_id: gdId,
+      giang_vien_id: giangVienId,
+    };
     const cu = await this.prisma.hau_can_giang_vien.findUnique({
       where: { lop_id_giai_doan_id_giang_vien_id: khoa },
     });
     if (!cu) {
       try {
         return await this.prisma.hau_can_giang_vien.create({
-          data: { ...khoa, ...(data as Prisma.hau_can_giang_vienUncheckedCreateInput) },
+          data: {
+            ...khoa,
+            ...(data as Prisma.hau_can_giang_vienUncheckedCreateInput),
+          },
         });
       } catch (e) {
-        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-          throw new ConflictAppException('Người khác vừa nhập hậu cần này — tải lại để xem');
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === 'P2002'
+        ) {
+          throw new ConflictAppException(
+            'Người khác vừa nhập hậu cần này — tải lại để xem',
+          );
         }
         throw e;
       }
@@ -140,19 +188,29 @@ export class VanHanhLopService {
       data,
     });
     if (kq.count === 0) {
-      throw new ConflictAppException('Người khác vừa sửa hậu cần này — tải lại để xem bản mới');
+      throw new ConflictAppException(
+        'Người khác vừa sửa hậu cần này — tải lại để xem bản mới',
+      );
     }
-    return this.prisma.hau_can_giang_vien.findUniqueOrThrow({ where: { id: cu.id } });
+    return this.prisma.hau_can_giang_vien.findUniqueOrThrow({
+      where: { id: cu.id },
+    });
   }
 
-  async thayThucDia(user: AuthenticatedUser, lopId: string, gdId: string, ds: ThucDiaMucDto[]) {
+  async thayThucDia(
+    user: AuthenticatedUser,
+    lopId: string,
+    gdId: string,
+    ds: ThucDiaMucDto[],
+  ) {
     await this.damBaoDot(user, lopId, gdId);
     const dong = ds.map((n, i) => {
       const sdt = chuanHoaSoDienThoai(n.so_dien_thoai);
       if (!sdt) {
-        throw new ValidationException(`Số điện thoại dòng ${i + 1} sai định dạng`, [
-          { field: 'nhan_su', message: 'SĐT sai định dạng' },
-        ]);
+        throw new ValidationException(
+          `Số điện thoại dòng ${i + 1} sai định dạng`,
+          [{ field: 'nhan_su', message: 'SĐT sai định dạng' }],
+        );
       }
       return {
         lop_id: lopId,
@@ -164,7 +222,9 @@ export class VanHanhLopService {
       };
     });
     await this.prisma.$transaction([
-      this.prisma.nhan_su_thuc_dia.deleteMany({ where: { lop_id: lopId, giai_doan_id: gdId } }),
+      this.prisma.nhan_su_thuc_dia.deleteMany({
+        where: { lop_id: lopId, giai_doan_id: gdId },
+      }),
       this.prisma.nhan_su_thuc_dia.createMany({ data: dong }),
     ]);
     return this.prisma.nhan_su_thuc_dia.findMany({

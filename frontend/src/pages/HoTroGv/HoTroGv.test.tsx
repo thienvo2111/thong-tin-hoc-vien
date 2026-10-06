@@ -25,7 +25,7 @@ function render(initialEntries: string[]) {
       },
       {
         element: <RequireHoTroGv />,
-        children: [{ element: <HoTroGvLayout />, children: [{ path: '/ho-tro-gv', element: <HoTroGvLop /> }] }],
+        children: [{ element: <HoTroGvLayout />, children: [{ path: '/ho-tro-gv/lop', element: <HoTroGvLop /> }, { path: '/ho-tro-gv', element: <div>Việc cần làm (trang chủ)</div> }] }],
       },
       { path: '/ho-tro', element: <div>Khu hỗ trợ học viên</div> },
     ],
@@ -38,9 +38,9 @@ describe('Khu người hỗ trợ giảng viên', () => {
     expect(trangChuTheoVaiTro('ho_tro_giang_vien')).toBe('/ho-tro-gv');
   });
 
-  it('ho_tro_giang_vien vào /ho-tro-gv → thấy lớp được phân công', async () => {
+  it('ho_tro_giang_vien vào /ho-tro-gv/lop → thấy lớp được phân công', async () => {
     db.nguoiDung.vai_tro = 'ho_tro_giang_vien';
-    render(['/ho-tro-gv']);
+    render(['/ho-tro-gv/lop']);
     expect(await screen.findByText('Lớp 01 – Nhóm cơ bản A')).toBeInTheDocument();
     expect(screen.getByText('AG-2026-014')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Đăng xuất' })).toBeInTheDocument();
@@ -49,14 +49,14 @@ describe('Khu người hỗ trợ giảng viên', () => {
   it('chưa được phân công → nhắc liên hệ Quản trị', async () => {
     db.nguoiDung.vai_tro = 'ho_tro_giang_vien';
     db.lopCuaToiGv = [];
-    render(['/ho-tro-gv']);
+    render(['/ho-tro-gv/lop']);
     expect(await screen.findByText(/chưa được phân công/)).toBeInTheDocument();
   });
 
   it('ho_tro_giang_vien vào /admin/* → về /ho-tro-gv; ho_tro_hoc_vien vào /ho-tro-gv → về /ho-tro', async () => {
     db.nguoiDung.vai_tro = 'ho_tro_giang_vien';
     const { unmount } = render(['/admin/tong-quan']);
-    expect(await screen.findByText('Lớp được phân công')).toBeInTheDocument();
+    expect(await screen.findByText('Việc cần làm (trang chủ)')).toBeInTheDocument();
     expect(screen.queryByText('Màn hình tổng quan')).not.toBeInTheDocument();
     unmount();
     db.nguoiDung.vai_tro = 'ho_tro_hoc_vien';

@@ -12,7 +12,7 @@ export default function HoTroGvDotLop() {
   return (
     <Container size="lg" py="lg">
       <Stack gap="md">
-        <Anchor component={Link} to="/ho-tro-gv" fz="sm">
+        <Anchor component={Link} to="/ho-tro-gv/lop" fz="sm">
           ← Danh sách lớp
         </Anchor>
         {isLoading && <Skeleton height={120} />}

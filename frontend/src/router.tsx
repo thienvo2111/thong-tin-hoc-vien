@@ -79,6 +79,10 @@ export const router = createBrowserRouter([
                 children: [
                   {
                     path: '/ho-tro-gv',
+                    lazy: () => import('@/pages/HoTroGv/HoTroGvViecCanLam').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/ho-tro-gv/lop',
                     lazy: () => import('@/pages/HoTroGv/HoTroGvLop').then((m) => ({ Component: m.default })),
                   },
                   {
@@ -188,6 +192,10 @@ export const router = createBrowserRouter([
                   {
                     path: '/admin/giang-vien',
                     lazy: () => import('@/pages/Admin/AdminGiangVien').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/admin/bang-kiem',
+                    lazy: () => import('@/pages/Admin/AdminBangKiem').then((m) => ({ Component: m.default })),
                   },
                   {
                     path: '/admin/diem-hoc',

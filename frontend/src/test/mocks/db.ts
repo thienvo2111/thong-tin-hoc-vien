@@ -1,4 +1,5 @@
 import type { LopCuaToiGv, TrangLop } from '@/api/hoTroGv';
+import type { BoBangKiem, DanhGiaDot } from '@/api/bangKiem';
 import type {
   DiemHoc,
   GiangVien,
@@ -1010,6 +1011,31 @@ export function taoTrangLopGvMau(): TrangLop {
   };
 }
 
+// ADR 0004 L4 (issue #17): bảng kiểm.
+export function taoBangKiemMacDinhMau(): BoBangKiem {
+  return {
+    nguon: 'mac_dinh',
+    muc: [
+      { id: 'm-1', khoa_id: null, thu_tu: 1, ten: 'Mọi buổi đã có điểm học', mo_ta: null, loai: 'tu_dong', ma_quy_tac: 'co_diem_hoc', han_truoc_ngay: 14, trang_thai: 'active' },
+      { id: 'm-2', khoa_id: null, thu_tu: 2, ten: 'Đã gửi danh sách điểm danh', mo_ta: null, loai: 'thu_cong', ma_quy_tac: null, han_truoc_ngay: 1, trang_thai: 'active' },
+    ],
+  };
+}
+
+export function taoDanhGiaDotMau(): DanhGiaDot {
+  return {
+    lop: { id: 'lop-1', ten_lop: 'Lớp 01 – Nhóm cơ bản A', loai_lop: 'truc_tiep', khoa: { id: 'khoa-1', ma_khoa: 'AG-2026-014', ten_khoa: 'Khóa An Giang' } },
+    giai_doan: { id: 'gd-2', thu_tu: 2, ten_giai_doan: 'Học trực tiếp' },
+    buoi_dau: '2026-11-10T01:00:00.000Z',
+    nguon: 'mac_dinh',
+    mau: 'do',
+    muc: [
+      { muc_id: 'm-1', ten: 'Mọi buổi đã phân công giảng viên', loai: 'tu_dong', ma_quy_tac: 'co_giang_vien', han: '2026-10-27T01:00:00.000Z', trang_thai: 'qua_han', ly_do: 'Buổi 1 chưa có giảng viên', ghi_chu: null, cap_nhat_boi: null, cap_nhat_luc: null },
+      { muc_id: 'm-2', ten: 'Đã gửi danh sách điểm danh', loai: 'thu_cong', ma_quy_tac: null, han: '2026-11-09T01:00:00.000Z', trang_thai: 'chua_dat', ly_do: null, ghi_chu: null, cap_nhat_boi: null, cap_nhat_luc: null },
+    ],
+  };
+}
+
 // ADR 0004 L1: lớp trong phạm vi người hỗ trợ giảng viên.
 export function taoLopCuaToiGvMau(): LopCuaToiGv[] {
   return [
@@ -1061,6 +1087,9 @@ export const db = {
   lichDay: taoLichDayMau(),
   lopCuaToiGv: taoLopCuaToiGvMau(),
   trangLopGv: taoTrangLopGvMau(),
+  bangKiemMacDinh: taoBangKiemMacDinhMau(),
+  bangKiemKhoa: {} as Record<string, BoBangKiem>,
+  danhGiaDot: taoDanhGiaDotMau(),
 };
 
 export function resetDb(): void {
@@ -1099,4 +1128,7 @@ export function resetDb(): void {
   db.lichDay = taoLichDayMau();
   db.lopCuaToiGv = taoLopCuaToiGvMau();
   db.trangLopGv = taoTrangLopGvMau();
+  db.bangKiemMacDinh = taoBangKiemMacDinhMau();
+  db.bangKiemKhoa = {};
+  db.danhGiaDot = taoDanhGiaDotMau();
 }

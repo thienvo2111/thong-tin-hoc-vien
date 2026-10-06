@@ -335,3 +335,7 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 141 | (L3) Hậu cần: khóa lạc quan theo `cap_nhat_luc` (UPDATE có điều kiện → 0 dòng → 409); giảng viên phải có phân công trong đợt; `tra_phong >= nhan_phong` | 🔴 | API + DB (`chk_hau_can_ngay`, `uq_hau_can_gv`) |
 | 142 | (L3) Hậu cần là dữ liệu cá nhân: chỉ Quản trị, nhóm hỗ trợ GV và chính giảng viên đó (lọc ở `locTheoVaiTro`); không xuất hiện ở khu hỗ trợ học viên và cổng học viên | 🔴 | API |
 | 143 | (L3) Thực địa theo đợt – lớp, thay toàn bộ; SĐT chuẩn hóa định dạng VN | 🔴 | API |
+| 144 | (L4, #17) Bảng kiểm: khóa có ≥ 1 mục riêng (kể cả đã ngưng) thì chỉ dùng mục riêng, ngược lại bộ mặc định; sửa bộ mặc định không ảnh hưởng khóa đã tùy chỉnh | 🔴 | API (`BangKiemService.boCuaKhoa`) |
+| 145 | (L4) Mục tự động phải có `ma_quy_tac` thuộc danh mục code (400) — DB CHECK `(loai='tu_dong') = (ma_quy_tac IS NOT NULL)`; không đổi loại mục; `han_truoc_ngay` 0–365 | 🔴 | API + DB |
+| 146 | (L4) Chỉ đánh dấu tay mục thủ công (tự động → 400); mục tự động tính động mỗi lần xem, không lưu kết quả | 🔴 | API |
+| 147 | (L4) Màu đợt: đỏ nếu có mục quá hạn (chưa đạt và đã qua hạn), vàng nếu có mục chưa đạt, xanh nếu đạt hết | 🔴 | API (`mauDot`, hàm thuần có test) |

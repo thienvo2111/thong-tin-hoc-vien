@@ -15,7 +15,7 @@ function render(initialEntries: string[]) {
   db.nguoiDung.vai_tro = 'ho_tro_giang_vien';
   return renderVoiRouter(
     [
-      { path: '/ho-tro-gv', element: <HoTroGvLop /> },
+      { path: '/ho-tro-gv/lop', element: <HoTroGvLop /> },
       { path: '/ho-tro-gv/lop/:lopId', element: <HoTroGvDotLop /> },
       { path: '/ho-tro-gv/lop/:lopId/giai-doan/:gdId', element: <HoTroGvHoSoLop /> },
       { path: '/ho-tro-gv/lich-day', element: <HoTroGvLichDay /> },
@@ -27,7 +27,7 @@ function render(initialEntries: string[]) {
 describe('Khu hỗ trợ giảng viên — trang lớp (L2)', () => {
   it('lớp → danh sách đợt trực tiếp → Hồ sơ chuẩn bị lớp', async () => {
     const user = userEvent.setup();
-    render(['/ho-tro-gv']);
+    render(['/ho-tro-gv/lop']);
     await user.click(await screen.findByRole('link', { name: 'Lớp 01 – Nhóm cơ bản A' }));
     await user.click(await screen.findByRole('link', { name: /GĐ 2 — Học trực tiếp/ }));
     expect(await screen.findByText(/Lớp 01 – Nhóm cơ bản A · GĐ 2/)).toBeInTheDocument();

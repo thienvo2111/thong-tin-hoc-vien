@@ -158,6 +158,21 @@ Vai trò `ho_tro_giang_vien` — cán bộ HCMUE, không gắn đơn vị, email
 
 `GET /ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}` thêm `hau_can: [...]` (kèm `nguoi_sua`) và `thuc_dia: [...]`. **Thực địa** cũng có ở `GET /ho-tro-hoc-vien/lich-hoc` (mỗi buổi `thuc_dia`) và `GET /hoc-vien/toi/khoa-hoc` (mỗi giai đoạn có lớp: `thuc_dia: [{ ho_ten, so_dien_thoai, nhiem_vu }]`). Hậu cần **không** có ở 2 nơi này.
 
+**Thêm L4 (issue #17, 2026-10-07) — bảng kiểm chuẩn bị** (`muc_kiem_tra`: `khoa_id NULL` = bộ mặc định, seed 7 quy tắc tự động + 1 mục thủ công; khóa có mục riêng thì chỉ dùng mục riêng):
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| GET | `/bang-kiem/quy-tac` | Danh mục quy tắc tự động trong code `[{ ma, ten }]` (`co_diem_hoc`, `co_giang_vien`, `khong_vuot_so_phong`, `co_hoc_vien`, `giang_vien_co_tai_khoan`, `hau_can_da_xac_nhan`, `co_thuc_dia`) | QuảnTrị |
+| GET | `/bang-kiem/mac-dinh`, `/bang-kiem/khoa/{khoaId}` | `{ nguon: 'mac_dinh' \| 'rieng', muc: [...] }` (kèm mục đã ngưng) | QuảnTrị |
+| POST | `/bang-kiem/khoa/{khoaId}/tuy-chinh` | Sao chép bộ mặc định thành bộ riêng của khóa; đã có bộ riêng → `409` | QuảnTrị |
+| POST | `/bang-kiem/mac-dinh/muc`, `/bang-kiem/khoa/{khoaId}/muc` | `{ ten, loai: 'tu_dong'\|'thu_cong', ma_quy_tac? (bắt buộc với tự động, phải có trong danh mục), han_truoc_ngay? (0–365), thu_tu? }`; khóa chưa tùy chỉnh → `409` | QuảnTrị |
+| PATCH | `/bang-kiem/muc/{id}` | Sửa tên/hạn/thứ tự/quy tắc, `trang_thai='ngung'` để ẩn (trạng thái đã đánh dấu giữ trong DB); không đổi loại (`400`) | QuảnTrị |
+| GET | `/ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}/bang-kiem` | `{ lop, giai_doan, buoi_dau, nguon, mau: 'xanh'\|'vang'\|'do', muc: [{ muc_id, ten, loai, ma_quy_tac, han, trang_thai: 'dat'\|'chua_dat'\|'qua_han', ly_do, ghi_chu, cap_nhat_boi, cap_nhat_luc }] }` — hạn = buổi đầu − `han_truoc_ngay`; đỏ = có mục quá hạn, vàng = có mục chưa đạt, xanh = đạt hết | `ho_tro_giang_vien` |
+| PUT | `/ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}/bang-kiem/{mucId}` | `{ da_xong, ghi_chu? }` — chỉ mục **thủ công** (tự động → `400`; mục không thuộc bộ của khóa → `404`) | `ho_tro_giang_vien` |
+| GET | `/ho-tro-giang-vien/viec-can-lam?so_ngay=21`, `/viec-can-lam/dem` | Đợt trực tiếp trong phạm vi có buổi từ nay tới N ngày, kèm màu + mục chưa đạt, sắp theo buổi đầu; `/dem` → `{ do }` (số đợt đỏ, hiện trên menu) | `ho_tro_giang_vien` |
+
+Nginx: thêm tiền tố `/bang-kiem`.
+
 Liên thông sang người hỗ trợ học viên: `GET /ho-tro-hoc-vien/lich-hoc` mỗi buổi thêm `phong`, `diem_hoc { ten, dia_chi, nguoi_lien_he, sdt_lien_he }`, `nhom_ho_tro_gv [{ ho_ten, email }]` — **không** có hậu cần hay liên hệ giảng viên.
 
 Phạm vi kiểm tra động mỗi request qua `HoTroGiangVienScopeService` — **điểm duy nhất** đọc `phan_cong_ho_tro_gv`, chỉ lộ API cấp lớp/khóa (`whereLopTrongPhamVi`, `lopIdsCuaToi`, `damBaoLopTrongPhamVi`, `damBaoKhoaTrongPhamVi`) để sau này thu hẹp về lớp mà không sửa nơi khác. Ngoài phạm vi → `404`.

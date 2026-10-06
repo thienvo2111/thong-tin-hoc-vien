@@ -63,6 +63,7 @@ import { ChonNguoiHoTroCum } from './ChonNguoiHoTroCum';
 import { SelectDiemHoc } from '@/components/SelectDiemHoc';
 import { ModalPhanCongBuoi } from './ModalPhanCongBuoi';
 import { ChonNhomHoTroGv } from './ChonNhomHoTroGv';
+import { BangKiemEditor } from './BangKiemEditor';
 
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 const MAU_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'blue', zoom: 'grape', vle: 'teal' };
@@ -834,6 +835,7 @@ export default function AdminKhoaChiTiet() {
                 <Tabs.Tab value="giai-doan">Giai đoạn</Tabs.Tab>
                 <Tabs.Tab value="cum">Cụm hỗ trợ Zalo</Tabs.Tab>
                 {laQuanTri && <Tabs.Tab value="ho-tro-gv">Hỗ trợ giảng viên</Tabs.Tab>}
+                {laQuanTri && <Tabs.Tab value="bang-kiem">Bảng kiểm chuẩn bị</Tabs.Tab>}
               </Tabs.List>
 
               {/* ---------------- Tab Lớp học ---------------- */}
@@ -1246,6 +1248,11 @@ export default function AdminKhoaChiTiet() {
               {laQuanTri && (
                 <Tabs.Panel value="ho-tro-gv" pt="md">
                   <ChonNhomHoTroGv khoa={khoa} />
+                </Tabs.Panel>
+              )}
+              {laQuanTri && (
+                <Tabs.Panel value="bang-kiem" pt="md">
+                  <BangKiemEditor khoaId={khoa.id} />
                 </Tabs.Panel>
               )}
             </Tabs>

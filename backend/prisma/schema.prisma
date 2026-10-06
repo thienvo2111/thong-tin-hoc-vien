@@ -175,6 +175,12 @@ enum trang_thai_khao_sat {
 
 // T5 (mo-rong-nls-an-giang.md, 2026-09-29): mức năng lực đầu vào/đầu ra của
 // dang_ky_hoc, import qua loai_danh_muc_import.ket_qua_danh_gia.
+// ADR 0004 G5b (issue #17): loại mục bảng kiểm chuẩn bị đợt trực tiếp.
+enum loai_muc_kiem_tra {
+  tu_dong
+  thu_cong
+}
+
 enum muc_nang_luc {
   co_ban
   thanh_thao
@@ -454,6 +460,8 @@ model nguoi_dung {
   phan_cong_xac_nhan                 phan_cong_giang_day[]      @relation("phan_cong_nguoi_xac_nhan")
 
   hau_can_cap_nhat hau_can_giang_vien[] @relation("hau_can_cap_nhat_boi")
+
+  muc_kiem_tra_cap_nhat trang_thai_muc_kiem_tra[] @relation("muc_kiem_tra_cap_nhat_boi")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -748,6 +756,9 @@ model khoa_boi_duong {
   // ADR 0004 G3: nhóm người hỗ trợ giảng viên của khóa.
   phan_cong_ho_tro_gv phan_cong_ho_tro_gv[]
 
+  // ADR 0004 G5b (issue #17): mục bảng kiểm riêng của khóa.
+  muc_kiem_tra muc_kiem_tra[]
+
   @@index([don_vi_dat_hang_id], map: "idx_khoa_don_vi")
   @@index([trang_thai], map: "idx_khoa_trang_thai")
 }
@@ -776,6 +787,8 @@ model giai_doan_khoa {
   // ADR 0004 L3 (issue #16)
   hau_can_giang_vien hau_can_giang_vien[]
   nhan_su_thuc_dia   nhan_su_thuc_dia[]
+
+  trang_thai_muc_kiem_tra trang_thai_muc_kiem_tra[]
 
   @@unique([khoa_id, thu_tu], map: "uq_giai_doan_thu_tu")
   @@index([khoa_id], map: "idx_giai_doan_khoa")
@@ -813,6 +826,8 @@ model lop_hoc {
   // ADR 0004 L3 (issue #16)
   hau_can_giang_vien hau_can_giang_vien[]
   nhan_su_thuc_dia   nhan_su_thuc_dia[]
+
+  trang_thai_muc_kiem_tra trang_thai_muc_kiem_tra[]
 
   @@unique([khoa_id, loai_lop, ten_lop], map: "uq_lop_ten_trong_khoa")
   @@index([khoa_id], map: "idx_lop_khoa")
@@ -1335,4 +1350,44 @@ model nhan_su_thuc_dia {
   giai_doan giai_doan_khoa @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([lop_id, giai_doan_id], map: "idx_thuc_dia_dot")
+}
+
+// ADR 0004 G5b (issue #17): mục bảng kiểm. khoa_id NULL = bộ mặc định hệ
+// thống; khóa có mục riêng thì chỉ dùng mục riêng. Mục tự động: ma_quy_tac
+// thuộc danh mục quy tắc trong code (src/bang-kiem/quy-tac.ts).
+model muc_kiem_tra {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  khoa_id        String?           @db.Uuid
+  thu_tu         Int
+  ten            String            @db.VarChar(255)
+  mo_ta          String?
+  loai           loai_muc_kiem_tra
+  ma_quy_tac     String?           @db.VarChar(50)
+  han_truoc_ngay Int?              @db.SmallInt
+  trang_thai     trang_thai_active @default(active)
+  created_at     DateTime          @default(now()) @db.Timestamptz(6)
+
+  khoa           khoa_boi_duong?           @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  trang_thai_dot trang_thai_muc_kiem_tra[]
+
+  @@index([khoa_id], map: "idx_muc_kiem_tra_khoa")
+}
+
+// Trạng thái mục THỦ CÔNG theo đợt (lớp × giai đoạn).
+model trang_thai_muc_kiem_tra {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  muc_id       String   @db.Uuid
+  lop_id       String   @db.Uuid
+  giai_doan_id String   @db.Uuid
+  da_xong      Boolean  @default(false)
+  ghi_chu      String?
+  cap_nhat_boi String?  @db.Uuid
+  cap_nhat_luc DateTime @default(now()) @db.Timestamptz(6)
+
+  muc       muc_kiem_tra   @relation(fields: [muc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lop       lop_hoc        @relation(fields: [lop_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  giai_doan giai_doan_khoa @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  nguoi_sua nguoi_dung?    @relation("muc_kiem_tra_cap_nhat_boi", fields: [cap_nhat_boi], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@unique([muc_id, lop_id, giai_doan_id], map: "uq_trang_thai_muc_kiem_tra")
 }

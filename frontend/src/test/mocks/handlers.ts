@@ -45,6 +45,61 @@ function loi(status: number, code: string, message: string, extra: Record<string
 }
 
 export const handlers = [
+  // ADR 0004 L4 (issue #17): bảng kiểm.
+  http.get('/bang-kiem/quy-tac', () =>
+    HttpResponse.json([
+      { ma: 'co_diem_hoc', ten: 'Mọi buổi có điểm học' },
+      { ma: 'co_giang_vien', ten: 'Mọi buổi có ≥ 1 giảng viên' },
+    ]),
+  ),
+  http.get('/bang-kiem/mac-dinh', () => HttpResponse.json(db.bangKiemMacDinh)),
+  http.get('/bang-kiem/khoa/:khoaId', ({ params }) =>
+    HttpResponse.json(db.bangKiemKhoa[params.khoaId as string] ?? db.bangKiemMacDinh),
+  ),
+  http.post('/bang-kiem/khoa/:khoaId/tuy-chinh', ({ params }) => {
+    const bo = { nguon: 'rieng' as const, muc: db.bangKiemMacDinh.muc.map((m) => ({ ...m, id: `${m.id}-k`, khoa_id: params.khoaId as string })) };
+    db.bangKiemKhoa[params.khoaId as string] = bo;
+    return HttpResponse.json(bo, { status: 201 });
+  }),
+  http.post('/bang-kiem/mac-dinh/muc', async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    const m = { id: `m-${db.bangKiemMacDinh.muc.length + 1}`, khoa_id: null, thu_tu: db.bangKiemMacDinh.muc.length + 1, mo_ta: null, ma_quy_tac: null, han_truoc_ngay: null, trang_thai: 'active', ...body } as (typeof db.bangKiemMacDinh.muc)[number];
+    db.bangKiemMacDinh.muc.push(m);
+    return HttpResponse.json(m, { status: 201 });
+  }),
+  http.patch('/bang-kiem/muc/:id', async ({ params, request }) => {
+    const m = [...db.bangKiemMacDinh.muc, ...Object.values(db.bangKiemKhoa).flatMap((b) => b.muc)].find((x) => x.id === params.id);
+    if (!m) return loi(404, 'NOT_FOUND', 'Không tìm thấy mục');
+    Object.assign(m, (await request.json()) as Record<string, unknown>);
+    return HttpResponse.json(m);
+  }),
+  http.get('/ho-tro-giang-vien/lop/:lopId/giai-doan/:gdId/bang-kiem', () => HttpResponse.json(db.danhGiaDot)),
+  http.put('/ho-tro-giang-vien/lop/:lopId/giai-doan/:gdId/bang-kiem/:mucId', async ({ params, request }) => {
+    const body = (await request.json()) as { da_xong: boolean; ghi_chu?: string | null };
+    const m = db.danhGiaDot.muc.find((x) => x.muc_id === params.mucId);
+    if (!m) return loi(404, 'NOT_FOUND', 'Không tìm thấy mục');
+    if (m.loai === 'tu_dong') return loi(400, 'VALIDATION_ERROR', 'Mục tự động do hệ thống tính');
+    m.trang_thai = body.da_xong ? 'dat' : 'chua_dat';
+    m.ghi_chu = body.ghi_chu ?? null;
+    m.cap_nhat_boi = 'Phạm Văn Giảng';
+    m.cap_nhat_luc = new Date().toISOString();
+    return HttpResponse.json({});
+  }),
+  http.get('/ho-tro-giang-vien/viec-can-lam', () =>
+    HttpResponse.json([
+      {
+        lop: db.danhGiaDot.lop,
+        giai_doan: db.danhGiaDot.giai_doan,
+        buoi_dau: db.danhGiaDot.buoi_dau,
+        mau: db.danhGiaDot.mau,
+        so_qua_han: 1,
+        so_chua_dat: 2,
+        muc_chua_dat: db.danhGiaDot.muc.filter((m) => m.trang_thai !== 'dat').map((m) => ({ ten: m.ten, trang_thai: m.trang_thai, han: m.han })),
+      },
+    ]),
+  ),
+  http.get('/ho-tro-giang-vien/viec-can-lam/dem', () => HttpResponse.json({ do: db.danhGiaDot.mau === 'do' ? 1 : 0 })),
+
   // ADR 0004 L1 (issue #14): khu người hỗ trợ giảng viên + nhóm theo khóa.
   http.get('/ho-tro-giang-vien/lop-cua-toi', () => HttpResponse.json(db.lopCuaToiGv)),
   http.get('/ho-tro-giang-vien/lop/:lopId/dot', ({ params }) =>

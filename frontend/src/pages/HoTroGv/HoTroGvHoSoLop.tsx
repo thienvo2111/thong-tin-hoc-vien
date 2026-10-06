@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Alert, Anchor, Badge, Button, Container, Group, Paper, SimpleGrid, Skeleton, Stack, Table, Tabs, Text, Title } from '@mantine/core';
 import { ModalPhanCongBuoi } from '@/pages/Admin/ModalPhanCongBuoi';
 import { KhungThucDia, ModalSuaBuoiGv, TheHauCan } from './VanHanhLop';
+import { KhungBangKiem } from './KhungBangKiem';
 import { useTrangLopGv, type TrangLop } from '@/api/hoTroGv';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangGio, dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
@@ -61,6 +62,9 @@ function NoiDung({ d }: { d: TrangLop }) {
         </Tabs.List>
 
         <Tabs.Panel value="tong-quan" pt="md">
+          <Stack mb="md">
+            <KhungBangKiem lopId={d.lop.id} gdId={d.giai_doan.id} />
+          </Stack>
           <SimpleGrid cols={{ base: 1, sm: 3 }}>
             <Paper withBorder p="md" radius={12}>
               <Text fz="xs" c="dimmed">

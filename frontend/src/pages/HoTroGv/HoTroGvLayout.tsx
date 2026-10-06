@@ -1,11 +1,14 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Box, Button, Group, Image, ScrollArea, Text } from '@mantine/core';
+import { useEffect } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Badge, Box, Button, Group, Image, ScrollArea, Text } from '@mantine/core';
+import { useDemViecCanLam } from '@/api/bangKiem';
 import { useToi } from '@/auth/AuthContext';
 import logoHcmue from '@/assets/logo-hcmue.png';
 import { tokenKhac } from '@/theme';
 
 const MENU = [
-  { to: '/ho-tro-gv', nhan: 'Lớp', end: true },
+  { to: '/ho-tro-gv', nhan: 'Việc cần làm', end: true },
+  { to: '/ho-tro-gv/lop', nhan: 'Lớp', end: false },
   { to: '/ho-tro-gv/lich-day', nhan: 'Lịch dạy', end: false },
   { to: '/ho-tro-gv/danh-muc', nhan: 'Danh mục', end: false },
 ];
@@ -14,6 +17,14 @@ const MENU = [
 export default function HoTroGvLayout() {
   const { nguoiDung, dangXuat } = useToi();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const dem = useDemViecCanLam();
+  const { refetch } = dem;
+  // Như khu hỗ trợ học viên (H13): số đếm tải lại khi chuyển trang, không polling.
+  useEffect(() => {
+    void refetch();
+  }, [pathname, refetch]);
+  const soDo = dem.data?.do ?? 0;
 
   async function xuLyDangXuat() {
     await dangXuat();
@@ -54,6 +65,11 @@ export default function HoTroGvLayout() {
                     style={{ display: 'inline-flex', borderRadius: 8, background: isActive ? 'rgba(255,255,255,.14)' : 'transparent' }}
                   >
                     {m.nhan}
+                    {m.to === '/ho-tro-gv' && soDo > 0 && (
+                      <Badge component="span" ml={6} size="sm" color="red" circle={soDo < 10} aria-label={`${soDo} đợt có mục quá hạn`}>
+                        {soDo}
+                      </Badge>
+                    )}
                   </Text>
                 )}
               </NavLink>
