@@ -1341,6 +1341,20 @@ export class HocVienService {
     return this.toResponseVoiTen(hocVien);
   }
 
+  // ADR 0003 (người hỗ trợ học viên): hồ sơ kèm tên + mức đầy đủ. KHÔNG kiểm
+  // tra phạm vi — nơi gọi đã chặn qua HoTroHocVienScopeService.
+  async hoSoVoiTenKhongKiemPhamVi(id: string) {
+    const hocVien = await this.prisma.hoc_vien.findUnique({
+      where: { id },
+      include: INCLUDE_HOC_VIEN_DAY_DU_VOI_TEN,
+    });
+    if (!hocVien) {
+      throw new NotFoundAppException('Không tìm thấy hồ sơ học viên');
+    }
+    const { day_du, thieu } = await this.danhGiaDayDu(hocVien);
+    return { ...this.toResponseVoiTen(hocVien), day_du, thieu };
+  }
+
   async kiemTraTrung(soDinhDanh: string) {
     if (!/^[0-9]{12}$/.test(soDinhDanh)) {
       throw new ValidationException(

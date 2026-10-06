@@ -14,7 +14,8 @@ export type HanhDongNhatKy =
   | 'cap_nhat_muc_danh_gia'
   | 'cap_nhat_ket_qua_hoc'
   | 'phan_lop'
-  | 'doi_cum';
+  | 'doi_cum'
+  | 'ho_tro_xuat_danh_sach';
 
 const TIEU_DE: Record<HanhDongNhatKy, string> = {
   dang_nhap_thanh_cong: 'Đăng nhập thành công',
@@ -27,6 +28,7 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   cap_nhat_ket_qua_hoc: 'Cập nhật kết quả khóa học',
   phan_lop: 'Phân lớp',
   doi_cum: 'Đổi cụm hỗ trợ',
+  ho_tro_xuat_danh_sach: 'Người hỗ trợ xuất danh sách cụm',
 };
 
 const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
@@ -40,6 +42,7 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   cap_nhat_ket_qua_hoc: 'hoc_tap',
   phan_lop: 'hoc_tap',
   doi_cum: 'hoc_tap',
+  ho_tro_xuat_danh_sach: 'tai_khoan',
 };
 
 const NHAN_VAI_TRO: Record<vai_tro_nguoi_dung, string> = {

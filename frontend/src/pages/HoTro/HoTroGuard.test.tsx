@@ -39,14 +39,14 @@ describe('Khu người hỗ trợ học viên — guard', () => {
   it('ho_tro_hoc_vien vào /admin/* -> về /ho-tro', async () => {
     db.nguoiDung.vai_tro = 'ho_tro_hoc_vien';
     render(['/admin/tong-quan']);
-    expect(await screen.findByText('Khu làm việc người hỗ trợ học viên')).toBeInTheDocument();
+    expect(await screen.findByText('Cụm hỗ trợ của tôi')).toBeInTheDocument();
     expect(screen.queryByText('Màn hình tổng quan')).not.toBeInTheDocument();
   });
 
   it('ho_tro_hoc_vien vào /ho-tro -> thấy khu làm việc + nút Đăng xuất', async () => {
     db.nguoiDung.vai_tro = 'ho_tro_hoc_vien';
     render(['/ho-tro']);
-    expect(await screen.findByText('Khu làm việc người hỗ trợ học viên')).toBeInTheDocument();
+    expect(await screen.findByText('Cụm hỗ trợ của tôi')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Đăng xuất' })).toBeInTheDocument();
   });
 

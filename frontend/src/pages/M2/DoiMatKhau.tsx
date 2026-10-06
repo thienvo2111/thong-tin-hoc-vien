@@ -37,7 +37,8 @@ function DongCheck({ dat, children }: { dat: boolean; children: string }) {
 /** M2 — buộc đổi mật khẩu lần đầu (dac-ta § M2). Không có TopBar (route ngoài ProtectedLayout) nên cần lối "Đăng xuất" riêng. */
 export default function DoiMatKhau() {
   const { matKhauVuaDung, xacNhanDaDoiMatKhau, dangXuat, nguoiDung } = useToi();
-  const { data: hoSo } = useHoSoToi();
+  // Chỉ học viên có hồ sơ (gợi ý "không trùng ngày sinh"); vai trò khác gọi sẽ nhận 403.
+  const { data: hoSo } = useHoSoToi(nguoiDung?.vai_tro === 'hoc_vien');
   const navigate = useNavigate();
   const [dangDangXuat, setDangDangXuat] = useState(false);
 

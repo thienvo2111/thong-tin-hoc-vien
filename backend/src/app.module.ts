@@ -19,6 +19,7 @@ import { YeuCauHoTroModule } from './yeu-cau-ho-tro/yeu-cau-ho-tro.module';
 import { CauHinhKhaoSatModule } from './cau-hinh-khao-sat/cau-hinh-khao-sat.module';
 import { SsoModule } from './sso/sso.module';
 import { NhatKyModule } from './nhat-ky/nhat-ky.module';
+import { HoTroHocVienModule } from './ho-tro-hoc-vien/ho-tro-hoc-vien.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { NhatKyModule } from './nhat-ky/nhat-ky.module';
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60000, limit: 10 }]),
     PrismaModule,
     NhatKyModule,
+    HoTroHocVienModule,
     AuthModule,
     HocVienModule,
     KhoaBoiDuongModule,

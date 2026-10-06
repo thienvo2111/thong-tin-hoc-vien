@@ -90,6 +90,18 @@ Vai trò `ho_tro_hoc_vien` — cán bộ HCMUE, `don_vi_id`/`hoc_vien_id` luôn 
 
 Lỗi: như tài khoản đơn vị (tên đăng nhập/email sai định dạng `400`, trùng `409`); thiếu email → `400` field `email` "Người hỗ trợ học viên bắt buộc có email"; `:id` không phải người hỗ trợ → `404`.
 
+#### Khu làm việc người hỗ trợ — `/ho-tro/*` (ADR 0003 Lát 2, 2026-10-06)
+
+Chỉ `ho_tro_hoc_vien` (vai trò khác → `403`, kể cả Quản trị). Phạm vi = cụm trong `phan_cong_ho_tro` của người gọi, kiểm tra **mỗi request**; học viên thuộc cụm khi có `dang_ky_hoc.cum_id` thuộc các cụm đó. Học viên/cụm ngoài phạm vi → `404` (không `403`). Chưa được phân công → danh sách rỗng.
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/ho-tro/cum-cua-toi` | `[{ cum_id, ten_cum, link_zalo, trang_thai, khoa_id, ma_khoa, ten_khoa, so_hoc_vien }]` |
+| GET | `/ho-tro/hoc-vien` | Phân trang. Lọc `q` (họ tên không dấu, CCCD, mã MOET, tên đăng nhập), `cum_id` (ngoài phạm vi → 404), `don_vi_cong_tac_id`, `da_dang_nhap`, `day_du`. Dòng: `{ id, ho_ten, ma_dinh_danh_moet, ten_dang_nhap, dang_nhap_lan_cuoi, don_vi_cong_tac_ten, doi_tuong, so_dien_thoai_lien_he, email_lien_he, day_du, cum: [{ cum_id, ten_cum }], lop_theo_giai_doan: { [giai_doan_id]: ten_lop }, khao_sat: [{ loai, trang_thai, muc }] }` — `cum` chỉ gồm cụm trong phạm vi người gọi. Sắp theo họ tên |
+| GET | `/ho-tro/hoc-vien/xuat` | Cùng bộ lọc (bỏ phân trang) → `.xlsx`, 1 sheet/cụm (`Content-Disposition: attachment; filename="ds-cum-ho-tro-<yyyymmdd>.xlsx"`, `Cache-Control: no-store`). Cột: STT, Họ tên, Đơn vị công tác, Đối tượng, Số điện thoại, Email, `GĐ<n> - <tên giai đoạn>` (lớp được gán), Hồ sơ đầy đủ, Đã đăng nhập, Khảo sát. **Không** có CCCD, ngày sinh, mã MOET, nơi sinh. Ghi `nhat_ky_hoat_dong` `ho_tro_xuat_danh_sach` |
+| GET | `/ho-tro/hoc-vien/{id}` | `{ ho_so (như GET /hoc-vien/{id} + day_du, thieu), tai_khoan: { ten_dang_nhap, trang_thai, dang_nhap_lan_cuoi, phai_doi_mat_khau, khoa_den, dang_bi_khoa, email_da_xac_minh } \| null, hoc_tap (cùng cấu trúc GET /hoc-vien/{id}/khoa-hoc), khao_sat, yeu_cau_ho_tro (20 gần nhất, tóm tắt), lich_su_thay_doi (50 gần nhất, kèm nguoi_sua_ten) }` |
+| GET | `/ho-tro/lich-hoc` | `tu_ngay`/`den_ngay` (`YYYY-MM-DD` giờ VN; mặc định đầu hôm nay → hết 14 ngày sau), `cum_id`. Buổi (`lich_hoc_lop`) của cặp (lớp, giai đoạn) có ≥1 học viên của cụm được phân lớp, kèm `lop`, `giai_doan`, `khoa`, `nhan_su`, `so_hoc_vien_cum`; tối đa 500 buổi |
+
 ## 2. Dịch vụ Học viên
 
 | Method | Endpoint | Mô tả | Ai gọi |

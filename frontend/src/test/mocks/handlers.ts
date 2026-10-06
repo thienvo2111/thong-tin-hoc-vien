@@ -851,6 +851,23 @@ export const handlers = [
     return HttpResponse.json({ cum_id: cum.id, nguoi_ho_tro: cum.nguoi_ho_tro });
   }),
 
+  // Khu người hỗ trợ học viên (ADR 0003) — /ho-tro/*.
+  http.get('/ho-tro/cum-cua-toi', () => HttpResponse.json(db.hoTroCum)),
+  http.get('/ho-tro/hoc-vien', () =>
+    HttpResponse.json({ data: db.hoTroHocVien, total: db.hoTroHocVien.length, page: 1, page_size: 20 }),
+  ),
+  http.get('/ho-tro/hoc-vien/xuat', () =>
+    new HttpResponse(new Blob(['xlsx']), {
+      headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    }),
+  ),
+  http.get('/ho-tro/hoc-vien/:id', ({ params }) =>
+    params.id === db.hoTroChiTiet.ho_so.id
+      ? HttpResponse.json(db.hoTroChiTiet)
+      : loi(404, 'NOT_FOUND', 'Không tìm thấy hồ sơ học viên'),
+  ),
+  http.get('/ho-tro/lich-hoc', () => HttpResponse.json(db.hoTroLichHoc)),
+
   // Tài khoản học viên — /nguoi-dung/hoc-vien.
   http.get('/nguoi-dung/hoc-vien', () => {
     const data = db.taiKhoanHocVien;

@@ -923,8 +923,9 @@ export class KhoaBoiDuongService {
   // kèm lớp được gán ở giai đoạn đó (chỉ buổi thuộc giai đoạn đó) hoặc null,
   // link/hướng dẫn chung của giai đoạn, và tiến độ (ket_qua_giai_doan).
   //
-  // Dùng chung cho GET /hoc-vien/toi/khoa-hoc VÀ GET /hoc-vien/{id}/khoa-hoc.
-  private async khoaHocTheoHocVienId(hocVienId: string) {
+  // Dùng chung cho GET /hoc-vien/toi/khoa-hoc, GET /hoc-vien/{id}/khoa-hoc VÀ
+  // chi tiết học viên của người hỗ trợ (ADR 0003 — nơi gọi tự kiểm phạm vi).
+  async khoaHocTheoHocVienId(hocVienId: string) {
     const dangKyList = await this.prisma.dang_ky_hoc.findMany({
       where: { hoc_vien_id: hocVienId },
       include: {

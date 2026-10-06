@@ -15,9 +15,7 @@ function renderTrang(id: string) {
   });
 }
 
-// Màn rất nhiều tab/modal: vài test thao tác form mất ~3 giây khi chạy riêng, vượt ngưỡng 5 giây mặc định
-// khi cả suite chạy song song.
-describe('Admin — Chi tiết khóa bồi dưỡng', { timeout: 15000 }, () => {
+describe('Admin — Chi tiết khóa bồi dưỡng', () => {
   it('trạng thái tải: hiện skeleton trong lúc chờ API', () => {
     renderTrang('khoa-1');
     expect(document.querySelectorAll('.mantine-Skeleton-root').length).toBeGreaterThan(0);

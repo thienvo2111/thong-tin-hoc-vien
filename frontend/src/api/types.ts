@@ -748,3 +748,85 @@ export interface NhatKyHocVien {
   hoc_vien: { id: string; ho_ten: string };
   muc: MucNhatKy[];
 }
+
+// ---------------------------------------------------------------------------------------------------
+// Khu người hỗ trợ học viên (ADR 0003) — /ho-tro/*, chỉ ho_tro_hoc_vien.
+export interface CumCuaToi {
+  cum_id: string;
+  ten_cum: string;
+  link_zalo: string | null;
+  trang_thai: TrangThaiActive;
+  khoa_id: string;
+  ma_khoa: string;
+  ten_khoa: string;
+  so_hoc_vien: number;
+}
+
+export interface KhaoSatTomTat {
+  loai: string;
+  trang_thai: 'da_mo' | 'dang_lam' | 'hoan_thanh';
+  muc: MucNangLuc | null;
+}
+
+export interface HocVienHoTroDong {
+  id: string;
+  ho_ten: string;
+  ma_dinh_danh_moet: string | null;
+  ten_dang_nhap: string | null;
+  dang_nhap_lan_cuoi: string | null;
+  don_vi_cong_tac_ten: string;
+  doi_tuong: DoiTuongHocVien | null;
+  so_dien_thoai_lien_he: string | null;
+  email_lien_he: string | null;
+  day_du: boolean;
+  cum: { cum_id: string; ten_cum: string }[];
+  khao_sat: KhaoSatTomTat[];
+}
+
+export interface HocVienHoTroChiTiet {
+  ho_so: HocVien & { day_du: boolean; thieu: ApiFieldError[] };
+  tai_khoan: {
+    id: string;
+    ten_dang_nhap: string;
+    trang_thai: TrangThaiActive;
+    dang_nhap_lan_cuoi: string | null;
+    phai_doi_mat_khau: boolean;
+    khoa_den: string | null;
+    dang_bi_khoa: boolean;
+    email_da_xac_minh: boolean;
+  } | null;
+  hoc_tap: KhoaHocDangKy[];
+  khao_sat: (KhaoSatTomTat & { hoan_thanh_luc: string | null; cap_nhat_luc: string })[];
+  yeu_cau_ho_tro: {
+    id: string;
+    tinh_huong: string | null;
+    noi_dung_hoi: string;
+    trang_thai: 'cho_xu_ly' | 'da_phan_hoi' | 'da_dong';
+    thoi_gian_tao: string;
+    thoi_gian_phan_hoi: string | null;
+  }[];
+  lich_su_thay_doi: {
+    truong: string;
+    gia_tri_cu: string | null;
+    gia_tri_moi: string | null;
+    vai_tro_nguoi_sua: string;
+    sua_luc: string;
+    nguoi_sua_ten: string;
+  }[];
+}
+
+export interface BuoiHocHoTro {
+  id: string;
+  lop_id: string;
+  giai_doan_id: string;
+  buoi_so: number;
+  thoi_gian_bat_dau: string;
+  thoi_gian_ket_thuc: string;
+  dia_diem_hoac_link: string | null;
+  trang_thai: TrangThaiLichHoc;
+  lop: { id: string; ten_lop: string; loai_lop: LoaiLop };
+  giai_doan: { id: string; thu_tu: number; ten_giai_doan: string };
+  khoa: { id: string; ma_khoa: string; ten_khoa: string };
+  nhan_su: { ho_ten: string; vai_tro: VaiTroNhanSuLop; so_dien_thoai: string | null }[];
+  so_hoc_vien_cum: number;
+}

@@ -18,6 +18,10 @@ import type {
   NhatKyImportItem,
   TaiKhoanDonVi,
   TaiKhoanHoTro,
+  CumCuaToi,
+  HocVienHoTroDong,
+  HocVienHoTroChiTiet,
+  BuoiHocHoTro,
   TaiKhoanHocVien,
   TongHopDonViRow,
   TongQuanResult,
@@ -668,6 +672,90 @@ export function taoDanhSachTaiKhoanHoTroMau(): TaiKhoanHoTro[] {
   ];
 }
 
+// Khu người hỗ trợ học viên (ADR 0003): 1 cụm, 1 học viên, 1 buổi học.
+export function taoHoTroCumMau(): CumCuaToi[] {
+  return [
+    {
+      cum_id: 'cum-1',
+      ten_cum: 'Cụm Long Xuyên',
+      link_zalo: 'https://zalo.me/g/cum-long-xuyen',
+      trang_thai: 'active',
+      khoa_id: 'khoa-1',
+      ma_khoa: 'KBD-AG-01',
+      ten_khoa: 'Khóa An Giang',
+      so_hoc_vien: 120,
+    },
+  ];
+}
+
+export function taoHoTroHocVienMau(): HocVienHoTroDong[] {
+  return [
+    {
+      id: 'hv-ht-1',
+      ho_ten: 'Nguyễn Văn Một',
+      ma_dinh_danh_moet: '7900000001',
+      ten_dang_nhap: '7900000001',
+      dang_nhap_lan_cuoi: null,
+      don_vi_cong_tac_ten: 'Trường THPT Long Xuyên',
+      doi_tuong: 'giao_vien',
+      so_dien_thoai_lien_he: '0912345678',
+      email_lien_he: null,
+      day_du: false,
+      cum: [{ cum_id: 'cum-1', ten_cum: 'Cụm Long Xuyên' }],
+      khao_sat: [{ loai: 'danh-gia', trang_thai: 'hoan_thanh', muc: 'thanh_thao' }],
+    },
+  ];
+}
+
+export function taoHoTroChiTietMau(): HocVienHoTroChiTiet {
+  return {
+    ho_so: {
+      ...taoHoSoMoi(),
+      id: 'hv-ht-1',
+      ho_ten: 'Nguyễn Văn Một',
+      don_vi_cong_tac_ten: 'Trường THPT Long Xuyên',
+      day_du: false,
+      thieu: [{ field: 'doi_tuong', message: 'Chưa chọn đối tượng (giáo viên hoặc cán bộ quản lý)' }],
+    },
+    tai_khoan: {
+      id: 'nd-ht-1',
+      ten_dang_nhap: '7900000001',
+      trang_thai: 'active',
+      dang_nhap_lan_cuoi: null,
+      phai_doi_mat_khau: true,
+      khoa_den: null,
+      dang_bi_khoa: false,
+      email_da_xac_minh: false,
+    },
+    hoc_tap: [],
+    khao_sat: [
+      { loai: 'danh-gia', trang_thai: 'hoan_thanh', muc: 'thanh_thao', hoan_thanh_luc: null, cap_nhat_luc: '2026-10-05T02:00:00.000Z' },
+    ],
+    yeu_cau_ho_tro: [],
+    lich_su_thay_doi: [],
+  };
+}
+
+export function taoHoTroLichHocMau(): BuoiHocHoTro[] {
+  return [
+    {
+      id: 'buoi-1',
+      lop_id: 'lop-1',
+      giai_doan_id: 'gd-1',
+      buoi_so: 1,
+      thoi_gian_bat_dau: '2026-10-10T01:00:00.000Z',
+      thoi_gian_ket_thuc: '2026-10-10T04:00:00.000Z',
+      dia_diem_hoac_link: 'https://zoom.us/j/123',
+      trang_thai: 'chua_dien_ra',
+      lop: { id: 'lop-1', ten_lop: 'Zoom 01', loai_lop: 'zoom' },
+      giai_doan: { id: 'gd-1', thu_tu: 1, ten_giai_doan: 'Zoom – nhóm 1' },
+      khoa: { id: 'khoa-1', ma_khoa: 'KBD-AG-01', ten_khoa: 'Khóa An Giang' },
+      nhan_su: [{ ho_ten: 'TS. Giảng Viên', vai_tro: 'giang_vien', so_dien_thoai: '0900000000' }],
+      so_hoc_vien_cum: 35,
+    },
+  ];
+}
+
 export function taoDanhSachTaiKhoanDonViMau(): TaiKhoanDonVi[] {
   return [
     {
@@ -797,6 +885,10 @@ export const db = {
   danhSachYeuCauHoTro: taoDanhSachYeuCauHoTroMau(),
   taiKhoanDonVi: taoDanhSachTaiKhoanDonViMau(),
   taiKhoanHoTro: taoDanhSachTaiKhoanHoTroMau(),
+  hoTroCum: taoHoTroCumMau(),
+  hoTroHocVien: taoHoTroHocVienMau(),
+  hoTroChiTiet: taoHoTroChiTietMau(),
+  hoTroLichHoc: taoHoTroLichHocMau(),
   donViChuaCap: taoDonViChuaCapMau(),
   taiKhoanHocVien: taoDanhSachTaiKhoanHocVienMau(),
   nhatKyHocVien: taoNhatKyHocVienMau(),
@@ -826,6 +918,10 @@ export function resetDb(): void {
   db.danhSachYeuCauHoTro = taoDanhSachYeuCauHoTroMau();
   db.taiKhoanDonVi = taoDanhSachTaiKhoanDonViMau();
   db.taiKhoanHoTro = taoDanhSachTaiKhoanHoTroMau();
+  db.hoTroCum = taoHoTroCumMau();
+  db.hoTroHocVien = taoHoTroHocVienMau();
+  db.hoTroChiTiet = taoHoTroChiTietMau();
+  db.hoTroLichHoc = taoHoTroLichHocMau();
   db.donViChuaCap = taoDonViChuaCapMau();
   db.taiKhoanHocVien = taoDanhSachTaiKhoanHocVienMau();
   db.nhatKyHocVien = taoNhatKyHocVienMau();

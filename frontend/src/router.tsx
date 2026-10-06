@@ -81,6 +81,18 @@ export const router = createBrowserRouter([
                     path: '/ho-tro',
                     lazy: () => import('@/pages/HoTro/HoTroTrangChu').then((m) => ({ Component: m.default })),
                   },
+                  {
+                    path: '/ho-tro/hoc-vien',
+                    lazy: () => import('@/pages/HoTro/HoTroDanhSachHocVien').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/ho-tro/hoc-vien/:id',
+                    lazy: () => import('@/pages/HoTro/HoTroHocVienChiTiet').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/ho-tro/lich-hoc',
+                    lazy: () => import('@/pages/HoTro/HoTroLichHoc').then((m) => ({ Component: m.default })),
+                  },
                 ],
               },
             ],

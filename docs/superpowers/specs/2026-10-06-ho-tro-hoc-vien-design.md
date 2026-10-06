@@ -43,7 +43,7 @@ Quyết định nền: [ADR 0003](../../adr/0003-nguoi-ho-tro-hoc-vien.md) (H1�
   - `damBaoTrongPhamVi(caller, hocVienId)` → `NotFoundAppException` nếu ngoài phạm vi (không 403, không lộ tồn tại).
   - Không có phân công → danh sách rỗng, không lỗi.
 - `GET /ho-tro/cum-cua-toi` — `[{cum_id, ten_cum, link_zalo, khoa_id, ten_khoa, so_hoc_vien, so_yeu_cau_cho_xu_ly}]`.
-- `GET /ho-tro/hoc-vien?tu_khoa=&cum_id=&don_vi_cong_tac_id=&day_du=&da_dang_nhap=&trang_thai_khao_sat=&page=` — tìm không dấu theo họ tên, CCCD, mã MOET, tên đăng nhập. `cum_id` ngoài phạm vi → 404.
+- `GET /ho-tro/hoc-vien?q=&cum_id=&don_vi_cong_tac_id=&day_du=&da_dang_nhap=&page=` (sửa khi code #11: tham số tìm là `q` như GET /hoc-vien; **chưa** có lọc `trang_thai_khao_sat` — trạng thái từng bài đã hiện trên mỗi dòng và trong file xuất, thêm bộ lọc khi chốt danh sách bài bắt buộc) — tìm không dấu theo họ tên, CCCD, mã MOET, tên đăng nhập. `cum_id` ngoài phạm vi → 404.
 - `GET /ho-tro/hoc-vien/{id}` — hồ sơ (kèm `_ten`), `tai_khoan` (`ten_dang_nhap`, `dang_nhap_lan_cuoi`, `dang_bi_khoa`, `khoa_den`, `email_da_xac_minh`, `phai_doi_mat_khau`), `hoc_tap` (theo từng `dang_ky_hoc`: khóa, cụm, lớp theo giai đoạn, lịch buổi + `dia_diem_hoac_link`, `nhan_su_lop`, điểm danh, kết quả khảo sát), `yeu_cau_ho_tro` (tóm tắt), `lich_su_thay_doi` (kèm `ly_do`, người sửa).
 - `GET /ho-tro/lich-hoc?tu_ngay=&den_ngay=&cum_id=` — buổi của mọi lớp có ≥1 học viên trong phạm vi (được phân lớp ở đúng giai đoạn của buổi), kèm giảng viên/trợ giảng, số học viên của cụm trong lớp. Mặc định 14 ngày tới.
 - `GET /ho-tro/hoc-vien/xuat?<cùng bộ lọc>` — `.xlsx`, 1 sheet/cụm, cột theo ADR H6; ghi `nhat_ky_hoat_dong` (`hanh_dong = 'ho_tro_xuat_danh_sach'`, `chi_tiet = {cum_ids, bo_loc, so_dong}`).

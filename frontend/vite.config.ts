@@ -41,5 +41,8 @@ export default defineConfig(({ mode }) => ({
     setupFiles: ['./src/test/setup.ts'],
     css: true,
     globals: true,
+    // Test thao tác form bằng user-event mất 2–3 giây khi chạy riêng; chạy cả suite song song trên máy
+    // 4 nhân thì vượt ngưỡng 5 giây mặc định.
+    testTimeout: 15000,
   },
 }));
