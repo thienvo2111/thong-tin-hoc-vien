@@ -26,6 +26,7 @@ import { HoTroGiangVienModule } from './ho-tro-giang-vien/ho-tro-giang-vien.modu
 import { BangKiemModule } from './bang-kiem/bang-kiem.module';
 import { CongGiangVienModule } from './cong-giang-vien/cong-giang-vien.module';
 import { NhacLichModule } from './nhac-lich/nhac-lich.module';
+import { VanHanhModule } from './van-hanh/van-hanh.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { NhacLichModule } from './nhac-lich/nhac-lich.module';
     BangKiemModule,
     CongGiangVienModule,
     NhacLichModule,
+    VanHanhModule,
     DanhMucModule,
     ImportModule,
     BaoCaoModule,

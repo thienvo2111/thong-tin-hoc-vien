@@ -190,6 +190,12 @@ Nginx: thêm tiền tố `/bang-kiem`.
 
 Trang lớp (`GET /ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}`) thêm `hoc_vien[].bao_vang` (`lich_hoc_id → ly_do`) và `de_nghi_cho` (đề nghị chờ ra/vào lớp; giảng viên không thấy). Hàm thuần `hopNhatDiemDanh` (dùng ở L6): `vang` + có báo vắng → `vang_co_phep`, `co_mat` luôn thắng.
 
+**Thêm L9 (issue #22, 2026-10-07) — màn giám sát Vận hành** (ADR 0004 G15, Quản trị giám sát thay vì làm thay). Nginx thêm tiền tố `/van-hanh`; trang `/admin/van-hanh`.
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| GET | `/van-hanh` | `{ dot_do, de_nghi_cho_lau, thay_doi_lich, khoa_chua_nhom_gv, cum_chua_ho_tro, danh_muc_moi: { diem_hoc, giang_vien } }` — đợt trực tiếp 21 ngày tới màu đỏ (+ mục quá hạn, nhóm hỗ trợ GV); đề nghị đổi lớp `cho_duyet` quá 48 giờ; nhật ký `sua_lich_hoc` 7 ngày qua (ai, vai trò, lý do, trước → sau, lớp); khóa chưa kết thúc có giai đoạn trực tiếp nhưng chưa có nhóm hỗ trợ GV; cụm active của khóa chưa kết thúc chưa có người hỗ trợ HV (+ số học viên); điểm học / giảng viên do người hỗ trợ tạo 7 ngày qua. Khối mẫu biểu (L6) chưa có. Mỗi khối tối đa 200 dòng | QuảnTrị |
+
 **Thêm L8 (issue #21, 2026-10-07) — tin nhắn nhắc lịch** (ADR 0004 G10/G11): hệ thống soạn sẵn nội dung, cán bộ sao chép gửi qua Zalo/SMS rồi bấm **Đã gửi** → ghi `nhat_ky_nhac_lich` (lưu nội dung đã gửi). **Không email, không cron.** Cờ theo (buổi, người nhận): chưa có lần gửi chứa buổi → `chua_nhac`; `lich_hoc_lop.cap_nhat_luc` > lần gửi cuối → `can_nhac_lai`; ngược lại `da_nhac`.
 
 | Method | Endpoint | Mô tả | Ai gọi |

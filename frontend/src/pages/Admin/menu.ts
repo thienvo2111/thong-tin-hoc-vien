@@ -14,6 +14,8 @@ export interface MucMenuAdmin {
 
 export const MENU_ADMIN: MucMenuAdmin[] = [
   { to: '/admin/tong-quan', nhan: 'Tổng quan', icon: '📊' },
+  // ADR 0004 G15 (issue #22): giám sát vận hành người hỗ trợ.
+  { to: '/admin/van-hanh', nhan: 'Vận hành', icon: '🛠️', chiQuanTri: true },
   { to: '/admin/hoc-vien', nhan: 'Học viên', icon: '👥' },
   { to: '/admin/khoa-boi-duong', nhan: 'Khóa bồi dưỡng', icon: '🎓' },
   { to: '/admin/dot-xac-nhan', nhan: 'Đợt xác nhận', icon: '🗓️', chiQuanTri: true },

@@ -75,8 +75,6 @@ export class ViecCanLamQueryDto {
   so_ngay?: number;
 }
 
-const MOT_NGAY_MS = 24 * 3600 * 1000;
-
 const TRANG_THAI_DE_NGHI = ['cho_duyet', 'da_duyet', 'tu_choi', 'da_huy'];
 
 export class LocDeNghiDto {
@@ -245,36 +243,9 @@ export class HoTroGiangVienController {
   }
 
   private async dsViecCanLam(user: AuthenticatedUser, soNgay: number) {
-    const bayGio = new Date();
-    const cuoi = new Date(bayGio.getTime() + soNgay * MOT_NGAY_MS);
-    const buoi = await this.prisma.lich_hoc_lop.findMany({
-      where: {
-        lop: await this.scope.whereLopTrongPhamVi(user.id),
-        giai_doan: { hinh_thuc: 'truc_tiep' },
-        thoi_gian_bat_dau: { gte: bayGio, lte: cuoi },
-      },
-      select: { lop_id: true, giai_doan_id: true },
-      distinct: ['lop_id', 'giai_doan_id'],
-    });
-    const ds = await Promise.all(
-      buoi.map(async ({ lop_id, giai_doan_id }) => {
-        const dg = await this.bangKiem.danhGiaDot(lop_id, giai_doan_id, bayGio);
-        return {
-          lop: dg.lop,
-          giai_doan: dg.giai_doan,
-          buoi_dau: dg.buoi_dau,
-          mau: dg.mau,
-          so_qua_han: dg.muc.filter((m) => m.trang_thai === 'qua_han').length,
-          so_chua_dat: dg.muc.filter((m) => m.trang_thai !== 'dat').length,
-          muc_chua_dat: dg.muc
-            .filter((m) => m.trang_thai !== 'dat')
-            .map((m) => ({ ten: m.ten, trang_thai: m.trang_thai, han: m.han })),
-          nhac_gv: dg.nhac_gv,
-        };
-      }),
-    );
-    return ds.sort(
-      (a, b) => (a.buoi_dau?.getTime() ?? 0) - (b.buoi_dau?.getTime() ?? 0),
+    return this.bangKiem.dsDotSapToi(
+      await this.scope.whereLopTrongPhamVi(user.id),
+      soNgay,
     );
   }
 

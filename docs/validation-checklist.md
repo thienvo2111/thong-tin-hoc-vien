@@ -351,3 +351,4 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 157 | (L8) "Đã gửi" giảng viên: mọi buổi trong phạm vi + có phân công của GV (404); cụm: mọi buổi thuộc lớp có học viên cụm ở đúng giai đoạn (400) | 🔴 | API |
 | 158 | (L8) Cờ nhắc: `can_nhac_lai` khi `cap_nhat_luc` của buổi > lần gửi cuối chứa buổi; gộp nhiều buổi: cần nhắc lại > chưa nhắc > đã nhắc | 🔴 | API (`trangThaiNhac`, hàm thuần có test) |
 | 159 | (L8) Tin nhắn giảng viên không chứa dữ liệu (tên, hậu cần) của giảng viên khác | 🔴 | API |
+| 160 | (L9, #22) `GET /van-hanh` chỉ Quản trị (403 vai trò khác); chỉ đọc; đề nghị "chờ lâu" = `cho_duyet` và `tao_luc` < now − 48 giờ; danh mục mới = `tao_boi` có vai trò người hỗ trợ, 7 ngày qua | 🔴 | API |

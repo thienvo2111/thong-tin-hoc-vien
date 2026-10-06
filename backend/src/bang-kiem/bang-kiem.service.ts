@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { loai_muc_kiem_tra, trang_thai_active } from '@prisma/client';
+import { Prisma, loai_muc_kiem_tra, trang_thai_active } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
@@ -245,6 +245,48 @@ export class BangKiemService {
       // ADR 0004 G11 (issue #21): giảng viên chưa nhắc / cần nhắc lại.
       nhac_gv: nhacTheoGiangVien(dot).filter((n) => n.trang_thai !== 'da_nhac'),
     };
+  }
+
+  /**
+   * Đợt trực tiếp có buổi từ bây giờ tới soNgay ngày tới (trong các lớp lọc theo whereLop), kèm màu bảng
+   * kiểm + mục chưa đạt + giảng viên chưa nhắc — sắp theo buổi đầu. Dùng cho Việc cần làm (hỗ trợ GV) và
+   * màn giám sát Vận hành của Quản trị (G15).
+   */
+  async dsDotSapToi(
+    whereLop: Prisma.lop_hocWhereInput,
+    soNgay: number,
+    bayGio = new Date(),
+  ) {
+    const cuoi = new Date(bayGio.getTime() + soNgay * 24 * 3600 * 1000);
+    const buoi = await this.prisma.lich_hoc_lop.findMany({
+      where: {
+        lop: whereLop,
+        giai_doan: { hinh_thuc: 'truc_tiep' },
+        thoi_gian_bat_dau: { gte: bayGio, lte: cuoi },
+      },
+      select: { lop_id: true, giai_doan_id: true },
+      distinct: ['lop_id', 'giai_doan_id'],
+    });
+    const ds = await Promise.all(
+      buoi.map(async ({ lop_id, giai_doan_id }) => {
+        const dg = await this.danhGiaDot(lop_id, giai_doan_id, bayGio);
+        return {
+          lop: dg.lop,
+          giai_doan: dg.giai_doan,
+          buoi_dau: dg.buoi_dau,
+          mau: dg.mau,
+          so_qua_han: dg.muc.filter((m) => m.trang_thai === 'qua_han').length,
+          so_chua_dat: dg.muc.filter((m) => m.trang_thai !== 'dat').length,
+          muc_chua_dat: dg.muc
+            .filter((m) => m.trang_thai !== 'dat')
+            .map((m) => ({ ten: m.ten, trang_thai: m.trang_thai, han: m.han })),
+          nhac_gv: dg.nhac_gv,
+        };
+      }),
+    );
+    return ds.sort(
+      (a, b) => (a.buoi_dau?.getTime() ?? 0) - (b.buoi_dau?.getTime() ?? 0),
+    );
   }
 
   /** Đánh dấu mục THỦ CÔNG của đợt (mục tự động → 400; mục không thuộc bộ của khóa → 404). */
