@@ -1,4 +1,4 @@
-import type { LopCuaToiGv } from '@/api/hoTroGv';
+import type { LopCuaToiGv, TrangLop } from '@/api/hoTroGv';
 import type {
   DiemHoc,
   GiangVien,
@@ -967,6 +967,49 @@ export function taoLichDayMau(): Record<string, LichDayGiangVien> {
   };
 }
 
+// ADR 0004 L2/L3: Hồ sơ chuẩn bị lớp (người hỗ trợ GV) — buổi tương lai để sửa được.
+export function taoTrangLopGvMau(): TrangLop {
+  const mai = new Date(Date.now() + 3 * 24 * 3600 * 1000);
+  mai.setUTCHours(1, 0, 0, 0);
+  return {
+    lop: { id: 'lop-1', ten_lop: 'Lớp 01 – Nhóm cơ bản A', loai_lop: 'truc_tiep', si_so_toi_da: 30, khoa: { id: 'khoa-1', ma_khoa: 'AG-2026-014', ten_khoa: 'Khóa An Giang' } },
+    giai_doan: { id: 'gd-2', thu_tu: 2, ten_giai_doan: 'Học trực tiếp', hinh_thuc: 'truc_tiep', thoi_gian_bat_dau: '2026-10-05T00:00:00.000Z', thoi_gian_ket_thuc: '2026-10-06T00:00:00.000Z' },
+    buoi: [
+      {
+        id: 'lh-1',
+        buoi_so: 1,
+        thoi_gian_bat_dau: mai.toISOString(),
+        thoi_gian_ket_thuc: new Date(mai.getTime() + 3 * 3600 * 1000).toISOString(),
+        dia_diem_hoac_link: null,
+        phong: 'P.101',
+        trang_thai: 'chua_dien_ra',
+        diem_hoc: { id: 'dh-1', ma_diem_hoc: 'AG-LX-01', ten: 'THPT Long Xuyên', dia_chi: '1 Trần Hưng Đạo', nguoi_lien_he: 'Cô Lan', sdt_lien_he: '0901000001', so_phong: 4, ghi_chu_csvc: null },
+        giang_vien: [{ id: 'gv-1', ho_ten: 'Nguyễn Văn Long', vai_tro: 'giang_vien', so_dien_thoai: '0909123456', email: 'long@hcmue.edu.vn', so_gio: 4, da_xac_nhan_gio: false }],
+      },
+    ],
+    hoc_vien: [
+      {
+        dang_ky_hoc_id: 'dk-1',
+        hoc_vien_id: 'hv-1',
+        ho_ten: 'Trần Thị Học',
+        gioi_tinh: 'Nữ',
+        don_vi: 'THPT Long Xuyên',
+        doi_tuong: 'giao_vien',
+        chuc_vu: null,
+        muc_dau_vao: 'co_ban',
+        so_dien_thoai: '0912000001',
+        email: null,
+        cum: { id: 'cum-1', ten_cum: 'Cụm Long Xuyên', nguoi_ho_tro: [{ ho_ten: 'Nguyễn Văn A', email: 'nguyen.a@hcmue.edu.vn' }] },
+        diem_danh: {},
+        ket_qua: null,
+      },
+    ],
+    nhom_ho_tro_gv: [{ ho_ten: 'Phạm Văn Giảng', email: 'pham.g@hcmue.edu.vn' }],
+    hau_can: [],
+    thuc_dia: [],
+  };
+}
+
 // ADR 0004 L1: lớp trong phạm vi người hỗ trợ giảng viên.
 export function taoLopCuaToiGvMau(): LopCuaToiGv[] {
   return [
@@ -1017,6 +1060,7 @@ export const db = {
   giangVien: taoDanhSachGiangVienMau(),
   lichDay: taoLichDayMau(),
   lopCuaToiGv: taoLopCuaToiGvMau(),
+  trangLopGv: taoTrangLopGvMau(),
 };
 
 export function resetDb(): void {
@@ -1054,4 +1098,5 @@ export function resetDb(): void {
   db.giangVien = taoDanhSachGiangVienMau();
   db.lichDay = taoLichDayMau();
   db.lopCuaToiGv = taoLopCuaToiGvMau();
+  db.trangLopGv = taoTrangLopGvMau();
 }

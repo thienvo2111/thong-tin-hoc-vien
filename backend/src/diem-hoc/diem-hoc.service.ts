@@ -41,6 +41,9 @@ export class DiemHocService {
   private async wherePhamVi(
     caller: AuthenticatedUser,
   ): Promise<Prisma.diem_hocWhereInput | null> {
+    // ADR 0004 G12: người hỗ trợ giảng viên chọn điểm học cho mọi buổi của
+    // khóa mình — cần thấy toàn bộ danh mục.
+    if (caller.vai_tro === 'ho_tro_giang_vien') return null;
     const donViIds = await this.scopeService.getAccessibleDonViIds(caller);
     if (donViIds === 'ALL') return null;
     const khoaIds = await this.scopeService.getKhoaIdsXemDuoc(caller);

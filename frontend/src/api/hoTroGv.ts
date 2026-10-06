@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type { LoaiLop, TrangThaiActive, VaiTroNhanSuLop } from './types';
 
@@ -67,6 +67,47 @@ export interface TrangLop {
     ket_qua: { ty_le_hoan_thanh: number | null; diem: number | null } | null;
   }[];
   nhom_ho_tro_gv: { ho_ten: string; email: string | null }[];
+  // ADR 0004 L3 (issue #16): hậu cần giảng viên + thực địa của đợt.
+  hau_can: HauCanGiangVien[];
+  thuc_dia: ThucDia[];
+}
+
+export interface HauCanGiangVien {
+  id: string;
+  giang_vien_id: string;
+  noi_o_ten: string | null;
+  noi_o_dia_chi: string | null;
+  nhan_phong: string | null;
+  tra_phong: string | null;
+  phuong_tien: string | null;
+  don_luc: string | null;
+  diem_don: string | null;
+  lien_he_don: string | null;
+  ghi_chu: string | null;
+  da_xac_nhan_noi_o: boolean;
+  da_xac_nhan_di_chuyen: boolean;
+  cap_nhat_luc: string;
+  nguoi_sua: string | null;
+}
+
+export interface ThucDia {
+  id?: string;
+  ho_ten: string;
+  so_dien_thoai: string;
+  nhiem_vu: string | null;
+  ghi_chu?: string | null;
+}
+
+export type LuuHauCanDto = Partial<Omit<HauCanGiangVien, 'id' | 'giang_vien_id' | 'nguoi_sua' | 'cap_nhat_luc'>> & {
+  cap_nhat_luc?: string;
+};
+
+export interface SuaBuoiGvDto {
+  thoi_gian_bat_dau?: string;
+  thoi_gian_ket_thuc?: string;
+  diem_hoc_id?: string;
+  phong?: string | null;
+  ly_do: string;
 }
 
 export interface BuoiLichDay {
@@ -108,5 +149,43 @@ export function useLichDayGv(params: { tu_ngay?: string; den_ngay?: string }) {
   return useQuery({
     queryKey: ['ho-tro-gv', 'lich-day', params],
     queryFn: () => apiFetch<BuoiLichDay[]>(`/ho-tro-giang-vien/lich-day${qs ? `?${qs}` : ''}`),
+  });
+}
+
+function useLamMoiGv() {
+  const qc = useQueryClient();
+  return () => qc.invalidateQueries({ queryKey: ['ho-tro-gv'] });
+}
+
+export function useSuaBuoiGv() {
+  const lamMoi = useLamMoiGv();
+  return useMutation({
+    mutationFn: ({ lichHocId, dto }: { lichHocId: string; dto: SuaBuoiGvDto }) =>
+      apiFetch<{ canh_bao?: string[] }>(`/ho-tro-giang-vien/lich-hoc/${lichHocId}`, { method: 'PATCH', body: JSON.stringify(dto) }),
+    onSuccess: lamMoi,
+  });
+}
+
+export function useLuuHauCan(lopId: string, gdId: string) {
+  const lamMoi = useLamMoiGv();
+  return useMutation({
+    mutationFn: ({ giangVienId, dto }: { giangVienId: string; dto: LuuHauCanDto }) =>
+      apiFetch<HauCanGiangVien>(`/ho-tro-giang-vien/lop/${lopId}/giai-doan/${gdId}/hau-can/${giangVienId}`, {
+        method: 'PUT',
+        body: JSON.stringify(dto),
+      }),
+    onSettled: lamMoi,
+  });
+}
+
+export function useThayThucDia(lopId: string, gdId: string) {
+  const lamMoi = useLamMoiGv();
+  return useMutation({
+    mutationFn: (nhan_su: { ho_ten: string; so_dien_thoai: string; nhiem_vu?: string }[]) =>
+      apiFetch<ThucDia[]>(`/ho-tro-giang-vien/lop/${lopId}/giai-doan/${gdId}/thuc-dia`, {
+        method: 'PUT',
+        body: JSON.stringify({ nhan_su }),
+      }),
+    onSuccess: lamMoi,
   });
 }

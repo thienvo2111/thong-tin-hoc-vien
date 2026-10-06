@@ -254,6 +254,23 @@ export class HoTroHocVienService {
       orderBy: [{ thoi_gian_bat_dau: 'asc' }, { buoi_so: 'asc' }],
       take: 500,
     });
+    // ADR 0004 G4 (issue #16): người hỗ trợ thực địa của đợt (lớp × giai đoạn).
+    const thucDia = await this.prisma.nhan_su_thuc_dia.findMany({
+      where: {
+        OR: capLop.map(({ lop_id, giai_doan_id }) => ({
+          lop_id,
+          giai_doan_id,
+        })),
+      },
+      select: {
+        lop_id: true,
+        giai_doan_id: true,
+        ho_ten: true,
+        so_dien_thoai: true,
+        nhiem_vu: true,
+      },
+      orderBy: { created_at: 'asc' },
+    });
     return buoi.map(({ lop, ...b }) => {
       const { nhan_su, khoa, ...lopGon } = lop;
       const { phan_cong_ho_tro_gv, ...khoaGon } = khoa;
@@ -263,6 +280,15 @@ export class HoTroHocVienService {
         khoa: khoaGon,
         nhan_su,
         nhom_ho_tro_gv: phan_cong_ho_tro_gv.map((p) => p.nguoi_dung),
+        thuc_dia: thucDia
+          .filter(
+            (t) => t.lop_id === b.lop_id && t.giai_doan_id === b.giai_doan_id,
+          )
+          .map(({ ho_ten, so_dien_thoai, nhiem_vu }) => ({
+            ho_ten,
+            so_dien_thoai,
+            nhiem_vu,
+          })),
         so_hoc_vien_cum: soHocVien.get(`${b.lop_id}|${b.giai_doan_id}`) ?? 0,
       };
     });

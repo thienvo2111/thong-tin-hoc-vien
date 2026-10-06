@@ -453,6 +453,8 @@ model nguoi_dung {
   giang_vien_tao                     giang_vien[]               @relation("giang_vien_tao_boi")
   phan_cong_xac_nhan                 phan_cong_giang_day[]      @relation("phan_cong_nguoi_xac_nhan")
 
+  hau_can_cap_nhat hau_can_giang_vien[] @relation("hau_can_cap_nhat_boi")
+
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
 }
@@ -771,6 +773,10 @@ model giai_doan_khoa {
   // đoạn, nhập qua import ket_qua_giai_doan.
   ket_qua_giai_doan ket_qua_giai_doan[]
 
+  // ADR 0004 L3 (issue #16)
+  hau_can_giang_vien hau_can_giang_vien[]
+  nhan_su_thuc_dia   nhan_su_thuc_dia[]
+
   @@unique([khoa_id, thu_tu], map: "uq_giai_doan_thu_tu")
   @@index([khoa_id], map: "idx_giai_doan_khoa")
 }
@@ -804,6 +810,10 @@ model lop_hoc {
   // QĐ10: UNIQUE đổi từ (khoa_id, ten_lop) sang (khoa_id, loai_lop, ten_lop)
   // — cho phép trùng tên lớp GIỮA các loại lớp khác nhau trong cùng khóa
   // (vd "Lớp 1" vừa có ở trực tiếp vừa có ở zoom).
+  // ADR 0004 L3 (issue #16)
+  hau_can_giang_vien hau_can_giang_vien[]
+  nhan_su_thuc_dia   nhan_su_thuc_dia[]
+
   @@unique([khoa_id, loai_lop, ten_lop], map: "uq_lop_ten_trong_khoa")
   @@index([khoa_id], map: "idx_lop_khoa")
 }
@@ -898,6 +908,7 @@ model giang_vien {
   nguoi_tao    nguoi_dung?           @relation("giang_vien_tao_boi", fields: [tao_boi], references: [id], onDelete: SetNull, onUpdate: NoAction)
   nguon_import nhat_ky_import?       @relation(fields: [nguon_import_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   phan_cong    phan_cong_giang_day[]
+  hau_can      hau_can_giang_vien[]
 }
 
 // T11 (issue #3): phân công giảng viên vào từng buổi. Giờ dạy chỉ được cộng
@@ -1276,4 +1287,52 @@ model phan_cong_ho_tro_gv {
 
   @@unique([nguoi_dung_id, khoa_id], map: "uq_phan_cong_ho_tro_gv")
   @@index([khoa_id], map: "idx_phan_cong_ho_tro_gv_khoa")
+}
+
+// ADR 0004 G5 (issue #16, 2026-10-07): hậu cần (chỗ ở, phương tiện) của 1
+// giảng viên trong 1 đợt (lớp × giai đoạn). Cả nhóm hỗ trợ GV cùng sửa → PUT
+// gửi kèm cap_nhat_luc đã đọc (khóa lạc quan, lệch → 409).
+model hau_can_giang_vien {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lop_id                String    @db.Uuid
+  giai_doan_id          String    @db.Uuid
+  giang_vien_id         String    @db.Uuid
+  noi_o_ten             String?   @db.VarChar(255)
+  noi_o_dia_chi         String?   @db.VarChar(500)
+  nhan_phong            DateTime? @db.Date
+  tra_phong             DateTime? @db.Date
+  phuong_tien           String?   @db.VarChar(255)
+  don_luc               DateTime? @db.Timestamptz(6)
+  diem_don              String?   @db.VarChar(500)
+  lien_he_don           String?   @db.VarChar(255)
+  ghi_chu               String?
+  da_xac_nhan_noi_o     Boolean   @default(false)
+  da_xac_nhan_di_chuyen Boolean   @default(false)
+  cap_nhat_boi          String?   @db.Uuid
+  cap_nhat_luc          DateTime  @default(now()) @db.Timestamptz(6)
+
+  lop        lop_hoc        @relation(fields: [lop_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  giai_doan  giai_doan_khoa @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  giang_vien giang_vien     @relation(fields: [giang_vien_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  nguoi_sua  nguoi_dung?    @relation("hau_can_cap_nhat_boi", fields: [cap_nhat_boi], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@unique([lop_id, giai_doan_id, giang_vien_id], map: "uq_hau_can_gv")
+}
+
+// ADR 0004 G4 (issue #16): người hỗ trợ thực địa theo ĐỢT – LỚP (Q4) — chỉ là
+// thông tin liên hệ, không có tài khoản.
+model nhan_su_thuc_dia {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lop_id        String   @db.Uuid
+  giai_doan_id  String   @db.Uuid
+  ho_ten        String   @db.VarChar(255)
+  so_dien_thoai String   @db.VarChar(20)
+  nhiem_vu      String?  @db.VarChar(255)
+  ghi_chu       String?
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  lop       lop_hoc        @relation(fields: [lop_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  giai_doan giai_doan_khoa @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([lop_id, giai_doan_id], map: "idx_thuc_dia_dot")
 }

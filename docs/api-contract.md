@@ -146,6 +146,18 @@ Vai trò `ho_tro_giang_vien` — cán bộ HCMUE, không gắn đơn vị, email
 | GET | `/ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}` | Hồ sơ chuẩn bị lớp (bản đọc): `{ lop, giai_doan, buoi: [{ …, phong, diem_hoc, giang_vien: [{ ho_ten, vai_tro, so_dien_thoai, email, so_gio, da_xac_nhan_gio }] }], hoc_vien: [{ ho_ten, gioi_tinh, don_vi, doi_tuong, chuc_vu, muc_dau_vao, so_dien_thoai, email, cum: { ten_cum, nguoi_ho_tro }, diem_danh, ket_qua }], nhom_ho_tro_gv }` — **không** CCCD/ngày sinh/mã MOET. Giai đoạn không trực tiếp / lớp ngoài phạm vi → `404` | `ho_tro_giang_vien` |
 | GET | `/ho-tro-giang-vien/lich-day?tu_ngay=&den_ngay=` | Buổi của mọi lớp trong phạm vi (mặc định hôm nay + 14 ngày, giờ VN) kèm lớp, giai đoạn, điểm học, giảng viên (họ tên, vai trò) | `ho_tro_giang_vien` |
 
+**Thêm L3 (issue #16, 2026-10-07)** — vận hành lớp/đợt (mọi endpoint kiểm phạm vi trước):
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| PATCH | `/ho-tro-giang-vien/lich-hoc/{id}` | `{ thoi_gian_bat_dau?, thoi_gian_ket_thuc?, diem_hoc_id?, phong?, ly_do }` — `ly_do` **bắt buộc** 5–500 ký tự. Chỉ buổi **chưa diễn ra** và **chưa có điểm danh** (ngược lại `400`). Đi qua đúng luật của Quản trị (`capNhatLichHoc`: #49, điểm học bắt buộc với GĐ trực tiếp, giảng viên không trùng giờ, cảnh báo số phòng) → nhật ký `sua_lich_hoc` có lý do + vai trò người sửa. Không có thêm/xóa buổi, đổi buổi số/trạng thái | `ho_tro_giang_vien` |
+| PUT | `/ho-tro-giang-vien/lich-hoc/{id}/giang-vien` | Như `PUT /lop/{id}/lich-hoc/{lich_hoc_id}/giang-vien` của Quản trị (cùng `PhanCongGiangDayService`) | `ho_tro_giang_vien` |
+| PUT | `/ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}/hau-can/{giangVienId}` | Upsert hậu cần `{ cap_nhat_luc?, noi_o_ten, noi_o_dia_chi, nhan_phong, tra_phong (YYYY-MM-DD), phuong_tien, don_luc, diem_don, lien_he_don, ghi_chu, da_xac_nhan_noi_o, da_xac_nhan_di_chuyen }` (null = xóa). **Khóa lạc quan:** sửa bản đã có phải gửi `cap_nhat_luc` vừa đọc — lệch → `409`, không ghi đè. Giảng viên không có phân công trong đợt → `400`; trả phòng trước nhận phòng → `400` | `ho_tro_giang_vien` |
+| PUT | `/ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}/thuc-dia` | `{ nhan_su: [{ ho_ten, so_dien_thoai, nhiem_vu?, ghi_chu? }] }` (≤ 20) **thay toàn bộ** người hỗ trợ thực địa của đợt (Q4: theo đợt – lớp); SĐT chuẩn hóa như giảng viên | `ho_tro_giang_vien` |
+| GET / POST / PATCH | `/ho-tro-giang-vien/diem-hoc(/{id})`, `/ho-tro-giang-vien/giang-vien(/{id})` | Như danh mục của Quản trị (ghi `tao_boi`), thấy toàn bộ danh mục; gửi `trang_thai` (ngưng) → `403` — ngưng/gộp trùng là việc của Quản trị | `ho_tro_giang_vien` |
+
+`GET /ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}` thêm `hau_can: [...]` (kèm `nguoi_sua`) và `thuc_dia: [...]`. **Thực địa** cũng có ở `GET /ho-tro-hoc-vien/lich-hoc` (mỗi buổi `thuc_dia`) và `GET /hoc-vien/toi/khoa-hoc` (mỗi giai đoạn có lớp: `thuc_dia: [{ ho_ten, so_dien_thoai, nhiem_vu }]`). Hậu cần **không** có ở 2 nơi này.
+
 Liên thông sang người hỗ trợ học viên: `GET /ho-tro-hoc-vien/lich-hoc` mỗi buổi thêm `phong`, `diem_hoc { ten, dia_chi, nguoi_lien_he, sdt_lien_he }`, `nhom_ho_tro_gv [{ ho_ten, email }]` — **không** có hậu cần hay liên hệ giảng viên.
 
 Phạm vi kiểm tra động mỗi request qua `HoTroGiangVienScopeService` — **điểm duy nhất** đọc `phan_cong_ho_tro_gv`, chỉ lộ API cấp lớp/khóa (`whereLopTrongPhamVi`, `lopIdsCuaToi`, `damBaoLopTrongPhamVi`, `damBaoKhoaTrongPhamVi`) để sau này thu hẹp về lớp mà không sửa nơi khác. Ngoài phạm vi → `404`.

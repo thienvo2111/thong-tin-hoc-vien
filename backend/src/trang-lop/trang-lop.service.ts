@@ -70,7 +70,7 @@ export async function layDotLop(
     throw new NotFoundAppException('Không tìm thấy đợt học của lớp');
   }
 
-  const [dsBuoi, dsPhanLop, nhom] = await Promise.all([
+  const [dsBuoi, dsPhanLop, nhom, hauCan, thucDia] = await Promise.all([
     prisma.lich_hoc_lop.findMany({
       where: { lop_id: lopId, giai_doan_id: giaiDoanId },
       include: {
@@ -140,6 +140,15 @@ export async function layDotLop(
       select: { nguoi_dung: { select: { ho_ten: true, email: true } } },
       orderBy: { created_at: 'asc' },
     }),
+    // ADR 0004 L3 (issue #16): hậu cần giảng viên + thực địa của đợt.
+    prisma.hau_can_giang_vien.findMany({
+      where: { lop_id: lopId, giai_doan_id: giaiDoanId },
+      include: { nguoi_sua: { select: { ho_ten: true } } },
+    }),
+    prisma.nhan_su_thuc_dia.findMany({
+      where: { lop_id: lopId, giai_doan_id: giaiDoanId },
+      orderBy: { created_at: 'asc' },
+    }),
   ]);
 
   const { khoa_id: _bo, ...gd } = giaiDoan;
@@ -204,6 +213,17 @@ export async function layDotLop(
       }))
       .sort((a, b) => a.ho_ten.localeCompare(b.ho_ten, 'vi')),
     nhom_ho_tro_gv: nhom.map((n) => n.nguoi_dung),
+    hau_can: hauCan.map(({ nguoi_sua, ...h }) => ({
+      ...h,
+      nguoi_sua: nguoi_sua?.ho_ten ?? null,
+    })),
+    thuc_dia: thucDia.map((t) => ({
+      id: t.id,
+      ho_ten: t.ho_ten,
+      so_dien_thoai: t.so_dien_thoai,
+      nhiem_vu: t.nhiem_vu,
+      ghi_chu: t.ghi_chu,
+    })),
   };
 }
 
@@ -215,10 +235,16 @@ export type DotLop = Awaited<ReturnType<typeof layDotLop>>;
  * lấy). Giảng viên: không thấy SĐT/email học viên, liên hệ/số giờ giảng viên
  * khác, cụm hỗ trợ của học viên.
  */
-export function locTheoVaiTro(dot: DotLop, vaiTro: VaiTroXemLop): DotLop {
+export function locTheoVaiTro(
+  dot: DotLop,
+  vaiTro: VaiTroXemLop,
+  giangVienId?: string,
+): DotLop {
   if (vaiTro !== 'giang_vien') return dot;
   return {
     ...dot,
+    // Hậu cần là dữ liệu cá nhân — giảng viên chỉ thấy của chính mình.
+    hau_can: dot.hau_can.filter((h) => h.giang_vien_id === giangVienId),
     buoi: dot.buoi.map((b) => ({
       ...b,
       giang_vien: b.giang_vien.map((g) => ({
@@ -241,10 +267,15 @@ export function locTheoVaiTro(dot: DotLop, vaiTro: VaiTroXemLop): DotLop {
 export class TrangLopService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async layTrangLop(lopId: string, giaiDoanId: string, vaiTro: VaiTroXemLop) {
+  async layTrangLop(
+    lopId: string,
+    giaiDoanId: string,
+    nguoiXem: { vai_tro: VaiTroXemLop; giang_vien_id?: string },
+  ) {
     return locTheoVaiTro(
       await layDotLop(this.prisma, lopId, giaiDoanId),
-      vaiTro,
+      nguoiXem.vai_tro,
+      nguoiXem.giang_vien_id,
     );
   }
 }

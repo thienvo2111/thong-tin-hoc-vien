@@ -9,11 +9,13 @@ interface Props {
   required?: boolean;
   error?: string;
   description?: string;
+  /** Đường dẫn API danh mục — mặc định của Quản trị. */
+  base?: string;
 }
 
 /** Chọn điểm học đang hoạt động (T10, issue #2) — tìm không dấu theo tên/mã/địa chỉ phía client. */
-export function SelectDiemHoc({ value, onChange, required, error, description }: Props) {
-  const { data, isLoading } = useDiemHocDangHoatDong();
+export function SelectDiemHoc({ value, onChange, required, error, description, base }: Props) {
+  const { data, isLoading } = useDiemHocDangHoatDong(base);
   const options = useMemo(
     () =>
       (data?.data ?? []).map((d) => ({

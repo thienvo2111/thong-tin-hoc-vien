@@ -110,6 +110,11 @@ export default function HoTroLichHoc() {
                         {b.diem_hoc.nguoi_lien_he ? ` · Liên hệ: ${b.diem_hoc.nguoi_lien_he}${b.diem_hoc.sdt_lien_he ? ` (${b.diem_hoc.sdt_lien_he})` : ''}` : ''}
                       </Text>
                     )}
+                    {(b.thuc_dia ?? []).length > 0 && (
+                      <Text fz="xs" mt={4}>
+                        Thực địa: {(b.thuc_dia ?? []).map((t) => `${t.ho_ten} (${t.so_dien_thoai})${t.nhiem_vu ? ` — ${t.nhiem_vu}` : ''}`).join(' · ')}
+                      </Text>
+                    )}
                     {(b.nhom_ho_tro_gv ?? []).length > 0 && (
                       <Text fz="xs" c="dimmed" mt={4}>
                         Hỗ trợ giảng viên: {(b.nhom_ho_tro_gv ?? []).map((n) => `${n.ho_ten}${n.email ? ` (${n.email})` : ''}`).join(' · ')}

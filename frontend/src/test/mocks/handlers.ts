@@ -55,42 +55,46 @@ export const handlers = [
         })
       : loi(404, 'NOT_FOUND', 'Không tìm thấy lớp học'),
   ),
-  http.get('/ho-tro-giang-vien/lop/:lopId/giai-doan/:gdId', () =>
-    HttpResponse.json({
-      lop: { id: 'lop-1', ten_lop: 'Lớp 01 – Nhóm cơ bản A', loai_lop: 'truc_tiep', si_so_toi_da: 30, khoa: { id: 'khoa-1', ma_khoa: 'AG-2026-014', ten_khoa: 'Khóa An Giang' } },
-      giai_doan: { id: 'gd-2', thu_tu: 2, ten_giai_doan: 'Học trực tiếp', hinh_thuc: 'truc_tiep', thoi_gian_bat_dau: '2026-10-05T00:00:00.000Z', thoi_gian_ket_thuc: '2026-10-06T00:00:00.000Z' },
-      buoi: [
-        {
-          id: 'lh-1',
-          buoi_so: 1,
-          thoi_gian_bat_dau: '2026-10-05T01:00:00.000Z',
-          thoi_gian_ket_thuc: '2026-10-05T04:00:00.000Z',
-          dia_diem_hoac_link: null,
-          phong: 'P.101',
-          trang_thai: 'chua_dien_ra',
-          diem_hoc: { id: 'dh-1', ma_diem_hoc: 'AG-LX-01', ten: 'THPT Long Xuyên', dia_chi: '1 Trần Hưng Đạo', nguoi_lien_he: 'Cô Lan', sdt_lien_he: '0901000001', so_phong: 4, ghi_chu_csvc: null },
-          giang_vien: [{ id: 'gv-1', ho_ten: 'Nguyễn Văn Long', vai_tro: 'giang_vien', so_dien_thoai: '0909123456', email: 'long@hcmue.edu.vn', so_gio: 4, da_xac_nhan_gio: false }],
-        },
-      ],
-      hoc_vien: [
-        {
-          dang_ky_hoc_id: 'dk-1',
-          hoc_vien_id: 'hv-1',
-          ho_ten: 'Trần Thị Học',
-          gioi_tinh: 'Nữ',
-          don_vi: 'THPT Long Xuyên',
-          doi_tuong: 'giao_vien',
-          chuc_vu: null,
-          muc_dau_vao: 'co_ban',
-          so_dien_thoai: '0912000001',
-          email: null,
-          cum: { id: 'cum-1', ten_cum: 'Cụm Long Xuyên', nguoi_ho_tro: [{ ho_ten: 'Nguyễn Văn A', email: 'nguyen.a@hcmue.edu.vn' }] },
-          diem_danh: {},
-          ket_qua: null,
-        },
-      ],
-      nhom_ho_tro_gv: [{ ho_ten: 'Phạm Văn Giảng', email: 'pham.g@hcmue.edu.vn' }],
-    }),
+  http.get('/ho-tro-giang-vien/lop/:lopId/giai-doan/:gdId', () => HttpResponse.json(db.trangLopGv)),
+  // ADR 0004 L3 (issue #16): vận hành lớp của người hỗ trợ GV.
+  http.patch('/ho-tro-giang-vien/lich-hoc/:id', async ({ params, request }) => {
+    const body = (await request.json()) as { ly_do?: string; phong?: string | null };
+    if (!body.ly_do || body.ly_do.trim().length < 5) {
+      return loi(400, 'VALIDATION_ERROR', 'Thiếu lý do', { fields: [{ field: 'ly_do', message: 'Lý do tối thiểu 5 ký tự' }] });
+    }
+    const b = db.trangLopGv.buoi.find((x) => x.id === params.id);
+    if (!b) return loi(404, 'NOT_FOUND', 'Không tìm thấy buổi học');
+    b.phong = body.phong ?? null;
+    return HttpResponse.json({ ...b, canh_bao: [] });
+  }),
+  http.put('/ho-tro-giang-vien/lop/:lopId/giai-doan/:gdId/hau-can/:gvId', async ({ params, request }) => {
+    const body = (await request.json()) as Record<string, unknown> & { cap_nhat_luc?: string };
+    const cu = db.trangLopGv.hau_can.find((h) => h.giang_vien_id === params.gvId);
+    if (cu && body.cap_nhat_luc !== cu.cap_nhat_luc) {
+      return loi(409, 'CONFLICT', 'Người khác vừa sửa hậu cần này — tải lại để xem bản mới');
+    }
+    const { cap_nhat_luc: _bo, ...truong } = body;
+    void _bo;
+    const moi = {
+      ...(cu ?? { id: `hc-${params.gvId}`, giang_vien_id: params.gvId as string }),
+      ...truong,
+      cap_nhat_luc: new Date(Date.now() + 1000).toISOString(),
+      nguoi_sua: 'Phạm Văn Giảng',
+    } as (typeof db.trangLopGv.hau_can)[number];
+    db.trangLopGv.hau_can = [...db.trangLopGv.hau_can.filter((h) => h.giang_vien_id !== params.gvId), moi];
+    return HttpResponse.json(moi);
+  }),
+  http.put('/ho-tro-giang-vien/lop/:lopId/giai-doan/:gdId/thuc-dia', async ({ request }) => {
+    const { nhan_su } = (await request.json()) as { nhan_su: { ho_ten: string; so_dien_thoai: string; nhiem_vu?: string }[] };
+    db.trangLopGv.thuc_dia = nhan_su.map((n, i) => ({ id: `td-${i}`, ho_ten: n.ho_ten, so_dien_thoai: n.so_dien_thoai, nhiem_vu: n.nhiem_vu ?? null }));
+    return HttpResponse.json(db.trangLopGv.thuc_dia);
+  }),
+  http.get('/ho-tro-giang-vien/diem-hoc', () => {
+    const data = db.diemHoc.filter((d) => d.trang_thai === 'active');
+    return HttpResponse.json({ data, total: data.length, page: 1, page_size: 20 });
+  }),
+  http.get('/ho-tro-giang-vien/giang-vien', () =>
+    HttpResponse.json({ data: db.giangVien, total: db.giangVien.length, page: 1, page_size: 20 }),
   ),
   http.get('/ho-tro-giang-vien/lich-day', () =>
     HttpResponse.json([

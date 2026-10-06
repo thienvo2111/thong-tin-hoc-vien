@@ -941,3 +941,49 @@ CREATE TRIGGER trg_khoa_updated_at BEFORE UPDATE ON khoa_boi_duong
 --    về Sở GD&ĐT thay vì chặn — xem docs/api-contract.md mục "Routing đơn
 --    vị duyệt".
 -- =====================================================================
+
+-- ADR 0004 L1/L3 (issue #14, #16, 2026-10-07): người hỗ trợ giảng viên.
+-- Enum vai_tro_nguoi_dung += 'ho_tro_giang_vien' (migration riêng);
+-- chk_nguoi_dung_scope/chk_nguoi_dung_email_bat_buoc thêm nhánh này.
+CREATE TABLE phan_cong_ho_tro_gv (
+    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    nguoi_dung_id uuid NOT NULL REFERENCES nguoi_dung(id) ON DELETE CASCADE,
+    khoa_id       uuid NOT NULL REFERENCES khoa_boi_duong(id) ON DELETE CASCADE,
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_phan_cong_ho_tro_gv UNIQUE (nguoi_dung_id, khoa_id)
+);
+CREATE INDEX idx_phan_cong_ho_tro_gv_khoa ON phan_cong_ho_tro_gv(khoa_id);
+
+CREATE TABLE hau_can_giang_vien (
+    id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    lop_id                uuid NOT NULL REFERENCES lop_hoc(id) ON DELETE CASCADE,
+    giai_doan_id          uuid NOT NULL REFERENCES giai_doan_khoa(id) ON DELETE CASCADE,
+    giang_vien_id         uuid NOT NULL REFERENCES giang_vien(id) ON DELETE CASCADE,
+    noi_o_ten             varchar(255),
+    noi_o_dia_chi         varchar(500),
+    nhan_phong            date,
+    tra_phong             date,
+    phuong_tien           varchar(255),
+    don_luc               timestamptz,
+    diem_don              varchar(500),
+    lien_he_don           varchar(255),
+    ghi_chu               text,
+    da_xac_nhan_noi_o     boolean NOT NULL DEFAULT false,
+    da_xac_nhan_di_chuyen boolean NOT NULL DEFAULT false,
+    cap_nhat_boi          uuid REFERENCES nguoi_dung(id) ON DELETE SET NULL,
+    cap_nhat_luc          timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_hau_can_gv UNIQUE (lop_id, giai_doan_id, giang_vien_id),
+    CONSTRAINT chk_hau_can_ngay CHECK (tra_phong IS NULL OR nhan_phong IS NULL OR tra_phong >= nhan_phong)
+);
+
+CREATE TABLE nhan_su_thuc_dia (
+    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    lop_id        uuid NOT NULL REFERENCES lop_hoc(id) ON DELETE CASCADE,
+    giai_doan_id  uuid NOT NULL REFERENCES giai_doan_khoa(id) ON DELETE CASCADE,
+    ho_ten        varchar(255) NOT NULL,
+    so_dien_thoai varchar(20) NOT NULL,
+    nhiem_vu      varchar(255),
+    ghi_chu       text,
+    created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_thuc_dia_dot ON nhan_su_thuc_dia(lop_id, giai_doan_id);

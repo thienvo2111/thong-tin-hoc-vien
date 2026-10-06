@@ -1146,6 +1146,28 @@ export class KhoaBoiDuongService {
         d.trang_thai,
       ]),
     );
+    // ADR 0004 G4 (issue #16): người hỗ trợ thực địa của các đợt học viên được
+    // phân lớp (lớp × giai đoạn) — học viên thấy họ tên + SĐT.
+    const capDot = dangKyList.flatMap((dk) =>
+      dk.phan_lop_giai_doan.map((p) => ({
+        lop_id: p.lop.id,
+        giai_doan_id: p.giai_doan_id,
+      })),
+    );
+    const dsThucDia = capDot.length
+      ? await this.prisma.nhan_su_thuc_dia.findMany({
+          where: { OR: capDot },
+          select: {
+            lop_id: true,
+            giai_doan_id: true,
+            ho_ten: true,
+            so_dien_thoai: true,
+            nhiem_vu: true,
+          },
+          orderBy: { created_at: 'asc' },
+        })
+      : [];
+
     const tienDoMap = new Map(
       ketQuaGiaiDoanList.map((kq) => [
         `${kq.dang_ky_hoc_id}|${kq.giai_doan_id}`,
@@ -1193,6 +1215,17 @@ export class KhoaBoiDuongService {
                 }
               : null,
             tien_do: tienDoMap.get(`${dk.id}|${gd.id}`) ?? null,
+            thuc_dia: lop
+              ? dsThucDia
+                  .filter(
+                    (t) => t.lop_id === lop.id && t.giai_doan_id === gd.id,
+                  )
+                  .map(({ ho_ten, so_dien_thoai, nhiem_vu }) => ({
+                    ho_ten,
+                    so_dien_thoai,
+                    nhiem_vu,
+                  }))
+              : [],
           };
         }),
       };

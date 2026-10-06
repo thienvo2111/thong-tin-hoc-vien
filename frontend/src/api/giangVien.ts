@@ -29,6 +29,11 @@ export interface MucPhanCongDto {
 
 const KEY = ['giang-vien'] as const;
 
+// ADR 0004 G12: người hỗ trợ giảng viên dùng cùng màn danh mục qua
+// /ho-tro-giang-vien/giang-vien (tạo/sửa, không ngưng, không xác nhận giờ).
+export const GIANG_VIEN_QUAN_TRI = '/giang-vien';
+export const GIANG_VIEN_HO_TRO_GV = '/ho-tro-giang-vien/giang-vien';
+
 function queryString(params: object): string {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -38,10 +43,10 @@ function queryString(params: object): string {
   return s ? `?${s}` : '';
 }
 
-export function useGiangVien(params: GiangVienParams, enabled = true) {
+export function useGiangVien(params: GiangVienParams, enabled = true, base = GIANG_VIEN_QUAN_TRI) {
   return useQuery({
-    queryKey: [...KEY, params],
-    queryFn: () => apiFetch<PaginatedResult<GiangVien>>(`/giang-vien${queryString(params)}`),
+    queryKey: [...KEY, base, params],
+    queryFn: () => apiFetch<PaginatedResult<GiangVien>>(`${base}${queryString(params)}`),
     placeholderData: keepPreviousData,
     enabled,
   });
@@ -55,19 +60,19 @@ export function useLichDayGiangVien(id: string | null) {
   });
 }
 
-export function useTaoGiangVien() {
+export function useTaoGiangVien(base = GIANG_VIEN_QUAN_TRI) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (dto: LuuGiangVienDto) => apiFetch<GiangVien>('/giang-vien', { method: 'POST', body: JSON.stringify(dto) }),
+    mutationFn: (dto: LuuGiangVienDto) => apiFetch<GiangVien>(base, { method: 'POST', body: JSON.stringify(dto) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
   });
 }
 
-export function useSuaGiangVien() {
+export function useSuaGiangVien(base = GIANG_VIEN_QUAN_TRI) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, dto }: { id: string; dto: LuuGiangVienDto }) =>
-      apiFetch<GiangVien>(`/giang-vien/${id}`, { method: 'PATCH', body: JSON.stringify(dto) }),
+      apiFetch<GiangVien>(`${base}/${id}`, { method: 'PATCH', body: JSON.stringify(dto) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
   });
 }
@@ -84,17 +89,19 @@ export function useXacNhanGio() {
   });
 }
 
-/** PUT thay toàn bộ phân công 1 buổi; invalidate chi tiết khóa đang xem. */
-export function usePhanCongBuoi(khoaId: string) {
+/** PUT thay toàn bộ phân công 1 buổi. khu='quan_tri': /lop/... + làm mới chi tiết khóa; khu='ho_tro_gv':
+ * /ho-tro-giang-vien/lich-hoc/... + làm mới trang lớp của người hỗ trợ GV. */
+export function usePhanCongBuoi(khoaId: string, khu: 'quan_tri' | 'ho_tro_gv' = 'quan_tri') {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ lopId, lichHocId, phan_cong }: { lopId: string; lichHocId: string; phan_cong: MucPhanCongDto[] }) =>
-      apiFetch<PhanCongBuoi[]>(`/lop/${lopId}/lich-hoc/${lichHocId}/giang-vien`, {
-        method: 'PUT',
-        body: JSON.stringify({ phan_cong }),
-      }),
+      apiFetch<PhanCongBuoi[]>(
+        khu === 'quan_tri' ? `/lop/${lopId}/lich-hoc/${lichHocId}/giang-vien` : `/ho-tro-giang-vien/lich-hoc/${lichHocId}/giang-vien`,
+        { method: 'PUT', body: JSON.stringify({ phan_cong }) },
+      ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: chiTietKhoaKey(khoaId) });
+      if (khu === 'quan_tri') queryClient.invalidateQueries({ queryKey: chiTietKhoaKey(khoaId) });
+      else queryClient.invalidateQueries({ queryKey: ['ho-tro-gv'] });
       queryClient.invalidateQueries({ queryKey: KEY });
     },
   });

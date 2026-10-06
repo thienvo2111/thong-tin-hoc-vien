@@ -73,21 +73,25 @@ function soHoacNull(v: string): number | null {
   return v.trim() === '' ? null : Number(v);
 }
 
-/** Danh mục điểm học trực tiếp (T10, issue #2) — chỉ Quản trị. Không xóa cứng: "Ngưng" / "Mở lại". */
-export default function AdminDiemHoc() {
+/** Danh mục điểm học trực tiếp (T10, issue #2). Quản trị: đủ quyền, không xóa cứng ("Ngưng" / "Mở lại").
+ * Người hỗ trợ GV (ADR 0004 G12): cùng màn qua base khác, choNgung=false. */
+export function DanhMucDiemHoc({ base, choNgung = true }: { base?: string; choNgung?: boolean }) {
   const [q, setQ] = useState('');
   const [qDebounced] = useDebouncedValue(q, 300);
   const [trangThai, setTrangThai] = useState<TrangThaiActive>('active');
   const [page, setPage] = useState(1);
 
-  const { data, isLoading, isError, error, isFetching } = useDiemHoc({
-    q: qDebounced.trim() ? chuanHoaNfc(qDebounced.trim()) : undefined,
-    trang_thai: trangThai,
-    page,
-    page_size: KICH_THUOC_TRANG,
-  });
-  const taoDiemHoc = useTaoDiemHoc();
-  const suaDiemHoc = useSuaDiemHoc();
+  const { data, isLoading, isError, error, isFetching } = useDiemHoc(
+    {
+      q: qDebounced.trim() ? chuanHoaNfc(qDebounced.trim()) : undefined,
+      trang_thai: trangThai,
+      page,
+      page_size: KICH_THUOC_TRANG,
+    },
+    base,
+  );
+  const taoDiemHoc = useTaoDiemHoc(base);
+  const suaDiemHoc = useSuaDiemHoc(base);
 
   const [moModal, setMoModal] = useState(false);
   const [dangSua, setDangSua] = useState<DiemHoc | null>(null);
@@ -168,7 +172,6 @@ export default function AdminDiemHoc() {
 
   return (
     <>
-      <AdminPageHeader title="Điểm học trực tiếp" />
       <Container size="xl" py="lg" px={{ base: 'md', md: 28 }}>
         <Stack gap="md">
           <Group gap="sm" wrap="wrap" align="flex-end">
@@ -267,9 +270,11 @@ export default function AdminDiemHoc() {
                           <Button size="xs" variant="default" onClick={() => moSua(d)} mr={8}>
                             Sửa
                           </Button>
-                          <Button size="xs" variant="subtle" color={d.trang_thai === 'active' ? 'red' : 'blue'} onClick={() => doiTrangThai(d)}>
-                            {d.trang_thai === 'active' ? 'Ngưng' : 'Mở lại'}
-                          </Button>
+                          {choNgung && (
+                            <Button size="xs" variant="subtle" color={d.trang_thai === 'active' ? 'red' : 'blue'} onClick={() => doiTrangThai(d)}>
+                              {d.trang_thai === 'active' ? 'Ngưng' : 'Mở lại'}
+                            </Button>
+                          )}
                         </Table.Td>
                       </Table.Tr>
                     ))}
@@ -387,6 +392,15 @@ export default function AdminDiemHoc() {
           </Button>
         </Stack>
       </Modal>
+    </>
+  );
+}
+
+export default function AdminDiemHoc() {
+  return (
+    <>
+      <AdminPageHeader title="Điểm học trực tiếp" />
+      <DanhMucDiemHoc />
     </>
   );
 }

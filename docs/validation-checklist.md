@@ -330,3 +330,8 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 136 | `/ho-tro-giang-vien/*` chỉ `ho_tro_giang_vien` (403); người hỗ trợ giảng viên không vào `/ho-tro-hoc-vien/*` và `/admin` | 🔴 | API (`@Roles`) + FE (`RequireHoTroGv`, `RequireAdmin`) |
 | 137 | (L2, #15) Trang lớp lọc trường theo vai trò bằng 1 hàm thuần `locTheoVaiTro` (ma trận §3 đặc tả — test dạng bảng); giảng viên không thấy SĐT/email học viên, liên hệ giảng viên khác, cụm của học viên; không vai trò nào nhận CCCD/ngày sinh/mã MOET qua trang lớp | 🔴 | API (`TrangLopService`) |
 | 138 | (L2) Hồ sơ chuẩn bị lớp chỉ mở cho giai đoạn `hinh_thuc='truc_tiep'` (khác → 404) và chỉ học viên được phân lớp ở **đúng giai đoạn** đó | 🔴 | API |
+| 139 | (L3, #16) Người hỗ trợ GV sửa buổi: lý do bắt buộc 5–500 ký tự; chỉ buổi chưa diễn ra (`thoi_gian_bat_dau > now`) và chưa có `diem_danh`; cùng mọi luật sửa buổi của Quản trị | 🔴 | API (`VanHanhLopService.suaBuoi` → `KhoaBoiDuongService.capNhatLichHoc`) |
+| 140 | (L3) Người hỗ trợ GV KHÔNG được: thêm/xóa buổi, xác nhận giờ dạy, sửa kết quả cuối khóa, ngưng/gộp danh mục (403) | 🔴 | API (`@Roles`, `chanNgung`) |
+| 141 | (L3) Hậu cần: khóa lạc quan theo `cap_nhat_luc` (UPDATE có điều kiện → 0 dòng → 409); giảng viên phải có phân công trong đợt; `tra_phong >= nhan_phong` | 🔴 | API + DB (`chk_hau_can_ngay`, `uq_hau_can_gv`) |
+| 142 | (L3) Hậu cần là dữ liệu cá nhân: chỉ Quản trị, nhóm hỗ trợ GV và chính giảng viên đó (lọc ở `locTheoVaiTro`); không xuất hiện ở khu hỗ trợ học viên và cổng học viên | 🔴 | API |
+| 143 | (L3) Thực địa theo đợt – lớp, thay toàn bộ; SĐT chuẩn hóa định dạng VN | 🔴 | API |

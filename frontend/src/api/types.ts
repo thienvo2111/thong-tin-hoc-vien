@@ -615,6 +615,8 @@ export interface GiaiDoanCuaToi {
   huong_dan: string | null;
   lop: LopHocToi | null;
   tien_do: { ty_le_hoan_thanh: number | null; diem: number | null } | null;
+  // ADR 0004 G4 (issue #16): người hỗ trợ thực địa của đợt (lớp × giai đoạn) — họ tên, SĐT.
+  thuc_dia?: { ho_ten: string; so_dien_thoai: string; nhiem_vu: string | null }[];
 }
 
 export interface KhoaHocDangKy {
@@ -933,4 +935,5 @@ export interface BuoiHocHoTro {
   phong?: string | null;
   diem_hoc?: { id: string; ten: string; dia_chi: string; nguoi_lien_he: string | null; sdt_lien_he: string | null } | null;
   nhom_ho_tro_gv?: { ho_ten: string; email: string | null }[];
+  thuc_dia?: { ho_ten: string; so_dien_thoai: string; nhiem_vu: string | null }[];
 }

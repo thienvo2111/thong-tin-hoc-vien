@@ -89,6 +89,7 @@ describe('M7 — Thông tin lớp học', () => {
               i === 1
                 ? {
                     ...g,
+                    thuc_dia: [{ ho_ten: 'Anh Tâm', so_dien_thoai: '0933333333', nhiem_vu: 'Mở phòng' }],
                     lop: {
                       ...g.lop!,
                       lich_hoc: [
@@ -125,6 +126,9 @@ describe('M7 — Thông tin lớp học', () => {
     expect(within(gd2).getByRole('link', { name: '0901000001' })).toHaveAttribute('href', 'tel:0901000001');
     // T11 (issue #3): giảng viên theo buổi (chỉ họ tên + vai trò).
     expect(within(gd2).getByText(/Nguyễn Văn Long, Trần Thị Mai \(hỗ trợ\)/)).toBeInTheDocument();
+    // ADR 0004 G4 (issue #16): người hỗ trợ thực địa của đợt, SĐT gọi được.
+    expect(within(gd2).getByText(/Hỗ trợ tại điểm học:/)).toBeInTheDocument();
+    expect(within(gd2).getByRole('link', { name: '0933333333' })).toHaveAttribute('href', 'tel:0933333333');
   });
 
   it('giai đoạn không lớp: hiện link + hướng dẫn chung của giai đoạn', async () => {

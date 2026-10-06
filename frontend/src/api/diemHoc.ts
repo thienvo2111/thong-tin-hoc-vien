@@ -27,6 +27,11 @@ export interface LuuDiemHocDto {
 
 const KEY = ['diem-hoc'] as const;
 
+// ADR 0004 G12: người hỗ trợ giảng viên dùng cùng màn danh mục qua
+// /ho-tro-giang-vien/diem-hoc (tạo/sửa, không ngưng).
+export const DIEM_HOC_QUAN_TRI = '/diem-hoc';
+export const DIEM_HOC_HO_TRO_GV = '/ho-tro-giang-vien/diem-hoc';
+
 function queryString(params: DiemHocParams): string {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -36,37 +41,36 @@ function queryString(params: DiemHocParams): string {
   return s ? `?${s}` : '';
 }
 
-export function layDiemHoc(params: DiemHocParams) {
-  return apiFetch<PaginatedResult<DiemHoc>>(`/diem-hoc${queryString(params)}`);
+export function layDiemHoc(params: DiemHocParams, base = DIEM_HOC_QUAN_TRI) {
+  return apiFetch<PaginatedResult<DiemHoc>>(`${base}${queryString(params)}`);
 }
 
-export function useDiemHoc(params: DiemHocParams) {
+export function useDiemHoc(params: DiemHocParams, base = DIEM_HOC_QUAN_TRI) {
   return useQuery({
-    queryKey: [...KEY, params],
-    queryFn: () => layDiemHoc(params),
+    queryKey: [...KEY, base, params],
+    queryFn: () => layDiemHoc(params, base),
     placeholderData: keepPreviousData,
   });
 }
 
 /** Toàn bộ điểm học đang hoạt động (≤ 200) — cho ô chọn điểm học của buổi học. */
-export function useDiemHocDangHoatDong() {
-  return useDiemHoc({ trang_thai: 'active', page_size: 200 });
+export function useDiemHocDangHoatDong(base = DIEM_HOC_QUAN_TRI) {
+  return useDiemHoc({ trang_thai: 'active', page_size: 200 }, base);
 }
 
-export function useTaoDiemHoc() {
+export function useTaoDiemHoc(base = DIEM_HOC_QUAN_TRI) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (dto: LuuDiemHocDto) =>
-      apiFetch<DiemHoc>('/diem-hoc', { method: 'POST', body: JSON.stringify(dto) }),
+    mutationFn: (dto: LuuDiemHocDto) => apiFetch<DiemHoc>(base, { method: 'POST', body: JSON.stringify(dto) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
   });
 }
 
-export function useSuaDiemHoc() {
+export function useSuaDiemHoc(base = DIEM_HOC_QUAN_TRI) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, dto }: { id: string; dto: LuuDiemHocDto }) =>
-      apiFetch<DiemHoc>(`/diem-hoc/${id}`, { method: 'PATCH', body: JSON.stringify(dto) }),
+      apiFetch<DiemHoc>(`${base}/${id}`, { method: 'PATCH', body: JSON.stringify(dto) }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
   });
 }

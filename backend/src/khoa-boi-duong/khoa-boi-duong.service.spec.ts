@@ -76,6 +76,7 @@ describe('KhoaBoiDuongService', () => {
     hoc_vien: { findUnique: jest.Mock };
     diem_danh: { findMany: jest.Mock };
     ket_qua_giai_doan: { findMany: jest.Mock };
+    nhan_su_thuc_dia: { findMany: jest.Mock };
   };
   let scopeService: { canAccessDonVi: jest.Mock };
   let thongBaoService: { guiDangKyHocPhanLop: jest.Mock };
@@ -149,6 +150,7 @@ describe('KhoaBoiDuongService', () => {
       // độ giai đoạn — mặc định rỗng, test nào cần dữ liệu cụ thể tự override.
       diem_danh: { findMany: jest.fn().mockResolvedValue([]) },
       ket_qua_giai_doan: { findMany: jest.fn().mockResolvedValue([]) },
+      nhan_su_thuc_dia: { findMany: jest.fn().mockResolvedValue([]) },
     };
     scopeService = { canAccessDonVi: jest.fn() };
     thongBaoService = {

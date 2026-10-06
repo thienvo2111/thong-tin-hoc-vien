@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActionIcon, Badge, Button, Group, Modal, NumberInput, Select, Stack, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useGiangVien, usePhanCongBuoi } from '@/api/giangVien';
+import { GIANG_VIEN_HO_TRO_GV, GIANG_VIEN_QUAN_TRI, useGiangVien, usePhanCongBuoi } from '@/api/giangVien';
 import type { LichHocLop, LopHoc, VaiTroNhanSuLop } from '@/api/types';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { locTiengViet } from '@/lib/timKiemTiengViet';
 
@@ -25,13 +25,20 @@ export function ModalPhanCongBuoi({
   khoaId,
   buoi,
   onClose,
+  khu = 'quan_tri',
 }: {
   khoaId: string;
-  buoi: { lop: LopHoc; lich: LichHocLop } | null;
+  buoi: { lop: Pick<LopHoc, 'id' | 'ten_lop'>; lich: Pick<LichHocLop, 'id' | 'buoi_so' | 'thoi_gian_bat_dau' | 'thoi_gian_ket_thuc' | 'phan_cong'> } | null;
   onClose: () => void;
+  /** ADR 0004 G12: người hỗ trợ GV phân công qua /ho-tro-giang-vien. */
+  khu?: 'quan_tri' | 'ho_tro_gv';
 }) {
-  const { data: dsGiangVien } = useGiangVien({ trang_thai: 'active', page_size: 200 }, !!buoi);
-  const luu = usePhanCongBuoi(khoaId);
+  const { data: dsGiangVien } = useGiangVien(
+    { trang_thai: 'active', page_size: 200 },
+    !!buoi,
+    khu === 'quan_tri' ? GIANG_VIEN_QUAN_TRI : GIANG_VIEN_HO_TRO_GV,
+  );
+  const luu = usePhanCongBuoi(khoaId, khu);
   const [dong, setDong] = useState<Dong[]>([]);
 
   useEffect(() => {
@@ -78,7 +85,7 @@ export function ModalPhanCongBuoi({
           notifications.show({ color: 'green', message: 'Đã lưu phân công giảng viên' });
           onClose();
         },
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err), autoClose: 8000 }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err), autoClose: 8000 }),
       },
     );
   }

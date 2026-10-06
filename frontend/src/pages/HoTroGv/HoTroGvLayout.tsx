@@ -7,6 +7,7 @@ import { tokenKhac } from '@/theme';
 const MENU = [
   { to: '/ho-tro-gv', nhan: 'Lớp', end: true },
   { to: '/ho-tro-gv/lich-day', nhan: 'Lịch dạy', end: false },
+  { to: '/ho-tro-gv/danh-muc', nhan: 'Danh mục', end: false },
 ];
 
 /** Khung khu làm việc người hỗ trợ giảng viên (ADR 0004) — tách hẳn layout admin, như khu hỗ trợ học viên. */

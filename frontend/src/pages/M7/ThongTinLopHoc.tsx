@@ -270,6 +270,17 @@ function TheGiaiDoan({
             </Stack>
           )}
           <DanhSachBuoi lichHoc={gd.lop.lich_hoc} />
+          {(gd.thuc_dia ?? []).length > 0 && (
+            <Text size="sm">
+              <b>Hỗ trợ tại điểm học:</b>{' '}
+              {(gd.thuc_dia ?? []).map((t, i) => (
+                <span key={i}>
+                  {i > 0 ? ' · ' : ''}
+                  {t.ho_ten} (<a href={`tel:${t.so_dien_thoai}`}>{t.so_dien_thoai}</a>){t.nhiem_vu ? ` — ${t.nhiem_vu}` : ''}
+                </span>
+              ))}
+            </Text>
+          )}
         </Stack>
       ) : baiKhaoSat ? (
         <BaiKhaoSatGiaiDoan loai={baiKhaoSat} tinhTrang={tinhTrang} />

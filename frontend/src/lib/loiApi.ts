@@ -33,3 +33,11 @@ export function loiFieldsThanhMap(err: unknown): Record<string, string> {
 export function laLoiDotDong(err: unknown): boolean {
   return err instanceof ApiError && err.status === 403 && err.code === 'DOT_XAC_NHAN_DONG';
 }
+
+/** Như thongDiepLoiChung nhưng giữ thông điệp server cho 409 — dùng ở các thao tác có xung đột KHÔNG phải
+ * CCCD (khóa lạc quan hậu cần, phân công đã xác nhận giờ...). thongDiepLoiChung map mọi CONFLICT thành
+ * câu về CCCD (đúng cho màn hồ sơ học viên). */
+export function thongDiepLoiXungDot(err: unknown): string {
+  if (err instanceof ApiError && err.status === 409 && err.message) return err.message;
+  return thongDiepLoiChung(err);
+}

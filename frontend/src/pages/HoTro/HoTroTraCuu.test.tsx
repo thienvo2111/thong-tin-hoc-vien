@@ -127,11 +127,13 @@ describe('Người hỗ trợ — Lịch học', () => {
         phong: 'P.7',
         diem_hoc: { id: 'dh-1', ten: 'THPT Long Xuyên', dia_chi: '1 Trần Hưng Đạo', nguoi_lien_he: 'Cô Lan', sdt_lien_he: '0901000001' },
         nhom_ho_tro_gv: [{ ho_ten: 'Phạm Văn Giảng', email: 'pham.g@hcmue.edu.vn' }],
+        thuc_dia: [{ ho_ten: 'Anh Tâm', so_dien_thoai: '0933333333', nhiem_vu: 'Mở phòng' }],
       },
     ];
     render(['/ho-tro/lich-hoc']);
     expect(await screen.findByText(/Điểm học: THPT Long Xuyên — phòng P.7 · 1 Trần Hưng Đạo · Liên hệ: Cô Lan \(0901000001\)/)).toBeInTheDocument();
     expect(screen.getByText(/Hỗ trợ giảng viên: Phạm Văn Giảng \(pham.g@hcmue.edu.vn\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Thực địa: Anh Tâm \(0933333333\) — Mở phòng/)).toBeInTheDocument();
   });
 
   it('không có buổi -> thông báo rỗng', async () => {

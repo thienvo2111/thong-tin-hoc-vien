@@ -46,20 +46,25 @@ const FORM_RONG: FormGiangVien = { ho_ten: '', so_dien_thoai: '', email: '', don
 
 const NHAN_VAI_TRO = { giang_vien: 'Giảng viên', ho_tro: 'Hỗ trợ' } as const;
 
-/** Danh mục giảng viên (T11, issue #3) — chỉ Quản trị. Phân công vào buổi: ở chi tiết khóa hoặc import. */
-export default function AdminGiangVien() {
+/** Danh mục giảng viên (T11, issue #3). Quản trị: đủ quyền (ngưng, lịch dạy + xác nhận giờ). Người hỗ trợ GV
+ * (ADR 0004 G12): cùng màn qua base khác, chỉ tạo/sửa. */
+export function DanhMucGiangVien({ base, quanTri = true }: { base?: string; quanTri?: boolean }) {
   const [q, setQ] = useState('');
   const [qDebounced] = useDebouncedValue(q, 300);
   const [trangThai, setTrangThai] = useState<TrangThaiActive>('active');
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError, error, isFetching } = useGiangVien({
-    q: qDebounced.trim() ? chuanHoaNfc(qDebounced.trim()) : undefined,
-    trang_thai: trangThai,
-    page,
-    page_size: KICH_THUOC_TRANG,
-  });
-  const taoGiangVien = useTaoGiangVien();
-  const suaGiangVien = useSuaGiangVien();
+  const { data, isLoading, isError, error, isFetching } = useGiangVien(
+    {
+      q: qDebounced.trim() ? chuanHoaNfc(qDebounced.trim()) : undefined,
+      trang_thai: trangThai,
+      page,
+      page_size: KICH_THUOC_TRANG,
+    },
+    true,
+    base,
+  );
+  const taoGiangVien = useTaoGiangVien(base);
+  const suaGiangVien = useSuaGiangVien(base);
 
   const [moModal, setMoModal] = useState(false);
   const [dangSua, setDangSua] = useState<GiangVien | null>(null);
@@ -128,7 +133,6 @@ export default function AdminGiangVien() {
 
   return (
     <>
-      <AdminPageHeader title="Giảng viên" />
       <Container size="xl" py="lg" px={{ base: 'md', md: 28 }}>
         <Stack gap="md">
           <Group gap="sm" wrap="wrap" align="flex-end">
@@ -219,15 +223,19 @@ export default function AdminGiangVien() {
                         <Table.Td>{gv.don_vi_cong_tac ?? '—'}</Table.Td>
                         <Table.Td>{gv.so_buoi ?? 0}</Table.Td>
                         <Table.Td ta="right" style={{ whiteSpace: 'nowrap' }}>
-                          <Button size="xs" variant="light" onClick={() => setXemLichDay(gv)} mr={8}>
-                            Lịch dạy
-                          </Button>
+                          {quanTri && (
+                            <Button size="xs" variant="light" onClick={() => setXemLichDay(gv)} mr={8}>
+                              Lịch dạy
+                            </Button>
+                          )}
                           <Button size="xs" variant="default" onClick={() => moSua(gv)} mr={8}>
                             Sửa
                           </Button>
-                          <Button size="xs" variant="subtle" color={gv.trang_thai === 'active' ? 'red' : 'blue'} onClick={() => doiTrangThai(gv)}>
-                            {gv.trang_thai === 'active' ? 'Ngưng' : 'Mở lại'}
-                          </Button>
+                          {quanTri && (
+                            <Button size="xs" variant="subtle" color={gv.trang_thai === 'active' ? 'red' : 'blue'} onClick={() => doiTrangThai(gv)}>
+                              {gv.trang_thai === 'active' ? 'Ngưng' : 'Mở lại'}
+                            </Button>
+                          )}
                         </Table.Td>
                       </Table.Tr>
                     ))}
@@ -283,6 +291,15 @@ export default function AdminGiangVien() {
       <Modal opened={xemLichDay !== null} onClose={() => setXemLichDay(null)} title={`Lịch dạy — ${xemLichDay?.ho_ten ?? ''}`} size="xl">
         {xemLichDay && <LichDay giangVienId={xemLichDay.id} />}
       </Modal>
+    </>
+  );
+}
+
+export default function AdminGiangVien() {
+  return (
+    <>
+      <AdminPageHeader title="Giảng viên" />
+      <DanhMucGiangVien />
     </>
   );
 }

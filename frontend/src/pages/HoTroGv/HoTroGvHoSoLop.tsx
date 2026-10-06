@@ -1,5 +1,8 @@
+import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Alert, Anchor, Badge, Container, Group, Paper, SimpleGrid, Skeleton, Stack, Table, Tabs, Text, Title } from '@mantine/core';
+import { Alert, Anchor, Badge, Button, Container, Group, Paper, SimpleGrid, Skeleton, Stack, Table, Tabs, Text, Title } from '@mantine/core';
+import { ModalPhanCongBuoi } from '@/pages/Admin/ModalPhanCongBuoi';
+import { KhungThucDia, ModalSuaBuoiGv, TheHauCan } from './VanHanhLop';
 import { useTrangLopGv, type TrangLop } from '@/api/hoTroGv';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangGio, dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
@@ -8,7 +11,8 @@ const NHAN_VAI_TRO = { giang_vien: 'Giảng viên', ho_tro: 'Hỗ trợ' } as co
 const NHAN_DOI_TUONG: Record<string, string> = { giao_vien: 'Giáo viên', can_bo_quan_ly: 'CBQL' };
 const NHAN_MUC: Record<string, string> = { co_ban: 'Cơ bản', thanh_thao: 'Thành thạo', nang_cao: 'Nâng cao' };
 
-/** Hồ sơ chuẩn bị lớp — bản đọc (ADR 0004 G5, L2). Hậu cần/bảng kiểm/biểu mẫu thêm ở các lát sau. */
+/** Hồ sơ chuẩn bị lớp (ADR 0004 G5): L2 bản đọc; L3 (issue #16) sửa buổi có lý do, phân công giảng viên,
+ * hậu cần, thực địa. Bảng kiểm/biểu mẫu thêm ở các lát sau. */
 export default function HoTroGvHoSoLop() {
   const { lopId = '', gdId = '' } = useParams();
   const { data, isLoading, isError, error } = useTrangLopGv(lopId, gdId);
@@ -29,6 +33,15 @@ export default function HoTroGvHoSoLop() {
 
 function NoiDung({ d }: { d: TrangLop }) {
   const siSo = d.hoc_vien.length;
+  const [buoiSua, setBuoiSua] = useState<TrangLop['buoi'][number] | null>(null);
+  const [buoiPhanCong, setBuoiPhanCong] = useState<TrangLop['buoi'][number] | null>(null);
+  // Giảng viên của đợt (gộp mọi buổi) — mỗi người 1 thẻ hậu cần.
+  const giangVienDot = useMemo(() => {
+    const m = new Map<string, { id: string; ho_ten: string; so_dien_thoai?: string }>();
+    for (const b of d.buoi) for (const g of b.giang_vien) if (!m.has(g.id)) m.set(g.id, g);
+    return [...m.values()];
+  }, [d.buoi]);
+  const bayGio = Date.now();
   return (
     <>
       <div>
@@ -90,6 +103,7 @@ function NoiDung({ d }: { d: TrangLop }) {
                     <Table.Th>Thời gian</Table.Th>
                     <Table.Th>Điểm học</Table.Th>
                     <Table.Th>Phòng</Table.Th>
+                    <Table.Th />
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -118,16 +132,50 @@ function NoiDung({ d }: { d: TrangLop }) {
                         )}
                       </Table.Td>
                       <Table.Td>{b.phong ?? '—'}</Table.Td>
+                      <Table.Td ta="right" style={{ whiteSpace: 'nowrap' }}>
+                        <Button size="xs" variant="subtle" onClick={() => setBuoiPhanCong(b)}>
+                          Giảng viên
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="subtle"
+                          disabled={new Date(b.thoi_gian_bat_dau).getTime() <= bayGio}
+                          title={new Date(b.thoi_gian_bat_dau).getTime() <= bayGio ? 'Buổi đã diễn ra' : undefined}
+                          onClick={() => setBuoiSua(b)}
+                        >
+                          Sửa
+                        </Button>
+                      </Table.Td>
                     </Table.Tr>
                   ))}
                 </Table.Tbody>
               </Table>
             </Table.ScrollContainer>
           </Paper>
+          <Stack mt="md">
+            <KhungThucDia lopId={d.lop.id} gdId={d.giai_doan.id} thucDia={d.thuc_dia} />
+          </Stack>
         </Tabs.Panel>
 
         <Tabs.Panel value="giang-vien" pt="md">
           <Stack gap="sm">
+            {giangVienDot.length > 0 && (
+              <Text fw={700} fz="sm">
+                Hậu cần giảng viên
+              </Text>
+            )}
+            {giangVienDot.map((g) => (
+              <TheHauCan
+                key={g.id}
+                lopId={d.lop.id}
+                gdId={d.giai_doan.id}
+                giangVien={g}
+                hauCan={d.hau_can.find((h) => h.giang_vien_id === g.id)}
+              />
+            ))}
+            <Text fw={700} fz="sm" mt="sm">
+              Giảng viên theo buổi
+            </Text>
             {d.buoi.map((b) => (
               <Paper key={b.id} withBorder radius={12} p="sm">
                 <Text fw={600} fz="sm">
@@ -205,6 +253,33 @@ function NoiDung({ d }: { d: TrangLop }) {
           </Paper>
         </Tabs.Panel>
       </Tabs>
+
+      <ModalSuaBuoiGv buoi={buoiSua} onClose={() => setBuoiSua(null)} />
+      <ModalPhanCongBuoi
+        khu="ho_tro_gv"
+        khoaId={d.lop.khoa.id}
+        buoi={
+          buoiPhanCong
+            ? {
+                lop: { id: d.lop.id, ten_lop: d.lop.ten_lop },
+                lich: {
+                  id: buoiPhanCong.id,
+                  buoi_so: buoiPhanCong.buoi_so,
+                  thoi_gian_bat_dau: buoiPhanCong.thoi_gian_bat_dau,
+                  thoi_gian_ket_thuc: buoiPhanCong.thoi_gian_ket_thuc,
+                  phan_cong: buoiPhanCong.giang_vien.map((g) => ({
+                    id: g.id,
+                    vai_tro: g.vai_tro,
+                    so_gio: g.so_gio ?? null,
+                    da_xac_nhan_gio: g.da_xac_nhan_gio ?? false,
+                    giang_vien: { id: g.id, ho_ten: g.ho_ten },
+                  })),
+                },
+              }
+            : null
+        }
+        onClose={() => setBuoiPhanCong(null)}
+      />
     </>
   );
 }

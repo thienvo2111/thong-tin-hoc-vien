@@ -63,6 +63,57 @@ const dot: DotLop = {
     },
   ],
   nhom_ho_tro_gv: [{ ho_ten: 'Nhóm GV', email: 'nhom@x.vn' }],
+  hau_can: [
+    {
+      id: 'hc-gv1',
+      lop_id: 'lop-1',
+      giai_doan_id: 'gd-1',
+      giang_vien_id: 'gv1',
+      noi_o_ten: 'KS gv1',
+      noi_o_dia_chi: null,
+      nhan_phong: null,
+      tra_phong: null,
+      phuong_tien: 'Xe',
+      don_luc: null,
+      diem_don: null,
+      lien_he_don: null,
+      ghi_chu: null,
+      da_xac_nhan_noi_o: false,
+      da_xac_nhan_di_chuyen: false,
+      cap_nhat_boi: null,
+      cap_nhat_luc: new Date('2026-10-01'),
+      nguoi_sua: null,
+    },
+    {
+      id: 'hc-gv2',
+      lop_id: 'lop-1',
+      giai_doan_id: 'gd-1',
+      giang_vien_id: 'gv2',
+      noi_o_ten: 'KS gv2',
+      noi_o_dia_chi: null,
+      nhan_phong: null,
+      tra_phong: null,
+      phuong_tien: 'Xe',
+      don_luc: null,
+      diem_don: null,
+      lien_he_don: null,
+      ghi_chu: null,
+      da_xac_nhan_noi_o: false,
+      da_xac_nhan_di_chuyen: false,
+      cap_nhat_boi: null,
+      cap_nhat_luc: new Date('2026-10-01'),
+      nguoi_sua: null,
+    },
+  ],
+  thuc_dia: [
+    {
+      id: 't1',
+      ho_ten: 'Anh Tâm',
+      so_dien_thoai: '0933333333',
+      nhiem_vu: 'Mở phòng',
+      ghi_chu: null,
+    },
+  ],
 };
 
 const COT: {
@@ -121,6 +172,21 @@ const COT: {
     thay: { quan_tri: true, ho_tro_giang_vien: true, giang_vien: true },
   },
   {
+    truong: 'hậu cần của chính giảng viên đang xem (gv1)',
+    lay: (d) => d.hau_can.find((h) => h.giang_vien_id === 'gv1'),
+    thay: { quan_tri: true, ho_tro_giang_vien: true, giang_vien: true },
+  },
+  {
+    truong: 'hậu cần của giảng viên khác (gv2)',
+    lay: (d) => d.hau_can.find((h) => h.giang_vien_id === 'gv2'),
+    thay: { quan_tri: true, ho_tro_giang_vien: true, giang_vien: false },
+  },
+  {
+    truong: 'người hỗ trợ thực địa',
+    lay: (d) => d.thuc_dia[0]?.so_dien_thoai,
+    thay: { quan_tri: true, ho_tro_giang_vien: true, giang_vien: true },
+  },
+  {
     truong: 'nhóm hỗ trợ GV',
     lay: (d) => d.nhom_ho_tro_gv[0],
     thay: { quan_tri: true, ho_tro_giang_vien: true, giang_vien: true },
@@ -135,7 +201,7 @@ describe('locTheoVaiTro — ma trận liên thông §3', () => {
   ] as VaiTroXemLop[]) {
     for (const c of COT) {
       it(`${vaiTro} ${c.thay[vaiTro] ? 'THẤY' : 'KHÔNG thấy'} ${c.truong}`, () => {
-        const giaTri = c.lay(locTheoVaiTro(dot, vaiTro));
+        const giaTri = c.lay(locTheoVaiTro(dot, vaiTro, 'gv1'));
         if (c.thay[vaiTro]) expect(giaTri).toBeDefined();
         else expect(giaTri).toBeUndefined();
       });

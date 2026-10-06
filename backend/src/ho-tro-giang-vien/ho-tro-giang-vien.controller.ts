@@ -1,4 +1,14 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { IsOptional, Matches } from 'class-validator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -8,6 +18,33 @@ import { NotFoundAppException } from '../common/exceptions/app.exceptions';
 import { khoangNgayVn } from '../common/utils/khoang-ngay-vn.util';
 import { TrangLopService } from '../trang-lop/trang-lop.service';
 import { HoTroGiangVienScopeService } from './ho-tro-giang-vien-scope.service';
+import { VanHanhLopService } from './van-hanh-lop.service';
+import {
+  LuuHauCanDto,
+  SuaBuoiHoTroGvDto,
+  ThucDiaDto,
+} from './dto/van-hanh-lop.dto';
+import { PhanCongBuoiDto } from '../giang-vien/dto/giang-vien.dto';
+import {
+  CreateGiangVienDto,
+  QueryGiangVienDto,
+  UpdateGiangVienDto,
+} from '../giang-vien/dto/giang-vien.dto';
+import { GiangVienService } from '../giang-vien/giang-vien.service';
+import {
+  CreateDiemHocDto,
+  QueryDiemHocDto,
+  UpdateDiemHocDto,
+} from '../diem-hoc/dto/diem-hoc.dto';
+import { DiemHocService } from '../diem-hoc/diem-hoc.service';
+import { ForbiddenAppException } from '../common/exceptions/app.exceptions';
+
+// Ngưng/gộp danh mục là việc của Quản trị (ADR 0004 G12).
+function chanNgung(dto: { trang_thai?: unknown }) {
+  if (dto.trang_thai !== undefined) {
+    throw new ForbiddenAppException('Chỉ Quản trị được ngưng danh mục');
+  }
+}
 
 const NGAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -31,7 +68,99 @@ export class HoTroGiangVienController {
     private readonly prisma: PrismaService,
     private readonly scope: HoTroGiangVienScopeService,
     private readonly trangLop: TrangLopService,
+    private readonly vanHanh: VanHanhLopService,
+    private readonly giangVien: GiangVienService,
+    private readonly diemHoc: DiemHocService,
   ) {}
+
+  // ---------------- L3 (issue #16): vận hành lớp/đợt ----------------
+  @Patch('lich-hoc/:id')
+  suaBuoi(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SuaBuoiHoTroGvDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.vanHanh.suaBuoi(user, id, dto);
+  }
+
+  @Put('lich-hoc/:id/giang-vien')
+  phanCongBuoi(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: PhanCongBuoiDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.vanHanh.phanCongBuoi(user, id, dto.phan_cong);
+  }
+
+  @Put('lop/:lopId/giai-doan/:gdId/hau-can/:giangVienId')
+  luuHauCan(
+    @Param('lopId', ParseUUIDPipe) lopId: string,
+    @Param('gdId', ParseUUIDPipe) gdId: string,
+    @Param('giangVienId', ParseUUIDPipe) giangVienId: string,
+    @Body() dto: LuuHauCanDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.vanHanh.luuHauCan(user, lopId, gdId, giangVienId, dto);
+  }
+
+  @Put('lop/:lopId/giai-doan/:gdId/thuc-dia')
+  thayThucDia(
+    @Param('lopId', ParseUUIDPipe) lopId: string,
+    @Param('gdId', ParseUUIDPipe) gdId: string,
+    @Body() dto: ThucDiaDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.vanHanh.thayThucDia(user, lopId, gdId, dto.nhan_su);
+  }
+
+  // Danh mục: tạo/sửa được, KHÔNG ngưng/gộp (Quản trị). Tìm trùng trước khi tạo
+  // bằng chính danh sách có q (SĐT/email/tên).
+  @Get('diem-hoc')
+  dsDiemHoc(
+    @Query() query: QueryDiemHocDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.diemHoc.findAll(query, user);
+  }
+
+  @Post('diem-hoc')
+  taoDiemHoc(
+    @Body() dto: CreateDiemHocDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.diemHoc.create(dto, user);
+  }
+
+  @Patch('diem-hoc/:id')
+  suaDiemHoc(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateDiemHocDto,
+  ) {
+    chanNgung(dto);
+    return this.diemHoc.update(id, dto);
+  }
+
+  @Get('giang-vien')
+  dsGiangVien(@Query() query: QueryGiangVienDto) {
+    return this.giangVien.findAll(query);
+  }
+
+  @Post('giang-vien')
+  taoGiangVien(
+    @Body() dto: CreateGiangVienDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.giangVien.create(dto, user);
+  }
+
+  @Patch('giang-vien/:id')
+  suaGiangVien(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateGiangVienDto,
+  ) {
+    chanNgung(dto);
+    return this.giangVien.update(id, dto);
+  }
 
   // Lớp trong phạm vi (hiện = mọi lớp của các khóa trong nhóm).
   @Get('lop-cua-toi')
@@ -111,7 +240,7 @@ export class HoTroGiangVienController {
     if (gd?.hinh_thuc !== 'truc_tiep') {
       throw new NotFoundAppException('Không tìm thấy đợt học trực tiếp');
     }
-    return this.trangLop.layTrangLop(lopId, gdId, 'ho_tro_giang_vien');
+    return this.trangLop.layTrangLop(lopId, gdId, { vai_tro: 'ho_tro_giang_vien' });
   }
 
   // Lịch dạy theo ngày của mọi lớp trong phạm vi (mặc định 14 ngày tới).
