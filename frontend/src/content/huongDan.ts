@@ -42,6 +42,9 @@ export interface PhanHuongDan {
   id: string;
   tieuDe: string;
   moTa: string;
+  /** Tóm tắt 1 dòng: nội dung phần này dùng để làm gì / đọc khi nào (≤ 25 từ). Dùng cho mục
+   * "Cách tìm và tra cứu tài liệu" (bản in Word) — trang web không hiển thị. */
+  tomTat?: string;
   hinh?: HinhKey;
   buoc?: string[];
   ghiChu?: GhiChu[];
@@ -73,6 +76,9 @@ export interface NoiDungHuongDan {
   parts: PhanHuongDan[];
   troubleshooting: TinhHuongLoi[];
   contact: LienHeHoTro;
+  /** Mục "Cách tìm và tra cứu tài liệu hướng dẫn" — chỉ dùng cho bản in Word (scripts/huong-dan/tao-docx.mjs),
+   * trang web /huong-dan không hiển thị mục này. */
+  cachTraCuu: { tieuDe: string; buoc: string[] };
 }
 
 /** Nhãn nhóm dùng cho bộ lọc (chip/SegmentedControl) ở Phần "Lỗi thường gặp". */
@@ -144,6 +150,7 @@ export const huongDan: NoiDungHuongDan = {
     {
       id: 'tong-quan',
       tieuDe: 'Tổng quan các giai đoạn',
+      tomTat: 'Xem các giai đoạn của khóa học và việc cần làm ngay bây giờ.',
       moTa:
         'Khóa bồi dưỡng đi qua các giai đoạn dưới đây. Ban tổ chức sẽ thông báo (qua nhà trường, nhóm Zalo hoặc email) khi mỗi giai đoạn mở. Thầy/Cô chỉ cần làm đúng việc của giai đoạn đang mở.',
       ghiChu: [
@@ -158,6 +165,7 @@ export const huongDan: NoiDungHuongDan = {
     {
       id: 'chuan-bi',
       tieuDe: 'Chuẩn bị trước khi bắt đầu',
+      tomTat: 'Chuẩn bị mã định danh, ngày sinh, CCCD, email và Zalo trước khi bắt đầu.',
       moTa: 'Chuẩn bị sẵn những thứ sau để làm một lần là xong, không bị gián đoạn.',
       ghiChu: [
         {
@@ -176,6 +184,7 @@ export const huongDan: NoiDungHuongDan = {
     {
       id: 'dang-nhap',
       tieuDe: 'Đăng nhập lần đầu',
+      tomTat: 'Đăng nhập lần đầu bằng mã định danh và mật khẩu là ngày sinh.',
       moTa:
         'Mở **boiduongnls.hcmue.edu.vn**, bấm [[Đăng nhập cổng học viên]] (hoặc gõ thẳng boiduongnls.hcmue.edu.vn/dang-nhap). Mọi việc tiếp theo, kể cả làm khảo sát, đều thực hiện sau khi đăng nhập.',
       hinh: 'dang-nhap',
@@ -205,6 +214,7 @@ export const huongDan: NoiDungHuongDan = {
     {
       id: 'doi-mat-khau',
       tieuDe: 'Đổi mật khẩu lần đầu',
+      tomTat: 'Đổi mật khẩu mới theo yêu cầu bắt buộc ngay sau lần đăng nhập đầu tiên.',
       moTa:
         'Hệ thống bắt buộc đặt mật khẩu mới ngay lần đầu, để người khác không thể đăng nhập bằng ngày sinh của Thầy/Cô.',
       hinh: 'doi-mat-khau',
@@ -224,6 +234,7 @@ export const huongDan: NoiDungHuongDan = {
     {
       id: 'trang-chu',
       tieuDe: 'Trang chủ của tôi',
+      tomTat: 'Xem việc cần làm tiếp theo và lối tắt tới Hồ sơ, Lớp học trên Trang chủ.',
       moTa: 'Sau khi đăng nhập, Thầy/Cô vào trang chủ. Khung màu ở trên cùng cho biết việc cần làm tiếp theo.',
       hinh: 'trang-chu',
       buoc: [
@@ -300,6 +311,7 @@ export const huongDan: NoiDungHuongDan = {
     {
       id: 'ho-so',
       tieuDe: 'Bổ sung hồ sơ',
+      tomTat: 'Bổ sung và kiểm tra thông tin hồ sơ, bắt buộc trước khi làm khảo sát.',
       moTa:
         'Đây là bước **bắt buộc trước khi làm khảo sát**. Khối khảo sát chỉ mở khi hồ sơ đã đủ các thông tin bắt buộc. Hồ sơ sửa được trong thời gian Ban tổ chức mở cập nhật. Ngoài thời gian đó, các ô chỉ để xem, không có nút Lưu.',
       ghiChu: [
@@ -343,6 +355,7 @@ export const huongDan: NoiDungHuongDan = {
     {
       id: 'khao-sat',
       tieuDe: 'Làm khảo sát đầu vào',
+      tomTat: 'Làm lần lượt 2 phiếu khảo sát đầu vào khi hồ sơ đã đầy đủ.',
       moTa:
         'Khảo sát làm ngay trên hệ thống, sau khi đăng nhập. Khối khảo sát trên Trang chủ **chỉ mở khi hồ sơ đã đủ thông tin** (Phần 6). Làm lần lượt 2 phiếu: khảo sát kĩ năng số trước, rồi đánh giá năng lực số.',
       hinh: 'khao-sat',
@@ -397,6 +410,7 @@ export const huongDan: NoiDungHuongDan = {
     {
       id: 'lop-hoc',
       tieuDe: 'Nhóm Zalo hỗ trợ và thông tin lớp học',
+      tomTat: 'Vào nhóm Zalo hỗ trợ của cụm và xem thông tin, lịch học của lớp.',
       moTa:
         'Mỗi học viên được xếp vào một **cụm hỗ trợ** theo địa bàn. Mỗi cụm có một nhóm Zalo để nhận thông báo và hỏi đáp. Thầy/Cô **tham gia được ngay khi đăng nhập**, không cần chờ làm xong hồ sơ hay khảo sát. Lớp học theo trình độ sẽ được chia sau khi có kết quả khảo sát.',
       hinh: 'lop-hoc',
@@ -424,6 +438,7 @@ export const huongDan: NoiDungHuongDan = {
     {
       id: 'xac-nhan',
       tieuDe: 'Xác nhận thông tin cuối khóa',
+      tomTat: 'Kiểm tra và xác nhận thông tin cuối khóa trước khi được cấp chứng nhận.',
       moTa:
         'Thực hiện khi Ban tổ chức mở **đợt xác nhận** (thường ở cuối khóa, trước khi cấp chứng nhận). Xác nhận là lời cam kết thông tin đúng. Phải xác nhận trong thời hạn của đợt thì hồ sơ mới được ghi nhận.',
       hinh: 'xac-nhan',
@@ -444,6 +459,7 @@ export const huongDan: NoiDungHuongDan = {
     {
       id: 'quen-mat-khau',
       tieuDe: 'Quên mật khẩu',
+      tomTat: 'Lấy lại mật khẩu khi quên, theo email đã xác minh hay chưa.',
       moTa: 'Có hai cách, tùy việc email của Thầy/Cô đã được xác minh hay chưa.',
       bang: [
         {
@@ -472,6 +488,7 @@ export const huongDan: NoiDungHuongDan = {
     {
       id: 'ho-tro',
       tieuDe: 'Gửi yêu cầu hỗ trợ trên hệ thống',
+      tomTat: 'Gửi yêu cầu hỗ trợ ngay trên hệ thống khi đã đăng nhập được.',
       moTa: 'Khi đã đăng nhập được, cách nhanh nhất là gửi yêu cầu ngay trên hệ thống. Câu trả lời hiện lại ở cùng trang.',
       hinh: 'ho-tro',
       buoc: [
@@ -827,16 +844,40 @@ export const huongDan: NoiDungHuongDan = {
       'Không chia sẻ mật khẩu, kể cả với đồng nghiệp làm hộ.',
     ],
   },
+
+  cachTraCuu: {
+    tieuDe: 'Cách tìm và tra cứu tài liệu hướng dẫn',
+    buoc: [
+      'Mở trình duyệt, vào **boiduongnls.hcmue.edu.vn** (trang giới thiệu chương trình).',
+      'Bấm nút [[Hướng dẫn sử dụng]] ngay ở phần đầu trang (cũng có trên thanh menu và ở cuối trang). Ở trang đăng nhập có dòng [[Lần đầu sử dụng? Xem hướng dẫn từng bước có hình minh họa]]; sau khi đăng nhập có mục [[Hướng dẫn]] trên menu. Có thể gõ thẳng boiduongnls.hcmue.edu.vn/huong-dan.',
+      'Xem **Mục lục**: trên máy tính nằm ở cột bên trái; trên điện thoại dùng ô [[Đi tới phần]] ở đầu trang. Bấm tên mục để nhảy tới mục đó. Chọn kiểu hình [[Máy tính]] hoặc [[Điện thoại]] cho đúng thiết bị đang dùng.',
+      'Gặp lỗi: vào mục **Lỗi thường gặp và cách khắc phục**, gõ vài chữ của thông báo trên màn hình vào ô tìm kiếm (gõ không dấu cũng được) hoặc chọn nhóm vấn đề.',
+      'Chưa tìm được cách xử lý: xem mục **Liên hệ hỗ trợ** để gửi email theo mẫu, hoặc gửi yêu cầu tại mục [[Hỗ trợ]] sau khi đăng nhập.',
+    ],
+  },
 };
+
+/** Tóm tắt 1 dòng của Phụ lục "Nhóm Zalo hỗ trợ theo cụm" (nhomZaloTheoCum.ts) — dùng cho mục
+ * "Cách tìm và tra cứu tài liệu hướng dẫn" (bản in Word), cùng vị trí với tomTat của parts[]. */
+export const TOM_TAT_PHU_LUC_ZALO =
+  'Tra tên trường để tìm đúng nhóm Zalo hỗ trợ của cụm khi chưa thấy nút Vào nhóm Zalo.';
 
 /** Danh sách phần theo đúng thứ tự hiển thị ở trang Hướng dẫn (M9) — nguồn duy nhất cho việc đánh
  * số "Phần N": parts[] rồi tới "Lỗi thường gặp" (Phần 12) và "Liên hệ hỗ trợ" (Phần 13). Dùng để
  * build mục lục (HuongDan.tsx) và để tra id phần cho các mention "Phần N" trong nội dung (xem
  * idPhanTheoSo). Nơi khác không tự đánh số lại. */
-export const DANH_SACH_PHAN_THEO_THU_TU: { id: string; tieuDe: string }[] = [
-  ...huongDan.parts.map((p) => ({ id: p.id, tieuDe: p.tieuDe })),
-  { id: 'loi', tieuDe: 'Lỗi thường gặp và cách khắc phục' },
-  { id: 'lien-he', tieuDe: 'Liên hệ hỗ trợ và an toàn tài khoản' },
+export const DANH_SACH_PHAN_THEO_THU_TU: { id: string; tieuDe: string; tomTat?: string }[] = [
+  ...huongDan.parts.map((p) => ({ id: p.id, tieuDe: p.tieuDe, tomTat: p.tomTat })),
+  {
+    id: 'loi',
+    tieuDe: 'Lỗi thường gặp và cách khắc phục',
+    tomTat: 'Khi gặp thông báo lỗi, tra theo từ khóa hoặc nhóm vấn đề để tìm cách xử lý.',
+  },
+  {
+    id: 'lien-he',
+    tieuDe: 'Liên hệ hỗ trợ và an toàn tài khoản',
+    tomTat: 'Xem email hỗ trợ, mẫu email gửi yêu cầu và cách giữ an toàn tài khoản.',
+  },
 ];
 
 /** Tra id phần theo số thứ tự "Phần N" (1-based) dùng trong nội dung. Trả về undefined nếu không

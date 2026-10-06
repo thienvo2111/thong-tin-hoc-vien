@@ -426,6 +426,9 @@ function Hero({
             )}
             <Group gap="sm" wrap="wrap">
               <NutCta cta={cta} size="lg" color="accent" />
+              <Button component={Link} to="/huong-dan" size="lg" variant="white" color="primary">
+                {gioiThieu.huongDanSuDung.nutHero}
+              </Button>
               {ctaPhuHref && (
                 <Button
                   component="a"

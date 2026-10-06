@@ -49,7 +49,7 @@ await build({
   alias: { '@': path.join(ROOT, 'frontend/src') },
   logLevel: 'error',
 });
-const { huongDan, NHAN_NHOM_LOI, DANH_SACH_PHAN_THEO_THU_TU, nhomZaloTheoCum, huongDanQuanTri } = await import(pathToFileURL(tmp).href);
+const { huongDan, NHAN_NHOM_LOI, DANH_SACH_PHAN_THEO_THU_TU, nhomZaloTheoCum, huongDanQuanTri, TOM_TAT_PHU_LUC_ZALO } = await import(pathToFileURL(tmp).href);
 fs.rmSync(tmp, { force: true });
 
 const {
@@ -257,6 +257,39 @@ c.push(
   thanBai(`Mỗi thao tác có hình minh họa trên máy tính (hình a) và trên điện thoại (hình b); các số tròn màu đỏ trong hình tương ứng với số thứ tự của bước cần làm. Tên người, mã số trong hình là ví dụ. Bản hướng dẫn trực tuyến, có tra cứu lỗi nhanh, đăng tại **${huongDan.hero.diaChi}/huong-dan**.`),
   thanBai(`Đầu mối hỗ trợ: email **${huongDan.hero.email}**; học viên đã đăng nhập có thể gửi yêu cầu tại mục “Hỗ trợ” trên hệ thống.`),
 );
+
+// Cách tìm và tra cứu tài liệu (không đánh số La Mã để giữ đúng các dẫn chiếu "mục III, VI..." trong nội dung).
+if (huongDan.cachTraCuu) {
+  const tc = huongDan.cachTraCuu;
+  c.push(
+    new Paragraph({ heading: HeadingLevel.HEADING_1, keepNext: true, alignment: AlignmentType.JUSTIFIED, spacing: { before: 240, after: 120, line: 288 }, indent: { firstLine: LUI_DAU_DONG }, children: [new TextRun({ text: tc.tieuDe.toUpperCase(), bold: true })] }),
+    thanBai('Học viên lần đầu vào hệ thống nên mở trang hướng dẫn trực tuyến trước, xem mục lục để biết mỗi việc nằm ở mục nào, rồi làm lần lượt theo các mục. Khi gặp lỗi, tra cứu theo các bước dưới đây.'),
+    ...cacBuoc(tc.buoc),
+  );
+  // Ảnh chụp giao diện thật (scripts/huong-dan: chụp từ trang đang chạy); thiếu ảnh thì bỏ qua.
+  const anhTraCuu = [
+    ['tra-cuu-trang-chu-pc.png', 520, 'Nút “Hướng dẫn sử dụng” ở đầu trang giới thiệu (giao diện máy tính)'],
+    ['tra-cuu-muc-luc-pc.png', 520, 'Trang Hướng dẫn sử dụng: mục lục ở cột bên trái (giao diện máy tính)'],
+    ['tra-cuu-muc-luc-phone.png', 200, 'Trang Hướng dẫn sử dụng trên điện thoại: ô “Đi tới phần” để chọn mục'],
+  ].filter(([f]) => fs.existsSync(path.join(IMG, f)));
+  anhTraCuu.forEach(([f, rong, ten]) => {
+    soHinh++;
+    c.push(
+      new Paragraph({ alignment: AlignmentType.CENTER, keepNext: true, spacing: { before: 120, line: 240 }, indent: { firstLine: 0 }, children: [anh(f, rong)] }),
+      chuThich(`Hình ${soHinh}. ${ten}`),
+    );
+  });
+  const tt = (m) => m.tomTat ?? '';
+  const hang = [
+    ...huongDan.parts.map((p, i) => [LA_MA[i], `**${p.tieuDe}**`, tt(p)]),
+    ...DANH_SACH_PHAN_THEO_THU_TU.slice(huongDan.parts.length).map((m, i) => [LA_MA[huongDan.parts.length + i], `**${m.tieuDe}**`, tt(m)]),
+    ['Phụ lục', `**${nhomZaloTheoCum.tieuDe.replace(/^Phụ lục:\s*/, '')}**`, TOM_TAT_PHU_LUC_ZALO ?? ''],
+  ];
+  c.push(
+    tieuDeTieuMuc('Mục lục tài liệu và nội dung chính của từng mục'),
+    ...bang([1100, 3300, W - 4400], ['Mục', 'Tên mục', 'Nội dung chính'], hang),
+  );
+}
 
 huongDan.parts.forEach((phan, i) => {
   const so = i + 1;

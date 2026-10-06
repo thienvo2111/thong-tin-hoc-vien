@@ -118,7 +118,22 @@ describe('M0 — Trang giới thiệu: nội dung chung', () => {
       '/huong-dan',
     );
   });
+
+  it('hero có nút "Hướng dẫn sử dụng" trỏ /huong-dan (chế độ khảo sát mặc định)', async () => {
+    renderTrang(<TrangGioiThieu />);
+    await choTrang();
+    expect(heroHuongDanLink()).toHaveAttribute('href', '/huong-dan');
+  });
 });
+
+/** Nút hướng dẫn sử dụng trong hero — loại trừ 2 link cùng nhãn ở header/footer để không bị lỗi
+ * "tìm thấy nhiều phần tử" (3 lối vào /huong-dan dùng chung 1 nhãn). */
+function heroHuongDanLink() {
+  const header = screen.getByRole('banner');
+  const footer = screen.getByRole('contentinfo');
+  const tatCa = screen.getAllByRole('link', { name: gioiThieu.huongDanSuDung.nutHero });
+  return tatCa.find((a) => !header.contains(a) && !footer.contains(a));
+}
 
 describe('M0 — quản trị chưa lưu cấu hình / API lỗi -> dùng mặc định', () => {
   it('chưa lưu (cau_hinh null): chế độ khảo sát, phiếu mặc định chưa có link -> nút bị khóa', async () => {
@@ -229,6 +244,13 @@ describe('M0 — chế độ "dang_nhap" (đã mở cổng học viên / địa 
     renderTrang(<TrangGioiThieu />);
     await screen.findByRole('heading', { name: gioiThieu.huongDan.tieuDe });
     expect(screen.getByRole('link', { name: gioiThieu.huongDanSuDung.nutChiTiet })).toHaveAttribute('href', '/huong-dan');
+  });
+
+  it('hero có nút "Hướng dẫn sử dụng" trỏ /huong-dan (chế độ đăng nhập)', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ che_do_hoc_vien: 'dang_nhap' }));
+    renderTrang(<TrangGioiThieu />);
+    await screen.findByRole('link', { name: gioiThieu.moDau.nutChinh });
+    expect(heroHuongDanLink()).toHaveAttribute('href', '/huong-dan');
   });
 
   it('tắt khối khảo sát -> không render khối và không có mục menu', async () => {

@@ -43,7 +43,7 @@ export interface NoiDungGioiThieu {
   };
   huongDan: Khoi & { tieuDe: string; buoc: { ten: string; moTa: string }[] };
   /** Lối vào trang Hướng dẫn sử dụng (M9, /huong-dan) — luôn hiện, không phụ thuộc chế độ triển khai. */
-  huongDanSuDung: { nhanMenu: string; nutChiTiet: string; lienKetChanTrang: string };
+  huongDanSuDung: { nhanMenu: string; nutHero: string; nutChiTiet: string; lienKetChanTrang: string };
   hoiDap: Khoi & { tieuDe: string; cau: { hoi: string; dap: string; cheDo?: CheDoHocVien }[] };
   lienHe: Khoi & { tieuDe: string; hotline: string; zalo: string; email: string; gioHoTro: string };
   hopTac: Khoi & { tieuDe: string; moTa: string; hotline: string; email: string };
@@ -300,6 +300,7 @@ export const gioiThieu: NoiDungGioiThieu = {
 
   huongDanSuDung: {
     nhanMenu: 'Hướng dẫn sử dụng',
+    nutHero: 'Hướng dẫn sử dụng',
     nutChiTiet: 'Xem hướng dẫn chi tiết từng bước',
     lienKetChanTrang: 'Hướng dẫn sử dụng',
   },
