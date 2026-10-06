@@ -16,7 +16,7 @@ describe('M1 — Quên mật khẩu', () => {
     const user = userEvent.setup();
     renderVoiRouter(routes, { initialEntries: ['/quen-mat-khau'] });
 
-    await user.type(screen.getByLabelText('Tên đăng nhập, mã định danh hoặc số CCCD'), '9115131060');
+    await user.type(screen.getByLabelText('Tên tài khoản hoặc mã định danh MOET'), '9115131060');
     await user.click(screen.getByRole('button', { name: 'Gửi yêu cầu' }));
 
     expect(
@@ -30,7 +30,7 @@ describe('M1 — Quên mật khẩu', () => {
     const user = userEvent.setup();
     renderVoiRouter(routes, { initialEntries: ['/quen-mat-khau'] });
 
-    await user.type(screen.getByLabelText('Tên đăng nhập, mã định danh hoặc số CCCD'), 'khong-ton-tai');
+    await user.type(screen.getByLabelText('Tên tài khoản hoặc mã định danh MOET'), 'khong-ton-tai');
     await user.click(screen.getByRole('button', { name: 'Gửi yêu cầu' }));
 
     expect(
@@ -60,7 +60,7 @@ describe('M1 — Quên mật khẩu', () => {
     const user = userEvent.setup();
     renderVoiRouter(routes, { initialEntries: ['/quen-mat-khau'] });
 
-    await user.type(screen.getByLabelText('Tên đăng nhập, mã định danh hoặc số CCCD'), '9115131060');
+    await user.type(screen.getByLabelText('Tên tài khoản hoặc mã định danh MOET'), '9115131060');
     await user.click(screen.getByRole('button', { name: 'Gửi yêu cầu' }));
 
     expect(await screen.findByText('Không kết nối được máy chủ. Kiểm tra mạng và thử lại.')).toBeInTheDocument();

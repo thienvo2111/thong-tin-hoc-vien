@@ -17,7 +17,7 @@ const routes = [
 ];
 
 async function dangNhapTruoc(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText('Tên đăng nhập, mã định danh hoặc số CCCD'), '9115131060');
+  await user.type(screen.getByLabelText('Tên tài khoản hoặc mã định danh MOET'), '9115131060');
   await user.type(screen.getByLabelText('Mật khẩu'), '08121983');
   await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
   await screen.findByRole('heading', { name: 'Đổi mật khẩu' });
@@ -96,7 +96,7 @@ describe('M2 — Đổi mật khẩu lần đầu', () => {
     await dangNhapTruoc(user);
 
     await user.click(screen.getByRole('button', { name: 'Đăng xuất' }));
-    expect(await screen.findByLabelText('Tên đăng nhập, mã định danh hoặc số CCCD')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Tên tài khoản hoặc mã định danh MOET')).toBeInTheDocument();
   });
 
   it('vai_tro=quan_tri đổi mật khẩu xong → điều hướng /admin/tong-quan, không phải /toi (hồi quy bug)', async () => {

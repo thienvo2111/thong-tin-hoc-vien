@@ -123,8 +123,8 @@ export default function DangNhap() {
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
               <Stack gap="md">
                 <TextInput
-                  label="Tên đăng nhập, mã định danh hoặc số CCCD"
-                  description="Mã định danh CSDL ngành do nhà trường cung cấp, hoặc số CCCD nếu Thầy/Cô đã bổ sung vào hồ sơ"
+                  label="Tên tài khoản hoặc mã định danh MOET"
+                  description="Mã định danh trên CSDL MOET do nhà trường cung cấp"
                   inputMode="numeric"
                   autoComplete="username"
                   onPaste={xuLyDan}

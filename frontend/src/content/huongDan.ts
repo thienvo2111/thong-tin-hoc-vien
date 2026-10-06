@@ -180,7 +180,7 @@ export const huongDan: NoiDungHuongDan = {
         'Mở **boiduongnls.hcmue.edu.vn**, bấm [[Đăng nhập cổng học viên]] (hoặc gõ thẳng boiduongnls.hcmue.edu.vn/dang-nhap). Mọi việc tiếp theo, kể cả làm khảo sát, đều thực hiện sau khi đăng nhập.',
       hinh: 'dang-nhap',
       buoc: [
-        'Nhập **tên đăng nhập, mã định danh hoặc số CCCD**. Mã định danh trên CSDL MOET do nhà trường cung cấp (lấy từ danh sách học viên) — chỉ gồm chữ số, không có dấu cách. Nếu đã bổ sung số CCCD vào hồ sơ, Thầy/Cô cũng có thể đăng nhập bằng số CCCD.',
+        'Nhập **tên tài khoản hoặc mã định danh MOET**. Mã định danh trên CSDL MOET do nhà trường cung cấp (lấy từ danh sách học viên) — chỉ gồm chữ số, không có dấu cách.',
         'Nhập **mật khẩu**. Lần đầu là ngày sinh viết liền 8 chữ số. Bấm biểu tượng con mắt ở cuối ô để xem lại mình đã gõ đúng chưa.',
         'Bấm [[Đăng nhập]]. Lần đầu, hệ thống sẽ chuyển sang màn hình đổi mật khẩu.',
       ],
@@ -451,7 +451,7 @@ export const huongDan: NoiDungHuongDan = {
           hang: [
             [
               '**Email đã xác minh**',
-              'Ở màn hình đăng nhập, bấm [[Quên mật khẩu?]]. Nhập mã định danh hoặc số CCCD, bấm [[Gửi yêu cầu]]. Mở email (xem cả Thư rác), bấm liên kết đặt lại mật khẩu, đặt mật khẩu mới.',
+              'Ở màn hình đăng nhập, bấm [[Quên mật khẩu?]]. Nhập tên tài khoản hoặc mã định danh MOET, bấm [[Gửi yêu cầu]]. Mở email (xem cả Thư rác), bấm liên kết đặt lại mật khẩu, đặt mật khẩu mới.',
             ],
             [
               '**Email chưa xác minh** hoặc không nhận được thư sau 15 phút',

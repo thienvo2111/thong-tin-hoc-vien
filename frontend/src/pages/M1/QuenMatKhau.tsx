@@ -40,7 +40,7 @@ export default function QuenMatKhau() {
             Quên mật khẩu
           </Title>
           <Text size="sm" c="dimmed">
-            Nhập mã định danh hoặc số CCCD đã dùng để đăng nhập. Nếu tài khoản hợp lệ và đã có email liên
+            Nhập tên tài khoản hoặc mã định danh MOET đã dùng để đăng nhập. Nếu tài khoản hợp lệ và đã có email liên
             hệ được xác minh, hệ thống sẽ gửi liên kết đặt lại mật khẩu qua email.
           </Text>
 
@@ -55,7 +55,7 @@ export default function QuenMatKhau() {
               <form onSubmit={handleSubmit(onSubmit)} noValidate>
                 <Stack gap="md">
                   <TextInput
-                    label="Tên đăng nhập, mã định danh hoặc số CCCD"
+                    label="Tên tài khoản hoặc mã định danh MOET"
                     inputMode="numeric"
                     autoComplete="username"
                     error={errors.ten_dang_nhap?.message}

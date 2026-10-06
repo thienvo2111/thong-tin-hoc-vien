@@ -292,7 +292,7 @@ export const gioiThieu: NoiDungGioiThieu = {
     tieuDe: 'Bắt đầu trong 4 bước',
     buoc: [
       { ten: 'Nhận mã định danh', moTa: 'Trường sẽ sử dụng mã định danh MOET được cung cấp để làm tên đăng nhập.' },
-      { ten: 'Đăng nhập', moTa: 'Đăng nhập bằng mã định danh hoặc số CCCD. Mật khẩu lần đầu là ngày sinh viết liền ngày-tháng-năm, ví dụ 08121983. Hệ thống sẽ yêu cầu đổi mật khẩu mới.' },
+      { ten: 'Đăng nhập', moTa: 'Đăng nhập bằng tên tài khoản hoặc mã định danh MOET. Mật khẩu lần đầu là ngày sinh viết liền ngày-tháng-năm, ví dụ 08121983. Hệ thống sẽ yêu cầu đổi mật khẩu mới.' },
       { ten: 'Bổ sung và xác nhận hồ sơ', moTa: 'Kiểm tra thông tin, sửa nếu chưa đúng, bổ sung phần còn thiếu, rồi bấm Xác nhận trong thời gian quy định.' },
       { ten: 'Làm bài đánh giá đầu vào', moTa: 'Khi hồ sơ đã đầy đủ và được xác nhận, đường dẫn làm bài sẽ hiện trên trang của thầy cô.' },
     ],
