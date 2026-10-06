@@ -9,6 +9,8 @@
 // Cần: gói `docx` (npm i -g docx); esbuild có sẵn trong frontend/node_modules.
 // Ảnh: docs/huong-dan-hoc-vien-img/<hinh>-{pc,phone}.png (cùng bộ ảnh với frontend/src/assets/huong-dan).
 // Kết quả: docs/huong-dan-hoc-vien.docx
+// Thêm --quan-tri: sinh bản hướng dẫn trang quản trị từ frontend/src/content/huongDanQuanTri.ts
+// -> docs/huong-dan-quan-tri.docx (cùng thể thức, không có hình minh họa).
 
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -19,7 +21,8 @@ import path from 'node:path';
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const IMG = path.join(ROOT, 'docs/huong-dan-hoc-vien-img');
-const OUT = path.join(ROOT, 'docs/huong-dan-hoc-vien.docx');
+const QUAN_TRI = process.argv.includes('--quan-tri');
+const OUT = path.join(ROOT, QUAN_TRI ? 'docs/huong-dan-quan-tri.docx' : 'docs/huong-dan-hoc-vien.docx');
 
 const tham = process.argv.slice(2);
 const doc = (ten, macDinh) => {
@@ -35,7 +38,7 @@ const { build } = require(path.join(ROOT, 'frontend/node_modules/esbuild'));
 const tmp = path.join(os.tmpdir(), `huong-dan-${process.pid}.mjs`);
 await build({
   stdin: {
-    contents: "export * from './huongDan'; export * from './nhomZaloTheoCum';",
+    contents: "export * from './huongDan'; export * from './nhomZaloTheoCum'; export * from './huongDanQuanTri';",
     resolveDir: path.join(ROOT, 'frontend/src/content'),
     loader: 'ts',
   },
@@ -46,7 +49,7 @@ await build({
   alias: { '@': path.join(ROOT, 'frontend/src') },
   logLevel: 'error',
 });
-const { huongDan, NHAN_NHOM_LOI, DANH_SACH_PHAN_THEO_THU_TU, nhomZaloTheoCum } = await import(pathToFileURL(tmp).href);
+const { huongDan, NHAN_NHOM_LOI, DANH_SACH_PHAN_THEO_THU_TU, nhomZaloTheoCum, huongDanQuanTri } = await import(pathToFileURL(tmp).href);
 fs.rmSync(tmp, { force: true });
 
 const {
@@ -208,13 +211,46 @@ c.push(new Table({
 c.push(
   rong(240),
   giua([new TextRun({ text: 'HƯỚNG DẪN', bold: true, size: CO })], 0),
-  giua([new TextRun({ text: 'Sử dụng hệ thống Bồi dưỡng Năng lực số dành cho học viên', bold: true, size: CO })], 0),
+  giua([new TextRun({ text: QUAN_TRI ? 'Sử dụng trang quản trị hệ thống Bồi dưỡng Năng lực số' : 'Sử dụng hệ thống Bồi dưỡng Năng lực số dành cho học viên', bold: true, size: CO })], 0),
   ...(KHOA ? [giua([new TextRun({ text: KHOA.charAt(0).toUpperCase() + KHOA.slice(1), bold: true, size: CO })], 0)] : []),
   giua([new TextRun({ text: `(Kèm theo Công văn số ${CONG_VAN} ${NGAY}`, italics: true, size: CO })], 0),
   giua([new TextRun({ text: 'của Trường Đại học Sư phạm Thành phố Hồ Chí Minh)', italics: true, size: CO })], 0),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240, line: 240 }, indent: { firstLine: 0, left: 3400, right: 3400 }, border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '000000', space: 1 } }, children: [] }),
 );
 
+// Bản quản trị: tiêu đề tiểu mục + các bước, bảng, lưu ý của 1 mục (dùng chung cho phần và tiểu mục).
+function mucQuanTri(m) {
+  if (m.buoc) c.push(...cacBuoc(m.buoc));
+  (m.bang ?? []).forEach((b) => c.push(...bangTuDong(b)));
+  (m.ghiChu ?? []).forEach((g) => c.push(...luuY(g)));
+}
+function noiDungQuanTri() {
+  const qt = huongDanQuanTri;
+  c.push(
+    thanBai(qt.gioiThieu),
+    thanBai(`Mỗi mục ghi rõ phạm vi áp dụng: **mọi tài khoản** vào trang quản trị (Quản trị, Sở GD&ĐT, Phòng Văn hóa – Xã hội, Trường) hoặc **chỉ tài khoản Quản trị**. Bản trực tuyến, có tìm kiếm nhanh, ở mục “Hướng dẫn” trong trang quản trị (**${huongDan.hero.diaChi}/admin/huong-dan**).`),
+  );
+  let so = 1;
+  c.push(tieuDeMuc(so++, 'Quy trình vận hành một khóa bồi dưỡng'), thanBai('Áp dụng: chỉ tài khoản Quản trị. Các bước nên làm theo đúng thứ tự:'), ...cacBuoc(qt.quyTrinh));
+  qt.parts.forEach((phan) => {
+    c.push(tieuDeMuc(so++, phan.tieuDe), thanBai(phan.moTa));
+    c.push(thanBai(`Áp dụng: ${phan.vaiTro === 'quan_tri' ? 'chỉ tài khoản Quản trị' : 'mọi tài khoản vào trang quản trị'}.${phan.manHinh ? ` Màn hình: menu **${phan.manHinh.nhan}** (địa chỉ ${huongDan.hero.diaChi}${phan.manHinh.duongDan}).` : ''}`));
+    mucQuanTri(phan);
+    (phan.muc ?? []).forEach((m) => {
+      if (m.tieuDe) c.push(tieuDeTieuMuc(m.tieuDe));
+      mucQuanTri(m);
+    });
+  });
+  c.push(tieuDeMuc(so++, 'Hỏi đáp thường gặp'),
+    ...bang([Math.round(W * 0.36), W - Math.round(W * 0.36)], ['Câu hỏi', 'Trả lời'],
+      qt.hoiDap.map((h) => [`${h.hoi}${h.vaiTro === 'quan_tri' ? ' *(Quản trị)*' : ''}`, h.dap])),
+    thanBai(`Trong quá trình sử dụng, nếu có vướng mắc, liên hệ email **${huongDan.hero.email}** để được hỗ trợ./.`, { spacing: { ...DOAN, before: 120 } }),
+  );
+}
+
+if (QUAN_TRI) {
+  noiDungQuanTri();
+} else {
 // Phần mở đầu: mục đích, phạm vi, đối tượng, nơi xem bản trực tuyến, đầu mối hỗ trợ.
 c.push(
   thanBai(`Hướng dẫn này giúp giáo viên và cán bộ quản lý tham gia khóa bồi dưỡng năng lực số${KHOA ? ` (${KHOA})` : ''} sử dụng hệ thống Bồi dưỡng Năng lực số tại địa chỉ **${huongDan.hero.diaChi}**: đăng nhập, bổ sung hồ sơ, thực hiện khảo sát đầu vào, theo dõi lớp học và xử lý các lỗi thường gặp.`),
@@ -282,9 +318,11 @@ c.push(
     nhomZaloTheoCum.cum.map((cm) => [`**${cm.ten}**`, cm.donVi.map((d, j) => `${j + 1}. ${d}`), cm.linkZalo])),
 );
 
+}
+
 const tep = new Document({
   creator: 'Trường Đại học Sư phạm Thành phố Hồ Chí Minh',
-  title: 'Hướng dẫn sử dụng hệ thống Bồi dưỡng Năng lực số dành cho học viên',
+  title: QUAN_TRI ? 'Hướng dẫn sử dụng trang quản trị hệ thống Bồi dưỡng Năng lực số' : 'Hướng dẫn sử dụng hệ thống Bồi dưỡng Năng lực số dành cho học viên',
   styles: {
     default: { document: { run: { font: FONT, size: CO, color: '000000' }, paragraph: { spacing: { line: 288 } } } },
     paragraphStyles: [
@@ -306,4 +344,6 @@ const tep = new Document({
 });
 
 fs.writeFileSync(OUT, await Packer.toBuffer(tep));
-console.log(`Đã ghi ${path.relative(ROOT, OUT)}: ${huongDan.parts.length + 2} mục, ${huongDan.troubleshooting.length} lỗi thường gặp, ${soHinh} cặp hình, phụ lục ${nhomZaloTheoCum.cum.length} cụm Zalo`);
+console.log(QUAN_TRI
+  ? `Đã ghi ${path.relative(ROOT, OUT)}: ${huongDanQuanTri.parts.length + 2} mục, ${huongDanQuanTri.hoiDap.length} hỏi đáp`
+  : `Đã ghi ${path.relative(ROOT, OUT)}: ${huongDan.parts.length + 2} mục, ${huongDan.troubleshooting.length} lỗi thường gặp, ${soHinh} cặp hình, phụ lục ${nhomZaloTheoCum.cum.length} cụm Zalo`);

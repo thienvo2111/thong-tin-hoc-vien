@@ -1,5 +1,5 @@
-import { Avatar, Box, Group, Image, Stack, Text } from '@mantine/core';
-import { Link, useLocation } from 'react-router-dom';
+import { Avatar, Box, Button, Group, Image, Stack, Text } from '@mantine/core';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useToi } from '@/auth/AuthContext';
 import logoHcmue from '@/assets/logo-hcmue.png';
 import { MENU_ADMIN } from './menu';
@@ -15,7 +15,8 @@ const NHAN_VAI_TRO: Record<string, string> = {
  * design/redesign-spec.md § 2 + mockup AdminTongQuan.dc.html. */
 export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
-  const { nguoiDung } = useToi();
+  const { nguoiDung, dangXuat } = useToi();
+  const navigate = useNavigate();
   const tenVaiTro = nguoiDung ? (NHAN_VAI_TRO[nguoiDung.vai_tro] ?? nguoiDung.vai_tro) : '';
   const chuCaiDau = tenVaiTro.trim().charAt(0).toUpperCase() || 'Q';
 
@@ -83,6 +84,21 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
               </Text>
             </Box>
           </Group>
+          {/* 2026-10-06: trang quản trị trước đây không có lối đăng xuất (máy dùng chung ở trường). */}
+          <Button
+            variant="subtle"
+            color="gray.4"
+            size="xs"
+            fullWidth
+            mt={8}
+            onClick={async () => {
+              onNavigate?.();
+              await dangXuat();
+              navigate('/dang-nhap', { replace: true });
+            }}
+          >
+            Đăng xuất
+          </Button>
         </Box>
       )}
     </Stack>

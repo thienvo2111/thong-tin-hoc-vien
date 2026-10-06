@@ -7,7 +7,8 @@ export interface MucMenuAdmin {
   nhan: string;
   icon: string;
   sapRaMat?: boolean;
-  /** Chỉ hiện với quan_tri (ADR 0002 — trang Người dùng). */
+  /** Chỉ hiện với quan_tri — API của màn hình chỉ cho Quản trị (2026-10-06: thêm Đợt xác nhận, Nhập dữ liệu,
+   * Cấu hình khảo sát, Yêu cầu hỗ trợ; tài khoản đơn vị mở các mục này chỉ nhận lỗi không có quyền). */
   chiQuanTri?: boolean;
 }
 
@@ -15,13 +16,14 @@ export const MENU_ADMIN: MucMenuAdmin[] = [
   { to: '/admin/tong-quan', nhan: 'Tổng quan', icon: '📊' },
   { to: '/admin/hoc-vien', nhan: 'Học viên', icon: '👥' },
   { to: '/admin/khoa-boi-duong', nhan: 'Khóa bồi dưỡng', icon: '🎓' },
-  { to: '/admin/dot-xac-nhan', nhan: 'Đợt xác nhận', icon: '🗓️' },
+  { to: '/admin/dot-xac-nhan', nhan: 'Đợt xác nhận', icon: '🗓️', chiQuanTri: true },
   { to: '/admin/bao-cao', nhan: 'Báo cáo', icon: '📈' },
-  { to: '/admin/nhap-du-lieu', nhan: 'Nhập dữ liệu', icon: '⇪' },
-  { to: '/admin/cau-hinh-khao-sat', nhan: 'Cấu hình khảo sát', icon: '📝' },
+  { to: '/admin/nhap-du-lieu', nhan: 'Nhập dữ liệu', icon: '⇪', chiQuanTri: true },
+  { to: '/admin/cau-hinh-khao-sat', nhan: 'Cấu hình khảo sát', icon: '📝', chiQuanTri: true },
   { to: '/admin/tinh-hinh-khao-sat', nhan: 'Tình hình khảo sát', icon: '📋', chiQuanTri: true },
-  { to: '/admin/yeu-cau-ho-tro', nhan: 'Yêu cầu hỗ trợ', icon: '💬' },
+  { to: '/admin/yeu-cau-ho-tro', nhan: 'Yêu cầu hỗ trợ', icon: '💬', chiQuanTri: true },
   { to: '/admin/danh-muc-truong', nhan: 'Danh mục trường', icon: '🏫' },
   { to: '/admin/nguoi-dung', nhan: 'Người dùng', icon: '🔑', chiQuanTri: true },
   { to: '/admin/tai-khoan-hoc-vien', nhan: 'Tài khoản học viên', icon: '🪪', chiQuanTri: true },
+  { to: '/admin/huong-dan', nhan: 'Hướng dẫn', icon: '📘' },
 ];
