@@ -1,11 +1,15 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { server } from './mocks/server';
 import { resetDb } from './mocks/db';
 import { datLaiCauHinhKhaoSatMock } from './mocks/cauHinhKhaoSat';
 import { datLaiThangMucMock, datLaiTinhTrangKhaoSatMock } from './mocks/sso';
 import { xoaToken } from '@/auth/tokenStore';
+
+// findBy*/waitFor mặc định chờ 1 giây — đủ khi chạy riêng 1 file, nhưng cả suite song song trên máy 4 nhân
+// thì vài màn nặng (TrangChinh, Cấu hình khảo sát) render chậm hơn. Cùng lý do với testTimeout ở vite.config.ts.
+configure({ asyncUtilTimeout: 3000 });
 
 // Polyfill cần cho các component Mantine (Combobox/Select/Popover…) chạy trong jsdom.
 if (!window.matchMedia) {

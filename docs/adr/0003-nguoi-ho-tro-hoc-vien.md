@@ -1,7 +1,7 @@
 # ADR 0003 — Tài khoản Người hỗ trợ học viên theo cụm hỗ trợ Zalo
 
 - Ngày: 2026-10-06
-- Trạng thái: Đã chấp nhận — Lát 1 (tài khoản + phân công, #10) và Lát 2 (tra cứu + xuất, #11) đã code 2026-10-06; Lát 3–4 chưa
+- Trạng thái: Đã chấp nhận — Lát 1 (#10), Lát 2 (#11), Lát 4 (yêu cầu hỗ trợ theo cụm, #13) đã code 2026-10-06; Lát 3 (sửa hồ sơ + mật khẩu, #12) chưa
 - Đặc tả: [`docs/superpowers/specs/2026-10-06-ho-tro-hoc-vien-design.md`](../superpowers/specs/2026-10-06-ho-tro-hoc-vien-design.md)
 - Liên quan: ADR 0002 (tài khoản đơn vị — tái dùng luồng cấp tài khoản), QĐ10 (`cum_hoc_vien`), M8 (`yeu_cau_ho_tro`)
 

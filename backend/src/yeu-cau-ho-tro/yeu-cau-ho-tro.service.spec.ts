@@ -1,6 +1,10 @@
 import { YeuCauHoTroService } from './yeu-cau-ho-tro.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { ForbiddenAppException, NotFoundAppException } from '../common/exceptions/app.exceptions';
+import {
+  ConflictAppException,
+  ForbiddenAppException,
+  NotFoundAppException,
+} from '../common/exceptions/app.exceptions';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
 
 describe('YeuCauHoTroService — phía học viên', () => {
@@ -11,6 +15,8 @@ describe('YeuCauHoTroService — phía học viên', () => {
       findMany: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
       count: jest.Mock;
     };
     loai_van_de_ho_tro: { findUniqueOrThrow: jest.Mock };
@@ -24,6 +30,8 @@ describe('YeuCauHoTroService — phía học viên', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
         count: jest.fn(),
       },
       loai_van_de_ho_tro: { findUniqueOrThrow: jest.fn() },
@@ -54,7 +62,11 @@ describe('YeuCauHoTroService — phía học viên', () => {
 
     expect(prisma.yeu_cau_ho_tro.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { hoc_vien_id: 'hv-1', tinh_huong: 'Quên mật khẩu', noi_dung_hoi: 'Tôi quên mật khẩu' },
+        data: {
+          hoc_vien_id: 'hv-1',
+          tinh_huong: 'Quên mật khẩu',
+          noi_dung_hoi: 'Tôi quên mật khẩu',
+        },
       }),
     );
     expect(prisma.loai_van_de_ho_tro.findUniqueOrThrow).not.toHaveBeenCalled();
@@ -71,7 +83,9 @@ describe('YeuCauHoTroService — phía học viên', () => {
       trang_thai: 'cho_xu_ly',
       loai_van_de: { ten: 'Quên mật khẩu' },
     });
-    expect((await service.chiTietCuaToi('hv-1', 'yc-cu')).chu_de).toBe('Quên mật khẩu');
+    expect((await service.chiTietCuaToi('hv-1', 'yc-cu')).chu_de).toBe(
+      'Quên mật khẩu',
+    );
 
     prisma.yeu_cau_ho_tro.findUnique.mockResolvedValueOnce({
       id: 'yc-x',
@@ -96,9 +110,9 @@ describe('YeuCauHoTroService — phía học viên', () => {
 
   it('chiTietCuaToi không tồn tại -> NotFoundAppException', async () => {
     prisma.yeu_cau_ho_tro.findUnique.mockResolvedValueOnce(null);
-    await expect(service.chiTietCuaToi('hv-1', 'yc-khong-ton-tai')).rejects.toBeInstanceOf(
-      NotFoundAppException,
-    );
+    await expect(
+      service.chiTietCuaToi('hv-1', 'yc-khong-ton-tai'),
+    ).rejects.toBeInstanceOf(NotFoundAppException);
   });
 
   it('da_dong_hieu_luc = true khi da_phan_hoi quá 7 ngày', async () => {
@@ -161,6 +175,8 @@ describe('YeuCauHoTroService — phía quan_tri', () => {
       findMany: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
       count: jest.Mock;
     };
     loai_van_de_ho_tro: { findUniqueOrThrow: jest.Mock };
@@ -174,6 +190,8 @@ describe('YeuCauHoTroService — phía quan_tri', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
         count: jest.fn(),
       },
       loai_van_de_ho_tro: { findUniqueOrThrow: jest.fn() },
@@ -197,11 +215,13 @@ describe('YeuCauHoTroService — phía quan_tri', () => {
         danh_gia: 'hai_long',
         thoi_gian_phan_hoi: new Date(),
         loai_van_de: { ten: 'Tài khoản' },
-        hoc_vien: { ho_ten: 'Bùi Thị A' },
+        hoc_vien: { ho_ten: 'Bùi Thị A', dang_ky_hoc: [] },
         tra_loi_boi_user: { ho_ten: 'Quản trị B' },
       },
     ]);
-    prisma.yeu_cau_ho_tro.count.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+    prisma.yeu_cau_ho_tro.count
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(0);
 
     const res = await service.danhSachQuanTri({ trang_thai: 'da_phan_hoi' });
 
@@ -233,7 +253,7 @@ describe('YeuCauHoTroService — phía quan_tri', () => {
         tinh_huong: 'Quên mật khẩu',
         thoi_gian_phan_hoi: phanHoi,
         loai_van_de: null,
-        hoc_vien: { ho_ten: 'A' },
+        hoc_vien: { ho_ten: 'A', dang_ky_hoc: [] },
         tra_loi_boi_user: null,
       },
       {
@@ -243,7 +263,7 @@ describe('YeuCauHoTroService — phía quan_tri', () => {
         tinh_huong: null,
         thoi_gian_phan_hoi: phanHoi,
         loai_van_de: { ten: 'Tài khoản' },
-        hoc_vien: { ho_ten: 'A' },
+        hoc_vien: { ho_ten: 'A', dang_ky_hoc: [] },
         tra_loi_boi_user: null,
       },
     ]);
@@ -254,10 +274,16 @@ describe('YeuCauHoTroService — phía quan_tri', () => {
 
     const res = await service.danhSachQuanTri({});
 
-    const whereHoiLai = prisma.yeu_cau_ho_tro.count.mock.calls.slice(1).map((c) => c[0].where);
-    expect(whereHoiLai[0]).toEqual(expect.objectContaining({ tinh_huong: 'Quên mật khẩu' }));
+    const whereHoiLai = prisma.yeu_cau_ho_tro.count.mock.calls
+      .slice(1)
+      .map((c) => c[0].where);
+    expect(whereHoiLai[0]).toEqual(
+      expect.objectContaining({ tinh_huong: 'Quên mật khẩu' }),
+    );
     expect(whereHoiLai[0]).not.toHaveProperty('loai_van_de_id');
-    expect(whereHoiLai[1]).toEqual(expect.objectContaining({ loai_van_de_id: 'lvd-1' }));
+    expect(whereHoiLai[1]).toEqual(
+      expect.objectContaining({ loai_van_de_id: 'lvd-1' }),
+    );
     expect(whereHoiLai[1]).not.toHaveProperty('tinh_huong');
     expect(res.data.map((d) => d.hoi_lai)).toEqual([true, false]);
   });
@@ -269,7 +295,7 @@ describe('YeuCauHoTroService — phía quan_tri', () => {
         trang_thai: 'cho_xu_ly',
         thoi_gian_phan_hoi: null,
         loai_van_de: { ten: 'X' },
-        hoc_vien: { ho_ten: 'C' },
+        hoc_vien: { ho_ten: 'C', dang_ky_hoc: [] },
         tra_loi_boi_user: null,
       },
     ]);
@@ -277,28 +303,29 @@ describe('YeuCauHoTroService — phía quan_tri', () => {
 
     const res = await service.danhSachQuanTri({});
 
-    expect(prisma.yeu_cau_ho_tro.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
-    expect(res.data[0]).toEqual(expect.objectContaining({ nguoi_tra_loi_ten: null, hoi_lai: false }));
+    expect(prisma.yeu_cau_ho_tro.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: {} }),
+    );
+    expect(res.data[0]).toEqual(
+      expect.objectContaining({ nguoi_tra_loi_ten: null, hoi_lai: false }),
+    );
   });
 
-  it('traLoi ticket cho_xu_ly -> set da_phan_hoi + gọi gửi email', async () => {
-    prisma.yeu_cau_ho_tro.findUnique.mockResolvedValueOnce({
-      id: 'yc-1',
-      trang_thai: 'cho_xu_ly',
-      loai_van_de: { ten: 'X' },
-    });
-    prisma.yeu_cau_ho_tro.update.mockResolvedValueOnce({
+  it('traLoi ticket cho_xu_ly -> UPDATE có điều kiện cho_xu_ly, set da_phan_hoi + gọi gửi email', async () => {
+    prisma.yeu_cau_ho_tro.updateMany.mockResolvedValueOnce({ count: 1 });
+    prisma.yeu_cau_ho_tro.findUniqueOrThrow.mockResolvedValueOnce({
       id: 'yc-1',
       trang_thai: 'da_phan_hoi',
       thoi_gian_phan_hoi: new Date(),
+      thoi_gian_sua_tra_loi: null,
       loai_van_de: { ten: 'X' },
     });
 
     await service.traLoi('yc-1', 'qt-1', { noi_dung_tra_loi: 'Đã xử lý' });
 
-    expect(prisma.yeu_cau_ho_tro.update).toHaveBeenCalledWith(
+    expect(prisma.yeu_cau_ho_tro.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'yc-1' },
+        where: { id: 'yc-1', trang_thai: 'cho_xu_ly' },
         data: expect.objectContaining({
           trang_thai: 'da_phan_hoi',
           noi_dung_tra_loi: 'Đã xử lý',
@@ -309,17 +336,25 @@ describe('YeuCauHoTroService — phía quan_tri', () => {
     expect(thongBao.guiYeuCauHoTroTraLoi).toHaveBeenCalledWith('yc-1');
   });
 
-  it('traLoi ticket đã da_dong -> ConflictAppException, không update, không gửi mail', async () => {
-    prisma.yeu_cau_ho_tro.findUnique.mockResolvedValueOnce({
-      id: 'yc-1',
-      trang_thai: 'da_dong',
-      loai_van_de: { ten: 'X' },
-    });
-
-    await expect(
-      service.traLoi('yc-1', 'qt-1', { noi_dung_tra_loi: 'Trễ rồi' }),
-    ).rejects.toThrow();
-    expect(prisma.yeu_cau_ho_tro.update).not.toHaveBeenCalled();
+  it('traLoi ticket đã có câu trả lời / đã đóng -> ConflictAppException, không gửi mail (ADR 0003 H11)', async () => {
+    for (const trang_thai of ['da_phan_hoi', 'da_dong']) {
+      prisma.yeu_cau_ho_tro.updateMany.mockResolvedValueOnce({ count: 0 });
+      prisma.yeu_cau_ho_tro.findUnique.mockResolvedValueOnce({
+        id: 'yc-1',
+        trang_thai,
+      });
+      await expect(
+        service.traLoi('yc-1', 'qt-1', { noi_dung_tra_loi: 'Trễ rồi' }),
+      ).rejects.toThrow(ConflictAppException);
+    }
     expect(thongBao.guiYeuCauHoTroTraLoi).not.toHaveBeenCalled();
+  });
+
+  it('traLoi ticket không tồn tại -> NotFoundAppException', async () => {
+    prisma.yeu_cau_ho_tro.updateMany.mockResolvedValueOnce({ count: 0 });
+    prisma.yeu_cau_ho_tro.findUnique.mockResolvedValueOnce(null);
+    await expect(
+      service.traLoi('x', 'qt-1', { noi_dung_tra_loi: 'a' }),
+    ).rejects.toThrow(NotFoundAppException);
   });
 });

@@ -17,7 +17,7 @@ Công cụ phối hợp giữa **Sở GD&ĐT**, **Phòng Văn hóa - Xã hội**
 | `phong_vhxh` | Đơn vị mình + mọi đơn vị con |
 | `truong` | Chỉ đơn vị mình (trường) |
 | `hoc_vien` | Không có scope đơn vị — chỉ truy cập hồ sơ của chính mình qua `hoc_vien_id` |
-| `ho_tro_hoc_vien` | (ADR 0003, 2026-10-06 — tài khoản, phân công, tra cứu/xuất đã code; sửa hồ sơ/mật khẩu/ticket chưa) Cán bộ HCMUE. Không có scope đơn vị — chỉ học viên có `dang_ky_hoc.cum_id` thuộc các cụm trong `phan_cong_ho_tro` của mình, kiểm tra động mỗi request qua `HoTroHocVienScopeService`. Khu làm việc `/ho-tro` |
+| `ho_tro_hoc_vien` | (ADR 0003, 2026-10-06 — tài khoản, phân công, tra cứu/xuất, yêu cầu hỗ trợ theo cụm đã code; sửa hồ sơ/mật khẩu chưa) Cán bộ HCMUE. Không có scope đơn vị — chỉ học viên có `dang_ky_hoc.cum_id` thuộc các cụm trong `phan_cong_ho_tro` của mình, kiểm tra động mỗi request qua `HoTroHocVienScopeService`. Khu làm việc `/ho-tro` |
 
 **1 tài khoản = 1 vai trò.** Nhóm hỗ trợ giảng viên sau này = vai trò riêng `ho_tro_giang_vien` + bảng phân công + service phạm vi riêng (ADR 0003); cán bộ làm cả 2 việc dùng 2 tài khoản.
 

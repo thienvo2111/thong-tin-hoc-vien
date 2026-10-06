@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import type { ImportChiTiet, KhoaBoiDuong, LoaiLop, YeuCauHoTro } from '@/api/types';
+import type { ImportChiTiet, KhoaBoiDuong, LoaiLop, YeuCauHoTro, YeuCauHoTroQuanTri } from '@/api/types';
 import { DIA_DANH, DON_VI, MON_HOC, db } from './db';
 
 // QĐ10 (2026-09-30): dang_ky_hoc mẫu nằm rải trong db.khoaHocCuaHocVien (map theo hoc_vien_id) — tìm
@@ -14,6 +14,30 @@ function timDangKyTheoId(id: string) {
 
 function fileMoPhong() {
   return new HttpResponse('noi-dung-file-mo-phong', { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } });
+}
+
+// Dòng ticket phía xử lý (Quản trị / người hỗ trợ): mẫu có thể ghi đè các field bằng cách đặt sẵn trong db.
+function dongXuLy(y: YeuCauHoTro): YeuCauHoTroQuanTri {
+  return {
+    hoc_vien_ho_ten: 'Học viên mẫu',
+    nguoi_tra_loi_ten: null,
+    ten_cum: ['Cụm Long Xuyên'],
+    da_sua_boi_quan_tri: !!y.thoi_gian_sua_tra_loi,
+    hoi_lai: false,
+    ...(y as Partial<YeuCauHoTroQuanTri>),
+  } as YeuCauHoTroQuanTri;
+}
+
+// Như backend (ADR 0003 H11): chỉ trả lời được khi còn cho_xu_ly, còn lại 409 không ghi đè.
+async function traLoiMau(id: string, request: Request) {
+  const found = db.danhSachYeuCauHoTro.find((y) => y.id === id);
+  if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy yêu cầu hỗ trợ');
+  if (found.trang_thai !== 'cho_xu_ly') return loi(409, 'CONFLICT', 'Yêu cầu này đã có người trả lời');
+  const body = (await request.json()) as { noi_dung_tra_loi: string };
+  found.noi_dung_tra_loi = body.noi_dung_tra_loi;
+  found.trang_thai = 'da_phan_hoi';
+  found.thoi_gian_phan_hoi = new Date().toISOString();
+  return HttpResponse.json(found);
 }
 
 function loi(status: number, code: string, message: string, extra: Record<string, unknown> = {}) {
@@ -723,6 +747,7 @@ export const handlers = [
       thoi_gian_tao: new Date().toISOString(),
       thoi_gian_phan_hoi: null,
       thoi_gian_dong: null,
+      thoi_gian_sua_tra_loi: null,
     };
     db.danhSachYeuCauHoTro = [moi, ...db.danhSachYeuCauHoTro];
     return HttpResponse.json(moi, { status: 201 });
@@ -733,26 +758,55 @@ export const handlers = [
   http.get('/yeu-cau-ho-tro', ({ request }) => {
     const url = new URL(request.url);
     const trangThai = url.searchParams.get('trang_thai');
+    const chuaCoCum = url.searchParams.get('chua_co_cum') === 'true';
     const page = Number(url.searchParams.get('page') ?? '1');
     const pageSize = Number(url.searchParams.get('page_size') ?? '20');
 
-    let items = db.danhSachYeuCauHoTro;
+    let items = db.danhSachYeuCauHoTro.map(dongXuLy);
     if (trangThai) items = items.filter((y) => y.trang_thai === trangThai);
+    if (chuaCoCum) items = items.filter((y) => y.ten_cum.length === 0);
     const total = items.length;
     const start = (page - 1) * pageSize;
-    const data = items.slice(start, start + pageSize).map((y) => ({ hoc_vien_ho_ten: 'Học viên mẫu', nguoi_tra_loi_ten: null, ...y, hoi_lai: false }));
-    return HttpResponse.json({ data, total, page, page_size: pageSize });
+    return HttpResponse.json({ data: items.slice(start, start + pageSize), total, page, page_size: pageSize });
   }),
 
-  http.patch('/yeu-cau-ho-tro/:id/tra-loi', async ({ params, request }) => {
+  http.get('/yeu-cau-ho-tro/:id', ({ params }) => {
+    const found = db.danhSachYeuCauHoTro.find((y) => y.id === params.id);
+    return found ? HttpResponse.json(dongXuLy(found)) : loi(404, 'NOT_FOUND', 'Không tìm thấy yêu cầu hỗ trợ');
+  }),
+
+  http.patch('/yeu-cau-ho-tro/:id/tra-loi', async ({ params, request }) => traLoiMau(params.id as string, request)),
+
+  http.patch('/yeu-cau-ho-tro/:id/sua-tra-loi', async ({ params, request }) => {
     const found = db.danhSachYeuCauHoTro.find((y) => y.id === params.id);
     if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy yêu cầu hỗ trợ');
+    if (!found.noi_dung_tra_loi) return loi(409, 'CONFLICT', 'Yêu cầu chưa có câu trả lời để sửa');
     const body = (await request.json()) as { noi_dung_tra_loi: string };
-    found.noi_dung_tra_loi = body.noi_dung_tra_loi;
-    found.trang_thai = 'da_phan_hoi';
-    found.thoi_gian_phan_hoi = new Date().toISOString();
-    return HttpResponse.json({ ...found, hoi_lai: false });
+    Object.assign(found, {
+      noi_dung_tra_loi: body.noi_dung_tra_loi,
+      thoi_gian_sua_tra_loi: new Date().toISOString(),
+      danh_gia: null,
+      trang_thai: 'da_phan_hoi',
+    });
+    return HttpResponse.json(found);
   }),
+
+  // Yêu cầu hỗ trợ theo cụm — người hỗ trợ học viên (ADR 0003).
+  http.get('/ho-tro/yeu-cau-ho-tro/dem', () =>
+    HttpResponse.json({ cho_xu_ly: db.danhSachYeuCauHoTro.filter((y) => y.trang_thai === 'cho_xu_ly').length }),
+  ),
+  http.get('/ho-tro/yeu-cau-ho-tro', ({ request }) => {
+    const trangThai = new URL(request.url).searchParams.get('trang_thai');
+    const items = db.danhSachYeuCauHoTro.map(dongXuLy).filter((y) => !trangThai || y.trang_thai === trangThai);
+    return HttpResponse.json({ data: items, total: items.length, page: 1, page_size: 20 });
+  }),
+  http.get('/ho-tro/yeu-cau-ho-tro/:id', ({ params }) => {
+    const found = db.danhSachYeuCauHoTro.find((y) => y.id === params.id);
+    return found
+      ? HttpResponse.json({ ...dongXuLy(found), ticket_truoc: [] })
+      : loi(404, 'NOT_FOUND', 'Không tìm thấy yêu cầu hỗ trợ');
+  }),
+  http.patch('/ho-tro/yeu-cau-ho-tro/:id/tra-loi', async ({ params, request }) => traLoiMau(params.id as string, request)),
 
   // Tài khoản đơn vị (ADR 0002).
   http.get('/nguoi-dung/don-vi/chua-cap', ({ request }) => {

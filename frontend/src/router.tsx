@@ -93,6 +93,10 @@ export const router = createBrowserRouter([
                     path: '/ho-tro/lich-hoc',
                     lazy: () => import('@/pages/HoTro/HoTroLichHoc').then((m) => ({ Component: m.default })),
                   },
+                  {
+                    path: '/ho-tro/yeu-cau-ho-tro',
+                    lazy: () => import('@/pages/HoTro/HoTroYeuCauHoTro').then((m) => ({ Component: m.default })),
+                  },
                 ],
               },
             ],

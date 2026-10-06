@@ -1,6 +1,16 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, apiFetchBlob } from './client';
-import type { BuoiHocHoTro, CumCuaToi, HocVienHoTroChiTiet, HocVienHoTroDong, PaginatedResult } from './types';
+import type {
+  BuoiHocHoTro,
+  CumCuaToi,
+  HocVienHoTroChiTiet,
+  HocVienHoTroDong,
+  PaginatedResult,
+  TrangThaiYeuCauHoTro,
+  YeuCauHoTro,
+  YeuCauHoTroChiTietHoTro,
+  YeuCauHoTroQuanTri,
+} from './types';
 
 // Khu người hỗ trợ học viên (ADR 0003) — mọi API tự lọc theo cụm được phân công ở backend.
 
@@ -65,4 +75,53 @@ export function useLichHocHoTro(params: LocLichHocHoTro) {
 export function xuatDanhSachHoTro(params: LocHocVienHoTro): Promise<Blob> {
   const { page: _p, page_size: _ps, ...loc } = params;
   return apiFetchBlob(`/ho-tro/hoc-vien/xuat${xayQueryString(loc)}`);
+}
+
+// --- Yêu cầu hỗ trợ theo cụm (ADR 0003 Lát 4) ---
+
+export interface LocYeuCauHoTroHoTro {
+  trang_thai?: TrangThaiYeuCauHoTro;
+  cum_id?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export function useYeuCauHoTroCuaCum(params: LocYeuCauHoTroHoTro) {
+  return useQuery({
+    queryKey: [...KHOA, 'yeu-cau', params],
+    queryFn: () => apiFetch<PaginatedResult<YeuCauHoTroQuanTri>>(`/ho-tro/yeu-cau-ho-tro${xayQueryString(params)}`),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Số đếm trên menu — tải lại khi chuyển trang (không polling, ADR 0003 H13). */
+export function useDemYeuCauHoTroCuaCum() {
+  return useQuery({
+    queryKey: [...KHOA, 'yeu-cau', 'dem'],
+    queryFn: () => apiFetch<{ cho_xu_ly: number }>('/ho-tro/yeu-cau-ho-tro/dem'),
+  });
+}
+
+export function layChiTietYeuCauHoTroCuaCum(id: string) {
+  return apiFetch<YeuCauHoTroChiTietHoTro>(`/ho-tro/yeu-cau-ho-tro/${id}`);
+}
+
+export function useChiTietYeuCauHoTroCuaCum(id: string | null) {
+  return useQuery({
+    queryKey: [...KHOA, 'yeu-cau', 'chi-tiet', id],
+    queryFn: () => layChiTietYeuCauHoTroCuaCum(id!),
+    enabled: !!id,
+  });
+}
+
+export function traLoiYeuCauHoTroCuaCum(id: string, noi_dung_tra_loi: string) {
+  return apiFetch<YeuCauHoTro>(`/ho-tro/yeu-cau-ho-tro/${id}/tra-loi`, {
+    method: 'PATCH',
+    body: JSON.stringify({ noi_dung_tra_loi }),
+  });
+}
+
+export function useLamMoiYeuCauHoTroCuaCum() {
+  const qc = useQueryClient();
+  return () => qc.invalidateQueries({ queryKey: [...KHOA, 'yeu-cau'] });
 }

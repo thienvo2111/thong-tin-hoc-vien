@@ -367,6 +367,47 @@ export class ThongBaoService {
     });
   }
 
+  // ADR 0003 H12: Quản trị đính chính câu trả lời — báo học viên đọc lại.
+  async guiYeuCauHoTroCapNhatTraLoi(yeuCauId: string): Promise<void> {
+    const yeuCau = await this.prisma.yeu_cau_ho_tro.findUnique({
+      where: { id: yeuCauId },
+      include: { hoc_vien: true },
+    });
+    if (!yeuCau) return;
+    if (!yeuCau.hoc_vien.email_lien_he) {
+      this.canhBaoThieuEmail(
+        'yeu_cau_ho_tro_cap_nhat_tra_loi',
+        yeuCau.hoc_vien_id,
+      );
+      return;
+    }
+
+    const html = boCucEmail({
+      xemTruoc: 'Câu trả lời cho yêu cầu hỗ trợ của Thầy/Cô đã được cập nhật.',
+      nhan: 'HỖ TRỢ HỌC VIÊN',
+      tieuDe: 'Câu trả lời đã được cập nhật',
+      noiDung: [
+        doanVan(`Kính gửi Thầy/Cô <b>${e(yeuCau.hoc_vien.ho_ten)}</b>,`),
+        doanVan(
+          'Ban Tổ chức đã cập nhật lại câu trả lời cho yêu cầu hỗ trợ của Thầy/Cô. Vui lòng đọc nội dung mới dưới đây:',
+        ),
+        bangThongTin([
+          ['Câu hỏi', e(yeuCau.noi_dung_hoi)],
+          ['Trả lời mới', e(yeuCau.noi_dung_tra_loi)],
+        ]),
+        nutBam('Xem yêu cầu hỗ trợ', `${layFrontendUrl()}/toi/yeu-cau-ho-tro`),
+      ].join(''),
+    });
+
+    await this.themVaoHangDoiEmail({
+      loaiSuKien: 'yeu_cau_ho_tro_cap_nhat_tra_loi',
+      hocVienId: yeuCau.hoc_vien_id,
+      email: yeuCau.hoc_vien.email_lien_he,
+      tieuDe: '[HCMUE-BDNLS] Câu trả lời yêu cầu hỗ trợ đã được cập nhật',
+      html,
+    });
+  }
+
   // Thêm 2026-09-30, sửa M9 (2026-10-01): xác minh email liên hệ & quên/đặt
   // lại mật khẩu — làn "ưu tiên cao", gửi NGAY (không qua hàng đợi, không bị
   // chặn bởi hạn mức/ngày dù đã hết) vì bảo mật quan trọng hơn. Từ M9, CÓ ghi

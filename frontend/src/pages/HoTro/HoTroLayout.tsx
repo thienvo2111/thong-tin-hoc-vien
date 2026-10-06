@@ -1,5 +1,7 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Box, Button, Group, Image, ScrollArea, Text } from '@mantine/core';
+import { useEffect } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Badge, Box, Button, Group, Image, ScrollArea, Text } from '@mantine/core';
+import { useDemYeuCauHoTroCuaCum } from '@/api/hoTro';
 import { useToi } from '@/auth/AuthContext';
 import logoHcmue from '@/assets/logo-hcmue.png';
 import { tokenKhac } from '@/theme';
@@ -8,6 +10,7 @@ const MENU = [
   { to: '/ho-tro', nhan: 'Cụm của tôi', end: true },
   { to: '/ho-tro/hoc-vien', nhan: 'Học viên', end: false },
   { to: '/ho-tro/lich-hoc', nhan: 'Lịch học', end: false },
+  { to: '/ho-tro/yeu-cau-ho-tro', nhan: 'Yêu cầu hỗ trợ', end: false },
 ];
 
 /** Khung khu làm việc của người hỗ trợ học viên (ADR 0003) — tách hẳn layout admin để không rò quyền qua
@@ -15,6 +18,14 @@ const MENU = [
 export default function HoTroLayout() {
   const { nguoiDung, dangXuat } = useToi();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const dem = useDemYeuCauHoTroCuaCum();
+  const { refetch } = dem;
+  // ADR 0003 H13: số đếm chờ xử lý tải lại mỗi lần chuyển trang (không polling, không email từng ticket).
+  useEffect(() => {
+    void refetch();
+  }, [pathname, refetch]);
+  const soChoXuLy = dem.data?.cho_xu_ly ?? 0;
 
   async function xuLyDangXuat() {
     await dangXuat();
@@ -46,14 +57,26 @@ export default function HoTroLayout() {
               <NavLink key={m.to} to={m.to} end={m.end} style={{ textDecoration: 'none' }}>
                 {({ isActive }) => (
                   <Text
+                    component="span"
                     px="md"
                     py={6}
                     fw={600}
                     fz="sm"
                     c={isActive ? 'white' : 'gray.4'}
-                    style={{ borderRadius: 8, whiteSpace: 'nowrap', background: isActive ? 'rgba(255,255,255,.14)' : 'transparent' }}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      borderRadius: 8,
+                      whiteSpace: 'nowrap',
+                      background: isActive ? 'rgba(255,255,255,.14)' : 'transparent',
+                    }}
                   >
                     {m.nhan}
+                    {m.to === '/ho-tro/yeu-cau-ho-tro' && soChoXuLy > 0 && (
+                      <Badge component="span" ml={6} size="sm" color="red" circle={soChoXuLy < 10} aria-label={`${soChoXuLy} yêu cầu chờ xử lý`}>
+                        {soChoXuLy}
+                      </Badge>
+                    )}
                   </Text>
                 )}
               </NavLink>

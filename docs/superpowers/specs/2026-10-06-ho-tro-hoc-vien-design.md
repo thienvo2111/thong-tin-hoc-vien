@@ -75,13 +75,13 @@ Quyết định nền: [ADR 0003](../../adr/0003-nguoi-ho-tro-hoc-vien.md) (H1�
 - `yeu_cau_ho_tro`: `thoi_gian_sua_tra_loi timestamptz NULL`, `sua_tra_loi_boi uuid NULL FK nguoi_dung`.
 
 ### Backend
-- **Sửa `traLoi`** (dùng chung `quan_tri` + `ho_tro_hoc_vien`): `updateMany where {id, trang_thai: 'cho_xu_ly'}`; `count = 0` → nạp lại ticket, 404 nếu không có, ngược lại 409 kèm `{noi_dung_tra_loi, nguoi_tra_loi_ten, thoi_gian_phan_hoi}` hiện tại. Email học viên chỉ gửi khi update thành công.
+- **Sửa `traLoi`** (dùng chung `quan_tri` + `ho_tro_hoc_vien`): `updateMany where {id, trang_thai: 'cho_xu_ly'}`; `count = 0` → 404 nếu không có, ngược lại 409. (Sửa khi code #13: body 409 **không** kèm câu trả lời — frontend gọi lại `GET .../{id}` để hiện, giữ API lỗi đồng nhất.) Email học viên chỉ gửi khi update thành công.
 - `GET /ho-tro/yeu-cau-ho-tro?trang_thai=&cum_id=` — ticket của học viên trong phạm vi; mỗi dòng kèm `ten_cum`(các cụm), `hoi_lai`, `da_sua_boi_quan_tri`. `GET /ho-tro/yeu-cau-ho-tro/{id}` kèm các ticket trước của cùng học viên. `PATCH /ho-tro/yeu-cau-ho-tro/{id}/tra-loi`.
 - `GET /ho-tro/yeu-cau-ho-tro/dem` — `{cho_xu_ly: n}` cho số đếm trên menu.
 - Quản trị: `GET /yeu-cau-ho-tro` thêm lọc `chua_co_cum=true` và trả `ten_cum`; `PATCH /yeu-cau-ho-tro/{id}/sua-tra-loi` `{noi_dung_tra_loi}` — 409 nếu chưa có câu trả lời; ghi nội dung cũ vào `nhat_ky_hoat_dong` (`hanh_dong = 'sua_tra_loi_ho_tro'`), set `thoi_gian_sua_tra_loi`/`sua_tra_loi_boi`, `danh_gia = NULL`, nếu `da_dong` thì về `da_phan_hoi`; enqueue email `yeu_cau_ho_tro_cap_nhat_tra_loi`.
 - `tinhDaDongHieuLuc`: mốc = `thoi_gian_sua_tra_loi ?? thoi_gian_phan_hoi`. `hoi_lai` giữ mốc `thoi_gian_phan_hoi`.
 - Response phía học viên: `nguoi_tra_loi_hien_thi` = tên cụm của học viên (nhiều cụm → cụm của khóa mới nhất); người trả lời là `quan_tri` hoặc không có cụm → "Ban tổ chức (HCMUE)". Không trả họ tên cán bộ. Thêm `thoi_gian_sua_tra_loi`.
-- `GET /hoc-vien/toi/cum-ho-tro` — `[{ten_cum, link_zalo, ten_khoa}]` cho thẻ cổng.
+- ~~`GET /hoc-vien/toi/cum-ho-tro`~~ — không cần (sửa khi code #13): `GET /hoc-vien/toi/khoa-hoc` đã trả `cum` (kèm `link_zalo`) cho từng khóa; thẻ cổng dùng luôn dữ liệu đó.
 
 ### Frontend
 - `/ho-tro/yeu-cau-ho-tro`: hàng chờ (mặc định `cho_xu_ly`, cũ nhất trước), chi tiết + ô trả lời; 409 → giữ nội dung đang soạn, hiện câu trả lời đã có.

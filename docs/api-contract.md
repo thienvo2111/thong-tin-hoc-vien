@@ -102,6 +102,26 @@ Chỉ `ho_tro_hoc_vien` (vai trò khác → `403`, kể cả Quản trị). Ph�
 | GET | `/ho-tro/hoc-vien/{id}` | `{ ho_so (như GET /hoc-vien/{id} + day_du, thieu), tai_khoan: { ten_dang_nhap, trang_thai, dang_nhap_lan_cuoi, phai_doi_mat_khau, khoa_den, dang_bi_khoa, email_da_xac_minh } \| null, hoc_tap (cùng cấu trúc GET /hoc-vien/{id}/khoa-hoc), khao_sat, yeu_cau_ho_tro (20 gần nhất, tóm tắt), lich_su_thay_doi (50 gần nhất, kèm nguoi_sua_ten) }` |
 | GET | `/ho-tro/lich-hoc` | `tu_ngay`/`den_ngay` (`YYYY-MM-DD` giờ VN; mặc định đầu hôm nay → hết 14 ngày sau), `cum_id`. Buổi (`lich_hoc_lop`) của cặp (lớp, giai đoạn) có ≥1 học viên của cụm được phân lớp, kèm `lop`, `giai_doan`, `khoa`, `nhan_su`, `so_hoc_vien_cum`; tối đa 500 buổi |
 
+#### Yêu cầu hỗ trợ (M8 2026-10-01; theo cụm — ADR 0003 Lát 4, 2026-10-06)
+
+Mô hình 1 hỏi – 1 đáp; hỏi tiếp = ticket mới (cờ `hoi_lai`). **Trả lời = UPDATE có điều kiện `trang_thai = 'cho_xu_ly'`** cho MỌI người trả lời: ticket đã có câu trả lời → `409` "Yêu cầu này đã có người trả lời" (đã đóng → `409` "Ticket đã đóng…"), không ghi đè; email `yeu_cau_ho_tro_tra_loi` chỉ gửi khi ghi thành công. Hạn tự đóng (`da_dong_hieu_luc`, 7 ngày) tính từ `thoi_gian_sua_tra_loi ?? thoi_gian_phan_hoi`.
+
+| Method | Path | Mô tả | Quyền |
+|---|---|---|---|
+| POST | `/yeu-cau-ho-tro/toi` | `{ tinh_huong, noi_dung_hoi }` | Học viên |
+| GET | `/yeu-cau-ho-tro/toi` | Ticket của tôi. Mỗi dòng có `nguoi_tra_loi_hien_thi`: tên cụm của học viên khi người hỗ trợ trả lời, `"Ban tổ chức (HCMUE)"` khi Quản trị trả lời, `null` khi chưa trả lời; `thoi_gian_sua_tra_loi`. **Không** có `tra_loi_boi`/`sua_tra_loi_boi` (H14) | Học viên |
+| POST | `/yeu-cau-ho-tro/toi/{id}/dong`, `/toi/{id}/danh-gia` | Đóng / đánh giá (`hai_long`\|`chua_hai_long`) ticket đã trả lời | Học viên |
+| GET | `/yeu-cau-ho-tro` | Phân trang; lọc `trang_thai`, `loai_van_de_id`, **`chua_co_cum=true`** (học viên không có `dang_ky_hoc` nào có cụm — chỉ Quản trị xử lý). Dòng thêm `hoc_vien_ho_ten`, `nguoi_tra_loi_ten`, `hoi_lai`, `ten_cum: string[]`, `da_sua_boi_quan_tri` | Quản trị |
+| GET | `/yeu-cau-ho-tro/{id}` | Như 1 dòng ở trên | Quản trị |
+| PATCH | `/yeu-cau-ho-tro/{id}/tra-loi` | `{ noi_dung_tra_loi }` — có điều kiện, xem trên | Quản trị |
+| PATCH | `/yeu-cau-ho-tro/{id}/sua-tra-loi` | `{ noi_dung_tra_loi }` — đính chính câu trả lời (kể cả ticket đã đóng): `409` nếu chưa có câu trả lời; ghi nội dung cũ vào `nhat_ky_hoat_dong` (`sua_tra_loi_ho_tro`), set `thoi_gian_sua_tra_loi`/`sua_tra_loi_boi`, `danh_gia = null`, `trang_thai = 'da_phan_hoi'`, email `yeu_cau_ho_tro_cap_nhat_tra_loi` | Quản trị |
+| GET | `/ho-tro/yeu-cau-ho-tro` | Ticket của học viên trong cụm của tôi (tính động). Lọc `trang_thai`, `cum_id` (ngoài phạm vi → 404). `cho_xu_ly` xếp cũ nhất trước. Dòng như phía Quản trị, `ten_cum` chỉ gồm cụm trong phạm vi | Người hỗ trợ |
+| GET | `/ho-tro/yeu-cau-ho-tro/dem` | `{ cho_xu_ly }` cho số đếm trên menu | Người hỗ trợ |
+| GET | `/ho-tro/yeu-cau-ho-tro/{id}` | Như 1 dòng + `ticket_truoc` (10 ticket khác gần nhất của cùng học viên). Ngoài phạm vi → 404 | Người hỗ trợ |
+| PATCH | `/ho-tro/yeu-cau-ho-tro/{id}/tra-loi` | `{ noi_dung_tra_loi }` — có điều kiện; ngoài phạm vi → 404 | Người hỗ trợ |
+
+Frontend khi nhận `409` lúc trả lời: KHÔNG làm mới danh sách ngay, tải lại ticket (`GET .../{id}`) để hiện câu trả lời đã có, giữ nguyên nội dung đang soạn (`components/KhungTraLoiTicket.tsx`).
+
 ## 2. Dịch vụ Học viên
 
 | Method | Endpoint | Mô tả | Ai gọi |

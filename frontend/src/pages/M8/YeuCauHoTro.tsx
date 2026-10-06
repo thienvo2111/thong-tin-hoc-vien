@@ -30,6 +30,7 @@ import { khopTimKiem } from '@/lib/timKiemTiengViet';
 import { taoYeuCauHoTroSchema, type TaoYeuCauHoTroForm } from '@/schemas/yeuCauHoTro';
 import { StatusBanner } from '@/components/StatusBanner';
 import { thongDiepLoiChung } from '@/lib/loiApi';
+import { dinhDangNgayGio } from '@/lib/ngay';
 
 const MAU_TRANG_THAI: Record<TrangThaiYeuCauHoTro, string> = {
   cho_xu_ly: 'yellow',
@@ -241,7 +242,12 @@ function DanhSachCuaToi() {
           <Text size="sm">{yc.noi_dung_hoi}</Text>
           {yc.noi_dung_tra_loi && (
             <Text size="sm" c="dimmed">
-              <b>Trả lời:</b> {yc.noi_dung_tra_loi}
+              <b>Trả lời{yc.nguoi_tra_loi_hien_thi ? ` · ${yc.nguoi_tra_loi_hien_thi}` : ''}:</b> {yc.noi_dung_tra_loi}
+            </Text>
+          )}
+          {yc.thoi_gian_sua_tra_loi && (
+            <Text size="xs" c="orange.8">
+              Câu trả lời đã được cập nhật lúc {dinhDangNgayGio(yc.thoi_gian_sua_tra_loi)}
             </Text>
           )}
           {yc.trang_thai === 'da_phan_hoi' && (

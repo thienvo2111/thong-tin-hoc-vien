@@ -81,6 +81,8 @@ export function useDanhGiaYeuCauHoTro() {
 
 export interface DanhSachYeuCauHoTroQuanTriParams {
   trang_thai?: TrangThaiYeuCauHoTro;
+  /** ADR 0003: ticket của học viên chưa được gán cụm. */
+  chua_co_cum?: boolean;
   page?: number;
   page_size?: number;
 }
@@ -112,6 +114,23 @@ export function useTraLoiYeuCauHoTro() {
   return useMutation({
     mutationFn: ({ id, noi_dung_tra_loi }: { id: string; noi_dung_tra_loi: string }) =>
       traLoiYeuCauHoTro(id, noi_dung_tra_loi),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'yeu-cau-ho-tro'] }),
+  });
+}
+
+export function layChiTietYeuCauHoTroQuanTri(id: string) {
+  return apiFetch<YeuCauHoTroQuanTri>(`/yeu-cau-ho-tro/${id}`);
+}
+
+// ADR 0003 H12: chỉ Quản trị đính chính câu trả lời (học viên nhận email cập nhật).
+export function useSuaTraLoiYeuCauHoTro() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, noi_dung_tra_loi }: { id: string; noi_dung_tra_loi: string }) =>
+      apiFetch<YeuCauHoTro>(`/yeu-cau-ho-tro/${id}/sua-tra-loi`, {
+        method: 'PATCH',
+        body: JSON.stringify({ noi_dung_tra_loi }),
+      }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'yeu-cau-ho-tro'] }),
   });
 }

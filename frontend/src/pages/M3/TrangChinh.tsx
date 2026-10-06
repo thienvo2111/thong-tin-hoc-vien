@@ -68,6 +68,8 @@ export default function TrangChinh() {
           <>
             <ThongBaoCapNhat capNhat={capNhat} />
 
+            <TheCumHoTro khoaHoc={khoaHoc} />
+
             <Stack gap="sm">
               <Text fw={700} size="sm">
                 Việc cần làm
@@ -532,5 +534,45 @@ function KhoiKhaoSatDauRa({ mucDo }: { mucDo: MucDoDayDu }) {
         <DieuKienKhaoSat mucDo={mucDo} />
       )}
     </StatusBanner>
+  );
+}
+
+/** ADR 0003 H14: cụm hỗ trợ của học viên lấy từ DB (dang_ky_hoc.cum) — nguồn sự thật khi đã đăng nhập,
+ * thay cho việc tự tra phụ lục theo tên trường. Không có cụm thì ẩn. */
+function TheCumHoTro({ khoaHoc }: { khoaHoc: KhoaHocDangKy[] | undefined }) {
+  const cums = (khoaHoc ?? []).flatMap((dk) => (dk.cum ? [{ ...dk.cum, ten_khoa: dk.khoa.ten_khoa }] : []));
+  if (cums.length === 0) return null;
+  return (
+    <Card withBorder radius="md" p="md">
+      <Stack gap="xs">
+        <Text fw={700} size="sm">
+          Cụm hỗ trợ của Thầy/Cô
+        </Text>
+        {cums.map((c) => {
+          const href = chuanHoaLienKet(c.link_zalo);
+          return (
+            <Group key={c.id} justify="space-between" wrap="wrap" gap="xs">
+              <div>
+                <Text fw={600}>{c.ten_cum}</Text>
+                {cums.length > 1 && (
+                  <Text size="xs" c="dimmed">
+                    {c.ten_khoa}
+                  </Text>
+                )}
+              </div>
+              {href && (
+                <Button component="a" href={href} size="sm">
+                  Vào nhóm Zalo
+                </Button>
+              )}
+            </Group>
+          );
+        })}
+        <Text size="xs" c="dimmed">
+          Cần hỗ trợ trên cổng? Gửi yêu cầu ở mục <Link to="/toi/yeu-cau-ho-tro">Hỗ trợ</Link> — người hỗ trợ của
+          cụm sẽ trả lời.
+        </Text>
+      </Stack>
+    </Card>
   );
 }

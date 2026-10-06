@@ -28,9 +28,12 @@ function taoTicket(ghiDe: Partial<YeuCauHoTroQuanTri>): YeuCauHoTroQuanTri {
     thoi_gian_tao: new Date().toISOString(),
     thoi_gian_phan_hoi: null,
     thoi_gian_dong: null,
+    thoi_gian_sua_tra_loi: null,
     hoi_lai: false,
     hoc_vien_ho_ten: 'Bùi Thị A',
     nguoi_tra_loi_ten: null,
+    ten_cum: [],
+    da_sua_boi_quan_tri: false,
     ...ghiDe,
   };
 }
