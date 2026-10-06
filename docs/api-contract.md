@@ -138,6 +138,16 @@ Vai trò `ho_tro_giang_vien` — cán bộ HCMUE, không gắn đơn vị, email
 | PUT | `/khoa-boi-duong/{id}/nhom-ho-tro-gv` | `{ nguoi_dung_ids: uuid[] }` (≤ 50) **thay toàn bộ** nhóm người hỗ trợ giảng viên của khóa (rỗng = gỡ hết) → `{ khoa_id, nhom_ho_tro_gv: [{ id, ho_ten }] }`. Tài khoản không phải `ho_tro_giang_vien` đang hoạt động → `400`. `GET /khoa-boi-duong/{id}` (Quản trị) kèm `nhom_ho_tro_gv` | QuảnTrị |
 | GET | `/ho-tro-giang-vien/lop-cua-toi` | Lớp trong phạm vi = mọi lớp của các khóa có người gọi trong nhóm (`{ id, ten_lop, loai_lop, trang_thai, khoa, _count.lich_hoc }`); chưa phân công → `[]` | `ho_tro_giang_vien` |
 
+**Thêm L2 (issue #15, 2026-10-07)** — "Trang lớp" dùng chung (`TrangLopService` + hàm thuần `locTheoVaiTro` theo ma trận §3 đặc tả):
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| GET | `/ho-tro-giang-vien/lop/{lopId}/dot` | `{ lop, dot: [{ id, thu_tu, ten_giai_doan, thoi_gian_*, so_buoi }] }` — các giai đoạn `truc_tiep` có buổi của lớp | `ho_tro_giang_vien` |
+| GET | `/ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}` | Hồ sơ chuẩn bị lớp (bản đọc): `{ lop, giai_doan, buoi: [{ …, phong, diem_hoc, giang_vien: [{ ho_ten, vai_tro, so_dien_thoai, email, so_gio, da_xac_nhan_gio }] }], hoc_vien: [{ ho_ten, gioi_tinh, don_vi, doi_tuong, chuc_vu, muc_dau_vao, so_dien_thoai, email, cum: { ten_cum, nguoi_ho_tro }, diem_danh, ket_qua }], nhom_ho_tro_gv }` — **không** CCCD/ngày sinh/mã MOET. Giai đoạn không trực tiếp / lớp ngoài phạm vi → `404` | `ho_tro_giang_vien` |
+| GET | `/ho-tro-giang-vien/lich-day?tu_ngay=&den_ngay=` | Buổi của mọi lớp trong phạm vi (mặc định hôm nay + 14 ngày, giờ VN) kèm lớp, giai đoạn, điểm học, giảng viên (họ tên, vai trò) | `ho_tro_giang_vien` |
+
+Liên thông sang người hỗ trợ học viên: `GET /ho-tro-hoc-vien/lich-hoc` mỗi buổi thêm `phong`, `diem_hoc { ten, dia_chi, nguoi_lien_he, sdt_lien_he }`, `nhom_ho_tro_gv [{ ho_ten, email }]` — **không** có hậu cần hay liên hệ giảng viên.
+
 Phạm vi kiểm tra động mỗi request qua `HoTroGiangVienScopeService` — **điểm duy nhất** đọc `phan_cong_ho_tro_gv`, chỉ lộ API cấp lớp/khóa (`whereLopTrongPhamVi`, `lopIdsCuaToi`, `damBaoLopTrongPhamVi`, `damBaoKhoaTrongPhamVi`) để sau này thu hẹp về lớp mà không sửa nơi khác. Ngoài phạm vi → `404`.
 
 ## 2. Dịch vụ Học viên

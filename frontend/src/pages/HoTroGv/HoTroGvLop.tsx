@@ -1,4 +1,5 @@
-import { Alert, Badge, Container, Paper, Skeleton, Stack, Table, Text, Title } from '@mantine/core';
+import { Link } from 'react-router-dom';
+import { Alert, Anchor, Badge, Container, Paper, Skeleton, Stack, Table, Text, Title } from '@mantine/core';
 import { useLopCuaToiGv } from '@/api/hoTroGv';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 
@@ -42,7 +43,11 @@ export default function HoTroGvLop() {
                           {l.khoa.ten_khoa}
                         </Text>
                       </Table.Td>
-                      <Table.Td>{l.ten_lop}</Table.Td>
+                      <Table.Td>
+                        <Anchor component={Link} to={`/ho-tro-gv/lop/${l.id}`} fw={600} fz="sm">
+                          {l.ten_lop}
+                        </Anchor>
+                      </Table.Td>
                       <Table.Td>
                         <Badge variant="light" size="sm">
                           {NHAN_LOAI_LOP[l.loai_lop]}

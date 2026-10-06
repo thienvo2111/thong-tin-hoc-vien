@@ -103,6 +103,18 @@ export default function HoTroLichHoc() {
                         )}
                       </Text>
                     )}
+                    {b.diem_hoc && (
+                      <Text fz="sm" mt={4}>
+                        Điểm học: {b.diem_hoc.ten}
+                        {b.phong ? ` — phòng ${b.phong}` : ''} · {b.diem_hoc.dia_chi}
+                        {b.diem_hoc.nguoi_lien_he ? ` · Liên hệ: ${b.diem_hoc.nguoi_lien_he}${b.diem_hoc.sdt_lien_he ? ` (${b.diem_hoc.sdt_lien_he})` : ''}` : ''}
+                      </Text>
+                    )}
+                    {(b.nhom_ho_tro_gv ?? []).length > 0 && (
+                      <Text fz="xs" c="dimmed" mt={4}>
+                        Hỗ trợ giảng viên: {(b.nhom_ho_tro_gv ?? []).map((n) => `${n.ho_ten}${n.email ? ` (${n.email})` : ''}`).join(' · ')}
+                      </Text>
+                    )}
                     {b.nhan_su.length > 0 && (
                       <Text fz="xs" c="dimmed" mt={4}>
                         {b.nhan_su

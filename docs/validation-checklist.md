@@ -328,3 +328,5 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 134 | Nhóm hỗ trợ GV của khóa chỉ nhận tài khoản `ho_tro_giang_vien` đang hoạt động (400) | 🔴 | API (`KhoaBoiDuongService.ganNhomHoTroGv`) |
 | 135 | Phạm vi = lớp của các khóa trong nhóm, kiểm động mỗi request (gỡ phân công hiệu lực ngay); ngoài phạm vi → 404; chỉ `HoTroGiangVienScopeService` đọc `phan_cong_ho_tro_gv` | 🔴 | API |
 | 136 | `/ho-tro-giang-vien/*` chỉ `ho_tro_giang_vien` (403); người hỗ trợ giảng viên không vào `/ho-tro-hoc-vien/*` và `/admin` | 🔴 | API (`@Roles`) + FE (`RequireHoTroGv`, `RequireAdmin`) |
+| 137 | (L2, #15) Trang lớp lọc trường theo vai trò bằng 1 hàm thuần `locTheoVaiTro` (ma trận §3 đặc tả — test dạng bảng); giảng viên không thấy SĐT/email học viên, liên hệ giảng viên khác, cụm của học viên; không vai trò nào nhận CCCD/ngày sinh/mã MOET qua trang lớp | 🔴 | API (`TrangLopService`) |
+| 138 | (L2) Hồ sơ chuẩn bị lớp chỉ mở cho giai đoạn `hinh_thuc='truc_tiep'` (khác → 404) và chỉ học viên được phân lớp ở **đúng giai đoạn** đó | 🔴 | API |

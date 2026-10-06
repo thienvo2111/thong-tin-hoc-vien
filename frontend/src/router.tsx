@@ -81,6 +81,18 @@ export const router = createBrowserRouter([
                     path: '/ho-tro-gv',
                     lazy: () => import('@/pages/HoTroGv/HoTroGvLop').then((m) => ({ Component: m.default })),
                   },
+                  {
+                    path: '/ho-tro-gv/lop/:lopId',
+                    lazy: () => import('@/pages/HoTroGv/HoTroGvDotLop').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/ho-tro-gv/lop/:lopId/giai-doan/:gdId',
+                    lazy: () => import('@/pages/HoTroGv/HoTroGvHoSoLop').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/ho-tro-gv/lich-day',
+                    lazy: () => import('@/pages/HoTroGv/HoTroGvLichDay').then((m) => ({ Component: m.default })),
+                  },
                 ],
               },
             ],

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { khoangNgayVn } from '../common/utils/khoang-ngay-vn.util';
 import * as bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,8 +20,6 @@ import {
 } from './dto/ho-tro-hoc-vien.dto';
 import { buildDanhSachCumWorkbook } from './xuat-danh-sach-cum.util';
 
-const MOT_NGAY_MS = 24 * 60 * 60 * 1000;
-const LECH_GIO_VN_MS = 7 * 60 * 60 * 1000;
 const SO_NGAY_LICH_MAC_DINH = 14;
 
 const includeDong = (cumIds: string[]) =>
@@ -194,7 +193,7 @@ export class HoTroHocVienService {
   async lichHoc(nguoiDungId: string, query: LocLichHocHoTroDto) {
     const cumIds = await this.scope.cumLoc(nguoiDungId, query.cum_id);
     if (cumIds.length === 0) return [];
-    const { tu, den } = khoangNgay(query);
+    const { tu, den } = khoangNgayVn(query, SO_NGAY_LICH_MAC_DINH);
 
     // Các cặp (lớp, giai đoạn) có học viên của cụm được gán — buổi chỉ "của
     // cụm" khi học viên cụm được phân vào đúng lớp ở đúng giai đoạn của buổi.
@@ -222,24 +221,48 @@ export class HoTroHocVienService {
             id: true,
             ten_lop: true,
             loai_lop: true,
-            khoa: { select: { id: true, ma_khoa: true, ten_khoa: true } },
+            khoa: {
+              select: {
+                id: true,
+                ma_khoa: true,
+                ten_khoa: true,
+                // ADR 0004 G9 (issue #15): nhóm hỗ trợ giảng viên của khóa.
+                phan_cong_ho_tro_gv: {
+                  select: {
+                    nguoi_dung: { select: { ho_ten: true, email: true } },
+                  },
+                },
+              },
+            },
             nhan_su: {
               select: { ho_ten: true, vai_tro: true, so_dien_thoai: true },
             },
           },
         },
         giai_doan: { select: { id: true, thu_tu: true, ten_giai_doan: true } },
+        // ADR 0004 G9: điểm học của buổi (không kèm hậu cần giảng viên).
+        diem_hoc: {
+          select: {
+            id: true,
+            ten: true,
+            dia_chi: true,
+            nguoi_lien_he: true,
+            sdt_lien_he: true,
+          },
+        },
       },
       orderBy: [{ thoi_gian_bat_dau: 'asc' }, { buoi_so: 'asc' }],
       take: 500,
     });
     return buoi.map(({ lop, ...b }) => {
       const { nhan_su, khoa, ...lopGon } = lop;
+      const { phan_cong_ho_tro_gv, ...khoaGon } = khoa;
       return {
         ...b,
         lop: lopGon,
-        khoa,
+        khoa: khoaGon,
         nhan_su,
+        nhom_ho_tro_gv: phan_cong_ho_tro_gv.map((p) => p.nguoi_dung),
         so_hoc_vien_cum: soHocVien.get(`${b.lop_id}|${b.giai_doan_id}`) ?? 0,
       };
     });
@@ -454,20 +477,4 @@ export class HoTroHocVienService {
       khao_sat: r.ket_qua_khao_sat,
     };
   }
-}
-
-// tu_ngay/den_ngay là ngày theo giờ Việt Nam; mặc định từ đầu hôm nay tới hết
-// SO_NGAY_LICH_MAC_DINH ngày sau.
-function khoangNgay(query: LocLichHocHoTroDto): { tu: Date; den: Date } {
-  const dauHomNay = new Date(
-    Math.floor((Date.now() + LECH_GIO_VN_MS) / MOT_NGAY_MS) * MOT_NGAY_MS -
-      LECH_GIO_VN_MS,
-  );
-  const tu = query.tu_ngay
-    ? new Date(`${query.tu_ngay}T00:00:00+07:00`)
-    : dauHomNay;
-  const den = query.den_ngay
-    ? new Date(`${query.den_ngay}T23:59:59.999+07:00`)
-    : new Date(tu.getTime() + (SO_NGAY_LICH_MAC_DINH + 1) * MOT_NGAY_MS - 1);
-  return { tu, den };
 }

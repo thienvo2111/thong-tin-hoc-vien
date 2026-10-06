@@ -4,7 +4,10 @@ import { useToi } from '@/auth/AuthContext';
 import logoHcmue from '@/assets/logo-hcmue.png';
 import { tokenKhac } from '@/theme';
 
-const MENU = [{ to: '/ho-tro-gv', nhan: 'Lớp', end: true }];
+const MENU = [
+  { to: '/ho-tro-gv', nhan: 'Lớp', end: true },
+  { to: '/ho-tro-gv/lich-day', nhan: 'Lịch dạy', end: false },
+];
 
 /** Khung khu làm việc người hỗ trợ giảng viên (ADR 0004) — tách hẳn layout admin, như khu hỗ trợ học viên. */
 export default function HoTroGvLayout() {
