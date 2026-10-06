@@ -124,7 +124,7 @@ export const huongDan: NoiDungHuongDan = {
     loai: 'success',
     tieuDe: 'Nhóm Zalo hỗ trợ theo cụm: tham gia bất cứ lúc nào sau khi đăng nhập',
     noiDung:
-      'Việc này không thuộc giai đoạn nào. Ngay khi đăng nhập được, Thầy/Cô vào mục **Lớp học**, bấm [[Vào nhóm Zalo]] để nhận thông báo và được hỗ trợ suốt khóa học (Phần 8).',
+      'Việc này không thuộc giai đoạn nào. Ngay khi đăng nhập được, Thầy/Cô vào mục **Lớp học**, bấm [[Vào nhóm Zalo]] để nhận thông báo và được hỗ trợ suốt khóa học (Phần 8). Chưa thấy nút này, Thầy/Cô tra tên trường mình trong **Phụ lục: Nhóm Zalo hỗ trợ theo cụm** ở cuối tài liệu để tham gia đúng nhóm.',
   },
 
   chuanBi: [

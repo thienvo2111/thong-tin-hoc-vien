@@ -25,7 +25,40 @@ describe('M9 — Hướng dẫn sử dụng: 13 phần', () => {
       expect(screen.getByRole('heading', { level: 2, name: tieuDe })).toBeInTheDocument();
     });
     expect(TIEU_DE_13_PHAN).toHaveLength(13);
-    expect(container.textContent).not.toContain('An Giang');
+    // Nội dung hướng dẫn dùng chung nhiều tỉnh; chỉ Phụ lục nhóm Zalo (dữ liệu riêng của khóa) được nêu tên tỉnh.
+    const banSao = container.cloneNode(true) as HTMLElement;
+    banSao.querySelector('#phu-luc-zalo')?.remove();
+    expect(banSao.textContent).not.toContain('An Giang');
+  });
+});
+
+describe('M9 — Phụ lục nhóm Zalo theo cụm', () => {
+  it('có mục lục "PL", đủ 9 cụm, mỗi cụm có nút tham gia đúng link Zalo', () => {
+    render();
+    expect(screen.getByRole('heading', { level: 2, name: 'Nhóm Zalo hỗ trợ theo cụm' })).toBeInTheDocument();
+    const cum = screen.getAllByRole('heading', { level: 3, name: /^Cụm hỗ trợ \d$/ });
+    expect(cum).toHaveLength(9);
+    const cum1 = screen.getByLabelText('Cụm hỗ trợ 1');
+    expect(within(cum1).getByRole('link', { name: 'Tham gia nhóm Zalo' })).toHaveAttribute(
+      'href',
+      'https://zalo.me/g/jiciclxxj0ianu3mfrov',
+    );
+  });
+
+  it('tìm tên trường không dấu -> chỉ còn cụm chứa trường đó', async () => {
+    const user = userEvent.setup();
+    render();
+    await user.type(screen.getByLabelText('Tìm trường của Thầy/Cô'), 'can dang');
+    expect(screen.getByLabelText('Cụm hỗ trợ 7')).toBeInTheDocument();
+    expect(screen.getByText('Trường THPT Cần Đăng')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Cụm hỗ trợ 1')).not.toBeInTheDocument();
+  });
+
+  it('không có trường nào khớp -> hướng dẫn liên hệ email', async () => {
+    const user = userEvent.setup();
+    render();
+    await user.type(screen.getByLabelText('Tìm trường của Thầy/Cô'), 'truong khong ton tai xyz');
+    expect(screen.getByText(/Không tìm thấy trường này trong danh sách/)).toBeInTheDocument();
   });
 });
 

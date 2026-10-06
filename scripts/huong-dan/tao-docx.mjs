@@ -30,11 +30,15 @@ const KHOA = doc('--khoa', '');
 const CONG_VAN = doc('--cong-van', '……/ĐHSP-……');
 const NGAY = doc('--ngay', `ngày …… tháng …… năm ${new Date().getFullYear()}`);
 
-// 1) Biên dịch huongDan.ts (TypeScript, có import nội bộ) thành module tạm rồi nạp.
+// 1) Biên dịch huongDan.ts + nhomZaloTheoCum.ts (phụ lục, dữ liệu riêng của khóa) thành module tạm rồi nạp.
 const { build } = require(path.join(ROOT, 'frontend/node_modules/esbuild'));
 const tmp = path.join(os.tmpdir(), `huong-dan-${process.pid}.mjs`);
 await build({
-  entryPoints: [path.join(ROOT, 'frontend/src/content/huongDan.ts')],
+  stdin: {
+    contents: "export * from './huongDan'; export * from './nhomZaloTheoCum';",
+    resolveDir: path.join(ROOT, 'frontend/src/content'),
+    loader: 'ts',
+  },
   bundle: true,
   format: 'esm',
   platform: 'node',
@@ -42,7 +46,7 @@ await build({
   alias: { '@': path.join(ROOT, 'frontend/src') },
   logLevel: 'error',
 });
-const { huongDan, NHAN_NHOM_LOI, DANH_SACH_PHAN_THEO_THU_TU } = await import(pathToFileURL(tmp).href);
+const { huongDan, NHAN_NHOM_LOI, DANH_SACH_PHAN_THEO_THU_TU, nhomZaloTheoCum } = await import(pathToFileURL(tmp).href);
 fs.rmSync(tmp, { force: true });
 
 const {
@@ -260,6 +264,15 @@ c.push(
   thanBai(`Trong quá trình thực hiện, nếu có vướng mắc, học viên liên hệ qua email **${ct.email}** để được hỗ trợ./.`, { spacing: { ...DOAN, before: 120 } }),
 );
 
+// Phụ lục: nhóm Zalo hỗ trợ theo cụm (dữ liệu riêng của khóa — content/nhomZaloTheoCum.ts).
+c.push(
+  new Paragraph({ pageBreakBefore: true, alignment: AlignmentType.CENTER, spacing: { after: 0, line: 288 }, indent: { firstLine: 0 }, children: [new TextRun({ text: 'PHỤ LỤC', bold: true, size: CO })] }),
+  giua([new TextRun({ text: 'DANH SÁCH NHÓM ZALO HỖ TRỢ THEO CỤM', bold: true, size: CO })], 240),
+  ...nhomZaloTheoCum.luuY.map((t) => new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: DOAN, indent: { firstLine: LUI_DAU_DONG }, children: [new TextRun('- '), ...runs(t)] })),
+  ...bang([1500, W - 1500 - 3300, 3300], ['Cụm', 'Đơn vị công tác', 'Link tham gia Zalo'],
+    nhomZaloTheoCum.cum.map((cm) => [`**${cm.ten}**`, cm.donVi.map((d, j) => `${j + 1}. ${d}`), cm.linkZalo])),
+);
+
 const tep = new Document({
   creator: 'Trường Đại học Sư phạm Thành phố Hồ Chí Minh',
   title: 'Hướng dẫn sử dụng hệ thống Bồi dưỡng Năng lực số dành cho học viên',
@@ -284,4 +297,4 @@ const tep = new Document({
 });
 
 fs.writeFileSync(OUT, await Packer.toBuffer(tep));
-console.log(`Đã ghi ${path.relative(ROOT, OUT)}: ${huongDan.parts.length + 2} mục, ${huongDan.troubleshooting.length} lỗi thường gặp, ${soHinh} cặp hình`);
+console.log(`Đã ghi ${path.relative(ROOT, OUT)}: ${huongDan.parts.length + 2} mục, ${huongDan.troubleshooting.length} lỗi thường gặp, ${soHinh} cặp hình, phụ lục ${nhomZaloTheoCum.cum.length} cụm Zalo`);

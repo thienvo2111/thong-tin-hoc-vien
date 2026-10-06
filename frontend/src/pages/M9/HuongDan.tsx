@@ -10,6 +10,7 @@ import {
   Flex,
   Group,
   Image,
+  List,
   NativeSelect,
   Paper,
   SegmentedControl,
@@ -38,6 +39,7 @@ import {
   type TinhHuongLoi,
 } from '@/content/huongDan';
 import { hinhHuongDan } from '@/content/huongDanHinh';
+import { nhomZaloTheoCum } from '@/content/nhomZaloTheoCum';
 import { khopTimKiem } from '@/lib/timKiemTiengViet';
 import { matKhauLanDau } from '@/lib/matKhauLanDau';
 import logoHcmue from '@/assets/logo-hcmue.png';
@@ -90,7 +92,7 @@ export default function HuongDan() {
         </Group>
 
         <Box data-testid="hang-bo-cuc" style={{ display: 'flex', flexWrap: 'wrap', gap: 40, alignItems: 'flex-start' }}>
-          <MucLuc danhSach={DANH_SACH_PHAN_THEO_THU_TU} />
+          <MucLuc danhSach={[...DANH_SACH_PHAN_THEO_THU_TU, { id: ID_PHU_LUC_ZALO, tieuDe: nhomZaloTheoCum.tieuDe, so: 'PL' }]} />
 
           <Stack gap={56} style={{ flex: '1 1 280px', minWidth: 0 }}>
             {huongDan.parts.map((p, i) => (
@@ -98,6 +100,7 @@ export default function HuongDan() {
             ))}
             <LoiThuongGap troubleshooting={huongDan.troubleshooting} email={huongDan.contact.email} />
             <LienHeSection contact={huongDan.contact} />
+            <PhuLucNhomZalo />
           </Stack>
         </Box>
       </Container>
@@ -174,7 +177,7 @@ function HeroHuongDan() {
   );
 }
 
-function MucLuc({ danhSach }: { danhSach: { id: string; tieuDe: string }[] }) {
+function MucLuc({ danhSach }: { danhSach: { id: string; tieuDe: string; so?: string }[] }) {
   return (
     <>
       <Box visibleFrom="md" w={240} style={{ flexShrink: 0, position: 'sticky', top: 16, alignSelf: 'flex-start' }}>
@@ -193,7 +196,7 @@ function MucLuc({ danhSach }: { danhSach: { id: string; tieuDe: string }[] }) {
                 style={{ display: 'flex', gap: 8, padding: '5px 8px', borderRadius: 6 }}
               >
                 <Text component="span" c="dimmed" fz={13} style={{ minWidth: '1.4em' }}>
-                  {i + 1}
+                  {m.so ?? i + 1}
                 </Text>
                 {m.tieuDe}
               </Anchor>
@@ -205,7 +208,7 @@ function MucLuc({ danhSach }: { danhSach: { id: string; tieuDe: string }[] }) {
       <Box hiddenFrom="md" style={{ width: '100%' }}>
         <NativeSelect
           label="Đi tới phần"
-          data={[{ value: '', label: '— Chọn phần —' }, ...danhSach.map((m, i) => ({ value: m.id, label: `${i + 1}. ${m.tieuDe}` }))]}
+          data={[{ value: '', label: '— Chọn phần —' }, ...danhSach.map((m, i) => ({ value: m.id, label: `${m.so ?? i + 1}. ${m.tieuDe}` }))]}
           onChange={(e) => {
             const id = e.currentTarget.value;
             if (id) window.location.hash = id;
@@ -608,6 +611,74 @@ function LienHeSection({ contact }: { contact: LienHeHoTro }) {
             </Paper>
           ))}
         </SimpleGrid>
+      </Stack>
+    </Box>
+  );
+}
+
+const ID_PHU_LUC_ZALO = 'phu-luc-zalo';
+
+/** Phụ lục — nhóm Zalo hỗ trợ theo cụm (dữ liệu riêng của khóa, content/nhomZaloTheoCum.ts). Tìm theo tên
+ * trường (không dấu) để học viên biết mình thuộc cụm nào; nút tham gia mở cùng tab (trình duyệt Zalo). */
+function PhuLucNhomZalo() {
+  const [tim, setTim] = useState('');
+  const dangTim = tim.trim().length > 0;
+  const ketQua = nhomZaloTheoCum.cum
+    .map((c) => ({ ...c, khop: dangTim ? c.donVi.filter((d) => khopTimKiem(d, tim)) : c.donVi }))
+    .filter((c) => c.khop.length > 0);
+
+  return (
+    <Box component="section" id={ID_PHU_LUC_ZALO} style={{ scrollMarginTop: 16 }}>
+      <Stack gap={20}>
+        <Box style={{ borderBottom: '2px solid var(--mantine-color-gray-2)', paddingBottom: 12 }}>
+          <Text fw={700} fz={12} c="accent.6" tt="uppercase" style={{ letterSpacing: '.08em' }}>
+            Phụ lục
+          </Text>
+          <Title order={2} fz={{ base: 20, sm: 24 }}>
+            Nhóm Zalo hỗ trợ theo cụm
+          </Title>
+        </Box>
+
+        <StatusBanner loai="info" tieuDe="Lưu ý">
+          <List size="sm" spacing={4}>
+            {nhomZaloTheoCum.luuY.map((l) => (
+              <List.Item key={l}>
+                <TextMarkup text={l} />
+              </List.Item>
+            ))}
+          </List>
+        </StatusBanner>
+
+        <TextInput
+          label="Tìm trường của Thầy/Cô"
+          placeholder="Gõ tên trường, vd: Cần Đăng"
+          value={tim}
+          onChange={(e) => setTim(e.currentTarget.value)}
+        />
+
+        {ketQua.length === 0 && (
+          <Text c="dimmed" size="sm">
+            Không tìm thấy trường này trong danh sách. Thầy/Cô liên hệ email hỗ trợ ở mục trên để được hướng dẫn.
+          </Text>
+        )}
+
+        {ketQua.map((c) => (
+          <Paper key={c.ten} withBorder radius="md" p="md" aria-label={c.ten}>
+            <Group justify="space-between" align="center" mb="sm" wrap="wrap" gap="xs">
+              <Title order={3} fz={16}>
+                {c.ten}
+              </Title>
+              <Button component="a" href={c.linkZalo} size="xs">
+                Tham gia nhóm Zalo
+              </Button>
+            </Group>
+            <List size="sm" spacing={2} type="ordered">
+              {c.khop.map((d) => (
+                <List.Item key={d}>{d}</List.Item>
+              ))}
+            </List>
+          </Paper>
+        ))}
       </Stack>
     </Box>
   );
