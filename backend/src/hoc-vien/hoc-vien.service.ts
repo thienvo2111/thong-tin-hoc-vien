@@ -647,6 +647,37 @@ export class HocVienService {
     );
   }
 
+  // ADR 0003 H7 (PATCH /ho-tro/hoc-vien/{id}): người hỗ trợ học viên sửa hộ
+  // như quan_tri (bỏ qua cổng đợt, đợt mở trùng -> hủy xác nhận) nhưng LUÔN
+  // ghi lịch sử kèm lý do (kể cả hồ sơ tu_dang_ky) để truy vết người sửa.
+  // KHÔNG kiểm tra phạm vi cụm — nơi gọi đã chặn qua HoTroHocVienScopeService.
+  async suaHoSoBoiHoTro(
+    id: string,
+    dto: UpdateHocVienDto,
+    caller: AuthenticatedUser,
+    lyDo: string,
+  ) {
+    const existing = await this.prisma.hoc_vien.findUnique({
+      where: { id },
+      include: { chuyen_mon: true },
+    });
+    if (!existing) {
+      throw new NotFoundAppException('Không tìm thấy hồ sơ học viên');
+    }
+    const dot =
+      existing.nguon_tao === 'import_moet'
+        ? await this.dotXacNhanService.dotDangMoCuaHocVien(existing.id)
+        : null;
+    return this.suaHoSo(
+      existing,
+      dto,
+      { id: caller.id, vai_tro: caller.vai_tro },
+      dot,
+      true,
+      lyDo,
+    );
+  }
+
   // Lõi dùng chung cho capNhatHoSoCuaToi (học viên) + suaHoSoByAdmin (quan_tri)
   // — chỉ khác ở việc gate quyền TRƯỚC khi gọi vào đây. ghiLichSu=true CHỈ
   // cho hồ sơ import_moet (rule T14 chỉ thay đổi hành vi cho nguồn này —
@@ -657,6 +688,7 @@ export class HocVienService {
     nguoiSua: { id: string; vai_tro: vai_tro_nguoi_dung },
     dot: dot_xac_nhan | null,
     ghiLichSu: boolean,
+    lyDo: string | null = null,
   ) {
     const merged: HocVienValidateInput = {
       ho_ten: dto.ho_ten ?? existing.ho_ten,
@@ -756,6 +788,7 @@ export class HocVienService {
                 nguoi_sua_id: nguoiSua.id,
                 vai_tro_nguoi_sua: nguoiSua.vai_tro,
                 dot_id: dot?.id ?? null,
+                ly_do: lyDo,
               })),
             });
             // Rule T14: sửa tiếp sau khi đã xác nhận ở đợt đang mở -> hủy

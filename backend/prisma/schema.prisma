@@ -668,6 +668,8 @@ model lich_su_thay_doi_ho_so {
   vai_tro_nguoi_sua  vai_tro_nguoi_dung
   dot_id             String?            @db.Uuid
   sua_luc            DateTime           @default(now()) @db.Timestamptz(6)
+  // ADR 0003 H7: lý do bắt buộc khi người hỗ trợ học viên sửa hộ (NULL với các luồng khác).
+  ly_do              String?
 
   hoc_vien  hoc_vien      @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   nguoi_sua nguoi_dung    @relation("lich_su_thay_doi_nguoi_sua", fields: [nguoi_sua_id], references: [id], onDelete: NoAction, onUpdate: NoAction)

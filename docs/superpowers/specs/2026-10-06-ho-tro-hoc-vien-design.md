@@ -66,6 +66,7 @@ Quyết định nền: [ADR 0003](../../adr/0003-nguoi-ho-tro-hoc-vien.md) (H1�
 
 ### Frontend
 - Tab Hồ sơ: nút Sửa → form các trường cho phép + ô **Lý do điều chỉnh** bắt buộc; CCCD/mã MOET chỉ đọc.
+- Ghi chú khi code #12 (2026-10-06): form giao diện gồm họ tên, ngày/tháng/năm sinh, giới tính, đối tượng, chức vụ, SĐT, email, đơn vị công tác, trình độ chuyên môn, cấp giảng dạy — chỉ gửi trường thật sự đổi. Chuyên môn/môn giảng dạy/nơi sinh/cư trú API vẫn nhận nhưng để học viên tự bổ sung ở M4 (YAGNI). Lịch sử luôn ghi khi người hỗ trợ sửa (kể cả `tu_dang_ky`); gửi link lặp trong 60 giây → 429.
 - Tab Tài khoản: 3 nút; "Gửi link" disabled + gợi ý khi email chưa xác minh; mật khẩu tạm hiện trong hộp thoại có nút Sao chép, cảnh báo "chỉ hiện 1 lần".
 
 ## 4. Lát 4 — Yêu cầu hỗ trợ theo cụm

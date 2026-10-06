@@ -1,8 +1,13 @@
 import {
+  Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
+  Post,
   Query,
   Res,
 } from '@nestjs/common';
@@ -14,6 +19,7 @@ import { HoTroHocVienService } from './ho-tro-hoc-vien.service';
 import {
   LocHocVienHoTroDto,
   LocLichHocHoTroDto,
+  SuaHoSoHoTroDto,
 } from './dto/ho-tro-hoc-vien.dto';
 
 // Khu làm việc người hỗ trợ học viên (ADR 0003). Chỉ ho_tro_hoc_vien — Quản
@@ -76,5 +82,42 @@ export class HoTroHocVienController {
     @Query() query: LocLichHocHoTroDto,
   ) {
     return this.service.lichHoc(user.id, query);
+  }
+
+  // Lát 3 (ADR 0003 H7–H9).
+  @Patch('hoc-vien/:id')
+  suaHoSo(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SuaHoSoHoTroDto,
+  ) {
+    return this.service.suaHoSo(user, id, dto);
+  }
+
+  @Post('hoc-vien/:id/gui-link-dat-lai-mat-khau')
+  @HttpCode(HttpStatus.OK)
+  guiLinkDatLaiMatKhau(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.service.guiLinkDatLaiMatKhau(user.id, id);
+  }
+
+  @Post('hoc-vien/:id/cap-mat-khau-tam')
+  @HttpCode(HttpStatus.OK)
+  capMatKhauTam(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.service.capMatKhauTam(user.id, id);
+  }
+
+  @Post('hoc-vien/:id/mo-khoa-tam')
+  @HttpCode(HttpStatus.OK)
+  moKhoaTam(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.service.moKhoaTam(user.id, id);
   }
 }

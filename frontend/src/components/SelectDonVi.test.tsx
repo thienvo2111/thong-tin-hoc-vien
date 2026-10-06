@@ -258,4 +258,25 @@ describe('SelectDonVi', () => {
       server.events.removeAllListeners();
     });
   });
+
+  it('2 đơn vị trùng cả tên lẫn xã -> không sập (Mantine cấm option trùng), nhãn kèm mã để phân biệt và chọn đúng id', async () => {
+    const dv = (id: string, ma: string) => ({
+      id,
+      ma_don_vi: ma,
+      ten_don_vi: 'Trường Tiểu học A',
+      loai_don_vi: 'truong',
+      dia_ban_id: 'xa-1',
+      dia_ban_ten: 'Xã Mỹ Hòa',
+      tinh_id: 'tinh-1',
+      tinh_ten: 'An Giang',
+      trang_thai: 'active',
+    });
+    server.use(http.get('/danh-muc/don-vi-cong-tac', () => HttpResponse.json({ data: [dv('dv-1', 'TH01'), dv('dv-2', 'TH02')] })));
+    const user = userEvent.setup();
+    renderTrang(<Bao />);
+    await user.type(screen.getByRole('textbox', { name: 'Đơn vị công tác' }), 'Tiểu học A');
+    await user.click(await screen.findByRole('option', { name: 'Trường Tiểu học A — Xã Mỹ Hòa (mã TH02)' }));
+    expect(screen.getByRole('option', { hidden: true, name: 'Trường Tiểu học A — Xã Mỹ Hòa (mã TH01)' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('gia-tri')).toHaveTextContent('dv-2'));
+  });
 });

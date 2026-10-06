@@ -826,6 +826,8 @@ export interface HocVienHoTroChiTiet {
     vai_tro_nguoi_sua: string;
     sua_luc: string;
     nguoi_sua_ten: string;
+    /** ADR 0003 H7: lý do khi người hỗ trợ sửa hộ; null với các luồng khác. */
+    ly_do: string | null;
   }[];
 }
 

@@ -1,10 +1,11 @@
-import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, apiFetchBlob } from './client';
 import type {
   BuoiHocHoTro,
   CumCuaToi,
   HocVienHoTroChiTiet,
   HocVienHoTroDong,
+  MatKhauTamResponse,
   PaginatedResult,
   TrangThaiYeuCauHoTro,
   YeuCauHoTro,
@@ -124,4 +125,73 @@ export function traLoiYeuCauHoTroCuaCum(id: string, noi_dung_tra_loi: string) {
 export function useLamMoiYeuCauHoTroCuaCum() {
   const qc = useQueryClient();
   return () => qc.invalidateQueries({ queryKey: [...KHOA, 'yeu-cau'] });
+}
+
+// --- Can thiệp hồ sơ & tài khoản (ADR 0003 Lát 3) ---
+
+/** Trường học viên tự sửa ở M4, TRỪ số định danh/CCCD; ly_do bắt buộc (5–500 ký tự). */
+export interface SuaHoSoHoTroDto {
+  ho_ten?: string;
+  ngay_sinh?: number;
+  thang_sinh?: number;
+  nam_sinh?: number;
+  gioi_tinh?: string;
+  chuc_vu?: string;
+  doi_tuong?: string;
+  don_vi_cong_tac_id?: string;
+  so_dien_thoai_lien_he?: string;
+  email_lien_he?: string;
+  trinh_do_chuyen_mon?: string;
+  cap_giang_day?: string;
+  ly_do: string;
+}
+
+function useLamMoiChiTiet(hocVienId: string) {
+  const qc = useQueryClient();
+  return () => {
+    qc.invalidateQueries({ queryKey: [...KHOA, 'hoc-vien', 'chi-tiet', hocVienId] });
+    qc.invalidateQueries({ queryKey: [...KHOA, 'hoc-vien'] });
+  };
+}
+
+export function useSuaHoSoHoTro(hocVienId: string) {
+  const lamMoi = useLamMoiChiTiet(hocVienId);
+  return useMutation({
+    mutationFn: (dto: SuaHoSoHoTroDto) =>
+      apiFetch<{ xac_nhan_bi_huy: boolean }>(`/ho-tro/hoc-vien/${hocVienId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(dto),
+      }),
+    onSuccess: lamMoi,
+  });
+}
+
+export function useGuiLinkDatLaiMatKhauHoTro(hocVienId: string) {
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ da_gui: true; email: string }>(`/ho-tro/hoc-vien/${hocVienId}/gui-link-dat-lai-mat-khau`, {
+        method: 'POST',
+      }),
+  });
+}
+
+export function useCapMatKhauTamHocVienHoTro(hocVienId: string) {
+  const lamMoi = useLamMoiChiTiet(hocVienId);
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<MatKhauTamResponse>(`/ho-tro/hoc-vien/${hocVienId}/cap-mat-khau-tam`, { method: 'POST' }),
+    onSuccess: lamMoi,
+    gcTime: 0,
+  });
+}
+
+export function useMoKhoaTamHoTro(hocVienId: string) {
+  const lamMoi = useLamMoiChiTiet(hocVienId);
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ ten_dang_nhap: string; dang_bi_khoa: false }>(`/ho-tro/hoc-vien/${hocVienId}/mo-khoa-tam`, {
+        method: 'POST',
+      }),
+    onSuccess: lamMoi,
+  });
 }

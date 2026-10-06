@@ -1,6 +1,15 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
+import {
+  IsEmpty,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  Matches,
+} from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { UpdateHocVienDto } from '../../hoc-vien/dto/update-hoc-vien.dto';
 
 const chuoiThanhBoolean = ({ value }: { value: unknown }) =>
   value === 'true' ? true : value === 'false' ? false : value;
@@ -44,4 +53,20 @@ export class LocLichHocHoTroDto {
   @IsOptional()
   @IsUUID()
   cum_id?: string;
+}
+
+// PATCH /ho-tro/hoc-vien/{id} — ADR 0003 H7: các trường học viên tự sửa ở M4,
+// TRỪ số định danh/CCCD (khóa khớp import + tên đăng nhập). ValidationPipe chỉ
+// bật whitelist (trường lạ bị bỏ im lặng) nên chặn CCCD tường minh bằng
+// @IsEmpty để trả 400 rõ ràng thay vì lặng lẽ bỏ qua.
+export class SuaHoSoHoTroDto extends UpdateHocVienDto {
+  @IsEmpty({ message: 'Người hỗ trợ không được sửa số định danh cá nhân' })
+  declare so_dinh_danh_ca_nhan?: string;
+
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().normalize('NFC') : value,
+  )
+  @IsString({ message: 'Bắt buộc nhập lý do điều chỉnh' })
+  @Length(5, 500, { message: 'Lý do điều chỉnh từ 5 đến 500 ký tự' })
+  ly_do!: string;
 }

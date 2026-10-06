@@ -1,15 +1,21 @@
 import { Injectable } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { HocVienService } from '../hoc-vien/hoc-vien.service';
 import { KhoaBoiDuongService } from '../khoa-boi-duong/khoa-boi-duong.service';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
+import { AuthService } from '../auth/auth.service';
+import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { NotFoundAppException } from '../common/exceptions/app.exceptions';
+import { sinhMatKhauTam } from '../nguoi-dung/tai-khoan-don-vi.util';
 import { paginate } from '../common/dto/pagination-query.dto';
 import { dieuKienKhongDau } from '../common/utils/tim-kiem-khong-dau.util';
 import { HoTroHocVienScopeService } from './ho-tro-hoc-vien-scope.service';
 import {
   LocHocVienHoTroDto,
   LocLichHocHoTroDto,
+  SuaHoSoHoTroDto,
 } from './dto/ho-tro-hoc-vien.dto';
 import { buildDanhSachCumWorkbook } from './xuat-danh-sach-cum.util';
 
@@ -54,6 +60,7 @@ export class HoTroHocVienService {
     private readonly hocVienService: HocVienService,
     private readonly khoaBoiDuongService: KhoaBoiDuongService,
     private readonly nhatKy: NhatKyService,
+    private readonly authService: AuthService,
   ) {}
 
   async cumCuaToi(nguoiDungId: string) {
@@ -158,6 +165,7 @@ export class HoTroHocVienService {
             gia_tri_moi: true,
             vai_tro_nguoi_sua: true,
             sua_luc: true,
+            ly_do: true,
             nguoi_sua: { select: { ho_ten: true } },
           },
           orderBy: { sua_luc: 'desc' },
@@ -282,6 +290,84 @@ export class HoTroHocVienService {
       },
     });
     return buffer;
+  }
+
+  // ---------------------------------------------------------------------
+  // Lát 3 — can thiệp hồ sơ & tài khoản (ADR 0003 H7–H9). Mọi thao tác kiểm
+  // tra phạm vi cụm TRƯỚC (ngoài phạm vi -> 404).
+  // ---------------------------------------------------------------------
+
+  async suaHoSo(
+    caller: AuthenticatedUser,
+    hocVienId: string,
+    dto: SuaHoSoHoTroDto,
+  ) {
+    await this.scope.damBaoTrongPhamVi(caller.id, hocVienId);
+    const { ly_do, ...thayDoi } = dto;
+    return this.hocVienService.suaHoSoBoiHoTro(
+      hocVienId,
+      thayDoi,
+      caller,
+      ly_do,
+    );
+  }
+
+  async guiLinkDatLaiMatKhau(nguoiDungId: string, hocVienId: string) {
+    await this.scope.damBaoTrongPhamVi(nguoiDungId, hocVienId);
+    return this.authService.guiLinkDatLaiMatKhauHocVien(hocVienId);
+  }
+
+  // H9(2): mật khẩu tạm hiện 1 lần cho người hỗ trợ nhắn Zalo; buộc đổi ở lần
+  // đăng nhập đầu; link đặt lại còn hạn mất hiệu lực. Không có "về ngày sinh".
+  async capMatKhauTam(nguoiDungId: string, hocVienId: string) {
+    await this.scope.damBaoTrongPhamVi(nguoiDungId, hocVienId);
+    const tk = await this.layTaiKhoanHocVien(hocVienId);
+    const matKhau = sinhMatKhauTam();
+    const hash = await bcrypt.hash(matKhau, 10);
+    await this.prisma.$transaction([
+      this.prisma.nguoi_dung.update({
+        where: { id: tk.id },
+        data: {
+          mat_khau_hash: hash,
+          phai_doi_mat_khau: true,
+          khoa_den: null,
+          so_lan_dang_nhap_sai: 0,
+        },
+      }),
+      this.prisma.token_xac_thuc.updateMany({
+        where: {
+          hoc_vien_id: hocVienId,
+          loai: 'dat_lai_mat_khau',
+          da_dung_luc: null,
+        },
+        data: { da_dung_luc: new Date() },
+      }),
+      this.prisma.nhat_ky_dat_lai_mat_khau.create({
+        data: { nguoi_dung_id: tk.id, thuc_hien_boi: nguoiDungId },
+      }),
+    ]);
+    return { ten_dang_nhap: tk.ten_dang_nhap, mat_khau_tam: matKhau };
+  }
+
+  async moKhoaTam(nguoiDungId: string, hocVienId: string) {
+    await this.scope.damBaoTrongPhamVi(nguoiDungId, hocVienId);
+    const tk = await this.layTaiKhoanHocVien(hocVienId);
+    await this.prisma.nguoi_dung.update({
+      where: { id: tk.id },
+      data: { khoa_den: null, so_lan_dang_nhap_sai: 0 },
+    });
+    return { ten_dang_nhap: tk.ten_dang_nhap, dang_bi_khoa: false };
+  }
+
+  private async layTaiKhoanHocVien(hocVienId: string) {
+    const tk = await this.prisma.nguoi_dung.findUnique({
+      where: { hoc_vien_id: hocVienId },
+      select: { id: true, ten_dang_nhap: true },
+    });
+    if (!tk) {
+      throw new NotFoundAppException('Học viên chưa có tài khoản đăng nhập');
+    }
+    return tk;
   }
 
   private async xayWhere(

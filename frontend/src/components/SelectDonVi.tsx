@@ -27,6 +27,17 @@ function nhanDonVi(d: DonViCongTac): string {
   return d.dia_ban_ten ? `${d.ten_don_vi} — ${d.dia_ban_ten}` : d.ten_don_vi;
 }
 
+// 2 đơn vị trùng cả tên lẫn xã cho ra cùng nhãn -> Mantine Autocomplete ném lỗi "Duplicate options" làm sập
+// trang. Nhãn trùng thì thêm mã đơn vị (duy nhất) để phân biệt.
+function ganNhan(ds: DonViCongTac[]): { d: DonViCongTac; nhan: string }[] {
+  const dem = new Map<string, number>();
+  for (const d of ds) dem.set(nhanDonVi(d), (dem.get(nhanDonVi(d)) ?? 0) + 1);
+  return ds.map((d) => {
+    const nhan = nhanDonVi(d);
+    return { d, nhan: (dem.get(nhan) ?? 0) > 1 ? `${nhan} (mã ${d.ma_don_vi})` : nhan };
+  });
+}
+
 /**
  * Autocomplete debounce 300ms, gõ ≥ 2 ký tự — dac-ta-cong-hoc-vien.md § M4 mục 3. Có thêm 2 Select
  * địa giới (tỉnh/thành → phường/xã) tùy chọn ở trên để thu hẹp phạm vi tìm kiếm qua dia_ban_id —
@@ -81,8 +92,8 @@ export function SelectDonVi({ label, nhanBanDau, idBanDau, onChange, error, requ
     enabled: duDieuKienTimKiem && !disabled,
   });
 
-  const danhSach = data?.data ?? [];
-  const options = danhSach.map(nhanDonVi);
+  const danhSach = ganNhan(data?.data ?? []);
+  const options = danhSach.map((x) => x.nhan);
   // Đang hiện nhãn đơn vị đã chọn -> mở danh sách thì hiện đủ trường trong xã, không lọc theo nhãn đó.
   const locTheoChu: OptionsFilter = (input) =>
     nhanDaChon && input.search === nhanDaChon ? input.options : locTiengViet(input);
@@ -144,7 +155,7 @@ export function SelectDonVi({ label, nhanBanDau, idBanDau, onChange, error, requ
           onChange(null, null);
         }}
         onOptionSubmit={(submitted) => {
-          const found = danhSach.find((d) => nhanDonVi(d) === submitted);
+          const found = danhSach.find((x) => x.nhan === submitted)?.d;
           setText(submitted);
           setNhanDaChon(submitted);
           nhanVuaChonRef.current = submitted;

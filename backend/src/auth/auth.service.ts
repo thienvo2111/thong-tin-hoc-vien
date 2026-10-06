@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
@@ -9,6 +9,8 @@ import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import {
   AccountLockedException,
+  ConflictAppException,
+  NotFoundAppException,
   UnauthorizedAppException,
   ValidationException,
 } from '../common/exceptions/app.exceptions';
@@ -344,11 +346,12 @@ export class AuthService {
     hocVienId: string,
     hoTen: string,
     email: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const now = new Date();
     // Chặn spam đơn giản theo tài khoản: đã có token còn hiệu lực tạo trong
     // 60 giây gần nhất thì bỏ qua, không tạo/gửi lại — vẫn trả response
     // thành công như bình thường ở quenMatKhau() (không tiết lộ qua timing).
+    // Trả false khi bị chặn để luồng người hỗ trợ báo rõ (429).
     const tokenGanDay = await this.prisma.token_xac_thuc.findFirst({
       where: {
         hoc_vien_id: hocVienId,
@@ -358,7 +361,7 @@ export class AuthService {
         tao_luc: { gt: new Date(now.getTime() - THOI_GIAN_CHAN_SPAM_TOKEN_MS) },
       },
     });
-    if (tokenGanDay) return;
+    if (tokenGanDay) return false;
 
     const { token, tokenHash } = taoTokenXacThuc();
     await this.prisma.$transaction([
@@ -384,6 +387,43 @@ export class AuthService {
 
     const link = `${layFrontendUrl()}/dat-lai-mat-khau?token=${token}`;
     await this.thongBaoService.guiDatLaiMatKhau(email, hoTen, link, hocVienId);
+    return true;
+  }
+
+  // ADR 0003 H9(1): người hỗ trợ học viên gửi link đặt lại mật khẩu thay học
+  // viên — CHỈ tới email đã xác minh (email vừa bị sửa hộ thì chưa xác minh,
+  // chặn chiếm tài khoản). Khác quenMatKhau() (công khai, không tiết lộ gì):
+  // ở đây báo rõ lý do không gửi. Nơi gọi đã kiểm tra phạm vi cụm.
+  async guiLinkDatLaiMatKhauHocVien(
+    hocVienId: string,
+  ): Promise<{ da_gui: true; email: string }> {
+    const hocVien = await this.prisma.hoc_vien.findUnique({
+      where: { id: hocVienId },
+      include: { nguoi_dung_account: { select: { trang_thai: true } } },
+    });
+    if (!hocVien?.nguoi_dung_account) {
+      throw new NotFoundAppException('Học viên chưa có tài khoản đăng nhập');
+    }
+    if (hocVien.nguoi_dung_account.trang_thai !== 'active') {
+      throw new ConflictAppException('Tài khoản học viên đang bị khóa');
+    }
+    if (!hocVien.email_lien_he || !hocVien.email_da_xac_minh) {
+      throw new ConflictAppException(
+        'Email của học viên chưa được xác minh — hãy cấp mật khẩu tạm',
+      );
+    }
+    const daGui = await this.taoVaGuiTokenDatLaiMatKhau(
+      hocVien.id,
+      hocVien.ho_ten,
+      hocVien.email_lien_he,
+    );
+    if (!daGui) {
+      throw new HttpException(
+        'Vừa gửi link đặt lại mật khẩu, vui lòng đợi ít phút rồi thử lại',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    return { da_gui: true, email: hocVien.email_lien_he };
   }
 
   private async taoVaGuiTokenDatLaiMatKhauNguoiDung(

@@ -921,6 +921,26 @@ export const handlers = [
       : loi(404, 'NOT_FOUND', 'Không tìm thấy hồ sơ học viên'),
   ),
   http.get('/ho-tro/lich-hoc', () => HttpResponse.json(db.hoTroLichHoc)),
+  http.patch('/ho-tro/hoc-vien/:id', async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    if (typeof body.ly_do !== 'string' || body.ly_do.trim().length < 5) {
+      return loi(400, 'VALIDATION_ERROR', 'Dữ liệu không hợp lệ', {
+        fields: [{ field: 'ly_do', message: 'Lý do điều chỉnh từ 5 đến 500 ký tự' }],
+      });
+    }
+    return HttpResponse.json({ ...db.hoTroChiTiet.ho_so, xac_nhan_bi_huy: false });
+  }),
+  http.post('/ho-tro/hoc-vien/:id/gui-link-dat-lai-mat-khau', () =>
+    db.hoTroChiTiet.tai_khoan?.email_da_xac_minh
+      ? HttpResponse.json({ da_gui: true, email: db.hoTroChiTiet.ho_so.email_lien_he })
+      : loi(409, 'CONFLICT', 'Email của học viên chưa được xác minh — hãy cấp mật khẩu tạm'),
+  ),
+  http.post('/ho-tro/hoc-vien/:id/cap-mat-khau-tam', () =>
+    HttpResponse.json({ ten_dang_nhap: db.hoTroChiTiet.tai_khoan?.ten_dang_nhap, mat_khau_tam: 'Hv7tQ2mZp9' }),
+  ),
+  http.post('/ho-tro/hoc-vien/:id/mo-khoa-tam', () =>
+    HttpResponse.json({ ten_dang_nhap: db.hoTroChiTiet.tai_khoan?.ten_dang_nhap, dang_bi_khoa: false }),
+  ),
 
   // Tài khoản học viên — /nguoi-dung/hoc-vien.
   http.get('/nguoi-dung/hoc-vien', () => {
