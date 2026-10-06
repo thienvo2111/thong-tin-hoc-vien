@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -9,7 +11,16 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { IsOptional, Matches } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
+import { trang_thai_de_nghi } from '@prisma/client';
+import { DeNghiDoiLopService } from './de-nghi-doi-lop.service';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
@@ -63,6 +74,28 @@ export class ViecCanLamQueryDto {
 
 const MOT_NGAY_MS = 24 * 3600 * 1000;
 
+const TRANG_THAI_DE_NGHI = ['cho_duyet', 'da_duyet', 'tu_choi', 'da_huy'];
+
+export class LocDeNghiDto {
+  @IsOptional()
+  @IsIn(TRANG_THAI_DE_NGHI)
+  trang_thai?: trang_thai_de_nghi;
+}
+
+export class DuyetDeNghiDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  ghi_chu?: string;
+}
+
+export class TuChoiDeNghiDto {
+  @IsString()
+  @MinLength(3, { message: 'Ghi rõ lý do từ chối (tối thiểu 3 ký tự)' })
+  @MaxLength(500)
+  ghi_chu!: string;
+}
+
 export class LichDayQueryDto {
   @IsOptional()
   @Matches(NGAY, { message: 'Định dạng YYYY-MM-DD' })
@@ -87,7 +120,37 @@ export class HoTroGiangVienController {
     private readonly giangVien: GiangVienService,
     private readonly diemHoc: DiemHocService,
     private readonly bangKiem: BangKiemService,
+    private readonly deNghi: DeNghiDoiLopService,
   ) {}
+
+  // ---------------- L5 (issue #18): đề nghị đổi lớp ----------------
+  @Get('de-nghi-doi-lop')
+  dsDeNghi(
+    @Query() query: LocDeNghiDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.deNghi.danhSach(user, query.trang_thai);
+  }
+
+  @Post('de-nghi-doi-lop/:id/duyet')
+  @HttpCode(HttpStatus.OK)
+  duyetDeNghi(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: DuyetDeNghiDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.deNghi.duyet(user, id, dto.ghi_chu);
+  }
+
+  @Post('de-nghi-doi-lop/:id/tu-choi')
+  @HttpCode(HttpStatus.OK)
+  tuChoiDeNghi(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: TuChoiDeNghiDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.deNghi.tuChoi(user, id, dto.ghi_chu);
+  }
 
   // ---------------- L4 (issue #17): bảng kiểm + Việc cần làm ----------------
   @Get('lop/:lopId/giai-doan/:gdId/bang-kiem')
@@ -124,8 +187,11 @@ export class HoTroGiangVienController {
 
   @Get('viec-can-lam/dem')
   async demViecCanLam(@CurrentUser() user: AuthenticatedUser) {
-    const ds = await this.dsViecCanLam(user, 21);
-    return { do: ds.filter((d) => d.mau === 'do').length };
+    const [ds, deNghi] = await Promise.all([
+      this.dsViecCanLam(user, 21),
+      this.deNghi.demChoDuyet(user),
+    ]);
+    return { do: ds.filter((d) => d.mau === 'do').length, de_nghi: deNghi };
   }
 
   private async dsViecCanLam(user: AuthenticatedUser, soNgay: number) {

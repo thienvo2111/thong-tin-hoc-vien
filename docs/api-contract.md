@@ -162,7 +162,7 @@ Vai trò `ho_tro_giang_vien` — cán bộ HCMUE, không gắn đơn vị, email
 
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
-| GET | `/bang-kiem/quy-tac` | Danh mục quy tắc tự động trong code `[{ ma, ten }]` (`co_diem_hoc`, `co_giang_vien`, `khong_vuot_so_phong`, `co_hoc_vien`, `giang_vien_co_tai_khoan`, `hau_can_da_xac_nhan`, `co_thuc_dia`) | QuảnTrị |
+| GET | `/bang-kiem/quy-tac` | Danh mục quy tắc tự động trong code `[{ ma, ten }]` (`co_diem_hoc`, `co_giang_vien`, `khong_vuot_so_phong`, `co_hoc_vien`, `giang_vien_co_tai_khoan`, `hau_can_da_xac_nhan`, `co_thuc_dia`, `khong_de_nghi_cho` — L5) | QuảnTrị |
 | GET | `/bang-kiem/mac-dinh`, `/bang-kiem/khoa/{khoaId}` | `{ nguon: 'mac_dinh' \| 'rieng', muc: [...] }` (kèm mục đã ngưng) | QuảnTrị |
 | POST | `/bang-kiem/khoa/{khoaId}/tuy-chinh` | Sao chép bộ mặc định thành bộ riêng của khóa; đã có bộ riêng → `409` | QuảnTrị |
 | POST | `/bang-kiem/mac-dinh/muc`, `/bang-kiem/khoa/{khoaId}/muc` | `{ ten, loai: 'tu_dong'\|'thu_cong', ma_quy_tac? (bắt buộc với tự động, phải có trong danh mục), han_truoc_ngay? (0–365), thu_tu? }`; khóa chưa tùy chỉnh → `409` | QuảnTrị |
@@ -172,6 +172,24 @@ Vai trò `ho_tro_giang_vien` — cán bộ HCMUE, không gắn đơn vị, email
 | GET | `/ho-tro-giang-vien/viec-can-lam?so_ngay=21`, `/viec-can-lam/dem` | Đợt trực tiếp trong phạm vi có buổi từ nay tới N ngày, kèm màu + mục chưa đạt, sắp theo buổi đầu; `/dem` → `{ do }` (số đợt đỏ, hiện trên menu) | `ho_tro_giang_vien` |
 
 Nginx: thêm tiền tố `/bang-kiem`.
+
+**Thêm L5 (issue #18, 2026-10-07) — báo vắng + đề nghị đổi lớp** (ADR 0004 G13/G14; ngoài cụm/khóa của mình → `404`):
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| POST | `/ho-tro-hoc-vien/hoc-vien/{id}/bao-vang` | `{ lich_hoc_id, ly_do (2–500) }` — buổi phải thuộc lớp học viên được phân ở giai đoạn đó và **chưa kết thúc** (`400`); ghi lại = cập nhật lý do. Nhật ký `bao_vang` | `ho_tro_hoc_vien` |
+| DELETE | `/ho-tro-hoc-vien/hoc-vien/{id}/bao-vang/{lichHocId}` | Hủy báo vắng (buổi chưa kết thúc) → `204`; chưa có → `404` | `ho_tro_hoc_vien` |
+| GET | `/ho-tro-hoc-vien/hoc-vien/{id}/lop-co-the-doi?giai_doan_id=` | `{ lop_hien_tai_id, lop: [{ id, ten_lop, loai_lop, si_so_toi_da, si_so }] }` — lớp cùng khóa, active, có buổi ở giai đoạn | `ho_tro_hoc_vien` |
+| POST | `/ho-tro-hoc-vien/hoc-vien/{id}/de-nghi-doi-lop` | `{ giai_doan_id, lop_de_nghi_id, ly_do (5–500) }` — lớp không hợp lệ / đang ở lớp đó → `400`; đã có đề nghị **chờ duyệt** cùng (học viên, giai đoạn) → `409` | `ho_tro_hoc_vien` |
+| POST | `/ho-tro-hoc-vien/de-nghi-doi-lop/{id}/huy` | Chỉ người tạo (`403`), chỉ khi `cho_duyet` (`409`) → `204` | `ho_tro_hoc_vien` |
+| GET | `/ho-tro-hoc-vien/hoc-vien/{id}` | **Thêm** `bao_vang: [{ lich_hoc_id, ly_do, ghi_luc, nguoi_ghi }]`, `de_nghi_doi_lop: [...]` | `ho_tro_hoc_vien` |
+| GET | `/ho-tro-giang-vien/de-nghi-doi-lop?trang_thai=` | Đề nghị có lớp đề nghị thuộc khóa của nhóm, kèm `si_so_lop_de_nghi` | `ho_tro_giang_vien` |
+| POST | `/ho-tro-giang-vien/de-nghi-doi-lop/{id}/duyet` | `{ ghi_chu? }` → `{ trang_thai: 'da_duyet', canh_bao: string[] }`. UPDATE có điều kiện `cho_duyet` (người thứ 2 → `409`); phân lớp hiện tại khác `lop_hien_tai_id` → `409` (đề nghị vẫn chờ); cập nhật `phan_lop_giai_doan` + nhật ký `duyet_doi_lop`; vượt `si_so_toi_da` chỉ cảnh báo | `ho_tro_giang_vien` |
+| POST | `/ho-tro-giang-vien/de-nghi-doi-lop/{id}/tu-choi` | `{ ghi_chu (3–500, bắt buộc) }`; đã xử lý → `409` | `ho_tro_giang_vien` |
+| GET | `/ho-tro-giang-vien/viec-can-lam/dem` | **Thêm** `de_nghi` (số đề nghị chờ duyệt) | `ho_tro_giang_vien` |
+
+Trang lớp (`GET /ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}`) thêm `hoc_vien[].bao_vang` (`lich_hoc_id → ly_do`) và `de_nghi_cho` (đề nghị chờ ra/vào lớp; giảng viên không thấy). Hàm thuần `hopNhatDiemDanh` (dùng ở L6): `vang` + có báo vắng → `vang_co_phep`, `co_mat` luôn thắng.
+
 
 Liên thông sang người hỗ trợ học viên: `GET /ho-tro-hoc-vien/lich-hoc` mỗi buổi thêm `phong`, `diem_hoc { ten, dia_chi, nguoi_lien_he, sdt_lien_he }`, `nhom_ho_tro_gv [{ ho_ten, email }]` — **không** có hậu cần hay liên hệ giảng viên.
 

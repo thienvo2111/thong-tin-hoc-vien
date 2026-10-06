@@ -59,6 +59,7 @@ const dot: DotLop = {
         nguoi_ho_tro: [{ ho_ten: 'HT', email: 'ht@x.vn' }],
       },
       diem_danh: { b1: 'co_mat' },
+      bao_vang: { b1: 'Ốm' },
       ket_qua: null,
     },
   ],
@@ -103,6 +104,17 @@ const dot: DotLop = {
       cap_nhat_boi: null,
       cap_nhat_luc: new Date('2026-10-01'),
       nguoi_sua: null,
+    },
+  ],
+  de_nghi_cho: [
+    {
+      id: 'dn1',
+      ho_ten: 'HV',
+      chieu: 'ra' as const,
+      tu_lop: 'L1',
+      den_lop: 'L2',
+      ly_do: 'x',
+      tao_luc: new Date(),
     },
   ],
   thuc_dia: [
@@ -185,6 +197,16 @@ const COT: {
     truong: 'người hỗ trợ thực địa',
     lay: (d) => d.thuc_dia[0]?.so_dien_thoai,
     thay: { quan_tri: true, ho_tro_giang_vien: true, giang_vien: true },
+  },
+  {
+    truong: 'báo vắng (G13)',
+    lay: (d) => d.hoc_vien[0].bao_vang.b1,
+    thay: { quan_tri: true, ho_tro_giang_vien: true, giang_vien: true },
+  },
+  {
+    truong: 'đề nghị đổi lớp chờ duyệt (G14)',
+    lay: (d) => d.de_nghi_cho[0],
+    thay: { quan_tri: true, ho_tro_giang_vien: true, giang_vien: false },
   },
   {
     truong: 'nhóm hỗ trợ GV',

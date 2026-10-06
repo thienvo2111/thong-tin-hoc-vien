@@ -339,3 +339,8 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 145 | (L4) Mục tự động phải có `ma_quy_tac` thuộc danh mục code (400) — DB CHECK `(loai='tu_dong') = (ma_quy_tac IS NOT NULL)`; không đổi loại mục; `han_truoc_ngay` 0–365 | 🔴 | API + DB |
 | 146 | (L4) Chỉ đánh dấu tay mục thủ công (tự động → 400); mục tự động tính động mỗi lần xem, không lưu kết quả | 🔴 | API |
 | 147 | (L4) Màu đợt: đỏ nếu có mục quá hạn (chưa đạt và đã qua hạn), vàng nếu có mục chưa đạt, xanh nếu đạt hết | 🔴 | API (`mauDot`, hàm thuần có test) |
+| 148 | (L5, #18) Báo vắng: chỉ học viên cụm mình (404), buổi thuộc lớp học viên được phân ở giai đoạn đó, chưa kết thúc (400); lý do 2–500 ký tự; UNIQUE (dang_ky_hoc, buổi) | 🔴 | API + DB |
+| 149 | (L5) Hợp nhất khi nạp điểm danh: `vang` + có báo vắng → `vang_co_phep`; `co_mat` luôn thắng | 🔴 | API (`hopNhatDiemDanh`, hàm thuần có test) |
+| 150 | (L5) Đề nghị đổi lớp: lớp đề nghị cùng khóa, active, có buổi ở giai đoạn, khác lớp hiện tại (400); ≤ 1 đề nghị `cho_duyet` / (đăng ký học, giai đoạn) — unique index một phần (409) | 🔴 | API + DB |
+| 151 | (L5) Duyệt/từ chối/hủy là UPDATE có điều kiện `trang_thai='cho_duyet'` (song song → đúng 1 thành công, còn lại 409); duyệt kiểm phân lớp hiện tại = `lop_hien_tai_id` (khác → 409, giữ chờ); vượt sĩ số chỉ cảnh báo | 🔴 | API |
+| 152 | (L5) Từ chối bắt buộc ghi chú; hủy chỉ người tạo (403) | 🟡 | API |

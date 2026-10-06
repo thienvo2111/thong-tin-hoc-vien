@@ -99,6 +99,14 @@ export const QUY_TAC: Record<string, QuyTac> = {
         : dat();
     },
   },
+  // ADR 0004 G14 (issue #18).
+  khong_de_nghi_cho: {
+    ten: 'Không còn đề nghị đổi lớp chờ duyệt',
+    kiemTra: ({ dot }) =>
+      dot.de_nghi_cho.length
+        ? thieu(`${dot.de_nghi_cho.length} đề nghị đổi lớp đang chờ duyệt`)
+        : dat(),
+  },
   co_thuc_dia: {
     ten: 'Có người hỗ trợ thực địa',
     kiemTra: ({ dot }) =>

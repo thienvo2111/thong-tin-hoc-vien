@@ -17,7 +17,10 @@ export type HanhDongNhatKy =
   | 'doi_cum'
   | 'ho_tro_xuat_danh_sach'
   | 'sua_tra_loi_ho_tro'
-  | 'sua_lich_hoc';
+  | 'sua_lich_hoc'
+  | 'bao_vang'
+  | 'de_nghi_doi_lop'
+  | 'duyet_doi_lop';
 
 const TIEU_DE: Record<HanhDongNhatKy, string> = {
   dang_nhap_thanh_cong: 'Đăng nhập thành công',
@@ -33,6 +36,9 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   ho_tro_xuat_danh_sach: 'Người hỗ trợ xuất danh sách cụm',
   sua_tra_loi_ho_tro: 'Quản trị sửa câu trả lời yêu cầu hỗ trợ',
   sua_lich_hoc: 'Sửa giờ/địa điểm buổi học',
+  bao_vang: 'Báo vắng buổi học',
+  de_nghi_doi_lop: 'Đề nghị đổi lớp',
+  duyet_doi_lop: 'Duyệt đổi lớp',
 };
 
 const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
@@ -49,6 +55,9 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   ho_tro_xuat_danh_sach: 'tai_khoan',
   sua_tra_loi_ho_tro: 'ho_tro',
   sua_lich_hoc: 'hoc_tap',
+  bao_vang: 'hoc_tap',
+  de_nghi_doi_lop: 'hoc_tap',
+  duyet_doi_lop: 'hoc_tap',
 };
 
 const NHAN_VAI_TRO: Record<vai_tro_nguoi_dung, string> = {

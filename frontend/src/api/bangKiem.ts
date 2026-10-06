@@ -148,6 +148,6 @@ export function useViecCanLam() {
 export function useDemViecCanLam() {
   return useQuery({
     queryKey: ['ho-tro-gv', 'viec-can-lam', 'dem'],
-    queryFn: () => apiFetch<{ do: number }>('/ho-tro-giang-vien/viec-can-lam/dem'),
+    queryFn: () => apiFetch<{ do: number; de_nghi?: number }>('/ho-tro-giang-vien/viec-can-lam/dem'),
   });
 }

@@ -4,6 +4,7 @@ import { KhoaBoiDuongModule } from '../khoa-boi-duong/khoa-boi-duong.module';
 import { GiangVienModule } from '../giang-vien/giang-vien.module';
 import { DiemHocModule } from '../diem-hoc/diem-hoc.module';
 import { VanHanhLopService } from './van-hanh-lop.service';
+import { DeNghiDoiLopService } from './de-nghi-doi-lop.service';
 import { BangKiemModule } from '../bang-kiem/bang-kiem.module';
 import { HoTroGiangVienController } from './ho-tro-giang-vien.controller';
 import { HoTroGiangVienScopeService } from './ho-tro-giang-vien-scope.service';
@@ -18,7 +19,11 @@ import { HoTroGiangVienScopeService } from './ho-tro-giang-vien-scope.service';
     BangKiemModule,
   ],
   controllers: [HoTroGiangVienController],
-  providers: [HoTroGiangVienScopeService, VanHanhLopService],
+  providers: [
+    HoTroGiangVienScopeService,
+    VanHanhLopService,
+    DeNghiDoiLopService,
+  ],
   exports: [HoTroGiangVienScopeService],
 })
 export class HoTroGiangVienModule {}

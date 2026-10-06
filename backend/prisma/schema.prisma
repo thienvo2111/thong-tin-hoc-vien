@@ -463,6 +463,11 @@ model nguoi_dung {
 
   muc_kiem_tra_cap_nhat trang_thai_muc_kiem_tra[] @relation("muc_kiem_tra_cap_nhat_boi")
 
+  // ADR 0004 L5 (issue #18)
+  bao_vang_ghi          bao_vang[]        @relation("bao_vang_nguoi_ghi")
+  de_nghi_doi_lop_tao   de_nghi_doi_lop[] @relation("de_nghi_nguoi_tao")
+  de_nghi_doi_lop_xu_ly de_nghi_doi_lop[] @relation("de_nghi_nguoi_xu_ly")
+
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
 }
@@ -789,6 +794,7 @@ model giai_doan_khoa {
   nhan_su_thuc_dia   nhan_su_thuc_dia[]
 
   trang_thai_muc_kiem_tra trang_thai_muc_kiem_tra[]
+  de_nghi_doi_lop         de_nghi_doi_lop[]
 
   @@unique([khoa_id, thu_tu], map: "uq_giai_doan_thu_tu")
   @@index([khoa_id], map: "idx_giai_doan_khoa")
@@ -828,6 +834,8 @@ model lop_hoc {
   nhan_su_thuc_dia   nhan_su_thuc_dia[]
 
   trang_thai_muc_kiem_tra trang_thai_muc_kiem_tra[]
+  de_nghi_tu_lop          de_nghi_doi_lop[]         @relation("de_nghi_lop_hien_tai")
+  de_nghi_den_lop         de_nghi_doi_lop[]         @relation("de_nghi_lop_de_nghi")
 
   @@unique([khoa_id, loai_lop, ten_lop], map: "uq_lop_ten_trong_khoa")
   @@index([khoa_id], map: "idx_lop_khoa")
@@ -898,6 +906,7 @@ model lich_hoc_lop {
   // T12 (mo-rong-nls-an-giang.md, 2026-09-30): điểm danh của học viên tại
   // buổi này, nhập qua import diem_danh.
   diem_danh diem_danh[]
+  bao_vang  bao_vang[]
 
   @@unique([lop_id, giai_doan_id, buoi_so], map: "uq_lich_hoc_lop_giai_doan_buoi")
   @@index([lop_id], map: "idx_lich_hoc_lop")
@@ -1016,6 +1025,8 @@ model dang_ky_hoc {
   // ket_qua_giai_doan.
   diem_danh          diem_danh[]
   ket_qua_giai_doan  ket_qua_giai_doan[]
+  bao_vang           bao_vang[]
+  de_nghi_doi_lop    de_nghi_doi_lop[]
 
   @@unique([hoc_vien_id, khoa_id], map: "uq_dang_ky_hoc_vien_khoa")
   @@index([hoc_vien_id], map: "idx_dang_ky_hoc_vien")
@@ -1390,4 +1401,56 @@ model trang_thai_muc_kiem_tra {
   nguoi_sua nguoi_dung?    @relation("muc_kiem_tra_cap_nhat_boi", fields: [cap_nhat_boi], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@unique([muc_id, lop_id, giai_doan_id], map: "uq_trang_thai_muc_kiem_tra")
+}
+
+// ADR 0004 G13/G14 (issue #18, 2026-10-07): báo vắng (người hỗ trợ HV ghi
+// trước buổi) và đề nghị đổi lớp cùng giai đoạn (nhóm hỗ trợ GV duyệt).
+// Chỉ 1 đề nghị cho_duyet / (dang_ky_hoc, giai_doan) — unique index một phần
+// (WHERE trang_thai = 'cho_duyet') viết bằng SQL trong migration.
+enum trang_thai_de_nghi {
+  cho_duyet
+  da_duyet
+  tu_choi
+  da_huy
+}
+
+model bao_vang {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dang_ky_hoc_id String   @db.Uuid
+  lich_hoc_id    String   @db.Uuid
+  ly_do          String
+  nguoi_ghi      String?  @db.Uuid
+  ghi_luc        DateTime @default(now()) @db.Timestamptz(6)
+
+  dang_ky_hoc dang_ky_hoc  @relation(fields: [dang_ky_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lich_hoc    lich_hoc_lop @relation(fields: [lich_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  nguoi       nguoi_dung?  @relation("bao_vang_nguoi_ghi", fields: [nguoi_ghi], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@unique([dang_ky_hoc_id, lich_hoc_id], map: "uq_bao_vang")
+  @@index([lich_hoc_id], map: "idx_bao_vang_lich_hoc")
+}
+
+model de_nghi_doi_lop {
+  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dang_ky_hoc_id  String             @db.Uuid
+  giai_doan_id    String             @db.Uuid
+  lop_hien_tai_id String?            @db.Uuid
+  lop_de_nghi_id  String             @db.Uuid
+  ly_do           String
+  trang_thai      trang_thai_de_nghi @default(cho_duyet)
+  nguoi_tao       String?            @db.Uuid
+  tao_luc         DateTime           @default(now()) @db.Timestamptz(6)
+  nguoi_xu_ly     String?            @db.Uuid
+  xu_ly_luc       DateTime?          @db.Timestamptz(6)
+  ghi_chu_xu_ly   String?
+
+  dang_ky_hoc  dang_ky_hoc    @relation(fields: [dang_ky_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  giai_doan    giai_doan_khoa @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lop_hien_tai lop_hoc?       @relation("de_nghi_lop_hien_tai", fields: [lop_hien_tai_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lop_de_nghi  lop_hoc        @relation("de_nghi_lop_de_nghi", fields: [lop_de_nghi_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tao_boi      nguoi_dung?    @relation("de_nghi_nguoi_tao", fields: [nguoi_tao], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  xu_ly_boi    nguoi_dung?    @relation("de_nghi_nguoi_xu_ly", fields: [nguoi_xu_ly], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([giai_doan_id, trang_thai], map: "idx_de_nghi_doi_lop_gd")
+  @@index([dang_ky_hoc_id], map: "idx_de_nghi_doi_lop_dk")
 }

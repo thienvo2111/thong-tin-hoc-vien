@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Alert, Anchor, Badge, Container, Group, Paper, Skeleton, Stack, Text, Title } from '@mantine/core';
-import { useViecCanLam } from '@/api/bangKiem';
+import { useDemViecCanLam, useViecCanLam } from '@/api/bangKiem';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 import { MAU_DOT } from './KhungBangKiem';
@@ -8,6 +8,7 @@ import { MAU_DOT } from './KhungBangKiem';
 /** Việc cần làm (ADR 0004 L4, issue #17) — đợt trực tiếp trong 21 ngày tới, màu theo bảng kiểm. */
 export default function HoTroGvViecCanLam() {
   const { data, isLoading, isError, error } = useViecCanLam();
+  const soDeNghi = useDemViecCanLam().data?.de_nghi ?? 0;
 
   return (
     <Container size="lg" py="lg">
@@ -16,6 +17,14 @@ export default function HoTroGvViecCanLam() {
         <Text fz="sm" c="dimmed">
           Các đợt học trực tiếp trong 21 ngày tới. Đỏ = có mục quá hạn, vàng = còn việc chưa xong, xanh = sẵn sàng.
         </Text>
+        {soDeNghi > 0 && (
+          <Alert color="yellow" variant="light">
+            Có {soDeNghi} đề nghị đổi lớp chờ duyệt.{' '}
+            <Anchor component={Link} to="/ho-tro-gv/de-nghi-doi-lop" fw={600}>
+              Xem đề nghị
+            </Anchor>
+          </Alert>
+        )}
         {isLoading && <Skeleton height={160} />}
         {isError && <Alert color="red">{thongDiepLoiChung(error)}</Alert>}
         {data && data.length === 0 && (

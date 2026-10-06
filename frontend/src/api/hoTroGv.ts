@@ -64,7 +64,19 @@ export interface TrangLop {
     email?: string | null;
     cum?: { id: string; ten_cum: string; nguoi_ho_tro: { ho_ten: string; email: string | null }[] } | null;
     diem_danh: Record<string, string>;
+    /** ADR 0004 G13 (issue #18): lich_hoc_id → lý do báo vắng. */
+    bao_vang?: Record<string, string>;
     ket_qua: { ty_le_hoan_thanh: number | null; diem: number | null } | null;
+  }[];
+  // ADR 0004 G14 (issue #18): đề nghị đổi lớp đang chờ, ra hoặc vào lớp này.
+  de_nghi_cho?: {
+    id: string;
+    ho_ten: string;
+    chieu: 'ra' | 'vao';
+    tu_lop: string | null;
+    den_lop: string;
+    ly_do: string;
+    tao_luc: string;
   }[];
   nhom_ho_tro_gv: { ho_ten: string; email: string | null }[];
   // ADR 0004 L3 (issue #16): hậu cần giảng viên + thực địa của đợt.

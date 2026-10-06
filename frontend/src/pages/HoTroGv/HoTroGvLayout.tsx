@@ -9,6 +9,7 @@ import { tokenKhac } from '@/theme';
 const MENU = [
   { to: '/ho-tro-gv', nhan: 'Việc cần làm', end: true },
   { to: '/ho-tro-gv/lop', nhan: 'Lớp', end: false },
+  { to: '/ho-tro-gv/de-nghi-doi-lop', nhan: 'Đề nghị đổi lớp', end: false },
   { to: '/ho-tro-gv/lich-day', nhan: 'Lịch dạy', end: false },
   { to: '/ho-tro-gv/danh-muc', nhan: 'Danh mục', end: false },
 ];
@@ -25,6 +26,7 @@ export default function HoTroGvLayout() {
     void refetch();
   }, [pathname, refetch]);
   const soDo = dem.data?.do ?? 0;
+  const soDeNghi = dem.data?.de_nghi ?? 0;
 
   async function xuLyDangXuat() {
     await dangXuat();
@@ -68,6 +70,11 @@ export default function HoTroGvLayout() {
                     {m.to === '/ho-tro-gv' && soDo > 0 && (
                       <Badge component="span" ml={6} size="sm" color="red" circle={soDo < 10} aria-label={`${soDo} đợt có mục quá hạn`}>
                         {soDo}
+                      </Badge>
+                    )}
+                    {m.to === '/ho-tro-gv/de-nghi-doi-lop' && soDeNghi > 0 && (
+                      <Badge component="span" ml={6} size="sm" color="yellow" circle={soDeNghi < 10} aria-label={`${soDeNghi} đề nghị chờ duyệt`}>
+                        {soDeNghi}
                       </Badge>
                     )}
                   </Text>

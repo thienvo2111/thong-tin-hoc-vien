@@ -36,6 +36,8 @@ export interface HocVienDot {
     nguoi_ho_tro: { ho_ten: string; email: string | null }[];
   } | null;
   diem_danh: Record<string, string>;
+  /** ADR 0004 G13 (issue #18): lich_hoc_id → lý do báo vắng. */
+  bao_vang: Record<string, string>;
   ket_qua: { ty_le_hoan_thanh: number | null; diem: number | null } | null;
 }
 
@@ -70,86 +72,114 @@ export async function layDotLop(
     throw new NotFoundAppException('Không tìm thấy đợt học của lớp');
   }
 
-  const [dsBuoi, dsPhanLop, nhom, hauCan, thucDia] = await Promise.all([
-    prisma.lich_hoc_lop.findMany({
-      where: { lop_id: lopId, giai_doan_id: giaiDoanId },
-      include: {
-        diem_hoc: {
-          select: {
-            id: true,
-            ma_diem_hoc: true,
-            ten: true,
-            dia_chi: true,
-            nguoi_lien_he: true,
-            sdt_lien_he: true,
-            so_phong: true,
-            ghi_chu_csvc: true,
+  const [dsBuoi, dsPhanLop, nhom, hauCan, thucDia, deNghiCho] =
+    await Promise.all([
+      prisma.lich_hoc_lop.findMany({
+        where: { lop_id: lopId, giai_doan_id: giaiDoanId },
+        include: {
+          diem_hoc: {
+            select: {
+              id: true,
+              ma_diem_hoc: true,
+              ten: true,
+              dia_chi: true,
+              nguoi_lien_he: true,
+              sdt_lien_he: true,
+              so_phong: true,
+              ghi_chu_csvc: true,
+            },
+          },
+          phan_cong: {
+            include: { giang_vien: true },
+            orderBy: { created_at: 'asc' },
           },
         },
-        phan_cong: {
-          include: { giang_vien: true },
-          orderBy: { created_at: 'asc' },
-        },
-      },
-      orderBy: [{ buoi_so: 'asc' }, { thoi_gian_bat_dau: 'asc' }],
-    }),
-    prisma.phan_lop_giai_doan.findMany({
-      where: { lop_id: lopId, giai_doan_id: giaiDoanId },
-      select: {
-        dang_ky_hoc: {
-          select: {
-            id: true,
-            muc_dau_vao: true,
-            hoc_vien: {
-              select: {
-                id: true,
-                ho_ten: true,
-                gioi_tinh: true,
-                doi_tuong: true,
-                chuc_vu: true,
-                so_dien_thoai_lien_he: true,
-                email_lien_he: true,
-                don_vi_cong_tac: { select: { ten_don_vi: true } },
+        orderBy: [{ buoi_so: 'asc' }, { thoi_gian_bat_dau: 'asc' }],
+      }),
+      prisma.phan_lop_giai_doan.findMany({
+        where: { lop_id: lopId, giai_doan_id: giaiDoanId },
+        select: {
+          dang_ky_hoc: {
+            select: {
+              id: true,
+              muc_dau_vao: true,
+              hoc_vien: {
+                select: {
+                  id: true,
+                  ho_ten: true,
+                  gioi_tinh: true,
+                  doi_tuong: true,
+                  chuc_vu: true,
+                  so_dien_thoai_lien_he: true,
+                  email_lien_he: true,
+                  don_vi_cong_tac: { select: { ten_don_vi: true } },
+                },
               },
-            },
-            cum: {
-              select: {
-                id: true,
-                ten_cum: true,
-                phan_cong_ho_tro: {
-                  select: {
-                    nguoi_dung: { select: { ho_ten: true, email: true } },
+              cum: {
+                select: {
+                  id: true,
+                  ten_cum: true,
+                  phan_cong_ho_tro: {
+                    select: {
+                      nguoi_dung: { select: { ho_ten: true, email: true } },
+                    },
                   },
                 },
               },
-            },
-            diem_danh: {
-              where: { lich_hoc: { lop_id: lopId, giai_doan_id: giaiDoanId } },
-              select: { lich_hoc_id: true, trang_thai: true },
-            },
-            ket_qua_giai_doan: {
-              where: { giai_doan_id: giaiDoanId },
-              select: { ty_le_hoan_thanh: true, diem: true },
+              diem_danh: {
+                where: {
+                  lich_hoc: { lop_id: lopId, giai_doan_id: giaiDoanId },
+                },
+                select: { lich_hoc_id: true, trang_thai: true },
+              },
+              bao_vang: {
+                where: {
+                  lich_hoc: { lop_id: lopId, giai_doan_id: giaiDoanId },
+                },
+                select: { lich_hoc_id: true, ly_do: true },
+              },
+              ket_qua_giai_doan: {
+                where: { giai_doan_id: giaiDoanId },
+                select: { ty_le_hoan_thanh: true, diem: true },
+              },
             },
           },
         },
-      },
-    }),
-    prisma.phan_cong_ho_tro_gv.findMany({
-      where: { khoa_id: lop.khoa.id },
-      select: { nguoi_dung: { select: { ho_ten: true, email: true } } },
-      orderBy: { created_at: 'asc' },
-    }),
-    // ADR 0004 L3 (issue #16): hậu cần giảng viên + thực địa của đợt.
-    prisma.hau_can_giang_vien.findMany({
-      where: { lop_id: lopId, giai_doan_id: giaiDoanId },
-      include: { nguoi_sua: { select: { ho_ten: true } } },
-    }),
-    prisma.nhan_su_thuc_dia.findMany({
-      where: { lop_id: lopId, giai_doan_id: giaiDoanId },
-      orderBy: { created_at: 'asc' },
-    }),
-  ]);
+      }),
+      prisma.phan_cong_ho_tro_gv.findMany({
+        where: { khoa_id: lop.khoa.id },
+        select: { nguoi_dung: { select: { ho_ten: true, email: true } } },
+        orderBy: { created_at: 'asc' },
+      }),
+      // ADR 0004 L3 (issue #16): hậu cần giảng viên + thực địa của đợt.
+      prisma.hau_can_giang_vien.findMany({
+        where: { lop_id: lopId, giai_doan_id: giaiDoanId },
+        include: { nguoi_sua: { select: { ho_ten: true } } },
+      }),
+      prisma.nhan_su_thuc_dia.findMany({
+        where: { lop_id: lopId, giai_doan_id: giaiDoanId },
+        orderBy: { created_at: 'asc' },
+      }),
+      // ADR 0004 G14 (issue #18): đề nghị đổi lớp đang chờ, ra hoặc vào lớp này.
+      prisma.de_nghi_doi_lop.findMany({
+        where: {
+          giai_doan_id: giaiDoanId,
+          trang_thai: 'cho_duyet',
+          OR: [{ lop_hien_tai_id: lopId }, { lop_de_nghi_id: lopId }],
+        },
+        select: {
+          id: true,
+          ly_do: true,
+          tao_luc: true,
+          lop_hien_tai_id: true,
+          lop_de_nghi_id: true,
+          dang_ky_hoc: { select: { hoc_vien: { select: { ho_ten: true } } } },
+          lop_hien_tai: { select: { ten_lop: true } },
+          lop_de_nghi: { select: { ten_lop: true } },
+        },
+        orderBy: { tao_luc: 'asc' },
+      }),
+    ]);
 
   const { khoa_id: _bo, ...gd } = giaiDoan;
   void _bo;
@@ -198,6 +228,9 @@ export async function layDotLop(
         diem_danh: Object.fromEntries(
           dk.diem_danh.map((d) => [d.lich_hoc_id, d.trang_thai]),
         ),
+        bao_vang: Object.fromEntries(
+          dk.bao_vang.map((b) => [b.lich_hoc_id, b.ly_do]),
+        ),
         ket_qua: dk.ket_qua_giai_doan[0]
           ? {
               ty_le_hoan_thanh:
@@ -216,6 +249,15 @@ export async function layDotLop(
     hau_can: hauCan.map(({ nguoi_sua, ...h }) => ({
       ...h,
       nguoi_sua: nguoi_sua?.ho_ten ?? null,
+    })),
+    de_nghi_cho: deNghiCho.map((d) => ({
+      id: d.id,
+      ho_ten: d.dang_ky_hoc.hoc_vien.ho_ten,
+      chieu: d.lop_de_nghi_id === lopId ? ('vao' as const) : ('ra' as const),
+      tu_lop: d.lop_hien_tai?.ten_lop ?? null,
+      den_lop: d.lop_de_nghi.ten_lop,
+      ly_do: d.ly_do,
+      tao_luc: d.tao_luc,
     })),
     thuc_dia: thucDia.map((t) => ({
       id: t.id,
@@ -243,6 +285,8 @@ export function locTheoVaiTro(
   if (vaiTro !== 'giang_vien') return dot;
   return {
     ...dot,
+    // Đề nghị đổi lớp là việc nội bộ giữa 2 nhóm hỗ trợ (ma trận §3: GV "—").
+    de_nghi_cho: [],
     // Hậu cần là dữ liệu cá nhân — giảng viên chỉ thấy của chính mình.
     hau_can: dot.hau_can.filter((h) => h.giang_vien_id === giangVienId),
     buoi: dot.buoi.map((b) => ({

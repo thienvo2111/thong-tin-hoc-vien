@@ -1016,3 +1016,31 @@ CREATE TABLE trang_thai_muc_kiem_tra (
     cap_nhat_luc timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT uq_trang_thai_muc_kiem_tra UNIQUE (muc_id, lop_id, giai_doan_id)
 );
+
+-- ADR 0004 L5 (issue #18, 2026-10-07): báo vắng + đề nghị đổi lớp.
+CREATE TYPE trang_thai_de_nghi AS ENUM ('cho_duyet', 'da_duyet', 'tu_choi', 'da_huy');
+CREATE TABLE bao_vang (
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    dang_ky_hoc_id uuid NOT NULL REFERENCES dang_ky_hoc(id) ON DELETE CASCADE,
+    lich_hoc_id    uuid NOT NULL REFERENCES lich_hoc_lop(id) ON DELETE CASCADE,
+    ly_do          text NOT NULL CHECK (length(btrim(ly_do)) > 0),
+    nguoi_ghi      uuid REFERENCES nguoi_dung(id) ON DELETE SET NULL,
+    ghi_luc        timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_bao_vang UNIQUE (dang_ky_hoc_id, lich_hoc_id)
+);
+CREATE TABLE de_nghi_doi_lop (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    dang_ky_hoc_id  uuid NOT NULL REFERENCES dang_ky_hoc(id) ON DELETE CASCADE,
+    giai_doan_id    uuid NOT NULL REFERENCES giai_doan_khoa(id) ON DELETE CASCADE,
+    lop_hien_tai_id uuid REFERENCES lop_hoc(id) ON DELETE CASCADE,
+    lop_de_nghi_id  uuid NOT NULL REFERENCES lop_hoc(id) ON DELETE CASCADE,
+    ly_do           text NOT NULL CHECK (length(btrim(ly_do)) > 0),
+    trang_thai      trang_thai_de_nghi NOT NULL DEFAULT 'cho_duyet',
+    nguoi_tao       uuid REFERENCES nguoi_dung(id) ON DELETE SET NULL,
+    tao_luc         timestamptz NOT NULL DEFAULT now(),
+    nguoi_xu_ly     uuid REFERENCES nguoi_dung(id) ON DELETE SET NULL,
+    xu_ly_luc       timestamptz,
+    ghi_chu_xu_ly   text,
+    CONSTRAINT chk_de_nghi_khac_lop CHECK (lop_hien_tai_id IS NULL OR lop_hien_tai_id <> lop_de_nghi_id)
+);
+CREATE UNIQUE INDEX uq_de_nghi_doi_lop_cho ON de_nghi_doi_lop(dang_ky_hoc_id, giai_doan_id) WHERE trang_thai = 'cho_duyet';

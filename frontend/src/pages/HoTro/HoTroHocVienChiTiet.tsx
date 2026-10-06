@@ -32,6 +32,7 @@ import { nhanMucNangLuc } from '@/lib/mucNangLuc';
 import { DOI_TUONG_OPTIONS, nhanTuTuyChon } from '@/lib/tuyChonHoSo';
 import { ModalMatKhauTam } from '@/pages/Admin/ModalMatKhauTam';
 import { ModalSuaHoSoHoTro } from './ModalSuaHoSoHoTro';
+import { BaoVangBuoi, DeNghiGiaiDoan } from './BaoVangDoiLop';
 
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 const NHAN_KHAO_SAT: Record<string, string> = { da_mo: 'Đã mở, chưa nộp', dang_lam: 'Đang làm', hoan_thanh: 'Đã hoàn thành' };
@@ -74,7 +75,17 @@ function LienKet({ url }: { url: string | null }) {
   );
 }
 
-function HocTap({ hocTap }: { hocTap: HocVienHoTroChiTiet['hoc_tap'] }) {
+function HocTap({
+  hocVienId,
+  hocTap,
+  baoVang,
+  deNghi,
+}: {
+  hocVienId: string;
+  hocTap: HocVienHoTroChiTiet['hoc_tap'];
+  baoVang: NonNullable<HocVienHoTroChiTiet['bao_vang']>;
+  deNghi: NonNullable<HocVienHoTroChiTiet['de_nghi_doi_lop']>;
+}) {
   if (hocTap.length === 0) return <Text c="dimmed">Chưa ghi danh khóa nào.</Text>;
   return (
     <Stack gap="md">
@@ -117,10 +128,12 @@ function HocTap({ hocTap }: { hocTap: HocVienHoTroChiTiet['hoc_tap'] }) {
                       <Text fz="sm" style={{ flex: 1 }}>
                         <LienKet url={b.dia_diem_hoac_link} />
                       </Text>
+                      <BaoVangBuoi hocVienId={hocVienId} buoi={b} baoVang={baoVang.find((x) => x.lich_hoc_id === b.id)} />
                     </Group>
                   ))}
                 </Stack>
               )}
+              <DeNghiGiaiDoan hocVienId={hocVienId} gd={gd} deNghi={deNghi} />
             </Paper>
           ))}
         </Stack>
@@ -291,7 +304,12 @@ export default function HoTroHocVienChiTiet() {
             </Khung>
 
             <Khung tieuDe="Học tập">
-              <HocTap hocTap={data.hoc_tap} />
+              <HocTap
+                hocVienId={data.ho_so.id}
+                hocTap={data.hoc_tap}
+                baoVang={data.bao_vang ?? []}
+                deNghi={data.de_nghi_doi_lop ?? []}
+              />
             </Khung>
 
             <Khung tieuDe="Khảo sát">

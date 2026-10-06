@@ -214,6 +214,18 @@ function NoiDung({ d }: { d: TrangLop }) {
         </Tabs.Panel>
 
         <Tabs.Panel value="hoc-vien" pt="md">
+          {(d.de_nghi_cho ?? []).length > 0 && (
+            <Alert color="yellow" variant="light" mb="sm" title="Đề nghị đổi lớp đang chờ duyệt">
+              {(d.de_nghi_cho ?? []).map((x) => (
+                <Text key={x.id} fz="sm">
+                  {x.ho_ten}: {x.tu_lop ?? 'Chưa phân lớp'} → {x.den_lop} — {x.ly_do}
+                </Text>
+              ))}
+              <Anchor component={Link} to="/ho-tro-gv/de-nghi-doi-lop" fz="sm" fw={600}>
+                Mở danh sách đề nghị
+              </Anchor>
+            </Alert>
+          )}
           <Paper withBorder radius={12} style={{ overflow: 'hidden' }}>
             <Table.ScrollContainer minWidth={760}>
               <Table verticalSpacing="xs" fz="sm">
@@ -225,6 +237,7 @@ function NoiDung({ d }: { d: TrangLop }) {
                     <Table.Th>Mức đầu vào</Table.Th>
                     <Table.Th>SĐT</Table.Th>
                     <Table.Th>Cụm · người hỗ trợ</Table.Th>
+                    <Table.Th>Báo vắng</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -248,6 +261,13 @@ function NoiDung({ d }: { d: TrangLop }) {
                         ) : (
                           '—'
                         )}
+                      </Table.Td>
+                      <Table.Td>
+                        {Object.entries(h.bao_vang ?? {}).map(([lichId, lyDo]) => (
+                          <Badge key={lichId} color="orange" variant="light" title={lyDo} mr={4}>
+                            Buổi {d.buoi.find((b) => b.id === lichId)?.buoi_so ?? '?'}: {lyDo}
+                          </Badge>
+                        ))}
                       </Table.Td>
                     </Table.Tr>
                   ))}

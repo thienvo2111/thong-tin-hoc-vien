@@ -915,6 +915,9 @@ export interface HocVienHoTroChiTiet {
     /** ADR 0003 H7: lý do khi người hỗ trợ sửa hộ; null với các luồng khác. */
     ly_do: string | null;
   }[];
+  // ADR 0004 G13/G14 (issue #18).
+  bao_vang?: import('./doiLop').BaoVangHocVien[];
+  de_nghi_doi_lop?: import('./doiLop').DeNghiDoiLopHocVien[];
 }
 
 export interface BuoiHocHoTro {

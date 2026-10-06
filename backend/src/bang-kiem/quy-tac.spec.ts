@@ -65,6 +65,7 @@ function dot(chinh: Partial<DotLop> = {}): DotLop {
         email: null,
         cum: null,
         diem_danh: {},
+        bao_vang: {},
         ket_qua: null,
       },
     ],
@@ -91,6 +92,7 @@ function dot(chinh: Partial<DotLop> = {}): DotLop {
         nguoi_sua: null,
       },
     ],
+    de_nghi_cho: [],
     thuc_dia: [
       {
         id: 't',
@@ -175,6 +177,26 @@ describe('QUY_TAC — từng trường hợp thiếu', () => {
     expect(
       QUY_TAC.hau_can_da_xac_nhan.kiemTra(ctx(dot({ hau_can: [h] }))).dat,
     ).toBe(false);
+  });
+
+  it('khong_de_nghi_cho: còn đề nghị chờ → chưa đạt, hết → đạt', () => {
+    const cho = {
+      id: 'dn',
+      ho_ten: 'HV',
+      chieu: 'vao' as const,
+      tu_lop: null,
+      den_lop: 'L1',
+      ly_do: 'x',
+      tao_luc: new Date(),
+    };
+    const kq = QUY_TAC.khong_de_nghi_cho.kiemTra(
+      ctx(dot({ de_nghi_cho: [cho] })),
+    );
+    expect(kq).toEqual({
+      dat: false,
+      ly_do: '1 đề nghị đổi lớp đang chờ duyệt',
+    });
+    expect(QUY_TAC.khong_de_nghi_cho.kiemTra(ctx(dot())).dat).toBe(true);
   });
 
   it('co_thuc_dia: chưa có người thực địa', () => {
