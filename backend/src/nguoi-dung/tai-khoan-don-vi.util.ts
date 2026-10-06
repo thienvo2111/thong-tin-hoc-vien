@@ -12,7 +12,11 @@ export const THOI_HAN_KICH_HOAT_MS = 72 * 60 * 60 * 1000;
 const TEN_DANG_NHAP_REGEX = /^[a-z0-9][a-z0-9._-]{2,49}$/;
 
 export type VaiTroDonVi = 'so_gddt' | 'phong_vhxh' | 'truong';
-export const VAI_TRO_DON_VI: VaiTroDonVi[] = ['so_gddt', 'phong_vhxh', 'truong'];
+export const VAI_TRO_DON_VI: VaiTroDonVi[] = [
+  'so_gddt',
+  'phong_vhxh',
+  'truong',
+];
 
 // Tài khoản do Quản trị cấp (đơn vị — ADR 0002, người hỗ trợ học viên — ADR
 // 0003): tên đăng nhập lưu chữ thường, đăng nhập khớp không phân biệt hoa/
@@ -22,6 +26,8 @@ export const VAI_TRO_TAI_KHOAN_CAP: vai_tro_nguoi_dung[] = [
   'ho_tro_hoc_vien',
   // ADR 0004 L1 (issue #14).
   'ho_tro_giang_vien',
+  // ADR 0004 L7 (issue #20).
+  'giang_vien',
 ];
 
 export function sinhMatKhauTam(): string {

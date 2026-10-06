@@ -306,6 +306,7 @@ describe('AuthService', () => {
                   'truong',
                   'ho_tro_hoc_vien',
                   'ho_tro_giang_vien',
+                  'giang_vien',
                 ],
               },
               ten_dang_nhap: { equals: '123456789012', mode: 'insensitive' },

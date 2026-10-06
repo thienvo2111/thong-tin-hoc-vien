@@ -344,3 +344,6 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 150 | (L5) Đề nghị đổi lớp: lớp đề nghị cùng khóa, active, có buổi ở giai đoạn, khác lớp hiện tại (400); ≤ 1 đề nghị `cho_duyet` / (đăng ký học, giai đoạn) — unique index một phần (409) | 🔴 | API + DB |
 | 151 | (L5) Duyệt/từ chối/hủy là UPDATE có điều kiện `trang_thai='cho_duyet'` (song song → đúng 1 thành công, còn lại 409); duyệt kiểm phân lớp hiện tại = `lop_hien_tai_id` (khác → 409, giữ chờ); vượt sĩ số chỉ cảnh báo | 🔴 | API |
 | 152 | (L5) Từ chối bắt buộc ghi chú; hủy chỉ người tạo (403) | 🟡 | API |
+| 153 | (L7, #20) `nguoi_dung`: vai trò `giang_vien` ⇔ có `giang_vien_id` (UNIQUE); không `don_vi_id`/`hoc_vien_id`; email bắt buộc | 🔴 | DB CHECK |
+| 154 | (L7) Gửi link kích hoạt: GV phải có email (400), không ngưng (400); tài khoản bị khóa → 409; hỗ trợ GV chỉ cho GV có phân công trong khóa của nhóm (404); chỉ Quản trị khóa/mở | 🔴 | API |
+| 155 | (L7) Phạm vi giảng viên = lớp có ≥ 1 buổi mình được phân công, động mỗi request (ngoài → 404); trang lớp lọc theo `locTheoVaiTro` | 🔴 | API |

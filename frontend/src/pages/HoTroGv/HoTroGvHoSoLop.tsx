@@ -4,6 +4,7 @@ import { Alert, Anchor, Badge, Button, Container, Group, Paper, SimpleGrid, Skel
 import { ModalPhanCongBuoi } from '@/pages/Admin/ModalPhanCongBuoi';
 import { KhungThucDia, ModalSuaBuoiGv, TheHauCan } from './VanHanhLop';
 import { KhungBangKiem } from './KhungBangKiem';
+import { TaiKhoanGiangVienDot } from './TaiKhoanGiangVien';
 import { useTrangLopGv, type TrangLop } from '@/api/hoTroGv';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangGio, dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
@@ -38,7 +39,7 @@ function NoiDung({ d }: { d: TrangLop }) {
   const [buoiPhanCong, setBuoiPhanCong] = useState<TrangLop['buoi'][number] | null>(null);
   // Giảng viên của đợt (gộp mọi buổi) — mỗi người 1 thẻ hậu cần.
   const giangVienDot = useMemo(() => {
-    const m = new Map<string, { id: string; ho_ten: string; so_dien_thoai?: string }>();
+    const m = new Map<string, TrangLop['buoi'][number]['giang_vien'][number]>();
     for (const b of d.buoi) for (const g of b.giang_vien) if (!m.has(g.id)) m.set(g.id, g);
     return [...m.values()];
   }, [d.buoi]);
@@ -163,6 +164,7 @@ function NoiDung({ d }: { d: TrangLop }) {
 
         <Tabs.Panel value="giang-vien" pt="md">
           <Stack gap="sm">
+            <TaiKhoanGiangVienDot giangVien={giangVienDot} />
             {giangVienDot.length > 0 && (
               <Text fw={700} fz="sm">
                 Hậu cần giảng viên

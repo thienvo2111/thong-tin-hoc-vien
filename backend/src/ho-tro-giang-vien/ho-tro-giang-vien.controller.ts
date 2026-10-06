@@ -42,6 +42,7 @@ import {
   UpdateGiangVienDto,
 } from '../giang-vien/dto/giang-vien.dto';
 import { GiangVienService } from '../giang-vien/giang-vien.service';
+import { TaiKhoanGiangVienService } from '../giang-vien/tai-khoan-giang-vien.service';
 import {
   CreateDiemHocDto,
   QueryDiemHocDto,
@@ -121,7 +122,29 @@ export class HoTroGiangVienController {
     private readonly diemHoc: DiemHocService,
     private readonly bangKiem: BangKiemService,
     private readonly deNghi: DeNghiDoiLopService,
+    private readonly taiKhoanGv: TaiKhoanGiangVienService,
   ) {}
+
+  // ---------------- L7 (issue #20): tài khoản giảng viên ----------------
+  // Chỉ giảng viên có phân công ở lớp trong phạm vi (ngoài phạm vi → 404).
+  @Post('giang-vien/:id/gui-link-kich-hoat')
+  @HttpCode(HttpStatus.OK)
+  async guiLinkKichHoatGv(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const co = await this.prisma.phan_cong_giang_day.count({
+      where: {
+        giang_vien_id: id,
+        lich_hoc: { lop: await this.scope.whereLopTrongPhamVi(user.id) },
+      },
+    });
+    if (!co)
+      throw new NotFoundAppException(
+        'Không tìm thấy giảng viên trong khóa của bạn',
+      );
+    return this.taiKhoanGv.guiLinkKichHoat(id, user);
+  }
 
   // ---------------- L5 (issue #18): đề nghị đổi lớp ----------------
   @Get('de-nghi-doi-lop')

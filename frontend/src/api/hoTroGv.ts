@@ -26,6 +26,8 @@ export interface GiangVienBuoiTrangLop {
   email?: string | null;
   so_gio?: number | null;
   da_xac_nhan_gio?: boolean;
+  /** ADR 0004 G8 (issue #20) — không có ở trang lớp của giảng viên. */
+  tai_khoan?: import('./congGiangVien').TrangThaiTaiKhoanGv;
 }
 
 export interface TrangLop {

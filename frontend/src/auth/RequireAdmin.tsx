@@ -33,7 +33,8 @@ export function RequireAdmin() {
   if (
     nguoiDung?.vai_tro === 'hoc_vien' ||
     nguoiDung?.vai_tro === 'ho_tro_hoc_vien' ||
-    nguoiDung?.vai_tro === 'ho_tro_giang_vien'
+    nguoiDung?.vai_tro === 'ho_tro_giang_vien' ||
+    nguoiDung?.vai_tro === 'giang_vien'
   ) {
     return <Navigate to={trangChuTheoVaiTro(nguoiDung.vai_tro)} replace />;
   }

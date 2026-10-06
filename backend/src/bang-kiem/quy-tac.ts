@@ -71,16 +71,28 @@ export const QUY_TAC: Record<string, QuyTac> = {
       return dat();
     },
   },
-  // Đến khi có tài khoản giảng viên (L7): điều kiện cấp tài khoản = có email.
+  // L7 (issue #20): đạt khi mọi giảng viên của đợt đã được cấp tài khoản
+  // (đã gửi link, chưa bị khóa) — chưa kích hoạt vẫn tính là đã cấp.
   giang_vien_co_tai_khoan: {
-    ten: 'Giảng viên có email (để cấp tài khoản, nhận thông tin)',
+    ten: 'Giảng viên đã được cấp tài khoản',
     kiemTra: ({ dot }) => {
       const gv = giangVienCuaDot(dot);
-      const thieuEmail = gv.filter((g) => !g.email).map((g) => g.ho_ten);
       if (gv.length === 0) return thieu('Chưa phân công giảng viên');
-      return thieuEmail.length
-        ? thieu(`Chưa có email: ${thieuEmail.join(', ')}`)
-        : dat();
+      const thieuEmail = gv
+        .filter((g) => g.tai_khoan === 'chua_co' && !g.email)
+        .map((g) => g.ho_ten);
+      const chuaCap = gv
+        .filter((g) => g.tai_khoan === 'chua_co' && g.email)
+        .map((g) => g.ho_ten);
+      const biKhoa = gv
+        .filter((g) => g.tai_khoan === 'bi_khoa')
+        .map((g) => g.ho_ten);
+      const lyDo = [
+        chuaCap.length && `Chưa cấp tài khoản: ${chuaCap.join(', ')}`,
+        thieuEmail.length && `Chưa có email: ${thieuEmail.join(', ')}`,
+        biKhoa.length && `Tài khoản bị khóa: ${biKhoa.join(', ')}`,
+      ].filter(Boolean);
+      return lyDo.length ? thieu(lyDo.join('; ')) : dat();
     },
   },
   hau_can_da_xac_nhan: {

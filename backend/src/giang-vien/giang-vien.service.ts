@@ -49,7 +49,18 @@ export class GiangVienService {
     const [data, total] = await Promise.all([
       this.prisma.giang_vien.findMany({
         where,
-        include: { _count: { select: { phan_cong: true } } },
+        include: {
+          _count: { select: { phan_cong: true } },
+          // ADR 0004 G8 (issue #20): trạng thái tài khoản cổng giảng viên.
+          tai_khoan: {
+            select: {
+              ten_dang_nhap: true,
+              trang_thai: true,
+              phai_doi_mat_khau: true,
+              dang_nhap_lan_cuoi: true,
+            },
+          },
+        },
         skip: (page - 1) * pageSize,
         take: pageSize,
         orderBy: [{ trang_thai: 'asc' }, { ho_ten: 'asc' }],

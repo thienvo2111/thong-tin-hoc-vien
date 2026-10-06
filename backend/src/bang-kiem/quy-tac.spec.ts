@@ -160,13 +160,22 @@ describe('QUY_TAC — từng trường hợp thiếu', () => {
     ).toContain('vượt tối đa 2');
   });
 
-  it('giang_vien_co_tai_khoan: giảng viên thiếu email', () => {
-    const g = { ...b0.giang_vien[0], email: null };
-    expect(
+  it('giang_vien_co_tai_khoan: theo trạng thái tài khoản thật', () => {
+    const kt = (g: object) =>
       QUY_TAC.giang_vien_co_tai_khoan.kiemTra(
-        ctx(dot({ buoi: [{ ...b0, giang_vien: [g] }] })),
-      ).ly_do,
-    ).toContain('GV A');
+        ctx(
+          dot({
+            buoi: [{ ...b0, giang_vien: [{ ...b0.giang_vien[0], ...g }] }],
+          }),
+        ),
+      );
+    expect(kt({ tai_khoan: 'chua_co' }).ly_do).toBe('Chưa cấp tài khoản: GV A');
+    expect(kt({ tai_khoan: 'chua_co', email: null }).ly_do).toBe(
+      'Chưa có email: GV A',
+    );
+    expect(kt({ tai_khoan: 'bi_khoa' }).ly_do).toBe('Tài khoản bị khóa: GV A');
+    expect(kt({ tai_khoan: 'chua_kich_hoat' }).dat).toBe(true);
+    expect(kt({ tai_khoan: 'hoat_dong' }).dat).toBe(true);
   });
 
   it('hau_can_da_xac_nhan: thiếu bản ghi hoặc chưa xác nhận đủ 2 mục', () => {

@@ -374,6 +374,13 @@ export interface GiangVien {
   ghi_chu: string | null;
   trang_thai: TrangThaiActive;
   so_buoi?: number;
+  // ADR 0004 G8 (issue #20): tài khoản cổng giảng viên (chỉ Quản trị thấy).
+  tai_khoan?: {
+    ten_dang_nhap: string;
+    trang_thai: TrangThaiActive;
+    phai_doi_mat_khau: boolean;
+    dang_nhap_lan_cuoi: string | null;
+  } | null;
 }
 
 export interface LichDayGiangVien {

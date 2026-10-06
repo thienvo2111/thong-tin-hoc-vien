@@ -71,6 +71,25 @@ export const router = createBrowserRouter([
             ],
           },
           {
+            // ADR 0004 G8 (issue #20): cổng giảng viên chỉ đọc. Trang /giang-day — API /cong-giang-vien.
+            lazy: () => import('@/auth/RequireGiangVien').then((m) => ({ Component: m.RequireGiangVien })),
+            children: [
+              {
+                lazy: () => import('@/pages/GiangDay/GiangDayLayout').then((m) => ({ Component: m.default })),
+                children: [
+                  {
+                    path: '/giang-day',
+                    lazy: () => import('@/pages/GiangDay/GiangDayLichDay').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/giang-day/lop/:lopId/giai-doan/:gdId',
+                    lazy: () => import('@/pages/GiangDay/GiangDayLop').then((m) => ({ Component: m.default })),
+                  },
+                ],
+              },
+            ],
+          },
+          {
             // ADR 0004: khu người hỗ trợ giảng viên. Trang ở /ho-tro-gv — API ở /ho-tro-giang-vien.
             lazy: () => import('@/auth/RequireHoTroGv').then((m) => ({ Component: m.RequireHoTroGv })),
             children: [

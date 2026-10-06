@@ -17,6 +17,19 @@ export interface GiangVienBuoi {
   email?: string | null;
   so_gio?: number | null;
   da_xac_nhan_gio?: boolean;
+  /** ADR 0004 G8 (issue #20): trạng thái tài khoản cổng giảng viên. */
+  tai_khoan?: TrangThaiTaiKhoanGv;
+}
+
+export type TrangThaiTaiKhoanGv =
+  'chua_co' | 'chua_kich_hoat' | 'hoat_dong' | 'bi_khoa';
+
+export function trangThaiTaiKhoanGv(
+  tk: { trang_thai: string; phai_doi_mat_khau: boolean } | null,
+): TrangThaiTaiKhoanGv {
+  if (!tk) return 'chua_co';
+  if (tk.trang_thai !== 'active') return 'bi_khoa';
+  return tk.phai_doi_mat_khau ? 'chua_kich_hoat' : 'hoat_dong';
 }
 
 export interface HocVienDot {
@@ -90,7 +103,15 @@ export async function layDotLop(
             },
           },
           phan_cong: {
-            include: { giang_vien: true },
+            include: {
+              giang_vien: {
+                include: {
+                  tai_khoan: {
+                    select: { trang_thai: true, phai_doi_mat_khau: true },
+                  },
+                },
+              },
+            },
             orderBy: { created_at: 'asc' },
           },
         },
@@ -204,6 +225,7 @@ export async function layDotLop(
         email: p.giang_vien.email,
         so_gio: p.so_gio == null ? null : Number(p.so_gio),
         da_xac_nhan_gio: p.da_xac_nhan_gio,
+        tai_khoan: trangThaiTaiKhoanGv(p.giang_vien.tai_khoan),
       })),
     })),
     hoc_vien: dsPhanLop

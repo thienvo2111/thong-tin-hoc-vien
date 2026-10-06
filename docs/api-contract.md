@@ -190,6 +190,19 @@ Nginx: thêm tiền tố `/bang-kiem`.
 
 Trang lớp (`GET /ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}`) thêm `hoc_vien[].bao_vang` (`lich_hoc_id → ly_do`) và `de_nghi_cho` (đề nghị chờ ra/vào lớp; giảng viên không thấy). Hàm thuần `hopNhatDiemDanh` (dùng ở L6): `vang` + có báo vắng → `vang_co_phep`, `co_mat` luôn thắng.
 
+**Thêm L7 (issue #20, 2026-10-07) — vai trò `giang_vien` (chỉ đọc) + cổng giảng viên** (ADR 0004 G8). Trang frontend `/giang-day`; API tiền tố **`/cong-giang-vien`** (Nginx thêm tiền tố) — `/giang-vien` vẫn là API danh mục của Quản trị. `nguoi_dung.giang_vien_id` (1–1), CHECK vai trò `giang_vien` ⇔ có `giang_vien_id`, email bắt buộc. Đăng nhập như tài khoản cấp (tên đăng nhập = phần trước @ của email, trùng thì thêm số).
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| POST | `/giang-vien/{id}/gui-link-kich-hoat` | Tạo tài khoản `giang_vien` (lần đầu) hoặc gửi lại link (mật khẩu cũ mất hiệu lực) → `{ da_gui, tao_moi, email }`. Không email → `400`; GV ngưng → `400`; tài khoản bị khóa → `409`; email trùng tài khoản khác → `409` | QuảnTrị |
+| POST | `/ho-tro-giang-vien/giang-vien/{id}/gui-link-kich-hoat` | Như trên, chỉ GV có phân công ở lớp trong khóa của nhóm (ngoài → `404`) | `ho_tro_giang_vien` |
+| PATCH | `/giang-vien/{id}/tai-khoan` | `{ trang_thai: 'active' \| 'ngung' }` — khóa/mở tài khoản; chưa có → `404` | QuảnTrị |
+| GET | `/giang-vien` | Mỗi dòng **thêm** `tai_khoan: { ten_dang_nhap, trang_thai, phai_doi_mat_khau, dang_nhap_lan_cuoi } \| null` | QuảnTrị |
+| GET | `/cong-giang-vien/lich-day?tu_ngay&den_ngay` | Buổi mình được phân công (mặc định 60 ngày tới, gồm buổi đang diễn ra): giờ, lớp, giai đoạn, điểm học (tên, địa chỉ, liên hệ), phòng, `vai_tro`, `giang_vien_khac`, `hau_can` (của mình), `thuc_dia`, `nhom_ho_tro_gv` | `giang_vien` |
+| GET | `/cong-giang-vien/lop/{lopId}/giai-doan/{gdId}` | Trang lớp lọc theo ma trận §3 (không SĐT/email/cụm học viên, không liên hệ/số giờ/tài khoản GV khác, hậu cần chỉ của mình, không đề nghị đổi lớp). Lớp không có buổi của mình → `404` | `giang_vien` |
+
+Trang lớp của hỗ trợ GV: `buoi[].giang_vien[].tai_khoan` = `chua_co | chua_kich_hoat | hoat_dong | bi_khoa`. Quy tắc bảng kiểm `giang_vien_co_tai_khoan` nay đọc trạng thái thật: đạt khi mọi GV của đợt đã được cấp (kể cả chưa kích hoạt) và không bị khóa. Giảng viên không có route ghi nào (mọi PATCH/PUT/POST khác → `403`).
+
 
 Liên thông sang người hỗ trợ học viên: `GET /ho-tro-hoc-vien/lich-hoc` mỗi buổi thêm `phong`, `diem_hoc { ten, dia_chi, nguoi_lien_he, sdt_lien_he }`, `nhom_ho_tro_gv [{ ho_ten, email }]` — **không** có hậu cần hay liên hệ giảng viên.
 

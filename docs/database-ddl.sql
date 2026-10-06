@@ -1044,3 +1044,9 @@ CREATE TABLE de_nghi_doi_lop (
     CONSTRAINT chk_de_nghi_khac_lop CHECK (lop_hien_tai_id IS NULL OR lop_hien_tai_id <> lop_de_nghi_id)
 );
 CREATE UNIQUE INDEX uq_de_nghi_doi_lop_cho ON de_nghi_doi_lop(dang_ky_hoc_id, giai_doan_id) WHERE trang_thai = 'cho_duyet';
+
+-- ADR 0004 L7 (issue #20, 2026-10-07): vai trò giảng viên (chỉ đọc).
+ALTER TYPE vai_tro_nguoi_dung ADD VALUE 'giang_vien';  -- migration riêng
+ALTER TABLE nguoi_dung ADD COLUMN giang_vien_id uuid UNIQUE REFERENCES giang_vien(id);
+ALTER TABLE nguoi_dung ADD CONSTRAINT chk_nguoi_dung_giang_vien CHECK ((vai_tro = 'giang_vien') = (giang_vien_id IS NOT NULL));
+-- chk_nguoi_dung_scope / chk_nguoi_dung_email_bat_buoc: thêm 'giang_vien' vào nhánh cán bộ HCMUE (không đơn vị, có email).

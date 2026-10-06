@@ -32,6 +32,7 @@ import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { AdminPageHeader } from './AdminPageHeader';
+import { TaiKhoanGiangVienAdmin } from './TaiKhoanGiangVienAdmin';
 
 const KICH_THUOC_TRANG = 20;
 
@@ -213,6 +214,7 @@ export function DanhMucGiangVien({ base, quanTri = true }: { base?: string; quan
                               </Badge>
                             )}
                           </Group>
+                          {quanTri && <TaiKhoanGiangVienAdmin gv={gv} />}
                         </Table.Td>
                         <Table.Td>
                           <Text fz={13.5}>{gv.so_dien_thoai}</Text>

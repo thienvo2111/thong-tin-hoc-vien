@@ -65,6 +65,8 @@ enum vai_tro_nguoi_dung {
   ho_tro_hoc_vien
   // ADR 0004 L1 (issue #14, 2026-10-07): người hỗ trợ giảng viên — migration enum RIÊNG.
   ho_tro_giang_vien
+  // ADR 0004 L7 (issue #20): giảng viên (chỉ đọc) — migration enum RIÊNG.
+  giang_vien
 }
 
 enum trinh_do_chuyen_mon {
@@ -436,9 +438,12 @@ model nguoi_dung {
   dang_nhap_lan_cuoi   DateTime?          @db.Timestamptz(6)
   created_at           DateTime           @default(now()) @db.Timestamptz(6)
   updated_at           DateTime           @default(now()) @db.Timestamptz(6)
+  // ADR 0004 G8 (issue #20): tài khoản giảng viên — CHECK vai_tro='giang_vien' ⇔ có giang_vien_id.
+  giang_vien_id        String?            @unique(map: "uq_nguoi_dung_giang_vien") @db.Uuid
 
-  don_vi   don_vi_cong_tac? @relation(fields: [don_vi_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  hoc_vien hoc_vien?        @relation("nguoi_dung_hoc_vien", fields: [hoc_vien_id], references: [id], map: "fk_nguoi_dung_hoc_vien", onDelete: NoAction, onUpdate: NoAction)
+  don_vi     don_vi_cong_tac? @relation(fields: [don_vi_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  hoc_vien   hoc_vien?        @relation("nguoi_dung_hoc_vien", fields: [hoc_vien_id], references: [id], map: "fk_nguoi_dung_hoc_vien", onDelete: NoAction, onUpdate: NoAction)
+  giang_vien giang_vien?      @relation("nguoi_dung_giang_vien", fields: [giang_vien_id], references: [id], map: "fk_nguoi_dung_giang_vien", onDelete: NoAction, onUpdate: NoAction)
 
   nhat_ky_import                     nhat_ky_import[]           @relation("nhat_ky_import_nguoi_import")
   hoc_vien_nguoi_duyet               hoc_vien[]                 @relation("hoc_vien_nguoi_duyet")
@@ -930,6 +935,7 @@ model giang_vien {
   updated_at      DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
 
   nguoi_tao    nguoi_dung?           @relation("giang_vien_tao_boi", fields: [tao_boi], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  tai_khoan    nguoi_dung?           @relation("nguoi_dung_giang_vien")
   nguon_import nhat_ky_import?       @relation(fields: [nguon_import_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   phan_cong    phan_cong_giang_day[]
   hau_can      hau_can_giang_vien[]
