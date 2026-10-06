@@ -28,6 +28,8 @@ export interface GiangVienBuoiTrangLop {
   da_xac_nhan_gio?: boolean;
   /** ADR 0004 G8 (issue #20) — không có ở trang lớp của giảng viên. */
   tai_khoan?: import('./congGiangVien').TrangThaiTaiKhoanGv;
+  /** ADR 0004 G11 (issue #21): đã nhắc giảng viên về buổi này chưa. */
+  nhac?: import('./nhacLich').TrangThaiNhac;
 }
 
 export interface TrangLop {

@@ -1,4 +1,5 @@
 import { DotLop } from '../trang-lop/trang-lop.service';
+import { TrangThaiNhac, gopTrangThaiNhac } from '../nhac-lich/nhac-lich.util';
 
 // ADR 0004 G5b (issue #17): danh mục quy tắc tự động của bảng kiểm. Mỗi quy
 // tắc là 1 hàm thuần (dữ liệu đợt) → { dat, ly_do }. Thêm quy tắc = thêm code
@@ -28,6 +29,24 @@ function giangVienCuaDot(dot: DotLop) {
   for (const b of dot.buoi)
     for (const g of b.giang_vien) if (!m.has(g.id)) m.set(g.id, g);
   return [...m.values()];
+}
+
+/** Trạng thái nhắc gộp theo giảng viên của đợt (cần nhắc lại > chưa nhắc > đã nhắc). */
+export function nhacTheoGiangVien(dot: DotLop) {
+  const m = new Map<
+    string,
+    { id: string; ho_ten: string; ds: TrangThaiNhac[] }
+  >();
+  for (const b of dot.buoi)
+    for (const g of b.giang_vien) {
+      const x = m.get(g.id) ?? { id: g.id, ho_ten: g.ho_ten, ds: [] };
+      x.ds.push(g.nhac ?? 'chua_nhac');
+      m.set(g.id, x);
+    }
+  return [...m.values()].map(({ ds, ...g }) => ({
+    ...g,
+    trang_thai: gopTrangThaiNhac(ds),
+  }));
 }
 
 export const QUY_TAC: Record<string, QuyTac> = {
@@ -109,6 +128,25 @@ export const QUY_TAC: Record<string, QuyTac> = {
       return chua.length
         ? thieu(`Chưa xác nhận hậu cần: ${chua.join(', ')}`)
         : dat();
+    },
+  },
+  // ADR 0004 G10/G11 (issue #21): mọi (buổi, giảng viên) đã nhắc, không có buổi sửa sau lần nhắc.
+  da_nhac_giang_vien: {
+    ten: 'Đã nhắc lịch mọi giảng viên',
+    kiemTra: ({ dot }) => {
+      const nhac = nhacTheoGiangVien(dot);
+      if (nhac.length === 0) return thieu('Chưa phân công giảng viên');
+      const chua = nhac
+        .filter((n) => n.trang_thai === 'chua_nhac')
+        .map((n) => n.ho_ten);
+      const lai = nhac
+        .filter((n) => n.trang_thai === 'can_nhac_lai')
+        .map((n) => n.ho_ten);
+      const lyDo = [
+        chua.length && `Chưa nhắc: ${chua.join(', ')}`,
+        lai.length && `Cần nhắc lại (lịch đã đổi): ${lai.join(', ')}`,
+      ].filter(Boolean);
+      return lyDo.length ? thieu(lyDo.join('; ')) : dat();
     },
   },
   // ADR 0004 G14 (issue #18).

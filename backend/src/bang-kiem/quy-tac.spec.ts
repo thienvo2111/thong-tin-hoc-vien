@@ -11,6 +11,7 @@ function dot(chinh: Partial<DotLop> = {}): DotLop {
     email: 'a@x.vn',
     so_gio: 3,
     da_xac_nhan_gio: false,
+    nhac: 'da_nhac' as const,
   };
   return {
     lop: {
@@ -186,6 +187,22 @@ describe('QUY_TAC — từng trường hợp thiếu', () => {
     expect(
       QUY_TAC.hau_can_da_xac_nhan.kiemTra(ctx(dot({ hau_can: [h] }))).dat,
     ).toBe(false);
+  });
+
+  it('da_nhac_giang_vien: chưa nhắc / cần nhắc lại theo giảng viên', () => {
+    const kt = (nhac: 'chua_nhac' | 'can_nhac_lai') =>
+      QUY_TAC.da_nhac_giang_vien.kiemTra(
+        ctx(
+          dot({
+            buoi: [{ ...b0, giang_vien: [{ ...b0.giang_vien[0], nhac }] }],
+          }),
+        ),
+      ).ly_do;
+    expect(kt('chua_nhac')).toBe('Chưa nhắc: GV A');
+    expect(kt('can_nhac_lai')).toBe('Cần nhắc lại (lịch đã đổi): GV A');
+    expect(QUY_TAC.da_nhac_giang_vien.kiemTra(ctx(dot({ buoi: [] }))).dat).toBe(
+      false,
+    );
   });
 
   it('khong_de_nghi_cho: còn đề nghị chờ → chưa đạt, hết → đạt', () => {

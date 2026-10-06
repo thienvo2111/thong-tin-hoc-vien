@@ -164,7 +164,7 @@ function NoiDung({ d }: { d: TrangLop }) {
 
         <Tabs.Panel value="giang-vien" pt="md">
           <Stack gap="sm">
-            <TaiKhoanGiangVienDot giangVien={giangVienDot} />
+            <TaiKhoanGiangVienDot lopId={d.lop.id} gdId={d.giai_doan.id} buoi={d.buoi} />
             {giangVienDot.length > 0 && (
               <Text fw={700} fz="sm">
                 Hậu cần giảng viên

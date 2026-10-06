@@ -190,6 +190,18 @@ Nginx: thêm tiền tố `/bang-kiem`.
 
 Trang lớp (`GET /ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}`) thêm `hoc_vien[].bao_vang` (`lich_hoc_id → ly_do`) và `de_nghi_cho` (đề nghị chờ ra/vào lớp; giảng viên không thấy). Hàm thuần `hopNhatDiemDanh` (dùng ở L6): `vang` + có báo vắng → `vang_co_phep`, `co_mat` luôn thắng.
 
+**Thêm L8 (issue #21, 2026-10-07) — tin nhắn nhắc lịch** (ADR 0004 G10/G11): hệ thống soạn sẵn nội dung, cán bộ sao chép gửi qua Zalo/SMS rồi bấm **Đã gửi** → ghi `nhat_ky_nhac_lich` (lưu nội dung đã gửi). **Không email, không cron.** Cờ theo (buổi, người nhận): chưa có lần gửi chứa buổi → `chua_nhac`; `lich_hoc_lop.cap_nhat_luc` > lần gửi cuối → `can_nhac_lai`; ngược lại `da_nhac`.
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| GET | `/ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}/tin-nhan-nhac/{giangVienId}` | `{ giang_vien, lich_hoc_ids, noi_dung, trang_thai_nhac, lan_gui_cuoi }` — chỉ buổi + hậu cần của **chính** giảng viên đó (lớp, buổi, điểm học + địa chỉ + link bản đồ, phòng, chỗ ở, đưa đón, thực địa, nhóm hỗ trợ GV); không dạy buổi nào trong đợt → `404` | `ho_tro_giang_vien` |
+| POST | `/ho-tro-giang-vien/nhac-lich` | `{ giang_vien_id, lich_hoc_ids[1..200], noi_dung (≤5000) }` — mọi buổi phải trong phạm vi và có phân công của GV (`404`) → `201 { id, gui_luc }` | `ho_tro_giang_vien` |
+| GET | `/ho-tro-hoc-vien/cum/{cumId}/tin-nhan-nhac?ngay=YYYY-MM-DD` | Buổi trong ngày (giờ VN) của các lớp có học viên cụm được phân ở đúng giai đoạn: `{ cum, ngay, buoi[], lich_hoc_ids, noi_dung \| null, trang_thai_nhac }`; cụm ngoài phạm vi → `404` | `ho_tro_hoc_vien` |
+| POST | `/ho-tro-hoc-vien/nhac-lich` | `{ cum_id, lich_hoc_ids, noi_dung }` — buổi không thuộc lớp của học viên cụm → `400` | `ho_tro_hoc_vien` |
+| GET | `/ho-tro-hoc-vien/nhac-lich/dem` | `{ can_nhac }` = số (buổi, cụm) từ bây giờ tới hết 2 ngày tới chưa nhắc / cần nhắc lại (số đếm menu Lịch học) | `ho_tro_hoc_vien` |
+
+Bổ sung: trang lớp `buoi[].giang_vien[].nhac`; `GET /ho-tro-hoc-vien/lich-hoc` mỗi buổi thêm `nhac_cum: [{ cum_id, trang_thai }]`; `viec-can-lam` mỗi đợt thêm `nhac_gv` (GV chưa nhắc / cần nhắc lại). Quy tắc bảng kiểm `da_nhac_giang_vien` (bộ mặc định: hạn 3 ngày). Cổng học viên: thẻ **Buổi học sắp tới** (≤ 7 ngày) dùng dữ liệu `GET /hoc-vien/toi/khoa-hoc` sẵn có.
+
 **Thêm L7 (issue #20, 2026-10-07) — vai trò `giang_vien` (chỉ đọc) + cổng giảng viên** (ADR 0004 G8). Trang frontend `/giang-day`; API tiền tố **`/cong-giang-vien`** (Nginx thêm tiền tố) — `/giang-vien` vẫn là API danh mục của Quản trị. `nguoi_dung.giang_vien_id` (1–1), CHECK vai trò `giang_vien` ⇔ có `giang_vien_id`, email bắt buộc. Đăng nhập như tài khoản cấp (tên đăng nhập = phần trước @ của email, trùng thì thêm số).
 
 | Method | Endpoint | Mô tả | Ai gọi |

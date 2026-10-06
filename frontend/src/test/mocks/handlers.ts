@@ -1193,6 +1193,8 @@ export const handlers = [
 
   // Khu người hỗ trợ học viên (ADR 0003) — API /ho-tro-hoc-vien/* (trang frontend là /ho-tro/*).
   http.get('/ho-tro-hoc-vien/cum-cua-toi', () => HttpResponse.json(db.hoTroCum)),
+  // ADR 0004 G11 (issue #21): số buổi cần nhắc (menu Lịch học).
+  http.get('/ho-tro-hoc-vien/nhac-lich/dem', () => HttpResponse.json({ can_nhac: 0 })),
   http.get('/ho-tro-hoc-vien/hoc-vien', () =>
     HttpResponse.json({ data: db.hoTroHocVien, total: db.hoTroHocVien.length, page: 1, page_size: 20 }),
   ),

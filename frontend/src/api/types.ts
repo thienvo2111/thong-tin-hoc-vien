@@ -941,6 +941,8 @@ export interface BuoiHocHoTro {
   khoa: { id: string; ma_khoa: string; ten_khoa: string };
   nhan_su: { ho_ten: string; vai_tro: VaiTroNhanSuLop; so_dien_thoai: string | null }[];
   so_hoc_vien_cum: number;
+  // ADR 0004 G11 (issue #21): trạng thái nhắc của từng cụm có học viên trong lớp.
+  nhac_cum?: { cum_id: string; trang_thai: import('./nhacLich').TrangThaiNhac }[];
   // ADR 0004 G9 (issue #15): liên thông — điểm học, phòng, nhóm hỗ trợ giảng viên của khóa.
   phong?: string | null;
   diem_hoc?: { id: string; ten: string; dia_chi: string; nguoi_lien_he: string | null; sdt_lien_he: string | null } | null;

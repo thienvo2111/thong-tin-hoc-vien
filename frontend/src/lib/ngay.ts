@@ -39,3 +39,8 @@ export function demNguoc(isoUtc: string, tuLuc: Date = new Date()): string | nul
 }
 
 export { dayjs };
+
+/** Ngày YYYY-MM-DD theo giờ Việt Nam của 1 mốc UTC (tham số `ngay` của API). */
+export function ngayIsoVn(isoUtc: string): string {
+  return new Date(Date.parse(isoUtc) + 7 * 3600 * 1000).toISOString().slice(0, 10);
+}

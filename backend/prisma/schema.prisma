@@ -469,9 +469,10 @@ model nguoi_dung {
   muc_kiem_tra_cap_nhat trang_thai_muc_kiem_tra[] @relation("muc_kiem_tra_cap_nhat_boi")
 
   // ADR 0004 L5 (issue #18)
-  bao_vang_ghi          bao_vang[]        @relation("bao_vang_nguoi_ghi")
-  de_nghi_doi_lop_tao   de_nghi_doi_lop[] @relation("de_nghi_nguoi_tao")
-  de_nghi_doi_lop_xu_ly de_nghi_doi_lop[] @relation("de_nghi_nguoi_xu_ly")
+  bao_vang_ghi          bao_vang[]          @relation("bao_vang_nguoi_ghi")
+  de_nghi_doi_lop_tao   de_nghi_doi_lop[]   @relation("de_nghi_nguoi_tao")
+  de_nghi_doi_lop_xu_ly de_nghi_doi_lop[]   @relation("de_nghi_nguoi_xu_ly")
+  nhac_lich_da_gui      nhat_ky_nhac_lich[] @relation("nhac_lich_nguoi_gui")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -859,9 +860,10 @@ model cum_hoc_vien {
   trang_thai trang_thai_active @default(active)
   created_at DateTime          @default(now()) @db.Timestamptz(6)
 
-  khoa             khoa_boi_duong     @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  khoa             khoa_boi_duong      @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   dang_ky_hoc      dang_ky_hoc[]
   phan_cong_ho_tro phan_cong_ho_tro[]
+  nhac_lich        nhat_ky_nhac_lich[]
 
   @@unique([khoa_id, ten_cum], map: "uq_cum_ten_trong_khoa")
   @@index([khoa_id], map: "idx_cum_khoa")
@@ -936,6 +938,7 @@ model giang_vien {
 
   nguoi_tao    nguoi_dung?           @relation("giang_vien_tao_boi", fields: [tao_boi], references: [id], onDelete: SetNull, onUpdate: NoAction)
   tai_khoan    nguoi_dung?           @relation("nguoi_dung_giang_vien")
+  nhac_lich    nhat_ky_nhac_lich[]
   nguon_import nhat_ky_import?       @relation(fields: [nguon_import_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   phan_cong    phan_cong_giang_day[]
   hau_can      hau_can_giang_vien[]
@@ -1459,4 +1462,30 @@ model de_nghi_doi_lop {
 
   @@index([giai_doan_id, trang_thai], map: "idx_de_nghi_doi_lop_gd")
   @@index([dang_ky_hoc_id], map: "idx_de_nghi_doi_lop_dk")
+}
+
+// ADR 0004 G10/G11 (issue #21): "Đã gửi" tin nhắn nhắc lịch. Cờ "cần nhắc
+// lại" = lich_hoc_lop.cap_nhat_luc > gui_luc của lần gửi cuối chứa buổi.
+enum doi_tuong_nhac {
+  giang_vien
+  cum
+}
+
+model nhat_ky_nhac_lich {
+  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  doi_tuong     doi_tuong_nhac
+  giang_vien_id String?        @db.Uuid
+  cum_id        String?        @db.Uuid
+  lich_hoc_ids  String[]       @db.Uuid
+  noi_dung      String
+  nguoi_gui     String?        @db.Uuid
+  gui_luc       DateTime       @default(now()) @db.Timestamptz(6)
+
+  giang_vien giang_vien?   @relation(fields: [giang_vien_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  cum        cum_hoc_vien? @relation(fields: [cum_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  nguoi      nguoi_dung?   @relation("nhac_lich_nguoi_gui", fields: [nguoi_gui], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([lich_hoc_ids], map: "idx_nhac_lich_buoi", type: Gin)
+  @@index([giang_vien_id], map: "idx_nhac_lich_giang_vien")
+  @@index([cum_id], map: "idx_nhac_lich_cum")
 }

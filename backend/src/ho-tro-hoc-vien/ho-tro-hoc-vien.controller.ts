@@ -23,6 +23,9 @@ import {
   SuaHoSoHoTroDto,
 } from './dto/ho-tro-hoc-vien.dto';
 import { VanHanhHocVienService } from './van-hanh-hoc-vien.service';
+import { NhacLichService } from '../nhac-lich/nhac-lich.service';
+import { HoTroHocVienScopeService } from './ho-tro-hoc-vien-scope.service';
+import { GhiNhacCumDto, TinNhanCumQueryDto } from '../nhac-lich/nhac-lich.dto';
 import {
   BaoVangDto,
   LopCoTheDoiQueryDto,
@@ -37,7 +40,38 @@ export class HoTroHocVienController {
   constructor(
     private readonly service: HoTroHocVienService,
     private readonly vanHanh: VanHanhHocVienService,
+    private readonly nhacLich: NhacLichService,
+    private readonly scope: HoTroHocVienScopeService,
   ) {}
+
+  // ---------------- ADR 0004 L8 (issue #21): tin nhắn nhắc cụm ----------------
+  @Get('cum/:cumId/tin-nhan-nhac')
+  async tinNhanNhacCum(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('cumId', ParseUUIDPipe) cumId: string,
+    @Query() query: TinNhanCumQueryDto,
+  ) {
+    await this.scope.cumLoc(user.id, cumId);
+    return this.nhacLich.tinNhanCum(cumId, query.ngay);
+  }
+
+  @Post('nhac-lich')
+  async daGuiNhacCum(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: GhiNhacCumDto,
+  ) {
+    await this.scope.cumLoc(user.id, dto.cum_id);
+    return this.nhacLich.ghiNhacCum(user, dto);
+  }
+
+  @Get('nhac-lich/dem')
+  async demNhacLich(@CurrentUser() user: AuthenticatedUser) {
+    return {
+      can_nhac: await this.nhacLich.demCanNhacCum(
+        await this.scope.cumIdsCuaToi(user.id),
+      ),
+    };
+  }
 
   @Get('cum-cua-toi')
   cumCuaToi(@CurrentUser() user: AuthenticatedUser) {

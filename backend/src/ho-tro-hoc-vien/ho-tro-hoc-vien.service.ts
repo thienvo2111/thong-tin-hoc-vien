@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { NhacLichService } from '../nhac-lich/nhac-lich.service';
 import { khoangNgayVn } from '../common/utils/khoang-ngay-vn.util';
 import * as bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
@@ -60,6 +61,7 @@ export class HoTroHocVienService {
     private readonly khoaBoiDuongService: KhoaBoiDuongService,
     private readonly nhatKy: NhatKyService,
     private readonly authService: AuthService,
+    private readonly nhacLich: NhacLichService,
   ) {}
 
   async cumCuaToi(nguoiDungId: string) {
@@ -271,6 +273,7 @@ export class HoTroHocVienService {
       },
       orderBy: { created_at: 'asc' },
     });
+    const nhacCum = await this.nhacLich.trangThaiCumTheoBuoi(cumIds, buoi);
     return buoi.map(({ lop, ...b }) => {
       const { nhan_su, khoa, ...lopGon } = lop;
       const { phan_cong_ho_tro_gv, ...khoaGon } = khoa;
@@ -290,6 +293,8 @@ export class HoTroHocVienService {
             nhiem_vu,
           })),
         so_hoc_vien_cum: soHocVien.get(`${b.lop_id}|${b.giai_doan_id}`) ?? 0,
+        // ADR 0004 G11 (issue #21): trạng thái nhắc từng cụm có học viên trong lớp.
+        nhac_cum: nhacCum.get(b.id) ?? [],
       };
     });
   }

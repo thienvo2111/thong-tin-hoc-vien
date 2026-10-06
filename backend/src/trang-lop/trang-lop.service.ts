@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundAppException } from '../common/exceptions/app.exceptions';
+import { TrangThaiNhac, trangThaiNhac } from '../nhac-lich/nhac-lich.util';
 
 // ADR 0004 G9 (issue #15): "Trang lớp" dùng chung — 1 hàm lấy đủ dữ liệu 1
 // đợt (lớp × giai đoạn) + 1 hàm thuần lọc trường theo vai trò (ma trận đặc tả
@@ -19,6 +20,8 @@ export interface GiangVienBuoi {
   da_xac_nhan_gio?: boolean;
   /** ADR 0004 G8 (issue #20): trạng thái tài khoản cổng giảng viên. */
   tai_khoan?: TrangThaiTaiKhoanGv;
+  /** ADR 0004 G11 (issue #21): đã nhắc giảng viên về buổi này chưa. */
+  nhac?: TrangThaiNhac;
 }
 
 export type TrangThaiTaiKhoanGv =
@@ -202,6 +205,22 @@ export async function layDotLop(
       }),
     ]);
 
+  // ADR 0004 G11 (issue #21): nhật ký nhắc giảng viên chứa các buổi của đợt.
+  const nhacGv = await prisma.nhat_ky_nhac_lich.findMany({
+    where: {
+      doi_tuong: 'giang_vien',
+      giang_vien_id: {
+        in: [
+          ...new Set(
+            dsBuoi.flatMap((b) => b.phan_cong.map((p) => p.giang_vien_id)),
+          ),
+        ],
+      },
+      lich_hoc_ids: { hasSome: dsBuoi.map((b) => b.id) },
+    },
+    select: { giang_vien_id: true, lich_hoc_ids: true, gui_luc: true },
+  });
+
   const { khoa_id: _bo, ...gd } = giaiDoan;
   void _bo;
   return {
@@ -226,6 +245,10 @@ export async function layDotLop(
         so_gio: p.so_gio == null ? null : Number(p.so_gio),
         da_xac_nhan_gio: p.da_xac_nhan_gio,
         tai_khoan: trangThaiTaiKhoanGv(p.giang_vien.tai_khoan),
+        nhac: trangThaiNhac(
+          b,
+          nhacGv.filter((n) => n.giang_vien_id === p.giang_vien_id),
+        ),
       })),
     })),
     hoc_vien: dsPhanLop

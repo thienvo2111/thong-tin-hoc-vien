@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Badge, Box, Button, Group, Image, ScrollArea, Text } from '@mantine/core';
 import { useDemYeuCauHoTroCuaCum } from '@/api/hoTro';
+import { useDemNhacLichCum } from '@/api/nhacLich';
 import { useToi } from '@/auth/AuthContext';
 import logoHcmue from '@/assets/logo-hcmue.png';
 import { tokenKhac } from '@/theme';
@@ -26,6 +27,13 @@ export default function HoTroLayout() {
     void refetch();
   }, [pathname, refetch]);
   const soChoXuLy = dem.data?.cho_xu_ly ?? 0;
+  // ADR 0004 G11 (issue #21): buổi 2 ngày tới chưa nhắc / cần nhắc lại.
+  const demNhac = useDemNhacLichCum();
+  const refetchNhac = demNhac.refetch;
+  useEffect(() => {
+    void refetchNhac();
+  }, [pathname, refetchNhac]);
+  const soCanNhac = demNhac.data?.can_nhac ?? 0;
 
   async function xuLyDangXuat() {
     await dangXuat();
@@ -72,6 +80,11 @@ export default function HoTroLayout() {
                     }}
                   >
                     {m.nhan}
+                    {m.to === '/ho-tro/lich-hoc' && soCanNhac > 0 && (
+                      <Badge component="span" ml={6} size="sm" color="orange" circle={soCanNhac < 10} aria-label={`${soCanNhac} buổi cần nhắc`}>
+                        {soCanNhac}
+                      </Badge>
+                    )}
                     {m.to === '/ho-tro/yeu-cau-ho-tro' && soChoXuLy > 0 && (
                       <Badge component="span" ml={6} size="sm" color="red" circle={soChoXuLy < 10} aria-label={`${soChoXuLy} yêu cầu chờ xử lý`}>
                         {soChoXuLy}

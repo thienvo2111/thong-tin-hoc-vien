@@ -1050,3 +1050,20 @@ ALTER TYPE vai_tro_nguoi_dung ADD VALUE 'giang_vien';  -- migration riêng
 ALTER TABLE nguoi_dung ADD COLUMN giang_vien_id uuid UNIQUE REFERENCES giang_vien(id);
 ALTER TABLE nguoi_dung ADD CONSTRAINT chk_nguoi_dung_giang_vien CHECK ((vai_tro = 'giang_vien') = (giang_vien_id IS NOT NULL));
 -- chk_nguoi_dung_scope / chk_nguoi_dung_email_bat_buoc: thêm 'giang_vien' vào nhánh cán bộ HCMUE (không đơn vị, có email).
+
+-- ADR 0004 L8 (issue #21, 2026-10-07): nhật ký "Đã gửi" tin nhắn nhắc lịch.
+CREATE TYPE doi_tuong_nhac AS ENUM ('giang_vien', 'cum');
+CREATE TABLE nhat_ky_nhac_lich (
+    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    doi_tuong     doi_tuong_nhac NOT NULL,
+    giang_vien_id uuid REFERENCES giang_vien(id) ON DELETE CASCADE,
+    cum_id        uuid REFERENCES cum_hoc_vien(id) ON DELETE CASCADE,
+    lich_hoc_ids  uuid[] NOT NULL CHECK (cardinality(lich_hoc_ids) > 0),
+    noi_dung      text NOT NULL,
+    nguoi_gui     uuid REFERENCES nguoi_dung(id) ON DELETE SET NULL,
+    gui_luc       timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT chk_nhac_lich_doi_tuong CHECK (
+        (doi_tuong = 'giang_vien' AND giang_vien_id IS NOT NULL AND cum_id IS NULL)
+        OR (doi_tuong = 'cum' AND cum_id IS NOT NULL AND giang_vien_id IS NULL))
+);
+CREATE INDEX idx_nhac_lich_buoi ON nhat_ky_nhac_lich USING GIN (lich_hoc_ids);

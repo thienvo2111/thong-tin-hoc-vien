@@ -5,7 +5,8 @@ import { useCumCuaToi, useLichHocHoTro } from '@/api/hoTro';
 import type { BuoiHocHoTro, LoaiLop } from '@/api/types';
 import { chuanHoaLienKet } from '@/lib/lienKet';
 import { thongDiepLoiChung } from '@/lib/loiApi';
-import { dinhDangGio, dinhDangNgay } from '@/lib/ngay';
+import { dinhDangGio, dinhDangNgay, ngayIsoVn } from '@/lib/ngay';
+import { CoNhacCum, NhacCumNgay } from './NhacCum';
 
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 
@@ -25,11 +26,12 @@ export default function HoTroLichHoc() {
   const theoNgay = useMemo(() => {
     const nhom = new Map<string, BuoiHocHoTro[]>();
     for (const b of data ?? []) {
-      const ngay = dinhDangNgay(b.thoi_gian_bat_dau);
+      const ngay = ngayIsoVn(b.thoi_gian_bat_dau);
       nhom.set(ngay, [...(nhom.get(ngay) ?? []), b]);
     }
     return [...nhom.entries()];
   }, [data]);
+  const tenCum = useMemo(() => new Map((cums.data ?? []).map((c) => [c.cum_id, c.ten_cum])), [cums.data]);
 
   function doiCum(v: string | null) {
     const next = new URLSearchParams(searchParams);
@@ -73,7 +75,15 @@ export default function HoTroLichHoc() {
         <Stack gap="md" style={{ opacity: isFetching ? 0.6 : 1 }}>
           {theoNgay.map(([ngay, buoi]) => (
             <Stack key={ngay} gap="xs">
-              <Text fw={700}>{ngay}</Text>
+              <Group justify="space-between" wrap="wrap" gap="xs">
+                <Text fw={700}>{dinhDangNgay(buoi[0].thoi_gian_bat_dau)}</Text>
+                <NhacCumNgay
+                  ngay={ngay}
+                  nhanNgay={dinhDangNgay(buoi[0].thoi_gian_bat_dau)}
+                  cumIds={[...new Set(buoi.flatMap((b) => (b.nhac_cum ?? []).map((n) => n.cum_id)))]}
+                  tenCum={tenCum}
+                />
+              </Group>
               {buoi.map((b) => {
                 const href = b.dia_diem_hoac_link ? chuanHoaLienKet(b.dia_diem_hoac_link) : null;
                 return (
@@ -120,6 +130,7 @@ export default function HoTroLichHoc() {
                         Hỗ trợ giảng viên: {(b.nhom_ho_tro_gv ?? []).map((n) => `${n.ho_ten}${n.email ? ` (${n.email})` : ''}`).join(' · ')}
                       </Text>
                     )}
+                    <CoNhacCum nhac={b.nhac_cum ?? []} tenCum={tenCum} />
                     {b.nhan_su.length > 0 && (
                       <Text fz="xs" c="dimmed" mt={4}>
                         {b.nhan_su

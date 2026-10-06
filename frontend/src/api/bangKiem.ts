@@ -63,6 +63,8 @@ export interface ViecCanLam {
   so_qua_han: number;
   so_chua_dat: number;
   muc_chua_dat: { ten: string; trang_thai: TrangThaiMuc; han: string | null }[];
+  // ADR 0004 G11 (issue #21): giảng viên chưa nhắc / cần nhắc lại.
+  nhac_gv?: { id: string; ho_ten: string; trang_thai: import('./nhacLich').TrangThaiNhac }[];
 }
 
 const KEY = ['bang-kiem'] as const;

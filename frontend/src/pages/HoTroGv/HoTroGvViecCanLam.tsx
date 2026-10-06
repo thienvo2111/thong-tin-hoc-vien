@@ -4,6 +4,7 @@ import { useDemViecCanLam, useViecCanLam } from '@/api/bangKiem';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 import { MAU_DOT } from './KhungBangKiem';
+import { NHAN_NHAC } from '@/api/nhacLich';
 
 /** Việc cần làm (ADR 0004 L4, issue #17) — đợt trực tiếp trong 21 ngày tới, màu theo bảng kiểm. */
 export default function HoTroGvViecCanLam() {
@@ -47,6 +48,12 @@ export default function HoTroGvViecCanLam() {
                 {MAU_DOT[d.mau].nhan}
               </Badge>
             </Group>
+            {(d.nhac_gv ?? []).length > 0 && (
+              <Text fz="sm" mt="xs" c="orange.8">
+                Nhắc lịch giảng viên:{' '}
+                {(d.nhac_gv ?? []).map((n) => `${n.ho_ten} (${NHAN_NHAC[n.trang_thai].nhan.toLowerCase()})`).join(', ')}
+              </Text>
+            )}
             {d.muc_chua_dat.length > 0 && (
               <Stack gap={2} mt="xs">
                 {d.muc_chua_dat.map((m) => (

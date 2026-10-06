@@ -21,6 +21,8 @@ import {
 } from 'class-validator';
 import { trang_thai_de_nghi } from '@prisma/client';
 import { DeNghiDoiLopService } from './de-nghi-doi-lop.service';
+import { NhacLichService } from '../nhac-lich/nhac-lich.service';
+import { GhiNhacGiangVienDto } from '../nhac-lich/nhac-lich.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
@@ -123,7 +125,32 @@ export class HoTroGiangVienController {
     private readonly bangKiem: BangKiemService,
     private readonly deNghi: DeNghiDoiLopService,
     private readonly taiKhoanGv: TaiKhoanGiangVienService,
+    private readonly nhacLich: NhacLichService,
   ) {}
+
+  // ---------------- L8 (issue #21): tin nhắn nhắc giảng viên ----------------
+  @Get('lop/:lopId/giai-doan/:gdId/tin-nhan-nhac/:giangVienId')
+  async tinNhanNhacGv(
+    @Param('lopId', ParseUUIDPipe) lopId: string,
+    @Param('gdId', ParseUUIDPipe) gdId: string,
+    @Param('giangVienId', ParseUUIDPipe) giangVienId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.damBaoDotTrucTiep(user, lopId, gdId);
+    return this.nhacLich.tinNhanGiangVien(lopId, gdId, giangVienId);
+  }
+
+  @Post('nhac-lich')
+  async daGuiNhacGv(
+    @Body() dto: GhiNhacGiangVienDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.nhacLich.ghiNhacGiangVien(
+      user,
+      dto,
+      await this.scope.whereLopTrongPhamVi(user.id),
+    );
+  }
 
   // ---------------- L7 (issue #20): tài khoản giảng viên ----------------
   // Chỉ giảng viên có phân công ở lớp trong phạm vi (ngoài phạm vi → 404).
@@ -242,6 +269,7 @@ export class HoTroGiangVienController {
           muc_chua_dat: dg.muc
             .filter((m) => m.trang_thai !== 'dat')
             .map((m) => ({ ten: m.ten, trang_thai: m.trang_thai, han: m.han })),
+          nhac_gv: dg.nhac_gv,
         };
       }),
     );

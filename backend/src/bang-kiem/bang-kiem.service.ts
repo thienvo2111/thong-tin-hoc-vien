@@ -9,7 +9,13 @@ import {
 } from '../common/exceptions/app.exceptions';
 import { DiemHocService } from '../diem-hoc/diem-hoc.service';
 import { layDotLop } from '../trang-lop/trang-lop.service';
-import { mauDot, QUY_TAC, tinhHan, trangThaiMuc } from './quy-tac';
+import {
+  mauDot,
+  nhacTheoGiangVien,
+  QUY_TAC,
+  tinhHan,
+  trangThaiMuc,
+} from './quy-tac';
 
 export interface LuuMucDto {
   ten?: string;
@@ -236,6 +242,8 @@ export class BangKiemService {
       nguon,
       mau: mauDot(ketQua.map((k) => k.trang_thai)),
       muc: ketQua,
+      // ADR 0004 G11 (issue #21): giảng viên chưa nhắc / cần nhắc lại.
+      nhac_gv: nhacTheoGiangVien(dot).filter((n) => n.trang_thai !== 'da_nhac'),
     };
   }
 
