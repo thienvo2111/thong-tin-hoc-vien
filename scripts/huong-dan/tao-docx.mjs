@@ -65,10 +65,14 @@ const LUI_DAU_DONG = 567; // 1 cm
 const DOAN = { before: 0, after: 120, line: 288 }; // sau đoạn 6 pt, giãn dòng 1,2
 const LA_MA = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'];
 
-// "Phần N" trong nội dung web -> "mục <La Mã>" trong văn bản.
+// "Phần N" trong nội dung web (trên web là liên kết bấm được) -> "xem mục <La Mã>" trong văn bản giấy.
+const laMa = (n) => LA_MA[Number(n) - 1] ?? n;
 const doiPhan = (t) =>
   t
-    .replace(/Phần (\d+)/g, (_, n) => `mục ${LA_MA[Number(n) - 1] ?? n}`)
+    // Công cụ tính mật khẩu chỉ có trên web.
+    .replace(/dùng công cụ ở Phần (\d+)/g, (_, n) => `xem cách viết mật khẩu ở mục ${laMa(n)}`)
+    .replace(/\(Phần (\d+)\)/g, (_, n) => `(xem mục ${laMa(n)})`)
+    .replace(/Phần (\d+)/g, (_, n) => `mục ${laMa(n)}`)
     // Văn bản hành chính không dùng biểu tượng cảm xúc (📝, 🔒…) có trong bản web.
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]\s?/gu, '')
     .replace(/\(\s*,\s*/g, '(')
@@ -117,7 +121,10 @@ const cacBuoc = (ds) => ds.map((t, i) => new Paragraph({
 }));
 
 // Lưu ý: đoạn văn thường, nhãn in đậm nghiêng — không hộp màu (chữ đen theo thể thức).
-const luuY = (g) => {
+// Tiêu đề lưu ý mang tính nhắc việc trên web -> diễn đạt cho văn bản giấy.
+const TIEU_DE_BAN_IN = { 'Việc cần làm ngay bây giờ': 'Thứ tự các việc cần làm' };
+const luuY = (g0) => {
+  const g = { ...g0, tieuDe: TIEU_DE_BAN_IN[g0.tieuDe] ?? g0.tieuDe };
   const ds = Array.isArray(g.noiDung) ? g.noiDung : [g.noiDung];
   return ds.map((t, i) => new Paragraph({
     alignment: AlignmentType.JUSTIFIED, spacing: DOAN, indent: { firstLine: LUI_DAU_DONG },
@@ -220,7 +227,8 @@ huongDan.parts.forEach((phan, i) => {
   c.push(tieuDeMuc(so, phan.tieuDe), thanBai(phan.moTa));
   if (phan.id === 'tong-quan') {
     c.push(...bang([1300, 3000, W - 4300], ['Giai đoạn', 'Nội dung', 'Học viên cần làm'],
-      huongDan.giaiDoan.map((g, j) => [String(j + 1), `**${g.ten}**`, g.nhan ? `${g.moTa} *(${g.nhan.toLowerCase()})*` : g.moTa])));
+      // Bỏ nhãn nhắc việc "Làm ngay" — chỉ có ý nghĩa trên web.
+      huongDan.giaiDoan.map((g, j) => [String(j + 1), `**${g.ten}**`, g.moTa])));
   }
   if (phan.id === 'chuan-bi') {
     c.push(...bang([3000, W - 3000], ['Cần chuẩn bị', 'Ghi chú'], huongDan.chuanBi.map((m) => [`**${m.tieuDe}**`, m.moTa])));
@@ -268,6 +276,7 @@ c.push(
 c.push(
   new Paragraph({ pageBreakBefore: true, alignment: AlignmentType.CENTER, spacing: { after: 0, line: 288 }, indent: { firstLine: 0 }, children: [new TextRun({ text: 'PHỤ LỤC', bold: true, size: CO })] }),
   giua([new TextRun({ text: 'DANH SÁCH NHÓM ZALO HỖ TRỢ THEO CỤM', bold: true, size: CO })], 240),
+  thanBai(`Học viên tìm tên đơn vị công tác của mình trong bảng dưới đây để tham gia đúng nhóm Zalo của cụm. Bản trực tuyến (có ô tìm theo tên trường, không cần đăng nhập) đăng tại **${huongDan.hero.diaChi}/huong-dan**, mục Phụ lục.`),
   ...nhomZaloTheoCum.luuY.map((t) => new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: DOAN, indent: { firstLine: LUI_DAU_DONG }, children: [new TextRun('- '), ...runs(t)] })),
   ...bang([1500, W - 1500 - 3300, 3300], ['Cụm', 'Đơn vị công tác', 'Link tham gia Zalo'],
     nhomZaloTheoCum.cum.map((cm) => [`**${cm.ten}**`, cm.donVi.map((d, j) => `${j + 1}. ${d}`), cm.linkZalo])),

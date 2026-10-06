@@ -164,6 +164,10 @@ export default function DangNhap() {
                     </Anchor>
                   </StatusBanner>
                 </Collapse>
+
+                <Anchor component={Link} to="/huong-dan#phu-luc-zalo" size="sm" ta="center">
+                  Tra cứu nhóm Zalo hỗ trợ theo trường
+                </Anchor>
               </Stack>
             </form>
           </Stack>

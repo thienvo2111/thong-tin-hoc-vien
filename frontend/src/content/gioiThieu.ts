@@ -355,6 +355,10 @@ export const gioiThieu: NoiDungGioiThieu = {
       { hoi: 'Tài khoản báo tạm khóa?', dap: 'Do nhập sai mật khẩu nhiều lần. Vui lòng chờ 15 phút rồi thử lại, hoặc liên hệ hỗ trợ qua email.', cheDo: 'dang_nhap' },
       { hoi: 'Thông tin của tôi trên hệ thống chưa đúng?', dap: 'Trong thời gian mở đợt kiểm tra, thầy cô tự sửa trực tiếp trên trang Hồ sơ. Họ tên và ngày sinh sẽ in trên giấy chứng nhận, vì vậy cần kiểm tra kỹ.', cheDo: 'dang_nhap' },
       { hoi: 'Vì sao tôi chưa thấy đường dẫn làm bài đánh giá?', dap: 'Đường dẫn chỉ hiện khi hồ sơ đã đầy đủ và thầy cô đã xác nhận trong đợt xác nhận trước đánh giá. Nếu đã sửa hồ sơ sau khi xác nhận, thầy cô cần xác nhận lại.', cheDo: 'dang_nhap' },
+      {
+        hoi: 'Tôi tham gia nhóm Zalo hỗ trợ nào?',
+        dap: 'Tra tên trường trong mục Phụ lục "Nhóm Zalo hỗ trợ theo cụm" của trang Hướng dẫn sử dụng (boiduongnls.hcmue.edu.vn/huong-dan), không cần đăng nhập. Mỗi trường thuộc một cụm, mỗi cụm có một nhóm Zalo.',
+      },
       { hoi: 'Tôi có thể làm trên điện thoại không?', dap: 'Có. Trang được thiết kế để dùng tốt trên điện thoại, kể cả khi mở từ Zalo.' },
     ],
   },
