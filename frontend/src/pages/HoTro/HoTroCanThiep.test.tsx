@@ -27,7 +27,7 @@ describe('Người hỗ trợ — sửa hồ sơ học viên', () => {
   it('chỉ gửi trường đã đổi + lý do; nút Lưu khóa khi chưa đổi gì hoặc lý do quá ngắn', async () => {
     let body: unknown = null;
     server.use(
-      http.patch('/ho-tro/hoc-vien/:id', async ({ request }) => {
+      http.patch('/ho-tro-hoc-vien/hoc-vien/:id', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ xac_nhan_bi_huy: false });
       }),
@@ -58,7 +58,7 @@ describe('Người hỗ trợ — sửa hồ sơ học viên', () => {
   });
 
   it('báo học viên phải xác nhận lại khi đợt đang mở bị hủy xác nhận', async () => {
-    server.use(http.patch('/ho-tro/hoc-vien/:id', () => HttpResponse.json({ xac_nhan_bi_huy: true })));
+    server.use(http.patch('/ho-tro-hoc-vien/hoc-vien/:id', () => HttpResponse.json({ xac_nhan_bi_huy: true })));
     render();
     const user = userEvent.setup();
     const modal = await moFormSua(user);
@@ -70,7 +70,7 @@ describe('Người hỗ trợ — sửa hồ sơ học viên', () => {
 
   it('lỗi field từ API hiện dưới ô tương ứng', async () => {
     server.use(
-      http.patch('/ho-tro/hoc-vien/:id', () =>
+      http.patch('/ho-tro-hoc-vien/hoc-vien/:id', () =>
         HttpResponse.json(
           {
             error: {

@@ -46,8 +46,10 @@ server {
 
     # Backend NestJS (khong co global prefix - xem backend/src/*.controller.ts)
     # /api la Swagger docs; cac path con lai la route API that su.
-    # THEM CONTROLLER MOI -> them prefix vao day roi chay lai script nay (06-deploy.sh co canh bao neu thieu).
-    location ~ ^/(api|auth|hoc-vien|khoa-boi-duong|dot-xac-nhan|thong-bao|danh-muc|nguoi-dung|bao-cao|import|validate|lop|dang-ky-hoc|yeu-cau-ho-tro|cau-hinh-khao-sat|sso) {
+    # THEM CONTROLLER MOI -> them prefix vao day roi chay lai script nay (06-deploy.sh co canh bao neu thieu;
+    # backend/src/nginx-prefix.spec.ts bat loi nay ngay khi chay test). Prefix API KHONG duoc trung route
+    # trang frontend (vd. /ho-tro la trang -> API nguoi ho tro dung /ho-tro-hoc-vien).
+    location ~ ^/(api|auth|hoc-vien|khoa-boi-duong|dot-xac-nhan|thong-bao|danh-muc|nguoi-dung|bao-cao|import|validate|lop|dang-ky-hoc|yeu-cau-ho-tro|cau-hinh-khao-sat|sso|ho-tro-hoc-vien) {
         proxy_pass http://127.0.0.1:${BACKEND_PORT};
         proxy_http_version 1.1;
         proxy_set_header Host \$host;

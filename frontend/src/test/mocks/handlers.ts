@@ -792,21 +792,21 @@ export const handlers = [
   }),
 
   // Yêu cầu hỗ trợ theo cụm — người hỗ trợ học viên (ADR 0003).
-  http.get('/ho-tro/yeu-cau-ho-tro/dem', () =>
+  http.get('/ho-tro-hoc-vien/yeu-cau-ho-tro/dem', () =>
     HttpResponse.json({ cho_xu_ly: db.danhSachYeuCauHoTro.filter((y) => y.trang_thai === 'cho_xu_ly').length }),
   ),
-  http.get('/ho-tro/yeu-cau-ho-tro', ({ request }) => {
+  http.get('/ho-tro-hoc-vien/yeu-cau-ho-tro', ({ request }) => {
     const trangThai = new URL(request.url).searchParams.get('trang_thai');
     const items = db.danhSachYeuCauHoTro.map(dongXuLy).filter((y) => !trangThai || y.trang_thai === trangThai);
     return HttpResponse.json({ data: items, total: items.length, page: 1, page_size: 20 });
   }),
-  http.get('/ho-tro/yeu-cau-ho-tro/:id', ({ params }) => {
+  http.get('/ho-tro-hoc-vien/yeu-cau-ho-tro/:id', ({ params }) => {
     const found = db.danhSachYeuCauHoTro.find((y) => y.id === params.id);
     return found
       ? HttpResponse.json({ ...dongXuLy(found), ticket_truoc: [] })
       : loi(404, 'NOT_FOUND', 'Không tìm thấy yêu cầu hỗ trợ');
   }),
-  http.patch('/ho-tro/yeu-cau-ho-tro/:id/tra-loi', async ({ params, request }) => traLoiMau(params.id as string, request)),
+  http.patch('/ho-tro-hoc-vien/yeu-cau-ho-tro/:id/tra-loi', async ({ params, request }) => traLoiMau(params.id as string, request)),
 
   // Tài khoản đơn vị (ADR 0002).
   http.get('/nguoi-dung/don-vi/chua-cap', ({ request }) => {
@@ -905,23 +905,23 @@ export const handlers = [
     return HttpResponse.json({ cum_id: cum.id, nguoi_ho_tro: cum.nguoi_ho_tro });
   }),
 
-  // Khu người hỗ trợ học viên (ADR 0003) — /ho-tro/*.
-  http.get('/ho-tro/cum-cua-toi', () => HttpResponse.json(db.hoTroCum)),
-  http.get('/ho-tro/hoc-vien', () =>
+  // Khu người hỗ trợ học viên (ADR 0003) — API /ho-tro-hoc-vien/* (trang frontend là /ho-tro/*).
+  http.get('/ho-tro-hoc-vien/cum-cua-toi', () => HttpResponse.json(db.hoTroCum)),
+  http.get('/ho-tro-hoc-vien/hoc-vien', () =>
     HttpResponse.json({ data: db.hoTroHocVien, total: db.hoTroHocVien.length, page: 1, page_size: 20 }),
   ),
-  http.get('/ho-tro/hoc-vien/xuat', () =>
+  http.get('/ho-tro-hoc-vien/hoc-vien/xuat', () =>
     new HttpResponse(new Blob(['xlsx']), {
       headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
     }),
   ),
-  http.get('/ho-tro/hoc-vien/:id', ({ params }) =>
+  http.get('/ho-tro-hoc-vien/hoc-vien/:id', ({ params }) =>
     params.id === db.hoTroChiTiet.ho_so.id
       ? HttpResponse.json(db.hoTroChiTiet)
       : loi(404, 'NOT_FOUND', 'Không tìm thấy hồ sơ học viên'),
   ),
-  http.get('/ho-tro/lich-hoc', () => HttpResponse.json(db.hoTroLichHoc)),
-  http.patch('/ho-tro/hoc-vien/:id', async ({ request }) => {
+  http.get('/ho-tro-hoc-vien/lich-hoc', () => HttpResponse.json(db.hoTroLichHoc)),
+  http.patch('/ho-tro-hoc-vien/hoc-vien/:id', async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     if (typeof body.ly_do !== 'string' || body.ly_do.trim().length < 5) {
       return loi(400, 'VALIDATION_ERROR', 'Dữ liệu không hợp lệ', {
@@ -930,15 +930,15 @@ export const handlers = [
     }
     return HttpResponse.json({ ...db.hoTroChiTiet.ho_so, xac_nhan_bi_huy: false });
   }),
-  http.post('/ho-tro/hoc-vien/:id/gui-link-dat-lai-mat-khau', () =>
+  http.post('/ho-tro-hoc-vien/hoc-vien/:id/gui-link-dat-lai-mat-khau', () =>
     db.hoTroChiTiet.tai_khoan?.email_da_xac_minh
       ? HttpResponse.json({ da_gui: true, email: db.hoTroChiTiet.ho_so.email_lien_he })
       : loi(409, 'CONFLICT', 'Email của học viên chưa được xác minh — hãy cấp mật khẩu tạm'),
   ),
-  http.post('/ho-tro/hoc-vien/:id/cap-mat-khau-tam', () =>
+  http.post('/ho-tro-hoc-vien/hoc-vien/:id/cap-mat-khau-tam', () =>
     HttpResponse.json({ ten_dang_nhap: db.hoTroChiTiet.tai_khoan?.ten_dang_nhap, mat_khau_tam: 'Hv7tQ2mZp9' }),
   ),
-  http.post('/ho-tro/hoc-vien/:id/mo-khoa-tam', () =>
+  http.post('/ho-tro-hoc-vien/hoc-vien/:id/mo-khoa-tam', () =>
     HttpResponse.json({ ten_dang_nhap: db.hoTroChiTiet.tai_khoan?.ten_dang_nhap, dang_bi_khoa: false }),
   ),
 

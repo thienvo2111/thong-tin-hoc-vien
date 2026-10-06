@@ -76,7 +76,7 @@ describe('Người hỗ trợ — Yêu cầu hỗ trợ của cụm', () => {
     db.danhSachYeuCauHoTro = [ticket()];
     let body: unknown = null;
     server.use(
-      http.patch('/ho-tro/yeu-cau-ho-tro/:id/tra-loi', async ({ request }) => {
+      http.patch('/ho-tro-hoc-vien/yeu-cau-ho-tro/:id/tra-loi', async ({ request }) => {
         body = await request.json();
         Object.assign(db.danhSachYeuCauHoTro[0], { trang_thai: 'da_phan_hoi', noi_dung_tra_loi: 'Link ở mục Lớp học' });
         return HttpResponse.json(db.danhSachYeuCauHoTro[0]);
@@ -93,7 +93,7 @@ describe('Người hỗ trợ — Yêu cầu hỗ trợ của cụm', () => {
 
   it('T12 (giao diện): người khác đã trả lời -> 409 giữ nguyên nội dung đang soạn + hiện câu trả lời đã có', async () => {
     db.danhSachYeuCauHoTro = [ticket()];
-    giaLapNguoiKhacDaTraLoi('/ho-tro/yeu-cau-ho-tro/:id/tra-loi');
+    giaLapNguoiKhacDaTraLoi('/ho-tro-hoc-vien/yeu-cau-ho-tro/:id/tra-loi');
     render();
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Trả lời' }));

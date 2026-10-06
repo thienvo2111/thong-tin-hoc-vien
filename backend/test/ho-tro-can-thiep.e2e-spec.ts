@@ -39,9 +39,9 @@ describe('Người hỗ trợ — sửa hồ sơ & tài khoản học viên (e2e
     http().post('/auth/dang-nhap').send({ ten_dang_nhap: ten, mat_khau: mk });
   const auth = () => ({ Authorization: `Bearer ${tokenHoTro}` });
   const sua = (id: string, body: Record<string, unknown>) =>
-    http().patch(`/ho-tro/hoc-vien/${id}`).set(auth()).send(body);
+    http().patch(`/ho-tro-hoc-vien/hoc-vien/${id}`).set(auth()).send(body);
   const post = (id: string, thaoTac: string) =>
-    http().post(`/ho-tro/hoc-vien/${id}/${thaoTac}`).set(auth());
+    http().post(`/ho-tro-hoc-vien/hoc-vien/${id}/${thaoTac}`).set(auth());
 
   async function taoHocVien(nhan: 'trong' | 'ngoai', donViId: string) {
     const h = await prisma.hoc_vien.create({
@@ -231,7 +231,7 @@ describe('Người hỗ trợ — sửa hồ sơ & tài khoản học viên (e2e
       nguoi_sua_id: hoTroId,
       dot_id: null,
     });
-    const ct = await http().get(`/ho-tro/hoc-vien/${hv.trong.id}`).set(auth());
+    const ct = await http().get(`/ho-tro-hoc-vien/hoc-vien/${hv.trong.id}`).set(auth());
     expect(ct.body.lich_su_thay_doi[0]).toMatchObject({
       truong: 'ngay_sinh',
       ly_do: 'Học viên báo sai ngày sinh qua Zalo',

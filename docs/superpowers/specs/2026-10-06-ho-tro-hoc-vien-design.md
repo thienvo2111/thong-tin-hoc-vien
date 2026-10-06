@@ -32,7 +32,7 @@ Quyết định nền: [ADR 0003](../../adr/0003-nguoi-ho-tro-hoc-vien.md) (H1�
 ### Frontend
 - Trang riêng **`/admin/nguoi-ho-tro`** (mục menu "Người hỗ trợ", chỉ quan_tri — sửa 2026-10-06: không làm tab trong `/admin/nguoi-dung`, cùng kiểu với mục "Tài khoản học viên"): bảng (họ tên, tên đăng nhập, email, cụm phụ trách, trạng thái, đăng nhập lần cuối), tạo lẻ, import, khóa/mở, cấp lại.
 - Màn chi tiết khóa → mục **Cụm**: cột "Người hỗ trợ" (multi-select tài khoản `ho_tro_hoc_vien` active); cụm chưa có ai → nhãn cảnh báo đỏ.
-- Route guard: `/ho-tro/*` chỉ `ho_tro_hoc_vien`; khung layout riêng với menu Học viên / Lịch học / Yêu cầu hỗ trợ.
+- Route guard: `/ho-tro-hoc-vien/*` chỉ `ho_tro_hoc_vien`; khung layout riêng với menu Học viên / Lịch học / Yêu cầu hỗ trợ.
 
 ## 2. Lát 2 — Tra cứu & xuất
 
@@ -42,14 +42,14 @@ Quyết định nền: [ADR 0003](../../adr/0003-nguoi-ho-tro-hoc-vien.md) (H1�
   - `whereHocVienTrongPhamVi(caller): Prisma.hoc_vienWhereInput` (`dang_ky_hoc: { some: { cum_id: { in } } }`)
   - `damBaoTrongPhamVi(caller, hocVienId)` → `NotFoundAppException` nếu ngoài phạm vi (không 403, không lộ tồn tại).
   - Không có phân công → danh sách rỗng, không lỗi.
-- `GET /ho-tro/cum-cua-toi` — `[{cum_id, ten_cum, link_zalo, khoa_id, ten_khoa, so_hoc_vien, so_yeu_cau_cho_xu_ly}]`.
-- `GET /ho-tro/hoc-vien?q=&cum_id=&don_vi_cong_tac_id=&day_du=&da_dang_nhap=&page=` (sửa khi code #11: tham số tìm là `q` như GET /hoc-vien; **chưa** có lọc `trang_thai_khao_sat` — trạng thái từng bài đã hiện trên mỗi dòng và trong file xuất, thêm bộ lọc khi chốt danh sách bài bắt buộc) — tìm không dấu theo họ tên, CCCD, mã MOET, tên đăng nhập. `cum_id` ngoài phạm vi → 404.
-- `GET /ho-tro/hoc-vien/{id}` — hồ sơ (kèm `_ten`), `tai_khoan` (`ten_dang_nhap`, `dang_nhap_lan_cuoi`, `dang_bi_khoa`, `khoa_den`, `email_da_xac_minh`, `phai_doi_mat_khau`), `hoc_tap` (theo từng `dang_ky_hoc`: khóa, cụm, lớp theo giai đoạn, lịch buổi + `dia_diem_hoac_link`, `nhan_su_lop`, điểm danh, kết quả khảo sát), `yeu_cau_ho_tro` (tóm tắt), `lich_su_thay_doi` (kèm `ly_do`, người sửa).
-- `GET /ho-tro/lich-hoc?tu_ngay=&den_ngay=&cum_id=` — buổi của mọi lớp có ≥1 học viên trong phạm vi (được phân lớp ở đúng giai đoạn của buổi), kèm giảng viên/trợ giảng, số học viên của cụm trong lớp. Mặc định 14 ngày tới.
-- `GET /ho-tro/hoc-vien/xuat?<cùng bộ lọc>` — `.xlsx`, 1 sheet/cụm, cột theo ADR H6; ghi `nhat_ky_hoat_dong` (`hanh_dong = 'ho_tro_xuat_danh_sach'`, `chi_tiet = {cum_ids, bo_loc, so_dong}`).
+- `GET /ho-tro-hoc-vien/cum-cua-toi` — `[{cum_id, ten_cum, link_zalo, khoa_id, ten_khoa, so_hoc_vien, so_yeu_cau_cho_xu_ly}]`.
+- `GET /ho-tro-hoc-vien/hoc-vien?q=&cum_id=&don_vi_cong_tac_id=&day_du=&da_dang_nhap=&page=` (sửa khi code #11: tham số tìm là `q` như GET /hoc-vien; **chưa** có lọc `trang_thai_khao_sat` — trạng thái từng bài đã hiện trên mỗi dòng và trong file xuất, thêm bộ lọc khi chốt danh sách bài bắt buộc) — tìm không dấu theo họ tên, CCCD, mã MOET, tên đăng nhập. `cum_id` ngoài phạm vi → 404.
+- `GET /ho-tro-hoc-vien/hoc-vien/{id}` — hồ sơ (kèm `_ten`), `tai_khoan` (`ten_dang_nhap`, `dang_nhap_lan_cuoi`, `dang_bi_khoa`, `khoa_den`, `email_da_xac_minh`, `phai_doi_mat_khau`), `hoc_tap` (theo từng `dang_ky_hoc`: khóa, cụm, lớp theo giai đoạn, lịch buổi + `dia_diem_hoac_link`, `nhan_su_lop`, điểm danh, kết quả khảo sát), `yeu_cau_ho_tro` (tóm tắt), `lich_su_thay_doi` (kèm `ly_do`, người sửa).
+- `GET /ho-tro-hoc-vien/lich-hoc?tu_ngay=&den_ngay=&cum_id=` — buổi của mọi lớp có ≥1 học viên trong phạm vi (được phân lớp ở đúng giai đoạn của buổi), kèm giảng viên/trợ giảng, số học viên của cụm trong lớp. Mặc định 14 ngày tới.
+- `GET /ho-tro-hoc-vien/hoc-vien/xuat?<cùng bộ lọc>` — `.xlsx`, 1 sheet/cụm, cột theo ADR H6; ghi `nhat_ky_hoat_dong` (`hanh_dong = 'ho_tro_xuat_danh_sach'`, `chi_tiet = {cum_ids, bo_loc, so_dong}`).
 
 ### Frontend
-- `/ho-tro/hoc-vien` (danh sách + bộ lọc + nút Xuất), `/ho-tro/hoc-vien/:id` (chi tiết, các tab Hồ sơ / Tài khoản / Học tập / Yêu cầu & lịch sử), `/ho-tro/lich-hoc`.
+- `/ho-tro-hoc-vien/hoc-vien` (danh sách + bộ lọc + nút Xuất), `/ho-tro-hoc-vien/hoc-vien/:id` (chi tiết, các tab Hồ sơ / Tài khoản / Học tập / Yêu cầu & lịch sử), `/ho-tro-hoc-vien/lich-hoc`.
 
 ## 3. Lát 3 — Can thiệp hồ sơ & tài khoản
 
@@ -57,11 +57,11 @@ Quyết định nền: [ADR 0003](../../adr/0003-nguoi-ho-tro-hoc-vien.md) (H1�
 - `lich_su_thay_doi_ho_so.ly_do text NULL`.
 
 ### Backend
-- `PATCH /ho-tro/hoc-vien/{id}` — DTO riêng `SuaHoSoHoTroDto` = `UpdateHocVienDto` **bỏ** `so_dinh_danh_ca_nhan` (whitelist, `forbidNonWhitelisted` → 400 nếu gửi), **thêm** `ly_do` bắt buộc (trim, 5–500 ký tự). Gọi lõi `suaHoSo` như `suaHoSoByAdmin` (bỏ qua cổng đợt, đợt mở trùng → hủy xác nhận), ghi `ly_do` vào mọi dòng lịch sử của lần sửa, `vai_tro_nguoi_sua = 'ho_tro_hoc_vien'`.
+- `PATCH /ho-tro-hoc-vien/hoc-vien/{id}` — DTO riêng `SuaHoSoHoTroDto` = `UpdateHocVienDto` **bỏ** `so_dinh_danh_ca_nhan` (whitelist, `forbidNonWhitelisted` → 400 nếu gửi), **thêm** `ly_do` bắt buộc (trim, 5–500 ký tự). Gọi lõi `suaHoSo` như `suaHoSoByAdmin` (bỏ qua cổng đợt, đợt mở trùng → hủy xác nhận), ghi `ly_do` vào mọi dòng lịch sử của lần sửa, `vai_tro_nguoi_sua = 'ho_tro_hoc_vien'`.
 - Quy tắc H8 (trong lõi, áp cho cả `quan_tri`): `email_lien_he` đổi giá trị bởi người không phải chính học viên → `email_da_xac_minh = false`.
-- `POST /ho-tro/hoc-vien/{id}/gui-link-dat-lai-mat-khau` — 409 nếu `email_da_xac_minh = false`; tái dùng việc tạo token `dat_lai_mat_khau` + vô hiệu token cũ của `AuthService.quenMatKhau` (tách hàm dùng chung), luôn gửi (không giả vờ "đã gửi" như luồng công khai).
-- `POST /ho-tro/hoc-vien/{id}/cap-mat-khau-tam` — sinh 10 ký tự (hàm của ADR 0002), `phai_doi_mat_khau = true`, reset `so_lan_dang_nhap_sai`/`khoa_den`, ghi `nhat_ky_dat_lai_mat_khau` (`thuc_hien_boi = caller`), trả `{mat_khau_tam}` 1 lần.
-- `POST /ho-tro/hoc-vien/{id}/mo-khoa-tam` — như endpoint quản trị đã có.
+- `POST /ho-tro-hoc-vien/hoc-vien/{id}/gui-link-dat-lai-mat-khau` — 409 nếu `email_da_xac_minh = false`; tái dùng việc tạo token `dat_lai_mat_khau` + vô hiệu token cũ của `AuthService.quenMatKhau` (tách hàm dùng chung), luôn gửi (không giả vờ "đã gửi" như luồng công khai).
+- `POST /ho-tro-hoc-vien/hoc-vien/{id}/cap-mat-khau-tam` — sinh 10 ký tự (hàm của ADR 0002), `phai_doi_mat_khau = true`, reset `so_lan_dang_nhap_sai`/`khoa_den`, ghi `nhat_ky_dat_lai_mat_khau` (`thuc_hien_boi = caller`), trả `{mat_khau_tam}` 1 lần.
+- `POST /ho-tro-hoc-vien/hoc-vien/{id}/mo-khoa-tam` — như endpoint quản trị đã có.
 - Mọi endpoint: `damBaoTrongPhamVi` trước tiên.
 
 ### Frontend
@@ -77,15 +77,15 @@ Quyết định nền: [ADR 0003](../../adr/0003-nguoi-ho-tro-hoc-vien.md) (H1�
 
 ### Backend
 - **Sửa `traLoi`** (dùng chung `quan_tri` + `ho_tro_hoc_vien`): `updateMany where {id, trang_thai: 'cho_xu_ly'}`; `count = 0` → 404 nếu không có, ngược lại 409. (Sửa khi code #13: body 409 **không** kèm câu trả lời — frontend gọi lại `GET .../{id}` để hiện, giữ API lỗi đồng nhất.) Email học viên chỉ gửi khi update thành công.
-- `GET /ho-tro/yeu-cau-ho-tro?trang_thai=&cum_id=` — ticket của học viên trong phạm vi; mỗi dòng kèm `ten_cum`(các cụm), `hoi_lai`, `da_sua_boi_quan_tri`. `GET /ho-tro/yeu-cau-ho-tro/{id}` kèm các ticket trước của cùng học viên. `PATCH /ho-tro/yeu-cau-ho-tro/{id}/tra-loi`.
-- `GET /ho-tro/yeu-cau-ho-tro/dem` — `{cho_xu_ly: n}` cho số đếm trên menu.
+- `GET /ho-tro-hoc-vien/yeu-cau-ho-tro?trang_thai=&cum_id=` — ticket của học viên trong phạm vi; mỗi dòng kèm `ten_cum`(các cụm), `hoi_lai`, `da_sua_boi_quan_tri`. `GET /ho-tro-hoc-vien/yeu-cau-ho-tro/{id}` kèm các ticket trước của cùng học viên. `PATCH /ho-tro-hoc-vien/yeu-cau-ho-tro/{id}/tra-loi`.
+- `GET /ho-tro-hoc-vien/yeu-cau-ho-tro/dem` — `{cho_xu_ly: n}` cho số đếm trên menu.
 - Quản trị: `GET /yeu-cau-ho-tro` thêm lọc `chua_co_cum=true` và trả `ten_cum`; `PATCH /yeu-cau-ho-tro/{id}/sua-tra-loi` `{noi_dung_tra_loi}` — 409 nếu chưa có câu trả lời; ghi nội dung cũ vào `nhat_ky_hoat_dong` (`hanh_dong = 'sua_tra_loi_ho_tro'`), set `thoi_gian_sua_tra_loi`/`sua_tra_loi_boi`, `danh_gia = NULL`, nếu `da_dong` thì về `da_phan_hoi`; enqueue email `yeu_cau_ho_tro_cap_nhat_tra_loi`.
 - `tinhDaDongHieuLuc`: mốc = `thoi_gian_sua_tra_loi ?? thoi_gian_phan_hoi`. `hoi_lai` giữ mốc `thoi_gian_phan_hoi`.
 - Response phía học viên: `nguoi_tra_loi_hien_thi` = tên cụm của học viên (nhiều cụm → cụm của khóa mới nhất); người trả lời là `quan_tri` hoặc không có cụm → "Ban tổ chức (HCMUE)". Không trả họ tên cán bộ. Thêm `thoi_gian_sua_tra_loi`.
 - ~~`GET /hoc-vien/toi/cum-ho-tro`~~ — không cần (sửa khi code #13): `GET /hoc-vien/toi/khoa-hoc` đã trả `cum` (kèm `link_zalo`) cho từng khóa; thẻ cổng dùng luôn dữ liệu đó.
 
 ### Frontend
-- `/ho-tro/yeu-cau-ho-tro`: hàng chờ (mặc định `cho_xu_ly`, cũ nhất trước), chi tiết + ô trả lời; 409 → giữ nội dung đang soạn, hiện câu trả lời đã có.
+- `/ho-tro-hoc-vien/yeu-cau-ho-tro`: hàng chờ (mặc định `cho_xu_ly`, cũ nhất trước), chi tiết + ô trả lời; 409 → giữ nội dung đang soạn, hiện câu trả lời đã có.
 - Menu `/ho-tro` hiện số đếm, tải lại khi chuyển trang.
 - Admin: lọc "Chưa có cụm", nút "Sửa câu trả lời".
 - Cổng học viên: nhãn "Đã cập nhật lúc HH:mm dd/mm"; ký tên "Cụm hỗ trợ N"; thẻ "Cụm hỗ trợ của bạn + Vào nhóm Zalo" ở trang chủ.
@@ -112,7 +112,7 @@ Quyết định nền: [ADR 0003](../../adr/0003-nguoi-ho-tro-hoc-vien.md) (H1�
 | T16 | Xuất danh sách | Không có CCCD/ngày sinh/mã MOET; theo bộ lọc; có nhật ký |
 | T17 | Tạo tài khoản hỗ trợ thiếu email / gắn `don_vi_id` | 400 / CHECK chặn |
 | T18 | Phân công cho tài khoản vai trò khác hoặc cụm không thuộc khóa | 400 / 404 |
-| T19 | Vai trò khác gọi `/ho-tro/*` | 403 |
+| T19 | Vai trò khác gọi `/ho-tro-hoc-vien/*` | 403 |
 
 ## 6. Kiểm tra trước triển khai
 

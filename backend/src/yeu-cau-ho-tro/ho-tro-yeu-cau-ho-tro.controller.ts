@@ -16,7 +16,7 @@ import { TraLoiYeuCauHoTroDto } from './dto/tra-loi-yeu-cau-ho-tro.dto';
 
 // ADR 0003 Lát 4: yêu cầu hỗ trợ theo cụm cho người hỗ trợ học viên.
 @Roles('ho_tro_hoc_vien')
-@Controller('ho-tro/yeu-cau-ho-tro')
+@Controller('ho-tro-hoc-vien/yeu-cau-ho-tro')
 export class HoTroYeuCauHoTroController {
   constructor(private readonly service: YeuCauHoTroService) {}
 

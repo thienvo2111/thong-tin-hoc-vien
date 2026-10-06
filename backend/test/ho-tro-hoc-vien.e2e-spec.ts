@@ -256,30 +256,30 @@ describe('Người hỗ trợ học viên — tra cứu theo cụm (e2e)', () =>
     await app.close();
   });
 
-  it('T19: vai trò khác ho_tro_hoc_vien gọi /ho-tro/* -> 403', async () => {
+  it('T19: vai trò khác ho_tro_hoc_vien gọi /ho-tro-hoc-vien/* -> 403', async () => {
     for (const path of [
-      '/ho-tro/cum-cua-toi',
-      '/ho-tro/hoc-vien',
-      `/ho-tro/hoc-vien/${hv.mot}`,
-      '/ho-tro/lich-hoc',
+      '/ho-tro-hoc-vien/cum-cua-toi',
+      '/ho-tro-hoc-vien/hoc-vien',
+      `/ho-tro-hoc-vien/hoc-vien/${hv.mot}`,
+      '/ho-tro-hoc-vien/lich-hoc',
     ]) {
       expect((await get(path, tokenQuanTri)).status).toBe(403);
     }
   });
 
   it('T2: người hỗ trợ chưa được phân công -> danh sách rỗng, không lỗi', async () => {
-    const cum = await get('/ho-tro/cum-cua-toi', token.s3);
+    const cum = await get('/ho-tro-hoc-vien/cum-cua-toi', token.s3);
     expect(cum.status).toBe(200);
     expect(cum.body).toEqual([]);
-    const ds = await get('/ho-tro/hoc-vien', token.s3);
+    const ds = await get('/ho-tro-hoc-vien/hoc-vien', token.s3);
     expect(ds.status).toBe(200);
     expect(ds.body.total).toBe(0);
-    const lich = await get('/ho-tro/lich-hoc', token.s3);
+    const lich = await get('/ho-tro-hoc-vien/lich-hoc', token.s3);
     expect(lich.body).toEqual([]);
   });
 
   it('cụm của tôi: tên cụm, link Zalo, khóa, số học viên', async () => {
-    const res = await get('/ho-tro/cum-cua-toi', token.s2);
+    const res = await get('/ho-tro-hoc-vien/cum-cua-toi', token.s2);
     expect(res.status).toBe(200);
     expect(res.body).toEqual([
       expect.objectContaining({
@@ -291,9 +291,9 @@ describe('Người hỗ trợ học viên — tra cứu theo cụm (e2e)', () =>
     ]);
   });
 
-  describe('GET /ho-tro/hoc-vien', () => {
+  describe('GET /ho-tro-hoc-vien/hoc-vien', () => {
     it('chỉ trả học viên trong cụm của mình, kèm đơn vị, cụm, trạng thái đăng nhập, hồ sơ đầy đủ', async () => {
-      const res = await get('/ho-tro/hoc-vien', token.s1);
+      const res = await get('/ho-tro-hoc-vien/hoc-vien', token.s1);
       expect(res.status).toBe(200);
       expect(res.body.data.map((x: { id: string }) => x.id)).toEqual([hv.mot]);
       const dong = res.body.data[0];
@@ -312,47 +312,47 @@ describe('Người hỗ trợ học viên — tra cứu theo cụm (e2e)', () =>
     });
 
     it('tìm không dấu theo họ tên, theo CCCD, theo tên đăng nhập', async () => {
-      const r1 = await get('/ho-tro/hoc-vien?q=van mot', token.s1);
+      const r1 = await get('/ho-tro-hoc-vien/hoc-vien?q=van mot', token.s1);
       expect(r1.body.data.map((x: { id: string }) => x.id)).toEqual([hv.mot]);
       const r2 = await get(
-        `/ho-tro/hoc-vien?q=${cccdMot.slice(2, 9)}`,
+        `/ho-tro-hoc-vien/hoc-vien?q=${cccdMot.slice(2, 9)}`,
         token.s1,
       );
       expect(r2.body.total).toBe(1);
-      const r3 = await get(`/ho-tro/hoc-vien?q=ht-mot-${suf}`, token.s1);
+      const r3 = await get(`/ho-tro-hoc-vien/hoc-vien?q=ht-mot-${suf}`, token.s1);
       expect(r3.body.total).toBe(1);
-      const r4 = await get('/ho-tro/hoc-vien?q=tran thi hai', token.s1);
+      const r4 = await get('/ho-tro-hoc-vien/hoc-vien?q=tran thi hai', token.s1);
       expect(r4.body.total).toBe(0);
     });
 
     it('lọc theo cụm ngoài phạm vi -> 404', async () => {
       expect(
-        (await get(`/ho-tro/hoc-vien?cum_id=${cumB}`, token.s1)).status,
+        (await get(`/ho-tro-hoc-vien/hoc-vien?cum_id=${cumB}`, token.s1)).status,
       ).toBe(404);
       expect(
-        (await get(`/ho-tro/hoc-vien?cum_id=${cumA}`, token.s1)).body.total,
+        (await get(`/ho-tro-hoc-vien/hoc-vien?cum_id=${cumA}`, token.s1)).body.total,
       ).toBe(1);
     });
 
     it('lọc da_dang_nhap', async () => {
       expect(
-        (await get('/ho-tro/hoc-vien?da_dang_nhap=false', token.s1)).body.total,
+        (await get('/ho-tro-hoc-vien/hoc-vien?da_dang_nhap=false', token.s1)).body.total,
       ).toBe(1);
       expect(
-        (await get('/ho-tro/hoc-vien?da_dang_nhap=true', token.s1)).body.total,
+        (await get('/ho-tro-hoc-vien/hoc-vien?da_dang_nhap=true', token.s1)).body.total,
       ).toBe(0);
     });
   });
 
-  describe('GET /ho-tro/hoc-vien/{id}', () => {
+  describe('GET /ho-tro-hoc-vien/hoc-vien/{id}', () => {
     it('T1: học viên ngoài cụm -> 404 (không 403, không lộ tồn tại)', async () => {
-      expect((await get(`/ho-tro/hoc-vien/${hv.hai}`, token.s1)).status).toBe(
+      expect((await get(`/ho-tro-hoc-vien/hoc-vien/${hv.hai}`, token.s1)).status).toBe(
         404,
       );
     });
 
     it('chi tiết: hồ sơ kèm tên, tài khoản, học tập (lớp + lịch + giảng viên), khảo sát', async () => {
-      const res = await get(`/ho-tro/hoc-vien/${hv.mot}`, token.s1);
+      const res = await get(`/ho-tro-hoc-vien/hoc-vien/${hv.mot}`, token.s1);
       expect(res.status).toBe(200);
       expect(res.body.ho_so).toMatchObject({
         id: hv.mot,
@@ -387,13 +387,13 @@ describe('Người hỗ trợ học viên — tra cứu theo cụm (e2e)', () =>
       await prisma.phan_cong_ho_tro.create({
         data: { nguoi_dung_id: hoTroId.s3, cum_id: cumC },
       });
-      expect((await get(`/ho-tro/hoc-vien/${hv.ba}`, token.s2)).status).toBe(
+      expect((await get(`/ho-tro-hoc-vien/hoc-vien/${hv.ba}`, token.s2)).status).toBe(
         200,
       );
-      expect((await get(`/ho-tro/hoc-vien/${hv.ba}`, token.s3)).status).toBe(
+      expect((await get(`/ho-tro-hoc-vien/hoc-vien/${hv.ba}`, token.s3)).status).toBe(
         200,
       );
-      const ds = await get('/ho-tro/hoc-vien', token.s3);
+      const ds = await get('/ho-tro-hoc-vien/hoc-vien', token.s3);
       expect(ds.body.data.map((x: { id: string }) => x.id)).toEqual([hv.ba]);
       await prisma.phan_cong_ho_tro.deleteMany({
         where: { nguoi_dung_id: hoTroId.s3 },
@@ -401,13 +401,13 @@ describe('Người hỗ trợ học viên — tra cứu theo cụm (e2e)', () =>
     });
 
     it('T3: gỡ phân công khi đang đăng nhập -> request kế tiếp 404', async () => {
-      expect((await get(`/ho-tro/hoc-vien/${hv.hai}`, token.s2)).status).toBe(
+      expect((await get(`/ho-tro-hoc-vien/hoc-vien/${hv.hai}`, token.s2)).status).toBe(
         200,
       );
       await prisma.phan_cong_ho_tro.deleteMany({
         where: { nguoi_dung_id: hoTroId.s2 },
       });
-      expect((await get(`/ho-tro/hoc-vien/${hv.hai}`, token.s2)).status).toBe(
+      expect((await get(`/ho-tro-hoc-vien/hoc-vien/${hv.hai}`, token.s2)).status).toBe(
         404,
       );
       await prisma.phan_cong_ho_tro.create({
@@ -416,9 +416,9 @@ describe('Người hỗ trợ học viên — tra cứu theo cụm (e2e)', () =>
     });
   });
 
-  describe('GET /ho-tro/lich-hoc', () => {
+  describe('GET /ho-tro-hoc-vien/lich-hoc', () => {
     it('buổi sắp tới của lớp có học viên trong cụm, kèm giảng viên và số học viên của cụm', async () => {
-      const res = await get('/ho-tro/lich-hoc', token.s1);
+      const res = await get('/ho-tro-hoc-vien/lich-hoc', token.s1);
       expect(res.status).toBe(200);
       expect(res.body).toHaveLength(1);
       expect(res.body[0]).toMatchObject({
@@ -435,19 +435,19 @@ describe('Người hỗ trợ học viên — tra cứu theo cụm (e2e)', () =>
     });
 
     it('cụm không có học viên nào trong lớp -> không thấy buổi đó', async () => {
-      expect((await get('/ho-tro/lich-hoc', token.s2)).body).toEqual([]);
+      expect((await get('/ho-tro-hoc-vien/lich-hoc', token.s2)).body).toEqual([]);
     });
 
     it('ngoài khoảng ngày -> không thấy', async () => {
       const res = await get(
-        '/ho-tro/lich-hoc?tu_ngay=2027-06-01&den_ngay=2027-06-30',
+        '/ho-tro-hoc-vien/lich-hoc?tu_ngay=2027-06-01&den_ngay=2027-06-30',
         token.s1,
       );
       expect(res.body).toEqual([]);
     });
   });
 
-  describe('GET /ho-tro/hoc-vien/xuat', () => {
+  describe('GET /ho-tro-hoc-vien/hoc-vien/xuat', () => {
     it('T16: xlsx 1 sheet/cụm, không có CCCD/ngày sinh/mã MOET, có nhật ký', async () => {
       const truoc = await prisma.nhat_ky_hoat_dong.count({
         where: {
@@ -456,7 +456,7 @@ describe('Người hỗ trợ học viên — tra cứu theo cụm (e2e)', () =>
         },
       });
       const res = await http()
-        .get('/ho-tro/hoc-vien/xuat')
+        .get('/ho-tro-hoc-vien/hoc-vien/xuat')
         .set(auth(token.s1))
         .buffer(true)
         .parse((r, cb) => {

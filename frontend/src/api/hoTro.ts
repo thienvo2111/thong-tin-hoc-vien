@@ -44,14 +44,14 @@ const KHOA = ['ho-tro'] as const;
 export function useCumCuaToi() {
   return useQuery({
     queryKey: [...KHOA, 'cum-cua-toi'],
-    queryFn: () => apiFetch<CumCuaToi[]>('/ho-tro/cum-cua-toi'),
+    queryFn: () => apiFetch<CumCuaToi[]>('/ho-tro-hoc-vien/cum-cua-toi'),
   });
 }
 
 export function useDanhSachHocVienHoTro(params: LocHocVienHoTro) {
   return useQuery({
     queryKey: [...KHOA, 'hoc-vien', params],
-    queryFn: () => apiFetch<PaginatedResult<HocVienHoTroDong>>(`/ho-tro/hoc-vien${xayQueryString(params)}`),
+    queryFn: () => apiFetch<PaginatedResult<HocVienHoTroDong>>(`/ho-tro-hoc-vien/hoc-vien${xayQueryString(params)}`),
     placeholderData: keepPreviousData,
   });
 }
@@ -59,7 +59,7 @@ export function useDanhSachHocVienHoTro(params: LocHocVienHoTro) {
 export function useChiTietHocVienHoTro(id: string | undefined) {
   return useQuery({
     queryKey: [...KHOA, 'hoc-vien', 'chi-tiet', id],
-    queryFn: () => apiFetch<HocVienHoTroChiTiet>(`/ho-tro/hoc-vien/${id}`),
+    queryFn: () => apiFetch<HocVienHoTroChiTiet>(`/ho-tro-hoc-vien/hoc-vien/${id}`),
     enabled: !!id,
   });
 }
@@ -67,7 +67,7 @@ export function useChiTietHocVienHoTro(id: string | undefined) {
 export function useLichHocHoTro(params: LocLichHocHoTro) {
   return useQuery({
     queryKey: [...KHOA, 'lich-hoc', params],
-    queryFn: () => apiFetch<BuoiHocHoTro[]>(`/ho-tro/lich-hoc${xayQueryString(params)}`),
+    queryFn: () => apiFetch<BuoiHocHoTro[]>(`/ho-tro-hoc-vien/lich-hoc${xayQueryString(params)}`),
     placeholderData: keepPreviousData,
   });
 }
@@ -75,7 +75,7 @@ export function useLichHocHoTro(params: LocLichHocHoTro) {
 /** Xuất .xlsx theo bộ lọc đang áp dụng (bỏ phân trang). */
 export function xuatDanhSachHoTro(params: LocHocVienHoTro): Promise<Blob> {
   const { page: _p, page_size: _ps, ...loc } = params;
-  return apiFetchBlob(`/ho-tro/hoc-vien/xuat${xayQueryString(loc)}`);
+  return apiFetchBlob(`/ho-tro-hoc-vien/hoc-vien/xuat${xayQueryString(loc)}`);
 }
 
 // --- Yêu cầu hỗ trợ theo cụm (ADR 0003 Lát 4) ---
@@ -90,7 +90,7 @@ export interface LocYeuCauHoTroHoTro {
 export function useYeuCauHoTroCuaCum(params: LocYeuCauHoTroHoTro) {
   return useQuery({
     queryKey: [...KHOA, 'yeu-cau', params],
-    queryFn: () => apiFetch<PaginatedResult<YeuCauHoTroQuanTri>>(`/ho-tro/yeu-cau-ho-tro${xayQueryString(params)}`),
+    queryFn: () => apiFetch<PaginatedResult<YeuCauHoTroQuanTri>>(`/ho-tro-hoc-vien/yeu-cau-ho-tro${xayQueryString(params)}`),
     placeholderData: keepPreviousData,
   });
 }
@@ -99,12 +99,12 @@ export function useYeuCauHoTroCuaCum(params: LocYeuCauHoTroHoTro) {
 export function useDemYeuCauHoTroCuaCum() {
   return useQuery({
     queryKey: [...KHOA, 'yeu-cau', 'dem'],
-    queryFn: () => apiFetch<{ cho_xu_ly: number }>('/ho-tro/yeu-cau-ho-tro/dem'),
+    queryFn: () => apiFetch<{ cho_xu_ly: number }>('/ho-tro-hoc-vien/yeu-cau-ho-tro/dem'),
   });
 }
 
 export function layChiTietYeuCauHoTroCuaCum(id: string) {
-  return apiFetch<YeuCauHoTroChiTietHoTro>(`/ho-tro/yeu-cau-ho-tro/${id}`);
+  return apiFetch<YeuCauHoTroChiTietHoTro>(`/ho-tro-hoc-vien/yeu-cau-ho-tro/${id}`);
 }
 
 export function useChiTietYeuCauHoTroCuaCum(id: string | null) {
@@ -116,7 +116,7 @@ export function useChiTietYeuCauHoTroCuaCum(id: string | null) {
 }
 
 export function traLoiYeuCauHoTroCuaCum(id: string, noi_dung_tra_loi: string) {
-  return apiFetch<YeuCauHoTro>(`/ho-tro/yeu-cau-ho-tro/${id}/tra-loi`, {
+  return apiFetch<YeuCauHoTro>(`/ho-tro-hoc-vien/yeu-cau-ho-tro/${id}/tra-loi`, {
     method: 'PATCH',
     body: JSON.stringify({ noi_dung_tra_loi }),
   });
@@ -158,7 +158,7 @@ export function useSuaHoSoHoTro(hocVienId: string) {
   const lamMoi = useLamMoiChiTiet(hocVienId);
   return useMutation({
     mutationFn: (dto: SuaHoSoHoTroDto) =>
-      apiFetch<{ xac_nhan_bi_huy: boolean }>(`/ho-tro/hoc-vien/${hocVienId}`, {
+      apiFetch<{ xac_nhan_bi_huy: boolean }>(`/ho-tro-hoc-vien/hoc-vien/${hocVienId}`, {
         method: 'PATCH',
         body: JSON.stringify(dto),
       }),
@@ -169,7 +169,7 @@ export function useSuaHoSoHoTro(hocVienId: string) {
 export function useGuiLinkDatLaiMatKhauHoTro(hocVienId: string) {
   return useMutation({
     mutationFn: () =>
-      apiFetch<{ da_gui: true; email: string }>(`/ho-tro/hoc-vien/${hocVienId}/gui-link-dat-lai-mat-khau`, {
+      apiFetch<{ da_gui: true; email: string }>(`/ho-tro-hoc-vien/hoc-vien/${hocVienId}/gui-link-dat-lai-mat-khau`, {
         method: 'POST',
       }),
   });
@@ -179,7 +179,7 @@ export function useCapMatKhauTamHocVienHoTro(hocVienId: string) {
   const lamMoi = useLamMoiChiTiet(hocVienId);
   return useMutation({
     mutationFn: () =>
-      apiFetch<MatKhauTamResponse>(`/ho-tro/hoc-vien/${hocVienId}/cap-mat-khau-tam`, { method: 'POST' }),
+      apiFetch<MatKhauTamResponse>(`/ho-tro-hoc-vien/hoc-vien/${hocVienId}/cap-mat-khau-tam`, { method: 'POST' }),
     onSuccess: lamMoi,
     gcTime: 0,
   });
@@ -189,7 +189,7 @@ export function useMoKhoaTamHoTro(hocVienId: string) {
   const lamMoi = useLamMoiChiTiet(hocVienId);
   return useMutation({
     mutationFn: () =>
-      apiFetch<{ ten_dang_nhap: string; dang_bi_khoa: false }>(`/ho-tro/hoc-vien/${hocVienId}/mo-khoa-tam`, {
+      apiFetch<{ ten_dang_nhap: string; dang_bi_khoa: false }>(`/ho-tro-hoc-vien/hoc-vien/${hocVienId}/mo-khoa-tam`, {
         method: 'POST',
       }),
     onSuccess: lamMoi,

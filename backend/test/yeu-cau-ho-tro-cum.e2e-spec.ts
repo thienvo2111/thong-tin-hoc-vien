@@ -116,7 +116,7 @@ describe('Yêu cầu hỗ trợ theo cụm (e2e)', () => {
       .set(auth(token))
       .send({ noi_dung_tra_loi: noiDung });
   const traLoiHoTro = (id: string, token: string, noiDung: string) =>
-    traLoi(id, token, noiDung, '/ho-tro/yeu-cau-ho-tro');
+    traLoi(id, token, noiDung, '/ho-tro-hoc-vien/yeu-cau-ho-tro');
   const soEmail = (
     email: string,
     loai: 'yeu_cau_ho_tro_tra_loi' | 'yeu_cau_ho_tro_cap_nhat_tra_loi',
@@ -233,7 +233,7 @@ describe('Yêu cầu hỗ trợ theo cụm (e2e)', () => {
 
     it('người hỗ trợ chỉ thấy ticket của học viên trong cụm mình, kèm tên học viên + tên cụm', async () => {
       const res = await http()
-        .get('/ho-tro/yeu-cau-ho-tro?trang_thai=cho_xu_ly')
+        .get('/ho-tro-hoc-vien/yeu-cau-ho-tro?trang_thai=cho_xu_ly')
         .set(auth(ht.s1.token));
       expect(res.status).toBe(200);
       const ids = res.body.data.map((x: { id: string }) => x.id);
@@ -250,7 +250,7 @@ describe('Yêu cầu hỗ trợ theo cụm (e2e)', () => {
 
     it('số đếm chờ xử lý cho menu', async () => {
       const res = await http()
-        .get('/ho-tro/yeu-cau-ho-tro/dem')
+        .get('/ho-tro-hoc-vien/yeu-cau-ho-tro/dem')
         .set(auth(ht.s1.token));
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ cho_xu_ly: 1 });
@@ -260,7 +260,7 @@ describe('Yêu cầu hỗ trợ theo cụm (e2e)', () => {
       expect(
         (
           await http()
-            .get(`/ho-tro/yeu-cau-ho-tro/${ticketB}`)
+            .get(`/ho-tro-hoc-vien/yeu-cau-ho-tro/${ticketB}`)
             .set(auth(ht.s1.token))
         ).status,
       ).toBe(404);
@@ -269,7 +269,7 @@ describe('Yêu cầu hỗ trợ theo cụm (e2e)', () => {
 
     it('T5: học viên chưa có cụm -> không người hỗ trợ nào thấy; Quản trị lọc chua_co_cum thấy', async () => {
       for (const s of [ht.s1, ht.s2]) {
-        const r = await http().get('/ho-tro/yeu-cau-ho-tro').set(auth(s.token));
+        const r = await http().get('/ho-tro-hoc-vien/yeu-cau-ho-tro').set(auth(s.token));
         expect(r.body.data.map((x: { id: string }) => x.id)).not.toContain(
           ticketX,
         );
@@ -340,7 +340,7 @@ describe('Yêu cầu hỗ trợ theo cụm (e2e)', () => {
     it('chi tiết cho người hỗ trợ kèm các ticket trước của cùng học viên', async () => {
       const ticketA2 = await taoTicket('a', 'Em hỏi thêm về lịch');
       const res = await http()
-        .get(`/ho-tro/yeu-cau-ho-tro/${ticketA2}`)
+        .get(`/ho-tro-hoc-vien/yeu-cau-ho-tro/${ticketA2}`)
         .set(auth(ht.s1.token));
       expect(res.status).toBe(200);
       expect(res.body.ticket_truoc.map((x: { id: string }) => x.id)).toEqual([
@@ -432,19 +432,19 @@ describe('Yêu cầu hỗ trợ theo cụm (e2e)', () => {
       expect(t).not.toHaveProperty('sua_tra_loi_boi');
 
       const htRes = await http()
-        .get(`/ho-tro/yeu-cau-ho-tro/${id}`)
+        .get(`/ho-tro-hoc-vien/yeu-cau-ho-tro/${id}`)
         .set(auth(ht.s1.token));
       expect(htRes.body.da_sua_boi_quan_tri).toBe(true);
     });
   });
 
-  it('T19: vai trò khác gọi /ho-tro/yeu-cau-ho-tro -> 403', async () => {
+  it('T19: vai trò khác gọi /ho-tro-hoc-vien/yeu-cau-ho-tro -> 403', async () => {
     expect(
-      (await http().get('/ho-tro/yeu-cau-ho-tro').set(auth(tokenQuanTri)))
+      (await http().get('/ho-tro-hoc-vien/yeu-cau-ho-tro').set(auth(tokenQuanTri)))
         .status,
     ).toBe(403);
     expect(
-      (await http().get('/ho-tro/yeu-cau-ho-tro').set(auth(hv.a.token))).status,
+      (await http().get('/ho-tro-hoc-vien/yeu-cau-ho-tro').set(auth(hv.a.token))).status,
     ).toBe(403);
   });
 });

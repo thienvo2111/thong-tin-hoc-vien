@@ -90,21 +90,23 @@ Vai trò `ho_tro_hoc_vien` — cán bộ HCMUE, `don_vi_id`/`hoc_vien_id` luôn 
 
 Lỗi: như tài khoản đơn vị (tên đăng nhập/email sai định dạng `400`, trùng `409`); thiếu email → `400` field `email` "Người hỗ trợ học viên bắt buộc có email"; `:id` không phải người hỗ trợ → `404`.
 
-#### Khu làm việc người hỗ trợ — `/ho-tro/*` (ADR 0003 Lát 2, 2026-10-06)
+#### Khu làm việc người hỗ trợ — API `/ho-tro-hoc-vien/*` (ADR 0003 Lát 2, 2026-10-06)
+
+**Tiền tố API là `/ho-tro-hoc-vien`, KHÔNG phải `/ho-tro`** (sửa 2026-10-06 sau deploy): `/ho-tro/*` là route TRANG của frontend; Nginx chỉ proxy tiền tố liệt kê trong `scripts/vps/05-install-nginx.sh`, tiền tố trùng route trang sẽ làm F5 trang rơi vào backend. `backend/src/nginx-prefix.spec.ts` kiểm tra cả 2 điều.
 
 Chỉ `ho_tro_hoc_vien` (vai trò khác → `403`, kể cả Quản trị). Phạm vi = cụm trong `phan_cong_ho_tro` của người gọi, kiểm tra **mỗi request**; học viên thuộc cụm khi có `dang_ky_hoc.cum_id` thuộc các cụm đó. Học viên/cụm ngoài phạm vi → `404` (không `403`). Chưa được phân công → danh sách rỗng.
 
 | Method | Path | Mô tả |
 |---|---|---|
-| GET | `/ho-tro/cum-cua-toi` | `[{ cum_id, ten_cum, link_zalo, trang_thai, khoa_id, ma_khoa, ten_khoa, so_hoc_vien }]` |
-| GET | `/ho-tro/hoc-vien` | Phân trang. Lọc `q` (họ tên không dấu, CCCD, mã MOET, tên đăng nhập), `cum_id` (ngoài phạm vi → 404), `don_vi_cong_tac_id`, `da_dang_nhap`, `day_du`. Dòng: `{ id, ho_ten, ma_dinh_danh_moet, ten_dang_nhap, dang_nhap_lan_cuoi, don_vi_cong_tac_ten, doi_tuong, so_dien_thoai_lien_he, email_lien_he, day_du, cum: [{ cum_id, ten_cum }], lop_theo_giai_doan: { [giai_doan_id]: ten_lop }, khao_sat: [{ loai, trang_thai, muc }] }` — `cum` chỉ gồm cụm trong phạm vi người gọi. Sắp theo họ tên |
-| GET | `/ho-tro/hoc-vien/xuat` | Cùng bộ lọc (bỏ phân trang) → `.xlsx`, 1 sheet/cụm (`Content-Disposition: attachment; filename="ds-cum-ho-tro-<yyyymmdd>.xlsx"`, `Cache-Control: no-store`). Cột: STT, Họ tên, Đơn vị công tác, Đối tượng, Số điện thoại, Email, `GĐ<n> - <tên giai đoạn>` (lớp được gán), Hồ sơ đầy đủ, Đã đăng nhập, Khảo sát. **Không** có CCCD, ngày sinh, mã MOET, nơi sinh. Ghi `nhat_ky_hoat_dong` `ho_tro_xuat_danh_sach` |
-| GET | `/ho-tro/hoc-vien/{id}` | `{ ho_so (như GET /hoc-vien/{id} + day_du, thieu), tai_khoan: { ten_dang_nhap, trang_thai, dang_nhap_lan_cuoi, phai_doi_mat_khau, khoa_den, dang_bi_khoa, email_da_xac_minh } \| null, hoc_tap (cùng cấu trúc GET /hoc-vien/{id}/khoa-hoc), khao_sat, yeu_cau_ho_tro (20 gần nhất, tóm tắt), lich_su_thay_doi (50 gần nhất, kèm nguoi_sua_ten, ly_do) }` |
-| GET | `/ho-tro/lich-hoc` | `tu_ngay`/`den_ngay` (`YYYY-MM-DD` giờ VN; mặc định đầu hôm nay → hết 14 ngày sau), `cum_id`. Buổi (`lich_hoc_lop`) của cặp (lớp, giai đoạn) có ≥1 học viên của cụm được phân lớp, kèm `lop`, `giai_doan`, `khoa`, `nhan_su`, `so_hoc_vien_cum`; tối đa 500 buổi |
-| PATCH | `/ho-tro/hoc-vien/{id}` | **Lát 3 (ADR 0003 H7)**: body như `PATCH /hoc-vien/toi` + `ly_do` (bắt buộc, 5–500 ký tự sau trim). Gửi `so_dinh_danh_ca_nhan` → `400`. Bỏ qua cổng đợt (như Quản trị); đợt đang mở và học viên đã xác nhận → hủy xác nhận (`xac_nhan_bi_huy: true`). **Luôn** ghi `lich_su_thay_doi_ho_so` kèm `ly_do` (kể cả hồ sơ `tu_dang_ky`), `vai_tro_nguoi_sua = 'ho_tro_hoc_vien'`. Đổi `email_lien_he` → `email_da_xac_minh = false` + gửi email xác minh tới địa chỉ mới |
-| POST | `/ho-tro/hoc-vien/{id}/gui-link-dat-lai-mat-khau` | H9(1) → `{ da_gui: true, email }`. Chỉ tới email **đã xác minh** (chưa → `409`); tài khoản bị khóa → `409`; vừa gửi trong 60 giây → `429`. Token `dat_lai_mat_khau` cũ chưa dùng bị vô hiệu |
-| POST | `/ho-tro/hoc-vien/{id}/cap-mat-khau-tam` | H9(2) → `{ ten_dang_nhap, mat_khau_tam }` (10 ký tự, trả 1 lần). `phai_doi_mat_khau = true`, xóa khóa tạm/bộ đếm sai, vô hiệu link đặt lại còn hạn, ghi `nhat_ky_dat_lai_mat_khau`. Không có thao tác "về ngày sinh" |
-| POST | `/ho-tro/hoc-vien/{id}/mo-khoa-tam` | H9(3) → `{ ten_dang_nhap, dang_bi_khoa: false }` |
+| GET | `/ho-tro-hoc-vien/cum-cua-toi` | `[{ cum_id, ten_cum, link_zalo, trang_thai, khoa_id, ma_khoa, ten_khoa, so_hoc_vien }]` |
+| GET | `/ho-tro-hoc-vien/hoc-vien` | Phân trang. Lọc `q` (họ tên không dấu, CCCD, mã MOET, tên đăng nhập), `cum_id` (ngoài phạm vi → 404), `don_vi_cong_tac_id`, `da_dang_nhap`, `day_du`. Dòng: `{ id, ho_ten, ma_dinh_danh_moet, ten_dang_nhap, dang_nhap_lan_cuoi, don_vi_cong_tac_ten, doi_tuong, so_dien_thoai_lien_he, email_lien_he, day_du, cum: [{ cum_id, ten_cum }], lop_theo_giai_doan: { [giai_doan_id]: ten_lop }, khao_sat: [{ loai, trang_thai, muc }] }` — `cum` chỉ gồm cụm trong phạm vi người gọi. Sắp theo họ tên |
+| GET | `/ho-tro-hoc-vien/hoc-vien/xuat` | Cùng bộ lọc (bỏ phân trang) → `.xlsx`, 1 sheet/cụm (`Content-Disposition: attachment; filename="ds-cum-ho-tro-<yyyymmdd>.xlsx"`, `Cache-Control: no-store`). Cột: STT, Họ tên, Đơn vị công tác, Đối tượng, Số điện thoại, Email, `GĐ<n> - <tên giai đoạn>` (lớp được gán), Hồ sơ đầy đủ, Đã đăng nhập, Khảo sát. **Không** có CCCD, ngày sinh, mã MOET, nơi sinh. Ghi `nhat_ky_hoat_dong` `ho_tro_xuat_danh_sach` |
+| GET | `/ho-tro-hoc-vien/hoc-vien/{id}` | `{ ho_so (như GET /hoc-vien/{id} + day_du, thieu), tai_khoan: { ten_dang_nhap, trang_thai, dang_nhap_lan_cuoi, phai_doi_mat_khau, khoa_den, dang_bi_khoa, email_da_xac_minh } \| null, hoc_tap (cùng cấu trúc GET /hoc-vien/{id}/khoa-hoc), khao_sat, yeu_cau_ho_tro (20 gần nhất, tóm tắt), lich_su_thay_doi (50 gần nhất, kèm nguoi_sua_ten, ly_do) }` |
+| GET | `/ho-tro-hoc-vien/lich-hoc` | `tu_ngay`/`den_ngay` (`YYYY-MM-DD` giờ VN; mặc định đầu hôm nay → hết 14 ngày sau), `cum_id`. Buổi (`lich_hoc_lop`) của cặp (lớp, giai đoạn) có ≥1 học viên của cụm được phân lớp, kèm `lop`, `giai_doan`, `khoa`, `nhan_su`, `so_hoc_vien_cum`; tối đa 500 buổi |
+| PATCH | `/ho-tro-hoc-vien/hoc-vien/{id}` | **Lát 3 (ADR 0003 H7)**: body như `PATCH /hoc-vien/toi` + `ly_do` (bắt buộc, 5–500 ký tự sau trim). Gửi `so_dinh_danh_ca_nhan` → `400`. Bỏ qua cổng đợt (như Quản trị); đợt đang mở và học viên đã xác nhận → hủy xác nhận (`xac_nhan_bi_huy: true`). **Luôn** ghi `lich_su_thay_doi_ho_so` kèm `ly_do` (kể cả hồ sơ `tu_dang_ky`), `vai_tro_nguoi_sua = 'ho_tro_hoc_vien'`. Đổi `email_lien_he` → `email_da_xac_minh = false` + gửi email xác minh tới địa chỉ mới |
+| POST | `/ho-tro-hoc-vien/hoc-vien/{id}/gui-link-dat-lai-mat-khau` | H9(1) → `{ da_gui: true, email }`. Chỉ tới email **đã xác minh** (chưa → `409`); tài khoản bị khóa → `409`; vừa gửi trong 60 giây → `429`. Token `dat_lai_mat_khau` cũ chưa dùng bị vô hiệu |
+| POST | `/ho-tro-hoc-vien/hoc-vien/{id}/cap-mat-khau-tam` | H9(2) → `{ ten_dang_nhap, mat_khau_tam }` (10 ký tự, trả 1 lần). `phai_doi_mat_khau = true`, xóa khóa tạm/bộ đếm sai, vô hiệu link đặt lại còn hạn, ghi `nhat_ky_dat_lai_mat_khau`. Không có thao tác "về ngày sinh" |
+| POST | `/ho-tro-hoc-vien/hoc-vien/{id}/mo-khoa-tam` | H9(3) → `{ ten_dang_nhap, dang_bi_khoa: false }` |
 
 #### Yêu cầu hỗ trợ (M8 2026-10-01; theo cụm — ADR 0003 Lát 4, 2026-10-06)
 
@@ -119,10 +121,10 @@ Mô hình 1 hỏi – 1 đáp; hỏi tiếp = ticket mới (cờ `hoi_lai`). **T
 | GET | `/yeu-cau-ho-tro/{id}` | Như 1 dòng ở trên | Quản trị |
 | PATCH | `/yeu-cau-ho-tro/{id}/tra-loi` | `{ noi_dung_tra_loi }` — có điều kiện, xem trên | Quản trị |
 | PATCH | `/yeu-cau-ho-tro/{id}/sua-tra-loi` | `{ noi_dung_tra_loi }` — đính chính câu trả lời (kể cả ticket đã đóng): `409` nếu chưa có câu trả lời; ghi nội dung cũ vào `nhat_ky_hoat_dong` (`sua_tra_loi_ho_tro`), set `thoi_gian_sua_tra_loi`/`sua_tra_loi_boi`, `danh_gia = null`, `trang_thai = 'da_phan_hoi'`, email `yeu_cau_ho_tro_cap_nhat_tra_loi` | Quản trị |
-| GET | `/ho-tro/yeu-cau-ho-tro` | Ticket của học viên trong cụm của tôi (tính động). Lọc `trang_thai`, `cum_id` (ngoài phạm vi → 404). `cho_xu_ly` xếp cũ nhất trước. Dòng như phía Quản trị, `ten_cum` chỉ gồm cụm trong phạm vi | Người hỗ trợ |
-| GET | `/ho-tro/yeu-cau-ho-tro/dem` | `{ cho_xu_ly }` cho số đếm trên menu | Người hỗ trợ |
-| GET | `/ho-tro/yeu-cau-ho-tro/{id}` | Như 1 dòng + `ticket_truoc` (10 ticket khác gần nhất của cùng học viên). Ngoài phạm vi → 404 | Người hỗ trợ |
-| PATCH | `/ho-tro/yeu-cau-ho-tro/{id}/tra-loi` | `{ noi_dung_tra_loi }` — có điều kiện; ngoài phạm vi → 404 | Người hỗ trợ |
+| GET | `/ho-tro-hoc-vien/yeu-cau-ho-tro` | Ticket của học viên trong cụm của tôi (tính động). Lọc `trang_thai`, `cum_id` (ngoài phạm vi → 404). `cho_xu_ly` xếp cũ nhất trước. Dòng như phía Quản trị, `ten_cum` chỉ gồm cụm trong phạm vi | Người hỗ trợ |
+| GET | `/ho-tro-hoc-vien/yeu-cau-ho-tro/dem` | `{ cho_xu_ly }` cho số đếm trên menu | Người hỗ trợ |
+| GET | `/ho-tro-hoc-vien/yeu-cau-ho-tro/{id}` | Như 1 dòng + `ticket_truoc` (10 ticket khác gần nhất của cùng học viên). Ngoài phạm vi → 404 | Người hỗ trợ |
+| PATCH | `/ho-tro-hoc-vien/yeu-cau-ho-tro/{id}/tra-loi` | `{ noi_dung_tra_loi }` — có điều kiện; ngoài phạm vi → 404 | Người hỗ trợ |
 
 Frontend khi nhận `409` lúc trả lời: KHÔNG làm mới danh sách ngay, tải lại ticket (`GET .../{id}`) để hiện câu trả lời đã có, giữ nguyên nội dung đang soạn (`components/KhungTraLoiTicket.tsx`).
 

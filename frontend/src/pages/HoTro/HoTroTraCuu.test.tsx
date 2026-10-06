@@ -58,7 +58,7 @@ describe('Người hỗ trợ — Danh sách học viên', () => {
   it('?cum_id trên URL và từ khóa tìm kiếm được gửi lên API', async () => {
     const queries: string[] = [];
     server.use(
-      http.get('/ho-tro/hoc-vien', ({ request }) => {
+      http.get('/ho-tro-hoc-vien/hoc-vien', ({ request }) => {
         queries.push(new URL(request.url).search);
         return HttpResponse.json({ data: [], total: 0, page: 1, page_size: 20 });
       }),
@@ -74,7 +74,7 @@ describe('Người hỗ trợ — Danh sách học viên', () => {
   it('Xuất Excel gửi đúng bộ lọc (không phân trang) và tải file', async () => {
     let query = '';
     server.use(
-      http.get('/ho-tro/hoc-vien/xuat', ({ request }) => {
+      http.get('/ho-tro-hoc-vien/hoc-vien/xuat', ({ request }) => {
         query = new URL(request.url).search;
         return new HttpResponse(new Blob(['xlsx']));
       }),

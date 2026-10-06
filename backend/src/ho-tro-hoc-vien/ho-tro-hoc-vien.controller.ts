@@ -25,7 +25,7 @@ import {
 // Khu làm việc người hỗ trợ học viên (ADR 0003). Chỉ ho_tro_hoc_vien — Quản
 // trị dùng các API /admin của mình, không đi qua đây.
 @Roles('ho_tro_hoc_vien')
-@Controller('ho-tro')
+@Controller('ho-tro-hoc-vien')
 export class HoTroHocVienController {
   constructor(private readonly service: HoTroHocVienService) {}
 
