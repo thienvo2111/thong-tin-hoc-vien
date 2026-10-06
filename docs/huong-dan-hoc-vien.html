@@ -1,3 +1,6 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hướng dẫn học viên BDNLS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -221,6 +224,14 @@ details.err[open] summary::after{content:"–"}
 .contact{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
 .box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:grid;gap:10px;align-content:start;min-width:0}
 .mail{font-size:1.2rem;font-weight:700;color:var(--navy-ink);word-break:break-all;user-select:all}
+.pl-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.cum{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:14px 16px;display:grid;gap:8px;align-content:start}
+.cum h3{margin:0;font-size:1.05rem}
+.cum ol{margin:0;padding-left:1.4em;font-size:.95rem}
+.cum .link{font-size:.8rem;color:var(--muted);word-break:break-all}
+nav.toc a.pl{margin-top:6px}
+nav.toc a.pl::before{content:"PL"}
+.cum[hidden]{display:none}
 .copy{font:inherit;font-weight:600;font-size:.9rem;padding:8px 14px;border-radius:8px;border:0;background:var(--red);color:#fff;cursor:pointer;justify-self:start}
 pre.tpl{margin:0;white-space:pre-wrap;font-family:var(--font);font-size:.92rem;background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:12px;user-select:all}
 .safe{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
@@ -270,6 +281,7 @@ footer{border-top:1px solid var(--line);padding-inline:16px;padding-block:24px;t
       <li><a href="#loi">Lỗi thường gặp</a></li>
       <li><a href="#lien-he">Liên hệ và an toàn tài khoản</a></li>
     </ol>
+    <a class="pl" href="#phu-luc-zalo">Phụ lục: Nhóm Zalo theo cụm</a>
   </nav>
 
   <main>
@@ -285,7 +297,7 @@ footer{border-top:1px solid var(--line);padding-inline:16px;padding-block:24px;t
         <li><b>Đánh giá đầu ra và chứng nhận</b><span>Làm bài đánh giá cuối khóa và phiếu khảo sát đánh giá khóa học (bắt buộc để hoàn tất).</span></li>
       </ol>
       <div class="note info"><b>Việc cần làm ngay bây giờ (khóa An Giang)</b><p>Đăng nhập (<a href="#dang-nhap">Phần 3</a>) → bổ sung hồ sơ, chọn đúng Đối tượng (<a href="#ho-so">Phần 6</a>) → làm 2 phiếu khảo sát (<a href="#khao-sat">Phần 7</a>).</p></div>
-      <div class="note ok"><b>Nhóm Zalo hỗ trợ theo cụm: tham gia bất cứ lúc nào sau khi đăng nhập</b><p>Việc này không thuộc giai đoạn nào. Ngay khi đăng nhập được, Thầy/Cô vào mục <b>Lớp học</b>, bấm <span class="ui">Vào nhóm Zalo</span> để nhận thông báo và được hỗ trợ suốt khóa học (<a href="#lop-hoc">Phần 8</a>).</p></div>
+      <div class="note ok"><b>Nhóm Zalo hỗ trợ theo cụm: tham gia bất cứ lúc nào sau khi đăng nhập</b><p>Việc này không thuộc giai đoạn nào. Ngay khi đăng nhập được, Thầy/Cô vào mục <b>Lớp học</b>, bấm <span class="ui">Vào nhóm Zalo</span> để nhận thông báo và được hỗ trợ suốt khóa học (<a href="#lop-hoc">Phần 8</a>). Chưa thấy nút này, Thầy/Cô tra tên trường mình trong <a href="#phu-luc-zalo">Phụ lục: Nhóm Zalo hỗ trợ theo cụm</a> ở cuối tài liệu để tham gia đúng nhóm.</p></div>
     </section>
     <!-- 2 -->
     <section id="chuan-bi">
@@ -778,6 +790,73 @@ Thời điểm gặp lỗi:
         <div>Không chia sẻ mật khẩu, kể cả với đồng nghiệp làm hộ.</div>
       </div>
     </section>
+    <!-- Phụ lục: dữ liệu riêng của khóa, nguồn frontend/src/content/nhomZaloTheoCum.ts -->
+    <section id="phu-luc-zalo">
+      <div class="sec-head"><span class="sec-no">Phụ lục</span><h2>Nhóm Zalo hỗ trợ theo cụm</h2>
+        <p class="lead">Gõ tên trường để biết Thầy/Cô thuộc cụm nào, rồi bấm <span class="ui">Tham gia nhóm Zalo</span> của cụm đó. Không cần đăng nhập.</p></div>
+      <div class="note info"><b>Lưu ý</b><p>Danh sách đơn vị phân theo cụm chỉ phục vụ hỗ trợ học viên trong quá trình bồi dưỡng, <b>không phải danh sách chia lớp</b> chính thức. Căn cứ <b>đơn vị công tác</b> để tham gia đúng nhóm Zalo của cụm mình, không tham gia cùng lúc nhiều nhóm. Mỗi học viên dùng <b>1 tài khoản Zalo</b>, đặt tên tài khoản đúng họ tên của mình.</p></div>
+      <div class="search">
+        <label for="qz" class="ui" style="border:0;background:none;padding:0">Tìm trường</label>
+        <input id="qz" type="search" placeholder="Ví dụ: Cần Đăng" autocomplete="off">
+      </div>
+      <p class="empty" id="emptyz" hidden>Không tìm thấy trường này trong danh sách. Thầy/Cô gửi email tới <b>boiduongnls@hcmue.edu.vn</b> để được hướng dẫn.</p>
+      <div class="pl-grid">
+        <div class="cum">
+          <h3>Cụm hỗ trợ 1</h3>
+          <ol><li>Trường THPT chuyên Huỳnh Mẫn Đạt</li><li>Trường THPT Ngô Sĩ Liên</li><li>Trường THPT Nguyễn Hùng Sơn</li><li>Trường THPT Nguyễn Trung Trực 1</li><li>Trường PT DTNT THCS và THPT An Giang 1</li><li>Trường THCS và THPT Mong Thọ</li><li>Trường THCS và THPT Võ Văn Kiệt</li><li>Trường TH, THCS và THPT Kiên Hải</li><li>Trường TH, THCS và THPT Lại Sơn</li><li>Trung Tâm GDTX An Giang 1</li><li>Trường THCS và THPT An Sơn</li></ol>
+          <a class="copy" href="https://zalo.me/g/jiciclxxj0ianu3mfrov">Tham gia nhóm Zalo</a>
+          <span class="link">https://zalo.me/g/jiciclxxj0ianu3mfrov</span>
+        </div>
+        <div class="cum">
+          <h3>Cụm hỗ trợ 2</h3>
+          <ol><li>Trường THPT Châu Thành</li><li>Trường Trung cấp Kỹ thuật - Tổng hợp An Giang</li><li>Trường Trung cấp An Giang 1</li><li>Trường THPT Hòn Đất</li><li>Trường THPT Sóc Sơn</li><li>Trường THCS và THPT Bình Sơn</li><li>Trường THCS và THPT Nam Thái Sơn</li><li>Trường THCS và THPT Nguyễn Hùng Hiệp</li><li>Trường THCS và THPT Phan Thị Ràng</li><li>Trường THPT Kiên Lương</li><li>Trường THPT Thoại Ngọc Hầu</li><li>Trường THCS và THPT Ba Hòn</li><li>Trung tâm GDNN-GDTX cụm Hà Tiên</li></ol>
+          <a class="copy" href="https://zalo.me/g/187j3jqe6sefqlju6uh5">Tham gia nhóm Zalo</a>
+          <span class="link">https://zalo.me/g/187j3jqe6sefqlju6uh5</span>
+        </div>
+        <div class="cum">
+          <h3>Cụm hỗ trợ 3</h3>
+          <ol><li>Trung tâm GDNN-GDTX cụm Giồng Riềng</li><li>Trường THPT Giồng Riềng</li><li>Trường THCS và THPT Bàn Tân Định</li><li>Trường THCS và THPT Hòa Hưng</li><li>Trường THCS và THPT Hòa Thuận</li><li>Trường THCS và THPT Long Thạnh</li><li>Trường THCS và THPT Thạnh Lộc</li><li>Trường Trung cấp nghề Dân tộc nội trú An Giang</li><li>Trường THPT Nguyễn Thần Hiến</li><li>Trường THCS và THPT Vĩnh Thắng</li><li>Trung tâm GDNN-GDTX cụm Gò Quao</li><li>Trường THCS và THPT Thới Quản</li><li>Trường THCS và THPT Vĩnh Hòa Hưng Bắc</li><li>Trường THPT Gò Quao</li><li>Trường THCS và THPT Định An</li></ol>
+          <a class="copy" href="https://zalo.me/g/makl763buz3ppqibfk7y">Tham gia nhóm Zalo</a>
+          <span class="link">https://zalo.me/g/makl763buz3ppqibfk7y</span>
+        </div>
+        <div class="cum">
+          <h3>Cụm hỗ trợ 4</h3>
+          <ol><li>Trường THCS và THPT Tân Thành</li><li>Trường THPT Tân Hiệp</li><li>Trường THCS và THPT Thạnh Tây</li><li>Trường THPT Thạnh Đông</li><li>Trường THCS và THPT Vĩnh Thuận</li><li>Trường THPT An Minh</li><li>Trường THPT Vĩnh Thuận</li><li>Trường THCS và THPT U Minh Thượng</li><li>Trường THCS và THPT Vĩnh Hòa</li><li>Trường THCS và THPT Vĩnh Phong</li><li>Trường THCS và THPT Đông Thái</li><li>Trường THCS và THPT Minh Thuận</li><li>Trường THCS và THPT Nam Yên</li><li>Trường THPT An Biên</li></ol>
+          <a class="copy" href="https://zalo.me/g/j3za7zgwqhixlueio59b">Tham gia nhóm Zalo</a>
+          <span class="link">https://zalo.me/g/j3za7zgwqhixlueio59b</span>
+        </div>
+        <div class="cum">
+          <h3>Cụm hỗ trợ 5</h3>
+          <ol><li>Trường THCS và THPT Vân Khánh</li><li>Trường THCS và THPT Vĩnh Bình Bắc</li><li>Trường THCS và THPT Nguyễn Văn Xiện</li><li>Trường THPT An Thới</li><li>Trường THPT Dương Đông</li><li>Trường THPT Phú Quốc</li><li>Trung tâm GDNN-GDTX cụm Đặc khu Phú Quốc</li><li>Trường Trung cấp Việt - Hàn Phú Quốc</li><li>Trường THPT An Phú</li><li>Trường THPT Châu Phong</li><li>Trường THPT Châu Phú</li><li>Trường THPT Nguyễn Công Trứ</li><li>Trường THPT Nguyễn Quang Diêu</li><li>Trường THPT Trần Văn Thành</li><li>Trường THPT Vĩnh Trạch</li></ol>
+          <a class="copy" href="https://zalo.me/g/drb3x1mherfsbj7ldn4v">Tham gia nhóm Zalo</a>
+          <span class="link">https://zalo.me/g/drb3x1mherfsbj7ldn4v</span>
+        </div>
+        <div class="cum">
+          <h3>Cụm hỗ trợ 6</h3>
+          <ol><li>Trường THPT Vọng Thê</li><li>Trường PT DTNT THCS và THPT An Giang 2</li><li>Trường THCS và THPT Bình Long</li><li>Trường THCS và THPT Long Bình</li><li>Trường THCS và THPT Phú Tân</li><li>Trung tâm GDNN-GDTX Phú Tân</li><li>Trường THPT Bình Mỹ</li><li>Trường THPT Nguyễn Hiền</li><li>Trường THPT Nguyễn Văn Hưởng</li><li>Trường THPT Vĩnh Bình</li><li>Trường THPT Võ Thị Sáu</li><li>Trường THCS và THPT Vĩnh Hanh</li></ol>
+          <a class="copy" href="https://zalo.me/g/5utluxouvzard8ktl5zv">Tham gia nhóm Zalo</a>
+          <span class="link">https://zalo.me/g/5utluxouvzard8ktl5zv</span>
+        </div>
+        <div class="cum">
+          <h3>Cụm hỗ trợ 7</h3>
+          <ol><li>Trung tâm GDNN-GDTX Tịnh Biên</li><li>Trường THPT Chuyên Thoại Ngọc Hầu</li><li>Trường THPT Nguyễn Trung Trực 2</li><li>Trường THPT Nguyễn Văn Thoại</li><li>Trường THPT Tân Châu</li><li>Trường THPT Vĩnh Xương</li><li>Trường THPT Võ Thành Trinh</li><li>Trường THCS và THPT Cô Tô</li><li>Trung tâm GDTX An Giang 2</li><li>Trung tâm GDNN-GDTX Thoại Sơn</li><li>Trường THPT Cần Đăng</li><li>Trường THPT Chi Lăng</li><li>Trường THPT Hòa Lạc</li><li>Trường THPT Huỳnh Thị Hưởng</li></ol>
+          <a class="copy" href="https://zalo.me/g/jekclf0jbx5jpawcnpec">Tham gia nhóm Zalo</a>
+          <span class="link">https://zalo.me/g/jekclf0jbx5jpawcnpec</span>
+        </div>
+        <div class="cum">
+          <h3>Cụm hỗ trợ 8</h3>
+          <ol><li>Trường THPT Lương Văn Cù</li><li>Trường THPT Nguyễn Khuyến</li><li>Trường THPT Ung Văn Khiêm</li><li>Trường THPT Xuân Tô</li><li>Trường THCS và THPT Mỹ Hòa Hưng</li><li>Trung tâm GDNN-GDTX An Phú</li><li>Trường Trẻ em Khuyết tật An Giang</li><li>Trường THPT Bình Thạnh Đông</li><li>Trường THPT Châu Thị Tế</li><li>Trường THPT Chuyên Thủ Khoa Nghĩa</li><li>Trường THPT Nguyễn Bỉnh Khiêm</li><li>Trường THPT Nguyễn Chí Thanh</li><li>Trường THPT Nguyễn Sinh Sắc</li></ol>
+          <a class="copy" href="https://zalo.me/g/hvwvlnkezun2xbvqj4p8">Tham gia nhóm Zalo</a>
+          <span class="link">https://zalo.me/g/hvwvlnkezun2xbvqj4p8</span>
+        </div>
+        <div class="cum">
+          <h3>Cụm hỗ trợ 9</h3>
+          <ol><li>Trường THPT Thạnh Mỹ Tây</li><li>Trường THPT Tịnh Biên</li><li>Trường THCS và THPT Bình Chánh</li><li>Trường THCS và THPT Vĩnh Lộc</li><li>Trường THPT Ba Chúc</li><li>Trường THPT Châu Văn Liêm</li><li>Trường THPT Chu Văn An</li><li>Trường THPT Long Xuyên</li><li>Trường THPT Nguyễn Hữu Cảnh</li><li>Trường THPT Quốc Thái</li><li>Trung tâm GDNN-GDTX Châu Thành</li><li>Trường Trung cấp Kỹ thuật-Công nghệ An Giang</li></ol>
+          <a class="copy" href="https://zalo.me/g/bmrz4c3zhqxqzt1saisu">Tham gia nhóm Zalo</a>
+          <span class="link">https://zalo.me/g/bmrz4c3zhqxqzt1saisu</span>
+        </div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -807,6 +886,10 @@ Thời điểm gặp lỗi:
   function loc(){var k=bo(q.value.trim()),n=0;items.forEach(function(it){var ok=(!g||it.dataset.g===g)&&(!k||bo(it.textContent).indexOf(k)>-1);it.hidden=!ok;if(ok)n++;if(k&&ok&&n<=3)it.open=true;});empty.hidden=n>0;}
   q.addEventListener('input',loc);
   chips.forEach(function(c){c.addEventListener('click',function(){g=c.dataset.g;chips.forEach(function(x){x.setAttribute('aria-pressed',x===c?'true':'false');});loc();});});
+
+  // Phụ lục nhóm Zalo: lọc theo tên trường (không dấu)
+  var qz=document.getElementById('qz'),cum=[].slice.call(document.querySelectorAll('.cum')),emptyz=document.getElementById('emptyz');
+  qz.addEventListener('input',function(){var k=bo(qz.value.trim()),n=0;cum.forEach(function(c){var co=0;[].slice.call(c.querySelectorAll('li')).forEach(function(li){var ok=!k||bo(li.textContent).indexOf(k)>-1;li.hidden=!ok;if(ok)co++;});c.hidden=co===0;if(co)n++;});emptyz.hidden=n>0;});
 
   // Sao chép
   document.querySelectorAll('[data-copy]').forEach(function(b){b.addEventListener('click',function(){
