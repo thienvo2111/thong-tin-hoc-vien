@@ -536,11 +536,7 @@ function LienHeSection({ contact }: { contact: LienHeHoTro }) {
   return (
     <Box component="section" id="lien-he" style={{ scrollMarginTop: 16 }}>
       <Stack gap={20}>
-        <HeaderPhan
-          soThuTu={13}
-          tieuDe="Liên hệ hỗ trợ và an toàn tài khoản"
-          moTa="Viết email đủ thông tin theo mẫu dưới đây giúp cán bộ hỗ trợ xử lý ngay, không phải hỏi lại."
-        />
+        <HeaderPhan soThuTu={13} tieuDe="Liên hệ hỗ trợ và an toàn tài khoản" moTa={contact.gioiThieu} />
 
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
           <Paper withBorder radius={14} p="lg">

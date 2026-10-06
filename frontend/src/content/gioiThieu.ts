@@ -5,6 +5,7 @@
 // Mục có `cheDo` chỉ hiện khi khớp chế độ triển khai hiện tại ('khao_sat' | 'dang_nhap') — quản trị chọn tại /admin/cau-hinh-khao-sat.
 
 import type { CheDoHocVien } from './trienKhai';
+import { EMAIL_HO_TRO } from './hoTro';
 
 export interface Khoi {
   hien: boolean;
@@ -340,13 +341,18 @@ export const gioiThieu: NoiDungGioiThieu = {
       },
       {
         hoi: 'Tôi kê khai sai thông tin trong phiếu thì sao?',
-        dap: 'Thầy/Cô liên hệ số hỗ trợ ở cuối trang. Thông tin hồ sơ sẽ được mở để kiểm tra, điều chỉnh ở đợt xác nhận cuối khóa, trước khi cấp chứng nhận.',
+        dap: `Thầy/Cô gửi email tới ${EMAIL_HO_TRO}. Thông tin hồ sơ sẽ được mở để kiểm tra, điều chỉnh ở đợt xác nhận cuối khóa, trước khi cấp chứng nhận.`,
         cheDo: 'khao_sat',
       },
-      { hoi: 'Tôi không biết mã định danh của mình?', dap: 'Thầy cô liên hệ bộ phận phụ trách của nhà trường hoặc số hỗ trợ ở cuối trang.', cheDo: 'dang_nhap' },
+      { hoi: 'Tôi không biết mã định danh của mình?', dap: 'Thầy cô liên hệ bộ phận phụ trách của nhà trường hoặc gửi email hỗ trợ.', cheDo: 'dang_nhap' },
       { hoi: 'Mật khẩu lần đầu là gì?', dap: 'Là ngày sinh viết liền theo dạng ngày-tháng-năm, đủ 8 chữ số. Ví dụ: sinh ngày 8/12/1983 thì nhập 08121983.', cheDo: 'dang_nhap' },
-      { hoi: 'Tôi quên mật khẩu mới đã đổi?', dap: 'Thầy cô liên hệ số hỗ trợ. Sau khi xác minh thông tin, cán bộ hỗ trợ sẽ đặt lại mật khẩu về ngày sinh để thầy cô đăng nhập và đổi lại.', cheDo: 'dang_nhap' },
-      { hoi: 'Tài khoản báo tạm khóa?', dap: 'Do nhập sai mật khẩu nhiều lần. Vui lòng chờ 15 phút rồi thử lại, hoặc liên hệ số hỗ trợ.', cheDo: 'dang_nhap' },
+      {
+        hoi: 'Tôi nhập đúng mã định danh và ngày sinh nhưng không đăng nhập được?',
+        dap: `Tài khoản chỉ được tạo cho người có tên trong danh sách học viên (lấy từ CSDL ngành MOET) do Sở/Phòng/nhà trường gửi. Nếu chưa có tên trong danh sách này, hoặc ngày sinh trong danh sách bị sai, hệ thống sẽ báo chung "Mã định danh hoặc mật khẩu không đúng" dù nhập đúng thông tin. Thầy/Cô liên hệ cán bộ phụ trách của nhà trường, hoặc gửi email tới ${EMAIL_HO_TRO} kèm họ tên, ngày sinh, mã định danh MOET (nếu biết), trường, xã/phường, số điện thoại.`,
+        cheDo: 'dang_nhap',
+      },
+      { hoi: 'Tôi quên mật khẩu mới đã đổi?', dap: 'Thầy cô liên hệ hỗ trợ qua email. Sau khi xác minh thông tin, cán bộ hỗ trợ sẽ đặt lại mật khẩu về ngày sinh để thầy cô đăng nhập và đổi lại.', cheDo: 'dang_nhap' },
+      { hoi: 'Tài khoản báo tạm khóa?', dap: 'Do nhập sai mật khẩu nhiều lần. Vui lòng chờ 15 phút rồi thử lại, hoặc liên hệ hỗ trợ qua email.', cheDo: 'dang_nhap' },
       { hoi: 'Thông tin của tôi trên hệ thống chưa đúng?', dap: 'Trong thời gian mở đợt kiểm tra, thầy cô tự sửa trực tiếp trên trang Hồ sơ. Họ tên và ngày sinh sẽ in trên giấy chứng nhận, vì vậy cần kiểm tra kỹ.', cheDo: 'dang_nhap' },
       { hoi: 'Vì sao tôi chưa thấy đường dẫn làm bài đánh giá?', dap: 'Đường dẫn chỉ hiện khi hồ sơ đã đầy đủ và thầy cô đã xác nhận trong đợt xác nhận trước đánh giá. Nếu đã sửa hồ sơ sau khi xác nhận, thầy cô cần xác nhận lại.', cheDo: 'dang_nhap' },
       { hoi: 'Tôi có thể làm trên điện thoại không?', dap: 'Có. Trang được thiết kế để dùng tốt trên điện thoại, kể cả khi mở từ Zalo.' },

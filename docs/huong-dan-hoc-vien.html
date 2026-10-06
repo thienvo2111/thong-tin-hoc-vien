@@ -313,7 +313,7 @@ footer{border-top:1px solid var(--line);padding-inline:16px;padding-block:24px;t
             <div class="body">
               <div class="m-h">Đăng nhập</div>
               <div class="m-sub">Sử dụng mã định danh được cấp để truy cập hệ thống.</div>
-              <div class="m-label">Mã định danh hoặc số CCCD <span class="pin">1</span></div>
+              <div class="m-label">Tên đăng nhập, mã định danh hoặc số CCCD <span class="pin">1</span></div>
               <div class="m-input">7900012345</div>
               <div class="m-label">Mật khẩu <span class="pin">2</span></div>
               <div class="m-input">••••••••<span class="eye" aria-hidden="true"></span></div>
@@ -499,25 +499,22 @@ footer{border-top:1px solid var(--line);padding-inline:16px;padding-block:24px;t
           <div class="note info"><b>Không cần tài khoản khác</b><p>Hệ thống tự chuyển Thầy/Cô sang trang làm phiếu, kèm thông tin đã khai trong hồ sơ (họ tên, đơn vị, đối tượng). Thầy/Cô không phải đăng ký hay nhập lại các thông tin này. Tùy cách Ban tổ chức thiết lập, sau khi bấm có thể hiện thêm một trang với các nút <span class="ui">Làm phiếu khảo sát kĩ năng số</span>, <span class="ui">Làm phiếu đánh giá năng lực số</span>.</p></div>
           <div class="note ok"><b>Sau khi làm xong 2 phiếu</b><p>Ban tổ chức tổng hợp kết quả, xếp mức năng lực (Cơ bản, Thành thạo hoặc Nâng cao) và chia lớp theo trình độ. Thầy/Cô theo dõi nhóm Zalo của cụm để nhận thông báo (<a href="#lop-hoc">Phần 8</a>).</p></div>
         </div>
-        <figure class="mock" aria-label="Minh họa khối khảo sát đầu vào trên Trang chủ khi hồ sơ đã đầy đủ">
+        <figure class="mock" aria-label="Minh họa trang làm khảo sát đầu vào với 2 bài và trạng thái">
           <div class="screen">
-            <div class="addr"><b>boiduongnls.hcmue.edu.vn</b>/toi</div>
-            <div class="topbar"><span class="logo">HCMUE</span><span class="nav"><span class="on">Trang chủ</span><span>Hồ sơ</span><span>Lớp học</span><span>Xác nhận</span><span>Hỗ trợ</span></span><span class="user"><i class="av">N</i>Nguyễn Thị Lan<u>Đăng xuất</u></span><span class="burger" aria-label="Mở menu"></span></div>
+            <div class="addr"><b>boiduongnls.hcmue.edu.vn</b>/toi/danh-gia-dau-vao</div>
+            <div class="topbar"><span class="logo">HCMUE</span><span class="nav"><span>Trang chủ</span><span>Hồ sơ</span><span>Lớp học</span><span>Xác nhận</span><span>Hỗ trợ</span></span><span class="user"><i class="av">N</i>Nguyễn Thị Lan<u>Đăng xuất</u></span><span class="burger" aria-label="Mở menu"></span></div>
             <div class="body">
-              <div class="m-banner ok"><div class="m-row"><b>Khảo sát đầu vào đã mở</b><span class="pin">1</span></div>
-                <span>Hồ sơ đã đầy đủ. Thầy/Cô có thể bắt đầu làm khảo sát đầu vào. <span class="pin">2</span></span>
-                <b style="color:var(--m-fg)">1. Phiếu khảo sát kĩ năng số</b>
-                <div class="m-btn">Mở phiếu khảo sát <span class="pin">3</span></div>
-                <b style="color:var(--m-fg)">2. Phiếu đánh giá năng lực số</b>
-                <div class="m-btn">Mở phiếu đánh giá <span class="pin">4</span></div>
-              </div>
-              <div class="m-tiles">
-                <div class="m-card"><b>Cập nhật hồ sơ</b><span class="m-hint">Xem và chỉnh sửa thông tin cá nhân</span></div>
-                <div class="m-card"><b>Thông tin lớp học</b><span class="m-hint">Lịch học, nhóm Zalo, kết quả đánh giá</span></div>
-              </div>
+              <div class="m-banner ok"><div class="m-row"><b>Hồ sơ đã đầy đủ</b><span class="pin">2</span></div>
+                <span>Thầy/Cô làm lần lượt 2 bài bên dưới. Hệ thống sẽ chuyển sang trang khảo sát và đăng nhập sẵn, không cần nhập lại mật khẩu.</span></div>
+              <div class="m-card"><div class="m-row" style="justify-content:space-between"><b>1. Phiếu khảo sát kĩ năng số</b><span class="m-row"><span class="m-badge ok">Đã hoàn thành</span><span class="pin">5</span></span></div>
+                <span class="m-hint">Hoàn thành lúc 06/10/2026 08:15.</span>
+                <div class="m-btn ghost">Mở lại trang khảo sát <span class="pin">3</span></div></div>
+              <div class="m-card"><div class="m-row" style="justify-content:space-between"><b>2. Phiếu đánh giá năng lực số</b><span class="m-badge">Chưa làm</span></div>
+                <div class="m-btn">Làm bài <span class="pin">4</span></div></div>
+              <div class="m-link" style="justify-content:center">Xem tất cả bài cần làm</div>
             </div>
           </div>
-          <figcaption>Hình 5. Hồ sơ đủ thì khung chuyển xanh và hiện nút làm phiếu</figcaption>
+          <figcaption>Hình. Trang làm khảo sát đầu vào: mỗi bài có trạng thái và nút làm bài</figcaption>
         </figure>
       </div>
     </section>

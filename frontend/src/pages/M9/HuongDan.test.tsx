@@ -29,6 +29,14 @@ describe('M9 — Hướng dẫn sử dụng: 13 phần', () => {
   });
 });
 
+describe('M9 — tài khoản tạo sẵn từ danh sách học viên', () => {
+  it('nội dung có nhắc trường hợp chưa có tên trong danh sách học viên và nhãn "Đã hoàn thành"', () => {
+    const { container } = render();
+    expect(container.textContent).toContain('danh sách học viên');
+    expect(container.textContent).toContain('Đã hoàn thành');
+  });
+});
+
 describe('M9 — bố cục mục lục + nội dung', () => {
   it('hàng mục lục/nội dung cho phép xuống dòng (tránh nội dung bị bóp 0px ở màn hình hẹp)', () => {
     const { container } = render();

@@ -157,6 +157,7 @@ export default function DangNhap() {
                 </Anchor>
                 <Collapse in={hienHuongDan}>
                   <StatusBanner loai="info">
+                    Tài khoản được tạo sẵn từ danh sách học viên; chưa có tên trong danh sách thì chưa đăng nhập được.
                     Thầy/Cô liên hệ bộ phận phụ trách của nhà trường, hoặc gửi email tới{' '}
                     <Anchor href={`mailto:${EMAIL_HO_TRO}`} size="sm">
                       {EMAIL_HO_TRO}

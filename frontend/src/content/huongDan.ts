@@ -60,6 +60,7 @@ export interface TinhHuongLoi {
 
 export interface LienHeHoTro {
   email: string;
+  gioiThieu: string;
   mauEmail: string[];
   anToan: string[];
 }
@@ -128,7 +129,11 @@ export const huongDan: NoiDungHuongDan = {
 
   chuanBi: [
     { tieuDe: 'Thiết bị có mạng', moTa: 'Điện thoại hoặc máy tính. Nên dùng Chrome, Safari, Edge hoặc Cốc Cốc bản mới.' },
-    { tieuDe: 'Mã định danh', moTa: 'Mã định danh trên cơ sở dữ liệu ngành (MOET). Nhà trường cung cấp. Đây là tên đăng nhập.' },
+    {
+      tieuDe: 'Mã định danh',
+      moTa:
+        'Mã định danh trên cơ sở dữ liệu ngành (MOET), lấy theo danh sách học viên nhà trường gửi để tạo tài khoản. Đây là tên đăng nhập.',
+    },
     { tieuDe: 'Ngày tháng năm sinh', moTa: 'Dùng làm mật khẩu lần đầu, viết liền 8 chữ số. Ví dụ: 08121983.' },
     { tieuDe: 'Số CCCD và email', moTa: 'Số căn cước công dân 12 số và một email cá nhân Thầy/Cô thường dùng.' },
     { tieuDe: 'Ứng dụng Zalo', moTa: 'Cài sẵn trên điện thoại để tham gia nhóm Zalo hỗ trợ của cụm.' },
@@ -145,7 +150,8 @@ export const huongDan: NoiDungHuongDan = {
         {
           loai: 'info',
           tieuDe: 'Việc cần làm ngay bây giờ',
-          noiDung: 'Đăng nhập (Phần 3) → bổ sung hồ sơ, chọn đúng Đối tượng (Phần 6) → làm 2 phiếu khảo sát (Phần 7).',
+          noiDung:
+            'Đăng nhập (Phần 3) → bổ sung hồ sơ, chọn đúng Đối tượng (Phần 6) → làm 2 phiếu khảo sát (Phần 7) → kiểm tra cả hai phiếu đã hiện "Đã hoàn thành". Chưa có tên trong danh sách học viên nên không đăng nhập được? Xem Phần 13 hoặc gửi email hỗ trợ.',
         },
       ],
     },
@@ -154,6 +160,11 @@ export const huongDan: NoiDungHuongDan = {
       tieuDe: 'Chuẩn bị trước khi bắt đầu',
       moTa: 'Chuẩn bị sẵn những thứ sau để làm một lần là xong, không bị gián đoạn.',
       ghiChu: [
+        {
+          loai: 'warning',
+          tieuDe: 'Chưa có tên trong danh sách học viên?',
+          noiDung: `Tài khoản không tự đăng ký được. Ban tổ chức tạo sẵn tài khoản cho từng người có tên trong **danh sách học viên**, lấy từ cơ sở dữ liệu ngành (CSDL MOET) do Sở/Phòng/nhà trường gửi. Nếu chưa có tên trong danh sách này, Thầy/Cô chưa đăng nhập được, dù nhập đúng thông tin cũng chỉ hiện thông báo lỗi đăng nhập chung (xem Phần 3). Hãy liên hệ cán bộ phụ trách của nhà trường để được bổ sung vào danh sách, hoặc gửi email tới **${EMAIL_HO_TRO}** kèm họ tên, ngày sinh, mã định danh MOET (nếu biết), trường, xã/phường, số điện thoại (mẫu ở Phần 13).`,
+        },
         {
           loai: 'warning',
           tieuDe: 'Mở đường dẫn từ Zalo',
@@ -169,7 +180,7 @@ export const huongDan: NoiDungHuongDan = {
         'Mở **boiduongnls.hcmue.edu.vn**, bấm [[Đăng nhập cổng học viên]] (hoặc gõ thẳng boiduongnls.hcmue.edu.vn/dang-nhap). Mọi việc tiếp theo, kể cả làm khảo sát, đều thực hiện sau khi đăng nhập.',
       hinh: 'dang-nhap',
       buoc: [
-        'Nhập **mã định danh** do nhà trường cung cấp. Chỉ gồm chữ số, không có dấu cách. Nếu đã bổ sung số CCCD vào hồ sơ, Thầy/Cô cũng có thể đăng nhập bằng số CCCD.',
+        'Nhập **tên đăng nhập, mã định danh hoặc số CCCD**. Mã định danh trên CSDL MOET do nhà trường cung cấp (lấy từ danh sách học viên) — chỉ gồm chữ số, không có dấu cách. Nếu đã bổ sung số CCCD vào hồ sơ, Thầy/Cô cũng có thể đăng nhập bằng số CCCD.',
         'Nhập **mật khẩu**. Lần đầu là ngày sinh viết liền 8 chữ số. Bấm biểu tượng con mắt ở cuối ô để xem lại mình đã gõ đúng chưa.',
         'Bấm [[Đăng nhập]]. Lần đầu, hệ thống sẽ chuyển sang màn hình đổi mật khẩu.',
       ],
@@ -181,6 +192,13 @@ export const huongDan: NoiDungHuongDan = {
             ['25/3/1990', '25031990', '25/03/1990 (có dấu /)'],
             ['1/1/1978', '01011978', '010178 (năm chỉ 2 số)'],
           ],
+        },
+      ],
+      ghiChu: [
+        {
+          loai: 'warning',
+          tieuDe: 'Nhập đúng mà vẫn báo sai?',
+          noiDung: `Hai nguyên nhân thường gặp: (1) Thầy/Cô **chưa có tên trong danh sách học viên** nên chưa có tài khoản; (2) **ngày sinh trong danh sách bị sai** nên mật khẩu lần đầu không đúng như Thầy/Cô nghĩ. Cả hai trường hợp, hệ thống đều chỉ hiện cùng một thông báo lỗi, không phân biệt sai phần nào. Đừng thử lại nhiều lần — sai 5 lần liên tiếp sẽ bị khóa 15 phút. Hãy liên hệ cán bộ phụ trách của nhà trường, hoặc gửi email tới **${EMAIL_HO_TRO}** kèm họ tên, ngày sinh, mã định danh MOET (nếu biết), trường, xã/phường, số điện thoại (mẫu ở Phần 13).`,
         },
       ],
     },
@@ -210,7 +228,8 @@ export const huongDan: NoiDungHuongDan = {
       hinh: 'trang-chu',
       buoc: [
         '**Menu**: *Trang chủ*, *Hồ sơ*, *Lớp học*, *Xác nhận*, *Hỗ trợ*. Tùy giai đoạn, có thể có thêm mục *Đánh giá đầu vào*. Trên máy tính, menu nằm ngang trên thanh xanh ở đầu trang; tên Thầy/Cô và nút [[Đăng xuất]] ở góc phải. Trên điện thoại, bấm nút [[☰]] ở góc phải để mở menu và nút Đăng xuất.',
-        '**Khung trạng thái**. Đọc kỹ khung này mỗi lần đăng nhập. Khung **vàng** liệt kê thông tin còn thiếu: bổ sung xong thì khung chuyển **xanh** và hiện nút làm khảo sát. Bảng dưới giải thích các trạng thái hay gặp.',
+        '**Việc cần làm**. Đọc kỹ mục này mỗi lần đăng nhập. Khung **Khảo sát đầu vào đã mở** màu **vàng** liệt kê thông tin còn thiếu: bổ sung xong thì khung chuyển **xanh** và hiện nút [[Làm khảo sát đầu vào]] (Phần 7). Dưới đó có thể còn khung của đợt xác nhận — bảng đầu tiên dưới đây giải thích các khung hay gặp.',
+        '**Các thẻ chức năng**. Ngay dưới mục Việc cần làm là các thẻ *Cập nhật hồ sơ*, *Thông tin lớp học*, *Khảo sát đầu vào*, *Đánh giá đầu ra*. Thẻ khóa (🔒, mờ) nghĩa là chưa làm được, kèm lý do ngay dưới tên thẻ — bảng thứ hai dưới đây giải thích các dòng ghi chú hay gặp ở thẻ **📝 Khảo sát đầu vào**.',
         '**Lối tắt** vào trang Hồ sơ và trang Lớp học. Vào *Thông tin lớp học* để tham gia nhóm Zalo của cụm ngay (Phần 8).',
       ],
       bang: [
@@ -225,7 +244,7 @@ export const huongDan: NoiDungHuongDan = {
             [
               'Khảo sát đầu vào đã mở · Hồ sơ đã đầy đủ (khung xanh)',
               'Đủ điều kiện làm khảo sát.',
-              'Bấm nút làm khảo sát, xem Phần 7.',
+              'Bấm [[Làm khảo sát đầu vào]], xem Phần 7.',
             ],
             ['Còn thông tin cần bổ sung · Hạn …', 'Đợt xác nhận đang mở, hồ sơ còn thiếu.', 'Bấm [[Bổ sung thông tin]], xem Phần 6.'],
             [
@@ -242,6 +261,39 @@ export const huongDan: NoiDungHuongDan = {
               'Nếu hồ sơ đủ, bấm nút làm bài trong khung. Nếu chưa đủ, bổ sung hồ sơ trước.',
             ],
           ],
+        },
+        {
+          cot: ['Thẻ "📝 Khảo sát đầu vào" ghi chú', 'Ý nghĩa', 'Thầy/Cô cần làm'],
+          hang: [
+            [
+              '🔒 Đã mở nhưng chưa kích hoạt được: cần cập nhật đủ … thông tin hồ sơ',
+              'Khảo sát đã mở nhưng hồ sơ còn thiếu, thẻ bị khóa.',
+              'Xem khung vàng ở mục Việc cần làm, bổ sung hồ sơ (Phần 6).',
+            ],
+            [
+              'Đã mở — bấm để bắt đầu',
+              'Hồ sơ đủ, có thể làm khảo sát ngay.',
+              'Bấm vào thẻ để sang trang làm khảo sát (Phần 7).',
+            ],
+            [
+              'Đã có kết quả: Mức Cơ bản / Thành thạo / Nâng cao',
+              'Đã hoàn thành cả 2 phiếu và đã có kết quả xếp mức.',
+              'Không cần làm gì thêm. Bấm vào thẻ để xem lớp học (Phần 8).',
+            ],
+            [
+              '🔒 Chưa mở. Thông báo sẽ hiện tại trang này khi khảo sát được mở',
+              'Ban tổ chức chưa mở khảo sát đầu vào.',
+              'Chờ thông báo, không cần làm gì.',
+            ],
+          ],
+        },
+      ],
+      ghiChu: [
+        {
+          loai: 'success',
+          tieuDe: 'Khung "Có cập nhật mới"',
+          noiDung:
+            'Khung màu xanh này tự hiện ở đầu trang khi có kết quả đánh giá mới hoặc Thầy/Cô vừa được chia lớp. Bấm [[Xem lớp học]] để xem ngay, hoặc [[Đã xem]] để ẩn khung.',
         },
       ],
     },
@@ -292,26 +344,53 @@ export const huongDan: NoiDungHuongDan = {
       id: 'khao-sat',
       tieuDe: 'Làm khảo sát đầu vào',
       moTa:
-        'Khảo sát làm ngay trên hệ thống, sau khi đăng nhập. Khối khảo sát trên Trang chủ **chỉ mở khi hồ sơ đã đủ thông tin**. Phải làm phiếu 1 xong rồi mới làm phiếu 2.',
+        'Khảo sát làm ngay trên hệ thống, sau khi đăng nhập. Khối khảo sát trên Trang chủ **chỉ mở khi hồ sơ đã đủ thông tin** (Phần 6). Làm lần lượt 2 phiếu: khảo sát kĩ năng số trước, rồi đánh giá năng lực số.',
       hinh: 'khao-sat',
       buoc: [
-        'Vào **Trang chủ**, tìm khung **Khảo sát đầu vào đã mở**. Nếu khung màu vàng còn liệt kê thông tin cần cập nhật, quay lại Phần 6 để bổ sung.',
-        'Khi khung chuyển màu xanh với dòng *"Hồ sơ đã đầy đủ. Thầy/Cô có thể bắt đầu làm khảo sát đầu vào."*, bấm nút làm khảo sát trong khung.',
-        'Làm **Phiếu 1 – Khảo sát kĩ năng số**. Trả lời hết các câu, bấm gửi ở cuối phiếu.',
-        'Quay lại hệ thống (bấm nút Quay lại của trình duyệt hoặc mở lại boiduongnls.hcmue.edu.vn), làm tiếp **Phiếu 2 – Đánh giá năng lực số** và bấm gửi.',
+        'Vào **Trang chủ** (boiduongnls.hcmue.edu.vn/toi), tìm khung **Khảo sát đầu vào đã mở**. Nếu khung màu vàng còn liệt kê thông tin cần cập nhật, quay lại Phần 6 để bổ sung hồ sơ trước.',
+        'Khi khung chuyển màu xanh với dòng *"Hồ sơ đã đầy đủ. Thầy/Cô có thể bắt đầu làm khảo sát đầu vào."*, bấm [[Làm khảo sát đầu vào]]. Trang hiện ra với 2 phiếu: *"1. Phiếu khảo sát kĩ năng số"* và *"2. Phiếu đánh giá năng lực số"*.',
+        'Ở phiếu **"1. Phiếu khảo sát kĩ năng số"**, bấm [[Làm bài]]. Hệ thống khảo sát mở ra ngay, đã đăng nhập sẵn — không cần nhập lại mật khẩu. Trả lời hết các câu rồi bấm nút nộp bài ở cuối phiếu.',
+        'Quay lại **boiduongnls.hcmue.edu.vn**, vào **Trang chủ**, bấm lại [[Làm khảo sát đầu vào]]. Ở phiếu **"2. Phiếu đánh giá năng lực số"**, bấm [[Làm bài]] (hoặc [[Làm tiếp]] nếu đã mở trước đó), làm tương tự rồi nộp bài.',
+        'Kiểm tra cả hai phiếu đã chuyển sang nhãn **"Đã hoàn thành"**. Trạng thái có thể cập nhật chậm vài phút sau khi nộp — tải lại trang nếu chưa thấy đổi.',
+      ],
+      bang: [
+        {
+          cot: ['Nhãn trên phiếu', 'Ý nghĩa', 'Thầy/Cô cần làm'],
+          hang: [
+            ['Chưa làm', 'Chưa bấm vào làm phiếu này.', 'Bấm [[Làm bài]].'],
+            [
+              'Đã mở, chưa nộp',
+              'Đã mở phiếu nhưng hệ thống chưa nhận được bài nộp.',
+              'Bấm [[Làm tiếp]], vào kiểm tra và bấm nộp bài.',
+            ],
+            ['Đang làm', 'Đang làm phiếu, chưa nộp xong.', 'Bấm [[Làm tiếp]] để làm tiếp và nộp bài.'],
+            [
+              'Cần kiểm tra lại',
+              'Mở phiếu đã lâu nhưng hệ thống vẫn chưa nhận được bài nộp.',
+              'Bấm [[Mở lại trang khảo sát]], vào lại kiểm tra và bấm nộp bài.',
+            ],
+            ['Đã hoàn thành', 'Đã nộp bài thành công.', 'Không cần làm gì thêm.'],
+          ],
+        },
       ],
       ghiChu: [
         {
           loai: 'info',
           tieuDe: 'Không cần tài khoản khác',
           noiDung:
-            'Hệ thống tự chuyển Thầy/Cô sang trang làm phiếu, kèm thông tin đã khai trong hồ sơ (họ tên, đơn vị, đối tượng). Thầy/Cô không phải đăng ký hay nhập lại các thông tin này. Tùy cách Ban tổ chức thiết lập, sau khi bấm có thể hiện thêm một trang với các nút [[Làm phiếu khảo sát kĩ năng số]], [[Làm phiếu đánh giá năng lực số]].',
+            'Hệ thống tự mở trang khảo sát và đăng nhập sẵn bằng thông tin đã khai trong hồ sơ (họ tên, đơn vị, đối tượng) — Thầy/Cô không phải đăng ký hay nhập lại mật khẩu. Việc chuyển trang diễn ra ngay trên tab đang mở, không mở cửa sổ mới.',
+        },
+        {
+          loai: 'warning',
+          tieuDe: 'Trang khảo sát báo liên kết đã hết hạn?',
+          noiDung:
+            'Mã truy cập chỉ có giá trị vài phút kể từ lúc bấm nút. Mở chậm hoặc để lâu không bấm, hệ thống khảo sát sẽ báo liên kết hết hạn hoặc không vào được. Quay lại **Trang chủ**, bấm lại [[Làm khảo sát đầu vào]] rồi bấm nút của phiếu ([[Làm bài]]/[[Làm tiếp]]) để lấy mã mới.',
         },
         {
           loai: 'success',
           tieuDe: 'Sau khi làm xong 2 phiếu',
           noiDung:
-            'Ban tổ chức tổng hợp kết quả, xếp mức năng lực (Cơ bản, Thành thạo hoặc Nâng cao) và chia lớp theo trình độ. Thầy/Cô theo dõi nhóm Zalo của cụm để nhận thông báo (Phần 8).',
+            'Khi cả hai phiếu đều hiện nhãn "Đã hoàn thành", Ban tổ chức sẽ tổng hợp kết quả, xếp mức năng lực (Cơ bản, Thành thạo hoặc Nâng cao) và chia lớp theo trình độ. Thầy/Cô theo dõi nhóm Zalo của cụm để nhận thông báo (Phần 8).',
         },
       ],
     },
@@ -455,13 +534,15 @@ export const huongDan: NoiDungHuongDan = {
       nhom: 'dang-nhap',
       nhanNhom: 'Đăng nhập',
       tinhHuong: '"Mã định danh hoặc mật khẩu không đúng"',
-      nguyenNhan: 'Sai mã hoặc sai mật khẩu. Vì lý do bảo mật, hệ thống không nói rõ sai phần nào.',
+      nguyenNhan:
+        'Sai mã hoặc sai mật khẩu. Cũng có thể do Thầy/Cô chưa có tên trong danh sách học viên (chưa có tài khoản) hoặc ngày sinh trong danh sách bị sai. Vì lý do bảo mật, hệ thống không nói rõ nguyên nhân nào.',
       cachXuLy: [
         'Kiểm tra mã định danh: chỉ chữ số, không dấu cách, đúng mã nhà trường gửi.',
         'Lần đầu: mật khẩu là ngày sinh đủ 8 số, có số 0 ở đầu ngày/tháng (dùng công cụ ở Phần 3).',
         'Nếu đã đổi mật khẩu trước đó: dùng mật khẩu mới, không dùng ngày sinh.',
         'Bấm biểu tượng con mắt để xem lại mật khẩu đã gõ; chú ý chữ hoa, chữ thường.',
         'Đừng thử quá 5 lần liên tiếp. Nếu vẫn không được, xem Phần 10.',
+        `Vẫn không vào được dù chắc chắn đúng: có thể chưa có tên trong danh sách học viên, hoặc ngày sinh trong danh sách bị sai. Liên hệ cán bộ phụ trách của nhà trường, hoặc gửi email tới ${EMAIL_HO_TRO} theo mẫu ở Phần 13.`,
       ],
     },
     {
@@ -488,6 +569,17 @@ export const huongDan: NoiDungHuongDan = {
       tinhHuong: 'Không biết mã định danh của mình',
       nguyenNhan: 'Mã định danh là mã của Thầy/Cô trên cơ sở dữ liệu ngành giáo dục.',
       cachXuLy: ['Liên hệ cán bộ phụ trách của nhà trường.', 'Hoặc gửi email hỗ trợ kèm họ tên, ngày sinh, trường công tác.'],
+    },
+    {
+      nhom: 'dang-nhap',
+      nhanNhom: 'Đăng nhập',
+      tinhHuong: 'Chưa có tên trong danh sách học viên, chưa có mã định danh',
+      nguyenNhan:
+        'Tài khoản không tự đăng ký được. Ban tổ chức chỉ tạo tài khoản cho người có tên trong danh sách học viên, lấy từ cơ sở dữ liệu ngành (CSDL MOET) do Sở/Phòng/nhà trường gửi. Chưa có tên trong danh sách này thì chưa có tài khoản để đăng nhập.',
+      cachXuLy: [
+        'Liên hệ cán bộ phụ trách của nhà trường để được bổ sung vào danh sách học viên.',
+        `Hoặc gửi email tới ${EMAIL_HO_TRO} kèm họ tên, ngày sinh, mã định danh MOET (nếu biết), trường, xã/phường, số điện thoại (mẫu ở Phần 13).`,
+      ],
     },
     {
       nhom: 'dang-nhap',
@@ -622,6 +714,40 @@ export const huongDan: NoiDungHuongDan = {
     },
     {
       nhom: 'khao-sat',
+      nhanNhom: 'Khảo sát',
+      tinhHuong: 'Bài khảo sát hiện nhãn "Cần kiểm tra lại"',
+      nguyenNhan: 'Thầy/Cô đã mở phiếu khảo sát từ lâu nhưng hệ thống chưa nhận được bài nộp.',
+      cachXuLy: [
+        'Bấm [[Mở lại trang khảo sát]].',
+        'Vào lại phiếu, kiểm tra các câu đã trả lời và bấm nút nộp bài ở cuối phiếu.',
+        `Vẫn không hết: gửi yêu cầu hỗ trợ hoặc email tới ${EMAIL_HO_TRO}, ghi rõ đã làm phiếu nào.`,
+      ],
+    },
+    {
+      nhom: 'khao-sat',
+      nhanNhom: 'Khảo sát',
+      tinhHuong: 'Đã làm xong nhưng vẫn hiện "Chưa làm" hoặc "Đã mở, chưa nộp"',
+      nguyenNhan:
+        'Trạng thái lấy từ hệ thống khảo sát, có thể cập nhật chậm vài phút sau khi nộp bài; hoặc Thầy/Cô chưa bấm nút nộp bài ở cuối phiếu.',
+      cachXuLy: [
+        'Chờ vài phút rồi tải lại trang.',
+        'Bấm [[Làm tiếp]], kiểm tra đã bấm nút nộp bài ở cuối phiếu chưa.',
+        'Sau 30 phút vẫn không đổi: gửi yêu cầu hỗ trợ hoặc email, ghi rõ thời điểm đã nộp bài.',
+      ],
+    },
+    {
+      nhom: 'khao-sat',
+      nhanNhom: 'Khảo sát',
+      tinhHuong: 'Trang khảo sát báo liên kết hết hạn, hoặc không vào được sau khi bấm [[Làm bài]]',
+      nguyenNhan: 'Mã truy cập chỉ có giá trị vài phút kể từ lúc bấm nút.',
+      cachXuLy: [
+        'Quay lại Trang chủ trên boiduongnls.hcmue.edu.vn.',
+        'Bấm lại [[Làm khảo sát đầu vào]] rồi bấm nút của phiếu để lấy mã mới.',
+        'Vẫn lỗi: gửi yêu cầu hỗ trợ, chụp màn hình thông báo lỗi.',
+      ],
+    },
+    {
+      nhom: 'khao-sat',
       nhanNhom: 'Zalo',
       tinhHuong: 'Không thấy khối "Cụm hỗ trợ Zalo" trong trang Lớp học',
       nguyenNhan: 'Ban tổ chức chưa xếp Thầy/Cô vào cụm hỗ trợ.',
@@ -680,12 +806,14 @@ export const huongDan: NoiDungHuongDan = {
 
   contact: {
     email: EMAIL_HO_TRO,
+    gioiThieu:
+      'Viết email đủ thông tin theo mẫu dưới đây giúp cán bộ hỗ trợ xử lý ngay, không phải hỏi lại. Thầy/Cô **chưa đăng nhập được vì chưa có tên trong danh sách học viên** cũng dùng email này — đây là cách duy nhất để liên hệ trong trường hợp đó, vì mục Hỗ trợ trong hệ thống (Phần 11) cần đăng nhập mới dùng được.',
     mauEmail: [
       'Tiêu đề: [Hỗ trợ BDNLS] Họ tên – vấn đề gặp phải',
       '',
       'Họ và tên:',
       'Ngày sinh:',
-      'Mã định danh (nếu biết):',
+      'Mã định danh MOET (nếu biết):',
       'Trường công tác, xã/phường, tỉnh/thành:',
       'Số điện thoại:',
       'Vấn đề gặp phải (đang làm bước nào, màn hình báo gì):',
