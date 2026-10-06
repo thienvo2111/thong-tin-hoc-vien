@@ -32,6 +32,8 @@ import { AdminPageHeader } from './AdminPageHeader';
 
 const SO_DONG_CHO_DUYET = 8;
 
+const KHAO_SAT_RONG: KhaoSatMucRow = { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0, chua_xep_muc: 0 };
+
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 
 function phanTram(tu: number, mau: number): string {
@@ -110,7 +112,8 @@ function KhoiKhaoSat({ nhan, duLieu, tongThamGia }: { nhan: string; duLieu: Khao
     { name: 'Cơ bản', value: duLieu.co_ban, color: 'primary.3' },
     { name: 'Thành thạo', value: duLieu.thanh_thao, color: 'primary.5' },
     { name: 'Nâng cao', value: duLieu.nang_cao, color: 'primary.7' },
-  ];
+    { name: 'Chưa xếp mức', value: duLieu.chua_xep_muc, color: 'gray.4' },
+  ].filter((s) => s.name !== 'Chưa xếp mức' || s.value > 0);
   return (
     <Stack gap={10} align="center">
       <Text fz={13.5} fw={700}>
@@ -284,8 +287,8 @@ function KhoiTongQuanMoRong() {
           <Skeleton height={220} />
         ) : (
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xl">
-            <KhoiKhaoSat nhan="Đầu vào" duLieu={tongQuan.data?.khao_sat.dau_vao ?? { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0 }} tongThamGia={tongThamGia} />
-            <KhoiKhaoSat nhan="Đầu ra" duLieu={tongQuan.data?.khao_sat.dau_ra ?? { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0 }} tongThamGia={tongThamGia} />
+            <KhoiKhaoSat nhan="Đầu vào" duLieu={tongQuan.data?.khao_sat.dau_vao ?? KHAO_SAT_RONG} tongThamGia={tongThamGia} />
+            <KhoiKhaoSat nhan="Đầu ra" duLieu={tongQuan.data?.khao_sat.dau_ra ?? KHAO_SAT_RONG} tongThamGia={tongThamGia} />
           </SimpleGrid>
         )}
       </Paper>

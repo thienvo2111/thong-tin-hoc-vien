@@ -26,6 +26,7 @@ describe('BaoCaoService.tongQuan', () => {
     phan_lop_giai_doan: { findMany: jest.Mock };
     nguoi_dung: { count: jest.Mock };
     lich_su_thay_doi_ho_so: { findMany: jest.Mock };
+    ket_qua_khao_sat: { findMany: jest.Mock };
   };
   let scopeService: {
     getAccessibleDonViIds: jest.Mock;
@@ -38,6 +39,7 @@ describe('BaoCaoService.tongQuan', () => {
       phan_lop_giai_doan: { findMany: jest.fn().mockResolvedValue([]) },
       nguoi_dung: { count: jest.fn().mockResolvedValue(0) },
       lich_su_thay_doi_ho_so: { findMany: jest.fn().mockResolvedValue([]) },
+      ket_qua_khao_sat: { findMany: jest.fn().mockResolvedValue([]) },
     };
     scopeService = {
       getAccessibleDonViIds: jest.fn(),
@@ -103,13 +105,81 @@ describe('BaoCaoService.tongQuan', () => {
       co_ban: 1,
       thanh_thao: 1,
       nang_cao: 0,
+      chua_xep_muc: 0,
     });
     expect(result.khao_sat.dau_ra).toEqual({
       da_lam: 1,
       co_ban: 0,
       thanh_thao: 0,
       nang_cao: 1,
+      chua_xep_muc: 0,
     });
+  });
+
+  it('khảo sát lấy từ ket_qua_khao_sat (hoàn thành) khi chưa có mức xác nhận', async () => {
+    scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
+    prisma.dang_ky_hoc.findMany.mockResolvedValue([
+      { hoc_vien_id: 'hv-1', muc_dau_vao: null, muc_dau_ra: null },
+      { hoc_vien_id: 'hv-2', muc_dau_vao: null, muc_dau_ra: null },
+      { hoc_vien_id: 'hv-3', muc_dau_vao: null, muc_dau_ra: null },
+      { hoc_vien_id: 'hv-4', muc_dau_vao: null, muc_dau_ra: null },
+    ]);
+    prisma.ket_qua_khao_sat.findMany.mockResolvedValue([
+      // hv-1: chỉ làm khảo sát kĩ năng số, chưa có mức
+      { hoc_vien_id: 'hv-1', loai: 'khao-sat', muc: null },
+      // hv-2: có đánh giá năng lực -> ưu tiên mức đánh giá
+      { hoc_vien_id: 'hv-2', loai: 'khao-sat', muc: null },
+      { hoc_vien_id: 'hv-2', loai: 'danh-gia', muc: 'thanh_thao' },
+      { hoc_vien_id: 'hv-2', loai: 'dau-ra', muc: 'nang_cao' },
+      // hv-3: đánh giá chưa có mức, khảo sát có mức -> lấy mức khảo sát
+      { hoc_vien_id: 'hv-3', loai: 'khao-sat', muc: 'co_ban' },
+      { hoc_vien_id: 'hv-3', loai: 'danh-gia', muc: null },
+    ]);
+
+    const result = await service.tongQuan({}, caller());
+
+    expect(prisma.ket_qua_khao_sat.findMany).toHaveBeenCalledWith({
+      where: {
+        hoc_vien_id: { in: ['hv-1', 'hv-2', 'hv-3', 'hv-4'] },
+        trang_thai: 'hoan_thanh',
+      },
+      select: { hoc_vien_id: true, loai: true, muc: true },
+    });
+    expect(result.khao_sat.dau_vao).toEqual({
+      da_lam: 3,
+      co_ban: 1,
+      thanh_thao: 1,
+      nang_cao: 0,
+      chua_xep_muc: 1,
+    });
+    expect(result.khao_sat.dau_ra).toEqual({
+      da_lam: 1,
+      co_ban: 0,
+      thanh_thao: 0,
+      nang_cao: 1,
+      chua_xep_muc: 0,
+    });
+  });
+
+  it('mức quản trị xác nhận (dang_ky_hoc) ưu tiên hơn mức bài khảo sát báo về', async () => {
+    scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
+    prisma.dang_ky_hoc.findMany.mockResolvedValue([
+      { hoc_vien_id: 'hv-1', muc_dau_vao: 'nang_cao', muc_dau_ra: null },
+    ]);
+    prisma.ket_qua_khao_sat.findMany.mockResolvedValue([
+      { hoc_vien_id: 'hv-1', loai: 'danh-gia', muc: 'co_ban' },
+    ]);
+
+    const result = await service.tongQuan({}, caller());
+
+    expect(result.khao_sat.dau_vao).toEqual({
+      da_lam: 1,
+      co_ban: 0,
+      thanh_thao: 0,
+      nang_cao: 1,
+      chua_xep_muc: 0,
+    });
+    expect(result.khao_sat.dau_ra.da_lam).toBe(0);
   });
 
   it('kết quả theo hình thức nhóm đúng theo loai_lop + ket_qua, bỏ qua ket_qua NULL', async () => {

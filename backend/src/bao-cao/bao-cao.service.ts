@@ -698,7 +698,8 @@ export class BaoCaoService {
       new Set(dangKyRows.map((r) => r.hoc_vien_id)),
     );
 
-    const [daDangNhap, hoSoDaSuaRows, phanLopRows] = await Promise.all([
+    const [daDangNhap, hoSoDaSuaRows, phanLopRows, ketQuaKhaoSatRows] =
+      await Promise.all([
       hocVienIds.length === 0
         ? Promise.resolve(0)
         : this.prisma.nguoi_dung.count({
@@ -723,6 +724,15 @@ export class BaoCaoService {
           dang_ky_hoc: { select: { ket_qua: true } },
         },
       }),
+      hocVienIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.ket_qua_khao_sat.findMany({
+            where: {
+              hoc_vien_id: { in: hocVienIds },
+              trang_thai: 'hoan_thanh',
+            },
+            select: { hoc_vien_id: true, loai: true, muc: true },
+          }),
     ]);
 
     // Phân lớp theo giai đoạn (spec 2026-10-02): 1 đăng ký có thể học cùng
@@ -743,10 +753,7 @@ export class BaoCaoService {
       tong_hoc_vien_tham_gia: dangKyRows.length,
       da_dang_nhap: daDangNhap,
       da_chinh_sua_ho_so: hoSoDaSuaRows.length,
-      khao_sat: {
-        dau_vao: this.demKhaoSat(dangKyRows.map((r) => r.muc_dau_vao)),
-        dau_ra: this.demKhaoSat(dangKyRows.map((r) => r.muc_dau_ra)),
-      },
+      khao_sat: this.gopKhaoSat(dangKyRows, ketQuaKhaoSatRows),
       ket_qua_theo_hinh_thuc: this.demKetQuaTheoHinhThuc([
         ...theoHinhThuc.values(),
       ]),
@@ -773,19 +780,52 @@ export class BaoCaoService {
     return where;
   }
 
-  private demKhaoSat(gia_tri: (string | null)[]): KhaoSatMucRow {
+  // Kết quả khảo sát thật nằm ở ket_qua_khao_sat (SSO/API/import, theo học
+  // viên); dang_ky_hoc.muc_dau_vao/muc_dau_ra là mức quản trị xác nhận (nhập
+  // file) — ưu tiên mức xác nhận, thiếu thì lấy mức bài khảo sát báo về.
+  // Đầu vào = 'danh-gia' (ưu tiên, có mức) hoặc 'khao-sat'; đầu ra = 'dau-ra'.
+  private gopKhaoSat(
+    dangKyRows: {
+      hoc_vien_id: string;
+      muc_dau_vao: string | null;
+      muc_dau_ra: string | null;
+    }[],
+    ketQuaRows: { hoc_vien_id: string; loai: string; muc: string | null }[],
+  ): TongQuanResult['khao_sat'] {
+    const kq = new Map<string, string | null>();
+    for (const r of ketQuaRows) kq.set(`${r.hoc_vien_id}|${r.loai}`, r.muc);
+    const bai = (hv: string, loai: string) =>
+      kq.has(`${hv}|${loai}`) ? (kq.get(`${hv}|${loai}`) ?? null) : undefined;
+
+    const dauVao = dangKyRows.map((r) => {
+      if (r.muc_dau_vao) return r.muc_dau_vao;
+      const danhGia = bai(r.hoc_vien_id, 'danh-gia');
+      const khaoSat = bai(r.hoc_vien_id, 'khao-sat');
+      if (danhGia === undefined) return khaoSat;
+      return danhGia ?? khaoSat ?? null;
+    });
+    const dauRa = dangKyRows.map(
+      (r) => r.muc_dau_ra ?? bai(r.hoc_vien_id, 'dau-ra'),
+    );
+    return { dau_vao: this.demKhaoSat(dauVao), dau_ra: this.demKhaoSat(dauRa) };
+  }
+
+  /** undefined = chưa làm; null = đã làm nhưng chưa xếp mức. */
+  private demKhaoSat(gia_tri: (string | null | undefined)[]): KhaoSatMucRow {
     const row: KhaoSatMucRow = {
       da_lam: 0,
       co_ban: 0,
       thanh_thao: 0,
       nang_cao: 0,
+      chua_xep_muc: 0,
     };
     for (const muc of gia_tri) {
-      if (!muc) continue;
+      if (muc === undefined) continue;
       row.da_lam += 1;
       if (muc === 'co_ban') row.co_ban += 1;
       else if (muc === 'thanh_thao') row.thanh_thao += 1;
       else if (muc === 'nang_cao') row.nang_cao += 1;
+      else row.chua_xep_muc += 1;
     }
     return row;
   }
@@ -819,8 +859,8 @@ export class BaoCaoService {
       da_dang_nhap: 0,
       da_chinh_sua_ho_so: 0,
       khao_sat: {
-        dau_vao: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0 },
-        dau_ra: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0 },
+        dau_vao: this.demKhaoSat([]),
+        dau_ra: this.demKhaoSat([]),
       },
       ket_qua_theo_hinh_thuc: LOAI_LOP_HOC.map((loai) => ({
         loai_lop: loai,

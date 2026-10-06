@@ -360,8 +360,8 @@ export function taoBaoCaoTongQuanMau(): TongQuanResult {
     da_dang_nhap: 7,
     da_chinh_sua_ho_so: 4,
     khao_sat: {
-      dau_vao: { da_lam: 8, co_ban: 3, thanh_thao: 3, nang_cao: 2 },
-      dau_ra: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0 },
+      dau_vao: { da_lam: 8, co_ban: 3, thanh_thao: 3, nang_cao: 2, chua_xep_muc: 0 },
+      dau_ra: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0, chua_xep_muc: 0 },
     },
     ket_qua_theo_hinh_thuc: [
       { loai_lop: 'truc_tiep', dang_hoc: 5, dat: 3, khong_dat: 1, vang: 1 },

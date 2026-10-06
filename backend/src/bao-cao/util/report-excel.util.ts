@@ -327,6 +327,7 @@ export async function buildTongQuanWorkbook(
     'Cơ bản',
     'Thành thạo',
     'Nâng cao',
+    'Chưa xếp mức',
   ]);
   sheetKhaoSat.getRow(1).font = { bold: true };
   sheetKhaoSat.addRow([
@@ -335,6 +336,7 @@ export async function buildTongQuanWorkbook(
     result.khao_sat.dau_vao.co_ban,
     result.khao_sat.dau_vao.thanh_thao,
     result.khao_sat.dau_vao.nang_cao,
+    result.khao_sat.dau_vao.chua_xep_muc,
   ]);
   sheetKhaoSat.addRow([
     'Đầu ra',
@@ -342,6 +344,7 @@ export async function buildTongQuanWorkbook(
     result.khao_sat.dau_ra.co_ban,
     result.khao_sat.dau_ra.thanh_thao,
     result.khao_sat.dau_ra.nang_cao,
+    result.khao_sat.dau_ra.chua_xep_muc,
   ]);
 
   const sheetKetQua = workbook.addWorksheet('Kết quả theo hình thức');

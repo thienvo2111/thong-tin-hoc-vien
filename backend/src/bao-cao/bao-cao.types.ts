@@ -150,6 +150,8 @@ export interface KhaoSatMucRow {
   co_ban: number;
   thanh_thao: number;
   nang_cao: number;
+  /** Đã hoàn thành bài nhưng hệ thống khảo sát chưa báo mức. */
+  chua_xep_muc: number;
 }
 
 export interface KetQuaTheoHinhThucRow {

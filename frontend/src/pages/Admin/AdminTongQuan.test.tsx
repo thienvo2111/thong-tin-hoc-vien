@@ -117,8 +117,8 @@ describe('Admin — Tổng quan mở rộng (bộ lọc + biểu đồ)', () => 
           da_dang_nhap: 2,
           da_chinh_sua_ho_so: 1,
           khao_sat: {
-            dau_vao: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0 },
-            dau_ra: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0 },
+            dau_vao: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0, chua_xep_muc: 0 },
+            dau_ra: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0, chua_xep_muc: 0 },
           },
           ket_qua_theo_hinh_thuc: [
             { loai_lop: 'truc_tiep', dang_hoc: 0, dat: 0, khong_dat: 0, vang: 0 },
