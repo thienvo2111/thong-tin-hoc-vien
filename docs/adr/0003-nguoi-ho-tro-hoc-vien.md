@@ -1,7 +1,7 @@
 # ADR 0003 — Tài khoản Người hỗ trợ học viên theo cụm hỗ trợ Zalo
 
 - Ngày: 2026-10-06
-- Trạng thái: Đã chấp nhận (chưa code)
+- Trạng thái: Đã chấp nhận — Lát 1 (tài khoản + phân công, #10) đã code 2026-10-06; Lát 2–4 chưa
 - Đặc tả: [`docs/superpowers/specs/2026-10-06-ho-tro-hoc-vien-design.md`](../superpowers/specs/2026-10-06-ho-tro-hoc-vien-design.md)
 - Liên quan: ADR 0002 (tài khoản đơn vị — tái dùng luồng cấp tài khoản), QĐ10 (`cum_hoc_vien`), M8 (`yeu_cau_ho_tro`)
 
@@ -16,7 +16,7 @@ Học viên An Giang phải **đăng nhập cổng mới làm được khảo s�
 | H1 | Phạm vi = **cụm hỗ trợ** `cum_hoc_vien`; học viên thuộc cụm qua `dang_ky_hoc.cum_id` (đúng cụm Zalo Quản trị đã gán). Không suy cụm từ đơn vị công tác. |
 | H2 | Vai trò mới **`ho_tro_hoc_vien`** (không phải `ho_tro` — tránh lẫn với `vai_tro_nhan_su_lop.ho_tro` = trợ giảng của lớp, không có tài khoản). `don_vi_id` và `hoc_vien_id` đều NULL. Người hỗ trợ là **cán bộ HCMUE**. |
 | H3 | Bảng **`phan_cong_ho_tro (nguoi_dung_id, cum_id)`** nhiều–nhiều. Vận hành thực tế 1 người/1 cụm, schema không ép. Phạm vi kiểm tra **động mỗi request** (không nhét vào JWT) → gỡ phân công có hiệu lực ngay. |
-| H4 | Cấp tài khoản tái dùng ADR 0002: tab "Người hỗ trợ" ở `/admin/nguoi-dung`, tạo lẻ + import `tai_khoan_ho_tro`; **email bắt buộc**, mặc định link kích hoạt, mật khẩu tạm dự phòng. **Phân công ở màn chi tiết khóa → mục Cụm.** Cụm chưa có người hỗ trợ → nhãn cảnh báo. |
+| H4 | Cấp tài khoản tái dùng ADR 0002: trang riêng `/admin/nguoi-ho-tro` (menu "Người hỗ trợ"), tạo lẻ (import Excel hoãn — YAGNI với ~9 cụm); **email bắt buộc**, mặc định link kích hoạt, mật khẩu tạm dự phòng. **Phân công ở màn chi tiết khóa → mục Cụm.** Cụm chưa có người hỗ trợ → nhãn cảnh báo. |
 | H5 | Tra cứu (chỉ trong cụm, khu `/ho-tro` riêng, không dùng `/admin`): danh sách học viên, chi tiết (hồ sơ, tài khoản, lớp theo giai đoạn, lịch buổi + giảng viên/trợ giảng của lớp từ `lop_hoc_nhan_su`, điểm danh, khảo sát, ticket, lịch sử sửa), lịch học theo cụm. Học viên ngoài cụm → 404, không lộ "thuộc cụm khác". |
 | H6 | **Xuất danh sách cụm** `.xlsx` theo bộ lọc đang áp dụng, 1 sheet/cụm; có họ tên, đơn vị, đối tượng, SĐT, email, lớp theo giai đoạn, tình trạng hồ sơ/đăng nhập/khảo sát; **không có** CCCD, ngày sinh, mã MOET, nơi sinh. Mỗi lần xuất ghi `nhat_ky_hoat_dong`. |
 | H7 | **Sửa hồ sơ** qua lõi `suaHoSo` (như `suaHoSoByAdmin`, bỏ qua cổng đợt). Trường được sửa = các trường học viên tự sửa ở M4, **gồm ngày sinh**; **không** sửa số định danh/CCCD, mã MOET, ghi danh/phân lớp/cụm/kết quả. **Bắt buộc lý do** (cột mới `lich_su_thay_doi_ho_so.ly_do`). Đang có đợt mở → hủy xác nhận như hiện tại. |

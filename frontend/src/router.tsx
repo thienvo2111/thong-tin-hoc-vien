@@ -71,6 +71,21 @@ export const router = createBrowserRouter([
             ],
           },
           {
+            // ADR 0003: khu làm việc người hỗ trợ học viên — layout riêng, không dùng chung /admin.
+            lazy: () => import('@/auth/RequireHoTro').then((m) => ({ Component: m.RequireHoTro })),
+            children: [
+              {
+                lazy: () => import('@/pages/HoTro/HoTroLayout').then((m) => ({ Component: m.default })),
+                children: [
+                  {
+                    path: '/ho-tro',
+                    lazy: () => import('@/pages/HoTro/HoTroTrangChu').then((m) => ({ Component: m.default })),
+                  },
+                ],
+              },
+            ],
+          },
+          {
             // Module admin — mới hoàn toàn (design/redesign-spec.md § 4). Đặt song song với
             // ProtectedLayout (route học viên) trong cùng nhánh RequireAuth, không đụng route cũ.
             lazy: () => import('@/auth/RequireAdmin').then((m) => ({ Component: m.RequireAdmin })),
@@ -141,6 +156,10 @@ export const router = createBrowserRouter([
                       {
                         path: '/admin/tai-khoan-hoc-vien',
                         lazy: () => import('@/pages/Admin/AdminTaiKhoanHocVien').then((m) => ({ Component: m.default })),
+                      },
+                      {
+                        path: '/admin/nguoi-ho-tro',
+                        lazy: () => import('@/pages/Admin/AdminNguoiHoTro').then((m) => ({ Component: m.default })),
                       },
                     ],
                   },

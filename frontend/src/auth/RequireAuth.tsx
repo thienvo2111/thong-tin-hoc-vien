@@ -1,10 +1,11 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Center, Loader } from '@mantine/core';
+import { trangChuTheoVaiTro } from '@/lib/trangChuTheoVaiTro';
 import { useToi } from './AuthContext';
 
 /** Guard route: yêu cầu đã đăng nhập; nếu phai_doi_mat_khau=true, buộc về M2 (CLAUDE.md § Token & bảo mật). */
 export function RequireAuth() {
-  const { dangTai, daXacThuc, phaiDoiMatKhau } = useToi();
+  const { dangTai, daXacThuc, phaiDoiMatKhau, nguoiDung } = useToi();
   const location = useLocation();
 
   if (dangTai) {
@@ -26,7 +27,7 @@ export function RequireAuth() {
   }
 
   if (!phaiDoiMatKhau && laTrangDoiMatKhau) {
-    return <Navigate to="/toi" replace />;
+    return <Navigate to={trangChuTheoVaiTro(nguoiDung?.vai_tro)} replace />;
   }
 
   return <Outlet />;

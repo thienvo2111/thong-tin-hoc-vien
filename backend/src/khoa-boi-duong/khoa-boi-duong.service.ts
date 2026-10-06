@@ -422,7 +422,15 @@ export class KhoaBoiDuongService {
         },
         // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): trả kèm danh sách cụm
         // học viên của khóa bên cạnh giai đoạn/lớp đã có.
-        cum_hoc_vien: { orderBy: { ten_cum: 'asc' } },
+        cum_hoc_vien: {
+          orderBy: { ten_cum: 'asc' },
+          include: {
+            phan_cong_ho_tro: {
+              select: { nguoi_dung: { select: { id: true, ho_ten: true } } },
+              orderBy: { created_at: 'asc' },
+            },
+          },
+        },
       },
     });
     if (!khoa) throw new NotFoundAppException('Không tìm thấy khóa bồi dưỡng');
@@ -477,6 +485,13 @@ export class KhoaBoiDuongService {
     return {
       ...khoa,
       pham_vi_hoc_vien: phamViHocVien,
+      // ADR 0003 H4/H14: người hỗ trợ của cụm chỉ Quản trị thấy (học viên
+      // không thấy họ tên cán bộ).
+      cum_hoc_vien: khoa.cum_hoc_vien.map(({ phan_cong_ho_tro, ...cum }) =>
+        caller.vai_tro === 'quan_tri'
+          ? { ...cum, nguoi_ho_tro: phan_cong_ho_tro.map((p) => p.nguoi_dung) }
+          : cum,
+      ),
       lop_hoc: khoa.lop_hoc.map((l) => ({
         ...l,
         si_so_hien_tai: siSoTheoLop.get(l.id) ?? 0,
@@ -680,6 +695,48 @@ export class KhoaBoiDuongService {
         'ten_cum',
       );
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // PUT /khoa-boi-duong/{id}/cum/{cumId}/nguoi-ho-tro — ADR 0003 H3/H4: thay
+  // TOÀN BỘ người hỗ trợ của cụm (rỗng = gỡ hết). Chỉ nhận ho_tro_hoc_vien.
+  // ---------------------------------------------------------------------
+  async ganNguoiHoTroCum(
+    khoaId: string,
+    cumId: string,
+    nguoiDungIds: string[],
+  ) {
+    await this.getCumTrongKhoaOrThrow(khoaId, cumId);
+    const ids = [...new Set(nguoiDungIds)];
+    const hopLe = await this.prisma.nguoi_dung.count({
+      where: { id: { in: ids }, vai_tro: 'ho_tro_hoc_vien' },
+    });
+    if (hopLe !== ids.length) {
+      throw new ValidationException(
+        'Chỉ phân công được tài khoản người hỗ trợ học viên',
+        [
+          {
+            field: 'nguoi_dung_ids',
+            message: 'Có tài khoản không phải người hỗ trợ học viên',
+          },
+        ],
+      );
+    }
+    await this.prisma.$transaction([
+      this.prisma.phan_cong_ho_tro.deleteMany({
+        where: { cum_id: cumId, nguoi_dung_id: { notIn: ids } },
+      }),
+      this.prisma.phan_cong_ho_tro.createMany({
+        data: ids.map((nguoi_dung_id) => ({ nguoi_dung_id, cum_id: cumId })),
+        skipDuplicates: true,
+      }),
+    ]);
+    const rows = await this.prisma.phan_cong_ho_tro.findMany({
+      where: { cum_id: cumId },
+      select: { nguoi_dung: { select: { id: true, ho_ten: true } } },
+      orderBy: { created_at: 'asc' },
+    });
+    return { cum_id: cumId, nguoi_ho_tro: rows.map((r) => r.nguoi_dung) };
   }
 
   // ---------------------------------------------------------------------

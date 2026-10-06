@@ -133,10 +133,11 @@ export function mauDatLaiMatKhau(p: {
 }
 
 // Tài khoản đơn vị (ADR 0002): link kích hoạt 72 giờ cho tài khoản quản lý
-// Sở/Phòng VHXH/Trường do Quản trị tạo.
+// Sở/Phòng VHXH/Trường do Quản trị tạo. tenDonVi = null: tài khoản Người hỗ
+// trợ học viên (ADR 0003) — không gắn đơn vị.
 export function mauKichHoatTaiKhoan(p: {
   hoTen: string;
-  tenDonVi: string;
+  tenDonVi: string | null;
   tenDangNhap: string;
   link: string;
 }): EmailDaDung {
@@ -144,7 +145,7 @@ export function mauKichHoatTaiKhoan(p: {
   const noiDung = [
     doanVan(`Kính gửi <b>${e(p.hoTen)}</b>,`),
     doanVan(
-      `Quản trị hệ thống đã cấp tài khoản quản lý cho đơn vị <b>${e(p.tenDonVi)}</b> trên Cổng thông tin Bồi dưỡng Năng lực số. Tên đăng nhập: <b>${e(p.tenDangNhap)}</b>. Vui lòng bấm nút bên dưới để đặt mật khẩu và kích hoạt tài khoản:`,
+      `Quản trị hệ thống đã cấp ${p.tenDonVi === null ? 'cho bạn tài khoản <b>Người hỗ trợ học viên</b>' : `tài khoản quản lý cho đơn vị <b>${e(p.tenDonVi)}</b>`} trên Cổng thông tin Bồi dưỡng Năng lực số. Tên đăng nhập: <b>${e(p.tenDangNhap)}</b>. Vui lòng bấm nút bên dưới để đặt mật khẩu và kích hoạt tài khoản:`,
     ),
     nutBam('Kích hoạt tài khoản', p.link),
     khoiNoiBat(

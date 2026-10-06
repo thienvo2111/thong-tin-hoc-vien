@@ -1,5 +1,5 @@
 import { randomInt } from 'crypto';
-import { loai_don_vi } from '@prisma/client';
+import { loai_don_vi, vai_tro_nguoi_dung } from '@prisma/client';
 
 // Tài khoản đơn vị (ADR 0002). Bỏ các ký tự dễ đọc nhầm khi gửi qua Zalo /
 // đọc qua điện thoại: 0 O o 1 l I L.
@@ -13,6 +13,14 @@ const TEN_DANG_NHAP_REGEX = /^[a-z0-9][a-z0-9._-]{2,49}$/;
 
 export type VaiTroDonVi = 'so_gddt' | 'phong_vhxh' | 'truong';
 export const VAI_TRO_DON_VI: VaiTroDonVi[] = ['so_gddt', 'phong_vhxh', 'truong'];
+
+// Tài khoản do Quản trị cấp (đơn vị — ADR 0002, người hỗ trợ học viên — ADR
+// 0003): tên đăng nhập lưu chữ thường, đăng nhập khớp không phân biệt hoa/
+// thường, có email thì tự lấy lại mật khẩu qua POST /auth/quen-mat-khau.
+export const VAI_TRO_TAI_KHOAN_CAP: vai_tro_nguoi_dung[] = [
+  ...VAI_TRO_DON_VI,
+  'ho_tro_hoc_vien',
+];
 
 export function sinhMatKhauTam(): string {
   for (;;) {

@@ -32,7 +32,7 @@ import {
 } from '../hoc-vien/hoc-vien-validation.util';
 import {
   THOI_HAN_KICH_HOAT_MS,
-  VAI_TRO_DON_VI,
+  VAI_TRO_TAI_KHOAN_CAP,
 } from '../nguoi-dung/tai-khoan-don-vi.util';
 
 const BCRYPT_SALT_ROUNDS = 10;
@@ -74,8 +74,9 @@ export class AuthService {
   // /hoc-vien/toi. Dùng chung cho dangNhap() và quenMatKhau() (2026-09-30) —
   // không lặp lại logic tìm tài khoản.
   //
-  // ADR 0002: tài khoản đơn vị (so_gddt/phong_vhxh/truong) lưu tên đăng nhập
-  // chữ thường và khớp KHÔNG phân biệt hoa/thường; học viên/quan_tri vẫn khớp
+  // ADR 0002/0003: tài khoản đơn vị (so_gddt/phong_vhxh/truong) và người hỗ
+  // trợ học viên lưu tên đăng nhập chữ thường và khớp KHÔNG phân biệt
+  // hoa/thường (VAI_TRO_TAI_KHOAN_CAP); học viên/quan_tri vẫn khớp
   // chính xác như cũ (không đổi hành vi đăng nhập của học viên).
   private timTaiKhoanTheoTenDangNhap(tenDangNhap: string) {
     return this.prisma.nguoi_dung.findFirst({
@@ -83,7 +84,7 @@ export class AuthService {
         OR: [
           { ten_dang_nhap: tenDangNhap },
           {
-            vai_tro: { in: VAI_TRO_DON_VI },
+            vai_tro: { in: VAI_TRO_TAI_KHOAN_CAP },
             ten_dang_nhap: { equals: tenDangNhap, mode: 'insensitive' },
           },
           { hoc_vien: { so_dinh_danh_ca_nhan: tenDangNhap } },
@@ -329,10 +330,10 @@ export class AuthService {
     } else if (
       nguoiDung &&
       nguoiDung.trang_thai === 'active' &&
-      (VAI_TRO_DON_VI as string[]).includes(nguoiDung.vai_tro) &&
+      VAI_TRO_TAI_KHOAN_CAP.includes(nguoiDung.vai_tro) &&
       nguoiDung.email
     ) {
-      // ADR 0002: tài khoản đơn vị có email tự lấy lại mật khẩu.
+      // ADR 0002/0003: tài khoản đơn vị / người hỗ trợ có email tự lấy lại mật khẩu.
       await this.taoVaGuiTokenDatLaiMatKhauNguoiDung(nguoiDung);
     }
 

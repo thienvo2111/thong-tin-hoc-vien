@@ -76,6 +76,20 @@ Lỗi (`fields[].message` nguyên văn): đơn vị đã có tài khoản → `4
 
 **Giới hạn:** cấp mật khẩu/link mới không thu hồi JWT đang mở của người cũ — muốn cắt ngay: khóa → cấp mới → mở khóa.
 
+### Người hỗ trợ học viên (ADR 0003, 2026-10-06)
+
+Vai trò `ho_tro_hoc_vien` — cán bộ HCMUE, `don_vi_id`/`hoc_vien_id` luôn NULL, **email bắt buộc**. Đăng nhập khớp tên không phân biệt hoa/thường và tự lấy lại mật khẩu qua `POST /auth/quen-mat-khau` (như tài khoản đơn vị). Gọi mọi API quản trị/đơn vị → `403`. Phạm vi làm việc = các cụm được phân công (`PUT .../nguoi-ho-tro`, mục 3).
+
+| Method | Path | Mô tả | Quyền |
+|---|---|---|---|
+| GET | `/nguoi-dung/ho-tro` | Phân trang; lọc `trang_thai`, `q` (họ tên, tên đăng nhập, email). Dòng: `{ id, ten_dang_nhap, ho_ten, email, vai_tro, trang_thai, dang_nhap_lan_cuoi, cum: [{ cum_id, ten_cum, khoa_id, ma_khoa, ten_khoa }] }` | Quản trị |
+| POST | `/nguoi-dung/ho-tro` | `{ ho_ten, email, ten_dang_nhap?, cach_cap?: 'email' \| 'mat_khau_tam' }` → `201 { tai_khoan, mat_khau_tam? }`. **Mặc định `email`** (link kích hoạt 72 giờ). `ten_dang_nhap` trống = phần trước `@` của email (chuẩn hóa chữ thường, phải khớp regex tài khoản đơn vị) | Quản trị |
+| PATCH | `/nguoi-dung/ho-tro/{id}` | `{ ho_ten?, email?, trang_thai? }` — email không được xóa; đổi email vô hiệu link còn hạn | Quản trị |
+| POST | `/nguoi-dung/ho-tro/{id}/cap-mat-khau-tam` | → `{ ten_dang_nhap, mat_khau_tam }` | Quản trị |
+| POST | `/nguoi-dung/ho-tro/{id}/gui-email-kich-hoat` | → `{ da_gui: true }` | Quản trị |
+
+Lỗi: như tài khoản đơn vị (tên đăng nhập/email sai định dạng `400`, trùng `409`); thiếu email → `400` field `email` "Người hỗ trợ học viên bắt buộc có email"; `:id` không phải người hỗ trợ → `404`.
+
 ## 2. Dịch vụ Học viên
 
 | Method | Endpoint | Mô tả | Ai gọi |
@@ -214,6 +228,7 @@ Với mỗi dòng hợp lệ (cùng thứ tự tạo bảng đã sửa như "Lu�
 | PATCH | `/khoa-boi-duong/{id}/lop/{lop_id}` | **Thêm 2026-09-30**: sửa một phần `{ ten_lop?, si_so_toi_da?, loai_lop?, nhom_hoc_vien?, muc_nang_luc?, trang_thai? }` (`trang_thai='ngung'` để vô hiệu hóa). Body rỗng/không có trường hợp lệ → `400 VALIDATION_ERROR`. `lop_id` không thuộc đúng `khoa_id` trên URL → `404`. Trùng `(khoa_id, loai_lop, ten_lop)` → `409 CONFLICT`. Đổi `loai_lop` khi lớp đang có đăng ký (`phan_lop_giai_doan` trỏ tới) **không bị chặn** — response trả kèm `canh_bao` (không tự động sửa/xóa các dòng `phan_lop_giai_doan` cũ). Không cho đổi `khoa_id` | QuảnTrị |
 | POST | `/khoa-boi-duong/{id}/cum` | **Thêm 2026-09-30 (QĐ10)**: `{ ten_cum, link_zalo?, ghi_chu? }` — tạo 1 **cụm học viên** (nhóm Zalo hỗ trợ theo địa lý), khái niệm độc lập hoàn toàn với cây đơn vị công tác VÀ với 3 loại lớp. Cụm chứa học viên trực tiếp (`dang_ky_hoc.cum_id`), không qua lớp nào. `link_zalo` thiếu scheme (vd `zalo.me/g/abc`) tự thêm `https://`; chỉ chấp nhận `http`/`https` hợp lệ, còn lại → `400 VALIDATION_ERROR` | QuảnTrị |
 | PATCH | `/khoa-boi-duong/{id}/cum/{cum_id}` | **Thêm 2026-09-30**: sửa một phần `{ ten_cum?, link_zalo?, ghi_chu?, trang_thai? }` (`trang_thai='ngung'` để vô hiệu hóa). Body rỗng/không có trường hợp lệ → `400 VALIDATION_ERROR`. `cum_id` không thuộc đúng `khoa_id` trên URL → `404`. Trùng `(khoa_id, ten_cum)` → `409 CONFLICT`. Không cho đổi `khoa_id`. `link_zalo` chuẩn hóa/validate như ở POST trên | QuảnTrị |
+| PUT | `/khoa-boi-duong/{id}/cum/{cum_id}/nguoi-ho-tro` | **Thêm 2026-10-06 (ADR 0003)**: `{ nguoi_dung_ids: uuid[] }` (tối đa 50) **thay toàn bộ** người hỗ trợ của cụm, rỗng = gỡ hết → `{ cum_id, nguoi_ho_tro: [{ id, ho_ten }] }`. Có id không phải `ho_tro_hoc_vien` → `400`; cụm không thuộc khóa → `404`. `GET /khoa-boi-duong/{id}` trả thêm `cum_hoc_vien[].nguoi_ho_tro` **chỉ khi người gọi là Quản trị** | QuảnTrị |
 | POST | `/lop/{id}/lich-hoc` | Thêm `LichHocLop` `{ giai_doan_id, buoi_so?, thoi_gian_bat_dau, thoi_gian_ket_thuc, dia_diem_hoac_link }` — **thêm 2026-09-29 (T6, QĐ3)**: `buoi_so` (tùy chọn, mặc định `1`) — 1 lớp có nhiều buổi trong cùng 1 giai đoạn, ràng buộc duy nhất chuyển từ `(lop_id, giai_doan_id)` sang `(lop_id, giai_doan_id, buoi_so)` | QuảnTrị |
 | PATCH | `/lop/{id}/lich-hoc/{lich_hoc_id}` | **Thêm 2026-09-30**: sửa một phần `{ thoi_gian_bat_dau?, thoi_gian_ket_thuc?, dia_diem_hoac_link?, buoi_so?, trang_thai? }`. Body rỗng/không có trường hợp lệ → `400 VALIDATION_ERROR`. `lich_hoc_id` không thuộc đúng `lop_id` trên URL → `404`. Trùng `(lop_id, giai_doan_id, buoi_so)` → `409 CONFLICT`. **`trang_thai` chỉ nhận 3 giá trị đã có** của `trang_thai_lich_hoc` (`chua_dien_ra`\|`dang_dien_ra`\|`ket_thuc`) — enum này CHƯA có giá trị "hủy/vô hiệu", nên endpoint chưa dùng để hủy hẳn 1 buổi học. Không cho đổi `giai_doan_id` | QuảnTrị |
 | POST | `/lop/{id}/nhan-su` | Thêm giảng viên/hỗ trợ `{ ho_ten, vai_tro, so_dien_thoai? }` | QuảnTrị |

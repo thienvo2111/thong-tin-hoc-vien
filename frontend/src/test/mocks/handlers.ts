@@ -801,6 +801,56 @@ export const handlers = [
   }),
   http.post('/nguoi-dung/don-vi/:id/gui-email-kich-hoat', () => HttpResponse.json({ da_gui: true })),
 
+  // Người hỗ trợ học viên (ADR 0003) — /nguoi-dung/ho-tro.
+  http.get('/nguoi-dung/ho-tro', () => {
+    const data = db.taiKhoanHoTro;
+    return HttpResponse.json({ data, total: data.length, page: 1, page_size: 20 });
+  }),
+  http.post('/nguoi-dung/ho-tro', async ({ request }) => {
+    const body = (await request.json()) as { ho_ten: string; email: string; ten_dang_nhap?: string; cach_cap?: string };
+    const email = body.email.trim().toLowerCase();
+    if (db.taiKhoanHoTro.some((t) => t.email === email)) {
+      return loi(409, 'CONFLICT', 'Email đã được dùng', { fields: [{ field: 'email', message: 'Email đã được dùng' }] });
+    }
+    const tk = {
+      id: `ht-${db.taiKhoanHoTro.length + 1}`,
+      ten_dang_nhap: (body.ten_dang_nhap || email.split('@')[0]).toLowerCase(),
+      ho_ten: body.ho_ten,
+      email,
+      vai_tro: 'ho_tro_hoc_vien' as const,
+      trang_thai: 'active' as const,
+      dang_nhap_lan_cuoi: null,
+      cum: [],
+    };
+    db.taiKhoanHoTro.push(tk);
+    return HttpResponse.json(
+      body.cach_cap === 'mat_khau_tam' ? { tai_khoan: tk, mat_khau_tam: 'Ht3dEf7hJk' } : { tai_khoan: tk },
+      { status: 201 },
+    );
+  }),
+  http.patch('/nguoi-dung/ho-tro/:id', async ({ params, request }) => {
+    const tk = db.taiKhoanHoTro.find((t) => t.id === params.id);
+    if (!tk) return loi(404, 'NOT_FOUND', 'Không tìm thấy tài khoản người hỗ trợ');
+    Object.assign(tk, (await request.json()) as object);
+    return HttpResponse.json(tk);
+  }),
+  http.post('/nguoi-dung/ho-tro/:id/cap-mat-khau-tam', ({ params }) => {
+    const tk = db.taiKhoanHoTro.find((t) => t.id === params.id);
+    if (!tk) return loi(404, 'NOT_FOUND', 'Không tìm thấy tài khoản người hỗ trợ');
+    return HttpResponse.json({ ten_dang_nhap: tk.ten_dang_nhap, mat_khau_tam: 'Zx8cVb2nMq' });
+  }),
+  http.post('/nguoi-dung/ho-tro/:id/gui-email-kich-hoat', () => HttpResponse.json({ da_gui: true })),
+  http.put('/khoa-boi-duong/:id/cum/:cumId/nguoi-ho-tro', async ({ params, request }) => {
+    const khoa = db.chiTietKhoa[params.id as string];
+    const cum = khoa?.cum_hoc_vien.find((c) => c.id === params.cumId);
+    if (!cum) return loi(404, 'NOT_FOUND', 'Không tìm thấy cụm học viên trong khóa này');
+    const { nguoi_dung_ids } = (await request.json()) as { nguoi_dung_ids: string[] };
+    cum.nguoi_ho_tro = db.taiKhoanHoTro
+      .filter((t) => nguoi_dung_ids.includes(t.id))
+      .map((t) => ({ id: t.id, ho_ten: t.ho_ten }));
+    return HttpResponse.json({ cum_id: cum.id, nguoi_ho_tro: cum.nguoi_ho_tro });
+  }),
+
   // Tài khoản học viên — /nguoi-dung/hoc-vien.
   http.get('/nguoi-dung/hoc-vien', () => {
     const data = db.taiKhoanHocVien;

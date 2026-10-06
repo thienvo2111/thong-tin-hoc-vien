@@ -61,6 +61,8 @@ enum vai_tro_nguoi_dung {
   truong
   hoc_vien
   quan_tri
+  // ADR 0003 (2026-10-06): người hỗ trợ học viên theo cụm — migration enum RIÊNG.
+  ho_tro_hoc_vien
 }
 
 enum trinh_do_chuyen_mon {
@@ -434,6 +436,7 @@ model nguoi_dung {
   lich_su_thay_doi_thuc_hien         lich_su_thay_doi_ho_so[]   @relation("lich_su_thay_doi_nguoi_sua")
   yeu_cau_ho_tro_tra_loi_boi         yeu_cau_ho_tro[]           @relation("yeu_cau_ho_tro_tra_loi_boi")
   token_xac_thuc                     token_xac_thuc[]
+  phan_cong_ho_tro                   phan_cong_ho_tro[]
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -799,11 +802,28 @@ model cum_hoc_vien {
   trang_thai trang_thai_active @default(active)
   created_at DateTime          @default(now()) @db.Timestamptz(6)
 
-  khoa        khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  dang_ky_hoc dang_ky_hoc[]
+  khoa             khoa_boi_duong     @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  dang_ky_hoc      dang_ky_hoc[]
+  phan_cong_ho_tro phan_cong_ho_tro[]
 
   @@unique([khoa_id, ten_cum], map: "uq_cum_ten_trong_khoa")
   @@index([khoa_id], map: "idx_cum_khoa")
+}
+
+/// ADR 0003 (2026-10-06): phân công người hỗ trợ học viên (vai trò
+/// ho_tro_hoc_vien) vào cụm — nhiều–nhiều, vận hành 1 người/1 cụm. Phạm vi
+/// kiểm tra động mỗi request (không nằm trong JWT).
+model phan_cong_ho_tro {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nguoi_dung_id String   @db.Uuid
+  cum_id        String   @db.Uuid
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  nguoi_dung nguoi_dung   @relation(fields: [nguoi_dung_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  cum        cum_hoc_vien @relation(fields: [cum_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([nguoi_dung_id, cum_id], map: "uq_phan_cong_ho_tro")
+  @@index([cum_id], map: "idx_phan_cong_ho_tro_cum")
 }
 
 model lich_hoc_lop {

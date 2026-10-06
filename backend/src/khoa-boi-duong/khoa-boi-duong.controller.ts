@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { KhoaBoiDuongService } from './khoa-boi-duong.service';
@@ -21,6 +22,7 @@ import { CreateLopHocDto } from './dto/create-lop-hoc.dto';
 import { UpdateLopHocDto } from './dto/update-lop-hoc.dto';
 import { CreateCumHocVienDto } from './dto/create-cum-hoc-vien.dto';
 import { UpdateCumHocVienDto } from './dto/update-cum-hoc-vien.dto';
+import { GanNguoiHoTroCumDto } from './dto/gan-nguoi-ho-tro-cum.dto';
 
 // Dịch vụ Khóa bồi dưỡng & Lớp học — docs/api-contract.md mục 3. D1/D6
 // (2026-10-03-don-vi-dat-hang): mọi endpoint ghi chỉ quan_tri — đã bỏ luồng
@@ -132,5 +134,20 @@ export class KhoaBoiDuongController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.khoaBoiDuongService.capNhatCum(id, cumId, dto, user);
+  }
+
+  // ADR 0003 (2026-10-06): phân công người hỗ trợ học viên cho cụm.
+  @Roles('quan_tri')
+  @Put(':id/cum/:cumId/nguoi-ho-tro')
+  ganNguoiHoTroCum(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('cumId', ParseUUIDPipe) cumId: string,
+    @Body() dto: GanNguoiHoTroCumDto,
+  ) {
+    return this.khoaBoiDuongService.ganNguoiHoTroCum(
+      id,
+      cumId,
+      dto.nguoi_dung_ids,
+    );
   }
 }

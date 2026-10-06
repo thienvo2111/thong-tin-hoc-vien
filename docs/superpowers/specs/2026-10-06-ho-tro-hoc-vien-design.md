@@ -13,7 +13,7 @@ Quyết định nền: [ADR 0003](../../adr/0003-nguoi-ho-tro-hoc-vien.md) (H1�
 ### Schema (chỉ thêm)
 1. Migration riêng: `ALTER TYPE vai_tro_nguoi_dung ADD VALUE 'ho_tro_hoc_vien'`.
 2. Bảng `phan_cong_ho_tro`: `id uuid PK`, `nguoi_dung_id uuid FK nguoi_dung` (ON DELETE CASCADE), `cum_id uuid FK cum_hoc_vien` (ON DELETE CASCADE), `created_at`; `UNIQUE (nguoi_dung_id, cum_id)`, index `cum_id`.
-3. CHECK trên `nguoi_dung`: `vai_tro <> 'ho_tro_hoc_vien' OR (don_vi_id IS NULL AND hoc_vien_id IS NULL AND email IS NOT NULL)`.
+3. CHECK trên `nguoi_dung`: thêm nhánh `ho_tro_hoc_vien` (`don_vi_id`/`hoc_vien_id` NULL) vào `chk_nguoi_dung_scope` có sẵn, và đưa `ho_tro_hoc_vien` vào `chk_nguoi_dung_email_bat_buoc` (cùng quan_tri).
 4. Ứng dụng chặn: chỉ gán phân công cho `nguoi_dung` có vai trò `ho_tro_hoc_vien` (400 nếu khác).
 
 ### API (chỉ `quan_tri`)
@@ -23,14 +23,14 @@ Quyết định nền: [ADR 0003](../../adr/0003-nguoi-ho-tro-hoc-vien.md) (H1�
 - `POST /nguoi-dung/ho-tro/{id}/cap-mat-khau-tam`, `POST /nguoi-dung/ho-tro/{id}/gui-email-kich-hoat` — như tài khoản đơn vị.
 - `PUT /khoa-boi-duong/{khoaId}/cum/{cumId}/nguoi-ho-tro` — `{nguoi_dung_ids: uuid[]}` thay toàn bộ phân công của cụm (rỗng = gỡ hết). Cụm phải thuộc khóa (404).
 - `GET /khoa-boi-duong/{id}/cum` (đã có hoặc mở rộng) — mỗi cụm trả thêm `nguoi_ho_tro: [{id, ho_ten}]`.
-- Import `tai_khoan_ho_tro` (khung import sẵn có): cột `ho_ten`, `email` (bắt buộc), `ten_dang_nhap`, `ma_khoa`, `ten_cum` (2 cột cuối tùy chọn, đi cùng nhau) → tạo tài khoản + phân công; xác nhận trả `.xlsx` mật khẩu tạm chỉ khi gửi email lỗi (như A6).
+- ~~Import `tai_khoan_ho_tro`~~ — **hoãn (2026-10-06, khi làm #10)**: vận hành 1 người/1 cụm, ~9 cụm → tạo lẻ đủ nhanh; import cần thêm giá trị enum `loai_danh_muc_import` + migration riêng mà chưa có nhu cầu (YAGNI). Làm khi số người hỗ trợ tăng.
 
 ### Đăng nhập
 - `ho_tro_hoc_vien` đăng nhập như tài khoản đơn vị (khớp không phân biệt hoa/thường), buộc đổi mật khẩu lần đầu, về `/ho-tro`.
 - `POST /auth/quen-mat-khau` áp dụng cho `ho_tro_hoc_vien` (luôn có email).
 
 ### Frontend
-- `/admin/nguoi-dung` tab **Người hỗ trợ**: bảng (họ tên, tên đăng nhập, email, cụm phụ trách, trạng thái, đăng nhập lần cuối), tạo lẻ, import, khóa/mở, cấp lại.
+- Trang riêng **`/admin/nguoi-ho-tro`** (mục menu "Người hỗ trợ", chỉ quan_tri — sửa 2026-10-06: không làm tab trong `/admin/nguoi-dung`, cùng kiểu với mục "Tài khoản học viên"): bảng (họ tên, tên đăng nhập, email, cụm phụ trách, trạng thái, đăng nhập lần cuối), tạo lẻ, import, khóa/mở, cấp lại.
 - Màn chi tiết khóa → mục **Cụm**: cột "Người hỗ trợ" (multi-select tài khoản `ho_tro_hoc_vien` active); cụm chưa có ai → nhãn cảnh báo đỏ.
 - Route guard: `/ho-tro/*` chỉ `ho_tro_hoc_vien`; khung layout riêng với menu Học viên / Lịch học / Yêu cầu hỗ trợ.
 

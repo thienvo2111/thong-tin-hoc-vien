@@ -59,6 +59,7 @@ import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { KhoaTrangThaiBadge } from '@/components/KhoaTrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
 import { ModalImportLopHoc } from './ModalImportLopHoc';
+import { ChonNguoiHoTroCum } from './ChonNguoiHoTroCum';
 
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 const MAU_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'blue', zoom: 'grape', vle: 'teal' };
@@ -1095,6 +1096,7 @@ export default function AdminKhoaChiTiet() {
                           <Table.Th>Tên cụm</Table.Th>
                           <Table.Th>Link Zalo</Table.Th>
                           <Table.Th>Ghi chú</Table.Th>
+                          {laQuanTri && <Table.Th>Người hỗ trợ</Table.Th>}
                           <Table.Th>Trạng thái</Table.Th>
                           <Table.Th />
                         </Table.Tr>
@@ -1102,7 +1104,7 @@ export default function AdminKhoaChiTiet() {
                       <Table.Tbody>
                         {khoa.cum_hoc_vien.length === 0 && (
                           <Table.Tr>
-                            <Table.Td colSpan={5}>
+                            <Table.Td colSpan={laQuanTri ? 6 : 5}>
                               <Text c="dimmed" ta="center" py="lg">
                                 Khóa chưa có cụm hỗ trợ Zalo nào.
                               </Text>
@@ -1130,6 +1132,11 @@ export default function AdminKhoaChiTiet() {
                                 )}
                               </Table.Td>
                               <Table.Td>{cum.ghi_chu ?? '—'}</Table.Td>
+                              {laQuanTri && (
+                                <Table.Td>
+                                  <ChonNguoiHoTroCum khoaId={khoa.id} cum={cum} />
+                                </Table.Td>
+                              )}
                               <Table.Td>
                                 <BadgeHoatDong trangThai={cum.trang_thai} />
                               </Table.Td>

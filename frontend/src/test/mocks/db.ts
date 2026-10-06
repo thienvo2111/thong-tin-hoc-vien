@@ -17,6 +17,7 @@ import type {
   NhatKyHocVien,
   NhatKyImportItem,
   TaiKhoanDonVi,
+  TaiKhoanHoTro,
   TaiKhoanHocVien,
   TongHopDonViRow,
   TongQuanResult,
@@ -327,6 +328,7 @@ export function taoChiTietKhoaMau(danhSach: KhoaBoiDuong[]): Record<string, Khoa
         ghi_chu: 'Hỗ trợ kỹ thuật trong giờ hành chính',
         trang_thai: 'active',
         created_at: '2026-09-01T00:00:00.000Z',
+        nguoi_ho_tro: [{ id: 'ht-1', ho_ten: 'Nguyễn Văn A' }],
       },
     ],
   };
@@ -640,6 +642,32 @@ export function taoDanhSachYeuCauHoTroMau(): YeuCauHoTro[] {
 }
 
 // Tài khoản đơn vị (ADR 0002) — /nguoi-dung/don-vi.
+// Người hỗ trợ học viên (ADR 0003) — 1 người đã phân công cụm-1 của khóa đầu, 1 người chưa phân công.
+export function taoDanhSachTaiKhoanHoTroMau(): TaiKhoanHoTro[] {
+  return [
+    {
+      id: 'ht-1',
+      ten_dang_nhap: 'nguyen.a',
+      ho_ten: 'Nguyễn Văn A',
+      email: 'nguyen.a@hcmue.edu.vn',
+      vai_tro: 'ho_tro_hoc_vien',
+      trang_thai: 'active',
+      dang_nhap_lan_cuoi: '2026-10-05T02:00:00.000Z',
+      cum: [{ cum_id: 'cum-1', ten_cum: 'Cụm Long Xuyên', khoa_id: 'khoa-1', ma_khoa: 'KBD-AG-01', ten_khoa: 'Khóa An Giang' }],
+    },
+    {
+      id: 'ht-2',
+      ten_dang_nhap: 'tran.b',
+      ho_ten: 'Trần Thị B',
+      email: 'tran.b@hcmue.edu.vn',
+      vai_tro: 'ho_tro_hoc_vien',
+      trang_thai: 'active',
+      dang_nhap_lan_cuoi: null,
+      cum: [],
+    },
+  ];
+}
+
 export function taoDanhSachTaiKhoanDonViMau(): TaiKhoanDonVi[] {
   return [
     {
@@ -768,6 +796,7 @@ export const db = {
   khoaHocCuaHocVien: taoKhoaHocCuaHocVienMau(),
   danhSachYeuCauHoTro: taoDanhSachYeuCauHoTroMau(),
   taiKhoanDonVi: taoDanhSachTaiKhoanDonViMau(),
+  taiKhoanHoTro: taoDanhSachTaiKhoanHoTroMau(),
   donViChuaCap: taoDonViChuaCapMau(),
   taiKhoanHocVien: taoDanhSachTaiKhoanHocVienMau(),
   nhatKyHocVien: taoNhatKyHocVienMau(),
@@ -796,6 +825,7 @@ export function resetDb(): void {
   db.khoaHocCuaHocVien = taoKhoaHocCuaHocVienMau();
   db.danhSachYeuCauHoTro = taoDanhSachYeuCauHoTroMau();
   db.taiKhoanDonVi = taoDanhSachTaiKhoanDonViMau();
+  db.taiKhoanHoTro = taoDanhSachTaiKhoanHoTroMau();
   db.donViChuaCap = taoDonViChuaCapMau();
   db.taiKhoanHocVien = taoDanhSachTaiKhoanHocVienMau();
   db.nhatKyHocVien = taoNhatKyHocVienMau();

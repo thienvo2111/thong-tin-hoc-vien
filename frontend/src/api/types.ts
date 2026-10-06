@@ -376,6 +376,13 @@ export interface CumHocVien {
   ghi_chu: string | null;
   trang_thai: TrangThaiActive;
   created_at: string;
+  /** ADR 0003 — chỉ có khi người gọi là quan_tri. */
+  nguoi_ho_tro?: NguoiHoTroRutGon[];
+}
+
+export interface NguoiHoTroRutGon {
+  id: string;
+  ho_ten: string;
 }
 
 // GET /khoa-boi-duong/{id} — "Chi tiết khóa kèm giai đoạn + lớp" (api-contract.md mục 3), hình dạng
@@ -651,6 +658,44 @@ export interface KetQuaTaoTaiKhoanDonVi {
 export interface MatKhauTamResponse {
   ten_dang_nhap: string;
   mat_khau_tam: string;
+}
+
+// Người hỗ trợ học viên (ADR 0003) — /nguoi-dung/ho-tro, chỉ quan_tri.
+export interface CumPhanCong {
+  cum_id: string;
+  ten_cum: string;
+  khoa_id: string;
+  ma_khoa: string;
+  ten_khoa: string;
+}
+
+export interface TaiKhoanHoTro {
+  id: string;
+  ten_dang_nhap: string;
+  ho_ten: string;
+  email: string;
+  vai_tro: 'ho_tro_hoc_vien';
+  trang_thai: TrangThaiActive;
+  dang_nhap_lan_cuoi: string | null;
+  cum: CumPhanCong[];
+}
+
+export interface TaoTaiKhoanHoTroDto {
+  ho_ten: string;
+  email: string;
+  ten_dang_nhap?: string;
+  cach_cap?: 'email' | 'mat_khau_tam';
+}
+
+export interface SuaTaiKhoanHoTroDto {
+  ho_ten?: string;
+  email?: string;
+  trang_thai?: TrangThaiActive;
+}
+
+export interface KetQuaTaoTaiKhoanHoTro {
+  tai_khoan: TaiKhoanHoTro;
+  mat_khau_tam?: string;
 }
 
 // Tài khoản học viên — /nguoi-dung/hoc-vien, chỉ quan_tri. Không bao giờ có mat_khau_hash.

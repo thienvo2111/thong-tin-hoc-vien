@@ -3,6 +3,7 @@ import { apiFetch } from './client';
 import { layDonViCongTac } from './danhMuc';
 import type {
   CumHocVien,
+  NguoiHoTroRutGon,
   GiaiDoanKhoa,
   HinhThucGiaiDoan,
   KhoaBoiDuong,
@@ -324,6 +325,26 @@ export function useCapNhatCum(khoaId: string) {
   return useMutation({
     mutationFn: ({ cumId, dto }: { cumId: string; dto: UpdateCumDto }) => capNhatCum(khoaId, cumId, dto),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: chiTietKhoaKey(khoaId) }),
+  });
+}
+
+// ADR 0003: PUT thay toàn bộ người hỗ trợ của cụm (rỗng = gỡ hết).
+export function ganNguoiHoTroCum(khoaId: string, cumId: string, nguoiDungIds: string[]) {
+  return apiFetch<{ cum_id: string; nguoi_ho_tro: NguoiHoTroRutGon[] }>(
+    `/khoa-boi-duong/${khoaId}/cum/${cumId}/nguoi-ho-tro`,
+    { method: 'PUT', body: JSON.stringify({ nguoi_dung_ids: nguoiDungIds }) },
+  );
+}
+
+export function useGanNguoiHoTroCum(khoaId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ cumId, nguoiDungIds }: { cumId: string; nguoiDungIds: string[] }) =>
+      ganNguoiHoTroCum(khoaId, cumId, nguoiDungIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: chiTietKhoaKey(khoaId) });
+      queryClient.invalidateQueries({ queryKey: ['nguoi-dung', 'ho-tro'] });
+    },
   });
 }
 

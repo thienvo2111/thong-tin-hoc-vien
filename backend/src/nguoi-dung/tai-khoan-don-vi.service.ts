@@ -6,7 +6,6 @@ import { AuthService } from '../auth/auth.service';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
-  ConflictAppException,
   NotFoundAppException,
   ValidationException,
 } from '../common/exceptions/app.exceptions';
@@ -16,10 +15,18 @@ import {
   VAI_TRO_DON_VI,
   VaiTroDonVi,
   chuanHoaTenDangNhap,
-  laTenDangNhapHopLe,
   sinhMatKhauTam,
   vaiTroTheoLoaiDonVi,
 } from './tai-khoan-don-vi.util';
+import {
+  LoiTaiKhoan,
+  THONG_DIEP_TAI_KHOAN,
+  chuanHoaEmail,
+  kiemTraEmail,
+  kiemTraTenDangNhap,
+  mapLoiUniqueTaiKhoan,
+  nemLoiTaiKhoan,
+} from './tai-khoan.kiem-tra';
 import {
   QueryDonViChuaCapDto,
   QueryTaiKhoanDonViDto,
@@ -28,20 +35,15 @@ import {
 } from './dto/tai-khoan-don-vi.dto';
 
 const BCRYPT_SALT_ROUNDS = 10;
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const THONG_DIEP = {
   DON_VI_DA_CO_TK: 'Đơn vị đã có tài khoản',
   LOAI_KHONG_CAP: 'Loại đơn vị không được cấp tài khoản',
   KHONG_HOP_LE: 'Không hợp lệ',
-  TEN_SAI_DINH_DANG: 'Chỉ gồm chữ thường không dấu, số, . _ - (3–50 ký tự)',
-  TEN_TRUNG: 'Tên đăng nhập đã được dùng',
-  EMAIL_SAI: 'Email không hợp lệ',
-  EMAIL_TRUNG: 'Email đã được dùng',
+  ...THONG_DIEP_TAI_KHOAN,
   CAN_EMAIL: 'Cần email để gửi link kích hoạt',
 } as const;
 
-export type LoiTaiKhoan = { field: string; message: string; status: 400 | 409 };
 
 const SELECT_VIEW = {
   id: true,
@@ -118,11 +120,11 @@ export class TaiKhoanDonViService {
         ? chuanHoaTenDangNhap(donVi.ma_don_vi)
         : '';
     if (donVi || dto.ten_dang_nhap?.trim()) {
-      loi.push(...(await this.kiemTraTenDangNhap(tenDangNhap)));
+      loi.push(...(await kiemTraTenDangNhap(this.prisma, tenDangNhap)));
     }
 
-    const email = this.chuanHoaEmail(dto.email);
-    if (email) loi.push(...(await this.kiemTraEmail(email)));
+    const email = chuanHoaEmail(dto.email);
+    if (email) loi.push(...(await kiemTraEmail(this.prisma, email)));
 
     const cachCap = dto.cach_cap ?? 'mat_khau_tam';
     if (cachCap === 'email' && !email) {
@@ -149,7 +151,7 @@ export class TaiKhoanDonViService {
     caller: AuthenticatedUser,
   ): Promise<{ tai_khoan: TaiKhoanDonViView; mat_khau_tam?: string }> {
     const { loi, duLieu } = await this.chuanBiTao(dto);
-    if (!duLieu) this.nemLoi(loi);
+    if (!duLieu) nemLoiTaiKhoan(loi);
     const d = duLieu!;
 
     const matKhau = sinhMatKhauTam();
@@ -185,7 +187,7 @@ export class TaiKhoanDonViService {
         return tk;
       });
     } catch (e) {
-      throw this.mapLoiUnique(e);
+      throw mapLoiUniqueTaiKhoan(e, { field: 'don_vi_id', message: THONG_DIEP.DON_VI_DA_CO_TK });
     }
 
     if (token) {
@@ -254,7 +256,7 @@ export class TaiKhoanDonViService {
 
     if (dto.ten_dang_nhap !== undefined) {
       const ten = chuanHoaTenDangNhap(dto.ten_dang_nhap);
-      loi.push(...(await this.kiemTraTenDangNhap(ten, id)));
+      loi.push(...(await kiemTraTenDangNhap(this.prisma, ten, id)));
       data.ten_dang_nhap = ten;
     }
     if (dto.ho_ten !== undefined && dto.ho_ten.trim()) {
@@ -262,13 +264,13 @@ export class TaiKhoanDonViService {
     }
     let doiEmail = false;
     if (dto.email !== undefined) {
-      const email = this.chuanHoaEmail(dto.email);
-      if (email) loi.push(...(await this.kiemTraEmail(email, id)));
+      const email = chuanHoaEmail(dto.email);
+      if (email) loi.push(...(await kiemTraEmail(this.prisma, email, id)));
       data.email = email;
       doiEmail = email !== tk.email;
     }
     if (dto.trang_thai) data.trang_thai = dto.trang_thai;
-    if (loi.length > 0) this.nemLoi(loi);
+    if (loi.length > 0) nemLoiTaiKhoan(loi);
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -283,7 +285,7 @@ export class TaiKhoanDonViService {
         return kq;
       });
     } catch (e) {
-      throw this.mapLoiUnique(e);
+      throw mapLoiUniqueTaiKhoan(e, { field: 'don_vi_id', message: THONG_DIEP.DON_VI_DA_CO_TK });
     }
   }
 
@@ -354,69 +356,5 @@ export class TaiKhoanDonViService {
       tenDangNhap: tk.ten_dang_nhap,
       link: `${layFrontendUrl()}/dat-lai-mat-khau?token=${token}`,
     });
-  }
-
-  private chuanHoaEmail(raw: string | undefined): string | null {
-    const s = raw?.trim().toLowerCase();
-    return s ? s : null;
-  }
-
-  private async kiemTraTenDangNhap(ten: string, boQuaId?: string): Promise<LoiTaiKhoan[]> {
-    if (!laTenDangNhapHopLe(ten)) {
-      return [{ field: 'ten_dang_nhap', message: THONG_DIEP.TEN_SAI_DINH_DANG, status: 400 }];
-    }
-    const trung = await this.prisma.nguoi_dung.findFirst({
-      where: {
-        ten_dang_nhap: { equals: ten, mode: 'insensitive' },
-        ...(boQuaId ? { id: { not: boQuaId } } : {}),
-      },
-      select: { id: true },
-    });
-    return trung
-      ? [{ field: 'ten_dang_nhap', message: THONG_DIEP.TEN_TRUNG, status: 409 }]
-      : [];
-  }
-
-  private async kiemTraEmail(email: string, boQuaId?: string): Promise<LoiTaiKhoan[]> {
-    if (!EMAIL_REGEX.test(email)) {
-      return [{ field: 'email', message: THONG_DIEP.EMAIL_SAI, status: 400 }];
-    }
-    const trung = await this.prisma.nguoi_dung.findFirst({
-      where: {
-        email: { equals: email, mode: 'insensitive' },
-        ...(boQuaId ? { id: { not: boQuaId } } : {}),
-      },
-      select: { id: true },
-    });
-    return trung ? [{ field: 'email', message: THONG_DIEP.EMAIL_TRUNG, status: 409 }] : [];
-  }
-
-  // Lỗi định dạng (400) ưu tiên hơn lỗi trùng (409) khi có cả hai.
-  private nemLoi(loi: LoiTaiKhoan[]): never {
-    const fields = loi.map(({ field, message }) => ({ field, message }));
-    if (loi.some((l) => l.status === 400)) {
-      throw new ValidationException('Dữ liệu tài khoản không hợp lệ', fields);
-    }
-    throw new ConflictAppException(loi[0].message, fields);
-  }
-
-  // Phòng tranh chấp đồng thời: kiểm tra trước đã qua nhưng unique của DB chặn.
-  private mapLoiUnique(e: unknown): unknown {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-      const target = String((e.meta?.target as string[] | string | undefined) ?? '');
-      const field = target.includes('ten_dang_nhap')
-        ? 'ten_dang_nhap'
-        : target.includes('email')
-          ? 'email'
-          : 'don_vi_id';
-      const message =
-        field === 'ten_dang_nhap'
-          ? THONG_DIEP.TEN_TRUNG
-          : field === 'email'
-            ? THONG_DIEP.EMAIL_TRUNG
-            : THONG_DIEP.DON_VI_DA_CO_TK;
-      return new ConflictAppException(message, [{ field, message }]);
-    }
-    return e;
   }
 }

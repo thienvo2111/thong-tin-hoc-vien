@@ -429,7 +429,7 @@ export class ThongBaoService {
   async guiKichHoatTaiKhoan(params: {
     email: string;
     hoTen: string;
-    tenDonVi: string;
+    tenDonVi: string | null;
     tenDangNhap: string;
     link: string;
   }): Promise<void> {
