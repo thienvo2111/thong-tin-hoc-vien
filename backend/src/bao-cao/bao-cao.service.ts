@@ -783,7 +783,7 @@ export class BaoCaoService {
   // Kết quả khảo sát thật nằm ở ket_qua_khao_sat (SSO/API/import, theo học
   // viên); dang_ky_hoc.muc_dau_vao/muc_dau_ra là mức quản trị xác nhận (nhập
   // file) — ưu tiên mức xác nhận, thiếu thì lấy mức bài khảo sát báo về.
-  // Đầu vào = 'danh-gia' (ưu tiên, có mức) hoặc 'khao-sat'; đầu ra = 'dau-ra'.
+  // Đầu vào = 'danh-gia' (Phiếu đánh giá năng lực số); đầu ra = 'dau-ra'.
   private gopKhaoSat(
     dangKyRows: {
       hoc_vien_id: string;
@@ -797,13 +797,9 @@ export class BaoCaoService {
     const bai = (hv: string, loai: string) =>
       kq.has(`${hv}|${loai}`) ? (kq.get(`${hv}|${loai}`) ?? null) : undefined;
 
-    const dauVao = dangKyRows.map((r) => {
-      if (r.muc_dau_vao) return r.muc_dau_vao;
-      const danhGia = bai(r.hoc_vien_id, 'danh-gia');
-      const khaoSat = bai(r.hoc_vien_id, 'khao-sat');
-      if (danhGia === undefined) return khaoSat;
-      return danhGia ?? khaoSat ?? null;
-    });
+    const dauVao = dangKyRows.map(
+      (r) => r.muc_dau_vao ?? bai(r.hoc_vien_id, 'danh-gia'),
+    );
     const dauRa = dangKyRows.map(
       (r) => r.muc_dau_ra ?? bai(r.hoc_vien_id, 'dau-ra'),
     );
@@ -843,7 +839,8 @@ export class BaoCaoService {
       };
       for (const r of rows) {
         if (r.loai_lop !== loai) continue;
-        const kq = r.dang_ky_hoc.ket_qua;
+        // Đã xếp lớp mà chưa có kết quả -> coi là đang học.
+        const kq = r.dang_ky_hoc.ket_qua ?? 'dang_hoc';
         if (kq === 'dang_hoc') row.dang_hoc += 1;
         else if (kq === 'dat') row.dat += 1;
         else if (kq === 'khong_dat') row.khong_dat += 1;

@@ -125,14 +125,12 @@ describe('BaoCaoService.tongQuan', () => {
       { hoc_vien_id: 'hv-4', muc_dau_vao: null, muc_dau_ra: null },
     ]);
     prisma.ket_qua_khao_sat.findMany.mockResolvedValue([
-      // hv-1: chỉ làm khảo sát kĩ năng số, chưa có mức
-      { hoc_vien_id: 'hv-1', loai: 'khao-sat', muc: null },
-      // hv-2: có đánh giá năng lực -> ưu tiên mức đánh giá
-      { hoc_vien_id: 'hv-2', loai: 'khao-sat', muc: null },
+      // hv-1: chỉ làm phiếu khảo sát kĩ năng số -> KHÔNG tính đầu vào
+      { hoc_vien_id: 'hv-1', loai: 'khao-sat', muc: 'co_ban' },
+      // hv-2: đánh giá năng lực có mức
       { hoc_vien_id: 'hv-2', loai: 'danh-gia', muc: 'thanh_thao' },
       { hoc_vien_id: 'hv-2', loai: 'dau-ra', muc: 'nang_cao' },
-      // hv-3: đánh giá chưa có mức, khảo sát có mức -> lấy mức khảo sát
-      { hoc_vien_id: 'hv-3', loai: 'khao-sat', muc: 'co_ban' },
+      // hv-3: đánh giá đã nộp nhưng chưa có mức -> chưa xếp mức
       { hoc_vien_id: 'hv-3', loai: 'danh-gia', muc: null },
     ]);
 
@@ -146,8 +144,8 @@ describe('BaoCaoService.tongQuan', () => {
       select: { hoc_vien_id: true, loai: true, muc: true },
     });
     expect(result.khao_sat.dau_vao).toEqual({
-      da_lam: 3,
-      co_ban: 1,
+      da_lam: 2,
+      co_ban: 0,
       thanh_thao: 1,
       nang_cao: 0,
       chua_xep_muc: 1,
@@ -182,7 +180,7 @@ describe('BaoCaoService.tongQuan', () => {
     expect(result.khao_sat.dau_ra.da_lam).toBe(0);
   });
 
-  it('kết quả theo hình thức nhóm đúng theo loai_lop + ket_qua, bỏ qua ket_qua NULL', async () => {
+  it('kết quả theo hình thức nhóm đúng theo loai_lop + ket_qua, ket_qua NULL tính là đang học', async () => {
     scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
     prisma.dang_ky_hoc.findMany.mockResolvedValue([
       { hoc_vien_id: 'hv-1', muc_dau_vao: null, muc_dau_ra: null },
@@ -207,7 +205,7 @@ describe('BaoCaoService.tongQuan', () => {
     expect(result.ket_qua_theo_hinh_thuc).toEqual([
       { loai_lop: 'truc_tiep', dang_hoc: 1, dat: 1, khong_dat: 0, vang: 0 },
       { loai_lop: 'zoom', dang_hoc: 0, dat: 0, khong_dat: 1, vang: 0 },
-      { loai_lop: 'vle', dang_hoc: 0, dat: 0, khong_dat: 0, vang: 1 },
+      { loai_lop: 'vle', dang_hoc: 1, dat: 0, khong_dat: 0, vang: 1 },
     ]);
   });
 
