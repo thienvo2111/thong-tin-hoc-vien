@@ -222,16 +222,16 @@ Mọi thao tác ghi + mọi lần tải mẫu biểu / nạp → `nhat_ky_hoat_d
 
 | Lát | Nội dung | Phụ thuộc |
 |---|---|---|
-| P0 | T10 #2, T11 #3 (sửa theo G1/G8/G12); `lich_hoc_lop.cap_nhat_luc`, `phong` + 1 hàm cập nhật lịch dùng chung | — |
-| L1 | Vai trò `ho_tro_giang_vien`, nhóm theo khóa, scope service cấp lớp, admin cấp/phân công | P0 |
-| L2 | Trang lớp (đọc) + ma trận §3 + lịch dạy; bổ sung Lịch học của hỗ trợ HV | L1 |
-| L3 | Vận hành lớp: sửa buổi có lý do, danh mục điểm học/GV, phân công GV vào buổi, hậu cần (409), thực địa đợt | L2 |
-| L4 | Bảng kiểm động + Việc cần làm + số đếm | L3 |
-| L5 | Báo vắng + đề nghị đổi lớp (hỗ trợ HV ↔ hỗ trợ GV) | L2 |
-| L6 | Mẫu biểu theo khóa: tải lên/kiểm ký hiệu/sao chép/tải thử, xuất, nạp | L2, **mẫu HCMUE + Q8** |
-| L7 | Vai trò `giang_vien` + khu `/giang-vien` + gửi link kích hoạt | L3 |
-| L8 | Tin nhắn nhắc lịch (GV + cụm), cờ cần nhắc lại, thẻ "Buổi học sắp tới" | L3, L7 |
-| L9 | Màn giám sát `/admin/van-hanh` | L3, L5 |
+| P0 (#2, #3) | T10 #2, T11 #3 (sửa theo G1/G8/G12); `lich_hoc_lop.cap_nhat_luc`, `phong` + 1 hàm cập nhật lịch dùng chung | — |
+| L1 (#14) | Vai trò `ho_tro_giang_vien`, nhóm theo khóa, scope service cấp lớp, admin cấp/phân công | P0 |
+| L2 (#15) | Trang lớp (đọc) + ma trận §3 + lịch dạy; bổ sung Lịch học của hỗ trợ HV | L1 |
+| L3 (#16) | Vận hành lớp: sửa buổi có lý do, danh mục điểm học/GV, phân công GV vào buổi, hậu cần (409), thực địa đợt | L2 |
+| L4 (#17) | Bảng kiểm động + Việc cần làm + số đếm | L3 |
+| L5 (#18) | Báo vắng + đề nghị đổi lớp (hỗ trợ HV ↔ hỗ trợ GV) | L2 |
+| L6 (#19) | Mẫu biểu theo khóa: tải lên/kiểm ký hiệu/sao chép/tải thử, xuất, nạp | L2, **mẫu HCMUE + Q8** |
+| L7 (#20) | Vai trò `giang_vien` + khu `/giang-vien` + gửi link kích hoạt | L3 |
+| L8 (#21) | Tin nhắn nhắc lịch (GV + cụm), cờ cần nhắc lại, thẻ "Buổi học sắp tới" | L3, L7 |
+| L9 (#22) | Màn giám sát `/admin/van-hanh` | L3, L5 |
 
 ## 9. Kịch bản kiểm thử bắt buộc
 
