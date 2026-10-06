@@ -18,6 +18,7 @@ Công cụ phối hợp giữa **Sở GD&ĐT**, **Phòng Văn hóa - Xã hội**
 | `truong` | Chỉ đơn vị mình (trường) |
 | `hoc_vien` | Không có scope đơn vị — chỉ truy cập hồ sơ của chính mình qua `hoc_vien_id` |
 | `ho_tro_hoc_vien` | (ADR 0003, 2026-10-06 — đã code đủ: tài khoản, phân công, tra cứu/xuất, sửa hồ sơ có lý do, mật khẩu, yêu cầu hỗ trợ theo cụm) Cán bộ HCMUE. Không có scope đơn vị — chỉ học viên có `dang_ky_hoc.cum_id` thuộc các cụm trong `phan_cong_ho_tro` của mình, kiểm tra động mỗi request qua `HoTroHocVienScopeService`. Khu làm việc `/ho-tro` |
+| `ho_tro_giang_vien`, `giang_vien` | **Đề xuất — chưa code** (ADR 0004, 2026-10-06). Phân vai: Quản trị = thiết lập + chốt + giám sát; Người hỗ trợ giảng viên = vận hành lớp/đợt (nhóm theo **khóa** qua `phan_cong_ho_tro_gv`, scope service lộ API cấp lớp) — sửa giờ/điểm học buổi có lý do, phân công GV, hậu cần, thực địa theo đợt–lớp, nạp điểm danh/kết quả, duyệt đề nghị đổi lớp; Người hỗ trợ học viên thêm báo vắng + đề nghị đổi lớp. Giảng viên: chỉ đọc lớp có `phan_cong_giang_day` của mình (đảo một phần QĐ5). Mẫu biểu do Quản trị tải lên theo khóa; nhắc lịch = tin nhắn soạn sẵn, không email. Tiên quyết T10/T11 |
 
 **1 tài khoản = 1 vai trò.** Nhóm hỗ trợ giảng viên sau này = vai trò riêng `ho_tro_giang_vien` + bảng phân công + service phạm vi riêng (ADR 0003); cán bộ làm cả 2 việc dùng 2 tài khoản.
 
