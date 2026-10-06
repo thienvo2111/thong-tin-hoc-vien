@@ -60,6 +60,7 @@ import { KhoaTrangThaiBadge } from '@/components/KhoaTrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
 import { ModalImportLopHoc } from './ModalImportLopHoc';
 import { ChonNguoiHoTroCum } from './ChonNguoiHoTroCum';
+import { SelectDiemHoc } from '@/components/SelectDiemHoc';
 
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 const MAU_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'blue', zoom: 'grape', vle: 'teal' };
@@ -135,6 +136,9 @@ interface FormBuoiHoc {
   thoi_gian_bat_dau: string;
   thoi_gian_ket_thuc: string;
   dia_diem_hoac_link: string;
+  // T10 (issue #2): bắt buộc khi giai đoạn hình thức trực tiếp.
+  diem_hoc_id: string | null;
+  phong: string;
 }
 const FORM_BUOI_RONG: FormBuoiHoc = {
   giai_doan_id: '',
@@ -142,10 +146,18 @@ const FORM_BUOI_RONG: FormBuoiHoc = {
   thoi_gian_bat_dau: '',
   thoi_gian_ket_thuc: '',
   dia_diem_hoac_link: '',
+  diem_hoc_id: null,
+  phong: '',
 };
 
 interface FormSuaBuoiHoc extends FormBuoiHoc {
   trang_thai: TrangThaiLichHoc;
+  ly_do: string;
+}
+
+/** Cảnh báo 🟡 từ API (vd vượt số phòng của điểm học) — không chặn, chỉ báo cho quản trị biết. */
+function baoCanhBao(canhBao: string[] | undefined) {
+  for (const cb of canhBao ?? []) notifications.show({ color: 'yellow', message: cb, autoClose: 8000 });
 }
 
 interface FormNhanSu {
@@ -403,11 +415,14 @@ export default function AdminKhoaChiTiet() {
           thoi_gian_bat_dau: new Date(formBuoi.thoi_gian_bat_dau).toISOString(),
           thoi_gian_ket_thuc: new Date(formBuoi.thoi_gian_ket_thuc).toISOString(),
           dia_diem_hoac_link: formBuoi.dia_diem_hoac_link.trim() || undefined,
+          diem_hoc_id: formBuoi.diem_hoc_id ?? undefined,
+          phong: formBuoi.phong.trim() || undefined,
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (lich) => {
           notifications.show({ color: 'green', message: 'Đã thêm buổi học' });
+          baoCanhBao(lich.canh_bao);
           setModalThemBuoi(null);
         },
         onError: (err) => {
@@ -428,6 +443,9 @@ export default function AdminKhoaChiTiet() {
       thoi_gian_ket_thuc: isoThanhInputDiaPhuong(lich.thoi_gian_ket_thuc),
       dia_diem_hoac_link: lich.dia_diem_hoac_link ?? '',
       trang_thai: lich.trang_thai,
+      diem_hoc_id: lich.diem_hoc_id ?? null,
+      phong: lich.phong ?? '',
+      ly_do: '',
     });
     setLoiSuaBuoi({});
   }
@@ -445,11 +463,15 @@ export default function AdminKhoaChiTiet() {
           thoi_gian_ket_thuc: new Date(formSuaBuoi.thoi_gian_ket_thuc).toISOString(),
           dia_diem_hoac_link: formSuaBuoi.dia_diem_hoac_link.trim() || undefined,
           trang_thai: formSuaBuoi.trang_thai,
+          diem_hoc_id: formSuaBuoi.diem_hoc_id,
+          phong: formSuaBuoi.phong.trim() || null,
+          ly_do: formSuaBuoi.ly_do.trim() || undefined,
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (lich) => {
           notifications.show({ color: 'green', message: 'Đã lưu thay đổi buổi học' });
+          baoCanhBao(lich.canh_bao);
           setBuoiDangSua(null);
           setFormSuaBuoi(null);
         },
@@ -707,16 +729,23 @@ export default function AdminKhoaChiTiet() {
   // --- Form hợp lệ (validate tối thiểu client-side) -------------------------
   const formTaoLopHopLe = formTaoLop.ten_lop.trim() !== '' && formTaoLop.loai_lop !== '';
   const formSuaLopHopLe = !!formSuaLop && formSuaLop.ten_lop.trim() !== '' && formSuaLop.loai_lop !== '';
+  // T10 (issue #2): buổi thuộc giai đoạn hình thức trực tiếp phải có điểm học.
+  const laGiaiDoanTrucTiep = (giaiDoanId: string) =>
+    khoa?.giai_doan?.find((g) => g.id === giaiDoanId)?.hinh_thuc === 'truc_tiep';
+  const buoiMoiCanDiemHoc = laGiaiDoanTrucTiep(formBuoi.giai_doan_id);
+  const buoiSuaCanDiemHoc = !!formSuaBuoi && laGiaiDoanTrucTiep(formSuaBuoi.giai_doan_id);
   const formBuoiHopLe =
     formBuoi.giai_doan_id !== '' &&
     formBuoi.thoi_gian_bat_dau !== '' &&
     formBuoi.thoi_gian_ket_thuc !== '' &&
-    new Date(formBuoi.thoi_gian_ket_thuc) > new Date(formBuoi.thoi_gian_bat_dau);
+    new Date(formBuoi.thoi_gian_ket_thuc) > new Date(formBuoi.thoi_gian_bat_dau) &&
+    (!buoiMoiCanDiemHoc || !!formBuoi.diem_hoc_id);
   const formSuaBuoiHopLe =
     !!formSuaBuoi &&
     formSuaBuoi.thoi_gian_bat_dau !== '' &&
     formSuaBuoi.thoi_gian_ket_thuc !== '' &&
-    new Date(formSuaBuoi.thoi_gian_ket_thuc) > new Date(formSuaBuoi.thoi_gian_bat_dau);
+    new Date(formSuaBuoi.thoi_gian_ket_thuc) > new Date(formSuaBuoi.thoi_gian_bat_dau) &&
+    (!buoiSuaCanDiemHoc || !!formSuaBuoi.diem_hoc_id);
   const formNhanSuHopLe = formNhanSu.ho_ten.trim() !== '' && formNhanSu.vai_tro !== '';
   const formTaoGiaiDoanHopLe =
     formTaoGiaiDoan.thu_tu !== '' &&
@@ -922,6 +951,7 @@ export default function AdminKhoaChiTiet() {
                                                 <Table.Th>Buổi</Table.Th>
                                                 <Table.Th>Thời gian</Table.Th>
                                                 <Table.Th>Địa điểm/link</Table.Th>
+                                                <Table.Th>Điểm học</Table.Th>
                                                 <Table.Th>Trạng thái</Table.Th>
                                                 <Table.Th />
                                               </Table.Tr>
@@ -935,6 +965,24 @@ export default function AdminKhoaChiTiet() {
                                                     {dinhDangNgayGio(lich.thoi_gian_bat_dau)} – {dinhDangNgayGio(lich.thoi_gian_ket_thuc)}
                                                   </Table.Td>
                                                   <Table.Td>{lich.dia_diem_hoac_link ?? '—'}</Table.Td>
+                                                  <Table.Td>
+                                                    {lich.diem_hoc ? (
+                                                      <>
+                                                        <Text fz={13}>{lich.diem_hoc.ten}</Text>
+                                                        {lich.phong && (
+                                                          <Text fz={12} c="dimmed">
+                                                            Phòng {lich.phong}
+                                                          </Text>
+                                                        )}
+                                                      </>
+                                                    ) : lich.giai_doan?.hinh_thuc === 'truc_tiep' ? (
+                                                      <Text fz={12.5} c="red">
+                                                        Chưa có
+                                                      </Text>
+                                                    ) : (
+                                                      '—'
+                                                    )}
+                                                  </Table.Td>
                                                   <Table.Td>{NHAN_TRANG_THAI_LICH_HOC[lich.trang_thai]}</Table.Td>
                                                   <Table.Td ta="right">
                                                     {laQuanTri && (
@@ -1377,6 +1425,21 @@ export default function AdminKhoaChiTiet() {
             error={loiBuoi.dia_diem_hoac_link}
             onChange={(e) => { const v = e.currentTarget.value; setFormBuoi((f) => ({ ...f, dia_diem_hoac_link: v })); }}
           />
+          <Group grow align="flex-start">
+            <SelectDiemHoc
+              value={formBuoi.diem_hoc_id}
+              onChange={(v) => setFormBuoi((f) => ({ ...f, diem_hoc_id: v }))}
+              required={buoiMoiCanDiemHoc}
+              error={loiBuoi.diem_hoc_id}
+              description={buoiMoiCanDiemHoc ? 'Bắt buộc với giai đoạn trực tiếp' : undefined}
+            />
+            <TextInput
+              label="Phòng"
+              value={formBuoi.phong}
+              error={loiBuoi.phong}
+              onChange={(e) => { const v = e.currentTarget.value; setFormBuoi((f) => ({ ...f, phong: v })); }}
+            />
+          </Group>
           <Button mt="sm" loading={themLichHoc.isPending} disabled={!formBuoiHopLe} onClick={xuLyThemBuoi} fullWidth>
             Thêm buổi học
           </Button>
@@ -1417,6 +1480,28 @@ export default function AdminKhoaChiTiet() {
               value={formSuaBuoi.dia_diem_hoac_link}
               error={loiSuaBuoi.dia_diem_hoac_link}
               onChange={(e) => { const v = e.currentTarget.value; setFormSuaBuoi((f) => (f ? { ...f, dia_diem_hoac_link: v } : f)); }}
+            />
+            <Group grow align="flex-start">
+              <SelectDiemHoc
+                value={formSuaBuoi.diem_hoc_id}
+                onChange={(v) => setFormSuaBuoi((f) => (f ? { ...f, diem_hoc_id: v } : f))}
+                required={buoiSuaCanDiemHoc}
+                error={loiSuaBuoi.diem_hoc_id}
+                description={buoiSuaCanDiemHoc ? 'Bắt buộc với giai đoạn trực tiếp' : undefined}
+              />
+              <TextInput
+                label="Phòng"
+                value={formSuaBuoi.phong}
+                error={loiSuaBuoi.phong}
+                onChange={(e) => { const v = e.currentTarget.value; setFormSuaBuoi((f) => (f ? { ...f, phong: v } : f)); }}
+              />
+            </Group>
+            <TextInput
+              label="Lý do thay đổi"
+              description="Ghi vào nhật ký khi đổi giờ/điểm học/phòng (để báo lại học viên, giảng viên)"
+              value={formSuaBuoi.ly_do}
+              error={loiSuaBuoi.ly_do}
+              onChange={(e) => { const v = e.currentTarget.value; setFormSuaBuoi((f) => (f ? { ...f, ly_do: v } : f)); }}
             />
             <Select
               label="Trạng thái diễn ra"

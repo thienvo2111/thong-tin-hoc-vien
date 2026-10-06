@@ -350,6 +350,7 @@ model dia_danh {
   hoc_vien_cu_tru_tinh      hoc_vien[]               @relation("hoc_vien_cu_tru_tinh")
   hoc_vien_cu_tru_phuong_xa hoc_vien[]               @relation("hoc_vien_cu_tru_phuong_xa")
   cau_hinh_khao_sat_khoa    cau_hinh_khao_sat_khoa[]
+  diem_hoc                  diem_hoc[]
 
   @@index([parent_id], map: "idx_dia_danh_parent")
   @@index([cap], map: "idx_dia_danh_cap")
@@ -375,6 +376,7 @@ model don_vi_cong_tac {
   nguoi_dung     nguoi_dung[]
   hoc_vien       hoc_vien[]
   khoa_boi_duong khoa_boi_duong[]
+  diem_hoc       diem_hoc[]
 
   @@index([loai_don_vi], map: "idx_don_vi_loai")
   @@index([dia_ban_id], map: "idx_don_vi_dia_ban")
@@ -440,6 +442,7 @@ model nguoi_dung {
   yeu_cau_ho_tro_sua_tra_loi_boi     yeu_cau_ho_tro[]           @relation("yeu_cau_ho_tro_sua_tra_loi_boi")
   token_xac_thuc                     token_xac_thuc[]
   phan_cong_ho_tro                   phan_cong_ho_tro[]
+  diem_hoc_tao                       diem_hoc[]                 @relation("diem_hoc_tao_boi")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -844,8 +847,15 @@ model lich_hoc_lop {
   thoi_gian_ket_thuc DateTime            @db.Timestamptz(6)
   dia_diem_hoac_link String?             @db.VarChar(500)
   trang_thai         trang_thai_lich_hoc @default(chua_dien_ra)
+  // T10 (issue #2) + ADR 0004 P0 (2026-10-07): điểm học (bắt buộc với giai
+  // đoạn truc_tiep — kiểm ở service), phòng, và mốc cập nhật giờ/địa điểm
+  // (chỉ đổi qua LichHocThayDoi — phát hiện "cần nhắc lại" sau khi đổi lịch).
+  diem_hoc_id        String?             @db.Uuid
+  phong              String?             @db.VarChar(100)
+  cap_nhat_luc       DateTime            @default(now()) @db.Timestamptz(6)
 
   lop       lop_hoc        @relation(fields: [lop_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  diem_hoc  diem_hoc?      @relation(fields: [diem_hoc_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   giai_doan giai_doan_khoa @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   // T12 (mo-rong-nls-an-giang.md, 2026-09-30): điểm danh của học viên tại
   // buổi này, nhập qua import diem_danh.
@@ -854,6 +864,35 @@ model lich_hoc_lop {
   @@unique([lop_id, giai_doan_id, buoi_so], map: "uq_lich_hoc_lop_giai_doan_buoi")
   @@index([lop_id], map: "idx_lich_hoc_lop")
   @@index([giai_doan_id], map: "idx_lich_hoc_giai_doan")
+  @@index([diem_hoc_id], map: "idx_lich_hoc_diem_hoc")
+}
+
+// T10 (issue #2, 2026-10-07): danh mục điểm học trực tiếp. Không xóa cứng
+// (rule #40) — ngưng bằng trang_thai. tao_boi: người tạo (ADR 0004 G12 —
+// người hỗ trợ giảng viên cũng tạo được, Quản trị gộp trùng).
+model diem_hoc {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ma_diem_hoc   String            @unique(map: "uq_diem_hoc_ma") @db.VarChar(30)
+  ten           String            @db.VarChar(255)
+  dia_chi       String            @db.VarChar(500)
+  dia_ban_id    String            @db.Uuid
+  don_vi_id     String?           @db.Uuid
+  suc_chua      Int?
+  so_phong      Int?              @db.SmallInt
+  nguoi_lien_he String?           @db.VarChar(255)
+  sdt_lien_he   String?           @db.VarChar(20)
+  ghi_chu_csvc  String?
+  trang_thai    trang_thai_active @default(active)
+  tao_boi       String?           @db.Uuid
+  created_at    DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
+
+  dia_ban   dia_danh         @relation(fields: [dia_ban_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  don_vi    don_vi_cong_tac? @relation(fields: [don_vi_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nguoi_tao nguoi_dung?      @relation("diem_hoc_tao_boi", fields: [tao_boi], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  lich_hoc  lich_hoc_lop[]
+
+  @@index([dia_ban_id], map: "idx_diem_hoc_dia_ban")
 }
 
 model lop_hoc_nhan_su {

@@ -440,7 +440,13 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     });
 
     it.each([
-      ['nop-duyet', () => request(app.getHttpServer()).post(`/khoa-boi-duong/${FAKE_ID}/nop-duyet`)],
+      [
+        'nop-duyet',
+        () =>
+          request(app.getHttpServer()).post(
+            `/khoa-boi-duong/${FAKE_ID}/nop-duyet`,
+          ),
+      ],
       [
         'duyet',
         () =>
@@ -1077,8 +1083,20 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
     let lopId: string;
     let giaiDoan1Id: string;
     let giaiDoanKhacKhoaId: string;
+    // T10 (issue #2): buổi giai đoạn truc_tiep phải có điểm học.
+    let diemHocId: string;
 
     beforeAll(async () => {
+      const dh = await prisma.diem_hoc.create({
+        data: {
+          ma_diem_hoc: `DH-KBD-${uniqueSuffix()}`.slice(0, 30),
+          ten: 'Điểm học test KBD',
+          dia_chi: '1 Đường Test',
+          dia_ban_id: xa.id,
+        },
+      });
+      diemHocId = dh.id;
+
       const k = await request(app.getHttpServer())
         .post('/khoa-boi-duong')
         .set('Authorization', `Bearer ${tokenQuanTri}`)
@@ -1217,8 +1235,21 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         .expect(400);
     });
 
+    it('lich-hoc giai đoạn trực tiếp thiếu diem_hoc_id -> 400 (T10)', async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/lop/${lopId}/lich-hoc`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({
+          giai_doan_id: giaiDoan1Id,
+          thoi_gian_bat_dau: '2026-01-02T08:00:00.000Z',
+          thoi_gian_ket_thuc: '2026-01-02T11:00:00.000Z',
+        })
+        .expect(400);
+      expect(JSON.stringify(res.body)).toContain('diem_hoc_id');
+    });
+
     it('lich-hoc hợp lệ (cùng khóa) -> 201', async () => {
-      await request(app.getHttpServer())
+      const res = await request(app.getHttpServer())
         .post(`/lop/${lopId}/lich-hoc`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .send({
@@ -1226,8 +1257,17 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
           thoi_gian_bat_dau: '2026-01-02T08:00:00.000Z',
           thoi_gian_ket_thuc: '2026-01-02T11:00:00.000Z',
           dia_diem_hoac_link: 'Hội trường A',
+          diem_hoc_id: diemHocId,
+          phong: 'P.101',
         })
         .expect(201);
+      expect(res.body).toEqual(
+        expect.objectContaining({
+          diem_hoc_id: diemHocId,
+          phong: 'P.101',
+          canh_bao: [],
+        }),
+      );
     });
 
     it('lich-hoc trùng (lop_id, giai_doan_id) -> 409', async () => {
@@ -1238,6 +1278,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
           giai_doan_id: giaiDoan1Id,
           thoi_gian_bat_dau: '2026-01-03T08:00:00.000Z',
           thoi_gian_ket_thuc: '2026-01-03T11:00:00.000Z',
+          diem_hoc_id: diemHocId,
         })
         .expect(409);
     });
@@ -1259,6 +1300,14 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         .delete(`/lop/${lopId}/nhan-su/${nhanSuId}`)
         .set('Authorization', `Bearer ${tokenQuanTri}`)
         .expect(404);
+    });
+
+    afterAll(async () => {
+      await prisma.lich_hoc_lop.updateMany({
+        where: { diem_hoc_id: diemHocId },
+        data: { diem_hoc_id: null },
+      });
+      await prisma.diem_hoc.delete({ where: { id: diemHocId } });
     });
   });
 
@@ -1938,13 +1987,16 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       ['truong', () => tokenTruong1],
       ['so_gddt', () => tokenSo],
       ['phong_vhxh', () => tokenPhong],
-    ])('%s gọi PATCH .../ket-qua -> 403 (D6: chỉ quan_tri)', async (_vaiTro, layToken) => {
-      await request(app.getHttpServer())
-        .patch(`/dang-ky-hoc/${dangKyId}/ket-qua`)
-        .set('Authorization', `Bearer ${layToken()}`)
-        .send({ ket_qua: 'dat' })
-        .expect(403);
-    });
+    ])(
+      '%s gọi PATCH .../ket-qua -> 403 (D6: chỉ quan_tri)',
+      async (_vaiTro, layToken) => {
+        await request(app.getHttpServer())
+          .patch(`/dang-ky-hoc/${dangKyId}/ket-qua`)
+          .set('Authorization', `Bearer ${layToken()}`)
+          .send({ ket_qua: 'dat' })
+          .expect(403);
+      },
+    );
 
     it('ket_qua ngoài enum ket_qua_hoc -> 400', async () => {
       await request(app.getHttpServer())

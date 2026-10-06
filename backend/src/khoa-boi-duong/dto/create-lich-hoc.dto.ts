@@ -33,4 +33,15 @@ export class CreateLichHocDto {
   @IsString()
   @MaxLength(500)
   dia_diem_hoac_link?: string;
+
+  // T10 (issue #2): bắt buộc khi giai đoạn hinh_thuc='truc_tiep' (kiểm ở
+  // service — DTO không biết giai đoạn), điểm học phải đang hoạt động.
+  @IsOptional()
+  @IsUUID()
+  diem_hoc_id?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  phong?: string;
 }

@@ -4,8 +4,10 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
   MaxLength,
+  MinLength,
 } from 'class-validator';
 import { trang_thai_lich_hoc } from '@prisma/client';
 
@@ -38,4 +40,23 @@ export class UpdateLichHocDto {
   @IsOptional()
   @IsEnum(trang_thai_lich_hoc)
   trang_thai?: trang_thai_lich_hoc;
+
+  // T10 (issue #2): null = gỡ điểm học (không được với giai đoạn truc_tiep).
+  @IsOptional()
+  @IsUUID()
+  diem_hoc_id?: string | null;
+
+  // null = xóa phòng.
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  phong?: string | null;
+
+  // Lý do đổi giờ/địa điểm — tùy chọn với Quản trị, ghi vào nhật ký
+  // sua_lich_hoc (người hỗ trợ giảng viên bắt buộc — ADR 0004 G12).
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(500)
+  ly_do?: string;
 }

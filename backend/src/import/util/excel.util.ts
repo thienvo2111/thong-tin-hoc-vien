@@ -22,9 +22,13 @@ export function cellToImportText(raw: unknown): string {
 
 // Đọc worksheet đầu tiên: dòng 1 = header (khớp columns truyền vào, không
 // phân biệt hoa/thường/khoảng trắng thừa), các dòng sau là dữ liệu.
+// cotCuoiTuyChon: các cột THÊM SAU ở cuối mẫu — file theo mẫu cũ (thiếu
+// đúng các cột cuối này) vẫn đọc được, giá trị cột thiếu = '' (không phá file
+// người dùng đang giữ khi mẫu có thêm cột mới).
 export async function readWorkbookRows(
   buffer: Buffer,
   expectedColumns: string[],
+  cotCuoiTuyChon: string[] = [],
 ): Promise<ParsedRow[]> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
@@ -40,11 +44,15 @@ export async function readWorkbookRows(
   });
 
   const normalize = (s: string) => s.trim().toLowerCase();
-  const headersMatch =
-    expectedColumns.length === actualHeaders.filter((h) => h).length &&
-    expectedColumns.every(
-      (col, i) => normalize(actualHeaders[i] ?? '') === normalize(col),
-    );
+  const khop = (cot: string[]) =>
+    cot.length === actualHeaders.filter((h) => h).length &&
+    cot.every((col, i) => normalize(actualHeaders[i] ?? '') === normalize(col));
+  let headersMatch = khop(expectedColumns);
+  for (let bo = 1; !headersMatch && bo <= cotCuoiTuyChon.length; bo++) {
+    const cuoi = expectedColumns.slice(-bo);
+    const laCotTuyChon = cuoi.every((c) => cotCuoiTuyChon.includes(c));
+    if (laCotTuyChon) headersMatch = khop(expectedColumns.slice(0, -bo));
+  }
   if (!headersMatch) {
     throw new ValidationException(
       `Cột file không đúng mẫu. Cột yêu cầu: ${expectedColumns.join(', ')}. Cột đọc được: ${actualHeaders.filter(Boolean).join(', ')}`,

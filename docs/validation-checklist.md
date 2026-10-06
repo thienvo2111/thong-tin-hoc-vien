@@ -295,3 +295,15 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 | 116 | (2026-10-05) `diem_toi_da` > 0, ≤ 9999 và ≥ `diem`; `muc_goc` chỉ nhận mã có trong thang mức quản trị cấu hình (mặc định `M1`–`M4`; chuẩn hóa hoa/thường, khoảng trắng); thang mức: 1–10 mức, mã `[A-Z0-9]{1,10}` không trùng, nhãn 1–40 ký tự; `url_ket_qua` chỉ http(s) **cùng tên miền** `SSO_KHAO_SAT_URL` (học viên bấm mở link này — chặn link lạ/`javascript:`) | 🔴 | API (`KetQuaKhaoSatService.ghiKetQua`) + import |
 | 117 | (2026-10-05) Trường lạ trong `POST /sso/ket-qua` vẫn bị bỏ (whitelist) nhưng được trả lại trong `bo_qua` + ghi log cảnh báo, để phát hiện gửi sai tên trường | 🟡 | API (`SsoController.baoKetQua`) |
 | 118 | (2026-10-05) Hồ sơ import MOET đã có xác nhận còn hiệu lực ở đợt đang mở → `POST /hoc-vien/toi/xac-nhan` trả 409; chỉ xác nhận lại được sau khi sửa hồ sơ (sửa tự hủy xác nhận). Không có đợt mở → `DOT_XAC_NHAN_DONG` (như cũ), học viên được hướng dẫn gửi Hỗ trợ | 🔴 | API (`HocVienService.xacNhanImportMoet`) + FE M5 |
+
+## Điểm học trực tiếp (T10, issue #2, 2026-10-07 — api-contract.md mục 4 "Điểm học")
+
+| # | Quy tắc | Mức | Nơi thực thi |
+|---|---|---|---|
+| 119 | Buổi học thuộc giai đoạn `hinh_thuc='truc_tiep'` phải có `diem_hoc_id` — tạo buổi thiếu, PATCH gỡ, hoặc PATCH đổi giờ/địa điểm trên buổi cũ chưa có điểm học → `400`; ngoại lệ PATCH chỉ đổi `trang_thai`. Import: buổi mới thiếu `ma_diem_hoc` → dòng lỗi; buổi đã có điểm học, ô trống = giữ | 🔴 | API (`KhoaBoiDuongService.assertDiemHocChoGiaiDoan`, `resolveLopVaLichHocRow`) |
+| 120 | Gán điểm học vào buổi: điểm học phải tồn tại và `active` | 🔴 | API (`DiemHocService.layDiemHocDangHoatDong`) + import (dòng lỗi) |
+| 121 | Số lớp khác nhau có buổi chồng giờ tại cùng 1 điểm học vượt `so_phong` → cảnh báo, **không chặn** (`canh_bao` ở response tạo/sửa buổi; `danh_sach_canh_bao` ở import) | 🟡 | API (`DiemHocService.canhBaoVuotSoPhong`) |
+| 122 | `ma_diem_hoc` duy nhất (409), 1–30 ký tự `[A-Za-z0-9_.-]`; `dia_ban_id`, `don_vi_id` phải tồn tại; `suc_chua`/`so_phong` > 0 | 🔴 | API (DTO + service) + DB (`uq_diem_hoc_ma`, CHECK) |
+| 123 | Không xóa cứng điểm học (rule #40) — chỉ `PATCH trang_thai='ngung'` | 🔴 | API (không expose DELETE) |
+| 124 | `lich_hoc_lop.cap_nhat_luc` chỉ đổi khi `thoi_gian_bat_dau`/`thoi_gian_ket_thuc`/`dia_diem_hoac_link`/`diem_hoc_id`/`phong` thật sự đổi (qua `LichHocThayDoiService` — điểm duy nhất sửa buổi đã tồn tại), kèm 1 dòng `nhat_ky_hoat_dong` `sua_lich_hoc`; chạy lại import y nguyên không đổi gì | 🔴 | API |
+| 125 | Import `lop_va_lich_hoc`: cột `phong` ở CUỐI và tùy chọn — file theo mẫu cũ (thiếu đúng cột cuối này) vẫn hợp lệ | 🔴 | API (`readWorkbookRows` tham số `cotCuoiTuyChon`) |

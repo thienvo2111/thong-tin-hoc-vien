@@ -17,7 +17,7 @@ import { loai_lop_hoc, muc_nang_luc } from '@prisma/client';
 // lop_hoc.loai_lop nay bắt buộc NOT NULL, xem
 // KhoaBoiDuongService.resolveLopVaLichHocRow), nhom_hoc_vien, muc_nang_luc,
 // si_so_toi_da, giai_doan_thu_tu, buoi_so, bat_dau, ket_thuc,
-// dia_diem_hoac_link, ma_diem_hoc (tùy chọn, T10 chưa làm — bị bỏ qua). Đã
+// dia_diem_hoac_link, phong, ma_diem_hoc (tùy chọn — T10, issue #2). Đã
 // được KhoaBoiDuongService tra cứu ra uuid khoa_id/giai_doan_id, giống
 // PhanLopHocVienRowDto.
 export class LopVaLichHocRowDto {
@@ -60,4 +60,15 @@ export class LopVaLichHocRowDto {
   @IsString()
   @MaxLength(500)
   dia_diem_hoac_link?: string;
+
+  // T10 (issue #2): tra từ ma_diem_hoc. undefined = ô trống = giữ điểm học
+  // hiện có của buổi (buổi mới thuộc giai đoạn truc_tiep thì bắt buộc).
+  @IsOptional()
+  @IsUUID()
+  diem_hoc_id?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  phong?: string;
 }

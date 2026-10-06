@@ -354,6 +354,8 @@ export interface CreateLichHocDto {
   thoi_gian_bat_dau: string;
   thoi_gian_ket_thuc: string;
   dia_diem_hoac_link?: string;
+  diem_hoc_id?: string;
+  phong?: string;
 }
 
 export interface UpdateLichHocDto {
@@ -362,6 +364,9 @@ export interface UpdateLichHocDto {
   dia_diem_hoac_link?: string;
   buoi_so?: number;
   trang_thai?: TrangThaiLichHoc;
+  diem_hoc_id?: string | null;
+  phong?: string | null;
+  ly_do?: string;
 }
 
 // Route riêng /lop/{id}/lich-hoc (không dưới /khoa-boi-duong). Hook nhận khoaId cố định (chỉ để

@@ -195,6 +195,43 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     expect(within(dongSauKhi).getByRole('button', { name: 'Kích hoạt lại' })).toBeInTheDocument();
   });
 
+  // T10 (issue #2): buổi thuộc giai đoạn trực tiếp phải chọn điểm học.
+  it('thêm buổi giai đoạn trực tiếp: phải chọn điểm học mới bật nút; lưu → hiện điểm học + phòng', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    let body: Record<string, unknown> | undefined;
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText('Lớp 01 – Nhóm cơ bản A');
+    const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
+    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết ▾' }));
+    await user.click(await screen.findByRole('button', { name: '+ Thêm buổi học' }));
+
+    const modal = await screen.findByRole('dialog');
+    await user.click(within(modal).getByRole('textbox', { name: /^Giai đoạn/ }));
+    await user.click(await screen.findByRole('option', { name: /Học trực tiếp/ }));
+    const batDau = within(modal).getByLabelText(/^Bắt đầu/);
+    const ketThuc = within(modal).getByLabelText(/^Kết thúc/);
+    await user.type(batDau, '2026-10-05T08:00');
+    await user.type(ketThuc, '2026-10-05T11:00');
+
+    const nutThem = within(modal).getByRole('button', { name: 'Thêm buổi học' });
+    expect(within(modal).getByText('Bắt buộc với giai đoạn trực tiếp')).toBeInTheDocument();
+    expect(nutThem).toBeDisabled();
+
+    server.events.on('request:start', async ({ request }) => {
+      if (request.method === 'POST' && request.url.includes('/lich-hoc')) body = await request.clone().json();
+    });
+    await user.click(within(modal).getByRole('textbox', { name: /^Điểm học/ }));
+    await user.click(await screen.findByRole('option', { name: /THPT Long Xuyên/ }));
+    await user.type(within(modal).getByLabelText(/^Phòng/), 'P.101');
+    expect(nutThem).toBeEnabled();
+    await user.click(nutThem);
+
+    await waitFor(() => expect(body).toEqual(expect.objectContaining({ diem_hoc_id: 'dh-1', phong: 'P.101' })));
+    expect(await screen.findByText('Phòng P.101')).toBeInTheDocument();
+    server.events.removeAllListeners();
+  });
+
   it('xem chi tiết lớp: mở rộng dòng → hiện nhân sự + thêm nhân sự mới thành công', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();

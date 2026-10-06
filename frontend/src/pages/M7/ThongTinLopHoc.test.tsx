@@ -75,6 +75,52 @@ describe('M7 — Thông tin lớp học', () => {
     expect(within(gd3).queryByText('Vắng')).not.toBeInTheDocument();
   });
 
+  // T10 (issue #2): buổi trực tiếp kèm điểm học (tên, địa chỉ, người liên hệ + SĐT gọi được) và phòng.
+  it('buổi trực tiếp có điểm học: hiện tên + phòng, địa chỉ, người liên hệ với link gọi điện', async () => {
+    const khoa = db.khoaHocToi[0];
+    const gdCoLop = khoa.giai_doan[1];
+    const buoiDau = gdCoLop.lop!.lich_hoc[0];
+    server.use(
+      http.get('/hoc-vien/toi/khoa-hoc', () =>
+        HttpResponse.json([
+          {
+            ...khoa,
+            giai_doan: khoa.giai_doan.map((g, i) =>
+              i === 1
+                ? {
+                    ...g,
+                    lop: {
+                      ...g.lop!,
+                      lich_hoc: [
+                        {
+                          ...buoiDau,
+                          phong: 'P.101',
+                          diem_hoc: {
+                            id: 'dh-1',
+                            ma_diem_hoc: 'AG-LX-01',
+                            ten: 'THPT Long Xuyên',
+                            dia_chi: '1 Trần Hưng Đạo',
+                            nguoi_lien_he: 'Cô Lan',
+                            sdt_lien_he: '0901000001',
+                          },
+                        },
+                      ],
+                    },
+                  }
+                : g,
+            ),
+          },
+        ]),
+      ),
+    );
+    renderDaDangNhap();
+    const gd2 = (await cacTheGiaiDoan())[1];
+    expect(within(gd2).getByText(/THPT Long Xuyên — phòng P\.101/)).toBeInTheDocument();
+    expect(within(gd2).getByText('1 Trần Hưng Đạo')).toBeInTheDocument();
+    expect(within(gd2).getByText(/Liên hệ: Cô Lan/)).toBeInTheDocument();
+    expect(within(gd2).getByRole('link', { name: '0901000001' })).toHaveAttribute('href', 'tel:0901000001');
+  });
+
   it('giai đoạn không lớp: hiện link + hướng dẫn chung của giai đoạn', async () => {
     renderDaDangNhap();
     const gd1 = (await cacTheGiaiDoan())[0];

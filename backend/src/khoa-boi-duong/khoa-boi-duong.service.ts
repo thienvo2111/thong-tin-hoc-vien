@@ -11,6 +11,8 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
+import { DiemHocService, DIEM_HOC_TOM_TAT } from '../diem-hoc/diem-hoc.service';
+import { LichHocThayDoiService } from './lich-hoc-thay-doi.service';
 import { DonViScope, ScopeService } from '../auth/scope/scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
@@ -91,6 +93,8 @@ export class KhoaBoiDuongService {
     private readonly scopeService: ScopeService,
     private readonly thongBaoService: ThongBaoService,
     private readonly nhatKy: NhatKyService,
+    private readonly diemHocService: DiemHocService,
+    private readonly lichHocThayDoi: LichHocThayDoiService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -158,6 +162,36 @@ export class KhoaBoiDuongService {
       throw new NotFoundAppException('Không tìm thấy lịch học trong lớp này');
     }
     return lich;
+  }
+
+  // Rule 🔴 T10 (issue #2): buổi thuộc giai đoạn hinh_thuc='truc_tiep' phải
+  // có điểm học.
+  private assertDiemHocChoGiaiDoan(
+    giaiDoan: { hinh_thuc: string },
+    diemHocId: string | null,
+  ) {
+    if (giaiDoan.hinh_thuc === 'truc_tiep' && !diemHocId) {
+      throw new ValidationException(
+        'Buổi học thuộc giai đoạn trực tiếp phải có điểm học',
+        [{ field: 'diem_hoc_id', message: 'Bắt buộc với giai đoạn trực tiếp' }],
+      );
+    }
+  }
+
+  // Rule 🟡 T10: cảnh báo vượt số phòng của điểm học — không chặn.
+  private canhBaoSoPhong(lich: {
+    diem_hoc_id: string | null;
+    lop_id: string;
+    thoi_gian_bat_dau: Date;
+    thoi_gian_ket_thuc: Date;
+  }): Promise<string[]> {
+    if (!lich.diem_hoc_id) return Promise.resolve([]);
+    return this.diemHocService.canhBaoVuotSoPhong({
+      diem_hoc_id: lich.diem_hoc_id,
+      lop_id: lich.lop_id,
+      bat_dau: lich.thoi_gian_bat_dau,
+      ket_thuc: lich.thoi_gian_ket_thuc,
+    });
   }
 
   // Rule mới (2026-09-30): PATCH không cho phép body rỗng/không có trường
@@ -417,7 +451,12 @@ export class KhoaBoiDuongService {
         lop_hoc: {
           include: {
             nhan_su: true,
-            lich_hoc: { include: { giai_doan: true } },
+            lich_hoc: {
+              include: {
+                giai_doan: true,
+                diem_hoc: { select: DIEM_HOC_TOM_TAT },
+              },
+            },
           },
         },
         // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): trả kèm danh sách cụm
@@ -808,9 +847,13 @@ export class KhoaBoiDuongService {
       'lịch học',
       false,
     );
+    this.assertDiemHocChoGiaiDoan(giaiDoan, dto.diem_hoc_id ?? null);
+    if (dto.diem_hoc_id) {
+      await this.diemHocService.layDiemHocDangHoatDong(dto.diem_hoc_id);
+    }
 
     try {
-      return await this.prisma.lich_hoc_lop.create({
+      const lich = await this.prisma.lich_hoc_lop.create({
         data: {
           lop_id: lopId,
           giai_doan_id: dto.giai_doan_id,
@@ -818,8 +861,11 @@ export class KhoaBoiDuongService {
           thoi_gian_bat_dau: new Date(dto.thoi_gian_bat_dau),
           thoi_gian_ket_thuc: new Date(dto.thoi_gian_ket_thuc),
           dia_diem_hoac_link: dto.dia_diem_hoac_link,
+          diem_hoc_id: dto.diem_hoc_id,
+          phong: dto.phong?.trim() || undefined,
         },
       });
+      return { ...lich, canh_bao: await this.canhBaoSoPhong(lich) };
     } catch (e) {
       throw this.mapUniqueViolation(
         e,
@@ -839,9 +885,10 @@ export class KhoaBoiDuongService {
     dto: UpdateLichHocDto,
     caller: AuthenticatedUser,
   ) {
-    const lop = await this.getLopOrThrow(lopId);
+    await this.getLopOrThrow(lopId);
     const lich = await this.getLichHocTrongLopOrThrow(lopId, lichHocId);
-    this.assertCoTruongSua(dto);
+    const { ly_do, ...thayDoi } = dto;
+    this.assertCoTruongSua(thayDoi);
 
     if (dto.thoi_gian_bat_dau || dto.thoi_gian_ket_thuc) {
       const batDau =
@@ -850,11 +897,27 @@ export class KhoaBoiDuongService {
         dto.thoi_gian_ket_thuc ?? lich.thoi_gian_ket_thuc.toISOString();
       this.assertThoiGianHopLe(batDau, ketThuc, 'lịch học', false);
     }
+    // T10: buổi giai đoạn truc_tiep phải có điểm học sau khi sửa. Ngoại lệ:
+    // PATCH chỉ đổi trang_thai (vận hành) trên buổi cũ chưa có điểm học.
+    const chiDoiTrangThai = Object.entries(thayDoi).every(
+      ([k, v]) => k === 'trang_thai' || v === undefined,
+    );
+    if (!chiDoiTrangThai) {
+      const giaiDoan = await this.prisma.giai_doan_khoa.findUniqueOrThrow({
+        where: { id: lich.giai_doan_id },
+      });
+      const diemHocSau =
+        dto.diem_hoc_id !== undefined ? dto.diem_hoc_id : lich.diem_hoc_id;
+      this.assertDiemHocChoGiaiDoan(giaiDoan, diemHocSau);
+    }
+    if (dto.diem_hoc_id && dto.diem_hoc_id !== lich.diem_hoc_id) {
+      await this.diemHocService.layDiemHocDangHoatDong(dto.diem_hoc_id);
+    }
 
     try {
-      return await this.prisma.lich_hoc_lop.update({
-        where: { id: lichHocId },
-        data: {
+      const capNhat = await this.lichHocThayDoi.capNhat(
+        lich,
+        {
           thoi_gian_bat_dau: dto.thoi_gian_bat_dau
             ? new Date(dto.thoi_gian_bat_dau)
             : undefined,
@@ -862,10 +925,15 @@ export class KhoaBoiDuongService {
             ? new Date(dto.thoi_gian_ket_thuc)
             : undefined,
           dia_diem_hoac_link: dto.dia_diem_hoac_link,
+          diem_hoc_id: dto.diem_hoc_id,
+          phong:
+            dto.phong === undefined ? undefined : dto.phong?.trim() || null,
           buoi_so: dto.buoi_so,
           trang_thai: dto.trang_thai,
         },
-      });
+        { ly_do: ly_do?.trim(), nguon: 'sua_tay' },
+      );
+      return { ...capNhat, canh_bao: await this.canhBaoSoPhong(capNhat) };
     } catch (e) {
       throw this.mapUniqueViolation(
         e,
@@ -944,7 +1012,10 @@ export class KhoaBoiDuongService {
               include: {
                 nhan_su: true,
                 lich_hoc: {
-                  include: { giai_doan: true },
+                  include: {
+                    giai_doan: true,
+                    diem_hoc: { select: DIEM_HOC_TOM_TAT },
+                  },
                   orderBy: [
                     { buoi_so: 'asc' },
                     { thoi_gian_bat_dau: 'asc' },
@@ -1701,8 +1772,9 @@ export class KhoaBoiDuongService {
   // nhom_hoc_vien (tùy chọn, 1-20), muc_nang_luc (tùy chọn), si_so_toi_da
   // (tùy chọn), giai_doan_thu_tu, buoi_so, bat_dau, ket_thuc (dd/mm/yyyy
   // hh:mm giờ VN, quy tắc chung #4), dia_diem_hoac_link (tùy chọn),
-  // ma_diem_hoc (tùy chọn — T10 "điểm học" CHƯA làm, không có bảng nào để
-  // lưu -> đọc cột nhưng BỎ QUA, không báo lỗi vì cột lạ, xem TODO T10).
+  // phong (tùy chọn), ma_diem_hoc (T10, issue #2 — bắt buộc với buổi thuộc
+  // giai đoạn truc_tiep, trừ khi buổi đã tồn tại và đã có điểm học: ô trống
+  // = giữ điểm học/phòng hiện có).
   //
   // Upsert lớp theo (khoa_id, ten_lop) — uq_lop_ten_trong_khoa (T3); upsert
   // lịch theo (lop_id, giai_doan_id, buoi_so) — uq_lich_hoc_lop_giai_doan_buoi
@@ -1725,6 +1797,8 @@ export class KhoaBoiDuongService {
       bat_dau?: string;
       ket_thuc?: string;
       dia_diem_hoac_link?: string;
+      phong?: string;
+      ma_diem_hoc?: string;
     },
     dupKeys?: Set<string>,
   ): Promise<RowBuildResult<LopVaLichHocRowDto>> {
@@ -1842,6 +1916,56 @@ export class KhoaBoiDuongService {
     if (diaDiemHoacLink && diaDiemHoacLink.length > 500) {
       return { error: 'Cột "dia_diem_hoac_link" tối đa 500 ký tự' };
     }
+    const phong = raw.phong?.trim() || undefined;
+    if (phong && phong.length > 100) {
+      return { error: 'Cột "phong" tối đa 100 ký tự' };
+    }
+
+    // T10: tra điểm học; buổi giai đoạn truc_tiep phải có điểm học sau khi
+    // ghi (ô trống chỉ hợp lệ khi buổi đã tồn tại và đã có điểm học).
+    const tenLopChuan = normalizeNfcName(tenLop);
+    const lopCu = await this.prisma.lop_hoc.findUnique({
+      where: {
+        khoa_id_loai_lop_ten_lop: {
+          khoa_id: khoa.id,
+          loai_lop: loaiLop,
+          ten_lop: tenLopChuan,
+        },
+      },
+      select: { id: true },
+    });
+    let diemHocId: string | undefined;
+    const maDiemHoc = raw.ma_diem_hoc?.trim();
+    if (maDiemHoc) {
+      const diemHoc = await this.prisma.diem_hoc.findUnique({
+        where: { ma_diem_hoc: maDiemHoc },
+      });
+      if (!diemHoc || diemHoc.trang_thai !== 'active') {
+        return {
+          error: `Điểm học "${maDiemHoc}" không tồn tại hoặc đã ngừng hoạt động`,
+        };
+      }
+      diemHocId = diemHoc.id;
+    } else if (giaiDoan.hinh_thuc === 'truc_tiep') {
+      const lichCu = lopCu
+        ? await this.prisma.lich_hoc_lop.findUnique({
+            where: {
+              lop_id_giai_doan_id_buoi_so: {
+                lop_id: lopCu.id,
+                giai_doan_id: giaiDoan.id,
+                buoi_so: buoiSo,
+              },
+            },
+            select: { diem_hoc_id: true },
+          })
+        : null;
+      if (!lichCu?.diem_hoc_id) {
+        return {
+          error:
+            'Buổi thuộc giai đoạn trực tiếp phải có "ma_diem_hoc" (điểm học)',
+        };
+      }
+    }
 
     if (dupKeys) {
       const key = `${khoa.id}|${loaiLop}|${tenLop.toLowerCase()}|${giaiDoan.id}|${buoiSo}`;
@@ -1853,10 +1977,19 @@ export class KhoaBoiDuongService {
       dupKeys.add(key);
     }
 
+    const canhBaoPhong = diemHocId
+      ? await this.diemHocService.canhBaoVuotSoPhong({
+          diem_hoc_id: diemHocId,
+          lop_id: lopCu?.id ?? '00000000-0000-0000-0000-000000000000',
+          bat_dau: batDau,
+          ket_thuc: ketThuc,
+        })
+      : [];
+
     return {
       dto: {
         khoa_id: khoa.id,
-        ten_lop: normalizeNfcName(tenLop),
+        ten_lop: tenLopChuan,
         loai_lop: loaiLop,
         nhom_hoc_vien: nhomHocVien,
         muc_nang_luc: mucNangLuc,
@@ -1866,12 +1999,20 @@ export class KhoaBoiDuongService {
         thoi_gian_bat_dau: batDau,
         thoi_gian_ket_thuc: ketThuc,
         dia_diem_hoac_link: diaDiemHoacLink,
+        diem_hoc_id: diemHocId,
+        phong,
       },
-      canhBao: canhBaoBuoiHocGiaiDoan(
-        loaiLop,
-        { bat_dau: batDau, ket_thuc: ketThuc },
-        giaiDoan,
-      ),
+      canhBao:
+        [
+          canhBaoBuoiHocGiaiDoan(
+            loaiLop,
+            { bat_dau: batDau, ket_thuc: ketThuc },
+            giaiDoan,
+          ),
+          ...canhBaoPhong,
+        ]
+          .filter(Boolean)
+          .join('; ') || undefined,
     };
   }
 
@@ -1905,7 +2046,10 @@ export class KhoaBoiDuongService {
       },
     });
 
-    await this.prisma.lich_hoc_lop.upsert({
+    // Buổi đã có → đi qua LichHocThayDoiService (chỉ đổi cap_nhat_luc + ghi
+    // nhật ký khi giờ/địa điểm thật sự đổi — chạy lại file y nguyên không
+    // làm "cần nhắc lại" giả).
+    const lichCu = await this.prisma.lich_hoc_lop.findUnique({
       where: {
         lop_id_giai_doan_id_buoi_so: {
           lop_id: lop.id,
@@ -1913,20 +2057,33 @@ export class KhoaBoiDuongService {
           buoi_so: dto.buoi_so,
         },
       },
-      create: {
-        lop_id: lop.id,
-        giai_doan_id: dto.giai_doan_id,
-        buoi_so: dto.buoi_so,
-        thoi_gian_bat_dau: dto.thoi_gian_bat_dau,
-        thoi_gian_ket_thuc: dto.thoi_gian_ket_thuc,
-        dia_diem_hoac_link: dto.dia_diem_hoac_link,
-      },
-      update: {
-        thoi_gian_bat_dau: dto.thoi_gian_bat_dau,
-        thoi_gian_ket_thuc: dto.thoi_gian_ket_thuc,
-        dia_diem_hoac_link: dto.dia_diem_hoac_link,
-      },
     });
+    if (!lichCu) {
+      await this.prisma.lich_hoc_lop.create({
+        data: {
+          lop_id: lop.id,
+          giai_doan_id: dto.giai_doan_id,
+          buoi_so: dto.buoi_so,
+          thoi_gian_bat_dau: dto.thoi_gian_bat_dau,
+          thoi_gian_ket_thuc: dto.thoi_gian_ket_thuc,
+          dia_diem_hoac_link: dto.dia_diem_hoac_link,
+          diem_hoc_id: dto.diem_hoc_id,
+          phong: dto.phong,
+        },
+      });
+      return;
+    }
+    await this.lichHocThayDoi.capNhat(
+      lichCu,
+      {
+        thoi_gian_bat_dau: dto.thoi_gian_bat_dau,
+        thoi_gian_ket_thuc: dto.thoi_gian_ket_thuc,
+        dia_diem_hoac_link: dto.dia_diem_hoac_link,
+        diem_hoc_id: dto.diem_hoc_id,
+        phong: dto.phong,
+      },
+      { nguon: 'import' },
+    );
   }
 
   // ---------------------------------------------------------------------

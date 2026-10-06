@@ -559,7 +559,11 @@ export class ImportService {
     if (loai === 'ho_so_nhan_su_moet') {
       return readMoetWorkbookRows(buffer);
     }
-    return readWorkbookRows(buffer, columns);
+    return readWorkbookRows(
+      buffer,
+      columns,
+      loai === 'lop_va_lich_hoc' ? ['phong'] : [],
+    );
   }
 
   private getColumns(loai: SupportedImportType): string[] {
@@ -664,6 +668,9 @@ export class ImportService {
           'ket_thuc',
           'dia_diem_hoac_link',
           'ma_diem_hoc',
+          // T10 (issue #2): thêm ở CUỐI + tùy chọn — file mẫu cũ (chưa có
+          // cột này) vẫn import được (readRows truyền cotCuoiTuyChon).
+          'phong',
         ];
       case 'diem_danh':
         // T12 (mo-rong-nls-an-giang.md): điểm danh nhập qua IMPORT EXCEL
@@ -844,8 +851,10 @@ export class ImportService {
         ket_thuc:
           'Bắt buộc — định dạng "dd/mm/yyyy hh:mm", giờ Việt Nam, phải lớn hơn bat_dau.',
         dia_diem_hoac_link: 'Tùy chọn — tối đa 500 ký tự.',
+        phong:
+          'Tùy chọn — phòng học trong điểm học, tối đa 100 ký tự. Để trống = giữ giá trị hiện có.',
         ma_diem_hoc:
-          'Tùy chọn — CHƯA sử dụng ở phiên bản hiện tại (chờ T10), điền vào sẽ bị bỏ qua.',
+          'Mã điểm học trong danh mục (đang hoạt động). BẮT BUỘC với buổi thuộc giai đoạn trực tiếp — trừ khi buổi đã có điểm học (để trống = giữ).',
       };
     }
     if (loai === 'diem_danh') {
@@ -988,6 +997,8 @@ export class ImportService {
             bat_dau: raw.bat_dau,
             ket_thuc: raw.ket_thuc,
             dia_diem_hoac_link: raw.dia_diem_hoac_link,
+            phong: raw.phong,
+            ma_diem_hoc: raw.ma_diem_hoc,
           },
           dupKeys,
         );

@@ -20,6 +20,7 @@ import { CauHinhKhaoSatModule } from './cau-hinh-khao-sat/cau-hinh-khao-sat.modu
 import { SsoModule } from './sso/sso.module';
 import { NhatKyModule } from './nhat-ky/nhat-ky.module';
 import { HoTroHocVienModule } from './ho-tro-hoc-vien/ho-tro-hoc-vien.module';
+import { DiemHocModule } from './diem-hoc/diem-hoc.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { HoTroHocVienModule } from './ho-tro-hoc-vien/ho-tro-hoc-vien.module';
     AuthModule,
     HocVienModule,
     KhoaBoiDuongModule,
+    DiemHocModule,
     DanhMucModule,
     ImportModule,
     BaoCaoModule,

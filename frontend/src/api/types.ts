@@ -345,6 +345,34 @@ export interface LichHocLop {
   dia_diem_hoac_link: string | null;
   trang_thai: TrangThaiLichHoc;
   giai_doan?: GiaiDoanKhoa;
+  // T10 (issue #2, 2026-10-07): điểm học (bắt buộc với giai đoạn trực tiếp), phòng, mốc đổi giờ/địa điểm.
+  diem_hoc_id?: string | null;
+  phong?: string | null;
+  cap_nhat_luc?: string;
+  diem_hoc?: DiemHocTomTat | null;
+  /** Chỉ có trong response tạo/sửa buổi: cảnh báo 🟡 vượt số phòng của điểm học (không chặn). */
+  canh_bao?: string[];
+}
+
+// T10 (issue #2): danh mục điểm học trực tiếp — GET /diem-hoc.
+export interface DiemHocTomTat {
+  id: string;
+  ma_diem_hoc: string;
+  ten: string;
+  dia_chi: string;
+  nguoi_lien_he: string | null;
+  sdt_lien_he: string | null;
+}
+
+export interface DiemHoc extends DiemHocTomTat {
+  dia_ban_id: string;
+  don_vi_id: string | null;
+  suc_chua: number | null;
+  so_phong: number | null;
+  ghi_chu_csvc: string | null;
+  trang_thai: TrangThaiActive;
+  dia_ban?: { id: string; ten: string; parent_id: string | null };
+  don_vi?: { id: string; ten_don_vi: string } | null;
 }
 
 // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30): 3 loại lớp độc lập nhau — xem
@@ -503,6 +531,9 @@ export interface LichHocLopToi {
   giai_doan: GiaiDoanKhoaToi;
   // null = chưa được điểm danh cho buổi này (KHÔNG suy diễn thành "vắng").
   trang_thai_diem_danh: TrangThaiDiemDanh | null;
+  // T10 (issue #2): điểm học + phòng của buổi trực tiếp (null/thiếu với buổi trực tuyến).
+  diem_hoc?: DiemHocTomTat | null;
+  phong?: string | null;
 }
 
 export interface NhanSuLopToi {

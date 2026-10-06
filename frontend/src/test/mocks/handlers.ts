@@ -45,6 +45,55 @@ function loi(status: number, code: string, message: string, extra: Record<string
 }
 
 export const handlers = [
+  // T10 (issue #2): danh mục điểm học.
+  http.get('/diem-hoc', ({ request }) => {
+    const url = new URL(request.url);
+    const q = url.searchParams.get('q')?.toLowerCase();
+    const trangThai = url.searchParams.get('trang_thai');
+    const page = Number(url.searchParams.get('page') ?? '1');
+    const pageSize = Number(url.searchParams.get('page_size') ?? '20');
+    const items = db.diemHoc.filter(
+      (d) =>
+        (!trangThai || d.trang_thai === trangThai) &&
+        (!q || `${d.ten} ${d.ma_diem_hoc} ${d.dia_chi}`.toLowerCase().includes(q)),
+    );
+    return HttpResponse.json({
+      data: items.slice((page - 1) * pageSize, page * pageSize),
+      total: items.length,
+      page,
+      page_size: pageSize,
+    });
+  }),
+
+  http.post('/diem-hoc', async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    if (db.diemHoc.some((d) => d.ma_diem_hoc === body.ma_diem_hoc)) {
+      return loi(409, 'CONFLICT', 'Mã điểm học đã tồn tại', {
+        fields: [{ field: 'ma_diem_hoc', message: 'Đã tồn tại' }],
+      });
+    }
+    const moi = {
+      id: `dh-${db.diemHoc.length + 1}`,
+      don_vi_id: null,
+      suc_chua: null,
+      so_phong: null,
+      nguoi_lien_he: null,
+      sdt_lien_he: null,
+      ghi_chu_csvc: null,
+      trang_thai: 'active',
+      ...body,
+    } as (typeof db.diemHoc)[number];
+    db.diemHoc.push(moi);
+    return HttpResponse.json(moi, { status: 201 });
+  }),
+
+  http.patch('/diem-hoc/:id', async ({ params, request }) => {
+    const found = db.diemHoc.find((d) => d.id === params.id);
+    if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy điểm học');
+    Object.assign(found, (await request.json()) as Record<string, unknown>);
+    return HttpResponse.json(found);
+  }),
+
   http.post('/auth/dang-nhap', async ({ request }) => {
     const body = (await request.json()) as { ten_dang_nhap: string; mat_khau: string };
     const maSach = body.ten_dang_nhap.trim();
@@ -517,7 +566,19 @@ export const handlers = [
       thoi_gian_bat_dau: string;
       thoi_gian_ket_thuc: string;
       dia_diem_hoac_link?: string;
+      diem_hoc_id?: string;
+      phong?: string;
     };
+    // Như backend (T10, issue #2): buổi giai đoạn trực tiếp phải có điểm học.
+    const giaiDoan = Object.values(db.chiTietKhoa)
+      .flatMap((k) => k.giai_doan ?? [])
+      .find((g) => g.id === body.giai_doan_id);
+    if (giaiDoan?.hinh_thuc === 'truc_tiep' && !body.diem_hoc_id) {
+      return loi(400, 'VALIDATION_ERROR', 'Buổi học thuộc giai đoạn trực tiếp phải có điểm học', {
+        fields: [{ field: 'diem_hoc_id', message: 'Bắt buộc với giai đoạn trực tiếp' }],
+      });
+    }
+    const diemHoc = db.diemHoc.find((d) => d.id === body.diem_hoc_id) ?? null;
     const buoiSo = body.buoi_so ?? 1;
     if ((lop.lich_hoc ?? []).some((l) => l.giai_doan_id === body.giai_doan_id && l.buoi_so === buoiSo)) {
       return loi(409, 'CONFLICT', 'Lớp này đã có lịch học cho giai đoạn và buổi này', {
@@ -533,9 +594,13 @@ export const handlers = [
       thoi_gian_ket_thuc: body.thoi_gian_ket_thuc,
       dia_diem_hoac_link: body.dia_diem_hoac_link ?? null,
       trang_thai: 'chua_dien_ra' as const,
+      diem_hoc_id: diemHoc?.id ?? null,
+      phong: body.phong ?? null,
+      diem_hoc: diemHoc,
+      giai_doan: giaiDoan,
     };
     lop.lich_hoc = [...(lop.lich_hoc ?? []), moi];
-    return HttpResponse.json(moi);
+    return HttpResponse.json({ ...moi, canh_bao: [] });
   }),
 
   http.patch('/lop/:id/lich-hoc/:lichHocId', async ({ params, request }) => {

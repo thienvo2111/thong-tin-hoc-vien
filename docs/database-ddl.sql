@@ -596,6 +596,31 @@ CREATE TABLE lop_hoc (
 
 CREATE INDEX idx_lop_khoa ON lop_hoc(khoa_id);
 
+-- T10 (issue #2, 2026-10-07): danh mục điểm học trực tiếp. Không xóa cứng
+-- (rule #40) — ngưng bằng trang_thai. tao_boi: người tạo (ADR 0004 — người
+-- hỗ trợ giảng viên cũng tạo được, Quản trị gộp trùng).
+CREATE TABLE diem_hoc (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    ma_diem_hoc     varchar(30)  NOT NULL,
+    ten             varchar(255) NOT NULL,
+    dia_chi         varchar(500) NOT NULL,
+    dia_ban_id      uuid NOT NULL REFERENCES dia_danh(id),
+    don_vi_id       uuid REFERENCES don_vi_cong_tac(id),   -- trường sở tại (nếu có)
+    suc_chua        integer,
+    so_phong        smallint,
+    nguoi_lien_he   varchar(255),
+    sdt_lien_he     varchar(20),
+    ghi_chu_csvc    text,
+    trang_thai      trang_thai_active NOT NULL DEFAULT 'active',
+    tao_boi         uuid REFERENCES nguoi_dung(id) ON DELETE SET NULL,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_diem_hoc_ma UNIQUE (ma_diem_hoc),
+    CONSTRAINT chk_diem_hoc_suc_chua CHECK (suc_chua IS NULL OR suc_chua > 0),
+    CONSTRAINT chk_diem_hoc_so_phong CHECK (so_phong IS NULL OR so_phong > 0)
+);
+CREATE INDEX idx_diem_hoc_dia_ban ON diem_hoc(dia_ban_id);
+
 CREATE TABLE lich_hoc_lop (
     id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     lop_id                  uuid NOT NULL REFERENCES lop_hoc(id) ON DELETE CASCADE,
@@ -607,6 +632,13 @@ CREATE TABLE lich_hoc_lop (
     thoi_gian_ket_thuc      timestamptz NOT NULL,
     dia_diem_hoac_link      varchar(500),
     trang_thai              trang_thai_lich_hoc NOT NULL DEFAULT 'chua_dien_ra',
+    -- T10 (issue #2, 2026-10-07): điểm học (bắt buộc với giai đoạn
+    -- hinh_thuc='truc_tiep' — kiểm ở API, rule #119), phòng, và mốc cập nhật
+    -- giờ/địa điểm (chỉ đổi khi 1 trong thoi_gian_*/dia_diem_hoac_link/
+    -- diem_hoc_id/phong đổi — ADR 0004 "cần nhắc lại").
+    diem_hoc_id             uuid REFERENCES diem_hoc(id),
+    phong                   varchar(100),
+    cap_nhat_luc            timestamptz NOT NULL DEFAULT now(),
 
     -- T6: thay uq_lich_hoc_lop_giai_doan (1 lịch/giai đoạn/lớp) bằng ràng
     -- buộc có thêm buoi_so.
@@ -617,6 +649,7 @@ CREATE TABLE lich_hoc_lop (
 
 CREATE INDEX idx_lich_hoc_lop ON lich_hoc_lop(lop_id);
 CREATE INDEX idx_lich_hoc_giai_doan ON lich_hoc_lop(giai_doan_id);
+CREATE INDEX idx_lich_hoc_diem_hoc ON lich_hoc_lop(diem_hoc_id);
 
 CREATE TABLE lop_hoc_nhan_su (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),

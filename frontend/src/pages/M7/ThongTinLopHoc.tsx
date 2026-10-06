@@ -355,6 +355,28 @@ function DanhSachBuoi({ lichHoc }: { lichHoc: LichHocLopToi[] }) {
           <Text size="sm" c="dimmed">
             {dinhDangNgayGio(buoi.thoi_gian_bat_dau)} – {dinhDangNgayGio(buoi.thoi_gian_ket_thuc)}
           </Text>
+          {buoi.diem_hoc && (
+            <Box mt={4}>
+              <Text size="sm">
+                <b>Điểm học:</b> {buoi.diem_hoc.ten}
+                {buoi.phong ? ` — phòng ${buoi.phong}` : ''}
+              </Text>
+              <Text size="sm" c="dimmed">
+                {buoi.diem_hoc.dia_chi}
+              </Text>
+              {buoi.diem_hoc.nguoi_lien_he && (
+                <Text size="sm" c="dimmed">
+                  Liên hệ: {buoi.diem_hoc.nguoi_lien_he}
+                  {buoi.diem_hoc.sdt_lien_he && (
+                    <>
+                      {' — '}
+                      <a href={`tel:${buoi.diem_hoc.sdt_lien_he}`}>{buoi.diem_hoc.sdt_lien_he}</a>
+                    </>
+                  )}
+                </Text>
+              )}
+            </Box>
+          )}
           {buoi.dia_diem_hoac_link &&
             (() => {
               const href = chuanHoaLienKet(buoi.dia_diem_hoac_link);

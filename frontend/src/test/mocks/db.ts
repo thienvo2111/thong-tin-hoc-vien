@@ -1,4 +1,5 @@
 import type {
+  DiemHoc,
   BaoCaoRow,
   DanhGiaDauVao,
   DiaDanh,
@@ -860,6 +861,44 @@ export function taoNhatKyHocVienMau(): NhatKyHocVien {
   };
 }
 
+// T10 (issue #2): danh mục điểm học trực tiếp.
+export function taoDanhSachDiemHocMau(): DiemHoc[] {
+  return [
+    {
+      id: 'dh-1',
+      ma_diem_hoc: 'AG-LX-01',
+      ten: 'THPT Long Xuyên',
+      dia_chi: '1 Trần Hưng Đạo',
+      dia_ban_id: 'phuong-1',
+      don_vi_id: null,
+      suc_chua: 200,
+      so_phong: 4,
+      nguoi_lien_he: 'Cô Lan',
+      sdt_lien_he: '0901000001',
+      ghi_chu_csvc: null,
+      trang_thai: 'active',
+      dia_ban: { id: 'phuong-1', ten: 'Phường Long Xuyên', parent_id: 'tinh-1' },
+      don_vi: null,
+    },
+    {
+      id: 'dh-2',
+      ma_diem_hoc: 'AG-CD-01',
+      ten: 'THCS Châu Đốc',
+      dia_chi: '5 Nguyễn Huệ',
+      dia_ban_id: 'phuong-1',
+      don_vi_id: null,
+      suc_chua: null,
+      so_phong: null,
+      nguoi_lien_he: null,
+      sdt_lien_he: null,
+      ghi_chu_csvc: null,
+      trang_thai: 'ngung',
+      dia_ban: { id: 'phuong-1', ten: 'Phường Long Xuyên', parent_id: 'tinh-1' },
+      don_vi: null,
+    },
+  ];
+}
+
 export const db = {
   hoSo: taoHoSoMoi(),
   dotXacNhan: taoDotXacNhanDangMoThieu(),
@@ -892,6 +931,7 @@ export const db = {
   donViChuaCap: taoDonViChuaCapMau(),
   taiKhoanHocVien: taoDanhSachTaiKhoanHocVienMau(),
   nhatKyHocVien: taoNhatKyHocVienMau(),
+  diemHoc: taoDanhSachDiemHocMau(),
 };
 
 export function resetDb(): void {
@@ -925,4 +965,5 @@ export function resetDb(): void {
   db.donViChuaCap = taoDonViChuaCapMau();
   db.taiKhoanHocVien = taoDanhSachTaiKhoanHocVienMau();
   db.nhatKyHocVien = taoNhatKyHocVienMau();
+  db.diemHoc = taoDanhSachDiemHocMau();
 }

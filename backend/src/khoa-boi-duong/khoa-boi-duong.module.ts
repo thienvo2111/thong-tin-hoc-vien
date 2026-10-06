@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { ThongBaoModule } from '../thong-bao/thong-bao.module';
+import { DiemHocModule } from '../diem-hoc/diem-hoc.module';
 import { KhoaBoiDuongController } from './khoa-boi-duong.controller';
 import { LopHocController } from './lop-hoc.controller';
 import { DangKyHocController } from './dang-ky-hoc.controller';
@@ -8,6 +9,7 @@ import { DangKyHocKetQuaController } from './dang-ky-hoc-ket-qua.controller';
 import { DangKyHocThaoTacController } from './dang-ky-hoc-thao-tac.controller';
 import { HocVienKhoaHocController } from './hoc-vien-khoa-hoc.controller';
 import { KhoaBoiDuongService } from './khoa-boi-duong.service';
+import { LichHocThayDoiService } from './lich-hoc-thay-doi.service';
 
 // Dịch vụ Khóa bồi dưỡng & Lớp học — xem docs/api-contract.md mục 3. Export
 // service ra để ImportModule tái dùng (import phan_lop_hoc_vien — nguồn duy
@@ -18,7 +20,7 @@ import { KhoaBoiDuongService } from './khoa-boi-duong.service';
 // khoa-boi-duong.service.ts) — không vòng lặp vì ThongBaoModule không phụ
 // thuộc ngược lại module này.
 @Module({
-  imports: [AuthModule, ThongBaoModule],
+  imports: [AuthModule, ThongBaoModule, DiemHocModule],
   controllers: [
     KhoaBoiDuongController,
     LopHocController,
@@ -27,7 +29,7 @@ import { KhoaBoiDuongService } from './khoa-boi-duong.service';
     DangKyHocThaoTacController,
     HocVienKhoaHocController,
   ],
-  providers: [KhoaBoiDuongService],
-  exports: [KhoaBoiDuongService],
+  providers: [KhoaBoiDuongService, LichHocThayDoiService],
+  exports: [KhoaBoiDuongService, LichHocThayDoiService],
 })
 export class KhoaBoiDuongModule {}

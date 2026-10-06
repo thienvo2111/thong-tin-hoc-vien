@@ -51,6 +51,32 @@ describe('excel.util', () => {
       const rows = await readWorkbookRows(buffer, ['ten_mon', 'cap_hoc']);
       expect(rows).toEqual([]);
     });
+
+    // T10 (issue #2): mẫu thêm cột mới ở cuối không được làm hỏng file cũ.
+    it('file mẫu cũ thiếu cột cuối tùy chọn -> vẫn đọc, cột thiếu = rỗng', async () => {
+      const buffer = await toBuffer([
+        ['a', 'b'],
+        ['1', '2'],
+      ]);
+      const rows = await readWorkbookRows(buffer, ['a', 'b', 'c'], ['c']);
+      expect(rows).toEqual([{ dong: 2, values: { a: '1', b: '2', c: '' } }]);
+    });
+
+    it('file mẫu mới có đủ cột cuối tùy chọn -> đọc giá trị', async () => {
+      const buffer = await toBuffer([
+        ['a', 'b', 'c'],
+        ['1', '2', '3'],
+      ]);
+      const rows = await readWorkbookRows(buffer, ['a', 'b', 'c'], ['c']);
+      expect(rows[0].values.c).toBe('3');
+    });
+
+    it('thiếu cột KHÔNG khai báo tùy chọn -> vẫn báo sai mẫu', async () => {
+      const buffer = await toBuffer([['a'], ['1']]);
+      await expect(
+        readWorkbookRows(buffer, ['a', 'b', 'c'], ['c']),
+      ).rejects.toBeInstanceOf(ValidationException);
+    });
   });
 
   describe('readWorkbookRows — kiểu ô Excel không phải chuỗi', () => {

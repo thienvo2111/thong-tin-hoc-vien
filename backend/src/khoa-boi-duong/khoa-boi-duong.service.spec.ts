@@ -9,8 +9,14 @@ import {
   ValidationException,
 } from '../common/exceptions/app.exceptions';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
+import { DiemHocService } from '../diem-hoc/diem-hoc.service';
+import { LichHocThayDoiService } from './lich-hoc-thay-doi.service';
 
 let nhatKy: { ghi: jest.Mock };
+let diemHocService: {
+  layDiemHocDangHoatDong: jest.Mock;
+  canhBaoVuotSoPhong: jest.Mock;
+};
 
 // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30) + phân lớp theo giai đoạn (spec
 // 2026-10-02): test cho phân lớp (phan_lop_giai_doan) + cụm học viên trong
@@ -55,11 +61,13 @@ describe('KhoaBoiDuongService', () => {
     };
     giai_doan_khoa: {
       findUnique: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
       findMany: jest.Mock;
       update: jest.Mock;
     };
     lich_hoc_lop: {
       findUnique: jest.Mock;
+      create: jest.Mock;
       update: jest.Mock;
       count: jest.Mock;
     };
@@ -118,11 +126,18 @@ describe('KhoaBoiDuongService', () => {
       },
       giai_doan_khoa: {
         findUnique: jest.fn(),
+        findUniqueOrThrow: jest
+          .fn()
+          .mockResolvedValue({ id: 'gd-1', hinh_thuc: 'truc_tuyen' }),
         findMany: jest.fn().mockResolvedValue([]),
         update: jest.fn(),
       },
       lich_hoc_lop: {
         findUnique: jest.fn(),
+        create: jest.fn().mockImplementation(({ data }) => ({
+          id: 'lich-moi',
+          ...data,
+        })),
         update: jest.fn(),
         count: jest.fn().mockResolvedValue(1),
       },
@@ -138,11 +153,20 @@ describe('KhoaBoiDuongService', () => {
       guiDangKyHocPhanLop: jest.fn().mockResolvedValue({ chuaCoEmail: false }),
     };
     nhatKy = { ghi: jest.fn().mockResolvedValue(undefined) };
+    diemHocService = {
+      layDiemHocDangHoatDong: jest.fn().mockResolvedValue({ id: 'dh-1' }),
+      canhBaoVuotSoPhong: jest.fn().mockResolvedValue([]),
+    };
     service = new KhoaBoiDuongService(
       prisma as unknown as PrismaService,
       scopeService as unknown as ScopeService,
       thongBaoService as unknown as ThongBaoService,
       nhatKy as unknown as NhatKyService,
+      diemHocService as unknown as DiemHocService,
+      new LichHocThayDoiService(
+        prisma as unknown as PrismaService,
+        nhatKy as unknown as NhatKyService,
+      ),
     );
   });
 
@@ -803,10 +827,119 @@ describe('KhoaBoiDuongService', () => {
     });
   });
 
+  // T10 (issue #2): cột ma_diem_hoc / phong của import lop_va_lich_hoc.
+  describe('resolveLopVaLichHocRow — điểm học (T10)', () => {
+    const khoaFull = { id: 'khoa-1', ma_khoa: 'K1' };
+    const gdTrucTiep = {
+      id: 'gd-2',
+      khoa_id: 'khoa-1',
+      thu_tu: 2,
+      ten_giai_doan: 'Trực tiếp',
+      hinh_thuc: 'truc_tiep',
+      thoi_gian_bat_dau: new Date('2026-01-01T00:00:00Z'),
+      thoi_gian_ket_thuc: new Date('2026-12-31T00:00:00Z'),
+    };
+    const dong = {
+      ma_khoa: 'K1',
+      ten_lop: 'Lớp 1',
+      giai_doan_thu_tu: '2',
+      buoi_so: '1',
+      bat_dau: '01/03/2026 08:00',
+      ket_thuc: '01/03/2026 10:00',
+    };
+    let diemHocMock: { findUnique: jest.Mock };
+
+    beforeEach(() => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoaFull);
+      prisma.giai_doan_khoa.findUnique.mockResolvedValue(gdTrucTiep);
+      prisma.lop_hoc.findUnique.mockResolvedValue(null);
+      diemHocMock = { findUnique: jest.fn() };
+      (prisma as unknown as { diem_hoc: typeof diemHocMock }).diem_hoc =
+        diemHocMock;
+    });
+
+    it('buổi mới giai đoạn trực tiếp thiếu ma_diem_hoc → dòng lỗi', async () => {
+      const { error } = await service.resolveLopVaLichHocRow(dong);
+      expect(error).toContain('ma_diem_hoc');
+    });
+
+    it('buổi đã có điểm học, ô ma_diem_hoc trống → giữ (không lỗi)', async () => {
+      prisma.lop_hoc.findUnique.mockResolvedValue({ id: 'lop-1' });
+      prisma.lich_hoc_lop.findUnique.mockResolvedValue({ diem_hoc_id: 'dh-1' });
+      const { dto, error } = await service.resolveLopVaLichHocRow(dong);
+      expect(error).toBeUndefined();
+      expect(dto?.diem_hoc_id).toBeUndefined();
+    });
+
+    it('ma_diem_hoc không tồn tại / đã ngưng → dòng lỗi', async () => {
+      diemHocMock.findUnique.mockResolvedValueOnce({
+        id: 'dh-1',
+        trang_thai: 'ngung',
+      });
+      const { error } = await service.resolveLopVaLichHocRow({
+        ...dong,
+        ma_diem_hoc: 'AG-01',
+      });
+      expect(error).toContain('AG-01');
+    });
+
+    it('ma_diem_hoc hợp lệ + phong → dto có diem_hoc_id/phong, cảnh báo số phòng nối vào canhBao', async () => {
+      diemHocMock.findUnique.mockResolvedValueOnce({
+        id: 'dh-1',
+        trang_thai: 'active',
+      });
+      diemHocService.canhBaoVuotSoPhong.mockResolvedValueOnce(['vượt phòng']);
+      const { dto, error, canhBao } = await service.resolveLopVaLichHocRow({
+        ...dong,
+        ma_diem_hoc: 'AG-01',
+        phong: ' P.101 ',
+      });
+      expect(error).toBeUndefined();
+      expect(dto).toEqual(
+        expect.objectContaining({ diem_hoc_id: 'dh-1', phong: 'P.101' }),
+      );
+      expect(canhBao).toContain('vượt phòng');
+    });
+  });
+
+  describe('commitLopVaLichHoc — buổi đã tồn tại đi qua LichHocThayDoiService', () => {
+    it('chạy lại y nguyên → không update, không ghi nhật ký', async () => {
+      prisma.lop_hoc.upsert.mockResolvedValue({ id: 'lop-1' });
+      const cu = {
+        id: 'lich-1',
+        lop_id: 'lop-1',
+        giai_doan_id: 'gd-1',
+        buoi_so: 1,
+        thoi_gian_bat_dau: new Date('2026-03-01T08:00:00Z'),
+        thoi_gian_ket_thuc: new Date('2026-03-01T10:00:00Z'),
+        dia_diem_hoac_link: null,
+        diem_hoc_id: 'dh-1',
+        phong: null,
+        trang_thai: 'chua_dien_ra',
+        cap_nhat_luc: new Date('2026-01-01T00:00:00Z'),
+      };
+      prisma.lich_hoc_lop.findUnique.mockResolvedValue(cu);
+      await service.commitLopVaLichHoc({
+        khoa_id: 'khoa-1',
+        ten_lop: 'Lớp 1',
+        loai_lop: 'truc_tiep',
+        giai_doan_id: 'gd-1',
+        buoi_so: 1,
+        thoi_gian_bat_dau: new Date('2026-03-01T08:00:00Z'),
+        thoi_gian_ket_thuc: new Date('2026-03-01T10:00:00Z'),
+      } as never);
+      expect(prisma.lich_hoc_lop.update).not.toHaveBeenCalled();
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
+    });
+  });
+
   describe('commitLopVaLichHoc — upsert theo (khoa_id, loai_lop, ten_lop)', () => {
     it('upsert lop_hoc dùng đúng khóa unique 3 trường mới', async () => {
       prisma.lop_hoc.upsert.mockResolvedValue({ id: 'lop-1' });
-      const lichHocLop = { upsert: jest.fn().mockResolvedValue({}) };
+      const lichHocLop = {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({}),
+      };
       (prisma as unknown as { lich_hoc_lop: typeof lichHocLop }).lich_hoc_lop =
         lichHocLop;
 
@@ -1063,14 +1196,109 @@ describe('KhoaBoiDuongService', () => {
 
       expect(prisma.lich_hoc_lop.update).toHaveBeenCalledWith({
         where: { id: 'lich-1' },
-        data: {
-          thoi_gian_bat_dau: undefined,
-          thoi_gian_ket_thuc: undefined,
+        data: expect.objectContaining({
           dia_diem_hoac_link: 'Phòng B',
-          buoi_so: undefined,
-          trang_thai: undefined,
-        },
+          cap_nhat_luc: expect.any(Date),
+        }),
       });
+      expect(nhatKy.ghi).toHaveBeenCalledWith(
+        expect.objectContaining({ hanh_dong: 'sua_lich_hoc' }),
+      );
+    });
+
+    // T10 (issue #2): buổi giai đoạn truc_tiep phải có điểm học.
+    it('giai đoạn trực tiếp, buổi cũ chưa có điểm học, sửa giờ không kèm điểm học → 400', async () => {
+      prisma.lop_hoc.findUnique.mockResolvedValue(lop1ConKhoa);
+      prisma.lich_hoc_lop.findUnique.mockResolvedValue({
+        ...lich1,
+        diem_hoc_id: null,
+      });
+      prisma.giai_doan_khoa.findUniqueOrThrow.mockResolvedValue({
+        id: 'gd-1',
+        hinh_thuc: 'truc_tiep',
+      });
+      await expect(
+        service.capNhatLichHoc(
+          'lop-1',
+          'lich-1',
+          { thoi_gian_ket_thuc: '2026-03-01T04:00:00Z' } as never,
+          truong,
+        ),
+      ).rejects.toBeInstanceOf(ValidationException);
+      expect(prisma.lich_hoc_lop.update).not.toHaveBeenCalled();
+    });
+
+    it('giai đoạn trực tiếp: gỡ điểm học (diem_hoc_id=null) → 400', async () => {
+      prisma.lop_hoc.findUnique.mockResolvedValue(lop1ConKhoa);
+      prisma.lich_hoc_lop.findUnique.mockResolvedValue({
+        ...lich1,
+        diem_hoc_id: 'dh-1',
+      });
+      prisma.giai_doan_khoa.findUniqueOrThrow.mockResolvedValue({
+        id: 'gd-1',
+        hinh_thuc: 'truc_tiep',
+      });
+      await expect(
+        service.capNhatLichHoc(
+          'lop-1',
+          'lich-1',
+          { diem_hoc_id: null } as never,
+          truong,
+        ),
+      ).rejects.toBeInstanceOf(ValidationException);
+    });
+
+    it('giai đoạn trực tiếp, buổi cũ chưa có điểm học: chỉ đổi trang_thai vẫn được', async () => {
+      prisma.lop_hoc.findUnique.mockResolvedValue(lop1ConKhoa);
+      prisma.lich_hoc_lop.findUnique.mockResolvedValue({
+        ...lich1,
+        diem_hoc_id: null,
+        trang_thai: 'chua_dien_ra',
+      });
+      prisma.giai_doan_khoa.findUniqueOrThrow.mockResolvedValue({
+        id: 'gd-1',
+        hinh_thuc: 'truc_tiep',
+      });
+      prisma.lich_hoc_lop.update.mockResolvedValue({ ...lich1 });
+      await service.capNhatLichHoc(
+        'lop-1',
+        'lich-1',
+        { trang_thai: 'ket_thuc' } as never,
+        truong,
+      );
+      expect(prisma.lich_hoc_lop.update).toHaveBeenCalled();
+    });
+
+    it('gán điểm học mới → kiểm tra đang hoạt động, trả kèm canh_bao số phòng', async () => {
+      prisma.lop_hoc.findUnique.mockResolvedValue(lop1ConKhoa);
+      prisma.lich_hoc_lop.findUnique.mockResolvedValue({
+        ...lich1,
+        diem_hoc_id: null,
+      });
+      prisma.giai_doan_khoa.findUniqueOrThrow.mockResolvedValue({
+        id: 'gd-1',
+        hinh_thuc: 'truc_tiep',
+      });
+      prisma.lich_hoc_lop.update.mockImplementation(({ data }) => ({
+        ...lich1,
+        ...data,
+      }));
+      diemHocService.canhBaoVuotSoPhong.mockResolvedValueOnce(['vượt phòng']);
+      const kq = await service.capNhatLichHoc(
+        'lop-1',
+        'lich-1',
+        { diem_hoc_id: 'dh-2', ly_do: 'Đổi trường' } as never,
+        truong,
+      );
+      expect(diemHocService.layDiemHocDangHoatDong).toHaveBeenCalledWith(
+        'dh-2',
+      );
+      expect(kq.canh_bao).toEqual(['vượt phòng']);
+      expect(nhatKy.ghi).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chi_tiet: expect.objectContaining({ ly_do: 'Đổi trường' }),
+        }),
+      );
     });
 
     it('body rỗng -> ValidationException', async () => {
