@@ -136,3 +136,18 @@ export interface CanDonDocResult {
   page: number;
   items: CanDonDocDong[];
 }
+
+export interface TienDoTruongDong {
+  don_vi_id: string;
+  ten_don_vi: string;
+  /** Tên đơn vị cha trực tiếp (Sở/Phòng), null nếu không có. */
+  ten_don_vi_cha: string | null;
+  so_hv: number;
+  ty_le_truy_cap: number | null;
+  ty_le_ky_nang_so: number | null;
+  ty_le_dau_vao: number | null;
+  ty_le_dau_ra: number | null;
+  ty_le_co_mat: number | null;
+  ty_le_vle_dat: number | null;
+  ty_le_dat: number | null;
+}

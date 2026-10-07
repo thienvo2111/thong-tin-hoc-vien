@@ -1,5 +1,5 @@
 import * as ExcelJS from 'exceljs';
-import { CanDonDocDong } from '../../thong-ke/thong-ke.types';
+import { CanDonDocDong, TienDoTruongDong } from '../../thong-ke/thong-ke.types';
 import {
   CAP_GIANG_DAY,
   KHONG_XAC_DINH,
@@ -430,6 +430,48 @@ export async function buildCanDonDocWorkbook(
       row.so_dien_thoai ?? '',
       row.email ?? '',
       row.chi_tiet,
+    ]);
+  });
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+// Tỷ lệ 0..1 -> số 0..100 làm tròn 1 chữ số; null để ô trống.
+const phanTram = (v: number | null): number | null =>
+  v === null ? null : Math.round(v * 1000) / 10;
+
+export async function buildTienDoTruongWorkbook(
+  rows: TienDoTruongDong[],
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Tiến độ theo trường');
+  sheet.addRow([
+    'STT',
+    'Trường',
+    'Đơn vị quản lý',
+    'Số HV',
+    '% Truy cập',
+    '% KS kỹ năng số',
+    '% Đánh giá đầu vào',
+    '% Đánh giá đầu ra',
+    '% Có mặt',
+    '% VLE ≥ 50%',
+    '% Đạt',
+  ]);
+  sheet.getRow(1).font = { bold: true };
+  rows.forEach((row, i) => {
+    sheet.addRow([
+      i + 1,
+      row.ten_don_vi,
+      row.ten_don_vi_cha ?? '',
+      row.so_hv,
+      phanTram(row.ty_le_truy_cap),
+      phanTram(row.ty_le_ky_nang_so),
+      phanTram(row.ty_le_dau_vao),
+      phanTram(row.ty_le_dau_ra),
+      phanTram(row.ty_le_co_mat),
+      phanTram(row.ty_le_vle_dat),
+      phanTram(row.ty_le_dat),
     ]);
   });
   const buffer = await workbook.xlsx.writeBuffer();

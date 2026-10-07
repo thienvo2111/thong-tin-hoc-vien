@@ -383,4 +383,70 @@ describe('Thống kê dashboard (e2e)', () => {
       );
     });
   });
+
+  describe('tiến độ theo trường', () => {
+    type Dong = {
+      don_vi_id: string;
+      so_hv: number;
+      ten_don_vi_cha: string | null;
+    };
+    const timDong = (body: Dong[], id: string) =>
+      body.find((r) => r.don_vi_id === id);
+
+    it('quan_tri lọc theo Sở: có T1/T2/T3/Khác với so_hv đúng', async () => {
+      const res = await get(
+        `/thong-ke/tien-do-truong?don_vi_id=${dv.so}`,
+        tok.quanTri,
+      );
+      expect(res.status).toBe(200);
+      const body = res.body as Dong[];
+      expect(timDong(body, dv.t1)?.so_hv).toBe(6);
+      expect(timDong(body, dv.t2)?.so_hv).toBe(5);
+      expect(timDong(body, dv.t3)?.so_hv).toBe(3);
+      expect(timDong(body, dv.khac)?.so_hv).toBe(5);
+      expect(timDong(body, dv.t1)?.ten_don_vi_cha).toBe(
+        `Đơn vị TK phong ${suf}`,
+      );
+      expect(timDong(body, dv.khac)?.ten_don_vi_cha).toBe(
+        `Đơn vị TK so ${suf}`,
+      );
+    });
+
+    it('phong: không có dòng của trường đơn vị khác', async () => {
+      const res = await get('/thong-ke/tien-do-truong', tok.phong);
+      expect(res.status).toBe(200);
+      const body = res.body as Dong[];
+      expect(timDong(body, dv.t1)).toBeDefined();
+      expect(timDong(body, dv.khac)).toBeUndefined();
+    });
+
+    it('truong T1 -> 403', async () => {
+      const res = await get('/thong-ke/tien-do-truong', tok.truong1);
+      expect(res.status).toBe(403);
+    });
+
+    it('ho_tro H: chỉ trường có HV trong cụm C1, so_hv chỉ đếm cụm C1', async () => {
+      const res = await get('/thong-ke/tien-do-truong', tok.hoTro);
+      expect(res.status).toBe(200);
+      const body = res.body as Dong[];
+      expect(timDong(body, dv.t1)?.so_hv).toBe(2);
+      expect(timDong(body, dv.t2)?.so_hv).toBe(1);
+      expect(timDong(body, dv.t3)?.so_hv).toBe(1);
+      expect(timDong(body, dv.khac)).toBeUndefined();
+    });
+
+    it('xuất Excel -> 200, content-type xlsx', async () => {
+      const res = await get(
+        `/thong-ke/tien-do-truong/xuat-excel?don_vi_id=${dv.so}`,
+        tok.quanTri,
+      );
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      expect(res.headers['content-disposition']).toContain(
+        'tien-do-theo-truong.xlsx',
+      );
+    });
+  });
 });

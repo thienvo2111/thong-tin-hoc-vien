@@ -11,6 +11,7 @@ import {
   XepHangQueryDto,
 } from './dto/thong-ke-query.dto';
 import { CanDonDocService } from './can-don-doc.service';
+import { TienDoTruongService } from './tien-do-truong.service';
 import { XepHangService } from './xep-hang.service';
 
 // hoc_vien không có phạm vi thống kê -> RolesGuard tự trả 403.
@@ -22,6 +23,7 @@ export class ThongKeController {
     private readonly service: ThongKeService,
     private readonly xepHangService: XepHangService,
     private readonly canDonDocService: CanDonDocService,
+    private readonly tienDoTruongService: TienDoTruongService,
   ) {}
 
   @Get('bo-loc')
@@ -93,6 +95,31 @@ export class ThongKeController {
         'Content-Type':
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': 'attachment; filename="can-don-doc.xlsx"',
+      })
+      .send(buffer);
+  }
+
+  @Get('tien-do-truong')
+  tienDoTruong(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: ThongKeQueryDto,
+  ) {
+    return this.tienDoTruongService.danhSach(user, q);
+  }
+
+  @Get('tien-do-truong/xuat-excel')
+  async tienDoTruongXuatExcel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: ThongKeQueryDto,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.tienDoTruongService.xuatExcel(user, q);
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition':
+          'attachment; filename="tien-do-theo-truong.xlsx"',
       })
       .send(buffer);
   }
