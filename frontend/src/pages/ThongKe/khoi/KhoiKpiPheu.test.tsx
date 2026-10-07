@@ -53,6 +53,13 @@ describe('KhoiKpiPheu', () => {
     expect(await screen.findByTestId('kpi-cho-duyet')).toBeInTheDocument();
   });
 
+  it('thẻ chờ duyệt là link tới danh sách hồ sơ chờ duyệt', async () => {
+    renderKhoi();
+    const the = await screen.findByTestId('kpi-cho-duyet');
+    expect(the).toHaveAttribute('href', '/admin/hoc-vien?trang_thai=cho_duyet');
+    expect(the).toHaveAccessibleName(/Hồ sơ chờ duyệt.*Xem danh sách/);
+  });
+
   it('ho_so_cho_duyet null → không có thẻ chờ duyệt', async () => {
     server.use(http.get('/thong-ke/pheu', () => HttpResponse.json({ ...pheuMau, ho_so_cho_duyet: null })));
     renderKhoi();

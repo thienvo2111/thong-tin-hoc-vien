@@ -1,5 +1,6 @@
 import { BarChart } from '@mantine/charts';
 import { Group, Paper, SimpleGrid, Stack, Text } from '@mantine/core';
+import { Link } from 'react-router-dom';
 import { usePheu, type LocThongKe } from '@/api/thongKe';
 import type { PheuResult } from '@/api/types';
 import { KhoiThongKe } from '../KhoiThongKe';
@@ -66,7 +67,16 @@ export function KhoiKpiPheu({ loc }: { loc: LocThongKe }) {
               </Paper>
             ))}
             {d.ho_so_cho_duyet !== null && (
-              <Paper withBorder p="sm" radius="md" data-testid="kpi-cho-duyet">
+              <Paper
+                withBorder
+                p="sm"
+                radius="md"
+                component={Link}
+                to="/admin/hoc-vien?trang_thai=cho_duyet"
+                aria-label="Hồ sơ chờ duyệt: Xem danh sách"
+                data-testid="kpi-cho-duyet"
+                style={{ textDecoration: 'none', color: 'inherit' }}
+              >
                 <Text size="sm" c="dimmed">
                   Hồ sơ chờ duyệt
                 </Text>
