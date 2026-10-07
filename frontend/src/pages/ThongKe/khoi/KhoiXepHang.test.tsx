@@ -41,6 +41,27 @@ describe('KhoiXepHang', () => {
     expect(await screen.findByText('Chưa đủ 5 học viên để xếp hạng')).toBeInTheDocument();
   });
 
+  it('tong_so 0 → không có trường cùng cấp để so sánh', async () => {
+    server.use(
+      http.get('/thong-ke/xep-hang', () =>
+        HttpResponse.json({ kieu: 'vi_tri', thu_hang: null, tong_so: 0, gia_tri: null, trung_binh: null }),
+      ),
+    );
+    renderKhoi();
+    expect(await screen.findByText('Không có trường cùng cấp để so sánh')).toBeInTheDocument();
+    expect(screen.queryByText('Chưa đủ 5 học viên để xếp hạng')).not.toBeInTheDocument();
+  });
+
+  it('trung_binh null (nhóm < 3) → hiện "—" cho trung bình', async () => {
+    server.use(
+      http.get('/thong-ke/xep-hang', () =>
+        HttpResponse.json({ kieu: 'vi_tri', thu_hang: 1, tong_so: 2, gia_tri: 0.8, trung_binh: null }),
+      ),
+    );
+    renderKhoi();
+    expect(await screen.findByText(/Trung bình —/)).toBeInTheDocument();
+  });
+
   it('đổi chỉ số → gọi API với chi_so mới', async () => {
     const chiSo: (string | null)[] = [];
     server.use(

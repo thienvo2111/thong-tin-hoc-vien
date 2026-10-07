@@ -33,6 +33,9 @@ function BangTop({ tieu_de, dong, mau }: { tieu_de: string; dong: XepHangDong[];
 }
 
 function ViTri({ d }: { d: Extract<XepHangResult, { kieu: 'vi_tri' }> }) {
+  if (d.tong_so === 0) {
+    return <Text c="dimmed">Không có trường cùng cấp để so sánh</Text>;
+  }
   if (d.thu_hang === null) {
     return <Text c="dimmed">Chưa đủ 5 học viên để xếp hạng</Text>;
   }

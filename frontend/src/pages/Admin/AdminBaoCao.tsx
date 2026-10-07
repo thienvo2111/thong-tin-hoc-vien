@@ -21,6 +21,7 @@ import {
   taiBaoCaoDieuKienDanhGiaExcel,
   taiBaoCaoSuaTruongMoetExcel,
   taiBaoCaoTongHopExcel,
+  taiBaoCaoTongQuanExcel,
   taiBaoCaoVanHanhExcel,
   taiBaoCaoXacNhanExcel,
   taiBaoCaoXuatChoVleExcel,
@@ -513,7 +514,54 @@ function TheBaoCaoGioDay() {
   );
 }
 
-/** Trung tâm báo cáo (Phase 5 redesign) — 6 thẻ, mỗi thẻ khớp đúng 1 nhóm báo cáo thật đang có API
+// --- 8. Tổng quan hệ thống — chỉ Excel (màn xem trực tuyến là dashboard /admin/tong-quan); khoa_id tùy chọn ---
+function TheBaoCaoTongQuan() {
+  const [khoaId, setKhoaId] = useState('');
+  const [tuNgay, setTuNgay] = useState('');
+  const [denNgay, setDenNgay] = useState('');
+  const { dangTai, tuyChon } = useTuyChonKhoa();
+  const excel = useTaiExcel();
+  const params = { khoa_id: khoaId || undefined, tu_ngay: tuNgay || undefined, den_ngay: denNgay || undefined };
+
+  return (
+    <KhungTheBaoCao
+      testId="the-bao-cao-tong-quan"
+      icon="📊"
+      iconBg="#EAF6F0"
+      title="Xuất Excel tổng quan"
+      desc="Số liệu tổng quan hệ thống theo khóa và khoảng ngày. Bỏ trống khóa để lấy mọi khóa trong phạm vi quyền."
+    >
+      <Select
+        label="Khóa bồi dưỡng"
+        placeholder="Tất cả khóa"
+        size="xs"
+        searchable
+        filter={locTiengViet}
+        clearable
+        data={tuyChon}
+        value={khoaId || null}
+        onChange={(v) => setKhoaId(v ?? '')}
+        disabled={dangTai}
+      />
+      <Group grow gap={6}>
+        <TextInput type="date" label="Từ ngày" size="xs" value={tuNgay} onChange={(e) => setTuNgay(e.currentTarget.value)} />
+        <TextInput type="date" label="Đến ngày" size="xs" value={denNgay} onChange={(e) => setDenNgay(e.currentTarget.value)} />
+      </Group>
+      <Button
+        color="accent"
+        size="xs"
+        mt={4}
+        loading={excel.isPending}
+        data-testid="nut-xuat-excel-tong-quan"
+        onClick={() => excel.mutate({ taiFn: () => taiBaoCaoTongQuanExcel(params), tenFile: `bao-cao-tong-quan${khoaId ? `-${khoaId}` : ''}.xlsx` })}
+      >
+        ⇩ Xuất Excel
+      </Button>
+    </KhungTheBaoCao>
+  );
+}
+
+/** Trung tâm báo cáo (Phase 5 redesign) — 8 thẻ, mỗi thẻ khớp đúng 1 nhóm báo cáo thật đang có API
  * (docs/api-contract.md mục 7 + mục "Đợt xác nhận" mục 2): tổng hợp, xác nhận, sửa trường MOET, xuất
  * cho VLE, điều kiện đánh giá đầu vào, vận hành theo lớp. Không bịa thêm báo cáo không có endpoint. */
 export default function AdminBaoCao() {
@@ -533,6 +581,7 @@ export default function AdminBaoCao() {
             <TheBaoCaoDieuKienDanhGia />
             <TheBaoCaoVanHanh />
             <TheBaoCaoGioDay />
+            <TheBaoCaoTongQuan />
           </SimpleGrid>
         </Stack>
       </Container>

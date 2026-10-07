@@ -17,7 +17,7 @@ làm tốt/kém, cần đôn đốc ai.
 | D1 | Lọc theo cụm: `quan_tri` (mọi cụm) + `ho_tro_hoc_vien` (chỉ cụm được phân công, không lọc đơn vị). |
 | D2 | Phạm vi đợt 1: lõi + ma trận chuyển mức + tỷ lệ Đạt + xếp hạng đơn vị + danh sách cần đôn đốc. |
 | D3 | "Tất cả khóa": KPI đếm HV duy nhất; có khối "So sánh khóa"; các khối khác gộp, đếm theo lượt `dang_ky_hoc`. |
-| D4 | Tài khoản `truong` thấy thứ hạng của mình + trung bình Sở cha, không thấy tên trường khác. |
+| D4 | Tài khoản `truong` thấy thứ hạng của mình + trung bình đơn vị cha trực tiếp (Sở hoặc Phòng), không thấy tên trường khác. |
 | D5 | Kiến trúc: mỗi khối một endpoint, dùng chung `ThongKeScopeService`. Không cache/snapshot. |
 | D6 | "Cấp sở" gồm `so_gddt` và `phong_vhxh` (giữ nguyên ngữ nghĩa cây đơn vị hiện có). |
 
@@ -56,7 +56,7 @@ Thư viện FE: `@mantine/charts`. Màu mức M1→M4 cố định toàn dashboa
 | 5 | Ma trận chuyển mức | `/thong-ke/chuyen-muc` | Heatmap 4×4 (dòng = mức đầu vào, cột = mức đầu ra), CSS grid tự dựng | Chỉ HV có cả 2 kết quả hoàn thành. Dòng tóm tắt "X% tăng · Y% giữ · Z% giảm". |
 | 6 | Kết quả học tập | `/thong-ke/ket-qua` | Cột chồng 100%: Đạt / Không đạt / Vắng / Đang học (`dang_ky_hoc.ket_qua`) | "Tất cả khóa": mỗi khóa 1 cột. |
 | 7 | Chuyên cần | `/thong-ke/chuyen-can` | Tab **Trực tiếp/Zoom**: cột chồng theo `buoi_so` (Có mặt/Vắng có phép/Vắng) + đường % có mặt. Tab **VLE**: phân bố `ket_qua_giai_doan.ty_le_hoan_thanh` theo 0–25/25–50/50–75/75–100 + "chưa có dữ liệu" | Tab Trực tiếp/Zoom yêu cầu chọn 1 khóa. Chưa import VLE → thông báo "Chưa có dữ liệu tiến trình VLE". |
-| 8 | Xếp hạng đơn vị | `/thong-ke/xep-hang?chi_so=truy_cap\|khao_sat\|dat` | Cột ngang top 10 / bottom 10 | `quan_tri`: xếp hạng Sở/Phòng, chọn 1 Sở/Phòng → xếp hạng trường con. `so_gddt`/`phong_vhxh`: các trường con. `truong`: chỉ trả `{thu_hang, tong_so, gia_tri, trung_binh_so}` — **không** trả tên đơn vị khác. Bỏ đơn vị < 5 HV. Không áp dụng cho `ho_tro_hoc_vien` (ẩn khối). |
+| 8 | Xếp hạng đơn vị | `/thong-ke/xep-hang?chi_so=truy_cap\|khao_sat\|dat` | Cột ngang top 10 / bottom 10 | `quan_tri`: xếp hạng Sở/Phòng, chọn 1 Sở/Phòng → xếp hạng trường con. `so_gddt`/`phong_vhxh`: các trường con. `truong`: chỉ trả `{thu_hang, tong_so, gia_tri, trung_binh}` (trung_binh = null khi tong_so < 3) — **không** trả tên đơn vị khác. Bỏ đơn vị < 5 HV. Không áp dụng cho `ho_tro_hoc_vien` (ẩn khối). |
 | 9 | Cần đôn đốc | `/thong-ke/can-don-doc?loai=chua_truy_cap\|chua_khao_sat\|vang_nhieu\|vle_thap&page` (+ `/xuat-excel`) | Bảng phân trang, tab theo `loai` | Ngưỡng hằng số: vắng ≥ 2 buổi, VLE < 50%. |
 
 ## 5. Xử lý lỗi và trạng thái
@@ -84,8 +84,8 @@ Thư viện FE: `@mantine/charts`. Màu mức M1→M4 cố định toàn dashboa
 
 ## 8. Tương thích ngược
 
-- Giữ `GET /bao-cao/tong-quan` và `/bao-cao/tong-quan/xuat-excel` (AdminBaoCao dùng
-  Excel), giữ tham số `tu_ngay`/`den_ngay`. Bên trong chuyển sang
+- Giữ `GET /bao-cao/tong-quan` và `/bao-cao/tong-quan/xuat-excel` (thẻ "Xuất Excel tổng quan" trong
+  AdminBaoCao: chọn khóa tùy chọn + từ/đến ngày), giữ tham số `tu_ngay`/`den_ngay`. Bên trong chuyển sang
   `ThongKeScopeService` → vá thiếu R1/R2 hiện có.
 - Cập nhật `docs/api-contract.md` §7 (thêm mục `/thong-ke/*`) và thêm thuật ngữ
   "Dashboard thống kê" vào `CONTEXT.md`.

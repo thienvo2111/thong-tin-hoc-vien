@@ -225,7 +225,7 @@ export class ThongKeScopeService {
     }
     const don_vi = donViIds.length
       ? await this.prisma.don_vi_cong_tac.findMany({
-          where: { id: { in: donViIds } },
+          where: { id: { in: donViIds }, loai_don_vi: { not: 'khac' } },
           select: { id: true, ten_don_vi: true, loai_don_vi: true },
           orderBy: { ten_don_vi: 'asc' },
         })

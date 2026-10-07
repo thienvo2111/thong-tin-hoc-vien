@@ -9,6 +9,7 @@ import { XepHangDong, XepHangResult } from './thong-ke.types';
 
 const SO_HV_TOI_THIEU = 5;
 const SO_DONG = 10;
+const TONG_SO_TOI_THIEU_TRUNG_BINH = 3;
 
 interface DonViNut {
   id: string;
@@ -68,7 +69,7 @@ export class XepHangService {
 
     const nhom =
       user.vai_tro === 'quan_tri' && !q.don_vi_id
-        ? new Set(nut.filter((n) => n.don_vi_cha_id === null).map((n) => n.id))
+        ? new Set(nut.filter(laNhomGoc).map((n) => n.id))
         : truongTrongCay(nut, q.don_vi_id ?? user.don_vi_id);
     const dong = await this.tinh(phamVi.where, nhom, byId, q.chi_so);
     return bang(dong);
@@ -100,9 +101,11 @@ export class XepHangService {
       thu_hang: chiSoMinh >= 0 ? thuHang(xep, chiSoMinh) : null,
       tong_so: xep.length,
       gia_tri: chiSoMinh >= 0 ? xep[chiSoMinh].gia_tri : null,
-      trung_binh: xep.length
-        ? xep.reduce((s, d) => s + d.gia_tri, 0) / xep.length
-        : null,
+      // Nhóm < 3 trường: trung bình để lộ giá trị trường còn lại.
+      trung_binh:
+        xep.length >= TONG_SO_TOI_THIEU_TRUNG_BINH
+          ? xep.reduce((s, d) => s + d.gia_tri, 0) / xep.length
+          : null,
     };
   }
 
@@ -176,6 +179,11 @@ export class XepHangService {
     return dong;
   }
 }
+
+// Nhóm xếp hạng gốc của quản trị: Sở/Phòng không có đơn vị cha (bỏ trường mồ côi, 'khac').
+const laNhomGoc = (n: DonViNut): boolean =>
+  n.don_vi_cha_id === null &&
+  (n.loai_don_vi === 'so_gddt' || n.loai_don_vi === 'phong_vhxh');
 
 const bangRong = (): XepHangResult => ({
   kieu: 'bang',

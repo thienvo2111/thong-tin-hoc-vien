@@ -80,7 +80,7 @@ export function KhoiCanDonDoc({ loc }: { loc: LocThongKe }) {
               </Table.Thead>
               <Table.Tbody>
                 {d.items.map((r) => (
-                  <Table.Tr key={r.hoc_vien_id}>
+                  <Table.Tr key={`${r.hoc_vien_id}-${r.ten_khoa}`}>
                     <Table.Td>{r.ho_ten}</Table.Td>
                     <Table.Td>{r.ten_don_vi}</Table.Td>
                     <Table.Td>{r.ten_khoa}</Table.Td>

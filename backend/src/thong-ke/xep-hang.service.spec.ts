@@ -221,6 +221,25 @@ describe('XepHangService', () => {
     expect(scope.resolve).toHaveBeenCalled();
   });
 
+  it('quan_tri không don_vi_id -> chỉ nhóm Sở/Phòng gốc, bỏ trường mồ côi và loại khac', async () => {
+    setup(
+      [
+        dv('so', null, 'so_gddt', 'Sở A'),
+        dv('mocoi', null, 'truong', 'Trường mồ côi'),
+        dv('khac', null, 'khac', 'Khác'),
+      ],
+      [
+        ...hocVien('so', 5),
+        ...hocVien('mocoi', 5),
+        ...hocVien('khac', 5),
+      ],
+    );
+    const r = await service.xepHang(caller('quan_tri'), { chi_so: 'truy_cap' });
+    if (r.kieu !== 'bang') throw new Error('kieu');
+    expect(r.top.map((d) => d.don_vi_id)).toEqual(['so']);
+    expect(r.tong_so).toBe(1);
+  });
+
   it('so_gddt -> xếp hạng các trường trong cây con, bỏ phòng và cây khác', async () => {
     setup(
       [
@@ -289,7 +308,7 @@ describe('XepHangService', () => {
       });
     });
 
-    it('trường mình < 5 HV -> thu_hang null nhưng trung_binh có', async () => {
+    it('trường mình < 5 HV -> thu_hang null; tong_so 2 -> trung_binh null (không suy ra giá trị trường kia)', async () => {
       setup(cay, [
         ...hocVien('me', 4, { dangNhap: 4 }),
         ...hocVien('khac1', 5, { dangNhap: 5 }),
@@ -303,8 +322,33 @@ describe('XepHangService', () => {
         thu_hang: null,
         tong_so: 2,
         gia_tri: null,
-        trung_binh: 0.6,
+        trung_binh: null,
       });
+    });
+
+    it('tong_so = 3 -> trung_binh là số; tong_so = 2 -> null', async () => {
+      setup(cay, [
+        ...hocVien('me', 5, { dangNhap: 5 }),
+        ...hocVien('khac1', 5, { dangNhap: 5 }),
+        ...hocVien('khac2', 5, { dangNhap: 0 }),
+      ]);
+      const ba = await service.xepHang(caller('truong', 'me'), {
+        chi_so: 'truy_cap',
+      });
+      if (ba.kieu !== 'vi_tri') throw new Error('kieu');
+      expect(ba.tong_so).toBe(3);
+      expect(ba.trung_binh).toBeCloseTo(2 / 3);
+
+      setup(cay, [
+        ...hocVien('me', 5, { dangNhap: 5 }),
+        ...hocVien('khac1', 5, { dangNhap: 0 }),
+      ]);
+      const hai = await service.xepHang(caller('truong', 'me'), {
+        chi_so: 'truy_cap',
+      });
+      if (hai.kieu !== 'vi_tri') throw new Error('kieu');
+      expect(hai.tong_so).toBe(2);
+      expect(hai.trung_binh).toBeNull();
     });
 
     it('trường không có don_vi_cha_id -> vi_tri rỗng, không truy vấn dữ liệu', async () => {

@@ -250,6 +250,7 @@ describe('ThongKeScopeService', () => {
       expect(r.don_vi).toHaveLength(1);
       expect(prisma.don_vi_cong_tac.findMany.mock.calls[0][0].where).toEqual({
         id: { in: [T1, CON] },
+        loai_don_vi: { not: 'khac' },
       });
     });
 
