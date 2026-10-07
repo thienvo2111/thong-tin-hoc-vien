@@ -31,3 +31,31 @@ export interface PheuResult extends PheuCounts {
   /** null nếu vai trò không duyệt hồ sơ (ho_tro_hoc_vien). */
   ho_so_cho_duyet: number | null;
 }
+
+export interface MucDem {
+  ma: string;
+  nhan: string;
+  so_luong: number;
+}
+
+interface KhoiMuc {
+  theo_muc: MucDem[];
+  chua_xep_muc: number;
+  chua_lam: number;
+}
+
+export interface KhaoSatResult {
+  ky_nang_so: { hoan_thanh: number; chua: number };
+  dau_vao: KhoiMuc;
+  dau_ra: KhoiMuc;
+}
+
+export interface ChuyenMucResult {
+  thang: { ma: string; nhan: string }[];
+  /** Mọi cặp thang×thang, kể cả 0. */
+  o: { tu: string; den: string; so_luong: number }[];
+  tong: number;
+  tang: number;
+  giu: number;
+  giam: number;
+}

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { HoTroHocVienModule } from '../ho-tro-hoc-vien/ho-tro-hoc-vien.module';
+import { SsoModule } from '../sso/sso.module';
 import { ThongKeController } from './thong-ke.controller';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { ThongKeService } from './thong-ke.service';
@@ -8,7 +9,7 @@ import { ThongKeService } from './thong-ke.service';
 // Dashboard thống kê: mọi endpoint /thong-ke/* lấy phạm vi dữ liệu DUY NHẤT
 // từ ThongKeScopeService (export cho BaoCaoModule dùng lại).
 @Module({
-  imports: [AuthModule, HoTroHocVienModule],
+  imports: [AuthModule, HoTroHocVienModule, SsoModule],
   controllers: [ThongKeController],
   providers: [ThongKeScopeService, ThongKeService],
   exports: [ThongKeScopeService],

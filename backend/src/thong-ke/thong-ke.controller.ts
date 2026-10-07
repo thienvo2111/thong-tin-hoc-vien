@@ -24,4 +24,17 @@ export class ThongKeController {
   pheu(@CurrentUser() user: AuthenticatedUser, @Query() q: ThongKeQueryDto) {
     return this.service.pheu(user, q);
   }
+
+  @Get('khao-sat')
+  khaoSat(@CurrentUser() user: AuthenticatedUser, @Query() q: ThongKeQueryDto) {
+    return this.service.khaoSat(user, q);
+  }
+
+  @Get('chuyen-muc')
+  chuyenMuc(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: ThongKeQueryDto,
+  ) {
+    return this.service.chuyenMuc(user, q);
+  }
 }
