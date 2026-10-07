@@ -59,3 +59,21 @@ export interface ChuyenMucResult {
   giu: number;
   giam: number;
 }
+
+export interface KetQuaHocCot {
+  khoa_id: string;
+  ten_khoa: string;
+  dat: number;
+  khong_dat: number;
+  vang: number;
+  dang_hoc: number;
+}
+
+export interface SoSanhKhoaCot {
+  khoa_id: string;
+  ten_khoa: string;
+  tham_gia: number;
+  ty_le_truy_cap: number | null;
+  ty_le_dau_vao: number | null;
+  ty_le_dat: number | null;
+}

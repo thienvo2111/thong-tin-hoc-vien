@@ -4,6 +4,7 @@ import { ThongKeScopeService } from './thong-ke-scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { PhamViThongKe } from './thong-ke.types';
 import { ThangMucService } from '../sso/thang-muc.service';
+import { ValidationException } from '../common/exceptions/app.exceptions';
 
 function caller(vai_tro: AuthenticatedUser['vai_tro']): AuthenticatedUser {
   return {
@@ -288,6 +289,176 @@ describe('ThongKeService khối khảo sát + chuyển mức', () => {
       expect(r).toMatchObject({ tong: 0, tang: 0, giu: 0, giam: 0 });
       expect(r.o).toHaveLength(16);
       expect(prisma.ket_qua_khao_sat.findMany).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('ThongKeService khối kết quả học tập + so sánh khóa', () => {
+  let service: ThongKeService;
+  let prisma: {
+    hoc_vien: { count: jest.Mock };
+    dang_ky_hoc: { groupBy: jest.Mock; count: jest.Mock };
+    khoa_boi_duong: { findMany: jest.Mock };
+  };
+  let scope: { resolve: jest.Mock };
+
+  beforeEach(() => {
+    prisma = {
+      hoc_vien: { count: jest.fn().mockResolvedValue(0) },
+      dang_ky_hoc: {
+        groupBy: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      khoa_boi_duong: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    scope = {
+      resolve: jest.fn().mockResolvedValue({
+        where: WHERE_SCOPE,
+        rong: false,
+        khoaIds: ['k1', 'k2'],
+      }),
+    };
+    service = new ThongKeService(
+      prisma as unknown as PrismaService,
+      scope as unknown as ThongKeScopeService,
+      { thang: jest.fn().mockResolvedValue([]) } as unknown as ThangMucService,
+    );
+  });
+
+  // where của từng khóa = { AND: [scope, { khoa_id, ... }] }
+  const khoaCua = (w: unknown) =>
+    (w as { AND: { khoa_id?: string }[] }).AND[1].khoa_id;
+  const kqRow = (khoa_id: string, ket_qua: string | null, n: number) => ({
+    khoa_id,
+    ket_qua,
+    _count: { _all: n },
+  });
+
+  describe('ketQuaHoc', () => {
+    it('ket_qua null đếm vào dang_hoc', async () => {
+      prisma.dang_ky_hoc.groupBy.mockResolvedValue([
+        kqRow('k1', null, 3),
+        kqRow('k1', 'dang_hoc', 2),
+        kqRow('k1', 'dat', 4),
+      ]);
+      prisma.khoa_boi_duong.findMany.mockResolvedValue([
+        { id: 'k1', ten_khoa: 'Khóa 1' },
+      ]);
+      const r = await service.ketQuaHoc(caller('quan_tri'), {});
+      expect(r).toEqual([
+        {
+          khoa_id: 'k1',
+          ten_khoa: 'Khóa 1',
+          dat: 4,
+          khong_dat: 0,
+          vang: 0,
+          dang_hoc: 5,
+        },
+      ]);
+      const arg = prisma.dang_ky_hoc.groupBy.mock.calls[0][0];
+      expect(arg.by).toEqual(['khoa_id', 'ket_qua']);
+      expect(arg.where).toEqual(WHERE_SCOPE);
+    });
+
+    it('2 khóa -> 2 cột, sắp theo ten_khoa', async () => {
+      prisma.dang_ky_hoc.groupBy.mockResolvedValue([
+        kqRow('k1', 'dat', 1),
+        kqRow('k2', 'khong_dat', 2),
+        kqRow('k2', 'vang', 3),
+      ]);
+      prisma.khoa_boi_duong.findMany.mockResolvedValue([
+        { id: 'k1', ten_khoa: 'B khóa' },
+        { id: 'k2', ten_khoa: 'A khóa' },
+      ]);
+      const r = await service.ketQuaHoc(caller('quan_tri'), {});
+      expect(r.map((c) => c.khoa_id)).toEqual(['k2', 'k1']);
+      expect(r[0]).toMatchObject({ khong_dat: 2, vang: 3, dat: 0 });
+    });
+
+    it('rong=true -> [] không truy vấn', async () => {
+      scope.resolve.mockResolvedValue({ where: {}, rong: true, khoaIds: [] });
+      expect(await service.ketQuaHoc(caller('truong'), {})).toEqual([]);
+      expect(prisma.dang_ky_hoc.groupBy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('soSanhKhoa', () => {
+    it('có khoa_id -> ValidationException', async () => {
+      const loi = await service
+        .soSanhKhoa(caller('quan_tri'), { khoa_id: 'k1' })
+        .catch((e) => e);
+      expect(loi).toBeInstanceOf(ValidationException);
+      expect(loi.getResponse().error.message).toBe(
+        'So sánh khóa chỉ dùng khi chọn Tất cả khóa',
+      );
+      expect(prisma.dang_ky_hoc.groupBy).not.toHaveBeenCalled();
+    });
+
+    it('tính tỷ lệ theo từng khóa, sắp theo ten_khoa', async () => {
+      prisma.dang_ky_hoc.groupBy.mockResolvedValue([
+        { khoa_id: 'k1' },
+        { khoa_id: 'k2' },
+      ]);
+      prisma.khoa_boi_duong.findMany.mockResolvedValue([
+        { id: 'k1', ten_khoa: 'B' },
+        { id: 'k2', ten_khoa: 'A' },
+      ]);
+      jest.spyOn(service, 'demPheu').mockImplementation(async (w) => {
+        const k1 = khoaCua(w) === 'k1';
+        return {
+          tham_gia: k1 ? 10 : 4,
+          da_truy_cap: k1 ? 5 : 4,
+          khao_sat_ky_nang_so: 0,
+          danh_gia_dau_vao: k1 ? 2 : 1,
+          danh_gia_dau_ra: 0,
+        };
+      });
+      prisma.dang_ky_hoc.count.mockImplementation(async ({ where }) =>
+        khoaCua(where) === 'k1' ? 8 : 2,
+      );
+      const r = await service.soSanhKhoa(caller('quan_tri'), {});
+      expect(r).toEqual([
+        {
+          khoa_id: 'k2',
+          ten_khoa: 'A',
+          tham_gia: 4,
+          ty_le_truy_cap: 1,
+          ty_le_dau_vao: 0.25,
+          ty_le_dat: 0.5,
+        },
+        {
+          khoa_id: 'k1',
+          ten_khoa: 'B',
+          tham_gia: 10,
+          ty_le_truy_cap: 0.5,
+          ty_le_dau_vao: 0.2,
+          ty_le_dat: 0.8,
+        },
+      ]);
+    });
+
+    it('khóa 0 HV -> các tỷ lệ null', async () => {
+      prisma.dang_ky_hoc.groupBy.mockResolvedValue([{ khoa_id: 'k1' }]);
+      prisma.khoa_boi_duong.findMany.mockResolvedValue([
+        { id: 'k1', ten_khoa: 'K' },
+      ]);
+      const r = await service.soSanhKhoa(caller('quan_tri'), {});
+      expect(r).toEqual([
+        {
+          khoa_id: 'k1',
+          ten_khoa: 'K',
+          tham_gia: 0,
+          ty_le_truy_cap: null,
+          ty_le_dau_vao: null,
+          ty_le_dat: null,
+        },
+      ]);
+    });
+
+    it('rong=true -> [] không truy vấn', async () => {
+      scope.resolve.mockResolvedValue({ where: {}, rong: true, khoaIds: [] });
+      expect(await service.soSanhKhoa(caller('truong'), {})).toEqual([]);
+      expect(prisma.dang_ky_hoc.groupBy).not.toHaveBeenCalled();
     });
   });
 });

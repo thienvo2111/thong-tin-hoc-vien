@@ -37,4 +37,17 @@ export class ThongKeController {
   ) {
     return this.service.chuyenMuc(user, q);
   }
+
+  @Get('ket-qua')
+  ketQua(@CurrentUser() user: AuthenticatedUser, @Query() q: ThongKeQueryDto) {
+    return this.service.ketQuaHoc(user, q);
+  }
+
+  @Get('so-sanh-khoa')
+  soSanhKhoa(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: ThongKeQueryDto,
+  ) {
+    return this.service.soSanhKhoa(user, q);
+  }
 }

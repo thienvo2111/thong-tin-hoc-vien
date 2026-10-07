@@ -5,12 +5,15 @@ import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongKeQueryDto } from './dto/thong-ke-query.dto';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { ThangMucService, MucThang } from '../sso/thang-muc.service';
+import { ValidationException } from '../common/exceptions/app.exceptions';
 import {
   ChuyenMucResult,
+  KetQuaHocCot,
   KhaoSatResult,
   MucDem,
   PheuCounts,
   PheuResult,
+  SoSanhKhoaCot,
 } from './thong-ke.types';
 
 // Loại bài khảo sát = giá trị `target` SSO (xem sso/dto/sso.dto.ts).
@@ -25,6 +28,9 @@ const PHEU_RONG: PheuCounts = {
   danh_gia_dau_vao: 0,
   danh_gia_dau_ra: 0,
 };
+
+const soTenKhoa = (a: { ten_khoa: string }, b: { ten_khoa: string }) =>
+  a.ten_khoa.localeCompare(b.ten_khoa, 'vi');
 
 @Injectable()
 export class ThongKeService {
@@ -177,6 +183,85 @@ export class ThongKeService {
       })),
     );
     return { thang, o, tong, tang, giu, giam };
+  }
+
+  async ketQuaHoc(
+    user: AuthenticatedUser,
+    q: ThongKeQueryDto,
+  ): Promise<KetQuaHocCot[]> {
+    const { where, rong } = await this.scope.resolve(user, q);
+    if (rong) return [];
+
+    const nhom = await this.prisma.dang_ky_hoc.groupBy({
+      by: ['khoa_id', 'ket_qua'],
+      where,
+      _count: { _all: true },
+    });
+    const tenKhoa = await this.tenKhoa(nhom.map((n) => n.khoa_id));
+
+    const cot = new Map<string, KetQuaHocCot>();
+    for (const n of nhom) {
+      const c = cot.get(n.khoa_id) ?? {
+        khoa_id: n.khoa_id,
+        ten_khoa: tenKhoa.get(n.khoa_id) ?? '',
+        dat: 0,
+        khong_dat: 0,
+        vang: 0,
+        dang_hoc: 0,
+      };
+      c[n.ket_qua ?? 'dang_hoc'] += n._count._all;
+      cot.set(n.khoa_id, c);
+    }
+    return [...cot.values()].sort(soTenKhoa);
+  }
+
+  async soSanhKhoa(
+    user: AuthenticatedUser,
+    q: ThongKeQueryDto,
+  ): Promise<SoSanhKhoaCot[]> {
+    if (q.khoa_id) {
+      throw new ValidationException(
+        'So sánh khóa chỉ dùng khi chọn Tất cả khóa',
+      );
+    }
+    const { where, rong } = await this.scope.resolve(user, q);
+    if (rong) return [];
+
+    const khoaIds = (
+      await this.prisma.dang_ky_hoc.groupBy({ by: ['khoa_id'], where })
+    ).map((k) => k.khoa_id);
+    const tenKhoa = await this.tenKhoa(khoaIds);
+
+    const cot = await Promise.all(
+      khoaIds.map(async (khoa_id): Promise<SoSanhKhoaCot> => {
+        const whereKhoa = { AND: [where, { khoa_id }] };
+        const [pheu, dat] = await Promise.all([
+          this.demPheu(whereKhoa),
+          this.prisma.dang_ky_hoc.count({
+            where: { AND: [where, { khoa_id, ket_qua: 'dat' }] },
+          }),
+        ]);
+        const tyLe = (tu: number) =>
+          pheu.tham_gia > 0 ? tu / pheu.tham_gia : null;
+        return {
+          khoa_id,
+          ten_khoa: tenKhoa.get(khoa_id) ?? '',
+          tham_gia: pheu.tham_gia,
+          ty_le_truy_cap: tyLe(pheu.da_truy_cap),
+          ty_le_dau_vao: tyLe(pheu.danh_gia_dau_vao),
+          ty_le_dat: tyLe(dat),
+        };
+      }),
+    );
+    return cot.sort(soTenKhoa);
+  }
+
+  private async tenKhoa(ids: string[]): Promise<Map<string, string>> {
+    const khoa = await this.prisma.khoa_boi_duong.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, ten_khoa: true },
+    });
+    return new Map(khoa.map((k) => [k.id, k.ten_khoa]));
   }
 
   private khaoSatRong(thang: MucThang[]): KhaoSatResult {
