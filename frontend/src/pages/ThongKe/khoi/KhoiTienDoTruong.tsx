@@ -69,13 +69,14 @@ interface TieuDeProps {
   dangSap: KhoaSapXep;
   chieu: Chieu;
   onSap: (cot: KhoaSapXep) => void;
+  canPhai?: boolean;
 }
 
-function TieuDeSapXep({ nhan, cot, dangSap, chieu, onSap }: TieuDeProps) {
+function TieuDeSapXep({ nhan, cot, dangSap, chieu, onSap, canPhai }: TieuDeProps) {
   const dang = dangSap === cot;
   const ariaSort = dang ? (chieu === 'asc' ? 'ascending' : 'descending') : 'none';
   return (
-    <Table.Th aria-sort={ariaSort}>
+    <Table.Th aria-sort={ariaSort} ta={canPhai ? 'right' : undefined}>
       <UnstyledButton onClick={() => onSap(cot)} fw={700} fz="sm">
         {nhan}
         {dang && <span aria-hidden> {chieu === 'asc' ? '↑' : '↓'}</span>}
@@ -126,9 +127,11 @@ export function KhoiTienDoTruong({ loc }: { loc: LocThongKe }) {
         <Group justify="space-between" align="flex-end">
           <Group align="flex-end" gap="md">
             <TextInput label="Tìm trường" value={tim} onChange={(e) => setTim(e.currentTarget.value)} />
-            <Text size="sm" c="dimmed" pb={8}>
-              {hien.length} trường
-            </Text>
+            {d && (
+              <Text size="sm" c="dimmed" pb={8}>
+                {hien.length} trường
+              </Text>
+            )}
           </Group>
           <Button size="xs" variant="light" loading={dangXuat} onClick={() => void xuatExcel()}>
             Xuất Excel
@@ -142,7 +145,7 @@ export function KhoiTienDoTruong({ loc }: { loc: LocThongKe }) {
             <Table.Thead>
               <Table.Tr>
                 <TieuDeSapXep nhan="Trường" cot="ten_don_vi" {...tieuDe} />
-                <TieuDeSapXep nhan="Số HV" cot="so_hv" {...tieuDe} />
+                <TieuDeSapXep nhan="Số HV" cot="so_hv" canPhai {...tieuDe} />
                 {COT_TY_LE.map((c) => (
                   <TieuDeSapXep key={c.key} nhan={c.nhan} cot={c.key} {...tieuDe} />
                 ))}
@@ -168,7 +171,7 @@ export function KhoiTienDoTruong({ loc }: { loc: LocThongKe }) {
                       </Text>
                     )}
                   </Table.Td>
-                  <Table.Td>{r.so_hv}</Table.Td>
+                  <Table.Td ta="right">{r.so_hv}</Table.Td>
                   {COT_TY_LE.map((c) => (
                     <Table.Td key={c.key}>
                       <OTyLe x={r[c.key]} />

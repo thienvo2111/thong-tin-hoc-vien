@@ -134,8 +134,11 @@ async function ghiLo<T>(ten: string, ds: T[], ghi: (lo: T[]) => Promise<unknown>
   console.log(`  ${ten}: ${ds.length}`);
 }
 
-async function capNhatLo(ds: Prisma.PrismaPromise<unknown>[]) {
-  for (const lo of chia(ds, CO_CAP_NHAT)) await prisma.$transaction(lo);
+async function capNhatLo(ds: Prisma.PrismaPromise<unknown>[], dem?: number[]) {
+  for (const lo of chia(ds, CO_CAP_NHAT)) {
+    const kq = await prisma.$transaction(lo);
+    if (dem) dem.push(...kq.map((r) => (r as { count: number }).count));
+  }
 }
 
 async function lenhTao() {
@@ -182,22 +185,30 @@ async function lenhTao() {
 
 async function khoiPhuc(file: string) {
   const sl: SaoLuu = JSON.parse(fs.readFileSync(path.join(THU_MUC_SAO_LUU, file), 'utf8'));
+  // updateMany: dòng đã bị xóa thì bỏ qua thay vì làm hỏng cả lô khôi phục
+  const kq: number[] = [];
   await capNhatLo(
     sl.nguoi_dung.map((n) =>
-      prisma.nguoi_dung.update({
+      prisma.nguoi_dung.updateMany({
         where: { id: n.id },
         data: { dang_nhap_lan_cuoi: n.dang_nhap_lan_cuoi ? new Date(n.dang_nhap_lan_cuoi) : null },
       }),
     ),
+    kq,
   );
+  const kqDk: number[] = [];
   await capNhatLo(
     sl.dang_ky_hoc.map((d) =>
-      prisma.dang_ky_hoc.update({
+      prisma.dang_ky_hoc.updateMany({
         where: { id: d.id },
         data: { ket_qua: d.ket_qua, cum_id: d.cum_id },
       }),
     ),
+    kqDk,
   );
+  const boQuaNd = kq.filter((c) => c === 0).length;
+  const boQuaDk = kqDk.filter((c) => c === 0).length;
+  if (boQuaNd + boQuaDk > 0) console.log(`  bỏ qua (không còn dòng) nguoi_dung: ${boQuaNd}, dang_ky_hoc: ${boQuaDk}`);
   console.log(`  khôi phục nguoi_dung: ${sl.nguoi_dung.length}, dang_ky_hoc: ${sl.dang_ky_hoc.length}`);
   fs.renameSync(
     path.join(THU_MUC_SAO_LUU, file),

@@ -64,12 +64,17 @@ describe('kiemTraDbLocal', () => {
     'postgresql://u:p@localhost:5432/db',
     'postgresql://u:p@127.0.0.1:5432/db',
     'postgresql://u:p@[::1]:5432/db',
+    'postgresql://u:p@localhost:5432/db?schema=public',
+    'postgresql://localhost/db',
   ])('cho qua %s', (url) => {
     expect(() => kiemTraDbLocal(url)).not.toThrow();
   });
 
   it.each([
     'postgresql://u:p@10.0.0.5:5432/db',
+    'postgresql://u:p@localhost/db?host=10.0.0.5',
+    'postgresql://u:p@localhost/db?hostaddr=10.0.0.5',
+    'postgresql://u:p@localhost,10.0.0.5:5432/db',
     'postgresql://u:p@boiduongnls.hcmue.edu.vn:5432/db',
   ])('chặn host khác %s', (url) => {
     expect(() => kiemTraDbLocal(url)).toThrow();

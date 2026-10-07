@@ -114,9 +114,11 @@ describe('KhoiTienDoTruong', () => {
     );
     URL.createObjectURL = vi.fn(() => 'blob:gia-lap');
     URL.revokeObjectURL = vi.fn();
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     renderKhoi();
     await userEvent.click(await screen.findByRole('button', { name: 'Xuất Excel' }));
     await waitFor(() => expect((url as URL | null)?.searchParams.get('khoa_id')).toBe('khoa-1'));
+    await waitFor(() => expect(click).toHaveBeenCalled());
+    expect(URL.createObjectURL).toHaveBeenCalled();
   });
 });

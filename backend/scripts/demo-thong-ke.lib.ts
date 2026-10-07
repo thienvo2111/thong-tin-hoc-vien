@@ -21,10 +21,18 @@ export function mulberry32(seed: number): () => number {
 
 export function kiemTraDbLocal(url: string | undefined | null): void {
   if (!url) throw new Error('DATABASE_URL rỗng — từ chối chạy.');
+  if (/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*,/i.test(url)) {
+    throw new Error('DATABASE_URL nhiều host — từ chối chạy.');
+  }
   let host: string;
   try {
-    host = new URL(url).hostname;
-  } catch {
+    const u = new URL(url);
+    host = u.hostname;
+    if (u.searchParams.has('host') || u.searchParams.has('hostaddr')) {
+      throw new Error('DATABASE_URL có tham số host/hostaddr — từ chối chạy.');
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('host/hostaddr')) throw e;
     throw new Error('DATABASE_URL không hợp lệ — từ chối chạy.');
   }
   if (!['localhost', '127.0.0.1', '[::1]', '::1'].includes(host)) {
