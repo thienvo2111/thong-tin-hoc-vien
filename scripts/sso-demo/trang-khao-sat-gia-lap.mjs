@@ -131,6 +131,7 @@ Mức <select name="muc"><option value="co_ban">Cơ bản</option><option value=
       trang(
         'Đã xác định người làm bài',
         `<div class="the">
+<p>Họ tên: <b>${thoat(hv.ho_ten ?? '—')}</b></p>
 <p>Mã định danh CSDL ngành: <code>${thoat(hv.ma_dinh_danh_moet ?? '(không có — dùng hoc_vien_id)')}</code></p>
 <p>hoc_vien_id: <code>${thoat(hv.hoc_vien_id)}</code></p>
 <p>Vai trò: <b>${hv.vai_tro === 'can_bo_quan_ly' ? 'Cán bộ quản lý' : hv.vai_tro === 'giao_vien' ? 'Giáo viên' : '(chưa chọn)'}</b> → chọn bộ câu hỏi tương ứng</p>

@@ -610,6 +610,7 @@ Response `POST /sso/doi-ma`:
 ```json
 {
   "hoc_vien_id": "uuid — định danh ổn định trong cổng (dùng khi không có mã MOET)",
+  "ho_ten": "Nguyễn Văn A",
   "ma_dinh_danh_moet": "9115131060",
   "vai_tro": "giao_vien",
   "ma_don_vi": "DV01",
@@ -624,6 +625,7 @@ Response `POST /sso/doi-ma`:
 - `vai_tro`: `giao_vien` | `can_bo_quan_ly` (học viên tự chọn ở hồ sơ, trường `doi_tuong`). Kênh `sso` chỉ cấp mã cho hồ sơ đầy đủ nên trường này luôn có giá trị.
 - `ma_khoa` (2026-10-02): khóa **đã duyệt** mới nhất học viên đã ghi danh — để bên khảo sát biết người làm bài thuộc tỉnh/khóa nào; `null` nếu chưa ghi danh.
 - `ma_don_vi`: có thể `null` nếu đơn vị chưa có mã. `lop`: rỗng nếu chưa được phân lớp (thường gặp ở giai đoạn đánh giá đầu vào).
+- `ho_ten` (thêm 2026-10-07): họ tên học viên theo hồ sơ — để bên khảo sát hiển thị/đối chiếu người làm bài.
 - **Cố ý KHÔNG trả** CCCD, ngày sinh, email, SĐT (tối thiểu hóa dữ liệu).
 
 Lỗi `POST /sso/doi-ma` (cùng thân lỗi chung `{ error: { code, message } }`):

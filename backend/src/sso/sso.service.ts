@@ -28,6 +28,7 @@ function bamMa(ma: string): string {
 
 export interface ThongTinSso {
   hoc_vien_id: string;
+  ho_ten: string;
   ma_dinh_danh_moet: string | null;
   vai_tro: 'giao_vien' | 'can_bo_quan_ly' | null;
   ma_don_vi: string | null;
@@ -186,6 +187,7 @@ export class SsoService {
 
     return {
       hoc_vien_id: hv.id,
+      ho_ten: hv.ho_ten,
       ma_dinh_danh_moet: hv.ma_dinh_danh_moet,
       vai_tro: hv.doi_tuong,
       ma_don_vi: hv.don_vi_cong_tac.ma_don_vi,

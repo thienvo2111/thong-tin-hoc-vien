@@ -207,6 +207,7 @@ describe('SSO sang hệ thống khảo sát (e2e)', () => {
     const doi = await doiMa(code).expect(200);
     expect(doi.body).toMatchObject({
       hoc_vien_id: hocVien.id,
+      ho_ten: 'Học Viên Sso',
       ma_dinh_danh_moet: tenDangNhap,
       vai_tro: 'can_bo_quan_ly',
       ma_don_vi: donViFixture.donVi.ma_don_vi,
@@ -322,6 +323,7 @@ describe('SSO sang hệ thống khảo sát (e2e)', () => {
       const doi = await doiMa(res.body.code).expect(200);
       expect(doi.body).toMatchObject({
         hoc_vien_id: hocVien.id,
+        ho_ten: 'Học Viên Sso',
         vai_tro: null,
         target: 'khao-sat',
       });
