@@ -297,7 +297,11 @@ describe('ThongKeService khối kết quả học tập + so sánh khóa', () =>
   let service: ThongKeService;
   let prisma: {
     hoc_vien: { count: jest.Mock };
-    dang_ky_hoc: { groupBy: jest.Mock; count: jest.Mock };
+    dang_ky_hoc: {
+      groupBy: jest.Mock;
+      count: jest.Mock;
+      findMany: jest.Mock;
+    };
     khoa_boi_duong: { findMany: jest.Mock };
   };
   let scope: { resolve: jest.Mock };
@@ -308,6 +312,7 @@ describe('ThongKeService khối kết quả học tập + so sánh khóa', () =>
       dang_ky_hoc: {
         groupBy: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       khoa_boi_duong: { findMany: jest.fn().mockResolvedValue([]) },
     };
@@ -379,6 +384,76 @@ describe('ThongKeService khối kết quả học tập + so sánh khóa', () =>
       scope.resolve.mockResolvedValue({ where: {}, rong: true, khoaIds: [] });
       expect(await service.ketQuaHoc(caller('truong'), {})).toEqual([]);
       expect(prisma.dang_ky_hoc.groupBy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ketQuaHocTheoTruong', () => {
+    const dkRow = (id: string | null, ten: string, ket_qua: string | null) => ({
+      ket_qua,
+      hoc_vien: {
+        don_vi_cong_tac_id: id,
+        don_vi_cong_tac: id ? { ten_don_vi: ten } : null,
+      },
+    });
+
+    it('thiếu khoa_id -> ValidationException, không gọi resolve', async () => {
+      const loi = await service
+        .ketQuaHocTheoTruong(caller('quan_tri'), {})
+        .catch((e: unknown) => e);
+      expect(loi).toBeInstanceOf(ValidationException);
+      expect(
+        (loi as ValidationException).getResponse() as {
+          error: { message: string };
+        },
+      ).toMatchObject({
+        error: { message: 'Cần chọn một khóa để xem kết quả theo trường' },
+      });
+      expect(scope.resolve).not.toHaveBeenCalled();
+    });
+
+    it('rong=true -> [] không truy vấn', async () => {
+      scope.resolve.mockResolvedValue({ where: {}, rong: true, khoaIds: [] });
+      const r = await service.ketQuaHocTheoTruong(caller('truong'), {
+        khoa_id: 'k1',
+      });
+      expect(r).toEqual([]);
+      expect(prisma.dang_ky_hoc.findMany).not.toHaveBeenCalled();
+    });
+
+    it('đếm đúng theo trường; ket_qua null -> dang_hoc; sắp theo tên', async () => {
+      prisma.dang_ky_hoc.findMany.mockResolvedValue([
+        dkRow('t1', 'Trường B', 'dat'),
+        dkRow('t1', 'Trường B', null),
+        dkRow('t1', 'Trường B', 'dang_hoc'),
+        dkRow('t2', 'Trường A', 'khong_dat'),
+        dkRow('t2', 'Trường A', 'vang'),
+        dkRow('t2', 'Trường A', 'dat'),
+        dkRow(null, '', 'dat'),
+      ]);
+      const r = await service.ketQuaHocTheoTruong(caller('quan_tri'), {
+        khoa_id: 'k1',
+      });
+      expect(r).toEqual([
+        {
+          don_vi_id: 't2',
+          ten_don_vi: 'Trường A',
+          dat: 1,
+          khong_dat: 1,
+          vang: 1,
+          dang_hoc: 0,
+        },
+        {
+          don_vi_id: 't1',
+          ten_don_vi: 'Trường B',
+          dat: 1,
+          khong_dat: 0,
+          vang: 0,
+          dang_hoc: 2,
+        },
+      ]);
+      expect(prisma.dang_ky_hoc.findMany.mock.calls[0][0].where).toEqual(
+        WHERE_SCOPE,
+      );
     });
   });
 
@@ -491,13 +566,11 @@ describe('ThongKeService.chuyenCan', () => {
       dang_ky_hoc: { count: jest.fn().mockResolvedValue(0) },
     };
     scope = {
-      resolve: jest
-        .fn()
-        .mockResolvedValue({
-          where: WHERE_SCOPE,
-          rong: false,
-          khoaIds: ['k1'],
-        }),
+      resolve: jest.fn().mockResolvedValue({
+        where: WHERE_SCOPE,
+        rong: false,
+        khoaIds: ['k1'],
+      }),
     };
     service = new ThongKeService(
       prisma as unknown as PrismaService,

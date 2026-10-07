@@ -221,23 +221,71 @@ describe('XepHangService', () => {
     expect(scope.resolve).toHaveBeenCalled();
   });
 
-  it('quan_tri không don_vi_id -> chỉ nhóm Sở/Phòng gốc, bỏ trường mồ côi và loại khac', async () => {
+  it('quan_tri không don_vi_id, 2 Sở gốc, không khoa_id -> chỉ nhóm Sở/Phòng gốc, bỏ trường mồ côi và loại khac', async () => {
     setup(
       [
         dv('so', null, 'so_gddt', 'Sở A'),
+        dv('so2', null, 'so_gddt', 'Sở B'),
         dv('mocoi', null, 'truong', 'Trường mồ côi'),
         dv('khac', null, 'khac', 'Khác'),
       ],
       [
         ...hocVien('so', 5),
+        ...hocVien('so2', 5),
         ...hocVien('mocoi', 5),
         ...hocVien('khac', 5),
       ],
     );
     const r = await service.xepHang(caller('quan_tri'), { chi_so: 'truy_cap' });
     if (r.kieu !== 'bang') throw new Error('kieu');
-    expect(r.top.map((d) => d.don_vi_id)).toEqual(['so']);
-    expect(r.tong_so).toBe(1);
+    expect(r.top.map((d) => d.don_vi_id).sort()).toEqual(['so', 'so2']);
+    expect(r.tong_so).toBe(2);
+  });
+
+  describe('quan_tri xuống cấp trường', () => {
+    const hv = [...hocVien('t1', 5), ...hocVien('t2', 5), ...hocVien('t3', 5)];
+    const mot = [
+      dv('so', null, 'so_gddt', 'Sở A'),
+      dv('phong', 'so', 'phong_vhxh'),
+      dv('t1', 'phong', 'truong'),
+      dv('t2', 'so', 'truong'),
+      dv('t3', null, 'truong', 'Trường mồ côi'),
+    ];
+    const hai = [...mot, dv('so2', null, 'so_gddt', 'Sở B')];
+
+    it('1 Sở gốc có học viên, không khoa_id -> các dòng là trường', async () => {
+      setup(mot, hv);
+      const r = await service.xepHang(caller('quan_tri'), { chi_so: 'dat' });
+      if (r.kieu !== 'bang') throw new Error('kieu');
+      expect(r.top.map((d) => d.don_vi_id).sort()).toEqual(['t1', 't2', 't3']);
+    });
+
+    it('3 Sở gốc nhưng chỉ 1 Sở đủ 5 HV, không khoa_id -> các dòng là trường', async () => {
+      setup(
+        [...hai, dv('so3', null, 'so_gddt', 'Sở C')],
+        [...hv, ...hocVien('so2', 4), ...hocVien('so3', 2)],
+      );
+      const r = await service.xepHang(caller('quan_tri'), { chi_so: 'dat' });
+      if (r.kieu !== 'bang') throw new Error('kieu');
+      expect(r.top.map((d) => d.don_vi_id).sort()).toEqual(['t1', 't2', 't3']);
+    });
+
+    it('2 Sở gốc, không khoa_id -> các dòng là Sở', async () => {
+      setup(hai, [...hv, ...hocVien('so', 5), ...hocVien('so2', 5)]);
+      const r = await service.xepHang(caller('quan_tri'), { chi_so: 'dat' });
+      if (r.kieu !== 'bang') throw new Error('kieu');
+      expect(r.top.map((d) => d.don_vi_id).sort()).toEqual(['so', 'so2']);
+    });
+
+    it('2 Sở gốc, có khoa_id -> các dòng là trường', async () => {
+      setup(hai, [...hv, ...hocVien('so', 5)]);
+      const r = await service.xepHang(caller('quan_tri'), {
+        chi_so: 'dat',
+        khoa_id: 'k1',
+      });
+      if (r.kieu !== 'bang') throw new Error('kieu');
+      expect(r.top.map((d) => d.don_vi_id).sort()).toEqual(['t1', 't2', 't3']);
+    });
   });
 
   it('so_gddt -> xếp hạng các trường trong cây con, bỏ phòng và cây khác', async () => {

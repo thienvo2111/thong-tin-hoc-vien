@@ -69,6 +69,15 @@ export interface KetQuaHocCot {
   dang_hoc: number;
 }
 
+export interface KetQuaHocTruongDong {
+  don_vi_id: string;
+  ten_don_vi: string;
+  dat: number;
+  khong_dat: number;
+  vang: number;
+  dang_hoc: number;
+}
+
 export interface SoSanhKhoaCot {
   khoa_id: string;
   ten_khoa: string;
