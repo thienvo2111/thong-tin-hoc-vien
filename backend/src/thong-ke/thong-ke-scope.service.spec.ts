@@ -206,12 +206,14 @@ describe('ThongKeScopeService', () => {
         {},
       );
       expect(r.rong).toBe(true);
+      expect(r.where).toEqual({ id: { in: [] } });
     });
 
     it('ho_tro chưa phân công cụm → rong=true', async () => {
       hoTroScope.cumIdsCuaToi.mockResolvedValue([]);
       const r = await service.resolve(hoTro(), {});
       expect(r.rong).toBe(true);
+      expect(r.where).toEqual({ id: { in: [] } });
     });
 
     it('hoc_vien → ForbiddenAppException', async () => {

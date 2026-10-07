@@ -13,6 +13,14 @@ import { BoLocResult, PhamViThongKe } from './thong-ke.types';
 
 type CumRow = { id: string; khoa_id: string };
 
+// Fail-closed: nhánh rong=true vẫn mang where không khớp dòng nào, để endpoint
+// quên kiểm rong cũng không rò dữ liệu.
+const PHAM_VI_RONG: PhamViThongKe = {
+  where: { id: { in: [] } },
+  rong: true,
+  khoaIds: [],
+};
+
 // Điểm duy nhất suy ra phạm vi dữ liệu của mọi endpoint /thong-ke/*:
 // where = (phạm vi theo vai trò) AND (bộ lọc khoa/đơn vị/cụm đã kiểm quyền).
 @Injectable()
@@ -95,7 +103,7 @@ export class ThongKeScopeService {
   ): Promise<PhamViThongKe> {
     const scope = await this.scopeService.getAccessibleDonViIds(user);
     if (scope === 'ALL' || scope.length === 0) {
-      return { where: {}, rong: true, khoaIds: [] };
+      return { ...PHAM_VI_RONG };
     }
     const khoaXem = await this.scopeService.getKhoaIdsXemDuoc(user);
     const khoaIds = khoaXem === 'ALL' ? [] : khoaXem;
@@ -131,7 +139,7 @@ export class ThongKeScopeService {
   ): Promise<PhamViThongKe> {
     const cumIds = await this.hoTroScope.cumIdsCuaToi(user.id);
     if (cumIds.length === 0) {
-      return { where: { cum_id: { in: [] } }, rong: true, khoaIds: [] };
+      return { ...PHAM_VI_RONG };
     }
     const cums = await this.cumPhanCong(cumIds);
     const khoaIds = [...new Set(cums.map((c) => c.khoa_id))];
