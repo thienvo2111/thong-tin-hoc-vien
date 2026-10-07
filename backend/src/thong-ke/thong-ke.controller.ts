@@ -4,7 +4,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { ThongKeService } from './thong-ke.service';
-import { ThongKeQueryDto } from './dto/thong-ke-query.dto';
+import { ThongKeQueryDto, XepHangQueryDto } from './dto/thong-ke-query.dto';
+import { XepHangService } from './xep-hang.service';
 
 // hoc_vien không có phạm vi thống kê -> RolesGuard tự trả 403.
 @Roles('truong', 'phong_vhxh', 'so_gddt', 'quan_tri', 'ho_tro_hoc_vien')
@@ -13,6 +14,7 @@ export class ThongKeController {
   constructor(
     private readonly scopeService: ThongKeScopeService,
     private readonly service: ThongKeService,
+    private readonly xepHangService: XepHangService,
   ) {}
 
   @Get('bo-loc')
@@ -57,5 +59,10 @@ export class ThongKeController {
     @Query() q: ThongKeQueryDto,
   ) {
     return this.service.chuyenCan(user, q);
+  }
+
+  @Get('xep-hang')
+  xepHang(@CurrentUser() user: AuthenticatedUser, @Query() q: XepHangQueryDto) {
+    return this.xepHangService.xepHang(user, q);
   }
 }

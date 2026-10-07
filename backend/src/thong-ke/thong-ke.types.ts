@@ -101,3 +101,21 @@ export interface ChuyenCanResult {
   truc_tiep: BuoiChuyenCan[] | null;
   vle: { khoang: VleKhoang[]; chua_co_du_lieu: number };
 }
+
+export interface XepHangDong {
+  don_vi_id: string;
+  ten_don_vi: string;
+  so_hv: number;
+  /** 0..1 */
+  gia_tri: number;
+}
+
+export type XepHangResult =
+  | { kieu: 'bang'; top: XepHangDong[]; bottom: XepHangDong[]; tong_so: number }
+  | {
+      kieu: 'vi_tri';
+      thu_hang: number | null;
+      tong_so: number;
+      gia_tri: number | null;
+      trung_binh: number | null;
+    };
