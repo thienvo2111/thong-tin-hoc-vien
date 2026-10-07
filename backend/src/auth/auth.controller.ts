@@ -7,7 +7,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { TaiKhoanThrottlerGuard } from '../common/guards/tai-khoan-throttler.guard';
 import { AuthService } from './auth.service';
 import { DangNhapDto } from './dto/dang-nhap.dto';
 import { DoiMatKhauDto } from './dto/doi-mat-khau.dto';
@@ -22,15 +22,17 @@ import { AuthenticatedUser } from './interfaces/jwt-payload.interface';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  // T1: giới hạn 10 request/phút/IP (mo-rong-nls-an-giang.md mục T1) — chỉ
-  // áp cho endpoint này (và GET /hoc-vien/kiem-tra-trung), không đăng ký
+  // T1: giới hạn 10 request/phút cho mỗi cặp IP + ten_dang_nhap (2026-10-07:
+  // trước là theo IP, nhưng mọi người dùng sau proxy HCMUE/NAT trường chung
+  // IP -> xem TaiKhoanThrottlerGuard). Chỉ áp cho endpoint này, quen-mat-khau
+  // (và GET /hoc-vien/kiem-tra-trung theo IP), không đăng ký
   // ThrottlerGuard toàn cục để tránh ảnh hưởng các endpoint khác. Giới hạn
   // thật lấy từ ThrottlerModule.forRoot() ở AppModule — KHÔNG hard-code lại
   // bằng @Throttle() ở đây, vì giá trị trong @Throttle() sẽ có độ ưu tiên
   // cao hơn option của module và làm vô hiệu hóa override trong test
   // (test/utils/test-app.ts raiseThrottlerLimit).
   @Public()
-  @UseGuards(ThrottlerGuard)
+  @UseGuards(TaiKhoanThrottlerGuard)
   @Post('dang-nhap')
   @HttpCode(HttpStatus.OK)
   dangNhap(@Body() dto: DangNhapDto) {
@@ -58,10 +60,10 @@ export class AuthController {
   }
 
   // 2026-09-30: quên/đặt lại mật khẩu + xác minh email liên hệ. Áp
-  // ThrottlerGuard cho quen-mat-khau giống dang-nhap (10 request/phút/IP) —
+  // TaiKhoanThrottlerGuard cho quen-mat-khau giống dang-nhap (10 request/phút/IP + tên) —
   // cùng cơ chế 429 hiện có, không tự chế giới hạn riêng.
   @Public()
-  @UseGuards(ThrottlerGuard)
+  @UseGuards(TaiKhoanThrottlerGuard)
   @Post('quen-mat-khau')
   @HttpCode(HttpStatus.OK)
   quenMatKhau(@Body() dto: QuenMatKhauDto) {

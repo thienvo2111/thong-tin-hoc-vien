@@ -34,6 +34,46 @@ describe('Giới hạn tần suất theo IP (T1, e2e)', () => {
     expect(res11.body.error.code).toBe('RATE_LIMITED');
   });
 
+  // 2026-10-07: dang-nhap/quen-mat-khau đếm theo cặp IP + ten_dang_nhap —
+  // mọi người dùng sau proxy HCMUE/NAT trường chung 1 IP không được chặn nhau.
+  // Supertest luôn gọi từ cùng 1 IP nên mô phỏng đúng tình huống NAT chung.
+  async function goi10Lan(duongDan: string, ten: string) {
+    for (let i = 0; i < 10; i++) {
+      const res = await request(app.getHttpServer())
+        .post(duongDan)
+        .send({ ten_dang_nhap: ten, mat_khau: 'x' });
+      expect(res.status).not.toBe(429);
+    }
+  }
+
+  it('POST /auth/dang-nhap: cùng IP nhưng tài khoản KHÁC không bị chặn khi tài khoản trước đã hết lượt', async () => {
+    await goi10Lan('/auth/dang-nhap', 'nat-tai-khoan-1');
+    const res = await request(app.getHttpServer())
+      .post('/auth/dang-nhap')
+      .send({ ten_dang_nhap: 'nat-tai-khoan-2', mat_khau: 'x' });
+    expect(res.status).not.toBe(429);
+  });
+
+  it('POST /auth/dang-nhap: tên đăng nhập không phân biệt hoa/thường khi đếm (abc và ABC chung lượt)', async () => {
+    await goi10Lan('/auth/dang-nhap', 'hoa-thuong-abc');
+    await request(app.getHttpServer())
+      .post('/auth/dang-nhap')
+      .send({ ten_dang_nhap: 'HOA-THUONG-ABC', mat_khau: 'x' })
+      .expect(429);
+  });
+
+  it('POST /auth/quen-mat-khau: request thứ 11 cùng tài khoản -> 429; tài khoản khác cùng IP vẫn qua', async () => {
+    await goi10Lan('/auth/quen-mat-khau', 'quen-mk-1');
+    await request(app.getHttpServer())
+      .post('/auth/quen-mat-khau')
+      .send({ ten_dang_nhap: 'quen-mk-1' })
+      .expect(429);
+    const res = await request(app.getHttpServer())
+      .post('/auth/quen-mat-khau')
+      .send({ ten_dang_nhap: 'quen-mk-2' });
+    expect(res.status).not.toBe(429);
+  });
+
   it('GET /hoc-vien/kiem-tra-trung: request thứ 11 trong 1 phút -> 429 (bucket riêng, không dùng chung với dang-nhap)', async () => {
     for (let i = 0; i < 10; i++) {
       const res = await request(app.getHttpServer()).get(

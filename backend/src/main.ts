@@ -7,6 +7,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { validationExceptionFactory } from './common/pipes/validation-exception-factory';
+import { docTrustProxy } from './common/utils/trust-proxy.util';
 
 // Đi ngược thư mục từ vị trí file build ra để tìm package.json gốc — không
 // hardcode số cấp thư mục vì `nest build` có lúc xuất ra dist/main.js, có
@@ -27,9 +28,10 @@ const appVersion = timVersionPackageJson(__dirname);
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   // T1: lấy đúng IP người gọi thật sau reverse proxy (X-Forwarded-For) —
-  // ThrottlerGuard (giới hạn 10 request/phút/IP) đọc req.ip, mặc định trỏ
-  // vào IP của proxy nếu không bật cờ này.
-  app.set('trust proxy', 1);
+  // ThrottlerGuard đọc req.ip, mặc định trỏ vào IP của proxy nếu không bật
+  // cờ này. Production có 2 lớp proxy (HCMUE -> Nginx) nên phải đặt
+  // TRUST_PROXY=loopback,10.0.197.1 — xem docTrustProxy.
+  app.set('trust proxy', docTrustProxy(process.env.TRUST_PROXY));
 
   // CORS_ORIGIN: danh sách origin được phép, phân cách bởi dấu phẩy (vd. FE
   // dev http://localhost:5173). Nếu không đặt: dev/test (NODE_ENV khác
