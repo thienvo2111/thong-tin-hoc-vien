@@ -3,7 +3,11 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { hang_doi_email } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ThongBaoService } from './thong-bao.service';
-import { getMailTransporter, getTestMessageUrl } from './util/mailer.util';
+import {
+  getTestMessageUrl,
+  guiEmail,
+  HetHanMucGuiEmailError,
+} from './util/mailer.util';
 
 const SO_DONG_MOI_LUOT = 20;
 const SO_LAN_THU_TOI_DA = 3;
@@ -12,8 +16,12 @@ const SO_LAN_THU_TOI_DA = 3;
 // mỗi phút — tối đa min(hạn mức còn lại hôm nay, 20) dòng/lượt, FIFO theo
 // created_at, để trải việc gửi hàng loạt (phân lớp, duyệt hồ sơ, ...) qua
 // nhiều ngày khi vượt EMAIL_DAILY_LIMIT, tránh gửi dồn dập khiến Google tạm
-// khóa/quarantine tài khoản Workspace. Dùng lại transporter singleton của
-// mailer.util.ts (getMailTransporter) — KHÔNG tạo transporter riêng.
+// khóa/quarantine tài khoản Workspace. Gửi qua mailer.util.ts (guiEmail, tự
+// xoay vòng tài khoản) — KHÔNG tạo transporter riêng.
+//
+// 2026-10-07: mọi tài khoản đều hết hạn mức Google -> DỪNG lượt, giữ nguyên
+// cho_gui và KHÔNG tăng so_lan_thu — trước đây lỗi 5.4.5 đốt hết 3 lượt thử
+// trong 3 phút rồi chuyển that_bai, thư mất hẳn.
 //
 // NGUYÊN TẮC "email là side effect" (xem comment đầu thong-bao.service.ts):
 // xuLyHangDoi() KHÔNG BAO GIỜ throw — mọi lỗi (gửi thất bại, lỗi DB khi
@@ -40,18 +48,17 @@ export class HangDoiEmailProcessor {
       });
 
       for (const dong of dongChoGui) {
-        await this.guiMotDong(dong);
+        if (!(await this.guiMotDong(dong))) break;
       }
     } catch (e) {
       console.error('[hang-doi-email] Lỗi xử lý hàng đợi', e);
     }
   }
 
-  private async guiMotDong(dong: hang_doi_email): Promise<void> {
+  /** false = mọi tài khoản hết hạn mức, dừng lượt này (thư giữ nguyên cho_gui). */
+  private async guiMotDong(dong: hang_doi_email): Promise<boolean> {
     try {
-      const { transporter, from } = await getMailTransporter();
-      const info = await transporter.sendMail({
-        from,
+      const { info } = await guiEmail({
         to: dong.email_nguoi_nhan,
         subject: dong.tieu_de,
         html: dong.noi_dung_html,
@@ -64,6 +71,12 @@ export class HangDoiEmailProcessor {
       }
       await this.ghiKetQua(dong, 'thanh_cong');
     } catch (e) {
+      if (e instanceof HetHanMucGuiEmailError) {
+        console.warn(
+          `[hang-doi-email] ${e.message} — tạm dừng, thư chờ lượt sau`,
+        );
+        return false;
+      }
       const loi =
         e instanceof Error ? e.message : 'Lỗi không xác định khi gửi email';
       console.error(
@@ -71,6 +84,7 @@ export class HangDoiEmailProcessor {
       );
       await this.ghiLoiThu(dong, loi);
     }
+    return true;
   }
 
   private async ghiKetQua(

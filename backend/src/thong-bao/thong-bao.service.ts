@@ -6,7 +6,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { paginate } from '../common/dto/pagination-query.dto';
-import { getMailTransporter, getTestMessageUrl } from './util/mailer.util';
+import { getTestMessageUrl, guiEmail } from './util/mailer.util';
 import { layFrontendUrl } from '../common/utils/token-xac-thuc.util';
 import { bienNgayVietNam } from './util/gio-viet-nam.util';
 import { LichSuThongBaoQueryDto } from './dto/lich-su-thong-bao-query.dto';
@@ -581,9 +581,7 @@ export class ThongBaoService {
     let loi: string | undefined;
 
     try {
-      const { transporter, from } = await getMailTransporter();
-      const info = await transporter.sendMail({
-        from,
+      const { info } = await guiEmail({
         to: params.email,
         subject: params.tieuDe,
         html: params.html,

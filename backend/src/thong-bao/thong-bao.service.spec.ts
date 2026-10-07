@@ -8,7 +8,10 @@ import * as mailerUtil from './util/mailer.util';
 // luồng). Ở đây chỉ kiểm tra logic xây nội dung + ghi nhat_ky_thong_bao/
 // hang_doi_email + hành vi "không bao giờ throw" một cách nhanh, xác định.
 jest.mock('./util/mailer.util', () => ({
-  getMailTransporter: jest.fn(),
+  ...jest.requireActual<typeof import('./util/mailer.util')>(
+    './util/mailer.util',
+  ),
+  guiEmail: jest.fn(),
   getTestMessageUrl: jest.fn(() => undefined),
 }));
 
@@ -47,10 +50,10 @@ describe('ThongBaoService', () => {
 
   beforeEach(() => {
     sendMail = jest.fn().mockResolvedValue({ messageId: 'x' });
-    (mailerUtil.getMailTransporter as jest.Mock).mockResolvedValue({
-      transporter: { sendMail },
-      from: 'no-reply@test.local',
-    });
+    (mailerUtil.guiEmail as jest.Mock).mockImplementation(async (thu) => ({
+      info: await sendMail(thu),
+      taiKhoan: 'no-reply@test.local',
+    }));
     prisma = {
       hoc_vien: { findUnique: jest.fn() },
       nguoi_dung: { findFirst: jest.fn() },
