@@ -8,6 +8,7 @@ import type {
   KhaoSatResult,
   PheuResult,
   SoSanhKhoaCot,
+  TienDoTruongDong,
   XepHangResult,
 } from '@/api/types';
 
@@ -127,7 +128,42 @@ export const canDonDocMau: CanDonDocResult = {
   ],
 };
 
+const dongTienDo = (
+  don_vi_id: string,
+  ten_don_vi: string,
+  so_hv: number,
+  ty_le_truy_cap: number | null,
+  ty_le_dat: number | null,
+): TienDoTruongDong => ({
+  don_vi_id,
+  ten_don_vi,
+  ten_don_vi_cha: 'Sở GD&ĐT An Giang',
+  so_hv,
+  ty_le_truy_cap,
+  ty_le_ky_nang_so: 0.6,
+  ty_le_dau_vao: 0.55,
+  ty_le_dau_ra: 0.3,
+  ty_le_co_mat: 0.85,
+  ty_le_vle_dat: 0.5,
+  ty_le_dat,
+});
+
+export const tienDoTruongMau: TienDoTruongDong[] = [
+  dongTienDo('dv-a', 'Trường THPT Nguyễn Du', 40, 0.9, 0.3),
+  dongTienDo('dv-b', 'Trường THCS Lê Lợi', 25, 0.4, null),
+  dongTienDo('dv-c', 'Trường Tiểu học Trần Phú', 30, 0.6, 0.9),
+  dongTienDo('dv-d', 'Trường THPT Phan Chu Trinh', 12, null, 0.5),
+];
+
 export const thongKeHandlers = [
+  http.get(
+    '/thong-ke/tien-do-truong/xuat-excel',
+    () =>
+      new HttpResponse('noi-dung-file-mo-phong', {
+        headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      }),
+  ),
+  http.get('/thong-ke/tien-do-truong', () => HttpResponse.json(tienDoTruongMau)),
   http.get('/thong-ke/bo-loc', () => HttpResponse.json(boLocQuanTri)),
   http.get('/thong-ke/pheu', () => HttpResponse.json(pheuMau)),
   http.get('/thong-ke/khao-sat', () => HttpResponse.json(khaoSatMau)),

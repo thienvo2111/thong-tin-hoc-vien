@@ -6,6 +6,7 @@ import { CanDonDocService } from './can-don-doc.service';
 import { ThongKeController } from './thong-ke.controller';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { ThongKeService } from './thong-ke.service';
+import { TienDoTruongService } from './tien-do-truong.service';
 import { XepHangService } from './xep-hang.service';
 
 // Dashboard thống kê: mọi endpoint /thong-ke/* lấy phạm vi dữ liệu DUY NHẤT
@@ -18,6 +19,7 @@ import { XepHangService } from './xep-hang.service';
     ThongKeService,
     XepHangService,
     CanDonDocService,
+    TienDoTruongService,
   ],
   exports: [ThongKeScopeService],
 })
