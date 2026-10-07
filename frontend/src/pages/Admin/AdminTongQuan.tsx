@@ -11,6 +11,7 @@ import {
   Skeleton,
   SimpleGrid,
   Stack,
+  Table,
   Text,
   TextInput,
 } from '@mantine/core';
@@ -22,7 +23,7 @@ import { useDanhSachYeuCauHoTroQuanTri } from '@/api/yeuCauHoTro';
 import { taiBaoCaoTongQuanExcel, useBaoCaoTongQuanTrungTam, type BaoCaoTongQuanParams } from '@/api/baoCao';
 import { useDanhSachKhoa } from '@/api/khoaBoiDuong';
 import { layDonViCongTac } from '@/api/danhMuc';
-import type { KhaoSatMucRow, KetQuaTheoHinhThucRow, LoaiLop } from '@/api/types';
+import type { KhaoSatMucRow, ThamGiaHocRow } from '@/api/types';
 import { SelectDonVi } from '@/components/SelectDonVi';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { taiFileTuBlob } from '@/lib/taiFile';
@@ -32,9 +33,13 @@ import { AdminPageHeader } from './AdminPageHeader';
 
 const SO_DONG_CHO_DUYET = 8;
 
-const KHAO_SAT_RONG: KhaoSatMucRow = { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0, chua_xep_muc: 0 };
+const KHAO_SAT_RONG: KhaoSatMucRow = { da_lam: 0, theo_muc: [], chua_xep_muc: 0 };
 
-const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
+// Dải xanh đậm dần theo thứ tự thang (sequential, thấp -> cao); thang > 4 bậc dùng lại màu đậm nhất.
+const MAU_THEO_MUC = ['primary.2', 'primary.4', 'primary.6', 'primary.8'];
+function mauTheoThuTuMuc(i: number): string {
+  return MAU_THEO_MUC[Math.min(i, MAU_THEO_MUC.length - 1)];
+}
 
 function phanTram(tu: number, mau: number): string {
   if (mau <= 0) return '0%';
@@ -104,16 +109,19 @@ function ChuThichMau({ mau, nhan, giaTri }: { mau: string; nhan: string; giaTri:
   );
 }
 
-/** Khối 1 đợt khảo sát (đầu vào hoặc đầu ra) — DonutChart phân bố Cơ bản/Thành thạo/Nâng cao. Dùng 1
- * dải màu xanh đậm dần (primary.3 → primary.7) vì đây là 3 MỨC có thứ tự (thấp → cao), không phải 3
- * phạm trù độc lập — đúng khuyến nghị "sequential = 1 màu, nhạt→đậm" cho dữ liệu có thứ hạng. */
+/** Khối 1 đợt khảo sát (đầu vào hoặc đầu ra) — DonutChart phân bố theo mức GỐC (muc_goc, thang quản
+ * trị cấu hình — không còn 3 bậc cứng co_ban/thanh_thao/nang_cao, quyết định 2026-10-05). Dùng 1 dải
+ * màu xanh đậm dần vì các mức có thứ tự (thấp → cao), không phải phạm trù độc lập — đúng khuyến nghị
+ * "sequential = 1 màu, nhạt→đậm" cho dữ liệu có thứ hạng. */
 function KhoiKhaoSat({ nhan, duLieu, tongThamGia }: { nhan: string; duLieu: KhaoSatMucRow; tongThamGia: number }) {
   const segments = [
-    { name: 'Cơ bản', value: duLieu.co_ban, color: 'primary.3' },
-    { name: 'Thành thạo', value: duLieu.thanh_thao, color: 'primary.5' },
-    { name: 'Nâng cao', value: duLieu.nang_cao, color: 'primary.7' },
-    { name: 'Chưa xếp mức', value: duLieu.chua_xep_muc, color: 'gray.4' },
-  ].filter((s) => s.name !== 'Chưa xếp mức' || s.value > 0);
+    ...duLieu.theo_muc.map((m, i) => ({
+      name: `${m.ma} – ${m.nhan}`,
+      value: m.so_luong,
+      color: mauTheoThuTuMuc(i),
+    })),
+    ...(duLieu.chua_xep_muc > 0 ? [{ name: 'Chưa xếp mức', value: duLieu.chua_xep_muc, color: 'gray.4' }] : []),
+  ];
   return (
     <Stack gap={10} align="center">
       <Text fz={13.5} fw={700}>
@@ -140,38 +148,72 @@ function KhoiKhaoSat({ nhan, duLieu, tongThamGia }: { nhan: string; duLieu: Khao
   );
 }
 
-/** Kết quả học theo hình thức (Trực tiếp/Zoom/VLE) — BarChart nhóm. Màu theo Ý NGHĨA trạng thái, tái
- * dùng đúng token theme đã có: Đạt = success (tốt), Không đạt = danger (nghiêm trọng), Vắng = warning
- * (cảnh báo), Đang học = primary (trung tính/đang diễn ra) — không bịa thêm màu ngoài theme. */
-function KhoiKetQuaTheoHinhThuc({ rows }: { rows: KetQuaTheoHinhThucRow[] }) {
-  const coDuLieu = rows.some((r) => r.dang_hoc + r.dat + r.khong_dat + r.vang > 0);
-  if (!coDuLieu) {
+/** Tình hình tham gia học theo điểm danh (sửa 2026-10-07, thay "Kết quả học theo hình thức" dựa vào
+ * dang_ky_hoc_lop đã bỏ) — BarChart xếp chồng theo giai đoạn + bảng số liệu chi tiết. Màu theo Ý NGHĨA
+ * trạng thái: Có mặt = success (tốt), Vắng có phép = warning (cảnh báo), Vắng = danger (nghiêm trọng).
+ * Nhãn giai đoạn kèm mã khóa khi lọc gộp nhiều khóa (tránh nhầm "GĐ1" của 2 khóa khác nhau). */
+function KhoiThamGiaHoc({ rows }: { rows: ThamGiaHocRow[] }) {
+  if (rows.length === 0) {
     return (
       <Text c="dimmed" fz="sm" ta="center" py="xl">
-        Chưa có dữ liệu
+        Chưa có dữ liệu điểm danh
       </Text>
     );
   }
+  const nhieuKhoa = new Set(rows.map((r) => r.ma_khoa)).size > 1;
+  const nhanGiaiDoan = (r: ThamGiaHocRow) =>
+    nhieuKhoa ? `${r.ma_khoa} · GĐ${r.thu_tu}` : `GĐ${r.thu_tu} – ${r.ten_giai_doan}`;
   const data = rows.map((r) => ({
-    hinh_thuc: NHAN_LOAI_LOP[r.loai_lop],
-    'Đang học': r.dang_hoc,
-    Đạt: r.dat,
-    'Không đạt': r.khong_dat,
+    giai_doan: nhanGiaiDoan(r),
+    'Có mặt': r.co_mat,
+    'Vắng có phép': r.vang_co_phep,
     Vắng: r.vang,
   }));
   return (
-    <BarChart
-      h={280}
-      data={data}
-      dataKey="hinh_thuc"
-      withLegend
-      series={[
-        { name: 'Đang học', color: 'primary.5' },
-        { name: 'Đạt', color: 'success.6' },
-        { name: 'Không đạt', color: 'danger.6' },
-        { name: 'Vắng', color: 'warning.6' },
-      ]}
-    />
+    <Stack gap="md">
+      <BarChart
+        type="stacked"
+        h={280}
+        data={data}
+        dataKey="giai_doan"
+        withLegend
+        legendProps={{ verticalAlign: 'bottom' }}
+        series={[
+          { name: 'Có mặt', color: 'success.6' },
+          { name: 'Vắng có phép', color: 'warning.6' },
+          { name: 'Vắng', color: 'danger.6' },
+        ]}
+      />
+      <Table.ScrollContainer minWidth={560}>
+        <Table verticalSpacing="xs" horizontalSpacing="md">
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Giai đoạn</Table.Th>
+              <Table.Th>Số buổi</Table.Th>
+              <Table.Th>Có mặt</Table.Th>
+              <Table.Th>Vắng có phép</Table.Th>
+              <Table.Th>Vắng</Table.Th>
+              <Table.Th>Tỉ lệ có mặt</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {rows.map((r) => {
+              const mau = r.co_mat + r.vang_co_phep + r.vang;
+              return (
+                <Table.Tr key={r.giai_doan_id}>
+                  <Table.Td>{nhanGiaiDoan(r)}</Table.Td>
+                  <Table.Td>{r.so_buoi}</Table.Td>
+                  <Table.Td>{r.co_mat}</Table.Td>
+                  <Table.Td>{r.vang_co_phep}</Table.Td>
+                  <Table.Td>{r.vang}</Table.Td>
+                  <Table.Td>{mau > 0 ? phanTram(r.co_mat, mau) : '—'}</Table.Td>
+                </Table.Tr>
+              );
+            })}
+          </Table.Tbody>
+        </Table>
+      </Table.ScrollContainer>
+    </Stack>
   );
 }
 
@@ -295,9 +337,9 @@ function KhoiTongQuanMoRong() {
 
       <Paper withBorder radius={14} p="lg">
         <Text fz={14.5} fw={700} mb="md">
-          Kết quả học theo hình thức
+          Tình hình tham gia học (theo điểm danh)
         </Text>
-        {tongQuan.isLoading ? <Skeleton height={280} /> : <KhoiKetQuaTheoHinhThuc rows={tongQuan.data?.ket_qua_theo_hinh_thuc ?? []} />}
+        {tongQuan.isLoading ? <Skeleton height={280} /> : <KhoiThamGiaHoc rows={tongQuan.data?.tham_gia_hoc ?? []} />}
       </Paper>
     </Stack>
   );

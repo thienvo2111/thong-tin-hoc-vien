@@ -213,23 +213,27 @@ export interface TongHopResult {
   rows: TongHopDonViRow[];
 }
 
-// GET /bao-cao/tong-quan — dashboard "Tổng quan hệ thống" (thêm 2026-09-30). Shape lấy từ
-// backend/src/bao-cao/bao-cao.types.ts (TongQuanResult) — không mô tả chi tiết trong api-contract.md,
-// flag: improvised. loai_lop dùng lại type LoaiLop khai báo ở dưới (khóa bồi dưỡng).
+// GET /bao-cao/tong-quan — dashboard "Tổng quan hệ thống" (thêm 2026-09-30, sửa 2026-10-07). Shape lấy
+// từ backend/src/bao-cao/bao-cao.types.ts (TongQuanResult) — không mô tả chi tiết trong
+// api-contract.md, flag: improvised. Mức dùng muc_goc (thang quản trị cấu hình) — quyết định
+// 2026-10-05: cổng KHÔNG quy đổi sang 3 bậc cứng co_ban/thanh_thao/nang_cao nữa.
 export interface KhaoSatMucRow {
   da_lam: number;
-  co_ban: number;
-  thanh_thao: number;
-  nang_cao: number;
+  theo_muc: { ma: string; nhan: string; so_luong: number }[];
   /** Đã hoàn thành bài nhưng hệ thống khảo sát chưa báo mức. */
   chua_xep_muc: number;
 }
 
-export interface KetQuaTheoHinhThucRow {
-  loai_lop: LoaiLop;
-  dang_hoc: number;
-  dat: number;
-  khong_dat: number;
+// Sửa 2026-10-07: thay "Kết quả học theo hình thức" (dang_ky_hoc_lop, đã bỏ) — tình hình tham gia học
+// THEO ĐIỂM DANH thật, nhóm theo giai đoạn.
+export interface ThamGiaHocRow {
+  giai_doan_id: string;
+  ma_khoa: string;
+  thu_tu: number;
+  ten_giai_doan: string;
+  so_buoi: number;
+  co_mat: number;
+  vang_co_phep: number;
   vang: number;
 }
 
@@ -241,7 +245,7 @@ export interface TongQuanResult {
     dau_vao: KhaoSatMucRow;
     dau_ra: KhaoSatMucRow;
   };
-  ket_qua_theo_hinh_thuc: KetQuaTheoHinhThucRow[];
+  tham_gia_hoc: ThamGiaHocRow[];
 }
 
 export type DoiTuongHocVien = 'giao_vien' | 'can_bo_quan_ly';

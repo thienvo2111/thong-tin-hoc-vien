@@ -76,6 +76,24 @@ describe('Admin — Tổng quan mở rộng (bộ lọc + biểu đồ)', () => 
     expect(khoi.getByText('40% trên tổng tham gia')).toBeInTheDocument();
   });
 
+  // Sửa 2026-10-07: mức theo muc_goc (thang quản trị cấu hình, không còn 3 bậc cứng); "Kết quả theo
+  // hình thức" thay bằng "Tình hình tham gia học (theo điểm danh)".
+  it('hiện chú thích mức "M4 – Nâng cao" kèm số lượng + khối "Tình hình tham gia học" với dòng giai đoạn', async () => {
+    renderTrang();
+    const khoi = within(await screen.findByTestId('khoi-tong-quan-mo-rong'));
+    // Fixture taoBaoCaoTongQuanMau(): đầu vào theo_muc M4 (Nâng cao) = 2 (đầu ra = 0 -> nhãn xuất hiện
+    // 2 lần, lấy phần tử đầu = khối "Đầu vào" theo đúng thứ tự DOM).
+    await khoi.findByText('Đầu vào');
+    const nhanM4 = khoi.getAllByText('M4 – Nâng cao')[0];
+    const chuThichM4 = nhanM4.closest('div')!;
+    expect(within(chuThichM4).getByText('2')).toBeInTheDocument();
+
+    expect(khoi.getByText('Tình hình tham gia học (theo điểm danh)')).toBeInTheDocument();
+    // Fixture: giai đoạn 1 (K-001, Trực tiếp – đợt 1) có 8 có mặt, 1 vắng có phép, 1 vắng. Nhãn này có
+    // thể xuất hiện cả trong biểu đồ (trục) và bảng chi tiết -> dùng getAllByText, chỉ cần tồn tại.
+    expect(khoi.getAllByText('GĐ1 – Trực tiếp – đợt 1').length).toBeGreaterThan(0);
+  });
+
   it('đổi bộ lọc "Từ ngày" gọi lại GET /bao-cao/tong-quan với đúng tham số', async () => {
     let thamSoCuoi: URLSearchParams | undefined;
     server.use(
@@ -117,21 +135,19 @@ describe('Admin — Tổng quan mở rộng (bộ lọc + biểu đồ)', () => 
           da_dang_nhap: 2,
           da_chinh_sua_ho_so: 1,
           khao_sat: {
-            dau_vao: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0, chua_xep_muc: 0 },
-            dau_ra: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0, chua_xep_muc: 0 },
+            dau_vao: { da_lam: 0, theo_muc: [], chua_xep_muc: 0 },
+            dau_ra: { da_lam: 0, theo_muc: [], chua_xep_muc: 0 },
           },
-          ket_qua_theo_hinh_thuc: [
-            { loai_lop: 'truc_tiep', dang_hoc: 0, dat: 0, khong_dat: 0, vang: 0 },
-            { loai_lop: 'zoom', dang_hoc: 0, dat: 0, khong_dat: 0, vang: 0 },
-            { loai_lop: 'vle', dang_hoc: 0, dat: 0, khong_dat: 0, vang: 0 },
-          ],
+          tham_gia_hoc: [],
         }),
       ),
     );
     renderTrang();
     const khoi = within(await screen.findByTestId('khoi-tong-quan-mo-rong'));
-    // 2 khối khảo sát (đầu vào + đầu ra) + 1 khối kết quả theo hình thức = 3 chỗ hiện "Chưa có dữ liệu".
-    expect(await khoi.findAllByText('Chưa có dữ liệu')).toHaveLength(3);
+    // 2 khối khảo sát (đầu vào + đầu ra) hiện "Chưa có dữ liệu"; khối tham gia học hiện riêng
+    // "Chưa có dữ liệu điểm danh" (không có buổi điểm danh nào khớp bộ lọc).
+    expect(await khoi.findAllByText('Chưa có dữ liệu')).toHaveLength(2);
+    expect(khoi.getByText('Chưa có dữ liệu điểm danh')).toBeInTheDocument();
   });
 
   it('lỗi API tổng quan: hiện thông báo lỗi thay vì màn trắng', async () => {

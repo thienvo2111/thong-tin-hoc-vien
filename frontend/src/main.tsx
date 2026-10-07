@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { MantineProvider, type CSSVariablesResolver } from '@mantine/core';
 import { RouterProvider } from 'react-router-dom';
 import '@mantine/core/styles.css';
+import '@mantine/charts/styles.css';
 import { theme, tokenKhac } from './theme';
 import { AuthProvider } from './auth/AuthContext';
 import { router } from './router';

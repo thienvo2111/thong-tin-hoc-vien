@@ -38,9 +38,11 @@ export const hocVienTinhHinhMock: HocVienTinhHinhKhaoSat[] = [
     ma_dinh_danh_moet: '9115131060',
     doi_tuong: 'giao_vien',
     ten_don_vi: 'Trường TH A',
+    // Sửa 2026-10-07: "khao-sat" (Phiếu khảo sát kĩ năng số) chỉ theo dõi đã làm/chưa làm, không có
+    // mức/điểm trên UI -> ví dụ đầy đủ mức/điểm/link đặt ở "danh-gia"; "khao-sat" dùng ví dụ đơn giản.
     ket_qua: [
       {
-        loai: 'khao-sat',
+        loai: 'danh-gia',
         trang_thai: 'hoan_thanh',
         can_kiem_tra: false,
         so_lan_mo: 1,
@@ -56,7 +58,7 @@ export const hocVienTinhHinhMock: HocVienTinhHinhKhaoSat[] = [
         cap_nhat_luc: '2026-10-04T01:30:00.000Z',
       },
       {
-        loai: 'danh-gia',
+        loai: 'khao-sat',
         trang_thai: 'da_mo',
         can_kiem_tra: true,
         so_lan_mo: 2,
@@ -95,7 +97,12 @@ export function datLaiThangMucMock() {
 }
 datLaiThangMucMock();
 
-const THEO_MUC_RONG = { co_ban: 0, thanh_thao: 0, nang_cao: 0, chua_xep_muc: 0 };
+const THEO_MUC_GOC_RONG = [
+  { ma: 'M1', nhan: 'Chưa đạt', so_luong: 0 },
+  { ma: 'M2', nhan: 'Cơ bản', so_luong: 0 },
+  { ma: 'M3', nhan: 'Thành thạo', so_luong: 0 },
+  { ma: 'M4', nhan: 'Nâng cao', so_luong: 0 },
+];
 
 export const ssoHandlers = [
   http.get('/sso/thang-muc', () => HttpResponse.json({ thang: thangMucMock.value, cap_nhat_luc: null })),
@@ -109,9 +116,36 @@ export const ssoHandlers = [
     HttpResponse.json({
       tong_hoc_vien: 2,
       theo_loai: [
-        { loai: 'khao-sat', chua_lam: 1, da_mo: 0, dang_lam: 0, hoan_thanh: 1, can_kiem_tra: 0, theo_muc: { ...THEO_MUC_RONG, thanh_thao: 1 } },
-        { loai: 'danh-gia', chua_lam: 1, da_mo: 1, dang_lam: 0, hoan_thanh: 0, can_kiem_tra: 1, theo_muc: THEO_MUC_RONG },
-        { loai: 'dau-ra', chua_lam: 2, da_mo: 0, dang_lam: 0, hoan_thanh: 0, can_kiem_tra: 0, theo_muc: THEO_MUC_RONG },
+        {
+          loai: 'khao-sat',
+          chua_lam: 1,
+          da_mo: 1,
+          dang_lam: 0,
+          hoan_thanh: 0,
+          can_kiem_tra: 1,
+          theo_muc_goc: THEO_MUC_GOC_RONG,
+          chua_xep_muc: 0,
+        },
+        {
+          loai: 'danh-gia',
+          chua_lam: 1,
+          da_mo: 0,
+          dang_lam: 0,
+          hoan_thanh: 1,
+          can_kiem_tra: 0,
+          theo_muc_goc: THEO_MUC_GOC_RONG.map((m) => (m.ma === 'M3' ? { ...m, so_luong: 1 } : m)),
+          chua_xep_muc: 0,
+        },
+        {
+          loai: 'dau-ra',
+          chua_lam: 2,
+          da_mo: 0,
+          dang_lam: 0,
+          hoan_thanh: 0,
+          can_kiem_tra: 0,
+          theo_muc_goc: THEO_MUC_GOC_RONG,
+          chua_xep_muc: 0,
+        },
       ],
     }),
   ),

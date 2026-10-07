@@ -139,10 +139,12 @@ export default function AdminTinhHinhKhaoSat() {
               );
             })}
           </SimpleGrid>
-          {tkLoai && tkLoai.hoan_thanh > 0 && (
+          {/* Phiếu khảo sát kĩ năng số chỉ theo dõi đã làm/chưa làm, không có mức -> không hiện dòng này. */}
+          {loai !== 'khao-sat' && tkLoai && tkLoai.hoan_thanh > 0 && (
             <Text fz={13} c="dimmed">
-              Mức của bài đã hoàn thành: Cơ bản {tkLoai.theo_muc.co_ban} · Thành thạo {tkLoai.theo_muc.thanh_thao} · Nâng
-              cao {tkLoai.theo_muc.nang_cao} · Chưa xếp mức {tkLoai.theo_muc.chua_xep_muc}
+              Mức của bài đã hoàn thành:{' '}
+              {tkLoai.theo_muc_goc.map((m) => `${m.ma} – ${m.nhan} ${m.so_luong}`).join(' · ')} · Chưa xếp mức{' '}
+              {tkLoai.chua_xep_muc}
             </Text>
           )}
 
@@ -190,8 +192,9 @@ export default function AdminTinhHinhKhaoSat() {
                       <Table.Th>Học viên</Table.Th>
                       <Table.Th>Đơn vị</Table.Th>
                       <Table.Th>Trạng thái</Table.Th>
-                      <Table.Th>Mức</Table.Th>
-                      <Table.Th>Điểm</Table.Th>
+                      {/* Phiếu khảo sát kĩ năng số chỉ theo dõi đã làm/chưa làm, không có mức/điểm. */}
+                      {loai !== 'khao-sat' && <Table.Th>Mức</Table.Th>}
+                      {loai !== 'khao-sat' && <Table.Th>Điểm</Table.Th>}
                       <Table.Th>Lần vào bài</Table.Th>
                       <Table.Th>Cập nhật</Table.Th>
                     </Table.Tr>
@@ -241,17 +244,21 @@ function DongHocVien({ hocVien, loai }: { hocVien: HocVienTinhHinhKhaoSat; loai:
           {badge.nhan}
         </Badge>
       </Table.Td>
-      <Table.Td>
-        <O_Muc kq={kq} />
-      </Table.Td>
-      <Table.Td>
-        <Text size="sm">{(kq && dinhDangDiem(kq.diem, kq.diem_toi_da)) ?? '—'}</Text>
-        {kq && chuanHoaLienKet(kq.url_ket_qua) && (
-          <Anchor href={chuanHoaLienKet(kq.url_ket_qua)!} target="_blank" rel="noopener noreferrer" size="xs">
-            Xem kết quả chi tiết
-          </Anchor>
-        )}
-      </Table.Td>
+      {loai !== 'khao-sat' && (
+        <Table.Td>
+          <O_Muc kq={kq} />
+        </Table.Td>
+      )}
+      {loai !== 'khao-sat' && (
+        <Table.Td>
+          <Text size="sm">{(kq && dinhDangDiem(kq.diem, kq.diem_toi_da)) ?? '—'}</Text>
+          {kq && chuanHoaLienKet(kq.url_ket_qua) && (
+            <Anchor href={chuanHoaLienKet(kq.url_ket_qua)!} target="_blank" rel="noopener noreferrer" size="xs">
+              Xem kết quả chi tiết
+            </Anchor>
+          )}
+        </Table.Td>
+      )}
       <Table.Td>{kq ? kq.so_lan_mo : '—'}</Table.Td>
       <Table.Td>
         {kq ? (

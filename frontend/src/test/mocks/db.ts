@@ -363,21 +363,57 @@ export function taoBaoCaoTongHopDonViMau(): TongHopDonViRow[] {
   ];
 }
 
-// Dashboard "Tổng quan hệ thống" (thêm 2026-09-30) — GET /bao-cao/tong-quan. Số liệu minh họa, khớp
-// TongQuanResult (backend/src/bao-cao/bao-cao.types.ts).
+// Dashboard "Tổng quan hệ thống" (thêm 2026-09-30, sửa 2026-10-07) — GET /bao-cao/tong-quan. Số liệu
+// minh họa, khớp TongQuanResult (backend/src/bao-cao/bao-cao.types.ts). Mức dùng muc_goc (thang quản
+// trị cấu hình, quyết định 2026-10-05); "tham_gia_hoc" thay "ket_qua_theo_hinh_thuc" (theo điểm danh).
 export function taoBaoCaoTongQuanMau(): TongQuanResult {
   return {
     tong_hoc_vien_tham_gia: 10,
     da_dang_nhap: 7,
     da_chinh_sua_ho_so: 4,
     khao_sat: {
-      dau_vao: { da_lam: 8, co_ban: 3, thanh_thao: 3, nang_cao: 2, chua_xep_muc: 0 },
-      dau_ra: { da_lam: 0, co_ban: 0, thanh_thao: 0, nang_cao: 0, chua_xep_muc: 0 },
+      dau_vao: {
+        da_lam: 8,
+        theo_muc: [
+          { ma: 'M1', nhan: 'Chưa đạt', so_luong: 0 },
+          { ma: 'M2', nhan: 'Cơ bản', so_luong: 3 },
+          { ma: 'M3', nhan: 'Thành thạo', so_luong: 3 },
+          { ma: 'M4', nhan: 'Nâng cao', so_luong: 2 },
+        ],
+        chua_xep_muc: 0,
+      },
+      dau_ra: {
+        da_lam: 0,
+        theo_muc: [
+          { ma: 'M1', nhan: 'Chưa đạt', so_luong: 0 },
+          { ma: 'M2', nhan: 'Cơ bản', so_luong: 0 },
+          { ma: 'M3', nhan: 'Thành thạo', so_luong: 0 },
+          { ma: 'M4', nhan: 'Nâng cao', so_luong: 0 },
+        ],
+        chua_xep_muc: 0,
+      },
     },
-    ket_qua_theo_hinh_thuc: [
-      { loai_lop: 'truc_tiep', dang_hoc: 5, dat: 3, khong_dat: 1, vang: 1 },
-      { loai_lop: 'zoom', dang_hoc: 2, dat: 0, khong_dat: 0, vang: 0 },
-      { loai_lop: 'vle', dang_hoc: 0, dat: 0, khong_dat: 0, vang: 0 },
+    tham_gia_hoc: [
+      {
+        giai_doan_id: 'gd-1',
+        ma_khoa: 'K-001',
+        thu_tu: 1,
+        ten_giai_doan: 'Trực tiếp – đợt 1',
+        so_buoi: 3,
+        co_mat: 8,
+        vang_co_phep: 1,
+        vang: 1,
+      },
+      {
+        giai_doan_id: 'gd-2',
+        ma_khoa: 'K-001',
+        thu_tu: 2,
+        ten_giai_doan: 'Zoom – đợt 1',
+        so_buoi: 2,
+        co_mat: 5,
+        vang_co_phep: 0,
+        vang: 0,
+      },
     ],
   };
 }

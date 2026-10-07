@@ -74,7 +74,10 @@ export interface ThongKeLoaiKhaoSat {
   dang_lam: number;
   hoan_thanh: number;
   can_kiem_tra: number;
-  theo_muc: Record<MucNangLuc | 'chua_xep_muc', number>;
+  /** Mức GỐC (muc_goc) theo thang quản trị cấu hình — không quy đổi sang MucNangLuc (2026-10-05). */
+  theo_muc_goc: { ma: string; nhan: string; so_luong: number }[];
+  /** Đã hoàn thành bài nhưng hệ thống khảo sát chưa báo mức. */
+  chua_xep_muc: number;
 }
 
 export interface ThongKeKhaoSat {

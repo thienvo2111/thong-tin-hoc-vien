@@ -7,6 +7,7 @@ import {
   DieuKienDanhGiaRow,
   MUC_NANG_LUC,
   SuaTruongMoetRow,
+  ThamGiaHocRow,
   TRANG_THAI_DANG_KY,
   TRANG_THAI_HO_SO,
   TongHopDiaBanRow,
@@ -19,11 +20,12 @@ import {
   XuatChoVleRow,
 } from '../bao-cao.types';
 
-const NHAN_LOAI_LOP: Record<string, string> = {
-  truc_tiep: 'Trực tiếp',
-  zoom: 'Zoom',
-  vle: 'VLE',
-};
+/** 0 lượt điểm danh -> '—'; ngược lại "92,3%" (1 chữ số thập phân). */
+function tiLeCoMat(row: ThamGiaHocRow): string {
+  const mau = row.co_mat + row.vang_co_phep + row.vang;
+  if (mau === 0) return '—';
+  return `${((row.co_mat / mau) * 100).toFixed(1).replace('.', ',')}%`;
+}
 
 const NHAN_TRANG_THAI_XAC_NHAN: Record<string, string> = {
   chua_dang_nhap: 'Chưa đăng nhập',
@@ -320,43 +322,60 @@ export async function buildTongQuanWorkbook(
   sheetTongQuan.addRow(['Đã đăng nhập', result.da_dang_nhap]);
   sheetTongQuan.addRow(['Đã chỉnh sửa hồ sơ', result.da_chinh_sua_ho_so]);
 
+  // Thứ bậc hiện theo thang quản trị cấu hình (union mã của đầu vào/đầu ra,
+  // giữ đúng thứ tự xuất hiện) — không còn 3 bậc cứng co_ban/thanh_thao/nang_cao.
   const sheetKhaoSat = workbook.addWorksheet('Khảo sát');
+  const maDanhSach: string[] = [];
+  const nhanTheoMa = new Map<string, string>();
+  for (const m of [
+    ...result.khao_sat.dau_vao.theo_muc,
+    ...result.khao_sat.dau_ra.theo_muc,
+  ]) {
+    if (!nhanTheoMa.has(m.ma)) {
+      nhanTheoMa.set(m.ma, m.nhan);
+      maDanhSach.push(m.ma);
+    }
+  }
   sheetKhaoSat.addRow([
     'Đợt khảo sát',
     'Đã làm',
-    'Cơ bản',
-    'Thành thạo',
-    'Nâng cao',
+    ...maDanhSach.map((ma) => `${ma} – ${nhanTheoMa.get(ma)}`),
     'Chưa xếp mức',
   ]);
   sheetKhaoSat.getRow(1).font = { bold: true };
-  sheetKhaoSat.addRow([
-    'Đầu vào',
-    result.khao_sat.dau_vao.da_lam,
-    result.khao_sat.dau_vao.co_ban,
-    result.khao_sat.dau_vao.thanh_thao,
-    result.khao_sat.dau_vao.nang_cao,
-    result.khao_sat.dau_vao.chua_xep_muc,
-  ]);
-  sheetKhaoSat.addRow([
-    'Đầu ra',
-    result.khao_sat.dau_ra.da_lam,
-    result.khao_sat.dau_ra.co_ban,
-    result.khao_sat.dau_ra.thanh_thao,
-    result.khao_sat.dau_ra.nang_cao,
-    result.khao_sat.dau_ra.chua_xep_muc,
-  ]);
+  for (const [ten, row] of [
+    ['Đầu vào', result.khao_sat.dau_vao],
+    ['Đầu ra', result.khao_sat.dau_ra],
+  ] as const) {
+    const soLuongTheoMa = new Map(row.theo_muc.map((m) => [m.ma, m.so_luong]));
+    sheetKhaoSat.addRow([
+      ten,
+      row.da_lam,
+      ...maDanhSach.map((ma) => soLuongTheoMa.get(ma) ?? 0),
+      row.chua_xep_muc,
+    ]);
+  }
 
-  const sheetKetQua = workbook.addWorksheet('Kết quả theo hình thức');
-  sheetKetQua.addRow(['Hình thức', 'Đang học', 'Đạt', 'Không đạt', 'Vắng']);
-  sheetKetQua.getRow(1).font = { bold: true };
-  for (const row of result.ket_qua_theo_hinh_thuc) {
-    sheetKetQua.addRow([
-      NHAN_LOAI_LOP[row.loai_lop] ?? row.loai_lop,
-      row.dang_hoc,
-      row.dat,
-      row.khong_dat,
+  const sheetThamGiaHoc = workbook.addWorksheet('Tham gia học');
+  sheetThamGiaHoc.addRow([
+    'Khóa',
+    'Giai đoạn',
+    'Số buổi đã điểm danh',
+    'Có mặt',
+    'Vắng có phép',
+    'Vắng',
+    'Tỉ lệ có mặt',
+  ]);
+  sheetThamGiaHoc.getRow(1).font = { bold: true };
+  for (const row of result.tham_gia_hoc) {
+    sheetThamGiaHoc.addRow([
+      row.ma_khoa,
+      `GĐ${row.thu_tu} – ${row.ten_giai_doan}`,
+      row.so_buoi,
+      row.co_mat,
+      row.vang_co_phep,
       row.vang,
+      tiLeCoMat(row),
     ]);
   }
 

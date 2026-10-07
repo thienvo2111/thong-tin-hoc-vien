@@ -478,7 +478,7 @@ describe('KetQuaKhaoSatService', () => {
   });
 
   describe('thongKe (quản trị)', () => {
-    it('chưa làm = tổng học viên − các trạng thái đã có; đếm theo mức', async () => {
+    it('chưa làm = tổng học viên − các trạng thái đã có; đếm theo mức gốc theo đúng thứ tự thang', async () => {
       prisma.hoc_vien.count.mockResolvedValue(10);
       prisma.ket_qua_khao_sat.groupBy
         .mockResolvedValueOnce([
@@ -487,8 +487,8 @@ describe('KetQuaKhaoSatService', () => {
           { loai: 'danh-gia', trang_thai: 'dang_lam', _count: { _all: 1 } },
         ])
         .mockResolvedValueOnce([
-          { loai: 'khao-sat', muc: 'co_ban', _count: { _all: 2 } },
-          { loai: 'khao-sat', muc: null, _count: { _all: 1 } },
+          { loai: 'khao-sat', muc_goc: 'M2', _count: { _all: 2 } },
+          { loai: 'khao-sat', muc_goc: null, _count: { _all: 1 } },
         ])
         .mockResolvedValueOnce([{ loai: 'khao-sat', _count: { _all: 1 } }]);
 
@@ -501,7 +501,13 @@ describe('KetQuaKhaoSatService', () => {
         dang_lam: 0,
         hoan_thanh: 3,
         can_kiem_tra: 1,
-        theo_muc: { co_ban: 2, thanh_thao: 0, nang_cao: 0, chua_xep_muc: 1 },
+        theo_muc_goc: [
+          { ma: 'M1', nhan: 'Chưa đạt', so_luong: 0 },
+          { ma: 'M2', nhan: 'Cơ bản', so_luong: 2 },
+          { ma: 'M3', nhan: 'Thành thạo', so_luong: 0 },
+          { ma: 'M4', nhan: 'Nâng cao', so_luong: 0 },
+        ],
+        chua_xep_muc: 1,
       });
       expect(kq.theo_loai[1]).toMatchObject({ chua_lam: 9, dang_lam: 1 });
       expect(prisma.hoc_vien.count.mock.calls[0][0].where).toEqual({
@@ -512,6 +518,31 @@ describe('KetQuaKhaoSatService', () => {
     it('không chọn khóa -> phạm vi toàn bộ học viên', async () => {
       await service.thongKe();
       expect(prisma.hoc_vien.count.mock.calls[0][0].where).toEqual({});
+    });
+
+    it('mã không còn trong thang (đã bị xóa khỏi cấu hình) -> nối cuối, nhãn = chính mã đó', async () => {
+      prisma.hoc_vien.count.mockResolvedValue(5);
+      prisma.ket_qua_khao_sat.groupBy
+        .mockResolvedValueOnce([
+          { loai: 'khao-sat', trang_thai: 'hoan_thanh', _count: { _all: 4 } },
+        ])
+        .mockResolvedValueOnce([
+          { loai: 'khao-sat', muc_goc: 'M4', _count: { _all: 1 } },
+          { loai: 'khao-sat', muc_goc: 'M3', _count: { _all: 1 } },
+          { loai: 'khao-sat', muc_goc: null, _count: { _all: 1 } },
+          { loai: 'khao-sat', muc_goc: 'X9', _count: { _all: 1 } },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const kq = await service.thongKe();
+      expect(kq.theo_loai[0].theo_muc_goc).toEqual([
+        { ma: 'M1', nhan: 'Chưa đạt', so_luong: 0 },
+        { ma: 'M2', nhan: 'Cơ bản', so_luong: 0 },
+        { ma: 'M3', nhan: 'Thành thạo', so_luong: 1 },
+        { ma: 'M4', nhan: 'Nâng cao', so_luong: 1 },
+        { ma: 'X9', nhan: 'X9', so_luong: 1 },
+      ]);
+      expect(kq.theo_loai[0].chua_xep_muc).toBe(1);
     });
   });
 

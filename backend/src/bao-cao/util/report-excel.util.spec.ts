@@ -1,14 +1,15 @@
 import * as ExcelJS from 'exceljs';
 import {
   buildTongHopWorkbook,
+  buildTongQuanWorkbook,
   buildVanHanhWorkbook,
 } from './report-excel.util';
-import { TongHopResult, VanHanhResult } from '../bao-cao.types';
+import { TongHopResult, TongQuanResult, VanHanhResult } from '../bao-cao.types';
 
-async function readSheetValues(buffer: Buffer): Promise<unknown[][]> {
+async function readSheetValues(buffer: Buffer, sheetIndex = 0): Promise<unknown[][]> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
-  const sheet = workbook.worksheets[0];
+  const sheet = workbook.worksheets[sheetIndex];
   const rows: unknown[][] = [];
   sheet.eachRow((row) => {
     rows.push((row.values as unknown[]).slice(1)); // exceljs values[0] luôn undefined (1-indexed)
@@ -256,5 +257,84 @@ describe('report-excel.util', () => {
     ]);
     expect(rows[2]).toEqual(['Lớp Zoom – Nhóm 2', 2, '', 1, 0, 0, 0, 0, 0, 1]);
     expect(rows[3]).toEqual(['Tổng cộng', '', '', 3, 1, 1, 1, 1, 0, 1]);
+  });
+
+  // Sửa 2026-10-07: mức theo muc_goc (thang cấu hình, không còn 3 bậc cứng);
+  // "Kết quả theo hình thức" thay bằng "Tham gia học" (theo điểm danh).
+  it('tong-quan: sheet "Khảo sát" theo đúng thang mức + sheet "Tham gia học"', async () => {
+    const result: TongQuanResult = {
+      tong_hoc_vien_tham_gia: 10,
+      da_dang_nhap: 7,
+      da_chinh_sua_ho_so: 4,
+      khao_sat: {
+        dau_vao: {
+          da_lam: 3,
+          theo_muc: [
+            { ma: 'M1', nhan: 'Chưa đạt', so_luong: 0 },
+            { ma: 'M2', nhan: 'Cơ bản', so_luong: 1 },
+            { ma: 'M3', nhan: 'Thành thạo', so_luong: 1 },
+            { ma: 'M4', nhan: 'Nâng cao', so_luong: 0 },
+          ],
+          chua_xep_muc: 1,
+        },
+        dau_ra: {
+          da_lam: 0,
+          theo_muc: [
+            { ma: 'M1', nhan: 'Chưa đạt', so_luong: 0 },
+            { ma: 'M2', nhan: 'Cơ bản', so_luong: 0 },
+            { ma: 'M3', nhan: 'Thành thạo', so_luong: 0 },
+            { ma: 'M4', nhan: 'Nâng cao', so_luong: 0 },
+          ],
+          chua_xep_muc: 0,
+        },
+      },
+      tham_gia_hoc: [
+        {
+          giai_doan_id: 'gd-1',
+          ma_khoa: 'K-001',
+          thu_tu: 1,
+          ten_giai_doan: 'Trực tiếp – đợt 1',
+          so_buoi: 3,
+          co_mat: 8,
+          vang_co_phep: 1,
+          vang: 1,
+        },
+      ],
+    };
+
+    const buffer = await buildTongQuanWorkbook(result);
+    const sheetKhaoSat = await readSheetValues(buffer, 1);
+    const sheetThamGiaHoc = await readSheetValues(buffer, 2);
+
+    expect(sheetKhaoSat[0]).toEqual([
+      'Đợt khảo sát',
+      'Đã làm',
+      'M1 – Chưa đạt',
+      'M2 – Cơ bản',
+      'M3 – Thành thạo',
+      'M4 – Nâng cao',
+      'Chưa xếp mức',
+    ]);
+    expect(sheetKhaoSat[1]).toEqual(['Đầu vào', 3, 0, 1, 1, 0, 1]);
+    expect(sheetKhaoSat[2]).toEqual(['Đầu ra', 0, 0, 0, 0, 0, 0]);
+
+    expect(sheetThamGiaHoc[0]).toEqual([
+      'Khóa',
+      'Giai đoạn',
+      'Số buổi đã điểm danh',
+      'Có mặt',
+      'Vắng có phép',
+      'Vắng',
+      'Tỉ lệ có mặt',
+    ]);
+    expect(sheetThamGiaHoc[1]).toEqual([
+      'K-001',
+      'GĐ1 – Trực tiếp – đợt 1',
+      3,
+      8,
+      1,
+      1,
+      '80,0%',
+    ]);
   });
 });

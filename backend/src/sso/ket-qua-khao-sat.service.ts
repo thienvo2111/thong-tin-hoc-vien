@@ -303,10 +303,12 @@ export class KetQuaKhaoSatService {
     return { ket_qua_khao_sat: { some: { loai, trang_thai: loc } } };
   }
 
-  // GET /ket-qua-khao-sat/thong-ke (quản trị): mỗi loại -> số theo trạng thái + phân bố mức.
+  // GET /ket-qua-khao-sat/thong-ke (quản trị): mỗi loại -> số theo trạng thái +
+  // phân bố mức GỐC (muc_goc, theo thang quản trị cấu hình — không quy đổi
+  // sang `muc`, xem ThangMucService).
   async thongKe(khoaId?: string) {
     const phamVi = this.phamViHocVien(khoaId);
-    const [tong, nhom, mucNhom, canKiemTraNhom] = await Promise.all([
+    const [tong, nhom, mucGocNhom, canKiemTraNhom, thang] = await Promise.all([
       this.prisma.hoc_vien.count({ where: phamVi }),
       this.prisma.ket_qua_khao_sat.groupBy({
         by: ['loai', 'trang_thai'],
@@ -314,7 +316,7 @@ export class KetQuaKhaoSatService {
         _count: { _all: true },
       }),
       this.prisma.ket_qua_khao_sat.groupBy({
-        by: ['loai', 'muc'],
+        by: ['loai', 'muc_goc'],
         where: { hoc_vien: phamVi, trang_thai: 'hoan_thanh' },
         _count: { _all: true },
       }),
@@ -327,6 +329,7 @@ export class KetQuaKhaoSatService {
         },
         _count: { _all: true },
       }),
+      this.thangMuc.thang(),
     ]);
 
     return {
@@ -338,8 +341,23 @@ export class KetQuaKhaoSatService {
         const daMo = dem('da_mo');
         const dangLam = dem('dang_lam');
         const hoanThanh = dem('hoan_thanh');
-        const demMuc = (m: string | null) =>
-          mucNhom.find((n) => n.loai === loai && n.muc === m)?._count._all ?? 0;
+        const demMucGoc = (ma: string | null) =>
+          mucGocNhom.find((n) => n.loai === loai && n.muc_goc === ma)?._count
+            ._all ?? 0;
+        // Mã xuất hiện trong dữ liệu nhưng không còn trong thang hiện tại
+        // (đã bị xóa khỏi cấu hình) -> vẫn hiện, nhãn = chính mã đó.
+        const maKhac = Array.from(
+          new Set(
+            mucGocNhom
+              .filter(
+                (n) =>
+                  n.loai === loai &&
+                  n.muc_goc !== null &&
+                  !thang.some((m) => m.ma === n.muc_goc),
+              )
+              .map((n) => n.muc_goc as string),
+          ),
+        );
         return {
           loai,
           chua_lam: tong - daMo - dangLam - hoanThanh,
@@ -348,12 +366,15 @@ export class KetQuaKhaoSatService {
           hoan_thanh: hoanThanh,
           can_kiem_tra:
             canKiemTraNhom.find((n) => n.loai === loai)?._count._all ?? 0,
-          theo_muc: {
-            co_ban: demMuc('co_ban'),
-            thanh_thao: demMuc('thanh_thao'),
-            nang_cao: demMuc('nang_cao'),
-            chua_xep_muc: demMuc(null),
-          },
+          theo_muc_goc: [
+            ...thang.map((m) => ({
+              ma: m.ma,
+              nhan: m.nhan,
+              so_luong: demMucGoc(m.ma),
+            })),
+            ...maKhac.map((ma) => ({ ma, nhan: ma, so_luong: demMucGoc(ma) })),
+          ],
+          chua_xep_muc: demMucGoc(null),
         };
       }),
     };

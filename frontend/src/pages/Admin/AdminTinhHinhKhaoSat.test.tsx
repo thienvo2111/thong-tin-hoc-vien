@@ -8,8 +8,8 @@ import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import AdminTinhHinhKhaoSat from './AdminTinhHinhKhaoSat';
 
-// Mock GET /sso/ket-qua(/thong-ke) ở test/mocks/sso.ts (hocVienTinhHinhMock: 1 người xong phiếu khảo sát,
-// đã mở phiếu đánh giá quá lâu; 1 người chưa làm gì).
+// Mock GET /sso/ket-qua(/thong-ke) ở test/mocks/sso.ts (hocVienTinhHinhMock: 1 người xong phiếu đánh giá,
+// đã mở phiếu khảo sát kĩ năng số quá lâu; 1 người chưa làm gì).
 function renderTrang() {
   datToken('token-gia-lap');
   db.nguoiDung.vai_tro = 'quan_tri';
@@ -21,12 +21,30 @@ function renderTrang() {
 const theThongKe = (nhan: string) => screen.getByRole('button', { name: new RegExp(nhan) });
 
 describe('Admin — Tình hình khảo sát', () => {
-  it('thống kê theo loại bài đang chọn + danh sách kèm mức, điểm, nguồn', async () => {
+  // Sửa 2026-10-07: "Phiếu khảo sát kĩ năng số" (tab mặc định) chỉ theo dõi đã làm/chưa làm, không có
+  // mức/điểm trên UI (hệ thống đó không trả mức có ý nghĩa) -> không cột Mức/Điểm, không dòng tóm tắt mức.
+  it('tab Phiếu khảo sát kĩ năng số: không cột Mức/Điểm, không dòng tóm tắt mức', async () => {
     renderTrang();
     expect(await screen.findByText('Hà Thị Thanh')).toBeInTheDocument();
-    await waitFor(() => expect(theThongKe('Đã hoàn thành')).toHaveTextContent('1'));
+    await waitFor(() => expect(theThongKe('Cần kiểm tra lại')).toHaveTextContent('1'));
     expect(theThongKe('Chưa làm')).toHaveTextContent('1');
+
+    expect(screen.queryByRole('columnheader', { name: 'Mức' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Điểm' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Thành thạo/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Mức của bài đã hoàn thành:', { exact: false })).not.toBeInTheDocument();
+  });
+
+  it('đổi sang phiếu đánh giá -> hiện cột Mức/Điểm + dòng tóm tắt mức + chi tiết từng hồ sơ', async () => {
+    renderTrang();
+    await screen.findByText('Hà Thị Thanh');
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText('Phiếu đánh giá năng lực số'));
+    await waitFor(() => expect(theThongKe('Đã hoàn thành')).toHaveTextContent('1'));
     expect(screen.getByText(/Thành thạo 1/)).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Mức' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Điểm' })).toBeInTheDocument();
 
     const dong = screen.getByText('Hà Thị Thanh').closest('tr')!;
     expect(within(dong).getByText('Đã hoàn thành')).toBeInTheDocument();
@@ -42,12 +60,10 @@ describe('Admin — Tình hình khảo sát', () => {
     expect(screen.getByRole('link', { name: 'Hà Thị Thanh' })).toHaveAttribute('href', '/admin/hoc-vien/hv-1');
   });
 
-  it('đổi sang phiếu đánh giá -> thấy "Cần kiểm tra lại"; bấm ô thống kê -> lọc theo trạng thái đó, bấm lại bỏ lọc', async () => {
+  it('bấm ô thống kê -> lọc theo trạng thái đó, bấm lại bỏ lọc', async () => {
     const user = userEvent.setup();
     renderTrang();
     await screen.findByText('Hà Thị Thanh');
-
-    await user.click(screen.getByText('Phiếu đánh giá năng lực số'));
     await waitFor(() => expect(theThongKe('Cần kiểm tra lại')).toHaveTextContent('1'));
 
     await user.click(theThongKe('Cần kiểm tra lại'));

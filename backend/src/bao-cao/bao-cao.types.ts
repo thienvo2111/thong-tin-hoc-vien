@@ -143,22 +143,28 @@ export interface VanHanhResult {
 // Dashboard "Tổng quan hệ thống" (thêm 2026-09-30) — GET /bao-cao/tong-quan.
 // Xem BaoCaoService.tongQuan cho định nghĩa từng số liệu.
 // -----------------------------------------------------------------------
-export const LOAI_LOP_HOC = ['truc_tiep', 'zoom', 'vle'] as const;
 
+// Sửa 2026-10-07: mức dùng `muc_goc` (thang quản trị cấu hình, xem
+// ThangMucService) thay cho `muc` — hệ thống khảo sát chỉ gửi muc_goc, cổng
+// không tự quy đổi (quyết định 2026-10-05).
 export interface KhaoSatMucRow {
   da_lam: number;
-  co_ban: number;
-  thanh_thao: number;
-  nang_cao: number;
+  theo_muc: { ma: string; nhan: string; so_luong: number }[];
   /** Đã hoàn thành bài nhưng hệ thống khảo sát chưa báo mức. */
   chua_xep_muc: number;
 }
 
-export interface KetQuaTheoHinhThucRow {
-  loai_lop: (typeof LOAI_LOP_HOC)[number];
-  dang_hoc: number;
-  dat: number;
-  khong_dat: number;
+// Sửa 2026-10-07: thay "Kết quả học theo hình thức" (dang_ky_hoc_lop, đã bỏ)
+// bằng tình hình tham gia học THEO ĐIỂM DANH (diem_danh), nhóm theo giai đoạn.
+export interface ThamGiaHocRow {
+  giai_doan_id: string;
+  ma_khoa: string;
+  thu_tu: number;
+  ten_giai_doan: string;
+  /** Số buổi (lich_hoc_lop) đã có ít nhất 1 lượt điểm danh. */
+  so_buoi: number;
+  co_mat: number;
+  vang_co_phep: number;
   vang: number;
 }
 
@@ -170,5 +176,5 @@ export interface TongQuanResult {
     dau_vao: KhaoSatMucRow;
     dau_ra: KhaoSatMucRow;
   };
-  ket_qua_theo_hinh_thuc: KetQuaTheoHinhThucRow[];
+  tham_gia_hoc: ThamGiaHocRow[];
 }

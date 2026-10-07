@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService, DonViScope } from '../auth/scope/scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { HocVienService } from '../hoc-vien/hoc-vien.service';
+import { ThangMucService, MucThang } from '../sso/thang-muc.service';
 import {
   ForbiddenAppException,
   NotFoundAppException,
@@ -18,11 +19,10 @@ import {
   DieuKienDanhGiaRow,
   KET_QUA_HOC,
   KhaoSatMucRow,
-  KetQuaTheoHinhThucRow,
   KHONG_XAC_DINH,
-  LOAI_LOP_HOC,
   MUC_NANG_LUC,
   SuaTruongMoetRow,
+  ThamGiaHocRow,
   TRANG_THAI_DANG_KY,
   TRANG_THAI_HO_SO,
   TongHopDiaBanRow,
@@ -68,6 +68,7 @@ export class BaoCaoService {
     private readonly prisma: PrismaService,
     private readonly scopeService: ScopeService,
     private readonly hocVienService: HocVienService,
+    private readonly thangMuc: ThangMucService,
   ) {}
 
   async tongHop(
@@ -690,73 +691,53 @@ export class BaoCaoService {
     }
 
     const where = this.tongQuanDangKyHocWhere(scope, query);
-    const dangKyRows = await this.prisma.dang_ky_hoc.findMany({
-      where,
-      select: { hoc_vien_id: true, muc_dau_vao: true, muc_dau_ra: true },
-    });
+    const [dangKyRows, thang] = await Promise.all([
+      this.prisma.dang_ky_hoc.findMany({
+        where,
+        select: { hoc_vien_id: true },
+      }),
+      this.thangMuc.thang(),
+    ]);
     const hocVienIds = Array.from(
       new Set(dangKyRows.map((r) => r.hoc_vien_id)),
     );
 
-    const [daDangNhap, hoSoDaSuaRows, phanLopRows, ketQuaKhaoSatRows] =
+    const [daDangNhap, hoSoDaSuaRows, thamGiaHoc, ketQuaKhaoSatRows] =
       await Promise.all([
-      hocVienIds.length === 0
-        ? Promise.resolve(0)
-        : this.prisma.nguoi_dung.count({
-            where: {
-              vai_tro: 'hoc_vien',
-              hoc_vien_id: { in: hocVienIds },
-              dang_nhap_lan_cuoi: { not: null },
-            },
-          }),
-      hocVienIds.length === 0
-        ? Promise.resolve([])
-        : this.prisma.lich_su_thay_doi_ho_so.findMany({
-            where: { hoc_vien_id: { in: hocVienIds } },
-            select: { hoc_vien_id: true },
-            distinct: ['hoc_vien_id'],
-          }),
-      this.prisma.phan_lop_giai_doan.findMany({
-        where: { dang_ky_hoc: where },
-        select: {
-          dang_ky_hoc_id: true,
-          lop: { select: { loai_lop: true } },
-          dang_ky_hoc: { select: { ket_qua: true } },
-        },
-      }),
-      hocVienIds.length === 0
-        ? Promise.resolve([])
-        : this.prisma.ket_qua_khao_sat.findMany({
-            where: {
-              hoc_vien_id: { in: hocVienIds },
-              trang_thai: 'hoan_thanh',
-            },
-            select: { hoc_vien_id: true, loai: true, muc: true },
-          }),
-    ]);
-
-    // Phân lớp theo giai đoạn (spec 2026-10-02): 1 đăng ký có thể học cùng
-    // loại lớp ở nhiều giai đoạn -> khử trùng theo (đăng ký, loại lớp) để giữ
-    // đúng ý nghĩa "số đăng ký theo hình thức" như khi còn dang_ky_hoc_lop.
-    const theoHinhThuc = new Map<
-      string,
-      { loai_lop: string; dang_ky_hoc: { ket_qua: string | null } }
-    >();
-    for (const r of phanLopRows) {
-      theoHinhThuc.set(`${r.dang_ky_hoc_id}|${r.lop.loai_lop}`, {
-        loai_lop: r.lop.loai_lop,
-        dang_ky_hoc: r.dang_ky_hoc,
-      });
-    }
+        hocVienIds.length === 0
+          ? Promise.resolve(0)
+          : this.prisma.nguoi_dung.count({
+              where: {
+                vai_tro: 'hoc_vien',
+                hoc_vien_id: { in: hocVienIds },
+                dang_nhap_lan_cuoi: { not: null },
+              },
+            }),
+        hocVienIds.length === 0
+          ? Promise.resolve([])
+          : this.prisma.lich_su_thay_doi_ho_so.findMany({
+              where: { hoc_vien_id: { in: hocVienIds } },
+              select: { hoc_vien_id: true },
+              distinct: ['hoc_vien_id'],
+            }),
+        this.tinhThamGiaHoc(where),
+        hocVienIds.length === 0
+          ? Promise.resolve([])
+          : this.prisma.ket_qua_khao_sat.findMany({
+              where: {
+                hoc_vien_id: { in: hocVienIds },
+                trang_thai: 'hoan_thanh',
+              },
+              select: { hoc_vien_id: true, loai: true, muc_goc: true },
+            }),
+      ]);
 
     return {
       tong_hoc_vien_tham_gia: dangKyRows.length,
       da_dang_nhap: daDangNhap,
       da_chinh_sua_ho_so: hoSoDaSuaRows.length,
-      khao_sat: this.gopKhaoSat(dangKyRows, ketQuaKhaoSatRows),
-      ket_qua_theo_hinh_thuc: this.demKetQuaTheoHinhThuc([
-        ...theoHinhThuc.values(),
-      ]),
+      khao_sat: this.gopKhaoSat(dangKyRows, ketQuaKhaoSatRows, thang),
+      tham_gia_hoc: thamGiaHoc,
     };
   }
 
@@ -781,73 +762,129 @@ export class BaoCaoService {
   }
 
   // Kết quả khảo sát thật nằm ở ket_qua_khao_sat (SSO/API/import, theo học
-  // viên); dang_ky_hoc.muc_dau_vao/muc_dau_ra là mức quản trị xác nhận (nhập
-  // file) — ưu tiên mức xác nhận, thiếu thì lấy mức bài khảo sát báo về.
-  // Đầu vào = 'danh-gia' (Phiếu đánh giá năng lực số); đầu ra = 'dau-ra'.
+  // viên) — quyết định 2026-10-05: cổng KHÔNG quy đổi muc_goc -> muc, dùng
+  // thẳng mã gốc theo thang quản trị cấu hình. Đầu vào = 'danh-gia' (Phiếu
+  // đánh giá năng lực số); đầu ra = 'dau-ra'. Đếm theo ĐĂNG KÝ (1 học viên có
+  // thể đăng ký nhiều khóa -> tính nhiều lần, giống hành vi cũ).
   private gopKhaoSat(
-    dangKyRows: {
+    dangKyRows: { hoc_vien_id: string }[],
+    ketQuaRows: {
       hoc_vien_id: string;
-      muc_dau_vao: string | null;
-      muc_dau_ra: string | null;
+      loai: string;
+      muc_goc: string | null;
     }[],
-    ketQuaRows: { hoc_vien_id: string; loai: string; muc: string | null }[],
+    thang: MucThang[],
   ): TongQuanResult['khao_sat'] {
     const kq = new Map<string, string | null>();
-    for (const r of ketQuaRows) kq.set(`${r.hoc_vien_id}|${r.loai}`, r.muc);
+    for (const r of ketQuaRows) kq.set(`${r.hoc_vien_id}|${r.loai}`, r.muc_goc);
     const bai = (hv: string, loai: string) =>
       kq.has(`${hv}|${loai}`) ? (kq.get(`${hv}|${loai}`) ?? null) : undefined;
 
-    const dauVao = dangKyRows.map(
-      (r) => r.muc_dau_vao ?? bai(r.hoc_vien_id, 'danh-gia'),
-    );
-    const dauRa = dangKyRows.map(
-      (r) => r.muc_dau_ra ?? bai(r.hoc_vien_id, 'dau-ra'),
-    );
-    return { dau_vao: this.demKhaoSat(dauVao), dau_ra: this.demKhaoSat(dauRa) };
-  }
-
-  /** undefined = chưa làm; null = đã làm nhưng chưa xếp mức. */
-  private demKhaoSat(gia_tri: (string | null | undefined)[]): KhaoSatMucRow {
-    const row: KhaoSatMucRow = {
-      da_lam: 0,
-      co_ban: 0,
-      thanh_thao: 0,
-      nang_cao: 0,
-      chua_xep_muc: 0,
+    const dauVao = dangKyRows.map((r) => bai(r.hoc_vien_id, 'danh-gia'));
+    const dauRa = dangKyRows.map((r) => bai(r.hoc_vien_id, 'dau-ra'));
+    return {
+      dau_vao: this.demKhaoSat(dauVao, thang),
+      dau_ra: this.demKhaoSat(dauRa, thang),
     };
-    for (const muc of gia_tri) {
-      if (muc === undefined) continue;
-      row.da_lam += 1;
-      if (muc === 'co_ban') row.co_ban += 1;
-      else if (muc === 'thanh_thao') row.thanh_thao += 1;
-      else if (muc === 'nang_cao') row.nang_cao += 1;
-      else row.chua_xep_muc += 1;
-    }
-    return row;
   }
 
-  private demKetQuaTheoHinhThuc(
-    rows: { loai_lop: string; dang_ky_hoc: { ket_qua: string | null } }[],
-  ): KetQuaTheoHinhThucRow[] {
-    return LOAI_LOP_HOC.map((loai) => {
-      const row: KetQuaTheoHinhThucRow = {
-        loai_lop: loai,
-        dang_hoc: 0,
-        dat: 0,
-        khong_dat: 0,
-        vang: 0,
-      };
-      for (const r of rows) {
-        if (r.loai_lop !== loai) continue;
-        // Đã xếp lớp mà chưa có kết quả -> coi là đang học.
-        const kq = r.dang_ky_hoc.ket_qua ?? 'dang_hoc';
-        if (kq === 'dang_hoc') row.dang_hoc += 1;
-        else if (kq === 'dat') row.dat += 1;
-        else if (kq === 'khong_dat') row.khong_dat += 1;
-        else if (kq === 'vang') row.vang += 1;
+  /** undefined = chưa làm; null = đã làm nhưng chưa xếp mức. Thứ tự bậc theo
+   * đúng thứ tự thang; mã lạ (không còn trong thang) nối cuối, nhãn = mã. */
+  private demKhaoSat(
+    gia_tri: (string | null | undefined)[],
+    thang: MucThang[],
+  ): KhaoSatMucRow {
+    const theo_muc = thang.map((m) => ({
+      ma: m.ma,
+      nhan: m.nhan,
+      so_luong: 0,
+    }));
+    let da_lam = 0;
+    let chua_xep_muc = 0;
+    for (const ma of gia_tri) {
+      if (ma === undefined) continue;
+      da_lam += 1;
+      if (ma === null) {
+        chua_xep_muc += 1;
+        continue;
       }
-      return row;
+      const muc = theo_muc.find((m) => m.ma === ma);
+      if (muc) muc.so_luong += 1;
+      else theo_muc.push({ ma, nhan: ma, so_luong: 1 });
+    }
+    return { da_lam, theo_muc, chua_xep_muc };
+  }
+
+  // Sửa 2026-10-07: thay "Kết quả học theo hình thức" (dựa vào
+  // dang_ky_hoc_lop đã bỏ) bằng tình hình tham gia học THEO ĐIỂM DANH thật
+  // (diem_danh), nhóm theo giai đoạn — đúng dữ liệu đang được nhập/dùng.
+  private async tinhThamGiaHoc(
+    dangKyHocWhere: Prisma.dang_ky_hocWhereInput,
+  ): Promise<ThamGiaHocRow[]> {
+    const diemDanhNhom = await this.prisma.diem_danh.groupBy({
+      by: ['lich_hoc_id', 'trang_thai'],
+      where: { dang_ky_hoc: dangKyHocWhere },
+      _count: { _all: true },
     });
+    if (diemDanhNhom.length === 0) return [];
+
+    const lichHocIds = Array.from(
+      new Set(diemDanhNhom.map((d) => d.lich_hoc_id)),
+    );
+    const lichHocs = await this.prisma.lich_hoc_lop.findMany({
+      where: { id: { in: lichHocIds } },
+      select: {
+        id: true,
+        giai_doan: {
+          select: {
+            id: true,
+            thu_tu: true,
+            ten_giai_doan: true,
+            khoa: { select: { ma_khoa: true } },
+          },
+        },
+      },
+    });
+    const giaiDoanCuaLich = new Map(lichHocs.map((l) => [l.id, l.giai_doan]));
+
+    const theoGiaiDoan = new Map<
+      string,
+      ThamGiaHocRow & { buoiDaDiemDanh: Set<string> }
+    >();
+    for (const d of diemDanhNhom) {
+      const giaiDoan = giaiDoanCuaLich.get(d.lich_hoc_id);
+      if (!giaiDoan) continue;
+      let row = theoGiaiDoan.get(giaiDoan.id);
+      if (!row) {
+        row = {
+          giai_doan_id: giaiDoan.id,
+          ma_khoa: giaiDoan.khoa.ma_khoa,
+          thu_tu: giaiDoan.thu_tu,
+          ten_giai_doan: giaiDoan.ten_giai_doan,
+          so_buoi: 0,
+          co_mat: 0,
+          vang_co_phep: 0,
+          vang: 0,
+          buoiDaDiemDanh: new Set(),
+        };
+        theoGiaiDoan.set(giaiDoan.id, row);
+      }
+      row.buoiDaDiemDanh.add(d.lich_hoc_id);
+      const soLuong = d._count._all;
+      if (d.trang_thai === 'co_mat') row.co_mat += soLuong;
+      else if (d.trang_thai === 'vang_co_phep') row.vang_co_phep += soLuong;
+      else if (d.trang_thai === 'vang') row.vang += soLuong;
+    }
+
+    return Array.from(theoGiaiDoan.values())
+      .map(({ buoiDaDiemDanh, ...row }) => ({
+        ...row,
+        so_buoi: buoiDaDiemDanh.size,
+      }))
+      .sort(
+        (a, b) =>
+          a.ma_khoa.localeCompare(b.ma_khoa, 'vi') || a.thu_tu - b.thu_tu,
+      );
   }
 
   private emptyTongQuan(): TongQuanResult {
@@ -856,16 +893,10 @@ export class BaoCaoService {
       da_dang_nhap: 0,
       da_chinh_sua_ho_so: 0,
       khao_sat: {
-        dau_vao: this.demKhaoSat([]),
-        dau_ra: this.demKhaoSat([]),
+        dau_vao: this.demKhaoSat([], []),
+        dau_ra: this.demKhaoSat([], []),
       },
-      ket_qua_theo_hinh_thuc: LOAI_LOP_HOC.map((loai) => ({
-        loai_lop: loai,
-        dang_hoc: 0,
-        dat: 0,
-        khong_dat: 0,
-        vang: 0,
-      })),
+      tham_gia_hoc: [],
     };
   }
 }
