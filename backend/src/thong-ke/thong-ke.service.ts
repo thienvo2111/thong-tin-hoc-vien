@@ -7,13 +7,17 @@ import { ThongKeScopeService } from './thong-ke-scope.service';
 import { ThangMucService, MucThang } from '../sso/thang-muc.service';
 import { ValidationException } from '../common/exceptions/app.exceptions';
 import {
+  BuoiChuyenCan,
+  ChuyenCanResult,
   ChuyenMucResult,
   KetQuaHocCot,
   KhaoSatResult,
+  KhoangVle,
   MucDem,
   PheuCounts,
   PheuResult,
   SoSanhKhoaCot,
+  VleKhoang,
 } from './thong-ke.types';
 
 // Loại bài khảo sát = giá trị `target` SSO (xem sso/dto/sso.dto.ts).
@@ -28,6 +32,12 @@ const PHEU_RONG: PheuCounts = {
   danh_gia_dau_vao: 0,
   danh_gia_dau_ra: 0,
 };
+
+const KHOANG_VLE: KhoangVle[] = ['0-25', '25-50', '50-75', '75-100'];
+
+// Biên thuộc khoảng trên; 100 thuộc '75-100'.
+const khoangVle = (tyLe: number): KhoangVle =>
+  KHOANG_VLE[Math.min(3, Math.floor(tyLe / 25))];
 
 const soTenKhoa = (a: { ten_khoa: string }, b: { ten_khoa: string }) =>
   a.ten_khoa.localeCompare(b.ten_khoa, 'vi');
@@ -254,6 +264,107 @@ export class ThongKeService {
       }),
     );
     return cot.sort(soTenKhoa);
+  }
+
+  async chuyenCan(
+    user: AuthenticatedUser,
+    q: ThongKeQueryDto,
+  ): Promise<ChuyenCanResult> {
+    const { where, rong } = await this.scope.resolve(user, q);
+    if (rong) {
+      return {
+        truc_tiep: q.khoa_id ? [] : null,
+        vle: { khoang: this.chiaKhoangVle([]), chua_co_du_lieu: 0 },
+      };
+    }
+    const [truc_tiep, vle] = await Promise.all([
+      q.khoa_id ? this.diemDanhTheoBuoi(where) : Promise.resolve(null),
+      this.vleTheoKhoang(where),
+    ]);
+    return { truc_tiep, vle };
+  }
+
+  private async diemDanhTheoBuoi(
+    where: Prisma.dang_ky_hocWhereInput,
+  ): Promise<BuoiChuyenCan[]> {
+    const nhom = await this.prisma.diem_danh.groupBy({
+      by: ['lich_hoc_id', 'trang_thai'],
+      where: {
+        dang_ky_hoc: where,
+        lich_hoc: { lop: { loai_lop: { in: ['truc_tiep', 'zoom'] } } },
+      },
+      _count: { _all: true },
+    });
+    if (nhom.length === 0) return [];
+
+    const lich = await this.prisma.lich_hoc_lop.findMany({
+      where: { id: { in: [...new Set(nhom.map((n) => n.lich_hoc_id))] } },
+      select: {
+        id: true,
+        buoi_so: true,
+        giai_doan: { select: { thu_tu: true } },
+      },
+    });
+    const buoiCuaLich = new Map(lich.map((l) => [l.id, l]));
+
+    const cot = new Map<string, BuoiChuyenCan>();
+    for (const n of nhom) {
+      const l = buoiCuaLich.get(n.lich_hoc_id);
+      if (!l) continue;
+      const thuTu = l.giai_doan.thu_tu;
+      const khoa = `${thuTu}|${l.buoi_so}`;
+      const c = cot.get(khoa) ?? {
+        nhan: `GĐ${thuTu} · Buổi ${l.buoi_so}`,
+        giai_doan_thu_tu: thuTu,
+        buoi_so: l.buoi_so,
+        co_mat: 0,
+        vang_co_phep: 0,
+        vang: 0,
+        ty_le_co_mat: null,
+      };
+      c[n.trang_thai] += n._count._all;
+      cot.set(khoa, c);
+    }
+    return [...cot.values()]
+      .sort(
+        (a, b) =>
+          a.giai_doan_thu_tu - b.giai_doan_thu_tu || a.buoi_so - b.buoi_so,
+      )
+      .map((c) => {
+        const tong = c.co_mat + c.vang_co_phep + c.vang;
+        return { ...c, ty_le_co_mat: tong > 0 ? c.co_mat / tong : null };
+      });
+  }
+
+  private async vleTheoKhoang(where: Prisma.dang_ky_hocWhereInput) {
+    const [rows, chua_co_du_lieu] = await Promise.all([
+      this.prisma.ket_qua_giai_doan.findMany({
+        where: { dang_ky_hoc: where, ty_le_hoan_thanh: { not: null } },
+        select: { ty_le_hoan_thanh: true },
+      }),
+      this.prisma.dang_ky_hoc.count({
+        where: {
+          AND: [
+            where,
+            {
+              ket_qua_giai_doan: { none: { ty_le_hoan_thanh: { not: null } } },
+            },
+          ],
+        },
+      }),
+    ]);
+    const tyLe = rows.map((r) => Number(r.ty_le_hoan_thanh));
+    return { khoang: this.chiaKhoangVle(tyLe), chua_co_du_lieu };
+  }
+
+  private chiaKhoangVle(tyLe: number[]): VleKhoang[] {
+    const dem = new Map<KhoangVle, number>();
+    for (const t of tyLe)
+      dem.set(khoangVle(t), (dem.get(khoangVle(t)) ?? 0) + 1);
+    return KHOANG_VLE.map((khoang) => ({
+      khoang,
+      so_luong: dem.get(khoang) ?? 0,
+    }));
   }
 
   private async tenKhoa(ids: string[]): Promise<Map<string, string>> {

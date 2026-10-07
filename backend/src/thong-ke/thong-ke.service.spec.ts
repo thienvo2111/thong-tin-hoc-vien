@@ -462,3 +462,151 @@ describe('ThongKeService khối kết quả học tập + so sánh khóa', () =>
     });
   });
 });
+
+describe('ThongKeService.chuyenCan', () => {
+  let service: ThongKeService;
+  let prisma: {
+    diem_danh: { groupBy: jest.Mock };
+    lich_hoc_lop: { findMany: jest.Mock };
+    ket_qua_giai_doan: { findMany: jest.Mock };
+    dang_ky_hoc: { count: jest.Mock };
+  };
+  let scope: { resolve: jest.Mock };
+
+  const lich = (id: string, thu_tu: number, buoi_so: number) => ({
+    id,
+    buoi_so,
+    giai_doan: { thu_tu },
+  });
+  const vle = (...tyLe: (number | null)[]) =>
+    prisma.ket_qua_giai_doan.findMany.mockResolvedValue(
+      tyLe.map((t) => ({ ty_le_hoan_thanh: t === null ? null : String(t) })),
+    );
+
+  beforeEach(() => {
+    prisma = {
+      diem_danh: { groupBy: jest.fn().mockResolvedValue([]) },
+      lich_hoc_lop: { findMany: jest.fn().mockResolvedValue([]) },
+      ket_qua_giai_doan: { findMany: jest.fn().mockResolvedValue([]) },
+      dang_ky_hoc: { count: jest.fn().mockResolvedValue(0) },
+    };
+    scope = {
+      resolve: jest
+        .fn()
+        .mockResolvedValue({
+          where: WHERE_SCOPE,
+          rong: false,
+          khoaIds: ['k1'],
+        }),
+    };
+    service = new ThongKeService(
+      prisma as unknown as PrismaService,
+      scope as unknown as ThongKeScopeService,
+      { thang: jest.fn() } as unknown as ThangMucService,
+    );
+  });
+
+  it('không khoa_id -> truc_tiep null, không truy vấn điểm danh', async () => {
+    const r = await service.chuyenCan(caller('quan_tri'), {});
+    expect(r.truc_tiep).toBeNull();
+    expect(prisma.diem_danh.groupBy).not.toHaveBeenCalled();
+  });
+
+  it('có khoa_id nhưng không có điểm danh -> truc_tiep []', async () => {
+    const r = await service.chuyenCan(caller('quan_tri'), { khoa_id: 'k1' });
+    expect(r.truc_tiep).toEqual([]);
+  });
+
+  it('truy vấn điểm danh chỉ lớp trực tiếp/zoom trong phạm vi', async () => {
+    await service.chuyenCan(caller('quan_tri'), { khoa_id: 'k1' });
+    expect(prisma.diem_danh.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: ['lich_hoc_id', 'trang_thai'],
+        where: {
+          dang_ky_hoc: WHERE_SCOPE,
+          lich_hoc: { lop: { loai_lop: { in: ['truc_tiep', 'zoom'] } } },
+        },
+      }),
+    );
+  });
+
+  it('gộp 2 lớp cùng (GĐ1, Buổi 1) vào một cột, sắp tăng, tính tỷ lệ', async () => {
+    prisma.diem_danh.groupBy.mockResolvedValue([
+      { lich_hoc_id: 'l-a', trang_thai: 'co_mat', _count: { _all: 6 } },
+      { lich_hoc_id: 'l-b', trang_thai: 'co_mat', _count: { _all: 2 } },
+      { lich_hoc_id: 'l-b', trang_thai: 'vang', _count: { _all: 1 } },
+      { lich_hoc_id: 'l-a', trang_thai: 'vang_co_phep', _count: { _all: 1 } },
+      { lich_hoc_id: 'l-c', trang_thai: 'vang', _count: { _all: 3 } },
+    ]);
+    prisma.lich_hoc_lop.findMany.mockResolvedValue([
+      lich('l-c', 2, 1),
+      lich('l-a', 1, 1),
+      lich('l-b', 1, 1),
+    ]);
+    const r = await service.chuyenCan(caller('quan_tri'), { khoa_id: 'k1' });
+    expect(r.truc_tiep).toEqual([
+      {
+        nhan: 'GĐ1 · Buổi 1',
+        giai_doan_thu_tu: 1,
+        buoi_so: 1,
+        co_mat: 8,
+        vang_co_phep: 1,
+        vang: 1,
+        ty_le_co_mat: 0.8,
+      },
+      {
+        nhan: 'GĐ2 · Buổi 1',
+        giai_doan_thu_tu: 2,
+        buoi_so: 1,
+        co_mat: 0,
+        vang_co_phep: 0,
+        vang: 3,
+        ty_le_co_mat: 0,
+      },
+    ]);
+  });
+
+  it('VLE chia khoảng: biên thuộc khoảng trên, 100 thuộc 75-100', async () => {
+    vle(0, 24.99, 25, 50, 75, 100);
+    prisma.dang_ky_hoc.count.mockResolvedValue(4);
+    const r = await service.chuyenCan(caller('quan_tri'), {});
+    expect(r.vle).toEqual({
+      khoang: [
+        { khoang: '0-25', so_luong: 2 },
+        { khoang: '25-50', so_luong: 1 },
+        { khoang: '50-75', so_luong: 1 },
+        { khoang: '75-100', so_luong: 2 },
+      ],
+      chua_co_du_lieu: 4,
+    });
+  });
+
+  it('chua_co_du_lieu đếm đăng ký không có tỷ lệ VLE nào', async () => {
+    await service.chuyenCan(caller('quan_tri'), {});
+    expect(prisma.dang_ky_hoc.count).toHaveBeenCalledWith({
+      where: {
+        AND: [
+          WHERE_SCOPE,
+          { ket_qua_giai_doan: { none: { ty_le_hoan_thanh: { not: null } } } },
+        ],
+      },
+    });
+  });
+
+  it('rong=true -> rỗng đủ 4 khoảng, không truy vấn; có khoa_id -> truc_tiep []', async () => {
+    scope.resolve.mockResolvedValue({ where: {}, rong: true, khoaIds: [] });
+    const khoang = ['0-25', '25-50', '50-75', '75-100'].map((k) => ({
+      khoang: k,
+      so_luong: 0,
+    }));
+    expect(await service.chuyenCan(caller('truong'), {})).toEqual({
+      truc_tiep: null,
+      vle: { khoang, chua_co_du_lieu: 0 },
+    });
+    expect(
+      (await service.chuyenCan(caller('truong'), { khoa_id: 'k1' })).truc_tiep,
+    ).toEqual([]);
+    expect(prisma.diem_danh.groupBy).not.toHaveBeenCalled();
+    expect(prisma.ket_qua_giai_doan.findMany).not.toHaveBeenCalled();
+  });
+});

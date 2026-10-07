@@ -77,3 +77,27 @@ export interface SoSanhKhoaCot {
   ty_le_dau_vao: number | null;
   ty_le_dat: number | null;
 }
+
+export interface BuoiChuyenCan {
+  nhan: string;
+  giai_doan_thu_tu: number;
+  buoi_so: number;
+  co_mat: number;
+  vang_co_phep: number;
+  vang: number;
+  /** 0..1; null khi chưa có điểm danh nào. */
+  ty_le_co_mat: number | null;
+}
+
+export type KhoangVle = '0-25' | '25-50' | '50-75' | '75-100';
+
+export interface VleKhoang {
+  khoang: KhoangVle;
+  so_luong: number;
+}
+
+export interface ChuyenCanResult {
+  /** null khi không chọn khóa. */
+  truc_tiep: BuoiChuyenCan[] | null;
+  vle: { khoang: VleKhoang[]; chua_co_du_lieu: number };
+}

@@ -50,4 +50,12 @@ export class ThongKeController {
   ) {
     return this.service.soSanhKhoa(user, q);
   }
+
+  @Get('chuyen-can')
+  chuyenCan(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: ThongKeQueryDto,
+  ) {
+    return this.service.chuyenCan(user, q);
+  }
 }
