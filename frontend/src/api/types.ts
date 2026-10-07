@@ -248,7 +248,7 @@ export interface TongQuanResult {
   tham_gia_hoc: ThamGiaHocRow[];
 }
 
-export type DoiTuongHocVien = 'giao_vien' | 'can_bo_quan_ly';
+export type DoiTuongHocVien = 'giao_vien' | 'can_bo_quan_ly' | 'nhan_vien';
 
 /** Kênh làm bài đánh giá đầu vào (cấu hình admin): 'sso' = chuyển sang hệ thống khảo sát; 'vle' = T15. */
 export type KenhDanhGia = 'sso' | 'vle';
@@ -271,6 +271,8 @@ export interface DanhGiaDauVaoChuaDu {
   kenh: KenhDanhGia;
   du_dieu_kien: false;
   het_han?: boolean;
+  /** 2026-10-07: đối tượng nhân viên — khảo sát chưa triển khai, ly_do là câu thông báo. */
+  chua_trien_khai?: true;
   // ly_do là danh sách câu tiếng Việt hoàn chỉnh do backend dựng sẵn (T15,
   // hoc-vien.service.ts#danhGiaDauVaoCuaToi — vd "Chưa xác nhận hồ sơ ở đợt
   // xác nhận trước đánh giá (đợt 2)" hoặc thieu[].message của muc-do-day-du),

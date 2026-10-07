@@ -11,6 +11,7 @@ import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { TEN_BAI_KHAO_SAT, nhanMucKetQua, nhanTrangThaiKhaoSat } from '@/lib/trangThaiKhaoSat';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
+import { ThongBaoNhanVien } from '@/components/ThongBaoNhanVien';
 import { CountdownTimer } from '@/components/CountdownTimer';
 import { nhanMucNangLuc } from '@/lib/mucNangLuc';
 import { useCapNhatMoi, type CapNhatMoi } from './capNhatMoi';
@@ -32,6 +33,8 @@ export default function TrangChinh() {
   // giới thiệu công khai không làm mất khối này. Chờ tải xong cấu hình thật, tránh chớp theo giá trị mặc định.
   const dauVaoMo = daTaiCauHinh && cauHinh.khaoSatDauVaoMo;
   const dauRaMo = daTaiCauHinh && cauHinh.khaoSatDauRaMo;
+  // Nhân viên (2026-10-07): chỉ cung cấp thông tin cá nhân, khảo sát chưa triển khai -> thay khối khảo sát bằng thông báo.
+  const laNhanVien = hoSo?.doi_tuong === 'nhan_vien';
   const { data: mucDo } = useMucDoDayDu(dauVaoMo || dauRaMo);
   const { data: khoaHoc } = useKhoaHocToi();
   const capNhat = useCapNhatMoi(khoaHoc);
@@ -77,18 +80,19 @@ export default function TrangChinh() {
               <Text fw={700} size="sm">
                 Việc cần làm
               </Text>
-              {mucDo && dauVaoMo && (
+              {laNhanVien && <ThongBaoNhanVien />}
+              {mucDo && dauVaoMo && !laNhanVien && (
                 <Box id="khao-sat-dau-vao">
                   <KhoiKhaoSatDauVao mucDo={mucDo} cauHinh={cauHinh} />
                 </Box>
               )}
-              {mucDo && dauRaMo && (
+              {mucDo && dauRaMo && !laNhanVien && (
                 <Box id="khao-sat-dau-ra">
                   <KhoiKhaoSatDauRa mucDo={mucDo} />
                 </Box>
               )}
               {/* Khối khảo sát đầu vào đã hiện thì không lặp khối "Đánh giá đầu vào" của đợt 2 (cùng đích M6). */}
-              <KhoiTrangThai data={data} anKhoiDanhGia={!!(mucDo && dauVaoMo)} />
+              <KhoiTrangThai data={data} anKhoiDanhGia={!!(mucDo && dauVaoMo) || laNhanVien} />
             </Stack>
 
             <TheHuongDan />
@@ -117,6 +121,7 @@ export default function TrangChinh() {
                 moTa="Khảo sát kĩ năng số và đánh giá năng lực số trước khóa học"
                 tt={trangThaiKhaoSat({
                   muc: mucDauVao,
+                  laNhanVien,
                   daTai: daTaiCauHinh,
                   mo: dauVaoMo,
                   mucDo,
@@ -131,6 +136,7 @@ export default function TrangChinh() {
                 moTa="Đánh giá năng lực số sau khi hoàn thành khóa bồi dưỡng"
                 tt={trangThaiKhaoSat({
                   muc: mucDauRa,
+                  laNhanVien,
                   daTai: daTaiCauHinh,
                   mo: dauRaMo,
                   mucDo,
@@ -177,6 +183,7 @@ function laQuaM6(cauHinh: CauHinhTrienKhai) {
 
 function trangThaiKhaoSat(p: {
   muc: MucNangLuc | null;
+  laNhanVien: boolean;
   daTai: boolean;
   mo: boolean;
   mucDo: MucDoDayDu | undefined;
@@ -184,6 +191,7 @@ function trangThaiKhaoSat(p: {
   lyDoChuaMo: string;
 }): TrangThaiThe {
   if (p.muc) return { loai: 'xong', toi: '/toi/lop-hoc', ghiChu: `Đã có kết quả: Mức ${nhanMucNangLuc(p.muc)}` };
+  if (p.laNhanVien) return { loai: 'khoa', ghiChu: 'Chưa triển khai cho đối tượng nhân viên (dự kiến năm 2027).' };
   // Chưa tải xong cấu hình / mức độ đầy đủ -> khóa không ghi chú, tránh chớp sai lý do.
   if (!p.daTai) return { loai: 'khoa' };
   if (!p.mo) return { loai: 'khoa', ghiChu: p.lyDoChuaMo };

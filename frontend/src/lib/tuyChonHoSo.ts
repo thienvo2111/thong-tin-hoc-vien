@@ -18,6 +18,7 @@ export const CAP_GIANG_DAY_OPTIONS = [
 export const DOI_TUONG_OPTIONS = [
   { value: 'giao_vien', label: 'Giáo viên' },
   { value: 'can_bo_quan_ly', label: 'Cán bộ quản lý' },
+  { value: 'nhan_vien', label: 'Nhân viên' },
 ];
 
 export const GIOI_TINH_OPTIONS = [

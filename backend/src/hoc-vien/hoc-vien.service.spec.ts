@@ -1,4 +1,7 @@
-import { HocVienService } from './hoc-vien.service';
+import {
+  HocVienService,
+  THONG_BAO_KHAO_SAT_NHAN_VIEN,
+} from './hoc-vien.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from '../auth/scope/scope.service';
 import {
@@ -73,12 +76,16 @@ describe('HocVienService', () => {
     coXacNhanTruocDanhGiaConHieuLuc: jest.Mock;
     dotXacNhanTruocDanhGiaApDung: jest.Mock;
   };
-  let cauHinhKhaoSatService: { layKenhDanhGia: jest.Mock };
+  let cauHinhKhaoSatService: {
+    layKenhDanhGia: jest.Mock;
+    khaoSatDauRaDangMo: jest.Mock;
+  };
 
   beforeEach(() => {
     // 2026-10-02: mặc định kênh 'vle' = hành vi cũ, test SSO tự override.
     cauHinhKhaoSatService = {
       layKenhDanhGia: jest.fn().mockResolvedValue('vle'),
+      khaoSatDauRaDangMo: jest.fn().mockResolvedValue(true),
     };
     prisma = {
       hoc_vien: {
@@ -838,7 +845,8 @@ describe('HocVienService', () => {
       expect(res.thieu).toEqual([
         {
           field: 'doi_tuong',
-          message: 'Chưa chọn đối tượng (giáo viên hoặc cán bộ quản lý)',
+          message:
+            'Chưa chọn đối tượng (giáo viên, cán bộ quản lý hoặc nhân viên)',
         },
       ]);
     });
@@ -869,7 +877,53 @@ describe('HocVienService', () => {
         expect(res).toEqual({
           kenh: 'sso',
           du_dieu_kien: false,
-          ly_do: ['Chưa chọn đối tượng (giáo viên hoặc cán bộ quản lý)'],
+          ly_do: [
+            'Chưa chọn đối tượng (giáo viên, cán bộ quản lý hoặc nhân viên)',
+          ],
+        });
+      });
+
+      it.each(['sso', 'vle'])(
+        '2026-10-07: đối tượng nhân viên (kênh %s) -> chưa triển khai, ly_do là thông báo, không xét đợt 2',
+        async (kenh) => {
+          cauHinhKhaoSatService.layKenhDanhGia.mockResolvedValue(kenh);
+          prisma.hoc_vien.findUnique.mockResolvedValue(
+            baseHocVienDayDu({ doi_tuong: 'nhan_vien' }),
+          );
+          const res = await service.danhGiaDauVaoCuaToi(caller);
+          expect(res).toEqual({
+            kenh,
+            du_dieu_kien: false,
+            chua_trien_khai: true,
+            ly_do: [THONG_BAO_KHAO_SAT_NHAN_VIEN],
+          });
+          expect(
+            dotXacNhanService.coXacNhanTruocDanhGiaConHieuLuc,
+          ).not.toHaveBeenCalled();
+        },
+      );
+
+      it('2026-10-07: nhân viên có hồ sơ đầy đủ (đối tượng hợp lệ)', async () => {
+        const res = await service.danhGiaDayDu(
+          baseHocVienDayDu({ doi_tuong: 'nhan_vien' }) as never,
+        );
+        expect(res).toEqual({ day_du: true, thieu: [] });
+      });
+
+      it('khảo sát đầu ra: nhân viên -> mở nhưng chưa triển khai; giáo viên đủ hồ sơ -> đủ điều kiện', async () => {
+        prisma.hoc_vien.findUnique.mockResolvedValue(
+          baseHocVienDayDu({ doi_tuong: 'nhan_vien' }),
+        );
+        expect(await service.khaoSatDauRaCuaToi(caller)).toEqual({
+          mo: true,
+          du_dieu_kien: false,
+          chua_trien_khai: true,
+          ly_do: [THONG_BAO_KHAO_SAT_NHAN_VIEN],
+        });
+        prisma.hoc_vien.findUnique.mockResolvedValue(baseHocVienDayDu());
+        expect(await service.khaoSatDauRaCuaToi(caller)).toEqual({
+          mo: true,
+          du_dieu_kien: true,
         });
       });
 

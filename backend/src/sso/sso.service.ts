@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
-import { HocVienService } from '../hoc-vien/hoc-vien.service';
+import {
+  HocVienService,
+  THONG_BAO_KHAO_SAT_NHAN_VIEN,
+} from '../hoc-vien/hoc-vien.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
   ForbiddenAppException,
@@ -30,7 +33,7 @@ export interface ThongTinSso {
   hoc_vien_id: string;
   ho_ten: string;
   ma_dinh_danh_moet: string | null;
-  vai_tro: 'giao_vien' | 'can_bo_quan_ly' | null;
+  vai_tro: 'giao_vien' | 'can_bo_quan_ly' | 'nhan_vien' | null;
   ma_don_vi: string | null;
   /** Khóa đã duyệt mới nhất học viên ghi danh (null nếu chưa ghi danh) — để bên khảo sát biết tỉnh/khóa. */
   ma_khoa: string | null;
@@ -119,6 +122,9 @@ export class SsoService {
     if (!dauRa.mo) {
       throw new ForbiddenAppException('Khảo sát đầu ra chưa mở');
     }
+    if ('chua_trien_khai' in dauRa) {
+      throw new ForbiddenAppException(THONG_BAO_KHAO_SAT_NHAN_VIEN);
+    }
     if (!dauRa.du_dieu_kien) {
       throw new ForbiddenAppException(
         'Hồ sơ chưa đầy đủ, chưa thể chuyển sang trang khảo sát',
@@ -129,6 +135,9 @@ export class SsoService {
   // Tái dùng đúng cổng điều kiện M6 — 1 nơi quyết định "đủ điều kiện".
   private async kiemTraDanhGiaDauVao(caller: AuthenticatedUser) {
     const dieuKien = await this.hocVienService.danhGiaDauVaoCuaToi(caller);
+    if ('chua_trien_khai' in dieuKien) {
+      throw new ForbiddenAppException(THONG_BAO_KHAO_SAT_NHAN_VIEN);
+    }
     if (dieuKien.kenh !== 'sso') {
       throw new ForbiddenAppException(
         'Hiện không dùng trang khảo sát cho bài đánh giá đầu vào',

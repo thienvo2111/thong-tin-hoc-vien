@@ -10,6 +10,7 @@ import type { DanhGiaDauVao, DanhGiaDauVaoDuDieuKien } from '@/api/types';
 import { chuanHoaLienKet } from '@/lib/lienKet';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
+import { ThongBaoNhanVien } from '@/components/ThongBaoNhanVien';
 
 // Câu tiếng Việt cố định do backend dựng cho lý do "chưa xác nhận đợt 2"
 // (hoc-vien.service.ts#danhGiaDauVaoCuaToi) — dùng để chọn nút M5 hay M4 bên dưới. ly_do là
@@ -44,6 +45,7 @@ export default function DanhGiaDauVaoPage() {
 
 function NoiDung({ data }: { data: DanhGiaDauVao }) {
   if (data.du_dieu_kien) return data.kenh === 'sso' ? <KhoiSso /> : <KhoiDuDieuKien data={data} />;
+  if (data.chua_trien_khai) return <ThongBaoNhanVien />;
 
   if (data.het_han) {
     const hoTro = `email ${EMAIL_HO_TRO}`;

@@ -1,7 +1,10 @@
 import { createHash } from 'crypto';
 import { SsoService, SSO_MA_HIEU_LUC_MS } from './sso.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { HocVienService } from '../hoc-vien/hoc-vien.service';
+import {
+  HocVienService,
+  THONG_BAO_KHAO_SAT_NHAN_VIEN,
+} from '../hoc-vien/hoc-vien.service';
 import { KetQuaKhaoSatService } from './ket-qua-khao-sat.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
@@ -138,6 +141,34 @@ describe('SsoService', () => {
       await expect(service.capMa(caller)).rejects.toBeInstanceOf(
         ForbiddenAppException,
       );
+      expect(prisma.ma_sso_mot_lan.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('capMa — đối tượng nhân viên (2026-10-07)', () => {
+    it('đầu vào chưa triển khai -> 403 kèm thông báo, không tạo mã', async () => {
+      hocVienService.danhGiaDauVaoCuaToi.mockResolvedValue({
+        kenh: 'sso',
+        du_dieu_kien: false,
+        chua_trien_khai: true,
+        ly_do: [THONG_BAO_KHAO_SAT_NHAN_VIEN],
+      });
+      await expect(service.capMa(caller)).rejects.toMatchObject({
+        response: { error: { message: THONG_BAO_KHAO_SAT_NHAN_VIEN } },
+      });
+      expect(prisma.ma_sso_mot_lan.create).not.toHaveBeenCalled();
+    });
+
+    it('đầu ra chưa triển khai -> 403 kèm thông báo, không tạo mã', async () => {
+      hocVienService.khaoSatDauRaCuaToi.mockResolvedValue({
+        mo: true,
+        du_dieu_kien: false,
+        chua_trien_khai: true,
+        ly_do: [THONG_BAO_KHAO_SAT_NHAN_VIEN],
+      });
+      await expect(service.capMa(caller, 'dau-ra')).rejects.toMatchObject({
+        response: { error: { message: THONG_BAO_KHAO_SAT_NHAN_VIEN } },
+      });
       expect(prisma.ma_sso_mot_lan.create).not.toHaveBeenCalled();
     });
   });

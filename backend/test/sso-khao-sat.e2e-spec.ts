@@ -252,7 +252,7 @@ describe('SSO sang hệ thống khảo sát (e2e)', () => {
       .expect(200);
     expect(dk.body.du_dieu_kien).toBe(false);
     expect(dk.body.ly_do).toContain(
-      'Chưa chọn đối tượng (giáo viên hoặc cán bộ quản lý)',
+      'Chưa chọn đối tượng (giáo viên, cán bộ quản lý hoặc nhân viên)',
     );
     await capMa(token).expect(403);
   });

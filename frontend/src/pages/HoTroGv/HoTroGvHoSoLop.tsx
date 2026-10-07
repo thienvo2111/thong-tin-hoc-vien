@@ -10,7 +10,7 @@ import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangGio, dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 
 const NHAN_VAI_TRO = { giang_vien: 'Giảng viên', ho_tro: 'Hỗ trợ' } as const;
-const NHAN_DOI_TUONG: Record<string, string> = { giao_vien: 'Giáo viên', can_bo_quan_ly: 'CBQL' };
+const NHAN_DOI_TUONG: Record<string, string> = { giao_vien: 'Giáo viên', can_bo_quan_ly: 'CBQL', nhan_vien: 'Nhân viên' };
 const NHAN_MUC: Record<string, string> = { co_ban: 'Cơ bản', thanh_thao: 'Thành thạo', nang_cao: 'Nâng cao' };
 
 /** Hồ sơ chuẩn bị lớp (ADR 0004 G5): L2 bản đọc; L3 (issue #16) sửa buổi có lý do, phân công giảng viên,

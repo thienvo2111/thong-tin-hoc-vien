@@ -1,6 +1,6 @@
 import { Anchor, Badge, Box, Button, Center, Container, Group, Loader, Paper, Stack, Text, Title } from '@mantine/core';
 import { useMutation } from '@tanstack/react-query';
-import { capMaSso, useKhoaHocToi, type SsoTarget } from '@/api/hocVien';
+import { capMaSso, useHoSoToi, useKhoaHocToi, type SsoTarget } from '@/api/hocVien';
 import { useCauHinhTrienKhai } from '@/content/trienKhai';
 import { BaiKhaoSat } from '@/components/BaiKhaoSat';
 import { useTinhTrangKhaoSat, type TinhTrangBaiKhaoSat } from '@/api/ketQuaKhaoSat';
@@ -60,9 +60,12 @@ export default function ThongTinLopHoc() {
   const { data: tinhTrang } = useTinhTrangKhaoSat();
   const { cauHinh, daTai: daTaiCauHinh } = useCauHinhTrienKhai({ loai: 'cua_toi' });
   // Kênh trang khảo sát: giai đoạn "Đánh giá" làm bài qua SSO thay cho link tĩnh (2026-10-05).
+  // Nhân viên (2026-10-07): khảo sát chưa triển khai -> không hiện nút làm bài.
+  const { data: hoSo } = useHoSoToi();
+  const coKhaoSat = daTaiCauHinh && hoSo?.doi_tuong !== 'nhan_vien';
   const baiTheoGiaiDoan = {
-    dauVao: daTaiCauHinh && cauHinh.kenhDanhGia === 'sso' ? (['khao-sat', 'danh-gia'] as SsoTarget[]) : null,
-    dauRa: daTaiCauHinh && cauHinh.khaoSatDauRaMo ? (['dau-ra'] as SsoTarget[]) : null,
+    dauVao: coKhaoSat && cauHinh.kenhDanhGia === 'sso' ? (['khao-sat', 'danh-gia'] as SsoTarget[]) : null,
+    dauRa: coKhaoSat && cauHinh.khaoSatDauRaMo ? (['dau-ra'] as SsoTarget[]) : null,
   };
 
   return (

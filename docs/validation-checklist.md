@@ -266,7 +266,7 @@ Thay rule #27/#28 **CHỈ cho hồ sơ `nguon_tao='import_moet'`** — `tu_dang_
 
 | # | Quy tắc | Mức | Nơi thực thi |
 |---|---|---|---|
-| 100 | `doi_tuong` ∈ {`giao_vien`, `can_bo_quan_ly`}; NULL được phép lưu (hồ sơ cũ/import chưa chọn) | 🔴 | DB (enum) + API (DTO `@IsEnum`) + FE (zod) |
+| 100 | `doi_tuong` ∈ {`giao_vien`, `can_bo_quan_ly`, `nhan_vien`}; NULL được phép lưu (hồ sơ cũ/import chưa chọn) | 🔴 | DB (enum) + API (DTO `@IsEnum`) + FE (zod) |
 | 101 | Hồ sơ **chưa chọn `doi_tuong`** → **không "đầy đủ"** (thêm 1 mục vào `thieu`). Đặt trong `danhGiaDayDu`, KHÔNG trong `validateHocVien` (bộ quy tắc đó còn dùng cho `POST /hoc-vien` tự đăng ký — không chặn luồng tạo hồ sơ) | 🔴 | API (`HocVienService.danhGiaDayDu`) |
 | 102 | Sửa `doi_tuong` ghi `lich_su_thay_doi_ho_so` như các trường hồ sơ khác; học viên `import_moet` chỉ tự sửa được khi có Đợt xác nhận đang mở (T14) — quản trị sửa được mọi lúc | 🔴 | API |
 | 103 | `kenh_danh_gia` ∈ {`sso`, `vle`}, bắt buộc khi PUT cấu hình; đọc cấu hình cũ thiếu trường → `vle` | 🔴 | API (DTO + `layKenhDanhGia`) |

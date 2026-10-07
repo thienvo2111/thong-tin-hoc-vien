@@ -294,6 +294,8 @@ enum nguon_diem_danh {
 enum doi_tuong_hoc_vien {
   giao_vien
   can_bo_quan_ly
+  /// 2026-10-07: chỉ cung cấp thông tin cá nhân, chưa khảo sát/tập huấn trong đợt này.
+  nhan_vien
 }
 
 enum trang_thai_yeu_cau_ho_tro {

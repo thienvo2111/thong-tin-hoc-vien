@@ -62,7 +62,7 @@ export interface HocVienTinhHinhKhaoSat {
   id: string;
   ho_ten: string;
   ma_dinh_danh_moet: string | null;
-  doi_tuong: 'giao_vien' | 'can_bo_quan_ly' | null;
+  doi_tuong: 'giao_vien' | 'can_bo_quan_ly' | 'nhan_vien' | null;
   ten_don_vi: string;
   ket_qua: KetQuaBaiQuanTri[];
 }

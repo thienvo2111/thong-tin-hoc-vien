@@ -23,6 +23,7 @@ import {
   TagsInput,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { ThongBaoNhanVien } from '@/components/ThongBaoNhanVien';
 import {
   guiLaiXacMinhEmail,
   kiemTraTrungCccd,
@@ -601,6 +602,7 @@ export default function HoSo() {
                     </Radio.Group>
                   )}
                 />
+                {watch('doi_tuong') === 'nhan_vien' && <ThongBaoNhanVien />}
               </Stack>
             </Card>
 

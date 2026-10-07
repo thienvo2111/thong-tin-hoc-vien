@@ -188,6 +188,20 @@ describe('M6 — kênh trang khảo sát (SSO, 2026-10-02)', () => {
     expect(screen.queryByRole('button', { name: 'Làm bài' })).not.toBeInTheDocument();
   });
 
+  it('2026-10-07: đối tượng nhân viên -> thông báo chưa triển khai, không có nút làm bài / bổ sung hồ sơ', async () => {
+    db.danhGiaDauVao = {
+      kenh: 'sso',
+      du_dieu_kien: false,
+      chua_trien_khai: true,
+      ly_do: ['Học viên chỉ cần cung cấp thông tin cá nhân cơ bản'],
+    };
+    renderDaDangNhap();
+    expect(await screen.findByText('Khảo sát chưa triển khai cho đối tượng nhân viên')).toBeInTheDocument();
+    expect(screen.queryByText('Chưa đủ điều kiện làm bài đánh giá')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Bổ sung hồ sơ' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Làm bài' })).not.toBeInTheDocument();
+  });
+
   describe('tình trạng từng bài (2026-10-04)', () => {
     it('mặc định: cả 2 bài "Chưa làm" theo thứ tự 1, 2, nút "Làm bài"', async () => {
       db.danhGiaDauVao = { kenh: 'sso', du_dieu_kien: true };

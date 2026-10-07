@@ -283,7 +283,7 @@ Quyết định nghiệp vụ chốt 2026-09-30: giấy khai sinh có thể ghi 
 
 ### Cổng điều kiện làm đánh giá đầu vào & tài khoản VLE (T15, 2026-09-28) — QĐ8, QĐ9
 
-> **2026-10-02 — 2 kênh, chọn ở cấu hình khảo sát (`kenh_danh_gia`, mục 9).** Response `GET /hoc-vien/toi/danh-gia-dau-vao` luôn có thêm `kenh: 'sso' | 'vle'`. Kênh `vle` = toàn bộ quy tắc T15 bên dưới (mặc định, kể cả khi chưa lưu cấu hình). Kênh `sso`: **đủ điều kiện = chỉ cần hồ sơ đầy đủ (T9)** — không cần đợt 2, xác nhận hay tài khoản VLE; trả `{ kenh: 'sso', du_dieu_kien: true }` (KHÔNG kèm link — link cấp lúc bấm qua `POST /sso/cap-ma`, mục 10) hoặc `{ kenh: 'sso', du_dieu_kien: false, ly_do: string[] }`.
+> **2026-10-02 — 2 kênh, chọn ở cấu hình khảo sát (`kenh_danh_gia`, mục 9).** Response `GET /hoc-vien/toi/danh-gia-dau-vao` luôn có thêm `kenh: 'sso' | 'vle'`. Kênh `vle` = toàn bộ quy tắc T15 bên dưới (mặc định, kể cả khi chưa lưu cấu hình). Kênh `sso`: **đủ điều kiện = chỉ cần hồ sơ đầy đủ (T9)** — không cần đợt 2, xác nhận hay tài khoản VLE; trả `{ kenh: 'sso', du_dieu_kien: true }` (KHÔNG kèm link — link cấp lúc bấm qua `POST /sso/cap-ma`, mục 10) hoặc `{ kenh: 'sso', du_dieu_kien: false, ly_do: string[] }`. **2026-10-07 — đối tượng `nhan_vien`:** khảo sát chưa triển khai → endpoint này (mọi kênh) và `GET /hoc-vien/toi/khao-sat-dau-ra` (khi đã mở) trả thêm `chua_trien_khai: true`, `du_dieu_kien: false`, `ly_do` = 1 câu thông báo (năm 2027); `POST /sso/cap-ma` trả 403 với cùng câu đó.
 
 Cách B (QĐ8): Phòng CNTT tạo tài khoản VLE cho **TẤT CẢ** học viên `import_moet` (import `tai_khoan_vle`, xem mục 5) — hệ thống chỉ **ẩn/hiện** thông tin đường dẫn + tài khoản, không chặn việc tạo tài khoản (chặn "mềm").
 
@@ -623,7 +623,7 @@ Response `POST /sso/doi-ma`:
 ```
 
 - `ma_dinh_danh_moet`: mã định danh CSDL ngành — `null` với hồ sơ tự đăng ký không có mã MOET (dùng `hoc_vien_id`).
-- `vai_tro`: `giao_vien` | `can_bo_quan_ly` (học viên tự chọn ở hồ sơ, trường `doi_tuong`). Kênh `sso` chỉ cấp mã cho hồ sơ đầy đủ nên trường này luôn có giá trị.
+- `vai_tro`: `giao_vien` | `can_bo_quan_ly` (học viên tự chọn ở hồ sơ, trường `doi_tuong`; `nhan_vien` không bao giờ được cấp mã — xem dưới). Kênh `sso` chỉ cấp mã cho hồ sơ đầy đủ nên trường này luôn có giá trị.
 - `ma_khoa` (2026-10-02): khóa **đã duyệt** mới nhất học viên đã ghi danh — để bên khảo sát biết người làm bài thuộc tỉnh/khóa nào; `null` nếu chưa ghi danh.
 - `ma_don_vi`: có thể `null` nếu đơn vị chưa có mã. `lop`: rỗng nếu chưa được phân lớp (thường gặp ở giai đoạn đánh giá đầu vào).
 - `ho_ten` (thêm 2026-10-07): họ tên học viên theo hồ sơ — để bên khảo sát hiển thị/đối chiếu người làm bài.

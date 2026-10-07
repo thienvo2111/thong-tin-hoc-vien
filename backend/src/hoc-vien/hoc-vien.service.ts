@@ -51,6 +51,15 @@ import { ChuyenMonDto } from './dto/chuyen-mon.dto';
 
 const BCRYPT_SALT_ROUNDS = 10;
 
+// 2026-10-07: đối tượng "nhân viên" chỉ cung cấp thông tin cá nhân — khảo sát
+// (đầu vào + đầu ra) chưa triển khai, SsoService.capMa cũng chặn theo cờ này.
+export const THONG_BAO_KHAO_SAT_NHAN_VIEN =
+  'Học viên chỉ cần cung cấp thông tin cá nhân cơ bản (chưa thực hiện khảo sát đánh giá năng lực và chưa tập huấn trong đợt này). Kế hoạch tập huấn: Việc khảo sát năng lực và tập huấn chuyên môn sẽ triển khai đồng loạt trên toàn tỉnh trong năm 2027.';
+const KHAO_SAT_CHUA_TRIEN_KHAI = {
+  chua_trien_khai: true as const,
+  ly_do: [THONG_BAO_KHAO_SAT_NHAN_VIEN],
+};
+
 // Cấu trúc "hồ sơ sẽ có sau khi lưu" dùng chung cho validateHocVien — ở POST
 // /hoc-vien đây chính là dto; ở PATCH /hoc-vien/toi đây là bản merge giữa hồ
 // sơ hiện tại + field được sửa (xem capNhatHoSoCuaToi).
@@ -1051,6 +1060,9 @@ export class HocVienService {
   async danhGiaDauVaoCuaToi(caller: AuthenticatedUser) {
     const hocVien = await this.getHocVienCuaToi(caller);
     const kenh = await this.cauHinhKhaoSatService.layKenhDanhGia(hocVien.id);
+    if (hocVien.doi_tuong === 'nhan_vien') {
+      return { kenh, du_dieu_kien: false, ...KHAO_SAT_CHUA_TRIEN_KHAI };
+    }
     if (kenh === 'sso') {
       const { day_du, thieu } = await this.danhGiaDayDu(hocVien);
       return day_du
@@ -1066,6 +1078,13 @@ export class HocVienService {
     const hocVien = await this.getHocVienCuaToi(caller);
     if (!(await this.cauHinhKhaoSatService.khaoSatDauRaDangMo(hocVien.id))) {
       return { mo: false as const };
+    }
+    if (hocVien.doi_tuong === 'nhan_vien') {
+      return {
+        mo: true as const,
+        du_dieu_kien: false,
+        ...KHAO_SAT_CHUA_TRIEN_KHAI,
+      };
     }
     const { day_du, thieu } = await this.danhGiaDayDu(hocVien);
     return day_du
@@ -1172,7 +1191,8 @@ export class HocVienService {
     if (!hocVien.doi_tuong) {
       loi.push({
         field: 'doi_tuong',
-        message: 'Chưa chọn đối tượng (giáo viên hoặc cán bộ quản lý)',
+        message:
+          'Chưa chọn đối tượng (giáo viên, cán bộ quản lý hoặc nhân viên)',
       });
     }
     return { day_du: loi.length === 0, thieu: loi };

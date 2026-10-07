@@ -318,6 +318,26 @@ describe('M3 — khảo sát đầu vào / đầu ra', () => {
     expect(await screen.findByText('Khảo sát đầu vào đã mở')).toBeInTheDocument();
     expect(await screen.findByText('Khảo sát đầu ra đã mở')).toBeInTheDocument();
   });
+
+  it('2026-10-07: đối tượng nhân viên, mở cả hai -> chỉ hiện thông báo chưa triển khai, không có khối/nút khảo sát', async () => {
+    datCauHinhKhaoSatMock(cauHinh({ danh_gia_dau_vao_trong_cong: true, khao_sat_dau_ra_mo: true }));
+    datDayDu();
+    db.hoSo.doi_tuong = 'nhan_vien';
+    db.khoaHocToi[0].muc_dau_vao = null;
+    db.khoaHocToi[0].muc_dau_ra = null;
+    renderDaDangNhap();
+    expect(await screen.findByText('Khảo sát chưa triển khai cho đối tượng nhân viên')).toBeInTheDocument();
+    expect(screen.getByText(/triển khai đồng loạt trên toàn tỉnh trong năm 2027/)).toBeInTheDocument();
+    expect(screen.queryByText('Khảo sát đầu vào đã mở')).not.toBeInTheDocument();
+    expect(screen.queryByText('Khảo sát đầu ra đã mở')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Làm khảo sát đầu vào' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Làm khảo sát đầu ra' })).not.toBeInTheDocument();
+    for (const ten of ['Khảo sát đầu vào', 'Đánh giá đầu ra']) {
+      const the = screen.getByText(ten).closest('.mantine-Card-root') as HTMLElement;
+      expect(within(the).getByText(/Chưa triển khai cho đối tượng nhân viên/)).toBeInTheDocument();
+      expect(the).toHaveAttribute('aria-disabled', 'true');
+    }
+  });
 });
 
 describe('M3 — cấu hình theo khóa học viên đã ghi danh (2026-10-02)', () => {

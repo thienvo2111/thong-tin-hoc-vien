@@ -435,6 +435,7 @@ const CAP_HOC_LABEL: Record<cap_hoc, string> = {
 const DOI_TUONG_LABEL: Record<doi_tuong_hoc_vien, string> = {
   giao_vien: 'Giáo viên',
   can_bo_quan_ly: 'Cán bộ quản lý',
+  nhan_vien: 'Nhân viên',
 };
 
 const GIOI_TINH_LABEL: Record<string, string> = {

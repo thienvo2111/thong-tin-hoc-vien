@@ -356,6 +356,19 @@ describe('M4 — Hồ sơ: xem & sửa', () => {
       expect(thanPatch).toEqual({ doi_tuong: 'can_bo_quan_ly' });
     });
 
+    it('2026-10-07: chọn "Nhân viên" -> hiện thông báo chưa khảo sát/tập huấn; chọn lại "Giáo viên" -> ẩn', async () => {
+      db.hoSo.doi_tuong = null;
+      const user = userEvent.setup();
+      renderDaDangNhap();
+
+      await user.click(await screen.findByRole('radio', { name: 'Nhân viên' }));
+      expect(screen.getByText('Khảo sát chưa triển khai cho đối tượng nhân viên')).toBeInTheDocument();
+      expect(screen.getByText(/chưa thực hiện khảo sát đánh giá năng lực và chưa tập huấn/)).toBeInTheDocument();
+
+      await user.click(screen.getByRole('radio', { name: 'Giáo viên' }));
+      expect(screen.queryByText('Khảo sát chưa triển khai cho đối tượng nhân viên')).not.toBeInTheDocument();
+    });
+
     it('hồ sơ đã có đối tượng -> radio tương ứng được chọn sẵn', async () => {
       db.hoSo.doi_tuong = 'giao_vien';
       renderDaDangNhap();
