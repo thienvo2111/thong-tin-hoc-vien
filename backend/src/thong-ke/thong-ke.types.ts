@@ -18,3 +18,16 @@ export interface BoLocResult {
   /** Đơn vị cố định của vai trò truong. */
   don_vi_co_dinh: { id: string; ten_don_vi: string } | null;
 }
+
+export interface PheuCounts {
+  tham_gia: number;
+  da_truy_cap: number;
+  khao_sat_ky_nang_so: number;
+  danh_gia_dau_vao: number;
+  danh_gia_dau_ra: number;
+}
+
+export interface PheuResult extends PheuCounts {
+  /** null nếu vai trò không duyệt hồ sơ (ho_tro_hoc_vien). */
+  ho_so_cho_duyet: number | null;
+}
