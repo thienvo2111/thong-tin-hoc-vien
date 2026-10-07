@@ -48,6 +48,33 @@ describe('DashboardThongKe', () => {
     expect(screen.getByRole('region', { name: 'Cần đôn đốc' })).toBeInTheDocument();
   });
 
+  it('tài khoản trường (don_vi_co_dinh) → không có khối Tiến độ theo trường, không gọi API', async () => {
+    let daGoi = false;
+    server.use(
+      http.get('/thong-ke/bo-loc', () =>
+        HttpResponse.json({
+          khoa: [],
+          don_vi: null,
+          cum: null,
+          don_vi_co_dinh: { id: 'dv-2', ten_don_vi: 'Trường THPT Long Xuyên' },
+        }),
+      ),
+      http.get('/thong-ke/tien-do-truong', () => {
+        daGoi = true;
+        return HttpResponse.json([]);
+      }),
+    );
+    renderDashboard();
+    expect(await screen.findByRole('region', { name: 'Cần đôn đốc' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Tiến độ theo trường' })).not.toBeInTheDocument();
+    expect(daGoi).toBe(false);
+  });
+
+  it('admin → có khối Tiến độ theo trường', async () => {
+    renderDashboard();
+    expect(await screen.findByRole('region', { name: 'Tiến độ theo trường' })).toBeInTheDocument();
+  });
+
   it('che_do ho_tro → không render và không gọi API xếp hạng', async () => {
     let daGoi = false;
     server.use(

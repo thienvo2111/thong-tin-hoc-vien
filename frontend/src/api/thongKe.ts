@@ -10,6 +10,7 @@ import type {
   KhaoSatResult,
   PheuResult,
   SoSanhKhoaCot,
+  TienDoTruongDong,
   XepHangResult,
 } from './types';
 
@@ -56,4 +57,12 @@ export const useCanDonDoc = (loc: LocThongKe & { loai: LoaiCanDonDoc; page: numb
 export async function xuatCanDonDoc(loc: LocThongKe & { loai: LoaiCanDonDoc }): Promise<void> {
   const blob = await apiFetchBlob(`/thong-ke/can-don-doc/xuat-excel${xayQuery(loc)}`);
   taiFileTuBlob(blob, `can-don-doc-${loc.loai}.xlsx`);
+}
+
+export const useTienDoTruong = (loc: LocThongKe, enabled = true) =>
+  useKhoi<TienDoTruongDong[]>('tien-do-truong', 'tien-do-truong', loc, enabled);
+
+export async function xuatTienDoTruong(loc: LocThongKe): Promise<void> {
+  const blob = await apiFetchBlob(`/thong-ke/tien-do-truong/xuat-excel${xayQuery(loc)}`);
+  taiFileTuBlob(blob, 'tien-do-theo-truong.xlsx');
 }
