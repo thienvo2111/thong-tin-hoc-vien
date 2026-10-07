@@ -26,13 +26,21 @@ if (!window.matchMedia) {
 }
 // Stub báo kích thước cố định để recharts ResponsiveContainer không cảnh báo width(0)/height(0) trong jsdom.
 window.ResizeObserver = class {
+  private dangQuanSat = new Set<Element>();
   constructor(private cb: ResizeObserverCallback) {}
   observe(target: Element) {
+    this.dangQuanSat.add(target);
     const contentRect = { width: 800, height: 400, top: 0, left: 0, right: 800, bottom: 400, x: 0, y: 0 } as DOMRectReadOnly;
-    queueMicrotask(() => this.cb([{ target, contentRect } as ResizeObserverEntry], this as unknown as ResizeObserver));
+    queueMicrotask(() => {
+      if (this.dangQuanSat.has(target)) this.cb([{ target, contentRect } as ResizeObserverEntry], this as unknown as ResizeObserver);
+    });
   }
-  unobserve() {}
-  disconnect() {}
+  unobserve(target: Element) {
+    this.dangQuanSat.delete(target);
+  }
+  disconnect() {
+    this.dangQuanSat.clear();
+  }
 };
 Element.prototype.scrollIntoView = vi.fn();
 // jsdom không cài URL.createObjectURL/revokeObjectURL — cần cho các nút "Xuất Excel"/"Tải file lỗi"
