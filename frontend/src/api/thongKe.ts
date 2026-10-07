@@ -7,6 +7,7 @@ import type {
   ChuyenCanResult,
   ChuyenMucResult,
   KetQuaHocCot,
+  KetQuaHocTruongDong,
   KhaoSatResult,
   PheuResult,
   SoSanhKhoaCot,
@@ -45,7 +46,10 @@ export const useBoLocThongKe = () => useKhoi<BoLocResult>('bo-loc', 'bo-loc', {}
 export const usePheu = (loc: LocThongKe) => useKhoi<PheuResult>('pheu', 'pheu', loc);
 export const useKhaoSat = (loc: LocThongKe) => useKhoi<KhaoSatResult>('khao-sat', 'khao-sat', loc);
 export const useChuyenMuc = (loc: LocThongKe) => useKhoi<ChuyenMucResult>('chuyen-muc', 'chuyen-muc', loc);
-export const useKetQuaHoc = (loc: LocThongKe) => useKhoi<KetQuaHocCot[]>('ket-qua', 'ket-qua', loc);
+export const useKetQuaHoc = (loc: LocThongKe, enabled = true) =>
+  useKhoi<KetQuaHocCot[]>('ket-qua', 'ket-qua', loc, enabled);
+export const useKetQuaHocTheoTruong = (loc: LocThongKe, enabled = true) =>
+  useKhoi<KetQuaHocTruongDong[]>('ket-qua-theo-truong', 'ket-qua-theo-truong', loc, enabled);
 export const useSoSanhKhoa = (loc: LocThongKe, enabled = true) =>
   useKhoi<SoSanhKhoaCot[]>('so-sanh-khoa', 'so-sanh-khoa', loc, enabled);
 export const useChuyenCan = (loc: LocThongKe) => useKhoi<ChuyenCanResult>('chuyen-can', 'chuyen-can', loc);

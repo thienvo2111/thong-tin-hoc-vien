@@ -335,6 +335,44 @@ describe('Thống kê dashboard (e2e)', () => {
     });
   });
 
+  describe('kết quả học theo trường', () => {
+    type Dong = {
+      don_vi_id: string;
+      dat: number;
+      khong_dat: number;
+      vang: number;
+      dang_hoc: number;
+    };
+    const tong = (r: Dong) => r.dat + r.khong_dat + r.vang + r.dang_hoc;
+
+    it('quan_tri khoa A + Sở: mỗi trường đúng số đăng ký', async () => {
+      const res = await get(
+        `/thong-ke/ket-qua-theo-truong?khoa_id=${khoaA}&don_vi_id=${dv.so}`,
+        tok.quanTri,
+      );
+      expect(res.status).toBe(200);
+      const body = res.body as Dong[];
+      expect(tong(body.find((r) => r.don_vi_id === dv.t1) as Dong)).toBe(6);
+      expect(tong(body.find((r) => r.don_vi_id === dv.t2) as Dong)).toBe(5);
+      expect(tong(body.find((r) => r.don_vi_id === dv.t3) as Dong)).toBe(3);
+    });
+
+    it('thiếu khoa_id -> 400', async () => {
+      const res = await get('/thong-ke/ket-qua-theo-truong', tok.quanTri);
+      expect(res.status).toBe(400);
+    });
+
+    it('truong T1 khoa A: chỉ 1 dòng của T1', async () => {
+      const res = await get(
+        `/thong-ke/ket-qua-theo-truong?khoa_id=${khoaA}`,
+        tok.truong1,
+      );
+      expect(res.status).toBe(200);
+      const body = res.body as Dong[];
+      expect(body.map((r) => r.don_vi_id)).toEqual([dv.t1]);
+    });
+  });
+
   describe('xếp hạng', () => {
     it('truong T1: kiểu vi_tri, tong_so = 2 (T3 < 5 HV bị loại), không lộ đơn vị khác', async () => {
       const res = await get('/thong-ke/xep-hang?chi_so=truy_cap', tok.truong1);

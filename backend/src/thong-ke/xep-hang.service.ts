@@ -69,7 +69,7 @@ export class XepHangService {
 
     const nhom =
       user.vai_tro === 'quan_tri' && !q.don_vi_id
-        ? new Set(nut.filter(laNhomGoc).map((n) => n.id))
+        ? nhomCuaQuanTri(nut, q)
         : truongTrongCay(nut, q.don_vi_id ?? user.don_vi_id);
     const dong = await this.tinh(phamVi.where, nhom, byId, q.chi_so);
     return bang(dong);
@@ -184,6 +184,17 @@ export class XepHangService {
 const laNhomGoc = (n: DonViNut): boolean =>
   n.don_vi_cha_id === null &&
   (n.loai_don_vi === 'so_gddt' || n.loai_don_vi === 'phong_vhxh');
+
+// Quản trị: xuống cấp trường khi đã chọn khóa hoặc chỉ có ≤ 1 nhóm gốc; ngược lại xếp theo nhóm gốc.
+function nhomCuaQuanTri(nut: DonViNut[], q: XepHangQueryDto): Set<string> {
+  const goc = nut.filter(laNhomGoc);
+  if (q.khoa_id || goc.length <= 1) {
+    return new Set(
+      nut.filter((n) => n.loai_don_vi === 'truong').map((n) => n.id),
+    );
+  }
+  return new Set(goc.map((n) => n.id));
+}
 
 const bangRong = (): XepHangResult => ({
   kieu: 'bang',

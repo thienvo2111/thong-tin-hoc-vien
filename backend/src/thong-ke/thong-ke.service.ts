@@ -11,6 +11,7 @@ import {
   ChuyenCanResult,
   ChuyenMucResult,
   KetQuaHocCot,
+  KetQuaHocTruongDong,
   KhaoSatResult,
   KhoangVle,
   MucDem,
@@ -223,6 +224,50 @@ export class ThongKeService {
       cot.set(n.khoa_id, c);
     }
     return [...cot.values()].sort(soTenKhoa);
+  }
+
+  async ketQuaHocTheoTruong(
+    user: AuthenticatedUser,
+    q: ThongKeQueryDto,
+  ): Promise<KetQuaHocTruongDong[]> {
+    if (!q.khoa_id) {
+      throw new ValidationException(
+        'Cần chọn một khóa để xem kết quả theo trường',
+      );
+    }
+    const { where, rong } = await this.scope.resolve(user, q);
+    if (rong) return [];
+
+    const rows = await this.prisma.dang_ky_hoc.findMany({
+      where,
+      select: {
+        ket_qua: true,
+        hoc_vien: {
+          select: {
+            don_vi_cong_tac_id: true,
+            don_vi_cong_tac: { select: { ten_don_vi: true } },
+          },
+        },
+      },
+    });
+    const dong = new Map<string, KetQuaHocTruongDong>();
+    for (const r of rows) {
+      const id = r.hoc_vien.don_vi_cong_tac_id;
+      if (!id) continue;
+      const d = dong.get(id) ?? {
+        don_vi_id: id,
+        ten_don_vi: r.hoc_vien.don_vi_cong_tac?.ten_don_vi ?? '',
+        dat: 0,
+        khong_dat: 0,
+        vang: 0,
+        dang_hoc: 0,
+      };
+      d[r.ket_qua ?? 'dang_hoc'] += 1;
+      dong.set(id, d);
+    }
+    return [...dong.values()].sort((a, b) =>
+      a.ten_don_vi.localeCompare(b.ten_don_vi, 'vi'),
+    );
   }
 
   async soSanhKhoa(

@@ -5,6 +5,7 @@ import type {
   ChuyenCanResult,
   ChuyenMucResult,
   KetQuaHocCot,
+  KetQuaHocTruongDong,
   KhaoSatResult,
   PheuResult,
   SoSanhKhoaCot,
@@ -82,6 +83,15 @@ export const chuyenMucMau: ChuyenMucResult = {
 export const ketQuaHocMau: KetQuaHocCot[] = [
   { khoa_id: 'khoa-1', ten_khoa: 'Khóa 1', dat: 60, khong_dat: 10, vang: 5, dang_hoc: 25 },
   { khoa_id: 'khoa-2', ten_khoa: 'Khóa 2', dat: 40, khong_dat: 5, vang: 5, dang_hoc: 50 },
+];
+
+export const ketQuaHocTruongMau: KetQuaHocTruongDong[] = [
+  { don_vi_id: 'dv-1', ten_don_vi: 'Trường Tiểu học Cẩm Hà', dat: 12, khong_dat: 3, vang: 2, dang_hoc: 33 },
+  { don_vi_id: 'dv-2', ten_don_vi: 'Trường THCS Minh Khai', dat: 30, khong_dat: 5, vang: 0, dang_hoc: 5 },
+  { don_vi_id: 'dv-3', ten_don_vi: 'Trường THPT An Phú', dat: 10, khong_dat: 10, vang: 5, dang_hoc: 25 },
+  { don_vi_id: 'dv-4', ten_don_vi: 'Trường Mầm non Hoa Mai', dat: 20, khong_dat: 0, vang: 0, dang_hoc: 0 },
+  { don_vi_id: 'dv-5', ten_don_vi: 'Trường Tiểu học Lê Lợi', dat: 18, khong_dat: 2, vang: 0, dang_hoc: 10 },
+  { don_vi_id: 'dv-6', ten_don_vi: 'Trường THCS Trống', dat: 0, khong_dat: 0, vang: 0, dang_hoc: 0 },
 ];
 
 export const soSanhKhoaMau: SoSanhKhoaCot[] = [
@@ -178,6 +188,7 @@ export const thongKeHandlers = [
   http.get('/thong-ke/pheu', () => HttpResponse.json(pheuMau)),
   http.get('/thong-ke/khao-sat', () => HttpResponse.json(khaoSatMau)),
   http.get('/thong-ke/chuyen-muc', () => HttpResponse.json(chuyenMucMau)),
+  http.get('/thong-ke/ket-qua-theo-truong', () => HttpResponse.json(ketQuaHocTruongMau)),
   http.get('/thong-ke/ket-qua', () => HttpResponse.json(ketQuaHocMau)),
   http.get('/thong-ke/so-sanh-khoa', () => HttpResponse.json(soSanhKhoaMau)),
   http.get('/thong-ke/chuyen-can', () => HttpResponse.json(chuyenCanMau)),
