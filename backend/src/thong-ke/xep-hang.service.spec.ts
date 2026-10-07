@@ -253,8 +253,18 @@ describe('XepHangService', () => {
     ];
     const hai = [...mot, dv('so2', null, 'so_gddt', 'Sở B')];
 
-    it('1 Sở gốc, không khoa_id -> các dòng là trường', async () => {
+    it('1 Sở gốc có học viên, không khoa_id -> các dòng là trường', async () => {
       setup(mot, hv);
+      const r = await service.xepHang(caller('quan_tri'), { chi_so: 'dat' });
+      if (r.kieu !== 'bang') throw new Error('kieu');
+      expect(r.top.map((d) => d.don_vi_id).sort()).toEqual(['t1', 't2', 't3']);
+    });
+
+    it('3 Sở gốc nhưng chỉ 1 Sở đủ 5 HV, không khoa_id -> các dòng là trường', async () => {
+      setup(
+        [...hai, dv('so3', null, 'so_gddt', 'Sở C')],
+        [...hv, ...hocVien('so2', 4), ...hocVien('so3', 2)],
+      );
       const r = await service.xepHang(caller('quan_tri'), { chi_so: 'dat' });
       if (r.kieu !== 'bang') throw new Error('kieu');
       expect(r.top.map((d) => d.don_vi_id).sort()).toEqual(['t1', 't2', 't3']);
