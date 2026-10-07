@@ -10,7 +10,7 @@ export function thongDiepLoiChung(err: unknown): string {
         ? `Tài khoản tạm khóa do nhập sai nhiều lần. Thử lại sau ${dinhDangNgayGio(err.khoaDenLuc)}`
         : 'Tài khoản tạm khóa do nhập sai nhiều lần. Vui lòng thử lại sau.';
     case 'TOO_MANY_REQUESTS':
-      return 'Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút';
+      return 'Bạn đã thử quá nhiều lần. Vui lòng chờ 1 phút rồi thử lại.';
     case 'CONFLICT':
       return 'Số CCCD này đã được dùng cho một hồ sơ khác. Liên hệ hỗ trợ.';
     case 'DOT_XAC_NHAN_DONG':

@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import type { ThrottlerRequest } from '@nestjs/throttler';
+
+// Bucket theo tài khoản hẹp hơn bucket theo IP nên cho gấp đôi giới hạn gốc
+// của ThrottlerModule (10 -> 20 lượt/phút). Nhân hệ số thay vì hard-code số
+// để override limit trong test (raiseThrottlerLimit) vẫn có tác dụng.
+export const HE_SO_GIOI_HAN_TAI_KHOAN = 2;
 
 // Rate limit cho POST /auth/dang-nhap và /auth/quen-mat-khau: đếm theo cặp
 // IP + ten_dang_nhap thay vì chỉ IP. Cả trường (NAT chung) hay mọi người dùng
@@ -14,5 +20,14 @@ export class TaiKhoanThrottlerGuard extends ThrottlerGuard {
       .trim()
       .toLowerCase();
     return `${req.ip}|${ten}`;
+  }
+
+  protected async handleRequest(
+    requestProps: ThrottlerRequest,
+  ): Promise<boolean> {
+    return super.handleRequest({
+      ...requestProps,
+      limit: requestProps.limit * HE_SO_GIOI_HAN_TAI_KHOAN,
+    });
   }
 }

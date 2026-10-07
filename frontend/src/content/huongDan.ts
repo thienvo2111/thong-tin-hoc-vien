@@ -576,9 +576,13 @@ export const huongDan: NoiDungHuongDan = {
     {
       nhom: 'dang-nhap',
       nhanNhom: 'Đăng nhập',
-      tinhHuong: '"Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút"',
-      nguyenNhan: 'Bấm nút đăng nhập quá nhiều lần trong một phút.',
-      cachXuLy: ['Chờ khoảng 1 phút rồi thử lại.', 'Mỗi lần chỉ bấm nút một lần và chờ kết quả.'],
+      tinhHuong: '"Bạn đã thử quá nhiều lần. Vui lòng chờ 1 phút rồi thử lại."',
+      nguyenNhan: 'Đăng nhập sai nhiều lần liên tiếp trong một phút, thường do mật khẩu không đúng.',
+      cachXuLy: [
+        'Chờ 1 phút rồi thử lại.',
+        'Nếu đã từng đổi mật khẩu: ngày sinh không còn dùng được, hãy dùng mật khẩu mới.',
+        'Không nhớ mật khẩu: làm theo Phần 10.',
+      ],
     },
     {
       nhom: 'dang-nhap',

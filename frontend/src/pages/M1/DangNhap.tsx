@@ -90,6 +90,11 @@ export default function DangNhap() {
       ? thongDiepLoiChung(mutation.error)
       : 'Mã định danh hoặc mật khẩu không đúng'
     : null;
+  // Học viên đã đổi mật khẩu thường gõ lại ngày sinh rồi bấm liên tục tới 429
+  // (2026-10-07) — nhắc nguyên nhân thật cho sai mật khẩu và 429, không cho 423
+  // (thông báo khóa đã có giờ mở khóa riêng).
+  const hienGoiYMatKhau =
+    mutation.isError && !(mutation.error instanceof ApiError && mutation.error.code === 'ACCOUNT_LOCKED');
 
   return (
     <Box style={{ display: 'flex', minHeight: '100vh' }} bg="white">
@@ -118,7 +123,17 @@ export default function DangNhap() {
               Lần đầu sử dụng? Xem hướng dẫn từng bước có hình minh họa
             </Anchor>
 
-            {loiChung && <StatusBanner loai="error">{loiChung}</StatusBanner>}
+            {loiChung && (
+              <StatusBanner loai="error">
+                <Text size="sm">{loiChung}</Text>
+                {hienGoiYMatKhau && (
+                  <Text size="sm" mt={4}>
+                    Nếu Thầy/Cô đã từng đổi mật khẩu, ngày sinh không còn dùng được. Bấm "Quên mật khẩu?" hoặc liên hệ
+                    nhóm Zalo hỗ trợ của trường.
+                  </Text>
+                )}
+              </StatusBanner>
+            )}
 
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
               <Stack gap="md">

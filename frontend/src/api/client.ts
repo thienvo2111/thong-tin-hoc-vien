@@ -53,7 +53,7 @@ export async function apiFetch<T>(path: string, tuyChon: TuyChon = {}): Promise<
       baoPhienHetHan();
     }
     if (res.status === 429) {
-      throw new ApiError(429, { code: 'TOO_MANY_REQUESTS', message: 'Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút' });
+      throw new ApiError(429, { code: 'TOO_MANY_REQUESTS', message: 'Bạn đã thử quá nhiều lần. Vui lòng chờ 1 phút rồi thử lại.' });
     }
     const errBody: ApiErrorBody = data?.error ?? { code: 'INTERNAL', message: 'Đã có lỗi xảy ra, thử lại sau.' };
     throw new ApiError(res.status, errBody);

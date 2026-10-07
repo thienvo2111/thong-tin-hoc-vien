@@ -65,6 +65,30 @@ describe('M1 — Đăng nhập', () => {
 
     expect(await screen.findByText(/Tài khoản tạm khóa do nhập sai nhiều lần/)).toBeInTheDocument();
     expect(screen.getByText(/15:15/)).toBeInTheDocument();
+    expect(screen.queryByText(/ngày sinh không còn dùng được/)).not.toBeInTheDocument();
+  });
+
+  async function dangNhapSai() {
+    const user = userEvent.setup();
+    renderVoiRouter(routes, { initialEntries: ['/dang-nhap'] });
+    await user.type(screen.getByLabelText('Tên tài khoản hoặc mã định danh MOET'), 'sai-ma');
+    await user.type(screen.getByLabelText('Mật khẩu'), 'sai');
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+  }
+
+  it('sai mật khẩu → nhắc đã đổi mật khẩu thì ngày sinh không còn dùng được', async () => {
+    await dangNhapSai();
+
+    expect(await screen.findByText('Mã định danh hoặc mật khẩu không đúng')).toBeInTheDocument();
+    expect(screen.getByText(/ngày sinh không còn dùng được/)).toBeInTheDocument();
+  });
+
+  it('429 → báo chờ 1 phút (không còn "vài phút") kèm lời nhắc mật khẩu', async () => {
+    server.use(http.post('/auth/dang-nhap', () => loi(429, 'RATE_LIMITED', 'Too Many Requests')));
+    await dangNhapSai();
+
+    expect(await screen.findByText('Bạn đã thử quá nhiều lần. Vui lòng chờ 1 phút rồi thử lại.')).toBeInTheDocument();
+    expect(screen.getByText(/ngày sinh không còn dùng được/)).toBeInTheDocument();
   });
 
   it('trạng thái tải: nút hiện loading khi đang gửi request', async () => {

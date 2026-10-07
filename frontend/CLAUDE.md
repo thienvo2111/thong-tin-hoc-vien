@@ -50,7 +50,7 @@ frontend/
   - `UNAUTHORIZED` → xóa token, về màn đăng nhập, giữ lại thông báo "Phiên đăng nhập đã hết hạn".
   - `FORBIDDEN` với code `DOT_XAC_NHAN_DONG` → thông báo "Đã hết thời gian chỉnh sửa", chuyển form sang chế độ chỉ xem.
   - `ACCOUNT_LOCKED` (423) → hiện thời điểm mở khóa theo giờ Việt Nam.
-  - 429 → "Bạn thao tác quá nhanh, vui lòng thử lại sau ít phút".
+  - 429 → "Bạn đã thử quá nhiều lần. Vui lòng chờ 1 phút rồi thử lại.".
   - `CONFLICT` ở CCCD → "Số CCCD này đã được dùng cho một hồ sơ khác. Liên hệ hỗ trợ." (không tiết lộ hồ sơ kia).
 - Thời gian từ API là UTC ISO 8601 → luôn hiển thị theo `Asia/Ho_Chi_Minh`, định dạng `dd/mm/yyyy HH:mm`.
 
