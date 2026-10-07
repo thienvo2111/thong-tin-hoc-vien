@@ -7,6 +7,7 @@ import '@mantine/charts/styles.css';
 import { theme, tokenKhac } from './theme';
 import { AuthProvider } from './auth/AuthContext';
 import { router } from './router';
+import { dangKyTuTaiLaiKhiLoiChunk } from './lib/tuTaiLaiKhiLoiChunk';
 
 // Áp nền trang + màu chữ phụ toàn cục theo design/redesign-spec.md § 1 (không có biến theme riêng cho 2 giá trị này).
 const cssVariablesResolver: CSSVariablesResolver = () => ({
@@ -17,6 +18,8 @@ const cssVariablesResolver: CSSVariablesResolver = () => ({
   },
   dark: {},
 });
+
+dangKyTuTaiLaiKhiLoiChunk();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -65,6 +65,13 @@ server {
         try_files \$uri \$uri/ /index.html;
     }
 
+    # index.html luon phai kiem tra lai (no-cache) de nhan ban deploy moi; asset hash thi cache lau.
+    # add_header o day khong ke thua cua server -> lap lai HSTS.
+    location = /index.html {
+        add_header Cache-Control "no-cache" always;
+        add_header Strict-Transport-Security "max-age=${HSTS_MAX_AGE}" always;
+    }
+
     location ~* \.(js|css|svg|png|jpg|jpeg|gif|ico|woff2?)$ {
         expires 30d;
         add_header Cache-Control "public, immutable";
