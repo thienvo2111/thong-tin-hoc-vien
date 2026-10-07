@@ -5,6 +5,7 @@ import { ScopeService, DonViScope } from '../auth/scope/scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { HocVienService } from '../hoc-vien/hoc-vien.service';
 import { ThangMucService, MucThang } from '../sso/thang-muc.service';
+import { ThongKeScopeService } from '../thong-ke/thong-ke-scope.service';
 import {
   ForbiddenAppException,
   NotFoundAppException,
@@ -69,6 +70,7 @@ export class BaoCaoService {
     private readonly scopeService: ScopeService,
     private readonly hocVienService: HocVienService,
     private readonly thangMuc: ThangMucService,
+    private readonly thongKeScope: ThongKeScopeService,
   ) {}
 
   async tongHop(
@@ -326,8 +328,7 @@ export class BaoCaoService {
         select: { don_vi_dat_hang_id: true },
       });
       apDungR1 =
-        !!khoa &&
-        (scope === 'ALL' || scope.includes(khoa.don_vi_dat_hang_id));
+        !!khoa && (scope === 'ALL' || scope.includes(khoa.don_vi_dat_hang_id));
     }
 
     const where: Prisma.hoc_vienWhereInput = { nguon_tao: 'import_moet' };
@@ -660,7 +661,8 @@ export class BaoCaoService {
 
   // -------------------------------------------------------------------
   // Dashboard "Tổng quan hệ thống" (thêm 2026-09-30) — GET /bao-cao/tong-quan.
-  // Phạm vi TÁI DÙNG scope hồ sơ (getAccessibleDonViIds), giống tongHop().
+  // Phạm vi lấy từ ThongKeScopeService (R1/R2 theo khóa, đơn vị lọc gồm cả
+  // cây con) — cùng nguồn với dashboard /thong-ke.
   // tu_ngay/den_ngay lọc theo dang_ky_hoc.ngay_dang_ky (ngày ghi danh — cùng
   // đơn vị đo với tong_hoc_vien_tham_gia, khác với hocVienWhere() ở trên vốn
   // lọc theo hoc_vien.created_at cho báo cáo tổng hợp).
@@ -674,23 +676,13 @@ export class BaoCaoService {
     query: TongQuanQueryDto,
     user: AuthenticatedUser,
   ): Promise<TongQuanResult> {
-    const scope = await this.scopeService.getAccessibleDonViIds(user);
-    if (query.don_vi_cong_tac_id) {
-      const coQuyen = await this.scopeService.canAccessDonVi(
-        user,
-        query.don_vi_cong_tac_id,
-      );
-      if (!coQuyen) {
-        throw new ForbiddenAppException(
-          'Đơn vị công tác nằm ngoài phạm vi quyền',
-        );
-      }
-    }
-    if (scope !== 'ALL' && scope.length === 0) {
-      return this.emptyTongQuan();
-    }
+    const phamVi = await this.thongKeScope.resolve(user, {
+      khoa_id: query.khoa_id,
+      don_vi_id: query.don_vi_cong_tac_id,
+    });
+    if (phamVi.rong) return this.emptyTongQuan();
 
-    const where = this.tongQuanDangKyHocWhere(scope, query);
+    const where = this.tongQuanDangKyHocWhere(phamVi.where, query);
     const [dangKyRows, thang] = await Promise.all([
       this.prisma.dang_ky_hoc.findMany({
         where,
@@ -742,23 +734,17 @@ export class BaoCaoService {
   }
 
   private tongQuanDangKyHocWhere(
-    scope: DonViScope,
+    phamVi: Prisma.dang_ky_hocWhereInput,
     query: TongQuanQueryDto,
   ): Prisma.dang_ky_hocWhereInput {
-    const where: Prisma.dang_ky_hocWhereInput = {};
-    const hocVienWhere: Prisma.hoc_vienWhereInput = {};
-    if (scope !== 'ALL') hocVienWhere.don_vi_cong_tac_id = { in: scope };
-    if (query.don_vi_cong_tac_id) {
-      hocVienWhere.don_vi_cong_tac_id = query.don_vi_cong_tac_id;
-    }
-    if (Object.keys(hocVienWhere).length > 0) where.hoc_vien = hocVienWhere;
-    if (query.khoa_id) where.khoa_id = query.khoa_id;
+    const and: Prisma.dang_ky_hocWhereInput[] = [phamVi];
     if (query.tu_ngay || query.den_ngay) {
-      where.ngay_dang_ky = {};
-      if (query.tu_ngay) where.ngay_dang_ky.gte = new Date(query.tu_ngay);
-      if (query.den_ngay) where.ngay_dang_ky.lte = new Date(query.den_ngay);
+      const ngay: Prisma.DateTimeFilter = {};
+      if (query.tu_ngay) ngay.gte = new Date(query.tu_ngay);
+      if (query.den_ngay) ngay.lte = new Date(query.den_ngay);
+      and.push({ ngay_dang_ky: ngay });
     }
-    return where;
+    return { AND: and };
   }
 
   // Kết quả khảo sát thật nằm ở ket_qua_khao_sat (SSO/API/import, theo học

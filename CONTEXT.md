@@ -53,6 +53,7 @@ Công cụ phối hợp giữa **Sở GD&ĐT**, **Phòng Văn hóa - Xã hội**
 - **NhatKyImport**, **NhatKyThongBao** — bảng nhật ký/audit trail.
 - **DiemHoc** (T10, #2, 2026-10-07) — danh mục điểm học trực tiếp; buổi thuộc giai đoạn `truc_tiep` bắt buộc có `lich_hoc_lop.diem_hoc_id`. `lich_hoc_lop.cap_nhat_luc` chỉ đổi khi giờ/địa điểm/điểm học/phòng thật sự đổi — mọi sửa buổi đã có đi qua `LichHocThayDoiService`.
 - **GiangVien** / **PhanCongGiangDay** (T11, #3, 2026-10-07) — danh mục giảng viên (SĐT duy nhất bắt buộc, email duy nhất tùy chọn) và phân công vào từng buổi; luật (không trùng giờ, không gỡ phân công đã xác nhận giờ) chỉ ở `PhanCongGiangDayService`. Giờ dạy chỉ tính phân công `da_xac_nhan_gio`. `lop_hoc_nhan_su` vẫn giữ (text liên hệ cũ).
+- **Dashboard thống kê** (2026-10-07, `backend/src/thong-ke/`, api-contract mục 7 `/thong-ke/*`; FE `frontend/src/pages/ThongKe/DashboardThongKe.tsx`): 9 khối (KPI + phễu, so sánh khóa, khảo sát, chuyển mức, kết quả học, chuyên cần, xếp hạng đơn vị, cần đôn đốc), mỗi khối một endpoint. Phạm vi lấy CHỈ qua `ThongKeScopeService.resolve` (R1/R2); gắn ở `/admin/tong-quan` (`che_do=admin`, có Xếp hạng) và `/ho-tro/thong-ke` (`che_do=ho_tro`, ẩn Xếp hạng). Bộ lọc khóa/đơn vị/cụm nằm trên URL; ngoài phạm vi → 403 và FE reset bộ lọc.
 - **Chưa tồn tại:** `ChungNhan` (T13, #6).
 
 ## Luồng nghiệp vụ chính

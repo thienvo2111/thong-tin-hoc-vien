@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch, apiFetchBlob } from './client';
-import type { BaoCaoRowsResult, BaoCaoTheo, DotXacNhanDanhMuc, TongQuanResult } from './types';
+import type { BaoCaoRowsResult, BaoCaoTheo, DotXacNhanDanhMuc } from './types';
 
 // Trung tâm báo cáo (Phase 5 redesign) — 6 nhóm báo cáo THẬT đang có API (docs/api-contract.md mục 7
 // + mục "Đợt xác nhận"). Mỗi nhóm = 1 hàm xem (GET, trả { rows }) + 1 hàm xuất Excel (GET blob).
@@ -117,14 +117,6 @@ export interface BaoCaoTongQuanParams {
   don_vi_cong_tac_id?: string;
   tu_ngay?: string;
   den_ngay?: string;
-}
-
-export function useBaoCaoTongQuanTrungTam(params: BaoCaoTongQuanParams, enabled = true) {
-  return useQuery({
-    queryKey: ['admin', 'bao-cao', 'tong-quan', params],
-    queryFn: () => apiFetch<TongQuanResult>(`/bao-cao/tong-quan${xayQueryString(params)}`),
-    enabled,
-  });
 }
 
 export function taiBaoCaoTongQuanExcel(params: BaoCaoTongQuanParams) {

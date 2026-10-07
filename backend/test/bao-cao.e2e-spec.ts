@@ -1048,6 +1048,44 @@ describe('Dịch vụ Báo cáo (e2e)', () => {
         .expect(403);
     });
 
+    describe('GET /bao-cao/tong-quan — áp R1/R2 qua ThongKeScopeService', () => {
+      const tongQuan = (token: string, qs: string) =>
+        request(app.getHttpServer())
+          .get(`/bao-cao/tong-quan?${qs}`)
+          .set('Authorization', `Bearer ${token}`);
+
+      it('Sở A khoa_id=K1 (R1 — chủ khóa): đếm cả T1+T3 (=2)', async () => {
+        const res = await tongQuan(tokenSoA, `khoa_id=${k1Id}`).expect(200);
+        expect(res.body.tong_hoc_vien_tham_gia).toBe(2);
+      });
+
+      it('Sở B khoa_id=K1 (R2 qua T3): chỉ đếm HV của mình (=1)', async () => {
+        const res = await tongQuan(tokenSoB, `khoa_id=${k1Id}`).expect(200);
+        expect(res.body.tong_hoc_vien_tham_gia).toBe(1);
+      });
+
+      it('T1 khoa_id=K1 (khóa Sở A đặt có HV của T1): chỉ đếm HV của T1 (=1)', async () => {
+        const res = await tongQuan(tokenT1, `khoa_id=${k1Id}`).expect(200);
+        expect(res.body.tong_hoc_vien_tham_gia).toBe(1);
+      });
+
+      it('T1 khoa_id=K3 (ngoài phạm vi) -> 403', async () => {
+        await tongQuan(tokenT1, `khoa_id=${k3Id}`).expect(403);
+      });
+
+      it('quan_tri khoa_id=K1 -> đếm đủ cả 2 đăng ký', async () => {
+        const res = await tongQuan(tokenQuanTri, `khoa_id=${k1Id}`).expect(200);
+        expect(res.body.tong_hoc_vien_tham_gia).toBe(2);
+      });
+
+      it('xuất-excel áp cùng phạm vi: T1 khoa_id=K3 -> 403', async () => {
+        await request(app.getHttpServer())
+          .get(`/bao-cao/tong-quan/xuat-excel?khoa_id=${k3Id}`)
+          .set('Authorization', `Bearer ${tokenT1}`)
+          .expect(403);
+      });
+    });
+
     // Fix #2 (final-review.md) — GET /bao-cao/xac-nhan áp R1 khi đợt gắn
     // khoa_id và caller thỏa R1 cho khóa đó (K1 đặt hàng Sở A).
     describe('GET /bao-cao/xac-nhan — áp R1/R2 khi đợt gắn khoa_id (fix #2 final-review)', () => {

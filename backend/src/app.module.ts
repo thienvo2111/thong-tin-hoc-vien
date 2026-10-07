@@ -11,6 +11,7 @@ import { KhoaBoiDuongModule } from './khoa-boi-duong/khoa-boi-duong.module';
 import { DanhMucModule } from './danh-muc/danh-muc.module';
 import { ImportModule } from './import/import.module';
 import { BaoCaoModule } from './bao-cao/bao-cao.module';
+import { ThongKeModule } from './thong-ke/thong-ke.module';
 import { ThongBaoModule } from './thong-bao/thong-bao.module';
 import { ValidateModule } from './validate/validate.module';
 import { NguoiDungModule } from './nguoi-dung/nguoi-dung.module';
@@ -56,6 +57,7 @@ import { VanHanhModule } from './van-hanh/van-hanh.module';
     DanhMucModule,
     ImportModule,
     BaoCaoModule,
+    ThongKeModule,
     ThongBaoModule,
     ValidateModule,
     NguoiDungModule,

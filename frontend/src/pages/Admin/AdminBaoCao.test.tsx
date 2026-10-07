@@ -13,7 +13,7 @@ function renderTrang() {
 }
 
 describe('Admin — Trung tâm báo cáo', () => {
-  it('hiện đủ 7 thẻ báo cáo thật (khớp API docs/api-contract.md mục 7)', () => {
+  it('hiện đủ 8 thẻ báo cáo thật (khớp API docs/api-contract.md mục 7)', () => {
     renderTrang();
     expect(screen.getByText('Báo cáo tổng hợp')).toBeInTheDocument();
     expect(screen.getByText('Báo cáo xác nhận')).toBeInTheDocument();
@@ -22,6 +22,7 @@ describe('Admin — Trung tâm báo cáo', () => {
     expect(screen.getByText('Điều kiện đánh giá đầu vào')).toBeInTheDocument();
     expect(screen.getByText('Vận hành theo lớp')).toBeInTheDocument();
     expect(screen.getByText('Giờ dạy')).toBeInTheDocument();
+    expect(screen.getByText('Xuất Excel tổng quan')).toBeInTheDocument();
   });
 
   // T11 (issue #3)
@@ -80,6 +81,27 @@ describe('Admin — Trung tâm báo cáo', () => {
     const the = within(screen.getByTestId('the-bao-cao-xuat-cho-vle'));
     expect(the.queryByRole('button', { name: 'Xem' })).not.toBeInTheDocument();
     expect(the.getByRole('button', { name: /Xuất Excel/ })).toBeInTheDocument();
+  });
+
+  it('tổng quan: Xuất Excel gọi /bao-cao/tong-quan/xuat-excel với khoa_id đã chọn', async () => {
+    const queries: URLSearchParams[] = [];
+    server.use(
+      http.get('/bao-cao/tong-quan/xuat-excel', ({ request }) => {
+        queries.push(new URL(request.url).searchParams);
+        return new HttpResponse('xlsx', {
+          headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderTrang();
+    const the = within(screen.getByTestId('the-bao-cao-tong-quan'));
+    await waitFor(() => expect(the.getByLabelText(/^Khóa bồi dưỡng/)).toBeEnabled());
+    await user.click(the.getByLabelText(/^Khóa bồi dưỡng/));
+    await user.click(await screen.findByRole('option', { name: 'AG-2026-014 — Bồi dưỡng NLS – Mức cơ bản' }));
+    await user.click(the.getByRole('button', { name: /Xuất Excel/ }));
+    await waitFor(() => expect(queries).toHaveLength(1));
+    expect(queries[0].get('khoa_id')).toBeTruthy();
   });
 
   it('lỗi API khi xem báo cáo: hiện thông báo lỗi thay vì màn trắng', async () => {

@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { ImportChiTiet, KhoaBoiDuong, LoaiLop, YeuCauHoTro, YeuCauHoTroQuanTri } from '@/api/types';
+import { thongKeHandlers } from './thongKe';
 import { DIA_DANH, DON_VI, MON_HOC, db } from './db';
 
 // QĐ10 (2026-09-30): dang_ky_hoc mẫu nằm rải trong db.khoaHocCuaHocVien (map theo hoc_vien_id) — tìm
@@ -45,6 +46,7 @@ function loi(status: number, code: string, message: string, extra: Record<string
 }
 
 export const handlers = [
+  ...thongKeHandlers,
   // ADR 0004 L4 (issue #17): bảng kiểm.
   http.get('/bang-kiem/quy-tac', () =>
     HttpResponse.json([

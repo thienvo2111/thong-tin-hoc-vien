@@ -5,6 +5,7 @@ import { BaoCaoController } from './bao-cao.controller';
 import { BaoCaoService } from './bao-cao.service';
 import { GioDayService } from './gio-day.service';
 import { ThangMucService } from '../sso/thang-muc.service';
+import { ThongKeModule } from '../thong-ke/thong-ke.module';
 
 // Dịch vụ Báo cáo — xem docs/api-contract.md mục 7. T15 (mo-rong-nls-an-
 // giang.md): import HocVienModule để tái dùng HocVienService.danhGiaDayDu()
@@ -13,7 +14,7 @@ import { ThangMucService } from '../sso/thang-muc.service';
 // (2026-10-07) khai thẳng làm provider ở đây thay vì import SsoModule — chỉ
 // phụ thuộc PrismaService, không kéo thêm phụ thuộc nào khác.
 @Module({
-  imports: [AuthModule, HocVienModule],
+  imports: [AuthModule, HocVienModule, ThongKeModule],
   controllers: [BaoCaoController],
   providers: [BaoCaoService, GioDayService, ThangMucService],
 })

@@ -124,8 +124,13 @@ if [ ! -d "${WEB_ROOT}" ]; then
   echo "LOI: ${WEB_ROOT} chua ton tai. Chay 05-install-nginx.sh (sudo) truoc buoc nay." >&2
   exit 1
 fi
-rm -rf "${WEB_ROOT:?}"/*
-cp -r dist/. "${WEB_ROOT}/"
+# KHONG xoa asset cu: tab dang mo van lazy-load chunk hash cu. Copy moi thu tru
+# index.html truoc, roi doi index.html nguyen tu (mv) o cuoi -> khong co luc nao thieu index.html.
+(cd dist && find . -type f ! -path './index.html' -print0 | xargs -0 -I{} cp --parents {} "${WEB_ROOT}/")
+cp dist/index.html "${WEB_ROOT}/.index.html.new"
+mv -f "${WEB_ROOT}/.index.html.new" "${WEB_ROOT}/index.html"
+# Don asset hash cu qua 14 ngay (tab mo lau hon the nay da bi dong/tai lai tu lau).
+find "${WEB_ROOT}/assets" -type f -mtime +14 -delete 2>/dev/null || true
 
 echo "==> Reload Nginx de nhan dist moi"
 sudo -n nginx -t && sudo -n systemctl reload nginx 2>/dev/null || \

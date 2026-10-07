@@ -49,7 +49,7 @@ server {
     # THEM CONTROLLER MOI -> them prefix vao day roi chay lai script nay (06-deploy.sh co canh bao neu thieu;
     # backend/src/nginx-prefix.spec.ts bat loi nay ngay khi chay test). Prefix API KHONG duoc trung route
     # trang frontend (vd. /ho-tro la trang -> API nguoi ho tro dung /ho-tro-hoc-vien).
-    location ~ ^/(api|auth|hoc-vien|khoa-boi-duong|dot-xac-nhan|thong-bao|danh-muc|nguoi-dung|bao-cao|import|validate|lop|dang-ky-hoc|yeu-cau-ho-tro|cau-hinh-khao-sat|sso|ho-tro-hoc-vien|diem-hoc|giang-vien|ho-tro-giang-vien|bang-kiem|cong-giang-vien|van-hanh) {
+    location ~ ^/(api|auth|hoc-vien|khoa-boi-duong|dot-xac-nhan|thong-bao|danh-muc|nguoi-dung|bao-cao|import|validate|lop|dang-ky-hoc|yeu-cau-ho-tro|cau-hinh-khao-sat|sso|ho-tro-hoc-vien|diem-hoc|giang-vien|ho-tro-giang-vien|bang-kiem|cong-giang-vien|van-hanh|thong-ke) {
         proxy_pass http://127.0.0.1:${BACKEND_PORT};
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -63,6 +63,13 @@ server {
     # SPA React: moi route khong khop file tinh deu tra ve index.html
     location / {
         try_files \$uri \$uri/ /index.html;
+    }
+
+    # index.html luon phai kiem tra lai (no-cache) de nhan ban deploy moi; asset hash thi cache lau.
+    # add_header o day khong ke thua cua server -> lap lai HSTS.
+    location = /index.html {
+        add_header Cache-Control "no-cache" always;
+        add_header Strict-Transport-Security "max-age=${HSTS_MAX_AGE}" always;
     }
 
     location ~* \.(js|css|svg|png|jpg|jpeg|gif|ico|woff2?)$ {

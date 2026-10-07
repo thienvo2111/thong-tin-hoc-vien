@@ -1,6 +1,7 @@
 import { BaoCaoService } from './bao-cao.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScopeService } from '../auth/scope/scope.service';
+import { ThongKeScopeService } from '../thong-ke/thong-ke-scope.service';
 import { HocVienService } from '../hoc-vien/hoc-vien.service';
 import { ThangMucService } from '../sso/thang-muc.service';
 import { ForbiddenAppException } from '../common/exceptions/app.exceptions';
@@ -31,6 +32,8 @@ function thangMucRong() {
   return THANG_MAC_DINH.map((m) => ({ ...m, so_luong: 0 }));
 }
 
+const PHAM_VI_TAT_CA = { where: {}, rong: false, khoaIds: 'ALL' as const };
+
 describe('BaoCaoService.tongQuan', () => {
   let service: BaoCaoService;
   let prisma: {
@@ -41,10 +44,7 @@ describe('BaoCaoService.tongQuan', () => {
     lich_su_thay_doi_ho_so: { findMany: jest.Mock };
     ket_qua_khao_sat: { findMany: jest.Mock };
   };
-  let scopeService: {
-    getAccessibleDonViIds: jest.Mock;
-    canAccessDonVi: jest.Mock;
-  };
+  let thongKeScope: { resolve: jest.Mock };
   let thangMucService: { thang: jest.Mock };
 
   beforeEach(() => {
@@ -56,21 +56,20 @@ describe('BaoCaoService.tongQuan', () => {
       lich_su_thay_doi_ho_so: { findMany: jest.fn().mockResolvedValue([]) },
       ket_qua_khao_sat: { findMany: jest.fn().mockResolvedValue([]) },
     };
-    scopeService = {
-      getAccessibleDonViIds: jest.fn(),
-      canAccessDonVi: jest.fn(),
+    thongKeScope = {
+      resolve: jest.fn().mockResolvedValue(PHAM_VI_TAT_CA),
     };
     thangMucService = { thang: jest.fn().mockResolvedValue(THANG_MAC_DINH) };
     service = new BaoCaoService(
       prisma as unknown as PrismaService,
-      scopeService as unknown as ScopeService,
+      {} as ScopeService,
       {} as HocVienService,
       thangMucService as unknown as ThangMucService,
+      thongKeScope as unknown as ThongKeScopeService,
     );
   });
 
   it('đếm đúng tổng học viên tham gia + đã đăng nhập + đã chỉnh sửa hồ sơ (theo tập hoc_vien phân biệt)', async () => {
-    scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
     prisma.dang_ky_hoc.findMany.mockResolvedValue([
       { hoc_vien_id: 'hv-1' },
       { hoc_vien_id: 'hv-2' },
@@ -95,7 +94,6 @@ describe('BaoCaoService.tongQuan', () => {
   });
 
   it('không có dang_ky_hoc nào khớp -> không gọi nguoi_dung.count/lich_su_thay_doi_ho_so.findMany', async () => {
-    scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
     prisma.dang_ky_hoc.findMany.mockResolvedValue([]);
 
     const result = await service.tongQuan({}, caller());
@@ -110,7 +108,6 @@ describe('BaoCaoService.tongQuan', () => {
   // Sửa 2026-10-07: portal KHÔNG quy đổi muc_goc -> muc (quyết định
   // 2026-10-05) — mức đếm thẳng theo muc_goc, thứ tự theo thang quản trị.
   it('khảo sát đầu vào/đầu ra đếm theo muc_goc của ket_qua_khao_sat (hoàn thành), đúng thứ tự thang', async () => {
-    scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
     prisma.dang_ky_hoc.findMany.mockResolvedValue([
       { hoc_vien_id: 'hv-1' },
       { hoc_vien_id: 'hv-2' },
@@ -159,7 +156,6 @@ describe('BaoCaoService.tongQuan', () => {
   });
 
   it('mã muc_goc không có trong thang -> nối cuối theo_muc, nhãn = chính mã đó', async () => {
-    scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
     prisma.dang_ky_hoc.findMany.mockResolvedValue([{ hoc_vien_id: 'hv-1' }]);
     prisma.ket_qua_khao_sat.findMany.mockResolvedValue([
       { hoc_vien_id: 'hv-1', loai: 'danh-gia', muc_goc: 'X9' },
@@ -176,7 +172,6 @@ describe('BaoCaoService.tongQuan', () => {
   // Sửa 2026-10-07: thay "Kết quả theo hình thức" (dang_ky_hoc_lop, đã bỏ)
   // bằng tình hình tham gia học THEO ĐIỂM DANH thật, nhóm theo giai đoạn.
   it('tham_gia_hoc: nhóm điểm danh theo giai đoạn; so_buoi = số buổi có ít nhất 1 lượt điểm danh', async () => {
-    scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
     prisma.dang_ky_hoc.findMany.mockResolvedValue([{ hoc_vien_id: 'hv-1' }]);
     // gd-1 (K-001): 2 buổi (lh-1, lh-2); gd-2 (K-001): 1 buổi (lh-3).
     prisma.diem_danh.groupBy.mockResolvedValue([
@@ -242,7 +237,6 @@ describe('BaoCaoService.tongQuan', () => {
   });
 
   it('không có lượt điểm danh nào -> tham_gia_hoc rỗng, không truy vấn lich_hoc_lop', async () => {
-    scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
     prisma.dang_ky_hoc.findMany.mockResolvedValue([{ hoc_vien_id: 'hv-1' }]);
     prisma.diem_danh.groupBy.mockResolvedValue([]);
 
@@ -252,9 +246,13 @@ describe('BaoCaoService.tongQuan', () => {
     expect(prisma.lich_hoc_lop.findMany).not.toHaveBeenCalled();
   });
 
-  it('lọc đúng theo khoa_id/don_vi_cong_tac_id/khoảng thời gian (quan_tri, don_vi bất kỳ)', async () => {
-    scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
-    scopeService.canAccessDonVi.mockResolvedValue(true);
+  it('gọi resolve với khoa_id + don_vi_id (map từ don_vi_cong_tac_id); lọc ngày AND với where của phạm vi', async () => {
+    thongKeScope.resolve.mockResolvedValue({
+      where: { khoa_id: { in: ['khoa-1'] } },
+      rong: false,
+      khoaIds: ['khoa-1'],
+    });
+    const user = caller();
 
     await service.tongQuan(
       {
@@ -263,24 +261,36 @@ describe('BaoCaoService.tongQuan', () => {
         tu_ngay: '2026-01-01',
         den_ngay: '2026-01-31',
       },
-      caller(),
+      user,
     );
 
+    expect(thongKeScope.resolve).toHaveBeenCalledWith(user, {
+      khoa_id: 'khoa-1',
+      don_vi_id: 'dv-1',
+    });
     expect(prisma.dang_ky_hoc.findMany).toHaveBeenCalledWith({
       where: {
-        hoc_vien: { don_vi_cong_tac_id: 'dv-1' },
-        khoa_id: 'khoa-1',
-        ngay_dang_ky: {
-          gte: new Date('2026-01-01'),
-          lte: new Date('2026-01-31'),
-        },
+        AND: [
+          { khoa_id: { in: ['khoa-1'] } },
+          {
+            ngay_dang_ky: {
+              gte: new Date('2026-01-01'),
+              lte: new Date('2026-01-31'),
+            },
+          },
+        ],
       },
       select: { hoc_vien_id: true },
     });
   });
 
-  it('phạm vi truong: chỉ lọc trong don_vi_id của chính mình', async () => {
-    scopeService.getAccessibleDonViIds.mockResolvedValue(['dv-1']);
+  it('không lọc ngày -> chỉ where của phạm vi', async () => {
+    const where = { khoa_id: { in: ['khoa-1'] } };
+    thongKeScope.resolve.mockResolvedValue({
+      where,
+      rong: false,
+      khoaIds: ['khoa-1'],
+    });
 
     await service.tongQuan(
       {},
@@ -288,13 +298,17 @@ describe('BaoCaoService.tongQuan', () => {
     );
 
     expect(prisma.dang_ky_hoc.findMany).toHaveBeenCalledWith({
-      where: { hoc_vien: { don_vi_cong_tac_id: { in: ['dv-1'] } } },
+      where: { AND: [where] },
       select: { hoc_vien_id: true },
     });
   });
 
-  it('scope rỗng (truong chưa gán don_vi): trả kết quả rỗng, không truy vấn DB', async () => {
-    scopeService.getAccessibleDonViIds.mockResolvedValue([]);
+  it('phạm vi rỗng: trả kết quả rỗng, không truy vấn DB', async () => {
+    thongKeScope.resolve.mockResolvedValue({
+      where: { id: { in: [] } },
+      rong: true,
+      khoaIds: [],
+    });
 
     const result = await service.tongQuan(
       {},
@@ -306,9 +320,10 @@ describe('BaoCaoService.tongQuan', () => {
     expect(prisma.dang_ky_hoc.findMany).not.toHaveBeenCalled();
   });
 
-  it('don_vi_cong_tac_id ngoài phạm vi quyền -> 403, không lộ dữ liệu đơn vị khác', async () => {
-    scopeService.getAccessibleDonViIds.mockResolvedValue(['dv-1']);
-    scopeService.canAccessDonVi.mockResolvedValue(false);
+  it('resolve ném 403 (ngoài phạm vi) -> lan ra, không truy vấn DB', async () => {
+    thongKeScope.resolve.mockRejectedValue(
+      new ForbiddenAppException('Ngoài phạm vi'),
+    );
 
     await expect(
       service.tongQuan(
