@@ -46,6 +46,11 @@ if [ ! -f .env ]; then
 else
   echo "==> backend/.env da ton tai, giu nguyen"
 fi
+# Sau proxy HCMUE (10.0.197.1) -> Nginx: thieu TRUST_PROXY thi req.ip luon la IP
+# proxy, rate limit/nhat ky gop chung moi nguoi dung (xem trust-proxy.util.ts).
+if ! grep -q '^TRUST_PROXY=' .env; then
+  echo "    !! CANH BAO: backend/.env chua co TRUST_PROXY - nen them: TRUST_PROXY=loopback,10.0.197.1"
+fi
 
 echo "==> Backend: generate Prisma Client (bat buoc sau moi npm ci - schema.prisma"
 echo "    sinh ra type cho @prisma/client, khong co buoc nay 'nest build' se loi"
