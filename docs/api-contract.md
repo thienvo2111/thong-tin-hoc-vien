@@ -496,6 +496,31 @@ Chi tiết quy tắc: [`validation-checklist.md`](validation-checklist.md). Endp
 | GET | `/bao-cao/gio-day?khoa_id=&tu_ngay=&den_ngay=` + `/xuat-excel` | **Thêm 2026-10-07 (T11, issue #3)**: mỗi dòng = giảng viên × lớp — `ho_ten`, `ma_khoa`, `ten_lop`, `so_buoi`, `so_buoi_da_xac_nhan`, `tong_gio_da_xac_nhan` (**chỉ cộng** phân công `da_xac_nhan_gio`) + `tong`. Phạm vi khóa theo R1/R2 (`getKhoaIdsXemDuoc`), `khoa_id` ngoài phạm vi → `403`. Chỉ **Quản trị** có thêm `so_dien_thoai`, `email` (cả Excel) | Trường, Phòng VHXH, Sở, QuảnTrị |
 | GET | `/bao-cao/tong-quan?khoa_id=&don_vi_cong_tac_id=&tu_ngay=&den_ngay=` + `/xuat-excel` | **Thêm 2026-09-30, sửa 2026-10-07**: dashboard "Tổng quan hệ thống" — `tong_hoc_vien_tham_gia` (số dòng `dang_ky_hoc` khớp bộ lọc), `da_dang_nhap`/`da_chinh_sua_ho_so` (tính trên tập `hoc_vien` phân biệt rút ra từ chính các dòng đó). `khao_sat.{dau_vao,dau_ra}` = `{ da_lam, theo_muc: [{ma,nhan,so_luong}], chua_xep_muc }` — mức lấy từ `ket_qua_khao_sat.muc_goc` (hoàn thành; đầu vào = loại `danh-gia`, đầu ra = `dau-ra`), theo đúng thang quản trị cấu hình (`ThangMucService`, **không quy đổi** sang `muc`, quyết định 2026-10-05); mã lạ ngoài thang nối cuối `theo_muc` với `nhan` = chính mã đó. `tham_gia_hoc` (**sửa 2026-10-07**, thay `ket_qua_theo_hinh_thuc` cũ dựa `dang_ky_hoc_lop` đã bỏ): mảng theo GIAI ĐOẠN — `{ giai_doan_id, ma_khoa, thu_tu, ten_giai_doan, so_buoi, co_mat, vang_co_phep, vang }`, tính từ `diem_danh` thật (lượt điểm danh của các đăng ký khớp bộ lọc) nhóm theo `lich_hoc_id` rồi gộp lên giai đoạn chứa buổi đó; `so_buoi` = số buổi (`lich_hoc_lop`) có ít nhất 1 lượt điểm danh. Tất cả query tùy chọn; `tu_ngay`/`den_ngay` lọc theo `dang_ky_hoc.ngay_dang_ky`. Improvised (chưa có trong đặc tả gốc) | Trường, Phòng VHXH, Sở, QuảnTrị |
 
+**`/bao-cao/tong-quan` (cập nhật 2026-10-07):** nay áp R1/R2 qua `ThongKeScopeService`; bộ lọc `don_vi_cong_tac_id` bao gồm cả cây đơn vị con của đơn vị đó. Shape và tham số giữ nguyên.
+
+### Dashboard thống kê `/thong-ke/*` (2026-10-07)
+
+Spec: `docs/superpowers/specs/2026-10-07-dashboard-thong-ke-design.md`. Kiểu response: `backend/src/thong-ke/thong-ke.types.ts`. Ai gọi: `quan_tri`, `so_gddt`, `phong_vhxh`, `truong`, `ho_tro_hoc_vien` (vai trò khác, gồm `hoc_vien` → `403`). Phạm vi chỉ lấy qua `ThongKeScopeService.resolve`.
+
+Query chung (tùy chọn, UUID): `khoa_id`, `don_vi_id`, `cum_id`.
+- Bộ lọc ngoài phạm vi quyền → `403`. Bộ lọc sai dạng → `400`.
+- `cum_id` bắt buộc kèm `khoa_id`; `don_vi_id` và `cum_id` loại trừ nhau; `ho_tro_hoc_vien` không được gửi `don_vi_id`; `so_gddt`/`phong_vhxh`/`truong` không được gửi `cum_id` (→ `400`).
+- Phạm vi rỗng (người dùng đơn vị thiếu `don_vi_id`, người hỗ trợ chưa có cụm) → mọi khối rỗng, không lỗi.
+- Mẫu số 0 → tỷ lệ `null`.
+
+| Method | Endpoint | Query thêm | Response |
+|---|---|---|---|
+| GET | `/thong-ke/bo-loc` | — | `BoLocResult`: `khoa[{id,ten_khoa}]`, `don_vi[{id,ten_don_vi,loai_don_vi}] \| null` (null = không hiện ô), `cum[{id,ten_cum,khoa_id}] \| null`, `don_vi_co_dinh {id,ten_don_vi} \| null` (vai trò `truong`) |
+| GET | `/thong-ke/pheu` | — | `PheuResult`: `tham_gia`, `da_truy_cap`, `khao_sat_ky_nang_so`, `danh_gia_dau_vao`, `danh_gia_dau_ra`, `ho_so_cho_duyet` (`null` với `ho_tro_hoc_vien`) |
+| GET | `/thong-ke/khao-sat` | — | `KhaoSatResult`: `ky_nang_so {hoan_thanh,chua}`, `dau_vao` / `dau_ra` = `{ theo_muc[{ma,nhan,so_luong}], chua_xep_muc, chua_lam }` |
+| GET | `/thong-ke/chuyen-muc` | — | `ChuyenMucResult`: `thang[{ma,nhan}]`, `o[{tu,den,so_luong}]` (mọi cặp, kể cả 0), `tong`, `tang`, `giu`, `giam` |
+| GET | `/thong-ke/ket-qua` | — | `KetQuaHocCot[]`: `{ khoa_id, ten_khoa, dat, khong_dat, vang, dang_hoc }` (`ket_qua = null` tính `dang_hoc`) |
+| GET | `/thong-ke/so-sanh-khoa` | — | `SoSanhKhoaCot[]`: `{ khoa_id, ten_khoa, tham_gia, ty_le_truy_cap, ty_le_dau_vao, ty_le_dat }` (tỷ lệ `null` khi mẫu số 0) |
+| GET | `/thong-ke/chuyen-can` | — | `ChuyenCanResult`: `truc_tiep: BuoiChuyenCan[] \| null` (null khi không chọn khóa; mỗi buổi `{nhan, giai_doan_thu_tu, buoi_so, co_mat, vang_co_phep, vang, ty_le_co_mat}`), `vle { khoang[{khoang: '0-25'\|'25-50'\|'50-75'\|'75-100', so_luong}], chua_co_du_lieu }` (khoảng `[0,25) [25,50) [50,75) [75,100]`) |
+| GET | `/thong-ke/xep-hang` | `chi_so=truy_cap\|khao_sat\|dat` (bắt buộc) | `XepHangResult`: `{ kieu:'bang', top[], bottom[], tong_so }` (dòng `{don_vi_id,ten_don_vi,so_hv,gia_tri 0..1}`; đơn vị < 5 học viên bị bỏ) hoặc `{ kieu:'vi_tri', thu_hang, tong_so, gia_tri, trung_binh }` (vai trò `truong` — không lộ tên/ID đơn vị khác) |
+| GET | `/thong-ke/can-don-doc` | `loai=chua_truy_cap\|chua_khao_sat\|vang_nhieu\|vle_thap` (bắt buộc), `page` (số nguyên ≥ 1) | `CanDonDocResult`: `{ tong, page, items[{hoc_vien_id,ho_ten,ten_don_vi,ten_khoa,so_dien_thoai,email,chi_tiet}] }`. Ngưỡng: vắng ≥ 2 buổi (chỉ `trang_thai='vang'`), VLE < 50 |
+| GET | `/thong-ke/can-don-doc/xuat-excel` | `loai` (bắt buộc) | File Excel toàn bộ danh sách khớp (không phân trang) |
+
 **Lưu ý (T7, sửa 2026-10-03 — ADR 0001):** 2 lớp phạm vi tách biệt, cùng cơ chế R1/R2 với `GET /khoa-boi-duong` (mục 3, thay hẳn cơ chế "đơn vị theo dõi" `khoa_don_vi_theo_doi` cũ của T2): lớp nào **hiện ra** theo phạm vi XEM khóa (`id ∈ getKhoaIdsXemDuoc`); nhưng học viên **đếm bên trong mỗi lớp** (`si_so`, `so_co_email`, `so_ho_so_day_du`, `theo_muc_dau_vao`) lọc theo `getHocVienScopeTrongKhoa` CỦA KHÓA chứa lớp đó — R1 (khóa do đơn vị trong phạm vi caller đặt hàng) đếm TOÀN BỘ; R2 (chỉ có học viên trong phạm vi tham gia) chỉ đếm đúng học viên thuộc phạm vi đó, không đếm nhầm học viên đơn vị khác trong cùng lớp/khóa.
 
 ---

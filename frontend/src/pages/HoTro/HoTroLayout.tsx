@@ -12,6 +12,7 @@ const MENU = [
   { to: '/ho-tro/hoc-vien', nhan: 'Học viên', end: false },
   { to: '/ho-tro/lich-hoc', nhan: 'Lịch học', end: false },
   { to: '/ho-tro/yeu-cau-ho-tro', nhan: 'Yêu cầu hỗ trợ', end: false },
+  { to: '/ho-tro/thong-ke', nhan: 'Thống kê', end: false },
 ];
 
 /** Khung khu làm việc của người hỗ trợ học viên (ADR 0003) — tách hẳn layout admin để không rò quyền qua

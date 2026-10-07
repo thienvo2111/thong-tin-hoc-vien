@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { apiFetch, apiFetchBlob } from './client';
 import { taiFileTuBlob } from '@/lib/taiFile';
 import type {
@@ -30,12 +30,13 @@ function xayQuery(params: object): string {
   return s ? `?${s}` : '';
 }
 
-function useKhoi<T>(khoi: string, path: string, params: object, enabled = true) {
+function useKhoi<T>(khoi: string, path: string, params: object, enabled = true, giuDuLieuCu = false) {
   return useQuery({
     queryKey: ['thong-ke', khoi, params],
     queryFn: () => apiFetch<T>(`/thong-ke/${path}${xayQuery(params)}`),
     staleTime: STALE_TIME,
     enabled,
+    placeholderData: giuDuLieuCu ? keepPreviousData : undefined,
   });
 }
 
@@ -50,7 +51,7 @@ export const useChuyenCan = (loc: LocThongKe) => useKhoi<ChuyenCanResult>('chuye
 export const useXepHang = (loc: LocThongKe & { chi_so: ChiSoXepHang }, enabled = true) =>
   useKhoi<XepHangResult>('xep-hang', 'xep-hang', loc, enabled);
 export const useCanDonDoc = (loc: LocThongKe & { loai: LoaiCanDonDoc; page: number }) =>
-  useKhoi<CanDonDocResult>('can-don-doc', 'can-don-doc', loc);
+  useKhoi<CanDonDocResult>('can-don-doc', 'can-don-doc', loc, true, true);
 
 export async function xuatCanDonDoc(loc: LocThongKe & { loai: LoaiCanDonDoc }): Promise<void> {
   const blob = await apiFetchBlob(`/thong-ke/can-don-doc/xuat-excel${xayQuery(loc)}`);

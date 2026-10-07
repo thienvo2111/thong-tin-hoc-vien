@@ -68,9 +68,8 @@ Thư viện FE: `@mantine/charts`. Màu mức M1→M4 cố định toàn dashboa
 
 ## 6. Hiệu năng
 
-- Mọi tổng hợp trong DB (`groupBy`/`count`; `$queryRaw` cho khối 5, 8). Không kéo bản ghi về Node để đếm.
-- Kiểm tra index `diem_danh(dang_ky_hoc_id)`, `ket_qua_khao_sat(hoc_vien_id, loai)`,
-  `dang_ky_hoc(khoa_id, cum_id)`; thiếu thì thêm một migration riêng.
+- Phần lớn khối tổng hợp trong DB (`groupBy`/`count`). Khối 5 và 8 lấy cột tối thiểu qua `findMany` theo `where` phạm vi rồi gộp trong Node (không dùng `$queryRaw`).
+- Index cần thiết đã có (`uq_diem_danh`, `uq_ket_qua_khao_sat_hoc_vien_loai`, `idx_dang_ky_khoa`, `idx_dang_ky_cum`) — không migration.
 - FE `staleTime: 60s`. Không cache phía server.
 
 ## 7. Frontend
