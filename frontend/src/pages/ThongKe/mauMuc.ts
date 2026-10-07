@@ -11,3 +11,11 @@ export function dinhDangTyLe(x: number | null): string {
   if (x === null || !Number.isFinite(x)) return '—';
   return `${(x * 100).toFixed(1).replace('.', ',')}%`;
 }
+
+/** Màu cho chuỗi KHÔNG phải mức M1→M4 — không dùng lại các sắc của MAU_MUC để tránh nhầm nghĩa. */
+export const MAU_SERIES = {
+  chinh: 'indigo.6',
+  thu_hai: 'teal.6',
+  thu_ba: 'grape.6',
+  trung_tinh: 'gray.6',
+} as const;

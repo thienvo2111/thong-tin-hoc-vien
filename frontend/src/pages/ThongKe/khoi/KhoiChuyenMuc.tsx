@@ -34,7 +34,7 @@ function MaTran({ d }: { d: ChuyenMucResult }) {
               role="img"
               aria-label={`Từ ${tu.ma} sang ${den.ma}: ${so} học viên`}
               style={{
-                background: alpha('var(--mantine-color-blue-6)', so / max),
+                background: alpha('var(--mantine-color-indigo-6)', so / max),
                 borderRadius: 4,
                 textAlign: 'center',
                 padding: '12px 4px',

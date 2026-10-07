@@ -2,13 +2,14 @@ import { BarChart } from '@mantine/charts';
 import { Stack } from '@mantine/core';
 import { useKetQuaHoc, type LocThongKe } from '@/api/thongKe';
 import { ChuThich } from '../ChuThich';
+import { MAU_SERIES } from '../mauMuc';
 import { KhoiThongKe } from '../KhoiThongKe';
 
 const SERIES = [
-  { name: 'Đạt', color: 'green.7' },
-  { name: 'Không đạt', color: 'red.6' },
-  { name: 'Vắng', color: 'yellow.6' },
-  { name: 'Đang học', color: 'gray.5' },
+  { name: 'Đạt', color: MAU_SERIES.thu_hai },
+  { name: 'Không đạt', color: MAU_SERIES.thu_ba },
+  { name: 'Vắng', color: MAU_SERIES.chinh },
+  { name: 'Đang học', color: MAU_SERIES.trung_tinh },
 ];
 
 export function KhoiKetQuaHoc({ loc }: { loc: LocThongKe }) {

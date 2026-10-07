@@ -12,11 +12,13 @@ interface Props {
   query: UseQueryResult<unknown>;
   rong: boolean;
   thong_bao_rong?: string;
+  /** Bộ chọn (tab, chỉ số…) luôn hiện kể cả khi đang tải/lỗi/rỗng. */
+  dieu_khien?: ReactNode;
   children: ReactNode;
 }
 
 /** Khung chung mỗi khối: tiêu đề + trạng thái tải / lỗi (Thử lại) / rỗng. */
-export function KhoiThongKe({ tieu_de, query, rong, thong_bao_rong, children }: Props) {
+export function KhoiThongKe({ tieu_de, query, rong, thong_bao_rong, dieu_khien, children }: Props) {
   const khiNgoaiPhamVi = useContext(NgoaiPhamViContext);
   const ngoaiPhamVi = query.error instanceof ApiError && query.error.status === 403;
 
@@ -60,6 +62,7 @@ export function KhoiThongKe({ tieu_de, query, rong, thong_bao_rong, children }: 
         <Title order={3} size="h4">
           {tieu_de}
         </Title>
+        {dieu_khien}
         {noiDung}
       </Stack>
     </Paper>

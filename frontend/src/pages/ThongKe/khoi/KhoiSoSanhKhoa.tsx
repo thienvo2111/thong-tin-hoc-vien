@@ -2,12 +2,13 @@ import { BarChart } from '@mantine/charts';
 import { Stack } from '@mantine/core';
 import { useSoSanhKhoa, type LocThongKe } from '@/api/thongKe';
 import { ChuThich } from '../ChuThich';
+import { MAU_SERIES } from '../mauMuc';
 import { KhoiThongKe } from '../KhoiThongKe';
 
 const SERIES = [
-  { name: '% truy cập', color: 'blue.6' },
-  { name: '% hoàn thành KS đầu vào', color: 'orange.6' },
-  { name: '% Đạt', color: 'green.7' },
+  { name: '% truy cập', color: MAU_SERIES.chinh },
+  { name: '% hoàn thành KS đầu vào', color: MAU_SERIES.thu_hai },
+  { name: '% Đạt', color: MAU_SERIES.thu_ba },
 ];
 
 const phanTram = (x: number | null) => (x === null ? undefined : Math.round(x * 1000) / 10);

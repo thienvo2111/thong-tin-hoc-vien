@@ -6,9 +6,9 @@ import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import DashboardThongKe from './DashboardThongKe';
 
-function renderDashboard(url = '/thong-ke') {
+function renderDashboard(url = '/thong-ke', cheDo: 'admin' | 'ho_tro' = 'admin') {
   datToken('token-gia-lap');
-  return renderVoiRouter([{ path: '/thong-ke', element: <DashboardThongKe che_do="admin" /> }], {
+  return renderVoiRouter([{ path: '/thong-ke', element: <DashboardThongKe che_do={cheDo} /> }], {
     initialEntries: [url],
   });
 }
@@ -39,5 +39,26 @@ describe('DashboardThongKe', () => {
     expect(await screen.findByText('Bộ lọc nằm ngoài phạm vi quyền')).toBeInTheDocument();
     await waitFor(() => expect(r.router.state.location.search).toBe(''));
     expect(await screen.findByTestId('kpi-tham-gia')).toBeInTheDocument();
+  });
+
+  it('che_do admin → có khối Xếp hạng + Chuyên cần + Cần đôn đốc', async () => {
+    renderDashboard();
+    expect(await screen.findByRole('region', { name: 'Xếp hạng đơn vị' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Chuyên cần' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Cần đôn đốc' })).toBeInTheDocument();
+  });
+
+  it('che_do ho_tro → không render và không gọi API xếp hạng', async () => {
+    let daGoi = false;
+    server.use(
+      http.get('/thong-ke/xep-hang', () => {
+        daGoi = true;
+        return HttpResponse.json({ kieu: 'bang', top: [], bottom: [], tong_so: 0 });
+      }),
+    );
+    renderDashboard('/thong-ke', 'ho_tro');
+    expect(await screen.findByRole('region', { name: 'Cần đôn đốc' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Xếp hạng đơn vị' })).not.toBeInTheDocument();
+    expect(daGoi).toBe(false);
   });
 });
