@@ -23,8 +23,9 @@ function dungKpi(d: PheuResult): TheKpi[] {
   return [
     { id: 'kpi-tham-gia', nhan: 'Tham gia', so: d.tham_gia },
     { id: 'kpi-da-truy-cap', nhan: 'Đã truy cập', so: d.da_truy_cap, ty_le: tyLe(d.da_truy_cap, d.tham_gia) },
-    { id: 'kpi-dau-vao', nhan: 'Đã làm KS đầu vào', so: d.danh_gia_dau_vao, ty_le: tyLe(d.danh_gia_dau_vao, d.da_truy_cap) },
-    { id: 'kpi-dau-ra', nhan: 'Đã làm KS đầu ra', so: d.danh_gia_dau_ra, ty_le: tyLe(d.danh_gia_dau_ra, d.danh_gia_dau_vao) },
+    { id: 'kpi-ky-nang-so', nhan: 'Đã làm KS kĩ năng số', so: d.khao_sat_ky_nang_so, ty_le: tyLe(d.khao_sat_ky_nang_so, d.da_truy_cap) },
+    { id: 'kpi-dau-vao', nhan: 'Đã làm đánh giá NLS đầu vào', so: d.danh_gia_dau_vao, ty_le: tyLe(d.danh_gia_dau_vao, d.khao_sat_ky_nang_so) },
+    { id: 'kpi-dau-ra', nhan: 'Đã làm đánh giá NLS đầu ra', so: d.danh_gia_dau_ra, ty_le: tyLe(d.danh_gia_dau_ra, d.danh_gia_dau_vao) },
   ];
 }
 
@@ -32,9 +33,9 @@ function dungPheu(d: PheuResult) {
   const buoc = [
     { id: 'pheu-tham-gia', nhan: 'Tham gia', so: d.tham_gia },
     { id: 'pheu-da-truy-cap', nhan: 'Truy cập', so: d.da_truy_cap },
-    { id: 'pheu-ks-ky-nang-so', nhan: 'KS kỹ năng số', so: d.khao_sat_ky_nang_so },
-    { id: 'pheu-dau-vao', nhan: 'Đánh giá đầu vào', so: d.danh_gia_dau_vao },
-    { id: 'pheu-dau-ra', nhan: 'Đánh giá đầu ra', so: d.danh_gia_dau_ra },
+    { id: 'pheu-ks-ky-nang-so', nhan: 'KS kĩ năng số', so: d.khao_sat_ky_nang_so },
+    { id: 'pheu-dau-vao', nhan: 'Đánh giá NLS đầu vào', so: d.danh_gia_dau_vao },
+    { id: 'pheu-dau-ra', nhan: 'Đánh giá NLS đầu ra', so: d.danh_gia_dau_ra },
   ];
   return buoc.map((b, i) => {
     const giu = i === 0 ? null : tyLe(b.so, buoc[i - 1].so);
@@ -50,7 +51,7 @@ export function KhoiKpiPheu({ loc }: { loc: LocThongKe }) {
     <Stack gap="md">
       <KhoiThongKe tieu_de="Tổng quan tham gia" query={query} rong={false}>
         {d && (
-          <SimpleGrid cols={{ base: 2, md: d.ho_so_cho_duyet === null ? 4 : 5 }}>
+          <SimpleGrid cols={{ base: 2, md: d.ho_so_cho_duyet === null ? 5 : 6 }}>
             {dungKpi(d).map((t) => (
               <Paper key={t.id} withBorder p="sm" radius="md" data-testid={t.id}>
                 <Text size="sm" c="dimmed">
@@ -106,7 +107,7 @@ function Pheu({ d }: { d: PheuResult }) {
         data={buoc.map((b) => ({ buoc: b.nhan, 'Số học viên': b.so }))}
         dataKey="buoc"
         series={[{ name: 'Số học viên', color: 'blue.6' }]}
-        yAxisProps={{ width: 130 }}
+        yAxisProps={{ width: 150 }}
       />
       <Stack gap={4}>
         {buoc.map((b) => (

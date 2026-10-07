@@ -1,10 +1,10 @@
 import { DonutChart } from '@mantine/charts';
-import { Paper, SimpleGrid, Stack, Text } from '@mantine/core';
+import { Paper, Progress, SimpleGrid, Stack, Text } from '@mantine/core';
 import { useKhaoSat, type LocThongKe } from '@/api/thongKe';
 import type { KhaoSatResult } from '@/api/types';
 import { ChuThich } from '../ChuThich';
 import { KhoiThongKe } from '../KhoiThongKe';
-import { MAU_MUC } from '../mauMuc';
+import { MAU_MUC, MAU_SERIES, dinhDangTyLe } from '../mauMuc';
 
 type Khoi = KhaoSatResult['dau_vao'];
 
@@ -32,9 +32,26 @@ function Donut({ tieu_de, testId, k }: { tieu_de: string; testId: string; k: Kho
             <ChuThich key={m.ma} muc={[{ nhan: `${m.nhan}: ${m.so_luong}`, mau: mauMuc(m.ma) }]} />
           ))}
           <ChuThich muc={[{ nhan: `Chưa xếp mức: ${k.chua_xep_muc}`, mau: 'gray.5' }]} />
+          <ChuThich muc={[{ nhan: `Chưa làm: ${k.chua_lam}`, mau: 'gray.3' }]} />
         </Stack>
       </Stack>
     </Paper>
+  );
+}
+
+function KyNangSo({ k }: { k: KhaoSatResult['ky_nang_so'] }) {
+  const tong = k.hoan_thanh + k.chua;
+  const tyLe = tong > 0 ? k.hoan_thanh / tong : null;
+  return (
+    <Stack gap={4} data-testid="ky-nang-so">
+      <Text fw={600} size="sm">
+        Khảo sát kĩ năng số (không phân mức)
+      </Text>
+      <Progress value={(tyLe ?? 0) * 100} color={MAU_SERIES.chinh} aria-label="Tỷ lệ hoàn thành khảo sát kĩ năng số" />
+      <Text size="sm">
+        Hoàn thành: {k.hoan_thanh} / {tong} ({dinhDangTyLe(tyLe)}) · Chưa làm: {k.chua}
+      </Text>
+    </Stack>
   );
 }
 
@@ -46,12 +63,13 @@ export function KhoiKhaoSat({ loc }: { loc: LocThongKe }) {
     <KhoiThongKe tieu_de="Kết quả khảo sát" query={query} rong={false}>
       {d && (
         <Stack gap="sm">
-          <Text size="sm" data-testid="ky-nang-so">
-            Khảo sát kỹ năng số: {d.ky_nang_so.hoan_thanh}/{d.ky_nang_so.hoan_thanh + d.ky_nang_so.chua} hoàn thành
+          <KyNangSo k={d.ky_nang_so} />
+          <Text fw={600} size="sm">
+            Đánh giá năng lực số
           </Text>
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
-            <Donut tieu_de="Đánh giá đầu vào" testId="donut-dau-vao" k={d.dau_vao} />
-            <Donut tieu_de="Đánh giá đầu ra" testId="donut-dau-ra" k={d.dau_ra} />
+            <Donut tieu_de="Đánh giá NLS đầu vào" testId="donut-dau-vao" k={d.dau_vao} />
+            <Donut tieu_de="Đánh giá NLS đầu ra" testId="donut-dau-ra" k={d.dau_ra} />
           </SimpleGrid>
         </Stack>
       )}

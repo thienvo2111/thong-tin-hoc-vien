@@ -1089,11 +1089,24 @@ export interface TienDoTruongDong {
   /** Tên đơn vị cha trực tiếp (Sở/Phòng), null nếu không có. */
   ten_don_vi_cha: string | null;
   so_hv: number;
+  so_truy_cap: number;
   ty_le_truy_cap: number | null;
+  so_ky_nang_so: number;
   ty_le_ky_nang_so: number | null;
+  so_dau_vao: number;
   ty_le_dau_vao: number | null;
+  so_dau_ra: number;
   ty_le_dau_ra: number | null;
+  /** Mẫu số của ty_le_co_mat (số dòng điểm danh). */
+  so_luot_diem_danh: number;
+  so_luot_co_mat: number;
   ty_le_co_mat: number | null;
+  /** Mẫu số của ty_le_vle_dat (HV có dữ liệu VLE). */
+  so_hv_co_vle: number;
+  so_hv_vle_dat: number;
   ty_le_vle_dat: number | null;
+  /** Mẫu số của ty_le_dat (lượt đăng ký). */
+  so_dang_ky: number;
+  so_dat: number;
   ty_le_dat: number | null;
 }

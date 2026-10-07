@@ -21,9 +21,9 @@ type Chieu = 'asc' | 'desc';
 
 const COT_TY_LE: { key: TyLeKey; nhan: string }[] = [
   { key: 'ty_le_truy_cap', nhan: '% Truy cập' },
-  { key: 'ty_le_ky_nang_so', nhan: '% KS kỹ năng số' },
-  { key: 'ty_le_dau_vao', nhan: '% Đánh giá đầu vào' },
-  { key: 'ty_le_dau_ra', nhan: '% Đánh giá đầu ra' },
+  { key: 'ty_le_ky_nang_so', nhan: '% KS kĩ năng số' },
+  { key: 'ty_le_dau_vao', nhan: '% Đánh giá NLS đầu vào' },
+  { key: 'ty_le_dau_ra', nhan: '% Đánh giá NLS đầu ra' },
   { key: 'ty_le_co_mat', nhan: '% Có mặt' },
   { key: 'ty_le_vle_dat', nhan: '% VLE ≥ 50%' },
   { key: 'ty_le_dat', nhan: '% Đạt' },

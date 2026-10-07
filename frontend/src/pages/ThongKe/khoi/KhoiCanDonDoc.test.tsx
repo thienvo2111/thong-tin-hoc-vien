@@ -37,6 +37,29 @@ describe('KhoiCanDonDoc', () => {
     await waitFor(() => expect(goi[goi.length - 1]).toBe('vang_nhieu:1'));
   });
 
+  it('thứ tự tab và tab "Chưa làm KS kĩ năng số" gọi loai=chua_ky_nang_so', async () => {
+    const goi: string[] = [];
+    server.use(
+      http.get('/thong-ke/can-don-doc', ({ request }) => {
+        goi.push(new URL(request.url).searchParams.get('loai') ?? '');
+        return HttpResponse.json(canDonDocMau);
+      }),
+    );
+    renderKhoi();
+    await screen.findByText('Nguyễn Văn An');
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'Chưa truy cập',
+      'Chưa làm KS kĩ năng số',
+      'Chưa làm đánh giá NLS',
+      'Vắng nhiều',
+      'VLE thấp',
+    ]);
+    await userEvent.click(screen.getByRole('tab', { name: 'Chưa làm KS kĩ năng số' }));
+    await waitFor(() => expect(goi[goi.length - 1]).toBe('chua_ky_nang_so'));
+    await userEvent.click(screen.getByRole('tab', { name: 'Chưa làm đánh giá NLS' }));
+    await waitFor(() => expect(goi[goi.length - 1]).toBe('chua_khao_sat'));
+  });
+
   it('rỗng → thông báo không có học viên', async () => {
     server.use(http.get('/thong-ke/can-don-doc', () => HttpResponse.json({ tong: 0, page: 1, items: [] })));
     renderKhoi();

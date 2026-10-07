@@ -9,7 +9,8 @@ const CO_TRANG = 20;
 
 const LOAI: { value: LoaiCanDonDoc; label: string }[] = [
   { value: 'chua_truy_cap', label: 'Chưa truy cập' },
-  { value: 'chua_khao_sat', label: 'Chưa làm khảo sát' },
+  { value: 'chua_ky_nang_so', label: 'Chưa làm KS kĩ năng số' },
+  { value: 'chua_khao_sat', label: 'Chưa làm đánh giá NLS' },
   { value: 'vang_nhieu', label: 'Vắng nhiều' },
   { value: 'vle_thap', label: 'VLE thấp' },
 ];

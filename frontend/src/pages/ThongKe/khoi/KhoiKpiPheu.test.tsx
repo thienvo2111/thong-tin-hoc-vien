@@ -13,10 +13,11 @@ function renderKhoi() {
 }
 
 describe('KhoiKpiPheu', () => {
-  it('hiện 4 thẻ đúng số fixture', async () => {
+  it('hiện đủ thẻ KPI đúng số fixture', async () => {
     renderKhoi();
     expect(await within(await screen.findByTestId('kpi-tham-gia')).findByText('200')).toBeInTheDocument();
     expect(within(screen.getByTestId('kpi-da-truy-cap')).getByText('150')).toBeInTheDocument();
+    expect(within(screen.getByTestId('kpi-ky-nang-so')).getByText('100')).toBeInTheDocument();
     expect(within(screen.getByTestId('kpi-dau-vao')).getByText('90')).toBeInTheDocument();
     expect(within(screen.getByTestId('kpi-dau-ra')).getByText('45')).toBeInTheDocument();
   });
@@ -25,7 +26,8 @@ describe('KhoiKpiPheu', () => {
     renderKhoi();
     await screen.findByTestId('kpi-da-truy-cap');
     expect(within(screen.getByTestId('kpi-da-truy-cap')).getByText(/75,0%/)).toBeInTheDocument(); // 150/200
-    expect(within(screen.getByTestId('kpi-dau-vao')).getByText(/60,0%/)).toBeInTheDocument(); // 90/150
+    expect(within(screen.getByTestId('kpi-ky-nang-so')).getByText(/66,7%/)).toBeInTheDocument(); // 100/150
+    expect(within(screen.getByTestId('kpi-dau-vao')).getByText(/90,0%/)).toBeInTheDocument(); // 90/100
     expect(within(screen.getByTestId('kpi-dau-ra')).getByText(/50,0%/)).toBeInTheDocument(); // 45/90
   });
 
@@ -46,6 +48,16 @@ describe('KhoiKpiPheu', () => {
     await screen.findByTestId('kpi-da-truy-cap');
     expect(within(screen.getByTestId('kpi-da-truy-cap')).getByText(/—/)).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('NaN');
+  });
+
+  it('nhãn thẻ và bước phễu dùng thuật ngữ KS kĩ năng số / đánh giá NLS', async () => {
+    renderKhoi();
+    expect(await within(await screen.findByTestId('kpi-ky-nang-so')).findByText('Đã làm KS kĩ năng số')).toBeInTheDocument();
+    expect(within(screen.getByTestId('kpi-dau-vao')).getByText('Đã làm đánh giá NLS đầu vào')).toBeInTheDocument();
+    expect(within(screen.getByTestId('kpi-dau-ra')).getByText('Đã làm đánh giá NLS đầu ra')).toBeInTheDocument();
+    expect(within(screen.getByTestId('pheu-ks-ky-nang-so')).getByText('KS kĩ năng số')).toBeInTheDocument();
+    expect(within(screen.getByTestId('pheu-dau-vao')).getByText('Đánh giá NLS đầu vào')).toBeInTheDocument();
+    expect(within(screen.getByTestId('pheu-dau-ra')).getByText('Đánh giá NLS đầu ra')).toBeInTheDocument();
   });
 
   it('hiện thẻ hồ sơ chờ duyệt khi có quyền, ẩn khi null', async () => {
