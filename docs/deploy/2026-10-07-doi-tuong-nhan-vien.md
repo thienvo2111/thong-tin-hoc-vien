@@ -118,8 +118,8 @@ psql -h 127.0.0.1 -U hocvien_app -d thong_tin_hoc_vien \
 - `> 0` → code cũ sẽ lỗi khi đọc các hồ sơ này. **Cách ưu tiên: sửa lỗi tiến (fix forward), không quay lui.**
   Nếu bắt buộc quay lui, phải **đổi dữ liệu** — hỏi lại trước khi làm, vì học viên mất lựa chọn đã chọn:
   ```sql
-  -- lưu danh sách để khôi phục sau
-  \copy (SELECT id FROM hoc_vien WHERE doi_tuong = 'nhan_vien') TO 'nhan-vien-ids.csv' CSV   -- ghi vào thư mục đang đứng
+  -- lưu danh sách id (file ghi vào thư mục đang đứng) để khôi phục sau
+  \copy (SELECT id FROM hoc_vien WHERE doi_tuong = 'nhan_vien') TO 'nhan-vien-ids.csv' CSV
   UPDATE hoc_vien SET doi_tuong = NULL WHERE doi_tuong = 'nhan_vien';
   ```
   Các hồ sơ này sẽ thành "chưa đầy đủ" (thiếu đối tượng) cho đến khi deploy lại.
