@@ -4,7 +4,10 @@ import { ThongBaoService } from './thong-bao.service';
 import * as mailerUtil from './util/mailer.util';
 
 jest.mock('./util/mailer.util', () => ({
-  getMailTransporter: jest.fn(),
+  ...jest.requireActual<typeof import('./util/mailer.util')>(
+    './util/mailer.util',
+  ),
+  guiEmail: jest.fn(),
   getTestMessageUrl: jest.fn(() => undefined),
 }));
 
@@ -34,10 +37,10 @@ describe('HangDoiEmailProcessor', () => {
 
   beforeEach(() => {
     sendMail = jest.fn().mockResolvedValue({ messageId: 'x' });
-    (mailerUtil.getMailTransporter as jest.Mock).mockResolvedValue({
-      transporter: { sendMail },
-      from: 'no-reply@test.local',
-    });
+    (mailerUtil.guiEmail as jest.Mock).mockImplementation(async (thu) => ({
+      info: await sendMail(thu),
+      taiKhoan: 'no-reply@test.local',
+    }));
     prisma = {
       hang_doi_email: { findMany: jest.fn(), update: jest.fn() },
       nhat_ky_thong_bao: { create: jest.fn() },
@@ -187,5 +190,21 @@ describe('HangDoiEmailProcessor', () => {
     prisma.hang_doi_email.update.mockRejectedValue(new Error('DB down'));
 
     await expect(processor.xuLyHangDoi()).resolves.toBeUndefined();
+  });
+
+  it('2026-10-07: mọi tài khoản hết hạn mức -> dừng lượt, thư giữ cho_gui, KHÔNG tăng so_lan_thu', async () => {
+    thongBaoService.tinhHanMucConLaiHomNay.mockResolvedValue(100);
+    prisma.hang_doi_email.findMany.mockResolvedValue([
+      dongChoGui({ id: 'hd-1', so_lan_thu: 2 }),
+      dongChoGui({ id: 'hd-2' }),
+    ]);
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    sendMail.mockRejectedValue(new mailerUtil.HetHanMucGuiEmailError());
+
+    await processor.xuLyHangDoi();
+
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(prisma.hang_doi_email.update).not.toHaveBeenCalled();
+    expect(prisma.nhat_ky_thong_bao.create).not.toHaveBeenCalled();
   });
 });
