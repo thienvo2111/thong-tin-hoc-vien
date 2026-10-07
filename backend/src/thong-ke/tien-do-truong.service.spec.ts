@@ -135,6 +135,16 @@ describe('TienDoTruongService', () => {
     expect(t1.ty_le_dau_vao).toBeCloseTo(1 / 3);
     expect(t1.ty_le_dau_ra).toBeCloseTo(1 / 3);
     expect(t1.ty_le_dat).toBeCloseTo(1 / 4); // 1 đạt / 4 đăng ký
+    expect(t1.so_truy_cap).toBe(2);
+    expect(t1.so_ky_nang_so).toBe(1);
+    expect(t1.so_dau_vao).toBe(1);
+    expect(t1.so_dau_ra).toBe(1);
+    expect(t1.so_dang_ky).toBe(4);
+    expect(t1.so_dat).toBe(1);
+    expect(t2.so_truy_cap).toBe(0);
+    expect(t2.so_dau_vao).toBe(1);
+    expect(t2.so_dang_ky).toBe(1);
+    expect(t2.so_dat).toBe(1);
     expect(t2.so_hv).toBe(1);
     expect(t2.ty_le_truy_cap).toBe(0);
     expect(t2.ty_le_dau_vao).toBe(1);
@@ -155,8 +165,14 @@ describe('TienDoTruongService', () => {
       ],
     );
     const rows = await service.danhSach(caller('quan_tri'), {});
-    expect(rows.find((r) => r.don_vi_id === 't1')!.ty_le_co_mat).toBe(0.75);
-    expect(rows.find((r) => r.don_vi_id === 't2')!.ty_le_co_mat).toBeNull();
+    const t1 = rows.find((r) => r.don_vi_id === 't1')!;
+    const t2 = rows.find((r) => r.don_vi_id === 't2')!;
+    expect(t1.ty_le_co_mat).toBe(0.75);
+    expect(t1.so_luot_co_mat).toBe(3);
+    expect(t1.so_luot_diem_danh).toBe(4);
+    expect(t2.ty_le_co_mat).toBeNull();
+    expect(t2.so_luot_co_mat).toBe(0);
+    expect(t2.so_luot_diem_danh).toBe(0);
   });
 
   it('ty_le_vle_dat: A min 60 đạt, B có 40 không đạt -> 0.5; không ai có VLE -> null', async () => {
@@ -175,8 +191,14 @@ describe('TienDoTruongService', () => {
       ],
     );
     const rows = await service.danhSach(caller('quan_tri'), {});
-    expect(rows.find((r) => r.don_vi_id === 't1')!.ty_le_vle_dat).toBe(0.5);
-    expect(rows.find((r) => r.don_vi_id === 't2')!.ty_le_vle_dat).toBeNull();
+    const t1 = rows.find((r) => r.don_vi_id === 't1')!;
+    const t2 = rows.find((r) => r.don_vi_id === 't2')!;
+    expect(t1.ty_le_vle_dat).toBe(0.5);
+    expect(t1.so_hv_vle_dat).toBe(1);
+    expect(t1.so_hv_co_vle).toBe(2);
+    expect(t2.ty_le_vle_dat).toBeNull();
+    expect(t2.so_hv_vle_dat).toBe(0);
+    expect(t2.so_hv_co_vle).toBe(0);
   });
 
   it('VLE: HV học 2 khóa, 1 khóa dưới 50 -> không đạt', async () => {
@@ -192,6 +214,36 @@ describe('TienDoTruongService', () => {
     );
     const rows = await service.danhSach(caller('quan_tri'), {});
     expect(rows[0].ty_le_vle_dat).toBe(0);
+  });
+
+  it('bất biến: mỗi ty_le = tử/mẫu tương ứng, null khi mẫu 0', async () => {
+    const a = dk('t1', 'h1', {
+      dangNhap: true,
+      ks: ['khao-sat', 'dau-ra'],
+      ketQua: 'dat',
+    });
+    const b = dk('t1', 'h2', { ks: ['danh-gia'] });
+    const c = dk('t2', 'h3');
+    setup(
+      [a, b, c],
+      [
+        { dang_ky_hoc_id: a.id, trang_thai: 'co_mat', _count: 2 },
+        { dang_ky_hoc_id: b.id, trang_thai: 'vang', _count: 1 },
+      ],
+      [{ dang_ky_hoc_id: a.id, ty_le_hoan_thanh: '80' }],
+    );
+    const rows = await service.danhSach(caller('quan_tri'), {});
+    const chia = (tu: number, mau: number) => (mau === 0 ? null : tu / mau);
+    expect(rows).toHaveLength(2);
+    for (const r of rows) {
+      expect(r.ty_le_truy_cap).toBe(chia(r.so_truy_cap, r.so_hv));
+      expect(r.ty_le_ky_nang_so).toBe(chia(r.so_ky_nang_so, r.so_hv));
+      expect(r.ty_le_dau_vao).toBe(chia(r.so_dau_vao, r.so_hv));
+      expect(r.ty_le_dau_ra).toBe(chia(r.so_dau_ra, r.so_hv));
+      expect(r.ty_le_co_mat).toBe(chia(r.so_luot_co_mat, r.so_luot_diem_danh));
+      expect(r.ty_le_vle_dat).toBe(chia(r.so_hv_vle_dat, r.so_hv_co_vle));
+      expect(r.ty_le_dat).toBe(chia(r.so_dat, r.so_dang_ky));
+    }
   });
 
   it('ten_don_vi_cha đúng, null khi không có cha; sắp theo tên (vi)', async () => {
@@ -236,8 +288,10 @@ describe('TienDoTruongService', () => {
     expect(row.getCell(2).value).toBe('Trường t1');
     expect(row.getCell(3).value).toBe('Sở A');
     expect(row.getCell(4).value).toBe(3);
-    expect(row.getCell(5).value).toBe(33.3);
-    expect(row.getCell(9).value).toBeNull(); // % Có mặt: không điểm danh
+    expect(row.getCell(5).value).toBe(1); // Đã truy cập
+    expect(row.getCell(6).value).toBe(33.3); // % Truy cập
+    expect(row.getCell(13).value).toBe(0); // Lượt điểm danh
+    expect(row.getCell(15).value).toBeNull(); // % Có mặt: không điểm danh
   });
 
   it('xuatExcel rong -> chỉ header', async () => {

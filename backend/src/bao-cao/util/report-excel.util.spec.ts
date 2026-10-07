@@ -1,9 +1,11 @@
 import * as ExcelJS from 'exceljs';
 import {
   buildTongHopWorkbook,
+  buildTienDoTruongWorkbook,
   buildTongQuanWorkbook,
   buildVanHanhWorkbook,
 } from './report-excel.util';
+import { TienDoTruongDong } from '../../thong-ke/thong-ke.types';
 import { TongHopResult, TongQuanResult, VanHanhResult } from '../bao-cao.types';
 
 async function readSheetValues(buffer: Buffer, sheetIndex = 0): Promise<unknown[][]> {
@@ -335,6 +337,63 @@ describe('report-excel.util', () => {
       1,
       1,
       '80,0%',
+    ]);
+  });
+
+  it('buildTienDoTruongWorkbook: đủ 21 tiêu đề đúng thứ tự, dòng có cả số lượng lẫn %', async () => {
+    const dong: TienDoTruongDong = {
+      don_vi_id: 'x',
+      ten_don_vi: 'Trường A',
+      ten_don_vi_cha: 'Sở B',
+      so_hv: 8,
+      so_truy_cap: 6,
+      ty_le_truy_cap: 0.75,
+      so_ky_nang_so: 4,
+      ty_le_ky_nang_so: 0.5,
+      so_dau_vao: 2,
+      ty_le_dau_vao: 0.25,
+      so_dau_ra: 1,
+      ty_le_dau_ra: 0.125,
+      so_luot_diem_danh: 10,
+      so_luot_co_mat: 9,
+      ty_le_co_mat: 0.9,
+      so_hv_co_vle: 0,
+      so_hv_vle_dat: 0,
+      ty_le_vle_dat: null,
+      so_dang_ky: 8,
+      so_dat: 3,
+      ty_le_dat: 0.375,
+    };
+    const rows = await readSheetValues(await buildTienDoTruongWorkbook([dong]));
+    expect(rows[0]).toEqual([
+      'STT',
+      'Trường',
+      'Đơn vị quản lý',
+      'Số HV',
+      'Đã truy cập',
+      '% Truy cập',
+      'Đã làm KS kỹ năng số',
+      '% KS kỹ năng số',
+      'Đã làm đánh giá đầu vào',
+      '% Đánh giá đầu vào',
+      'Đã làm đánh giá đầu ra',
+      '% Đánh giá đầu ra',
+      'Lượt điểm danh',
+      'Lượt có mặt',
+      '% Có mặt',
+      'HV có dữ liệu VLE',
+      'HV VLE ≥ 50%',
+      '% VLE ≥ 50%',
+      'Lượt đăng ký',
+      'Đạt',
+      '% Đạt',
+    ]);
+    expect(rows[1]).toEqual([
+      1, 'Trường A', 'Sở B', 8,
+      6, 75, 4, 50, 2, 25, 1, 12.5,
+      10, 9, 90,
+      0, 0, undefined, // ô trống đọc lại là undefined
+      8, 3, 37.5,
     ]);
   });
 });

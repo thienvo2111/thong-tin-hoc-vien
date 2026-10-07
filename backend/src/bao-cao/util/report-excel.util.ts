@@ -450,27 +450,52 @@ export async function buildTienDoTruongWorkbook(
     'Trường',
     'Đơn vị quản lý',
     'Số HV',
+    'Đã truy cập',
     '% Truy cập',
+    'Đã làm KS kỹ năng số',
     '% KS kỹ năng số',
+    'Đã làm đánh giá đầu vào',
     '% Đánh giá đầu vào',
+    'Đã làm đánh giá đầu ra',
     '% Đánh giá đầu ra',
+    'Lượt điểm danh',
+    'Lượt có mặt',
     '% Có mặt',
+    'HV có dữ liệu VLE',
+    'HV VLE ≥ 50%',
     '% VLE ≥ 50%',
+    'Lượt đăng ký',
+    'Đạt',
     '% Đạt',
   ]);
   sheet.getRow(1).font = { bold: true };
+  const doRong = [6, 45, 35, 12, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 12, 12];
+  doRong.forEach((width, i) => {
+    sheet.getColumn(i + 1).width = width;
+  });
+  sheet.views = [{ state: 'frozen', ySplit: 1 }];
   rows.forEach((row, i) => {
     sheet.addRow([
       i + 1,
       row.ten_don_vi,
       row.ten_don_vi_cha ?? '',
       row.so_hv,
+      row.so_truy_cap,
       phanTram(row.ty_le_truy_cap),
+      row.so_ky_nang_so,
       phanTram(row.ty_le_ky_nang_so),
+      row.so_dau_vao,
       phanTram(row.ty_le_dau_vao),
+      row.so_dau_ra,
       phanTram(row.ty_le_dau_ra),
+      row.so_luot_diem_danh,
+      row.so_luot_co_mat,
       phanTram(row.ty_le_co_mat),
+      row.so_hv_co_vle,
+      row.so_hv_vle_dat,
       phanTram(row.ty_le_vle_dat),
+      row.so_dang_ky,
+      row.so_dat,
       phanTram(row.ty_le_dat),
     ]);
   });

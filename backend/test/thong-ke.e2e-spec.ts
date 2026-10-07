@@ -388,6 +388,9 @@ describe('Thống kê dashboard (e2e)', () => {
     type Dong = {
       don_vi_id: string;
       so_hv: number;
+      so_truy_cap: number;
+      so_dang_ky: number;
+      so_dat: number;
       ten_don_vi_cha: string | null;
     };
     const timDong = (body: Dong[], id: string) =>
@@ -410,6 +413,10 @@ describe('Thống kê dashboard (e2e)', () => {
       expect(timDong(body, dv.khac)?.ten_don_vi_cha).toBe(
         `Đơn vị TK so ${suf}`,
       );
+      for (const r of body) {
+        expect(r.so_truy_cap).toBeLessThanOrEqual(r.so_hv);
+        expect(r.so_dat).toBeLessThanOrEqual(r.so_dang_ky);
+      }
     });
 
     it('phong: không có dòng của trường đơn vị khác', async () => {
