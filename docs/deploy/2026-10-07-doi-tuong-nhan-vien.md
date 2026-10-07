@@ -45,13 +45,21 @@ pm2 status
 ## 2. Sao lưu DB thủ công
 
 `06-deploy.sh` có tự backup trước migrate nếu đã cài `07-setup-backup.sh`, nhưng vẫn dump riêng 1 bản
-định dạng `-Fc` để khôi phục nhanh:
+định dạng `-Fc` để khôi phục nhanh.
+
+Mật khẩu DB **lấy thẳng từ `DATABASE_URL` trong `backend/.env`** (không gõ tay, không lộ trong lịch sử lệnh).
+Bỏ đuôi `?schema=public` vì đó là tham số của Prisma, `pg_dump`/`psql` không nhận. Biến `DB_URL` dùng tiếp
+cho mọi lệnh `psql`/`pg_restore` bên dưới trong cùng phiên SSH:
 
 ```bash
-pg_dump -h 127.0.0.1 -U hocvien_app -Fc thong_tin_hoc_vien \
-  -f ~/backups/postgres/truoc-nhan-vien-$(date +%F-%H%M).dump
-ls -lh ~/backups/postgres/ | tail -3      # file phải có dung lượng hợp lý, không 0 byte
+export DB_URL="$(grep '^DATABASE_URL=' ~/apps/boi-duong-nls/backend/.env | cut -d= -f2- | tr -d '"' | sed 's/?.*//')"
 ```
+
+```bash
+(umask 077; pg_dump "$DB_URL" -Fc -f ~/backups/postgres/truoc-nhan-vien-$(date +%F-%H%M).dump) && ls -lh ~/backups/postgres/ | tail -3
+```
+
+File phải có dung lượng hợp lý (không 0 byte), quyền `-rw-------` (dump chứa CCCD/ngày sinh/SĐT).
 
 ## 3. Kéo code mới
 
@@ -87,8 +95,7 @@ Sau khi xong:
 
 ```bash
 cd ~/apps/boi-duong-nls/backend && npx prisma migrate status   # kỳ vọng: Database schema is up to date
-psql -h 127.0.0.1 -U hocvien_app -d thong_tin_hoc_vien \
-  -c "SELECT enum_range(NULL::doi_tuong_hoc_vien);"            # kỳ vọng: {giao_vien,can_bo_quan_ly,nhan_vien}
+psql "$DB_URL" -c "SELECT enum_range(NULL::doi_tuong_hoc_vien);"   # kỳ vọng: {giao_vien,can_bo_quan_ly,nhan_vien}
 pm2 logs boiduongnls-backend --lines 50 --nostream
 ```
 
@@ -110,9 +117,10 @@ Quản trị:
 **Trước khi chạy lại code cũ**, kiểm tra có hồ sơ nào đã chọn Nhân viên:
 
 ```bash
-psql -h 127.0.0.1 -U hocvien_app -d thong_tin_hoc_vien \
-  -c "SELECT count(*) FROM hoc_vien WHERE doi_tuong = 'nhan_vien';"
+psql "$DB_URL" -c "SELECT count(*) FROM hoc_vien WHERE doi_tuong = 'nhan_vien';"
 ```
+
+(Phiên SSH mới thì chạy lại lệnh `export DB_URL=...` ở bước 2 trước.)
 
 - `0` → quay lui code thoải mái, không cần đụng DB.
 - `> 0` → code cũ sẽ lỗi khi đọc các hồ sơ này. **Cách ưu tiên: sửa lỗi tiến (fix forward), không quay lui.**
@@ -136,7 +144,7 @@ Chỉ khôi phục từ bản dump ở bước 2 khi **dữ liệu bị sai** �
 
 ```bash
 pm2 stop boiduongnls-backend
-pg_restore -h 127.0.0.1 -U hocvien_app -d thong_tin_hoc_vien --clean --if-exists \
+pg_restore -d "$DB_URL" --clean --if-exists \
   ~/backups/postgres/truoc-nhan-vien-<ngay-gio>.dump
 pm2 start boiduongnls-backend
 ```
