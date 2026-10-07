@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { HoTroHocVienModule } from '../ho-tro-hoc-vien/ho-tro-hoc-vien.module';
 import { SsoModule } from '../sso/sso.module';
+import { CanDonDocService } from './can-don-doc.service';
 import { ThongKeController } from './thong-ke.controller';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { ThongKeService } from './thong-ke.service';
@@ -12,7 +13,12 @@ import { XepHangService } from './xep-hang.service';
 @Module({
   imports: [AuthModule, HoTroHocVienModule, SsoModule],
   controllers: [ThongKeController],
-  providers: [ThongKeScopeService, ThongKeService, XepHangService],
+  providers: [
+    ThongKeScopeService,
+    ThongKeService,
+    XepHangService,
+    CanDonDocService,
+  ],
   exports: [ThongKeScopeService],
 })
 export class ThongKeModule {}

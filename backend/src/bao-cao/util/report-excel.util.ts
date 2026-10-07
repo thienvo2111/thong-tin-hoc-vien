@@ -1,4 +1,5 @@
 import * as ExcelJS from 'exceljs';
+import { CanDonDocDong } from '../../thong-ke/thong-ke.types';
 import {
   CAP_GIANG_DAY,
   KHONG_XAC_DINH,
@@ -408,6 +409,29 @@ export async function buildDieuKienDanhGiaWorkbook(
       row.da_xem_vle ? 'Đã xem' : 'Chưa xem',
     ]);
   }
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+// Dashboard thống kê — GET /thong-ke/can-don-doc/xuat-excel.
+export async function buildCanDonDocWorkbook(
+  rows: CanDonDocDong[],
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Cần đôn đốc');
+  sheet.addRow(['STT', 'Họ tên', 'Đơn vị', 'Khóa', 'SĐT', 'Email', 'Chi tiết']);
+  sheet.getRow(1).font = { bold: true };
+  rows.forEach((row, i) => {
+    sheet.addRow([
+      i + 1,
+      row.ho_ten,
+      row.ten_don_vi,
+      row.ten_khoa,
+      row.so_dien_thoai ?? '',
+      row.email ?? '',
+      row.chi_tiet,
+    ]);
+  });
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }

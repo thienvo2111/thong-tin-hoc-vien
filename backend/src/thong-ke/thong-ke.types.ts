@@ -119,3 +119,20 @@ export type XepHangResult =
       gia_tri: number | null;
       trung_binh: number | null;
     };
+
+export interface CanDonDocDong {
+  hoc_vien_id: string;
+  ho_ten: string;
+  ten_don_vi: string;
+  ten_khoa: string;
+  so_dien_thoai: string | null;
+  email: string | null;
+  /** "Vắng 3 buổi", "VLE 42%" hoặc '' */
+  chi_tiet: string;
+}
+
+export interface CanDonDocResult {
+  tong: number;
+  page: number;
+  items: CanDonDocDong[];
+}

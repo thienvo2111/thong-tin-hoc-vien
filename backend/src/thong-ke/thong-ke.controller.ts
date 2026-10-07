@@ -1,10 +1,16 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { ThongKeService } from './thong-ke.service';
-import { ThongKeQueryDto, XepHangQueryDto } from './dto/thong-ke-query.dto';
+import {
+  CanDonDocQueryDto,
+  ThongKeQueryDto,
+  XepHangQueryDto,
+} from './dto/thong-ke-query.dto';
+import { CanDonDocService } from './can-don-doc.service';
 import { XepHangService } from './xep-hang.service';
 
 // hoc_vien không có phạm vi thống kê -> RolesGuard tự trả 403.
@@ -15,6 +21,7 @@ export class ThongKeController {
     private readonly scopeService: ThongKeScopeService,
     private readonly service: ThongKeService,
     private readonly xepHangService: XepHangService,
+    private readonly canDonDocService: CanDonDocService,
   ) {}
 
   @Get('bo-loc')
@@ -64,5 +71,29 @@ export class ThongKeController {
   @Get('xep-hang')
   xepHang(@CurrentUser() user: AuthenticatedUser, @Query() q: XepHangQueryDto) {
     return this.xepHangService.xepHang(user, q);
+  }
+
+  @Get('can-don-doc')
+  canDonDoc(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: CanDonDocQueryDto,
+  ) {
+    return this.canDonDocService.danhSach(user, q);
+  }
+
+  @Get('can-don-doc/xuat-excel')
+  async canDonDocXuatExcel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: CanDonDocQueryDto,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.canDonDocService.xuatExcel(user, q);
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="can-don-doc.xlsx"',
+      })
+      .send(buffer);
   }
 }
