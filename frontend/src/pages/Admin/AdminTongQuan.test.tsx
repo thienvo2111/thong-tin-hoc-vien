@@ -84,7 +84,8 @@ describe('Admin — Tổng quan mở rộng (bộ lọc + biểu đồ)', () => 
     // Fixture taoBaoCaoTongQuanMau(): đầu vào theo_muc M4 (Nâng cao) = 2 (đầu ra = 0 -> nhãn xuất hiện
     // 2 lần, lấy phần tử đầu = khối "Đầu vào" theo đúng thứ tự DOM).
     await khoi.findByText('Đầu vào');
-    const nhanM4 = khoi.getAllByText('M4 – Nâng cao')[0];
+    // Bỏ qua tên mức trong tooltip recharts (render sẵn khi biểu đồ có kích thước).
+    const nhanM4 = khoi.getAllByText('M4 – Nâng cao').filter((e) => !e.closest('[class*="ChartTooltip"]'))[0];
     const chuThichM4 = nhanM4.closest('div')!;
     expect(within(chuThichM4).getByText('2')).toBeInTheDocument();
 

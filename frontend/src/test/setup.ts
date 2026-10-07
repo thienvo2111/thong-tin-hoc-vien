@@ -24,13 +24,16 @@ if (!window.matchMedia) {
     dispatchEvent: vi.fn(),
   }));
 }
-if (!window.ResizeObserver) {
-  window.ResizeObserver = class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  };
-}
+// Stub báo kích thước cố định để recharts ResponsiveContainer không cảnh báo width(0)/height(0) trong jsdom.
+window.ResizeObserver = class {
+  constructor(private cb: ResizeObserverCallback) {}
+  observe(target: Element) {
+    const contentRect = { width: 800, height: 400, top: 0, left: 0, right: 800, bottom: 400, x: 0, y: 0 } as DOMRectReadOnly;
+    queueMicrotask(() => this.cb([{ target, contentRect } as ResizeObserverEntry], this as unknown as ResizeObserver));
+  }
+  unobserve() {}
+  disconnect() {}
+};
 Element.prototype.scrollIntoView = vi.fn();
 // jsdom không cài URL.createObjectURL/revokeObjectURL — cần cho các nút "Xuất Excel"/"Tải file lỗi"
 // (Phase 5, src/lib/taiFile.ts) dùng Blob + createObjectURL để tải file qua trình duyệt.

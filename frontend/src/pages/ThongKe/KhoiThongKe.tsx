@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, type ReactNode } from 'react';
-import { Alert, Button, Group, Paper, Skeleton, Stack, Text, Title } from '@mantine/core';
+import { Alert, Button, Group, Paper, Skeleton, Stack, Text, Title, VisuallyHidden } from '@mantine/core';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { ApiError } from '@/api/client';
 import { thongDiepLoiChung } from '@/lib/loiApi';
@@ -27,7 +27,8 @@ export function KhoiThongKe({ tieu_de, query, rong, thong_bao_rong, children }: 
   let noiDung: ReactNode;
   if (query.isLoading) {
     noiDung = (
-      <Stack gap="xs">
+      <Stack gap="xs" aria-busy="true" role="status">
+        <VisuallyHidden>Đang tải…</VisuallyHidden>
         <Skeleton height={20} width="40%" />
         <Skeleton height={120} />
       </Stack>
