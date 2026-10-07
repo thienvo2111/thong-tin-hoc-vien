@@ -12,7 +12,9 @@ const mauMuc = (ma: string) => MAU_MUC[ma as keyof typeof MAU_MUC] ?? 'gray.5';
 
 function Donut({ tieu_de, testId, k }: { tieu_de: string; testId: string; k: Khoi }) {
   const lat = k.theo_muc.map((m) => ({ name: m.nhan, value: m.so_luong, color: mauMuc(m.ma) }));
-  const tong = lat.reduce((s, m) => s + m.value, 0) + k.chua_xep_muc;
+  const daLam = lat.reduce((s, m) => s + m.value, 0) + k.chua_xep_muc;
+  const tong = daLam + k.chua_lam;
+  const tyLeDaLam = (n: number) => dinhDangTyLe(daLam > 0 ? n / daLam : null);
   const duLieu = k.chua_xep_muc > 0 ? [...lat, { name: 'Chưa xếp mức', value: k.chua_xep_muc, color: 'gray.5' }] : lat;
   return (
     <Paper withBorder p="sm" radius="md" data-testid={testId}>
@@ -20,8 +22,8 @@ function Donut({ tieu_de, testId, k }: { tieu_de: string; testId: string; k: Kho
         <Text fw={600} size="sm">
           {tieu_de}
         </Text>
-        {tong > 0 ? (
-          <DonutChart size={160} thickness={24} withTooltip data={duLieu} />
+        {daLam > 0 ? (
+          <DonutChart size={160} thickness={24} withTooltip data={duLieu} chartLabel={`${daLam} · ${dinhDangTyLe(tong > 0 ? daLam / tong : null)}`} />
         ) : (
           <Text size="sm" c="dimmed">
             Chưa có kết quả
@@ -29,10 +31,10 @@ function Donut({ tieu_de, testId, k }: { tieu_de: string; testId: string; k: Kho
         )}
         <Stack gap={4}>
           {k.theo_muc.map((m) => (
-            <ChuThich key={m.ma} muc={[{ nhan: `${m.nhan}: ${m.so_luong}`, mau: mauMuc(m.ma) }]} />
+            <ChuThich key={m.ma} muc={[{ nhan: `${m.nhan}: ${m.so_luong} (${tyLeDaLam(m.so_luong)})`, mau: mauMuc(m.ma) }]} />
           ))}
-          <ChuThich muc={[{ nhan: `Chưa xếp mức: ${k.chua_xep_muc}`, mau: 'gray.5' }]} />
-          <ChuThich muc={[{ nhan: `Chưa làm: ${k.chua_lam}`, mau: 'gray.3' }]} />
+          <ChuThich muc={[{ nhan: `Chưa xếp mức: ${k.chua_xep_muc} (${tyLeDaLam(k.chua_xep_muc)})`, mau: 'gray.5' }]} />
+          <ChuThich muc={[{ nhan: `Chưa làm: ${k.chua_lam} (${dinhDangTyLe(tong > 0 ? k.chua_lam / tong : null)} tổng HV)`, mau: 'gray.3' }]} />
         </Stack>
       </Stack>
     </Paper>
