@@ -367,6 +367,40 @@ describe('Thống kê dashboard (e2e)', () => {
       expect(res.body.items[0].chi_tiet).toBe('Vắng 2 buổi');
     });
 
+    it('chua_ky_nang_so: HV đã hoàn thành phiếu khao-sat không còn trong danh sách; phiếu danh-gia không được tính', async () => {
+      const truoc = await get(duongDan('chua_ky_nang_so'), tok.quanTri);
+      expect(truoc.status).toBe(200);
+      expect(truoc.body.tong).toBe(14);
+      const hv = await prisma.hoc_vien.findFirstOrThrow({
+        where: { ma_dinh_danh_moet: `TK-t2-1-${SUF}` },
+      });
+      const hv2 = await prisma.hoc_vien.findFirstOrThrow({
+        where: { ma_dinh_danh_moet: `TK-t2-4-${SUF}` },
+      });
+      await prisma.ket_qua_khao_sat.createMany({
+        data: [
+          {
+            hoc_vien_id: hv.id,
+            loai: 'khao-sat',
+            trang_thai: 'hoan_thanh',
+            nguon: 'import',
+          },
+          {
+            hoc_vien_id: hv2.id,
+            loai: 'danh-gia',
+            trang_thai: 'hoan_thanh',
+            nguon: 'import',
+          },
+        ],
+      });
+      const sau = await get(duongDan('chua_ky_nang_so'), tok.quanTri);
+      expect(sau.status).toBe(200);
+      expect(sau.body.tong).toBe(13);
+      const ten = (sau.body.items as { ho_ten: string }[]).map((i) => i.ho_ten);
+      expect(ten).not.toContain('HV TK t2-1');
+      expect(ten).toContain('HV TK t2-4');
+    });
+
     it('loai không hợp lệ -> 400', async () => {
       const res = await get(duongDan('xyz'), tok.quanTri);
       expect(res.status).toBe(400);

@@ -27,6 +27,7 @@ export class XepHangQueryDto extends ThongKeQueryDto {
 
 export const LOAI_CAN_DON_DOC = [
   'chua_truy_cap',
+  'chua_ky_nang_so',
   'chua_khao_sat',
   'vang_nhieu',
   'vle_thap',

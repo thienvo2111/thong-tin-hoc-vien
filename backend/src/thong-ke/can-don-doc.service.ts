@@ -39,6 +39,16 @@ interface DieuKien {
   chiTiet: Map<string, string>;
 }
 
+// Chưa hoàn thành phiếu `loai` (khao-sat = kĩ năng số, danh-gia = NLS đầu vào).
+const chuaHoanThanhPhieu = (loai: 'khao-sat' | 'danh-gia'): DieuKien => ({
+  loc: {
+    hoc_vien: {
+      ket_qua_khao_sat: { none: { loai, trang_thai: 'hoan_thanh' } },
+    },
+  },
+  chiTiet: new Map(),
+});
+
 @Injectable()
 export class CanDonDocService {
   constructor(
@@ -106,17 +116,10 @@ export class CanDonDocService {
           },
           chiTiet: new Map(),
         };
+      case 'chua_ky_nang_so':
+        return chuaHoanThanhPhieu('khao-sat');
       case 'chua_khao_sat':
-        return {
-          loc: {
-            hoc_vien: {
-              ket_qua_khao_sat: {
-                none: { loai: 'danh-gia', trang_thai: 'hoan_thanh' },
-              },
-            },
-          },
-          chiTiet: new Map(),
-        };
+        return chuaHoanThanhPhieu('danh-gia');
       case 'vang_nhieu':
         return this.vangNhieu(where);
       case 'vle_thap':

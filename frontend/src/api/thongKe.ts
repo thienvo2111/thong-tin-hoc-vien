@@ -18,7 +18,7 @@ import type {
 
 export type LocThongKe = { khoa_id?: string; don_vi_id?: string; cum_id?: string };
 export type ChiSoXepHang = 'truy_cap' | 'khao_sat' | 'dat';
-export type LoaiCanDonDoc = 'chua_truy_cap' | 'chua_khao_sat' | 'vang_nhieu' | 'vle_thap';
+export type LoaiCanDonDoc = 'chua_truy_cap' | 'chua_ky_nang_so' | 'chua_khao_sat' | 'vang_nhieu' | 'vle_thap';
 
 const STALE_TIME = 60_000;
 

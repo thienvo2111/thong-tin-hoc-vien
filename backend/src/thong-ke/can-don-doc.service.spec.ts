@@ -115,6 +115,17 @@ describe('CanDonDocService', () => {
     });
   });
 
+  it('chua_ky_nang_so: không có phiếu khao-sat hoàn thành', async () => {
+    await service.danhSach(user, { loai: 'chua_ky_nang_so' });
+    expect(whereDaGoi().AND[1]).toEqual({
+      hoc_vien: {
+        ket_qua_khao_sat: {
+          none: { loai: 'khao-sat', trang_thai: 'hoan_thanh' },
+        },
+      },
+    });
+  });
+
   it('vang_nhieu: groupBy chỉ tính "vang", ngưỡng >= 2, chi_tiết "Vắng n buổi"', async () => {
     prisma.diem_danh.groupBy.mockResolvedValue([
       { dang_ky_hoc_id: 'dk-a', _count: { _all: 3 } },
