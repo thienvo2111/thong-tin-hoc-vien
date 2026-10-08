@@ -102,4 +102,23 @@ describe('DashboardThongKe', () => {
       for (const ten of ['pheu', 'khao-sat', 'chuyen-can', 'tien-do-truong']) expect(goi[ten]).toBe('nhan_vien');
     });
   });
+
+  it('403 ngoài phạm vi: xóa khoa/đơn vị nhưng giữ doi_tuong', async () => {
+    server.use(
+      http.get('/thong-ke/pheu', ({ request }) =>
+        new URL(request.url).searchParams.has('khoa_id')
+          ? HttpResponse.json({ error: { code: 'FORBIDDEN', message: 'Cấm' } }, { status: 403 })
+          : HttpResponse.json({
+              tham_gia: 1,
+              da_truy_cap: 1,
+              khao_sat_ky_nang_so: 1,
+              danh_gia_dau_vao: 1,
+              danh_gia_dau_ra: 1,
+              ho_so_cho_duyet: null,
+            }),
+      ),
+    );
+    const r = renderDashboard('/thong-ke?khoa_id=khoa-ngoai&doi_tuong=giao_vien');
+    await waitFor(() => expect(r.router.state.location.search).toBe('?doi_tuong=giao_vien'));
+  });
 });

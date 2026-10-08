@@ -23,7 +23,7 @@ export function KhoiCanDonDoc({ loc }: { loc: LocThongKe }) {
   const d = query.data;
 
   // Đổi bộ lọc → về trang 1 (tổng số trang có thể đã khác).
-  useEffect(() => setPage(1), [loc.khoa_id, loc.don_vi_id, loc.cum_id]);
+  useEffect(() => setPage(1), [loc.khoa_id, loc.don_vi_id, loc.cum_id, loc.doi_tuong]);
 
   async function xuatExcel() {
     setDangXuat(true);

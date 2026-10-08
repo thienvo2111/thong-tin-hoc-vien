@@ -31,8 +31,8 @@ export default function DashboardThongKe({ che_do }: Props) {
       color: 'red',
       message: 'Bộ lọc nằm ngoài phạm vi quyền',
     });
-    setLoc({});
-  }, [setLoc]);
+    setLoc({ doi_tuong: loc.doi_tuong });
+  }, [setLoc, loc.doi_tuong]);
 
   return (
     <NgoaiPhamViContext.Provider value={khiNgoaiPhamVi}>
