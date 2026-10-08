@@ -144,6 +144,7 @@ const dongTienDo = (
   so_hv: number,
   ty_le_truy_cap: number | null,
   ty_le_dat: number | null,
+  ghiDe: Partial<TienDoTruongDong> = {},
 ): TienDoTruongDong => ({
   don_vi_id,
   ten_don_vi,
@@ -166,13 +167,22 @@ const dongTienDo = (
   so_dang_ky: so_hv,
   so_dat: ty_le_dat === null ? 0 : Math.round(ty_le_dat * so_hv),
   ty_le_dat,
+  ...ghiDe,
 });
 
 export const tienDoTruongMau: TienDoTruongDong[] = [
   dongTienDo('dv-a', 'Trường THPT Nguyễn Du', 40, 0.9, 0.3),
-  dongTienDo('dv-b', 'Trường THCS Lê Lợi', 25, 0.4, null),
-  dongTienDo('dv-c', 'Trường Tiểu học Trần Phú', 30, 0.6, 0.9),
-  dongTienDo('dv-d', 'Trường THPT Phan Chu Trinh', 12, null, 0.5),
+  dongTienDo('dv-b', 'Trường THCS Lê Lợi', 25, 0.4, null, {
+    so_luot_diem_danh: 4,
+    so_luot_co_mat: 3,
+    ty_le_co_mat: 0.75,
+  }),
+  dongTienDo('dv-c', 'Trường Tiểu học Trần Phú', 30, 0.6, 0.9, { so_dau_ra: 3, ty_le_dau_ra: 0.1 }),
+  dongTienDo('dv-d', 'Trường THPT Phan Chu Trinh', 12, null, 0.5, {
+    so_luot_diem_danh: 0,
+    so_luot_co_mat: 0,
+    ty_le_co_mat: null,
+  }),
 ];
 
 export const thongKeHandlers = [
