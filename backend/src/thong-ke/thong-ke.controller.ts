@@ -11,6 +11,7 @@ import {
   XepHangQueryDto,
 } from './dto/thong-ke-query.dto';
 import { BieuMauService } from './bieu-mau.service';
+import { ChatLuongHoSoService } from './chat-luong-ho-so.service';
 import { CanDonDocService } from './can-don-doc.service';
 import { TienDoTruongService } from './tien-do-truong.service';
 import { XepHangService } from './xep-hang.service';
@@ -26,6 +27,7 @@ export class ThongKeController {
     private readonly canDonDocService: CanDonDocService,
     private readonly tienDoTruongService: TienDoTruongService,
     private readonly bieuMauService: BieuMauService,
+    private readonly chatLuongHoSoService: ChatLuongHoSoService,
   ) {}
 
   @Get('bo-loc')
@@ -130,6 +132,30 @@ export class ThongKeController {
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition':
           'attachment; filename="tien-do-theo-truong.xlsx"',
+      })
+      .send(buffer);
+  }
+
+  @Get('chat-luong-ho-so')
+  chatLuongHoSo(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: ThongKeQueryDto,
+  ) {
+    return this.chatLuongHoSoService.danhSach(user, q);
+  }
+
+  @Get('chat-luong-ho-so/xuat-excel')
+  async chatLuongHoSoXuatExcel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: ThongKeQueryDto,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.chatLuongHoSoService.xuatExcel(user, q);
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="chat-luong-ho-so.xlsx"',
       })
       .send(buffer);
   }

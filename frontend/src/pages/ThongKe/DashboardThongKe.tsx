@@ -6,6 +6,7 @@ import { thongDiepLoiChung } from '@/lib/loiApi';
 import { BoLocThongKe, useLocTuUrl } from './BoLocThongKe';
 import { NgoaiPhamViContext } from './KhoiThongKe';
 import { KhoiCanDonDoc } from './khoi/KhoiCanDonDoc';
+import { KhoiChatLuongHoSo } from './khoi/KhoiChatLuongHoSo';
 import { KhoiChuyenCan } from './khoi/KhoiChuyenCan';
 import { KhoiChuyenMuc } from './khoi/KhoiChuyenMuc';
 import { KhoiKetQuaHoc } from './khoi/KhoiKetQuaHoc';
@@ -63,6 +64,7 @@ export default function DashboardThongKe({ che_do }: Props) {
               → 6 kết quả học → 7 chuyên cần → 8 xếp hạng (ẩn khi ho_tro) → 9 cần đôn đốc. */}
           <KhoiKpiPheu loc={loc} />
           {hienTienDoTruong && <KhoiTienDoTruong loc={loc} />}
+          <KhoiChatLuongHoSo loc={loc} />
           <KhoiSoSanhKhoa loc={loc} />
           <KhoiKhaoSat loc={loc} />
           <KhoiChuyenMuc loc={loc} />

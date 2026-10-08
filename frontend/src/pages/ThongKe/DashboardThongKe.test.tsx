@@ -69,6 +69,15 @@ describe('DashboardThongKe', () => {
     expect(await screen.findByRole('region', { name: 'Cần đôn đốc' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Tiến độ theo trường' })).not.toBeInTheDocument();
     expect(daGoi).toBe(false);
+    // Chất lượng hồ sơ hiện cho cả tài khoản trường.
+    expect(await screen.findByRole('region', { name: 'Chất lượng hồ sơ' })).toBeInTheDocument();
+  });
+
+  it('admin → khối Chất lượng hồ sơ nằm ngay sau Tiến độ theo trường', async () => {
+    renderDashboard();
+    const tienDo = await screen.findByRole('region', { name: 'Tiến độ theo trường' });
+    const chatLuong = await screen.findByRole('region', { name: 'Chất lượng hồ sơ' });
+    expect(tienDo.nextElementSibling).toBe(chatLuong);
   });
 
   it('admin → có khối Tiến độ theo trường', async () => {

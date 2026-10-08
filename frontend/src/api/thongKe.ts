@@ -4,6 +4,7 @@ import { taiFileTuBlob } from '@/lib/taiFile';
 import type {
   BoLocResult,
   CanDonDocResult,
+  ChatLuongHoSoResult,
   ChuyenCanResult,
   ChuyenMucResult,
   KetQuaHocCot,
@@ -77,4 +78,12 @@ export const taiBieuMauDangKyTruyCap = (loc: LocThongKe): Promise<Blob> =>
 
 export async function xuatBieuMauDangKyTruyCap(loc: LocThongKe): Promise<void> {
   taiFileTuBlob(await taiBieuMauDangKyTruyCap(loc), 'bieu-mau-dang-ky-truy-cap.xlsx');
+}
+
+export const useChatLuongHoSo = (loc: LocThongKe, enabled = true) =>
+  useKhoi<ChatLuongHoSoResult>('chat-luong-ho-so', 'chat-luong-ho-so', loc, enabled);
+
+export async function xuatChatLuongHoSo(loc: LocThongKe): Promise<void> {
+  const blob = await apiFetchBlob(`/thong-ke/chat-luong-ho-so/xuat-excel${xayQuery(loc)}`);
+  taiFileTuBlob(blob, 'chat-luong-ho-so.xlsx');
 }

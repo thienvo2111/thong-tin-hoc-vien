@@ -3,9 +3,9 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { buildBieuMauDangKyTruyCapWorkbook } from '../bao-cao/util/report-excel.util';
-import { DOI_TUONG_LABEL } from '../thong-bao/mau-email/mau-email';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { ThongKeQueryDto } from './dto/thong-ke-query.dto';
+import { moTaBieuMau } from './mo-ta-bieu-mau';
 import {
   BieuMauDangKyTruyCap,
   CAP_BIEU_MAU,
@@ -15,7 +15,6 @@ import {
   DoiTuongKey,
   DongHocVienBieuMau,
   DongTruongBieuMau,
-  MoTaBieuMau,
 } from './thong-ke.types';
 
 const khoiTao = <K extends string>(khoa: readonly K[]): Record<K, DemDkTc> =>
@@ -96,7 +95,7 @@ export class BieuMauService {
     const rows = phamVi.rong ? [] : await this.layHocVien(phamVi.where);
     return buildBieuMauDangKyTruyCapWorkbook(
       tongHopDangKyTruyCap(rows),
-      await this.moTa(q, phamVi.rong),
+      await moTaBieuMau(this.prisma, q, phamVi.rong),
     );
   }
 
@@ -138,45 +137,5 @@ export class BieuMauService {
       });
     }
     return [...theoHv.values()];
-  }
-
-  private async moTa(q: ThongKeQueryDto, rong: boolean): Promise<MoTaBieuMau> {
-    // Phạm vi rỗng: id chưa được kiểm quyền, không tra cứu tên.
-    const [khoa, donVi, cum] = await Promise.all([
-      !rong && q.khoa_id
-        ? this.prisma.khoa_boi_duong.findUnique({
-            where: { id: q.khoa_id },
-            select: { ten_khoa: true },
-          })
-        : null,
-      !rong && q.don_vi_id
-        ? this.prisma.don_vi_cong_tac.findUnique({
-            where: { id: q.don_vi_id },
-            select: { ten_don_vi: true },
-          })
-        : null,
-      !rong && q.cum_id
-        ? this.prisma.cum_hoc_vien.findUnique({
-            where: { id: q.cum_id },
-            select: { ten_cum: true },
-          })
-        : null,
-    ]);
-    let phamVi = 'Toàn bộ phạm vi tài khoản';
-    if (donVi) phamVi = `Đơn vị ${donVi.ten_don_vi}`;
-    if (cum) phamVi = `Cụm ${cum.ten_cum}`;
-    let doiTuong = 'Tất cả đối tượng';
-    if (q.doi_tuong) {
-      doiTuong =
-        q.doi_tuong === 'chua_xac_dinh'
-          ? 'Chưa xác định'
-          : DOI_TUONG_LABEL[q.doi_tuong];
-    }
-    return {
-      khoa: khoa?.ten_khoa ?? 'Tất cả khóa',
-      pham_vi: phamVi,
-      doi_tuong: doiTuong,
-      ngay_xuat: new Date(),
-    };
   }
 }

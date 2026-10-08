@@ -1121,3 +1121,26 @@ export interface TienDoTruongDong {
   so_dat: number;
   ty_le_dat: number | null;
 }
+
+/** Chất lượng hồ sơ HV: số HV phân biệt thiếu từng mục; tỷ lệ 0..1, mẫu 0 -> null. */
+export interface DemChatLuongHoSo {
+  so_hv: number;
+  thieu_doi_tuong: number;
+  thieu_cap: number;
+  thieu_email: number;
+  thieu_sdt: number;
+  du_ho_so: number;
+  ty_le_du: number | null;
+}
+
+export interface ChatLuongHoSoDong extends DemChatLuongHoSo {
+  don_vi_id: string;
+  ten_don_vi: string;
+  ten_don_vi_cha: string | null;
+}
+
+export interface ChatLuongHoSoResult {
+  tong: DemChatLuongHoSo;
+  /** Sắp theo ten_don_vi (vi). */
+  theo_truong: ChatLuongHoSoDong[];
+}

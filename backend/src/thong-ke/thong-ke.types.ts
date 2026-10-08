@@ -230,3 +230,39 @@ export interface MoTaBieuMau {
   doi_tuong: string;
   ngay_xuat: Date;
 }
+
+/** Hồ sơ học viên: số HV phân biệt thiếu từng mục; tỷ lệ 0..1, mẫu 0 -> null. */
+export interface DemChatLuongHoSo {
+  so_hv: number;
+  thieu_doi_tuong: number;
+  thieu_cap: number;
+  thieu_email: number;
+  thieu_sdt: number;
+  du_ho_so: number;
+  ty_le_du: number | null;
+}
+
+export interface ChatLuongHoSoDong extends DemChatLuongHoSo {
+  don_vi_id: string;
+  ten_don_vi: string;
+  ten_don_vi_cha: string | null;
+}
+
+export interface ChatLuongHoSoResult {
+  tong: DemChatLuongHoSo;
+  /** Sắp theo ten_don_vi (vi). */
+  theo_truong: ChatLuongHoSoDong[];
+}
+
+/** Một HV đã khử trùng, dùng cho tổng hợp và sheet "Cần bổ sung". */
+export interface DongHoSoHocVien {
+  hoc_vien_id: string;
+  ho_ten: string;
+  doi_tuong: string | null;
+  cap_giang_day: string | null;
+  email: string | null;
+  so_dien_thoai: string | null;
+  don_vi_id: string;
+  ten_don_vi: string;
+  ten_don_vi_cha: string | null;
+}
