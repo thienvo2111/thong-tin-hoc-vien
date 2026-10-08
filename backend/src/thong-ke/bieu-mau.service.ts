@@ -96,7 +96,7 @@ export class BieuMauService {
     const rows = phamVi.rong ? [] : await this.layHocVien(phamVi.where);
     return buildBieuMauDangKyTruyCapWorkbook(
       tongHopDangKyTruyCap(rows),
-      await this.moTa(q),
+      await this.moTa(q, phamVi.rong),
     );
   }
 
@@ -140,21 +140,22 @@ export class BieuMauService {
     return [...theoHv.values()];
   }
 
-  private async moTa(q: ThongKeQueryDto): Promise<MoTaBieuMau> {
+  private async moTa(q: ThongKeQueryDto, rong: boolean): Promise<MoTaBieuMau> {
+    // Phạm vi rỗng: id chưa được kiểm quyền, không tra cứu tên.
     const [khoa, donVi, cum] = await Promise.all([
-      q.khoa_id
+      !rong && q.khoa_id
         ? this.prisma.khoa_boi_duong.findUnique({
             where: { id: q.khoa_id },
             select: { ten_khoa: true },
           })
         : null,
-      q.don_vi_id
+      !rong && q.don_vi_id
         ? this.prisma.don_vi_cong_tac.findUnique({
             where: { id: q.don_vi_id },
             select: { ten_don_vi: true },
           })
         : null,
-      q.cum_id
+      !rong && q.cum_id
         ? this.prisma.cum_hoc_vien.findUnique({
             where: { id: q.cum_id },
             select: { ten_cum: true },

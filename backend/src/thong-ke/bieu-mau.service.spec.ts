@@ -161,6 +161,30 @@ describe('BieuMauService', () => {
     expect(hang.getCell(2).value).toBe(0);
   });
 
+  it('rong: không tra cứu tên khóa/đơn vị/cụm, tiêu đề dùng nhãn chung', async () => {
+    scope.resolve.mockResolvedValue({
+      where: { id: { in: [] } },
+      rong: true,
+      khoaIds: [],
+    });
+    const wb = await doc(
+      await service.xuatDangKyTruyCap(caller, {
+        khoa_id: 'k',
+        don_vi_id: 'd',
+        cum_id: 'c',
+        doi_tuong: 'giao_vien',
+      }),
+    );
+    expect(prisma.khoa_boi_duong.findUnique).not.toHaveBeenCalled();
+    expect(prisma.don_vi_cong_tac.findUnique).not.toHaveBeenCalled();
+    expect(prisma.cum_hoc_vien.findUnique).not.toHaveBeenCalled();
+    const s = wb.getWorksheet('Tổng hợp')!;
+    expect(s.getCell('A2').value).toBe('Khóa: Tất cả khóa');
+    expect(s.getCell('A3').value).toBe(
+      'Phạm vi: Toàn bộ phạm vi tài khoản · Đối tượng: Giáo viên',
+    );
+  });
+
   it('khử trùng HV học 2 khóa (đếm 1) và dùng đúng where', async () => {
     const where = { khoa_id: 'k' };
     scope.resolve.mockResolvedValue({ where, rong: false, khoaIds: ['k'] });
