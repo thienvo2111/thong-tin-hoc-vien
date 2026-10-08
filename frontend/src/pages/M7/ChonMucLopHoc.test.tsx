@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
@@ -11,11 +11,37 @@ import ThongTinLopHoc from './ThongTinLopHoc';
 
 const routes = [{ path: '/toi/lop-hoc', element: <ThongTinLopHoc /> }];
 
-function datDangKy(muc_dau_vao: MucNangLuc | null, mo_dieu_chinh_muc: boolean, muc_hoc_chon: MucNangLuc | null = null) {
+function datDangKy(
+  muc_dau_vao: MucNangLuc | null,
+  mo_dieu_chinh_muc: boolean,
+  muc_hoc_chon: MucNangLuc | null = null,
+  muc_hoc_chon_luc: string | null = null,
+) {
   const dk = db.khoaHocToi[0];
   dk.muc_dau_vao = muc_dau_vao;
   dk.muc_hoc_chon = muc_hoc_chon;
+  dk.muc_hoc_chon_luc = muc_hoc_chon_luc;
   dk.khoa.mo_dieu_chinh_muc = mo_dieu_chinh_muc;
+}
+
+// Đếm số lần gọi PUT điều chỉnh mức (vẫn chuyển tiếp cho handler mặc định xử lý).
+const goBoNghe: (() => void)[] = [];
+afterEach(() => goBoNghe.splice(0).forEach((go) => go()));
+
+function demGoiApi() {
+  const dem = { soLan: 0 };
+  const nghe = ({ request }: { request: Request }) => {
+    if (request.method === 'PUT' && request.url.includes('/muc-hoc')) dem.soLan += 1;
+  };
+  server.events.on('request:start', nghe);
+  goBoNghe.push(() => server.events.removeListener('request:start', nghe));
+  return dem;
+}
+
+async function chonVaLuu(nhanMuc: string) {
+  await userEvent.click(await screen.findByRole('button', { name: 'Điều chỉnh mức lớp' }));
+  await userEvent.click(screen.getByRole('radio', { name: nhanMuc }));
+  await userEvent.click(screen.getByRole('button', { name: 'Lưu' }));
 }
 
 function renderDaDangNhap() {
@@ -83,12 +109,21 @@ describe('M7 — Điều chỉnh mức lớp học', () => {
       }),
     );
     renderDaDangNhap();
-    await userEvent.click(await screen.findByRole('button', { name: 'Điều chỉnh mức lớp' }));
-    await userEvent.click(screen.getByRole('radio', { name: 'Cơ bản' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Lưu' }));
+    await chonVaLuu('Cơ bản');
 
+    // Bấm Lưu chỉ mở hộp xác nhận, chưa gọi API.
+    const hop = await screen.findByRole('dialog', { name: 'Xác nhận điều chỉnh mức lớp học' });
+    expect(within(hop).getByText(/chuyển từ mức/)).toHaveTextContent(
+      'Thầy/Cô xác nhận chuyển từ mức Nâng cao sang mức Cơ bản? Lớp học sẽ được xếp theo mức đã chọn.',
+    );
+    expect(body).toBeUndefined();
+
+    await userEvent.click(within(hop).getByRole('button', { name: 'Xác nhận' }));
     expect(await screen.findByText(/Đã lưu mức lớp học/)).toBeInTheDocument();
     expect(body).toEqual({ muc: 'co_ban' });
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Xác nhận điều chỉnh mức lớp học' })).not.toBeInTheDocument(),
+    );
     await waitFor(() => expect(screen.getByText(/đã điều chỉnh từ Nâng cao/)).toBeInTheDocument());
     expect(screen.getByText('Cơ bản', { selector: 'b' })).toBeInTheDocument();
   });
@@ -104,10 +139,62 @@ describe('M7 — Điều chỉnh mức lớp học', () => {
       ),
     );
     renderDaDangNhap();
+    await chonVaLuu('Thành thạo');
+    const hop = await screen.findByRole('dialog', { name: 'Xác nhận điều chỉnh mức lớp học' });
+    await userEvent.click(within(hop).getByRole('button', { name: 'Xác nhận' }));
+    // Lỗi hiện ngay trong hộp xác nhận.
+    expect(await within(hop).findByText('Đã hết thời gian điều chỉnh mức lớp học')).toBeInTheDocument();
+  });
+
+  it('bấm Quay lại trong hộp xác nhận: không gọi API, giữ khu chọn', async () => {
+    datDangKy('nang_cao', true);
+    const dem = demGoiApi();
+    renderDaDangNhap();
+    await chonVaLuu('Cơ bản');
+    const hop = await screen.findByRole('dialog', { name: 'Xác nhận điều chỉnh mức lớp học' });
+    await userEvent.click(within(hop).getByRole('button', { name: 'Quay lại' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Xác nhận điều chỉnh mức lớp học' })).not.toBeInTheDocument(),
+    );
+    expect(dem.soLan).toBe(0);
+    expect(screen.getByRole('radio', { name: 'Cơ bản' })).toBeChecked();
+    expect(db.khoaHocToi[0].muc_hoc_chon).toBeNull();
+  });
+
+  it('chọn đúng mức đang học rồi Lưu: không hỏi xác nhận, không gọi API, đóng khu chọn', async () => {
+    datDangKy('nang_cao', true, 'thanh_thao');
+    const dem = demGoiApi();
+    renderDaDangNhap();
     await userEvent.click(await screen.findByRole('button', { name: 'Điều chỉnh mức lớp' }));
-    await userEvent.click(screen.getByRole('radio', { name: 'Thành thạo' }));
+    expect(screen.getByRole('radio', { name: 'Thành thạo' })).toBeChecked();
     await userEvent.click(screen.getByRole('button', { name: 'Lưu' }));
-    expect(await screen.findByText('Đã hết thời gian điều chỉnh mức lớp học')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    expect(nutDieuChinh()).toBeInTheDocument();
+    expect(dem.soLan).toBe(0);
+  });
+
+  it('đã điều chỉnh: hiện thời điểm điều chỉnh theo giờ Việt Nam', async () => {
+    datDangKy('nang_cao', true, 'thanh_thao', '2026-10-08T03:05:00.000Z');
+    renderDaDangNhap();
+    expect(await screen.findByText('Đã điều chỉnh lúc 08/10/2026 10:05')).toBeInTheDocument();
+  });
+
+  it('chưa điều chỉnh: không hiện dòng thời điểm', async () => {
+    datDangKy('nang_cao', true);
+    renderDaDangNhap();
+    await screen.findByText(/Mức lớp học:/);
+    expect(screen.queryByText(/Đã điều chỉnh lúc/)).not.toBeInTheDocument();
+  });
+
+  it('xác nhận qua handler mặc định: dòng thời điểm xuất hiện sau khi lưu', async () => {
+    datDangKy('nang_cao', true);
+    renderDaDangNhap();
+    await chonVaLuu('Thành thạo');
+    const hop = await screen.findByRole('dialog', { name: 'Xác nhận điều chỉnh mức lớp học' });
+    await userEvent.click(within(hop).getByRole('button', { name: 'Xác nhận' }));
+    expect(await screen.findByText(/Đã điều chỉnh lúc \d{2}\/\d{2}\/\d{4} \d{2}:\d{2}/)).toBeInTheDocument();
+    expect(db.khoaHocToi[0].muc_hoc_chon).toBe('thanh_thao');
   });
 
   it('bấm Hủy: đóng khu chọn, không gọi API', async () => {

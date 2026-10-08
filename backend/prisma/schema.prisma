@@ -1029,6 +1029,8 @@ model dang_ky_hoc {
   // 2026-10-08: mức lớp học học viên tự chọn (chỉ ≤ muc_dau_vao). NULL = học
   // theo mức đánh giá; mức học hiệu lực = muc_hoc_chon ?? muc_dau_vao.
   muc_hoc_chon    muc_nang_luc?
+  // Thời điểm điều chỉnh mức gần nhất (NULL = chưa điều chỉnh / bị reset khi import hạ mức).
+  muc_hoc_chon_luc DateTime?        @db.Timestamptz(6)
   // QĐ10: cụm học viên (nhóm Zalo hỗ trợ) — gán trực tiếp học viên, không
   // qua lớp nào. NULL = chưa gán cụm.
   cum_id          String?            @db.Uuid

@@ -15,6 +15,7 @@ import {
 import type { KhoaHocDangKy, MucNangLuc } from '@/api/types';
 import { cacMucDuocChon, mucHocHieuLuc, nhanMucNangLuc } from '@/lib/mucNangLuc';
 import { thongDiepLoiChung } from '@/lib/loiApi';
+import { dinhDangNgayGio } from '@/lib/ngay';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { TrangThaiBadge } from '@/components/TrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
@@ -229,6 +230,11 @@ function MucHocDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHo
         Mức lớp học: <b>{nhanMucNangLuc(mucHoc)}</b>
         {dangKy.muc_hoc_chon && <> (học viên tự điều chỉnh từ {nhanMucNangLuc(dangKy.muc_dau_vao)})</>}
       </Text>
+      {dangKy.muc_hoc_chon_luc && (
+        <Text fz="xs" c="dimmed">
+          Đã điều chỉnh lúc {dinhDangNgayGio(dangKy.muc_hoc_chon_luc)}
+        </Text>
+      )}
       {nguoiDung?.vai_tro === 'quan_tri' && (
         <Group gap="sm" wrap="wrap" align="flex-end">
           <Select

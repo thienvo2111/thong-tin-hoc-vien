@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { Box, Button, Group, Radio, Stack, Text } from '@mantine/core';
+import { Box, Button, Group, Modal, Radio, Stack, Text } from '@mantine/core';
 import { useChonMucHoc } from '@/api/hocVien';
 import type { KhoaHocDangKy, MucNangLuc } from '@/api/types';
 import { cacMucDuocChon, mucHocHieuLuc, nhanMucNangLuc } from '@/lib/mucNangLuc';
 import { thongDiepLoiChung } from '@/lib/loiApi';
+import { dinhDangNgayGio } from '@/lib/ngay';
 import { StatusBanner } from '@/components/StatusBanner';
 
 /** Điều chỉnh mức lớp học (2026-10-08): học viên chọn mức BẰNG hoặc THẤP HƠN kết quả đánh giá đầu vào,
- * chỉ khi khóa mở điều chỉnh. Khu chọn mở ngay trong thẻ (không popup). */
+ * chỉ khi khóa mở điều chỉnh. Khu chọn mở ngay trong thẻ; bấm Lưu -> hộp xác nhận trong trang rồi mới gọi API. */
 export function ChonMucLopHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
-  const { khoa, muc_dau_vao, muc_hoc_chon } = dangKy;
+  const { khoa, muc_dau_vao, muc_hoc_chon, muc_hoc_chon_luc } = dangKy;
   const [dangChon, setDangChon] = useState(false);
+  const [xacNhan, setXacNhan] = useState(false);
   const [giaTri, setGiaTri] = useState<MucNangLuc | null>(null);
   const [daLuu, setDaLuu] = useState(false);
   const chonMuc = useChonMucHoc();
@@ -26,12 +28,24 @@ export function ChonMucLopHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
     setDangChon(true);
   };
 
+  // Chọn đúng mức đang học -> không có gì để lưu, chỉ đóng khu chọn.
   const luu = () => {
+    if (!giaTri) return;
+    if (giaTri === mucHoc) {
+      setDangChon(false);
+      return;
+    }
+    chonMuc.reset();
+    setXacNhan(true);
+  };
+
+  const xacNhanLuu = () => {
     if (!giaTri) return;
     chonMuc.mutate(
       { khoaId: khoa.id, muc: giaTri },
       {
         onSuccess: () => {
+          setXacNhan(false);
           setDangChon(false);
           setDaLuu(true);
         },
@@ -45,6 +59,11 @@ export function ChonMucLopHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
         Mức lớp học: <b>{nhanMucNangLuc(mucHoc)}</b>
         {muc_hoc_chon && <> (đã điều chỉnh từ {nhanMucNangLuc(muc_dau_vao)})</>}
       </Text>
+      {muc_hoc_chon_luc && (
+        <Text size="xs" c="dimmed">
+          Đã điều chỉnh lúc {dinhDangNgayGio(muc_hoc_chon_luc)}
+        </Text>
+      )}
 
       {daLuu && (
         <Box mt="xs">
@@ -79,17 +98,39 @@ export function ChonMucLopHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
               ))}
             </Stack>
           </Radio.Group>
-          {chonMuc.isError && <StatusBanner loai="error">{thongDiepLoiChung(chonMuc.error)}</StatusBanner>}
           <Group gap="sm">
-            <Button size="sm" onClick={luu} loading={chonMuc.isPending} disabled={!giaTri}>
+            <Button size="sm" onClick={luu} disabled={!giaTri}>
               Lưu
             </Button>
-            <Button size="sm" variant="default" onClick={() => setDangChon(false)} disabled={chonMuc.isPending}>
+            <Button size="sm" variant="default" onClick={() => setDangChon(false)}>
               Hủy
             </Button>
           </Group>
         </Stack>
       )}
+
+      <Modal
+        opened={xacNhan}
+        onClose={() => !chonMuc.isPending && setXacNhan(false)}
+        title="Xác nhận điều chỉnh mức lớp học"
+        centered
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            Thầy/Cô xác nhận chuyển từ mức <b>{nhanMucNangLuc(mucHoc)}</b> sang mức <b>{nhanMucNangLuc(giaTri)}</b>?
+            Lớp học sẽ được xếp theo mức đã chọn.
+          </Text>
+          {chonMuc.isError && <StatusBanner loai="error">{thongDiepLoiChung(chonMuc.error)}</StatusBanner>}
+          <Group gap="sm" justify="flex-end">
+            <Button variant="default" onClick={() => setXacNhan(false)} disabled={chonMuc.isPending}>
+              Quay lại
+            </Button>
+            <Button onClick={xacNhanLuu} loading={chonMuc.isPending}>
+              Xác nhận
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Box>
   );
 }

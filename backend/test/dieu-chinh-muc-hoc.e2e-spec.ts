@@ -165,13 +165,24 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
 
   it('happy path: nâng cao -> thành thạo, có hiệu lực ngay, ghi nhật ký, GET khóa học trả field mới', async () => {
     const { hocVien, token, dangKy } = await taoHocVien('nang_cao');
+    const truoc = Date.now();
     const res = await chon(token, 'thanh_thao').expect(200);
     expect(res.body).toEqual({
       muc_dau_vao: 'nang_cao',
       muc_hoc_chon: 'thanh_thao',
       muc_hoc: 'thanh_thao',
+      muc_hoc_chon_luc: expect.any(String),
     });
-    expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBe('thanh_thao');
+    const daLuu = await docDangKy(dangKy!.id);
+    expect(daLuu.muc_hoc_chon).toBe('thanh_thao');
+    // Thời điểm điều chỉnh được ghi cùng lần cập nhật.
+    expect(daLuu.muc_hoc_chon_luc).not.toBeNull();
+    expect(daLuu.muc_hoc_chon_luc!.getTime()).toBeGreaterThanOrEqual(
+      truoc - 1000,
+    );
+    expect(new Date(res.body.muc_hoc_chon_luc).getTime()).toBe(
+      daLuu.muc_hoc_chon_luc!.getTime(),
+    );
 
     const nhatKy = await prisma.nhat_ky_hoat_dong.findMany({
       where: { hoc_vien_id: hocVien.id, hanh_dong: 'dieu_chinh_muc_hoc' },
@@ -180,6 +191,11 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
     expect((nhatKy[0].chi_tiet as { mo_ta: string }).mo_ta).toContain(
       'Nâng cao → Thành thạo',
     );
+    expect(nhatKy[0].chi_tiet).toMatchObject({
+      khoa_id: khoaId,
+      muc_cu: 'nang_cao',
+      muc_moi: 'thanh_thao',
+    });
 
     const khoaHoc = await http()
       .get('/hoc-vien/toi/khoa-hoc')
@@ -189,10 +205,15 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
       (r: { khoa: { id: string } }) => r.khoa.id === khoaId,
     );
     expect(entry.muc_hoc_chon).toBe('thanh_thao');
+    expect(entry.muc_hoc_chon_luc).toBe(res.body.muc_hoc_chon_luc);
     expect(entry.khoa.mo_dieu_chinh_muc).toBe(true);
 
-    // Gọi lại cùng mức -> không ghi thêm nhật ký.
-    await chon(token, 'thanh_thao').expect(200);
+    // Gọi lại cùng mức -> không ghi thêm nhật ký, giữ nguyên thời điểm.
+    const lai = await chon(token, 'thanh_thao').expect(200);
+    expect(lai.body.muc_hoc_chon_luc).toBe(res.body.muc_hoc_chon_luc);
+    expect((await docDangKy(dangKy!.id)).muc_hoc_chon_luc!.getTime()).toBe(
+      daLuu.muc_hoc_chon_luc!.getTime(),
+    );
     expect(
       await prisma.nhat_ky_hoat_dong.count({
         where: { hoc_vien_id: hocVien.id, hanh_dong: 'dieu_chinh_muc_hoc' },
@@ -207,8 +228,12 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
       muc_dau_vao: 'thanh_thao',
       muc_hoc_chon: null,
       muc_hoc: 'thanh_thao',
+      muc_hoc_chon_luc: null,
     });
-    expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBeNull();
+    const sau = await docDangKy(dangKy!.id);
+    expect(sau.muc_hoc_chon).toBeNull();
+    // Không đổi gì -> không ghi thời điểm điều chỉnh.
+    expect(sau.muc_hoc_chon_luc).toBeNull();
   });
 
   it('chọn null -> quay về học theo mức đánh giá', async () => {
@@ -219,6 +244,7 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
       muc_dau_vao: 'nang_cao',
       muc_hoc_chon: null,
       muc_hoc: 'nang_cao',
+      muc_hoc_chon_luc: expect.any(String),
     });
     expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBeNull();
   });
@@ -324,13 +350,16 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
 
     // Mức mới vẫn cao hơn lựa chọn -> giữ lựa chọn.
     await importMuc('nang_cao');
-    expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBe('thanh_thao');
+    const giu = await docDangKy(dangKy!.id);
+    expect(giu.muc_hoc_chon).toBe('thanh_thao');
+    expect(giu.muc_hoc_chon_luc).not.toBeNull();
 
     // Hạ đánh giá xuống bằng lựa chọn -> reset.
     await importMuc('thanh_thao');
     const sau = await docDangKy(dangKy!.id);
     expect(sau.muc_dau_vao).toBe('thanh_thao');
     expect(sau.muc_hoc_chon).toBeNull();
+    expect(sau.muc_hoc_chon_luc).toBeNull();
   });
 
   it('PATCH khóa bật/tắt mo_dieu_chinh_muc', async () => {
