@@ -718,6 +718,9 @@ CREATE TABLE dang_ky_hoc (
     -- học viên tự chọn, chỉ ≤ muc_dau_vao. NULL = học theo mức đánh giá.
     -- Mức học hiệu lực = COALESCE(muc_hoc_chon, muc_dau_vao).
     muc_hoc_chon        muc_nang_luc,
+    -- 2026-10-08 (migration 20261008150000_muc_hoc_chon_luc): thời điểm điều chỉnh
+    -- mức gần nhất. NULL = chưa điều chỉnh / reset khi import hạ muc_dau_vao.
+    muc_hoc_chon_luc    TIMESTAMPTZ(6),
 
     CONSTRAINT uq_dang_ky_hoc_vien_khoa UNIQUE (hoc_vien_id, khoa_id),
     CONSTRAINT chk_dang_ky_lop_thuoc_khoa

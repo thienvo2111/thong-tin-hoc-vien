@@ -1,4 +1,5 @@
-import { Anchor, Badge, Box, Button, Center, Container, Group, Loader, Paper, Stack, Text, Title } from '@mantine/core';
+import type { ReactNode } from 'react';
+import { Anchor, Badge, Box, Button, Center, Container, Divider, Group, Loader, Paper, Stack, Text, Title } from '@mantine/core';
 import { useMutation } from '@tanstack/react-query';
 import { capMaSso, useHoSoToi, useKhoaHocToi, type SsoTarget } from '@/api/hocVien';
 import { useCauHinhTrienKhai } from '@/content/trienKhai';
@@ -119,11 +120,31 @@ function KhoiKhoaHoc({
   const { khoa, cum, giai_doan, muc_dau_vao, muc_dau_ra } = dangKy;
   const chuaCoLopNao = giai_doan.every((gd) => !gd.lop);
   // Giai đoạn "Đánh giá" sớm nhất = đầu vào, các giai đoạn "Đánh giá" sau = đầu ra.
-  const thuTuDauVao = Math.min(...giai_doan.filter((g) => g.hinh_thuc === 'danh_gia').map((g) => g.thu_tu));
+  const thuTuDanhGia = giai_doan.filter((g) => g.hinh_thuc === 'danh_gia').map((g) => g.thu_tu);
+  const thuTuDauVao = thuTuDanhGia.length > 0 ? Math.min(...thuTuDanhGia) : null;
+  // Kết quả đầu ra gắn vào giai đoạn đánh giá đầu ra cuối cùng (tránh lặp khi có nhiều giai đoạn).
+  const thuTuDauRa = thuTuDanhGia.length > 1 ? Math.max(...thuTuDanhGia) : null;
   const baiCuaGiaiDoan = (gd: GiaiDoanCuaToi): SsoTarget[] | null => {
     if (gd.hinh_thuc !== 'danh_gia' || gd.lop) return null;
     return gd.thu_tu === thuTuDauVao ? baiTheoGiaiDoan.dauVao : baiTheoGiaiDoan.dauRa;
   };
+
+  // 2026-10-08: kết quả đánh giá hiện ngay trong thẻ giai đoạn tương ứng (đầu vào kèm điều chỉnh mức).
+  const ketQuaDauVao = (
+    <Stack gap="xs">
+      <DongKetQua nhan="Đầu vào" mucChot={muc_dau_vao} bai={baiDauVao} />
+      <ChonMucLopHoc dangKy={dangKy} />
+    </Stack>
+  );
+  const ketQuaDauRa = <DongKetQua nhan="Đầu ra" mucChot={muc_dau_ra} bai={baiDauRa} />;
+  const ketQuaCuaGiaiDoan = (gd: GiaiDoanCuaToi): ReactNode => {
+    if (gd.thu_tu === thuTuDauVao) return <KhuKetQua tieuDe="Kết quả đánh giá đầu vào">{ketQuaDauVao}</KhuKetQua>;
+    if (gd.thu_tu === thuTuDauRa) return <KhuKetQua tieuDe="Kết quả đánh giá đầu ra">{ketQuaDauRa}</KhuKetQua>;
+    return null;
+  };
+  // Khóa thiếu giai đoạn đánh giá tương ứng -> giữ khối cuối thẻ để không mất kết quả.
+  const thieuDauVao = thuTuDauVao == null;
+  const thieuDauRa = thuTuDauRa == null;
 
   return (
     <Box p="lg" style={{ borderRadius: 14, border: '1px solid var(--mantine-color-gray-3)', background: 'var(--mantine-color-white)' }}>
@@ -151,6 +172,7 @@ function KhoiKhoaHoc({
             chuaPhanLop={chuaCoLopNao}
             baiKhaoSat={baiCuaGiaiDoan(gd)}
             tinhTrang={tinhTrang}
+            ketQua={ketQuaCuaGiaiDoan(gd)}
           />
         ))}
 
@@ -165,17 +187,30 @@ function KhoiKhoaHoc({
           <StatusBanner loai="info">Lịch các giai đoạn của khóa học sẽ được cập nhật sau.</StatusBanner>
         )}
 
-        <Box>
-          <Text fw={700} size="sm" mb={4}>
-            Kết quả đánh giá
-          </Text>
-          <Stack gap="xs">
-            <DongKetQua nhan="Đầu vào" mucChot={muc_dau_vao} bai={baiDauVao} />
-            <DongKetQua nhan="Đầu ra" mucChot={muc_dau_ra} bai={baiDauRa} />
-            <ChonMucLopHoc dangKy={dangKy} />
-          </Stack>
-        </Box>
+        {(thieuDauVao || thieuDauRa) && (
+          <Box data-testid="ket-qua-cuoi-trang">
+            <Text fw={700} size="sm" mb={4}>
+              Kết quả đánh giá
+            </Text>
+            <Stack gap="xs">
+              {thieuDauVao && ketQuaDauVao}
+              {thieuDauRa && ketQuaDauRa}
+            </Stack>
+          </Box>
+        )}
       </Stack>
+    </Box>
+  );
+}
+
+function KhuKetQua({ tieuDe, children }: { tieuDe: string; children: ReactNode }) {
+  return (
+    <Box mt="sm" data-testid="ket-qua-giai-doan">
+      <Divider mb="sm" />
+      <Text fw={700} size="sm" mb={6}>
+        {tieuDe}
+      </Text>
+      {children}
     </Box>
   );
 }
@@ -243,11 +278,13 @@ function TheGiaiDoan({
   chuaPhanLop,
   baiKhaoSat,
   tinhTrang,
+  ketQua,
 }: {
   gd: GiaiDoanCuaToi;
   chuaPhanLop: boolean;
   baiKhaoSat: SsoTarget[] | null;
   tinhTrang?: TinhTrangBaiKhaoSat[];
+  ketQua?: ReactNode;
 }) {
   return (
     <Paper p="md" radius="md" withBorder data-testid="the-giai-doan">
@@ -314,6 +351,8 @@ function TheGiaiDoan({
           )}
         </Stack>
       )}
+
+      {ketQua}
 
       {gd.tien_do && (
         <Group gap="xs" mt="sm">

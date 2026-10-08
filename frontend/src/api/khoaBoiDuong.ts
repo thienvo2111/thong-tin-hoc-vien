@@ -194,7 +194,12 @@ export function useCapNhatCumDangKy(hocVienId: string) {
 
 // 2026-10-08: Quản trị sửa hộ mức lớp học (bỏ qua công tắc khóa, vẫn chỉ ≤ mức đánh giá).
 export function capNhatMucHoc(dangKyHocId: string, muc: MucNangLuc | null) {
-  return apiFetch<{ muc_dau_vao: MucNangLuc; muc_hoc_chon: MucNangLuc | null; muc_hoc: MucNangLuc }>(
+  return apiFetch<{
+    muc_dau_vao: MucNangLuc;
+    muc_hoc_chon: MucNangLuc | null;
+    muc_hoc: MucNangLuc;
+    muc_hoc_chon_luc: string | null;
+  }>(
     `/dang-ky-hoc/${dangKyHocId}/muc-hoc`,
     { method: 'PATCH', body: JSON.stringify({ muc }) },
   );

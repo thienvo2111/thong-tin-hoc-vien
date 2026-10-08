@@ -1486,6 +1486,8 @@ export class KhoaBoiDuongService {
       hoc_vien_id: string;
       muc_dau_vao: muc_nang_luc | null;
       muc_hoc_chon: muc_nang_luc | null;
+      muc_hoc_chon_luc: Date | null;
+      khoa_id: string;
       khoa: { ten_khoa: string };
     },
     muc: muc_nang_luc | null,
@@ -1507,21 +1509,28 @@ export class KhoaBoiDuongService {
       );
     }
     const mucMoi = muc === dangKy.muc_dau_vao ? null : muc;
+    let luc = dangKy.muc_hoc_chon_luc;
+    // Chỉ ghi thời điểm + nhật ký khi giá trị thật sự đổi (lưu lại cùng mức thì giữ nguyên).
     if (mucMoi !== dangKy.muc_hoc_chon) {
+      luc = new Date();
       await this.prisma.dang_ky_hoc.update({
         where: { id: dangKy.id },
-        data: { muc_hoc_chon: mucMoi },
+        data: { muc_hoc_chon: mucMoi, muc_hoc_chon_luc: luc },
       });
+      const mucCu = mucHocHieuLuc(dangKy);
+      const mucHoc = mucMoi ?? dangKy.muc_dau_vao;
       await this.nhatKy.ghi({
         hanh_dong: 'dieu_chinh_muc_hoc',
         hoc_vien_id: dangKy.hoc_vien_id,
-        mo_ta: `${dangKy.khoa.ten_khoa}: ${nhanMuc(mucHocHieuLuc(dangKy))} → ${nhanMuc(mucMoi ?? dangKy.muc_dau_vao)}`,
+        mo_ta: `${dangKy.khoa.ten_khoa}: ${nhanMuc(mucCu)} → ${nhanMuc(mucHoc)}`,
+        chi_tiet: { khoa_id: dangKy.khoa_id, muc_cu: mucCu, muc_moi: mucHoc },
       });
     }
     return {
       muc_dau_vao: dangKy.muc_dau_vao,
       muc_hoc_chon: mucMoi,
       muc_hoc: mucMoi ?? dangKy.muc_dau_vao,
+      muc_hoc_chon_luc: luc,
     };
   }
 
@@ -1973,7 +1982,9 @@ export class KhoaBoiDuongService {
         dto.loai === 'dau_vao'
           ? {
               muc_dau_vao: dto.muc,
-              ...(resetMucChon ? { muc_hoc_chon: null } : {}),
+              ...(resetMucChon
+                ? { muc_hoc_chon: null, muc_hoc_chon_luc: null }
+                : {}),
             }
           : { muc_dau_ra: dto.muc },
     });

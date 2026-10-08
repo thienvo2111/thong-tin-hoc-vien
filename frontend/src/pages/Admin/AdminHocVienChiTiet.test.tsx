@@ -101,6 +101,16 @@ describe('Admin — Chi tiết hồ sơ học viên — Mức lớp học', () =
     const dong = within(await screen.findByTestId('dong-muc-hoc'));
     expect(dong.getByText('Thành thạo', { selector: 'b' })).toBeInTheDocument();
     expect(dong.getByText(/học viên tự điều chỉnh từ Nâng cao/)).toBeInTheDocument();
+    expect(dong.queryByText(/Đã điều chỉnh lúc/)).not.toBeInTheDocument();
+  });
+
+  it('có thời điểm điều chỉnh -> hiện "Đã điều chỉnh lúc" theo giờ Việt Nam', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    datMuc('nang_cao', 'thanh_thao');
+    db.khoaHocCuaHocVien['hv-duyet-1'][0].muc_hoc_chon_luc = '2026-10-08T03:05:00.000Z';
+    renderTrang('hv-duyet-1');
+    const dong = within(await screen.findByTestId('dong-muc-hoc'));
+    expect(dong.getByText('Đã điều chỉnh lúc 08/10/2026 10:05')).toBeInTheDocument();
   });
 
   it('quản trị: Select chỉ có các mức ≤ đánh giá; chọn + Lưu mức -> PATCH đúng body, báo thành công', async () => {

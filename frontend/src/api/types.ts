@@ -646,6 +646,8 @@ export interface KhoaHocDangKy {
   muc_dau_ra: MucNangLuc | null;
   // 2026-10-08: mức lớp học tự chọn (≤ muc_dau_vao); null = học theo mức đánh giá.
   muc_hoc_chon: MucNangLuc | null;
+  // Thời điểm điều chỉnh mức gần nhất (UTC ISO); null = chưa điều chỉnh.
+  muc_hoc_chon_luc: string | null;
   cum_id: string | null;
   khoa: {
     id: string;

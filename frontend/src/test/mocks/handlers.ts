@@ -26,8 +26,16 @@ async function luuMucHocMock(dk: KhoaHocDangKy, request: Request) {
     const thongDiep = 'Chỉ được chọn mức bằng hoặc thấp hơn mức đánh giá';
     throw loi(400, 'VALIDATION_ERROR', thongDiep, { fields: [{ field: 'muc', message: thongDiep }] });
   }
-  dk.muc_hoc_chon = muc === dk.muc_dau_vao ? null : muc;
-  return { muc_dau_vao: dk.muc_dau_vao, muc_hoc_chon: dk.muc_hoc_chon, muc_hoc: dk.muc_hoc_chon ?? dk.muc_dau_vao };
+  const mucMoi = muc === dk.muc_dau_vao ? null : muc;
+  // Như backend: chỉ ghi thời điểm khi giá trị thật sự đổi.
+  if (mucMoi !== dk.muc_hoc_chon) dk.muc_hoc_chon_luc = new Date().toISOString();
+  dk.muc_hoc_chon = mucMoi;
+  return {
+    muc_dau_vao: dk.muc_dau_vao,
+    muc_hoc_chon: dk.muc_hoc_chon,
+    muc_hoc: dk.muc_hoc_chon ?? dk.muc_dau_vao,
+    muc_hoc_chon_luc: dk.muc_hoc_chon_luc,
+  };
 }
 
 function fileMoPhong() {

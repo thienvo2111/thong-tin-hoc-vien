@@ -122,6 +122,7 @@ export interface KetQuaChonMucHoc {
   muc_dau_vao: MucNangLuc;
   muc_hoc_chon: MucNangLuc | null;
   muc_hoc: MucNangLuc;
+  muc_hoc_chon_luc: string | null;
 }
 
 export function chonMucHoc(khoaId: string, muc: MucNangLuc | null) {
