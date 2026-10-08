@@ -17,7 +17,8 @@ import type {
 
 // Dashboard thống kê (docs/superpowers/specs/2026-10-07-dashboard-thong-ke-design.md): mỗi khối một endpoint.
 
-export type LocThongKe = { khoa_id?: string; don_vi_id?: string; cum_id?: string };
+export type DoiTuongLoc = 'giao_vien' | 'can_bo_quan_ly' | 'nhan_vien' | 'chua_xac_dinh';
+export type LocThongKe = { khoa_id?: string; don_vi_id?: string; cum_id?: string; doi_tuong?: DoiTuongLoc };
 export type ChiSoXepHang = 'truy_cap' | 'khao_sat' | 'dat';
 export type LoaiCanDonDoc = 'chua_truy_cap' | 'chua_ky_nang_so' | 'chua_khao_sat' | 'vang_nhieu' | 'vle_thap';
 
@@ -69,4 +70,11 @@ export const useTienDoTruong = (loc: LocThongKe, enabled = true) =>
 export async function xuatTienDoTruong(loc: LocThongKe): Promise<void> {
   const blob = await apiFetchBlob(`/thong-ke/tien-do-truong/xuat-excel${xayQuery(loc)}`);
   taiFileTuBlob(blob, 'tien-do-theo-truong.xlsx');
+}
+
+export const taiBieuMauDangKyTruyCap = (loc: LocThongKe): Promise<Blob> =>
+  apiFetchBlob(`/thong-ke/bieu-mau/dang-ky-truy-cap/xuat-excel${xayQuery(loc)}`);
+
+export async function xuatBieuMauDangKyTruyCap(loc: LocThongKe): Promise<void> {
+  taiFileTuBlob(await taiBieuMauDangKyTruyCap(loc), 'bieu-mau-dang-ky-truy-cap.xlsx');
 }

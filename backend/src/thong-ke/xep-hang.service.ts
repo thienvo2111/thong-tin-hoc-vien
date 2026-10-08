@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ForbiddenAppException } from '../common/exceptions/app.exceptions';
-import { ThongKeScopeService } from './thong-ke-scope.service';
+import { locDoiTuong, ThongKeScopeService } from './thong-ke-scope.service';
 import { ChiSoXepHang, XepHangQueryDto } from './dto/thong-ke-query.dto';
 import { XepHangDong, XepHangResult } from './thong-ke.types';
 
@@ -109,6 +109,7 @@ export class XepHangService {
       AND: [
         q.khoa_id ? { khoa_id: q.khoa_id } : {},
         { hoc_vien: { don_vi_cong_tac_id: { in: [...nhom].sort() } } },
+        ...(q.doi_tuong ? [locDoiTuong(q.doi_tuong)] : []),
       ],
     };
     const dong = await this.tinh(where, nhom, byId, q.chi_so);

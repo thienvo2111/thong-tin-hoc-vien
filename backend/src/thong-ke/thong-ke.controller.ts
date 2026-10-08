@@ -10,6 +10,7 @@ import {
   ThongKeQueryDto,
   XepHangQueryDto,
 } from './dto/thong-ke-query.dto';
+import { BieuMauService } from './bieu-mau.service';
 import { CanDonDocService } from './can-don-doc.service';
 import { TienDoTruongService } from './tien-do-truong.service';
 import { XepHangService } from './xep-hang.service';
@@ -24,6 +25,7 @@ export class ThongKeController {
     private readonly xepHangService: XepHangService,
     private readonly canDonDocService: CanDonDocService,
     private readonly tienDoTruongService: TienDoTruongService,
+    private readonly bieuMauService: BieuMauService,
   ) {}
 
   @Get('bo-loc')
@@ -128,6 +130,23 @@ export class ThongKeController {
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition':
           'attachment; filename="tien-do-theo-truong.xlsx"',
+      })
+      .send(buffer);
+  }
+
+  @Get('bieu-mau/dang-ky-truy-cap/xuat-excel')
+  async bieuMauDangKyTruyCapXuatExcel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: ThongKeQueryDto,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.bieuMauService.xuatDangKyTruyCap(user, q);
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition':
+          'attachment; filename="bieu-mau-dang-ky-truy-cap.xlsx"',
       })
       .send(buffer);
   }

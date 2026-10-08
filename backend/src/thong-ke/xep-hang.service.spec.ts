@@ -356,6 +356,28 @@ describe('XepHangService', () => {
       });
     });
 
+    it('doi_tuong được áp vào where so sánh của trường', async () => {
+      setup(cay, hocVien('me', 5));
+      await service.xepHang(caller('truong', 'me'), {
+        chi_so: 'dat',
+        doi_tuong: 'giao_vien',
+      });
+      const arg = prisma.dang_ky_hoc.findMany.mock.calls[0][0];
+      expect(arg.where.AND).toContainEqual({
+        hoc_vien: { doi_tuong: 'giao_vien' },
+      });
+    });
+
+    it('chua_xac_dinh -> doi_tuong null trong where so sánh', async () => {
+      setup(cay, hocVien('me', 5));
+      await service.xepHang(caller('truong', 'me'), {
+        chi_so: 'dat',
+        doi_tuong: 'chua_xac_dinh',
+      });
+      const arg = prisma.dang_ky_hoc.findMany.mock.calls[0][0];
+      expect(arg.where.AND).toContainEqual({ hoc_vien: { doi_tuong: null } });
+    });
+
     it('trường mình < 5 HV -> thu_hang null; tong_so 2 -> trung_binh null (không suy ra giá trị trường kia)', async () => {
       setup(cay, [
         ...hocVien('me', 4, { dangNhap: 4 }),

@@ -1,6 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import * as bcrypt from 'bcryptjs';
+import * as ExcelJS from 'exceljs';
 import { createTestApp } from './utils/test-app';
 import {
   prisma,
@@ -211,6 +212,20 @@ describe('Thống kê dashboard (e2e)', () => {
       await dangKy(await taoHocVien(`khac-${i}`, dv.khac), khoaB);
     }
 
+    // Đối tượng: 3 giao_vien (t1-1, t1-2, t2-1), 1 can_bo_quan_ly (t1-3), còn lại null.
+    const setDoiTuong = (
+      nhan: string,
+      doi_tuong: 'giao_vien' | 'can_bo_quan_ly',
+    ) =>
+      prisma.hoc_vien.update({
+        where: { ma_dinh_danh_moet: `TK-${nhan}-${SUF}` },
+        data: { doi_tuong },
+      });
+    await setDoiTuong('t1-1', 'giao_vien');
+    await setDoiTuong('t1-2', 'giao_vien');
+    await setDoiTuong('t2-1', 'giao_vien');
+    await setDoiTuong('t1-3', 'can_bo_quan_ly');
+
     // Điểm danh: t2-2 vắng 2 buổi; t2-3 vắng 1 + vắng có phép 1.
     const gd = await prisma.giai_doan_khoa.create({
       data: {
@@ -283,6 +298,38 @@ describe('Thống kê dashboard (e2e)', () => {
       expect(res.body.tham_gia).toBe(19);
       // 3 HV seed + t1-6 vừa đăng nhập ở beforeAll.
       expect(res.body.da_truy_cap).toBe(4);
+    });
+
+    it('lọc doi_tuong=giao_vien theo Sở: đếm đúng 3 HV', async () => {
+      const res = await get(
+        `/thong-ke/pheu?don_vi_id=${dv.so}&doi_tuong=giao_vien`,
+        tok.quanTri,
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.tham_gia).toBe(3);
+    });
+
+    it('lọc doi_tuong=chua_xac_dinh theo Sở: 19 - 4 = 15 HV', async () => {
+      const res = await get(
+        `/thong-ke/pheu?don_vi_id=${dv.so}&doi_tuong=chua_xac_dinh`,
+        tok.quanTri,
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.tham_gia).toBe(15);
+    });
+
+    it('truong T1 lọc doi_tuong vẫn bị giới hạn phạm vi (R2)', async () => {
+      const res = await get(
+        `/thong-ke/pheu?khoa_id=${khoaB}&doi_tuong=giao_vien`,
+        tok.truong1,
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.tham_gia).toBe(1);
+    });
+
+    it('doi_tuong không hợp lệ -> 400', async () => {
+      const res = await get('/thong-ke/pheu?doi_tuong=abc', tok.quanTri);
+      expect(res.status).toBe(400);
     });
 
     it('truong T1 xem khóa B của đơn vị khác: chỉ 1 HV của mình (R2)', async () => {
@@ -526,6 +573,72 @@ describe('Thống kê dashboard (e2e)', () => {
       expect(res.headers['content-disposition']).toContain(
         'tien-do-theo-truong.xlsx',
       );
+    });
+  });
+  describe('biểu mẫu đăng ký và truy cập', () => {
+    const URL_BM = '/thong-ke/bieu-mau/dang-ky-truy-cap/xuat-excel';
+    const taiXlsx = async (path: string, t: string) => {
+      const res = await get(path, t)
+        .buffer(true)
+        .parse((r, cb) => {
+          const chunks: Buffer[] = [];
+          r.on('data', (c: Buffer) => chunks.push(c));
+          r.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+      expect(res.status).toBe(200);
+      expect(res.headers['content-disposition']).toContain(
+        'bieu-mau-dang-ky-truy-cap.xlsx',
+      );
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(res.body as ExcelJS.Buffer);
+      return wb;
+    };
+    // Dòng của một trường trong sheet "Theo đối tượng": tên đơn vị -> ĐK tổng (cột D).
+    const dkTheoTruong = (wb: ExcelJS.Workbook) => {
+      const kq = new Map<string, number>();
+      wb.getWorksheet('Theo đối tượng')!.eachRow((r, so) => {
+        const ten = r.getCell(2).value;
+        if (so >= 8 && typeof ten === 'string' && ten.includes(suf)) {
+          kq.set(ten, r.getCell(4).value as number);
+        }
+      });
+      return kq;
+    };
+
+    it('quan_tri lọc theo Sở: dòng T1/T2/T3 có ĐK đúng', async () => {
+      const wb = await taiXlsx(`${URL_BM}?don_vi_id=${dv.so}`, tok.quanTri);
+      expect(wb.worksheets.map((x) => x.name)).toEqual([
+        'Tổng hợp',
+        'Theo đối tượng',
+        'Theo cấp',
+      ]);
+      const m = dkTheoTruong(wb);
+      expect(m.get(`Đơn vị TK t1 ${suf}`)).toBe(6);
+      expect(m.get(`Đơn vị TK t2 ${suf}`)).toBe(5);
+      expect(m.get(`Đơn vị TK t3 ${suf}`)).toBe(3);
+    });
+
+    it('truong T1: chỉ dòng T1', async () => {
+      const wb = await taiXlsx(URL_BM, tok.truong1);
+      const m = dkTheoTruong(wb);
+      expect([...m.keys()]).toEqual([`Đơn vị TK t1 ${suf}`]);
+    });
+
+    it('doi_tuong=giao_vien theo Sở: tổng ĐK = 3 GV fixture', async () => {
+      const wb = await taiXlsx(
+        `${URL_BM}?don_vi_id=${dv.so}&doi_tuong=giao_vien`,
+        tok.quanTri,
+      );
+      const m = dkTheoTruong(wb);
+      expect([...m.values()].reduce((a, b) => a + b, 0)).toBe(3);
+      expect(wb.getWorksheet('Tổng hợp')!.getCell('A3').value).toContain(
+        'Đối tượng: Giáo viên',
+      );
+    });
+
+    it('hoc_vien gọi biểu mẫu -> 403', async () => {
+      const res = await get(URL_BM, tok.hocVien);
+      expect(res.status).toBe(403);
     });
   });
 });

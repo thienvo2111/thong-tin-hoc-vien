@@ -8,10 +8,19 @@ import {
   ForbiddenAppException,
   ValidationException,
 } from '../common/exceptions/app.exceptions';
-import { ThongKeQueryDto } from './dto/thong-ke-query.dto';
+import { DoiTuongLoc, ThongKeQueryDto } from './dto/thong-ke-query.dto';
 import { BoLocResult, PhamViThongKe } from './thong-ke.types';
 
 type CumRow = { id: string; khoa_id: string };
+
+// Điều kiện đối tượng học viên; chỉ thu hẹp nên không ảnh hưởng phân quyền.
+export function locDoiTuong(
+  doiTuong: DoiTuongLoc,
+): Prisma.dang_ky_hocWhereInput {
+  return {
+    hoc_vien: { doi_tuong: doiTuong === 'chua_xac_dinh' ? null : doiTuong },
+  };
+}
 
 // Fail-closed: nhánh rong=true vẫn mang where không khớp dòng nào, để endpoint
 // quên kiểm rong cũng không rò dữ liệu.
@@ -78,6 +87,7 @@ export class ThongKeScopeService {
 
   private async resolveQuanTri(q: ThongKeQueryDto): Promise<PhamViThongKe> {
     const loc: Prisma.dang_ky_hocWhereInput[] = [];
+    if (q.doi_tuong) loc.push(locDoiTuong(q.doi_tuong));
     if (q.khoa_id) loc.push({ khoa_id: q.khoa_id });
     if (q.don_vi_id) loc.push(await this.locDonVi(q.don_vi_id));
     if (q.cum_id) {
@@ -111,6 +121,7 @@ export class ThongKeScopeService {
       throw new ForbiddenAppException('Không có quyền xem khóa này');
     }
     const loc: Prisma.dang_ky_hocWhereInput[] = [];
+    if (q.doi_tuong) loc.push(locDoiTuong(q.doi_tuong));
     if (q.khoa_id) loc.push({ khoa_id: q.khoa_id });
     if (q.don_vi_id) {
       if (!scope.includes(q.don_vi_id)) {
@@ -147,6 +158,7 @@ export class ThongKeScopeService {
       throw new ForbiddenAppException('Không có quyền xem khóa này');
     }
     const loc: Prisma.dang_ky_hocWhereInput[] = [];
+    if (q.doi_tuong) loc.push(locDoiTuong(q.doi_tuong));
     if (q.khoa_id) loc.push({ khoa_id: q.khoa_id });
     if (q.cum_id) {
       const cum = cums.find((c) => c.id === q.cum_id);

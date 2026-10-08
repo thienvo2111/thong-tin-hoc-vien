@@ -6,6 +6,8 @@ import { server } from '@/test/mocks/server';
 import { renderTrang } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import { canDonDocMau } from '@/test/mocks/thongKe';
+import { useState } from 'react';
+import type { LocThongKe } from '@/api/thongKe';
 import { KhoiCanDonDoc } from './KhoiCanDonDoc';
 
 function renderKhoi() {
@@ -81,5 +83,31 @@ describe('KhoiCanDonDoc', () => {
     await userEvent.click(await screen.findByRole('tab', { name: 'VLE thấp' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Xuất Excel' }));
     await waitFor(() => expect((url as URL | null)?.searchParams.get('loai')).toBe('vle_thap'));
+  });
+
+  it('đổi doi_tuong khi đang ở trang 2 → về trang 1', async () => {
+    const goi: string[] = [];
+    server.use(
+      http.get('/thong-ke/can-don-doc', ({ request }) => {
+        const p = new URL(request.url).searchParams;
+        goi.push(`${p.get('doi_tuong')}:${p.get('page')}`);
+        return HttpResponse.json({ ...canDonDocMau, tong: 45 });
+      }),
+    );
+    function Boc() {
+      const [loc, setLoc] = useState<LocThongKe>({});
+      return (
+        <>
+          <button onClick={() => setLoc({ doi_tuong: 'nhan_vien' })}>doi</button>
+          <KhoiCanDonDoc loc={loc} />
+        </>
+      );
+    }
+    datToken('token-gia-lap');
+    renderTrang(<Boc />);
+    await userEvent.click(await screen.findByRole('button', { name: '2' }));
+    await waitFor(() => expect(goi).toContain('null:2'));
+    await userEvent.click(screen.getByRole('button', { name: 'doi' }));
+    await waitFor(() => expect(goi[goi.length - 1]).toBe('nhan_vien:1'));
   });
 });

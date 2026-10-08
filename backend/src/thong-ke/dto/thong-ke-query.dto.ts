@@ -1,6 +1,14 @@
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
 
+export const DOI_TUONG_LOC = [
+  'giao_vien',
+  'can_bo_quan_ly',
+  'nhan_vien',
+  'chua_xac_dinh',
+] as const;
+export type DoiTuongLoc = (typeof DOI_TUONG_LOC)[number];
+
 // Bộ lọc chung cho mọi endpoint /thong-ke/*. cum_id cần khoa_id;
 // don_vi_id và cum_id loại trừ nhau (kiểm trong ThongKeScopeService).
 export class ThongKeQueryDto {
@@ -15,6 +23,10 @@ export class ThongKeQueryDto {
   @IsOptional()
   @IsUUID()
   cum_id?: string;
+
+  @IsOptional()
+  @IsIn(DOI_TUONG_LOC)
+  doi_tuong?: DoiTuongLoc;
 }
 
 export const CHI_SO_XEP_HANG = ['truy_cap', 'khao_sat', 'dat'] as const;

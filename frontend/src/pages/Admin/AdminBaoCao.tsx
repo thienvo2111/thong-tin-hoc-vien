@@ -34,10 +34,12 @@ import {
   useBaoCaoXacNhan,
   useDanhSachDotXacNhan,
 } from '@/api/baoCao';
+import { taiBieuMauDangKyTruyCap, type DoiTuongLoc } from '@/api/thongKe';
 import { useDanhSachKhoa } from '@/api/khoaBoiDuong';
 import type { BaoCaoRow, BaoCaoTheo } from '@/api/types';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { taiFileTuBlob } from '@/lib/taiFile';
+import { DOI_TUONG_OPTIONS } from '@/lib/tuyChonHoSo';
 import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { AdminPageHeader } from './AdminPageHeader';
 
@@ -561,7 +563,64 @@ function TheBaoCaoTongQuan() {
   );
 }
 
-/** Trung tâm báo cáo (Phase 5 redesign) — 8 thẻ, mỗi thẻ khớp đúng 1 nhóm báo cáo thật đang có API
+// --- 9. Biểu mẫu đăng ký & truy cập — chỉ Excel (GET /thong-ke/bieu-mau/dang-ky-truy-cap/xuat-excel) ---
+const TUY_CHON_DOI_TUONG_BIEU_MAU = [...DOI_TUONG_OPTIONS, { value: 'chua_xac_dinh', label: 'Chưa xác định' }];
+
+function TheBaoCaoBieuMauDangKyTruyCap() {
+  const [khoaId, setKhoaId] = useState('');
+  const [doiTuong, setDoiTuong] = useState('');
+  const { dangTai, tuyChon } = useTuyChonKhoa();
+  const excel = useTaiExcel();
+
+  return (
+    <KhungTheBaoCao
+      testId="the-bao-cao-bieu-mau-dang-ky-truy-cap"
+      icon="📑"
+      iconBg="#F3EEF9"
+      title="Biểu mẫu đăng ký & truy cập"
+      desc="Số học viên đăng ký và đã truy cập, phân theo đối tượng và cấp giảng dạy."
+    >
+      <Select
+        label="Khóa bồi dưỡng"
+        placeholder="Tất cả khóa"
+        size="xs"
+        searchable
+        filter={locTiengViet}
+        clearable
+        data={tuyChon}
+        value={khoaId || null}
+        onChange={(v) => setKhoaId(v ?? '')}
+        disabled={dangTai}
+      />
+      <Select
+        label="Đối tượng"
+        placeholder="Tất cả đối tượng"
+        size="xs"
+        clearable
+        data={TUY_CHON_DOI_TUONG_BIEU_MAU}
+        value={doiTuong || null}
+        onChange={(v) => setDoiTuong(v ?? '')}
+      />
+      <Button
+        color="accent"
+        size="xs"
+        mt={4}
+        loading={excel.isPending}
+        data-testid="nut-xuat-excel-bieu-mau-dang-ky-truy-cap"
+        onClick={() =>
+          excel.mutate({
+            taiFn: () => taiBieuMauDangKyTruyCap({ khoa_id: khoaId || undefined, doi_tuong: (doiTuong || undefined) as DoiTuongLoc | undefined }),
+            tenFile: 'bieu-mau-dang-ky-truy-cap.xlsx',
+          })
+        }
+      >
+        ⇩ Xuất Excel
+      </Button>
+    </KhungTheBaoCao>
+  );
+}
+
+/** Trung tâm báo cáo (Phase 5 redesign) — 9 thẻ, mỗi thẻ khớp đúng 1 nhóm báo cáo thật đang có API
  * (docs/api-contract.md mục 7 + mục "Đợt xác nhận" mục 2): tổng hợp, xác nhận, sửa trường MOET, xuất
  * cho VLE, điều kiện đánh giá đầu vào, vận hành theo lớp. Không bịa thêm báo cáo không có endpoint. */
 export default function AdminBaoCao() {
@@ -582,6 +641,7 @@ export default function AdminBaoCao() {
             <TheBaoCaoVanHanh />
             <TheBaoCaoGioDay />
             <TheBaoCaoTongQuan />
+            <TheBaoCaoBieuMauDangKyTruyCap />
           </SimpleGrid>
         </Stack>
       </Container>

@@ -236,7 +236,7 @@ export function KhoiTienDoTruong({ loc }: { loc: LocThongKe }) {
                             size="sm"
                             ta="left"
                             aria-label={`Xem riêng ${r.ten_don_vi}`}
-                            onClick={() => setLoc({ khoa_id: loc.khoa_id, don_vi_id: r.don_vi_id })}
+                            onClick={() => setLoc({ khoa_id: loc.khoa_id, don_vi_id: r.don_vi_id, doi_tuong: loc.doi_tuong })}
                           >
                             {r.ten_don_vi}
                           </Anchor>
