@@ -1,9 +1,12 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Alert, Button, Group, Select, Skeleton, Text } from '@mantine/core';
-import { useBoLocThongKe, type LocThongKe } from '@/api/thongKe';
+import { useBoLocThongKe, type DoiTuongLoc, type LocThongKe } from '@/api/thongKe';
+import { DOI_TUONG_OPTIONS } from '@/lib/tuyChonHoSo';
 
 const KHOA_URL = ['khoa_id', 'don_vi_id', 'cum_id'] as const;
+
+const DOI_TUONG_LOC = [...DOI_TUONG_OPTIONS, { value: 'chua_xac_dinh', label: 'Chưa xác định' }];
 
 /** Bộ lọc giữ trên URL query (chia sẻ link được). */
 export function useLocTuUrl(): [LocThongKe, (l: LocThongKe) => void] {
@@ -16,6 +19,8 @@ export function useLocTuUrl(): [LocThongKe, (l: LocThongKe) => void] {
       const v = p.get(k);
       if (v) out[k] = v;
     }
+    const dt = p.get('doi_tuong');
+    if (dt && DOI_TUONG_LOC.some((o) => o.value === dt)) out.doi_tuong = dt as DoiTuongLoc;
     return out;
   }, [chuoi]);
 
@@ -29,6 +34,8 @@ export function useLocTuUrl(): [LocThongKe, (l: LocThongKe) => void] {
             if (v) moi.set(k, v);
             else moi.delete(k);
           }
+          if (l.doi_tuong) moi.set('doi_tuong', l.doi_tuong);
+          else moi.delete('doi_tuong');
           return moi;
         },
         { replace: true },
@@ -90,6 +97,15 @@ export function BoLocThongKe() {
           onChange={(v) => setLoc({ ...loc, cum_id: v ?? undefined, don_vi_id: undefined })}
         />
       )}
+      <Select
+        label="Đối tượng"
+        placeholder="Tất cả đối tượng"
+        clearable
+        data={DOI_TUONG_LOC}
+        clearButtonProps={{ 'aria-label': 'Xóa đối tượng' }}
+        value={loc.doi_tuong ?? null}
+        onChange={(v) => setLoc({ ...loc, doi_tuong: (v as DoiTuongLoc | null) ?? undefined })}
+      />
       {don_vi_co_dinh && (
         <Text size="sm">
           Đơn vị: <b>{don_vi_co_dinh.ten_don_vi}</b>

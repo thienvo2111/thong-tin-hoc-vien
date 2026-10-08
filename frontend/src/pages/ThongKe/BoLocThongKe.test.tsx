@@ -89,4 +89,45 @@ describe('BoLocThongKe', () => {
     await waitFor(() => expect(search(r).get('cum_id')).toBe('cum-1'));
     expect(search(r).has('don_vi_id')).toBe(false);
   });
+
+  it('chọn đối tượng ghi doi_tuong lên URL; xóa chọn thì bỏ tham số', async () => {
+    const r = renderBoLoc();
+    expect(await o('Đối tượng')).toHaveAttribute('placeholder', 'Tất cả đối tượng');
+    await chon('Đối tượng', 'Giáo viên');
+    await waitFor(() => expect(search(r).get('doi_tuong')).toBe('giao_vien'));
+    await userEvent.click(await screen.findByLabelText('Xóa đối tượng'));
+    await waitFor(() => expect(search(r).has('doi_tuong')).toBe(false));
+  });
+
+  it('có đủ 4 lựa chọn đối tượng', async () => {
+    renderBoLoc();
+    await userEvent.click(await o('Đối tượng'));
+    for (const n of ['Giáo viên', 'Cán bộ quản lý', 'Nhân viên', 'Chưa xác định']) {
+      expect(await screen.findByRole('option', { name: n })).toBeInTheDocument();
+    }
+  });
+
+  it('đổi khóa/đơn vị/cụm không xóa doi_tuong', async () => {
+    const r = renderBoLoc('/thong-ke?doi_tuong=nhan_vien&khoa_id=khoa-1&cum_id=cum-1');
+    await chon('Khóa', 'Khóa 2');
+    await waitFor(() => expect(search(r).get('khoa_id')).toBe('khoa-2'));
+    await chon('Đơn vị', 'Trường THPT Long Xuyên');
+    await waitFor(() => expect(search(r).get('don_vi_id')).toBe('dv-2'));
+    expect(search(r).get('doi_tuong')).toBe('nhan_vien');
+  });
+
+  it('hiện ô đối tượng cả với tài khoản trường', async () => {
+    server.use(
+      http.get('/thong-ke/bo-loc', () =>
+        HttpResponse.json({
+          ...boLocQuanTri,
+          don_vi: null,
+          cum: null,
+          don_vi_co_dinh: { id: 'dv-9', ten_don_vi: 'Trường THPT Châu Phú' },
+        }),
+      ),
+    );
+    renderBoLoc();
+    expect(await o('Đối tượng')).toBeInTheDocument();
+  });
 });

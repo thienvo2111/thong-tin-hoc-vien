@@ -169,6 +169,17 @@ describe('KhoiTienDoTruong', () => {
     expect(searchCua(r).get('khoa_id')).toBe('khoa-1');
   });
 
+  it('bấm tên trường giữ doi_tuong', async () => {
+    datToken('token-gia-lap');
+    const r = renderVoiRouter(
+      [{ path: '/thong-ke', element: <KhoiTienDoTruong loc={{ khoa_id: 'khoa-1', doi_tuong: 'giao_vien' }} /> }],
+      { initialEntries: ['/thong-ke?khoa_id=khoa-1&doi_tuong=giao_vien'] },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Xem riêng Trường THCS Lê Lợi' }));
+    await waitFor(() => expect(searchCua(r).get('don_vi_id')).toBe('dv-b'));
+    expect(searchCua(r).get('doi_tuong')).toBe('giao_vien');
+  });
+
   it('mảng rỗng → thông báo rỗng', async () => {
     server.use(http.get('/thong-ke/tien-do-truong', () => HttpResponse.json([])));
     renderKhoi();

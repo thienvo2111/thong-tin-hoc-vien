@@ -504,7 +504,7 @@ Chi tiết quy tắc: [`validation-checklist.md`](validation-checklist.md). Endp
 
 Spec: `docs/superpowers/specs/2026-10-07-dashboard-thong-ke-design.md`. Kiểu response: `backend/src/thong-ke/thong-ke.types.ts`. Ai gọi: `quan_tri`, `so_gddt`, `phong_vhxh`, `truong`, `ho_tro_hoc_vien` (vai trò khác, gồm `hoc_vien` → `403`). Phạm vi chỉ lấy qua `ThongKeScopeService.resolve`.
 
-Query chung (tùy chọn, UUID): `khoa_id`, `don_vi_id`, `cum_id`.
+Query chung (tùy chọn): `khoa_id`, `don_vi_id`, `cum_id` (UUID) và `doi_tuong` = `giao_vien` \| `can_bo_quan_ly` \| `nhan_vien` \| `chua_xac_dinh` (`hoc_vien.doi_tuong` null). `doi_tuong` chỉ thu hẹp thêm (AND vào phạm vi), áp cho mọi endpoint `/thong-ke/*` kể cả xuất Excel và tập so sánh của `xep-hang` vai trò `truong`; không gửi = tính mọi đối tượng. Giá trị khác → `400`.
 - Bộ lọc ngoài phạm vi quyền → `403`. Bộ lọc sai dạng → `400`.
 - `cum_id` bắt buộc kèm `khoa_id`; `don_vi_id` và `cum_id` loại trừ nhau; `ho_tro_hoc_vien` không được gửi `don_vi_id`; `so_gddt`/`phong_vhxh`/`truong` không được gửi `cum_id` (→ `400`).
 - Phạm vi rỗng (người dùng đơn vị thiếu `don_vi_id`, người hỗ trợ chưa có cụm) → mọi khối rỗng, không lỗi.

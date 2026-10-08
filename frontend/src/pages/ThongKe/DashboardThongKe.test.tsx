@@ -88,4 +88,18 @@ describe('DashboardThongKe', () => {
     expect(screen.queryByRole('region', { name: 'Xếp hạng đơn vị' })).not.toBeInTheDocument();
     expect(daGoi).toBe(false);
   });
+
+  it('doi_tuong trên URL được gửi kèm request của các khối', async () => {
+    const goi: Record<string, string | null> = {};
+    const ghi = (ten: string) =>
+      http.get(`/thong-ke/${ten}`, ({ request }) => {
+        goi[ten] = new URL(request.url).searchParams.get('doi_tuong');
+        return undefined;
+      });
+    server.use(ghi('pheu'), ghi('khao-sat'), ghi('chuyen-can'), ghi('tien-do-truong'));
+    renderDashboard('/thong-ke?doi_tuong=nhan_vien');
+    await waitFor(() => {
+      for (const ten of ['pheu', 'khao-sat', 'chuyen-can', 'tien-do-truong']) expect(goi[ten]).toBe('nhan_vien');
+    });
+  });
 });

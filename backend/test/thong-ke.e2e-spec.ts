@@ -211,6 +211,20 @@ describe('Thống kê dashboard (e2e)', () => {
       await dangKy(await taoHocVien(`khac-${i}`, dv.khac), khoaB);
     }
 
+    // Đối tượng: 3 giao_vien (t1-1, t1-2, t2-1), 1 can_bo_quan_ly (t1-3), còn lại null.
+    const setDoiTuong = (
+      nhan: string,
+      doi_tuong: 'giao_vien' | 'can_bo_quan_ly',
+    ) =>
+      prisma.hoc_vien.update({
+        where: { ma_dinh_danh_moet: `TK-${nhan}-${SUF}` },
+        data: { doi_tuong },
+      });
+    await setDoiTuong('t1-1', 'giao_vien');
+    await setDoiTuong('t1-2', 'giao_vien');
+    await setDoiTuong('t2-1', 'giao_vien');
+    await setDoiTuong('t1-3', 'can_bo_quan_ly');
+
     // Điểm danh: t2-2 vắng 2 buổi; t2-3 vắng 1 + vắng có phép 1.
     const gd = await prisma.giai_doan_khoa.create({
       data: {
@@ -283,6 +297,38 @@ describe('Thống kê dashboard (e2e)', () => {
       expect(res.body.tham_gia).toBe(19);
       // 3 HV seed + t1-6 vừa đăng nhập ở beforeAll.
       expect(res.body.da_truy_cap).toBe(4);
+    });
+
+    it('lọc doi_tuong=giao_vien theo Sở: đếm đúng 3 HV', async () => {
+      const res = await get(
+        `/thong-ke/pheu?don_vi_id=${dv.so}&doi_tuong=giao_vien`,
+        tok.quanTri,
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.tham_gia).toBe(3);
+    });
+
+    it('lọc doi_tuong=chua_xac_dinh theo Sở: 19 - 4 = 15 HV', async () => {
+      const res = await get(
+        `/thong-ke/pheu?don_vi_id=${dv.so}&doi_tuong=chua_xac_dinh`,
+        tok.quanTri,
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.tham_gia).toBe(15);
+    });
+
+    it('truong T1 lọc doi_tuong vẫn bị giới hạn phạm vi (R2)', async () => {
+      const res = await get(
+        `/thong-ke/pheu?khoa_id=${khoaB}&doi_tuong=giao_vien`,
+        tok.truong1,
+      );
+      expect(res.status).toBe(200);
+      expect(res.body.tham_gia).toBe(1);
+    });
+
+    it('doi_tuong không hợp lệ -> 400', async () => {
+      const res = await get('/thong-ke/pheu?doi_tuong=abc', tok.quanTri);
+      expect(res.status).toBe(400);
     });
 
     it('truong T1 xem khóa B của đơn vị khác: chỉ 1 HV của mình (R2)', async () => {

@@ -7,6 +7,9 @@ import {
   ValidationException,
 } from '../common/exceptions/app.exceptions';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { ThongKeQueryDto } from './dto/thong-ke-query.dto';
 
 const T1 = '00000000-0000-4000-8000-0000000000a1';
 const CON = '00000000-0000-4000-8000-0000000000a2';
@@ -66,6 +69,53 @@ describe('ThongKeScopeService', () => {
       scope as unknown as ScopeService,
       hoTroScope as unknown as HoTroHocVienScopeService,
     );
+  });
+
+  describe('lọc doi_tuong', () => {
+    it.each(['giao_vien', 'can_bo_quan_ly', 'nhan_vien'] as const)(
+      'quan_tri doi_tuong=%s -> AND điều kiện hoc_vien.doi_tuong',
+      async (dt) => {
+        const r = await service.resolve(caller(), { doi_tuong: dt });
+        expect(r.where).toEqual({ AND: [{ hoc_vien: { doi_tuong: dt } }] });
+        expect(r.rong).toBe(false);
+      },
+    );
+
+    it('chua_xac_dinh -> doi_tuong null', async () => {
+      const r = await service.resolve(caller(), { doi_tuong: 'chua_xac_dinh' });
+      expect(r.where.AND).toContainEqual({ hoc_vien: { doi_tuong: null } });
+    });
+
+    it('so_gddt giữ nguyên phạm vi OR R1/R2 và thêm doi_tuong', async () => {
+      const r = await service.resolve(so(), {
+        khoa_id: K1,
+        doi_tuong: 'giao_vien',
+      });
+      expect(r.where.OR).toHaveLength(2);
+      expect(r.where.AND).toContainEqual({ khoa_id: K1 });
+      expect(r.where.AND).toContainEqual({
+        hoc_vien: { doi_tuong: 'giao_vien' },
+      });
+    });
+
+    it('ho_tro giữ cum_id scope và thêm doi_tuong', async () => {
+      const r = await service.resolve(hoTro(), { doi_tuong: 'nhan_vien' });
+      expect(r.where.cum_id).toEqual({ in: [CUM1] });
+      expect(r.where.AND).toEqual([{ hoc_vien: { doi_tuong: 'nhan_vien' } }]);
+    });
+
+    it('phạm vi rỗng vẫn fail-closed khi có doi_tuong', async () => {
+      scope.getAccessibleDonViIds.mockResolvedValue([]);
+      const r = await service.resolve(so(), { doi_tuong: 'giao_vien' });
+      expect(r.rong).toBe(true);
+    });
+
+    it('DTO chấp nhận giá trị hợp lệ, từ chối giá trị lạ', async () => {
+      const ok = plainToInstance(ThongKeQueryDto, { doi_tuong: 'giao_vien' });
+      expect(await validate(ok)).toHaveLength(0);
+      const bad = plainToInstance(ThongKeQueryDto, { doi_tuong: 'abc' });
+      expect(await validate(bad)).not.toHaveLength(0);
+    });
   });
 
   describe('resolve', () => {
