@@ -87,6 +87,57 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     expect(screen.getByRole('button', { name: 'Sửa khóa' })).toBeInTheDocument();
   });
 
+  // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học.
+  describe('Switch "Cho học viên điều chỉnh mức lớp học"', () => {
+    it('quan_tri: bật -> PATCH khóa mo_dieu_chinh_muc=true, switch bật; tắt lại -> false', async () => {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      const bodies: unknown[] = [];
+      server.use(
+        http.patch('/khoa-boi-duong/:id', async ({ params, request }) => {
+          const body = (await request.json()) as Record<string, unknown>;
+          bodies.push(body);
+          Object.assign(db.chiTietKhoa[params.id as string], body);
+          return HttpResponse.json(db.chiTietKhoa[params.id as string]);
+        }),
+      );
+      const user = userEvent.setup();
+      renderTrang('khoa-1');
+      const sw = await screen.findByRole('switch', { name: /Cho học viên điều chỉnh mức lớp học/ });
+      expect(sw).not.toBeChecked();
+
+      await user.click(sw);
+      await waitFor(() => expect(sw).toBeChecked());
+      expect(bodies).toEqual([{ mo_dieu_chinh_muc: true }]);
+      expect(await screen.findByText('Đã mở cho học viên điều chỉnh mức lớp học')).toBeInTheDocument();
+
+      await user.click(sw);
+      await waitFor(() => expect(sw).not.toBeChecked());
+      expect(bodies).toEqual([{ mo_dieu_chinh_muc: true }, { mo_dieu_chinh_muc: false }]);
+    });
+
+    it('lỗi API: báo lỗi, switch giữ nguyên', async () => {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      server.use(
+        http.patch('/khoa-boi-duong/:id', () =>
+          HttpResponse.json({ error: { code: 'FORBIDDEN', message: 'Không có quyền' } }, { status: 403 }),
+        ),
+      );
+      const user = userEvent.setup();
+      renderTrang('khoa-1');
+      const sw = await screen.findByRole('switch', { name: /Cho học viên điều chỉnh mức lớp học/ });
+      await user.click(sw);
+      expect(await screen.findByText('Không có quyền')).toBeInTheDocument();
+      expect(sw).not.toBeChecked();
+    });
+
+    it('vai_tro khác quan_tri: không hiện switch', async () => {
+      db.nguoiDung.vai_tro = 'truong';
+      renderTrang('khoa-1');
+      await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+      expect(screen.queryByRole('switch', { name: /điều chỉnh mức lớp học/ })).not.toBeInTheDocument();
+    });
+  });
+
   it('pham_vi_hoc_vien="don_vi" → hiện Alert phạm vi học viên', async () => {
     server.use(
       http.get('/khoa-boi-duong/:id', () =>

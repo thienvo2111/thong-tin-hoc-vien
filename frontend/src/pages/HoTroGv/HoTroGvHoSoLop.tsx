@@ -248,7 +248,14 @@ function NoiDung({ d }: { d: TrangLop }) {
                       <Table.Td fw={600}>{h.ho_ten}</Table.Td>
                       <Table.Td>{h.don_vi}</Table.Td>
                       <Table.Td>{h.doi_tuong ? NHAN_DOI_TUONG[h.doi_tuong] ?? h.doi_tuong : '—'}</Table.Td>
-                      <Table.Td>{h.muc_dau_vao ? <Badge variant="light">{NHAN_MUC[h.muc_dau_vao] ?? h.muc_dau_vao}</Badge> : '—'}</Table.Td>
+                      <Table.Td>
+                        {h.muc_dau_vao ? <Badge variant="light">{NHAN_MUC[h.muc_dau_vao] ?? h.muc_dau_vao}</Badge> : '—'}
+                        {h.muc_hoc_chon && (
+                          <Badge variant="outline" ml={4}>
+                            Tự chọn: {NHAN_MUC[h.muc_hoc_chon] ?? h.muc_hoc_chon}
+                          </Badge>
+                        )}
+                      </Table.Td>
                       <Table.Td>{h.so_dien_thoai ?? '—'}</Table.Td>
                       <Table.Td>
                         {h.cum ? (

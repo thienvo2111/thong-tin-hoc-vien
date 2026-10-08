@@ -77,6 +77,14 @@ export class DotXacNhanDongException extends HttpException {
   }
 }
 
+// 2026-10-08: 403 khi học viên tự điều chỉnh mức lớp học mà khóa chưa/không
+// còn mở điều chỉnh (khoa_boi_duong.mo_dieu_chinh_muc = false).
+export class DieuChinhMucDongException extends HttpException {
+  constructor(message = 'Khóa học chưa mở điều chỉnh mức lớp học') {
+    super({ error: { code: 'DIEU_CHINH_MUC_DONG', message } }, 403);
+  }
+}
+
 // Dùng bởi Dịch vụ Import (mỗi dòng file) để biến lỗi ném ra từ đúng 1 bộ
 // quy tắc validate dùng chung (ValidationException/ConflictAppException của
 // các *_hoc.service.ts) thành 1 chuỗi lý do ngắn gọn cho cột "Lý do".

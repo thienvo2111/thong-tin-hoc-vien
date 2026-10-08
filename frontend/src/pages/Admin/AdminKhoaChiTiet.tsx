@@ -15,6 +15,7 @@ import {
   Select,
   Skeleton,
   Stack,
+  Switch,
   Table,
   Tabs,
   Text,
@@ -243,6 +244,9 @@ export default function AdminKhoaChiTiet() {
 
   // --- Sửa khóa (chỉ quan_tri) ------------------------------------------
   const capNhatKhoa = useCapNhatKhoa(khoaId);
+  // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học — mutation riêng để không lẫn trạng thái
+  // với form sửa khóa.
+  const batTatDieuChinhMuc = useCapNhatKhoa(khoaId);
   const [modalSuaKhoa, setModalSuaKhoa] = useState(false);
   const [formSuaKhoa, setFormSuaKhoa] = useState<FormSuaKhoa | null>(null);
   const [loiSuaKhoa, setLoiSuaKhoa] = useState<Record<string, string>>({});
@@ -822,6 +826,32 @@ export default function AdminKhoaChiTiet() {
                 )}
               </Group>
             </Group>
+
+            {laQuanTri && (
+              <Paper withBorder radius={14} p="md">
+                <Switch
+                  label="Cho học viên điều chỉnh mức lớp học"
+                  description="Học viên chỉ được chọn mức bằng hoặc thấp hơn kết quả đánh giá đầu vào; có hiệu lực ngay."
+                  checked={khoa.mo_dieu_chinh_muc}
+                  disabled={batTatDieuChinhMuc.isPending}
+                  onChange={(e) =>
+                    batTatDieuChinhMuc.mutate(
+                      { mo_dieu_chinh_muc: e.currentTarget.checked },
+                      {
+                        onSuccess: (k) =>
+                          notifications.show({
+                            color: 'green',
+                            message: k.mo_dieu_chinh_muc
+                              ? 'Đã mở cho học viên điều chỉnh mức lớp học'
+                              : 'Đã đóng điều chỉnh mức lớp học',
+                          }),
+                        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+                      },
+                    )
+                  }
+                />
+              </Paper>
+            )}
 
             {khoa.pham_vi_hoc_vien === 'don_vi' && (
               <Alert color="blue" variant="light">

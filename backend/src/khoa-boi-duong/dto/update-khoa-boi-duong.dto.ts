@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsDateString,
   IsOptional,
   IsString,
@@ -40,4 +41,9 @@ export class UpdateKhoaBoiDuongDto {
   @IsOptional()
   @IsUUID()
   don_vi_dat_hang_id?: string;
+
+  // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học.
+  @IsOptional()
+  @IsBoolean()
+  mo_dieu_chinh_muc?: boolean;
 }

@@ -12,6 +12,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { CapNhatCumDangKyDto } from './dto/capnhat-cum-dang-ky.dto';
 import { GanLopGiaiDoanDto } from './dto/gan-lop-giai-doan.dto';
+import { ChonMucHocDto } from './dto/chon-muc-hoc.dto';
 
 // PUT /dang-ky-hoc/{id}/giai-doan/{giaiDoanId}/lop (phân lớp theo giai đoạn,
 // spec 2026-10-02), PATCH /dang-ky-hoc/{id}/cum — thao tác thủ công từng đăng
@@ -47,5 +48,16 @@ export class DangKyHocThaoTacController {
       dto.lop_id,
       user,
     );
+  }
+
+  // 2026-10-08: Quản trị sửa hộ mức lớp học — bỏ qua công tắc khóa, vẫn chỉ
+  // cho mức ≤ mức đánh giá.
+  @Roles('quan_tri')
+  @Patch(':id/muc-hoc')
+  capNhatMucHoc(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ChonMucHocDto,
+  ) {
+    return this.khoaBoiDuongService.capNhatMucHocDangKy(id, dto.muc);
   }
 }

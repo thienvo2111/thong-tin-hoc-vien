@@ -210,6 +210,7 @@ export function taoDanhSachKhoaMau(): KhoaBoiDuong[] {
       created_at: '2026-09-20T00:00:00.000Z',
       updated_at: '2026-09-20T00:00:00.000Z',
       created_by: 'nd-1',
+      mo_dieu_chinh_muc: false,
     },
     {
       id: 'khoa-2',
@@ -226,6 +227,7 @@ export function taoDanhSachKhoaMau(): KhoaBoiDuong[] {
       created_at: '2026-09-21T00:00:00.000Z',
       updated_at: '2026-09-21T00:00:00.000Z',
       created_by: 'nd-1',
+      mo_dieu_chinh_muc: false,
     },
   ];
 }
@@ -566,6 +568,7 @@ export function taoKhoaHocToiMau(): KhoaHocDangKy[] {
       ngay_hoan_thanh: null,
       muc_dau_vao: 'co_ban',
       muc_dau_ra: null,
+      muc_hoc_chon: null,
       cum_id: 'cum-1',
       khoa: {
         id: 'khoa-1',
@@ -575,6 +578,7 @@ export function taoKhoaHocToiMau(): KhoaHocDangKy[] {
         thoi_gian_bat_dau: '2026-10-05T00:00:00.000Z',
         thoi_gian_ket_thuc: '2026-11-20T00:00:00.000Z',
         trang_thai: 'da_duyet',
+        mo_dieu_chinh_muc: false,
       },
       cum: {
         id: 'cum-1',
@@ -663,6 +667,7 @@ export function taoKhoaHocCuaHocVienMau(): Record<string, KhoaHocDangKy[]> {
         ngay_hoan_thanh: null,
         muc_dau_vao: null,
         muc_dau_ra: null,
+        muc_hoc_chon: null,
         cum_id: null,
         khoa: {
           id: 'khoa-1',
@@ -672,6 +677,7 @@ export function taoKhoaHocCuaHocVienMau(): Record<string, KhoaHocDangKy[]> {
           thoi_gian_bat_dau: '2026-10-05',
           thoi_gian_ket_thuc: '2026-11-20',
           trang_thai: 'cho_duyet',
+          mo_dieu_chinh_muc: false,
         },
         cum: null,
         giai_doan: GIAI_DOAN_KHOA_1.map((g) => ({ ...g, lop: null, tien_do: null })),

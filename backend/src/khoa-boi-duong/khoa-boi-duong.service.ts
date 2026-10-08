@@ -21,6 +21,7 @@ import { normalizeNfcName } from '../common/utils/normalize-text.util';
 import { paginate } from '../common/dto/pagination-query.dto';
 import {
   ConflictAppException,
+  DieuChinhMucDongException,
   ForbiddenAppException,
   NotFoundAppException,
   ValidationException,
@@ -52,6 +53,7 @@ import { KetQuaGiaiDoanRowDto } from './dto/ket-qua-giai-doan-row.dto';
 import { RowBuildResult } from '../import/import.types';
 import { resolveHocVienImportRow } from '../import/util/hoc-vien-resolver.util';
 import { parseVnDateTime } from '../common/utils/vn-datetime.util';
+import { THU_TU_MUC, duocChonMuc, mucHocHieuLuc } from './util/muc-hoc.util';
 
 type LopHocVoiKhoa = lop_hoc & { khoa: khoa_boi_duong };
 
@@ -345,6 +347,7 @@ export class KhoaBoiDuongService {
           thoi_gian_ket_thuc: dto.thoi_gian_ket_thuc
             ? new Date(dto.thoi_gian_ket_thuc)
             : undefined,
+          mo_dieu_chinh_muc: dto.mo_dieu_chinh_muc,
         },
       });
     } catch (e) {
@@ -1449,6 +1452,79 @@ export class KhoaBoiDuongService {
     return updated;
   }
 
+  // ---------------------------------------------------------------------
+  // Điều chỉnh mức lớp học (2026-10-08): học viên tự chọn khi khóa mở công
+  // tắc (PUT /hoc-vien/toi/khoa-hoc/{khoaId}/muc-hoc); Quản trị sửa hộ bỏ qua
+  // công tắc (PATCH /dang-ky-hoc/{id}/muc-hoc). Cả 2 vẫn áp quy tắc ≤ mức
+  // đánh giá. Chọn bằng mức đánh giá -> lưu NULL.
+  // ---------------------------------------------------------------------
+  async chonMucHoc(
+    caller: AuthenticatedUser,
+    khoaId: string,
+    muc: muc_nang_luc | null,
+  ) {
+    const hocVienId = this.assertHocVienId(caller);
+    const dangKy = await this.prisma.dang_ky_hoc.findUnique({
+      where: {
+        hoc_vien_id_khoa_id: { hoc_vien_id: hocVienId, khoa_id: khoaId },
+      },
+      include: { khoa: true },
+    });
+    if (!dangKy) throw new NotFoundAppException('Không tìm thấy đăng ký học');
+    if (!dangKy.khoa.mo_dieu_chinh_muc) throw new DieuChinhMucDongException();
+    return this.luuMucHoc(dangKy, muc);
+  }
+
+  async capNhatMucHocDangKy(id: string, muc: muc_nang_luc | null) {
+    const dangKy = await this.getDangKyOrThrow(id);
+    return this.luuMucHoc(dangKy, muc);
+  }
+
+  private async luuMucHoc(
+    dangKy: {
+      id: string;
+      hoc_vien_id: string;
+      muc_dau_vao: muc_nang_luc | null;
+      muc_hoc_chon: muc_nang_luc | null;
+      khoa: { ten_khoa: string };
+    },
+    muc: muc_nang_luc | null,
+  ) {
+    if (!dangKy.muc_dau_vao) {
+      throw new ValidationException('Chưa có kết quả đánh giá đầu vào', [
+        { field: 'muc', message: 'Chưa có kết quả đánh giá đầu vào' },
+      ]);
+    }
+    if (muc && !duocChonMuc(dangKy.muc_dau_vao, muc)) {
+      throw new ValidationException(
+        'Chỉ được chọn mức bằng hoặc thấp hơn mức đánh giá',
+        [
+          {
+            field: 'muc',
+            message: 'Chỉ được chọn mức bằng hoặc thấp hơn mức đánh giá',
+          },
+        ],
+      );
+    }
+    const mucMoi = muc === dangKy.muc_dau_vao ? null : muc;
+    if (mucMoi !== dangKy.muc_hoc_chon) {
+      await this.prisma.dang_ky_hoc.update({
+        where: { id: dangKy.id },
+        data: { muc_hoc_chon: mucMoi },
+      });
+      await this.nhatKy.ghi({
+        hanh_dong: 'dieu_chinh_muc_hoc',
+        hoc_vien_id: dangKy.hoc_vien_id,
+        mo_ta: `${dangKy.khoa.ten_khoa}: ${nhanMuc(mucHocHieuLuc(dangKy))} → ${nhanMuc(mucMoi ?? dangKy.muc_dau_vao)}`,
+      });
+    }
+    return {
+      muc_dau_vao: dangKy.muc_dau_vao,
+      muc_hoc_chon: mucMoi,
+      muc_hoc: mucMoi ?? dangKy.muc_dau_vao,
+    };
+  }
+
   // Nhật ký phân lớp / đổi cụm — dựng câu mô tả lúc ghi vì tên lớp/cụm có thể đổi về sau.
   private async ghiPhanLop(
     dangKy: { hoc_vien_id: string; khoa: { ten_khoa: string } },
@@ -1550,7 +1626,12 @@ export class KhoaBoiDuongService {
     const gan: { giai_doan_id: string; lop_id: string | null }[] = [];
     const canhBaoList: string[] = [];
     // Mức đầu vào của học viên: tra tối đa 1 lần/dòng, chỉ khi có lớp gắn mức.
-    let mucDauVao: Promise<muc_nang_luc | null> | undefined;
+    let mucDauVao:
+      | Promise<{
+          muc_dau_vao: muc_nang_luc | null;
+          muc_hoc_chon: muc_nang_luc | null;
+        } | null>
+      | undefined;
     for (const gd of giaiDoanList) {
       const o = raw[`gd:${gd.thu_tu}`]?.trim();
       if (!o) continue;
@@ -1596,13 +1677,18 @@ export class KhoaBoiDuongService {
                 khoa_id: khoa.id,
               },
             },
-            select: { muc_dau_vao: true },
+            select: { muc_dau_vao: true, muc_hoc_chon: true },
           })
-          .then((dk) => dk?.muc_dau_vao ?? null);
-        const muc = await mucDauVao;
-        if (muc && muc !== lop.muc_nang_luc) {
+          .then((dk) => dk ?? null);
+        // So với mức học hiệu lực (muc_hoc_chon ?? muc_dau_vao, 2026-10-08).
+        const dk = await mucDauVao;
+        const muc = dk ? mucHocHieuLuc(dk) : null;
+        if (dk && muc && muc !== lop.muc_nang_luc) {
+          const dieuChinh = dk.muc_hoc_chon
+            ? ` (học viên tự điều chỉnh từ "${dk.muc_dau_vao}")`
+            : '';
           canhBaoList.push(
-            `Học viên "${ma}" có mức đầu vào "${muc}" khác mức năng lực "${lop.muc_nang_luc}" của lớp "${lop.ten_lop}" — kiểm tra lại phân lớp`,
+            `Học viên "${ma}" có mức học "${muc}"${dieuChinh} khác mức năng lực "${lop.muc_nang_luc}" của lớp "${lop.ten_lop}" — kiểm tra lại phân lớp`,
           );
         }
       }
@@ -1866,9 +1952,16 @@ export class KhoaBoiDuongService {
       select: {
         muc_dau_vao: true,
         muc_dau_ra: true,
+        muc_hoc_chon: true,
         khoa: { select: { ten_khoa: true } },
       },
     });
+    // Mức tự chọn chỉ còn ý nghĩa khi THẤP HƠN mức đánh giá mới — không thì
+    // reset về học theo mức đánh giá.
+    const resetMucChon =
+      dto.loai === 'dau_vao' &&
+      !!cu?.muc_hoc_chon &&
+      THU_TU_MUC[cu.muc_hoc_chon] >= THU_TU_MUC[dto.muc];
     await this.prisma.dang_ky_hoc.update({
       where: {
         hoc_vien_id_khoa_id: {
@@ -1878,7 +1971,10 @@ export class KhoaBoiDuongService {
       },
       data:
         dto.loai === 'dau_vao'
-          ? { muc_dau_vao: dto.muc }
+          ? {
+              muc_dau_vao: dto.muc,
+              ...(resetMucChon ? { muc_hoc_chon: null } : {}),
+            }
           : { muc_dau_ra: dto.muc },
     });
     const mucCu =

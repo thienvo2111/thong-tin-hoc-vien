@@ -64,6 +64,8 @@ export interface TrangLop {
     doi_tuong: string | null;
     chuc_vu: string | null;
     muc_dau_vao: string | null;
+    /** 2026-10-08: mức học viên tự điều chỉnh (null = theo mức đánh giá). */
+    muc_hoc_chon?: string | null;
     so_dien_thoai?: string | null;
     email?: string | null;
     cum?: { id: string; ten_cum: string; nguoi_ho_tro: { ho_ten: string; email: string | null }[] } | null;
