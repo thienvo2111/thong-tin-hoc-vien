@@ -9,7 +9,13 @@ export const TRANG_THAI_HO_SO = [
   'tu_choi',
   'loi',
 ] as const;
-export const CAP_GIANG_DAY = ['mam_non', 'tieu_hoc', 'thcs', 'thpt'] as const;
+export const CAP_GIANG_DAY = [
+  'mam_non',
+  'tieu_hoc',
+  'thcs',
+  'thpt',
+  'trung_cap_nghe',
+] as const;
 export const KHONG_XAC_DINH = 'khong_xac_dinh';
 export const TRANG_THAI_DANG_KY = [
   'cho_duyet',

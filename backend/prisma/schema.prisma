@@ -48,6 +48,8 @@ enum cap_hoc {
   tieu_hoc
   thcs
   thpt
+  /// 2026-10-08: môn duy nhất "Các môn trung cấp nghề" (seed trong migration).
+  trung_cap_nghe
 }
 
 enum trang_thai_active {

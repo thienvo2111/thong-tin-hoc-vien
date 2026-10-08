@@ -27,6 +27,7 @@ const TUY_CHON_CAP_GIANG_DAY = [
   { value: 'tieu_hoc', label: 'Tiểu học' },
   { value: 'thcs', label: 'THCS' },
   { value: 'thpt', label: 'THPT' },
+  { value: 'trung_cap_nghe', label: 'Trung cấp nghề' },
 ];
 
 /** Danh sách học viên (quản trị) — bộ lọc map đúng query param thật của GET /hoc-vien (trang_thai,

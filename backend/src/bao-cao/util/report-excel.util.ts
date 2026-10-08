@@ -47,6 +47,7 @@ const NHAN_CAP_GIANG_DAY: Record<string, string> = {
   tieu_hoc: 'Tiểu học',
   thcs: 'THCS',
   thpt: 'THPT',
+  trung_cap_nghe: 'Trung cấp nghề',
   [KHONG_XAC_DINH]: 'Không xác định',
 };
 

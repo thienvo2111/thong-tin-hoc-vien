@@ -26,7 +26,7 @@ CREATE TYPE cap_dia_danh AS ENUM ('tinh_thanh', 'phuong_xa_dac_khu');
 
 CREATE TYPE loai_don_vi AS ENUM ('so_gddt', 'phong_vhxh', 'truong', 'khac');
 
-CREATE TYPE cap_hoc AS ENUM ('mam_non', 'tieu_hoc', 'thcs', 'thpt');
+CREATE TYPE cap_hoc AS ENUM ('mam_non', 'tieu_hoc', 'thcs', 'thpt', 'trung_cap_nghe');
 
 CREATE TYPE trang_thai_active AS ENUM ('active', 'ngung');
 

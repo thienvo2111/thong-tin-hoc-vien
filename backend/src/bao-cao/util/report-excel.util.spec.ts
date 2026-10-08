@@ -63,6 +63,7 @@ describe('report-excel.util', () => {
       'Tiểu học',
       'THCS',
       'THPT',
+      'Trung cấp nghề',
       'Không xác định',
     ]);
     expect(rows[1]).toEqual([
@@ -75,6 +76,7 @@ describe('report-excel.util', () => {
       0,
       0,
       3,
+      0,
       0,
       0,
       0,

@@ -28,7 +28,7 @@ export type TrinhDoChuyenMon =
   | 'tien_si'
   | 'khac';
 
-export type CapGiangDay = 'mam_non' | 'tieu_hoc' | 'thcs' | 'thpt';
+export type CapGiangDay = 'mam_non' | 'tieu_hoc' | 'thcs' | 'thpt' | 'trung_cap_nghe';
 
 export interface HocVien {
   id: string;

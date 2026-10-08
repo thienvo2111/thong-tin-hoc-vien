@@ -13,6 +13,7 @@ export const CAP_GIANG_DAY_OPTIONS = [
   { value: 'tieu_hoc', label: 'Tiểu học' },
   { value: 'thcs', label: 'THCS' },
   { value: 'thpt', label: 'THPT' },
+  { value: 'trung_cap_nghe', label: 'Trung cấp nghề' },
 ];
 
 export const DOI_TUONG_OPTIONS = [

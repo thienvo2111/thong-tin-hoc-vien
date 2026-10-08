@@ -430,6 +430,7 @@ const CAP_HOC_LABEL: Record<cap_hoc, string> = {
   tieu_hoc: 'Tiểu học',
   thcs: 'THCS',
   thpt: 'THPT',
+  trung_cap_nghe: 'Trung cấp nghề',
 };
 
 const DOI_TUONG_LABEL: Record<doi_tuong_hoc_vien, string> = {

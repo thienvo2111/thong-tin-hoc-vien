@@ -25,7 +25,7 @@ export const emailSchema = z.string().email('Email không đúng định dạng'
 const NAM_HIEN_TAI = dayjs().year();
 
 export const trinhDoChuyenMonEnum = z.enum(['trung_cap', 'cao_dang', 'dai_hoc', 'thac_si', 'tien_si', 'khac']);
-export const capGiangDayEnum = z.enum(['mam_non', 'tieu_hoc', 'thcs', 'thpt']);
+export const capGiangDayEnum = z.enum(['mam_non', 'tieu_hoc', 'thcs', 'thpt', 'trung_cap_nghe']);
 export const doiTuongEnum = z.enum(['giao_vien', 'can_bo_quan_ly', 'nhan_vien'], {
   errorMap: () => ({ message: 'Vui lòng chọn đối tượng' }),
 });

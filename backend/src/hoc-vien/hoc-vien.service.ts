@@ -1477,7 +1477,7 @@ export class HocVienService {
     return this.toResponse(updated);
   }
 
-  // Rule #25b: THPT/NULL -> Sở GD&ĐT quản lý tỉnh chứa dia_ban_id của đơn vị
+  // Rule #25b: THPT/Trung cấp nghề/NULL -> Sở GD&ĐT quản lý tỉnh chứa dia_ban_id của đơn vị
   // công tác; MN/TH/THCS -> Phòng VHXH quản lý đúng xã đó. Định tuyến theo
   // cây địa lý (dia_danh), KHÔNG theo don_vi_cha_id (chỉ dùng cho phân quyền
   // escalation qua ScopeService, xem docs/database-ddl.sql comment).
@@ -1485,7 +1485,11 @@ export class HocVienService {
     capGiangDay: cap_hoc | null,
     xaId: string,
   ): Promise<{ id: string }> {
-    if (capGiangDay === null || capGiangDay === 'thpt') {
+    if (
+      capGiangDay === null ||
+      capGiangDay === 'thpt' ||
+      capGiangDay === 'trung_cap_nghe'
+    ) {
       const xa = await this.prisma.dia_danh.findUnique({ where: { id: xaId } });
       if (!xa || !xa.parent_id) {
         throw new NotFoundAppException(
