@@ -15,6 +15,8 @@ export function thongDiepLoiChung(err: unknown): string {
       return 'Số CCCD này đã được dùng cho một hồ sơ khác. Liên hệ hỗ trợ.';
     case 'DOT_XAC_NHAN_DONG':
       return 'Đã hết thời gian chỉnh sửa';
+    case 'DIEU_CHINH_MUC_DONG':
+      return 'Đã hết thời gian điều chỉnh mức lớp học';
     case 'UNAUTHORIZED':
       return 'Phiên đăng nhập đã hết hạn';
     default:

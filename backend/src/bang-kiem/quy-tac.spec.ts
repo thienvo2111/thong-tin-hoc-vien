@@ -62,6 +62,7 @@ function dot(chinh: Partial<DotLop> = {}): DotLop {
         doi_tuong: null,
         chuc_vu: null,
         muc_dau_vao: null,
+        muc_hoc_chon: null,
         so_dien_thoai: null,
         email: null,
         cum: null,

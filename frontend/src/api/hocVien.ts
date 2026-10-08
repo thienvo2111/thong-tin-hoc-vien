@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type {
   DaGuiResponse,
@@ -8,6 +8,7 @@ import type {
   KhoaHocDangKy,
   KiemTraTruocXacNhan,
   MucDoDayDu,
+  MucNangLuc,
   XacNhanResponse,
 } from './types';
 
@@ -113,4 +114,29 @@ export function useDanhGiaDauVao(enabled = true) {
 export const khoaHocToiKey = ['hoc-vien', 'toi', 'khoa-hoc'] as const;
 export function useKhoaHocToi(enabled = true) {
   return useQuery({ queryKey: khoaHocToiKey, queryFn: layKhoaHocToi, enabled });
+}
+
+// 2026-10-08: học viên tự điều chỉnh mức lớp học (chỉ ≤ mức đánh giá, khi khóa mở điều chỉnh).
+// muc=null = quay về học theo mức đánh giá.
+export interface KetQuaChonMucHoc {
+  muc_dau_vao: MucNangLuc;
+  muc_hoc_chon: MucNangLuc | null;
+  muc_hoc: MucNangLuc;
+}
+
+export function chonMucHoc(khoaId: string, muc: MucNangLuc | null) {
+  return apiFetch<KetQuaChonMucHoc>(`/hoc-vien/toi/khoa-hoc/${khoaId}/muc-hoc`, {
+    method: 'PUT',
+    body: JSON.stringify({ muc }),
+  });
+}
+
+export function useChonMucHoc() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ khoaId, muc }: { khoaId: string; muc: MucNangLuc | null }) => chonMucHoc(khoaId, muc),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: khoaHocToiKey });
+    },
+  });
 }

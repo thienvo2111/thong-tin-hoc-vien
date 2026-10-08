@@ -51,6 +51,7 @@ const dot: DotLop = {
       doi_tuong: 'giao_vien',
       chuc_vu: null,
       muc_dau_vao: 'co_ban',
+      muc_hoc_chon: null,
       so_dien_thoai: '0911111111',
       email: 'hv1@x.vn',
       cum: {

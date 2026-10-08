@@ -8,10 +8,12 @@ import { useToi } from '@/auth/AuthContext';
 import { DongThoiGianNhatKy } from '@/components/DongThoiGianNhatKy';
 import {
   useCapNhatCumDangKy,
+  useCapNhatMucHoc,
   useChiTietKhoa,
   useKhoaHocCuaHocVien,
 } from '@/api/khoaBoiDuong';
-import type { KhoaHocDangKy } from '@/api/types';
+import type { KhoaHocDangKy, MucNangLuc } from '@/api/types';
+import { cacMucDuocChon, mucHocHieuLuc, nhanMucNangLuc } from '@/lib/mucNangLuc';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { TrangThaiBadge } from '@/components/TrangThaiBadge';
@@ -171,6 +173,8 @@ function KhoiDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHocD
         <Stack gap="sm">
           <PhanLopTheoGiaiDoan hocVienId={hocVienId} dangKy={dangKy} khoa={khoa} />
 
+          <MucHocDangKy hocVienId={hocVienId} dangKy={dangKy} />
+
           <Group gap="sm" wrap="wrap" data-testid="dong-cum">
             <Select
               label="Cụm hỗ trợ Zalo"
@@ -190,5 +194,59 @@ function KhoiDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHocD
         </Stack>
       )}
     </Box>
+  );
+}
+
+// 2026-10-08: mức lớp học hiệu lực (tự chọn ?? đánh giá). Quản trị sửa hộ — bỏ qua công tắc khóa nhưng
+// chỉ chọn được mức ≤ mức đánh giá (backend kiểm lại).
+function MucHocDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHocDangKy }) {
+  const { nguoiDung } = useToi();
+  const capNhatMuc = useCapNhatMucHoc(hocVienId);
+  const mucHoc = mucHocHieuLuc(dangKy);
+  const [chonMuc, setChonMuc] = useState<string>(mucHoc ?? '');
+
+  if (!dangKy.muc_dau_vao) {
+    return (
+      <Text fz="sm" c="dimmed">
+        Mức lớp học: chưa có kết quả đánh giá đầu vào
+      </Text>
+    );
+  }
+
+  function luuMuc() {
+    capNhatMuc.mutate(
+      { dangKyHocId: dangKy.id, muc: chonMuc as MucNangLuc },
+      {
+        onSuccess: () => notifications.show({ color: 'green', message: 'Đã lưu mức lớp học' }),
+        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+      },
+    );
+  }
+
+  return (
+    <Stack gap={4} data-testid="dong-muc-hoc">
+      <Text fz="sm">
+        Mức lớp học: <b>{nhanMucNangLuc(mucHoc)}</b>
+        {dangKy.muc_hoc_chon && <> (học viên tự điều chỉnh từ {nhanMucNangLuc(dangKy.muc_dau_vao)})</>}
+      </Text>
+      {nguoiDung?.vai_tro === 'quan_tri' && (
+        <Group gap="sm" wrap="wrap" align="flex-end">
+          <Select
+            label="Sửa mức lớp học"
+            data={cacMucDuocChon(dangKy.muc_dau_vao).map((m) => ({
+              value: m,
+              label: m === dangKy.muc_dau_vao ? `${nhanMucNangLuc(m)} (theo kết quả đánh giá)` : nhanMucNangLuc(m),
+            }))}
+            value={chonMuc}
+            onChange={(v) => setChonMuc(v ?? '')}
+            allowDeselect={false}
+            w={260}
+          />
+          <Button size="xs" loading={capNhatMuc.isPending} onClick={luuMuc} disabled={!chonMuc}>
+            Lưu mức
+          </Button>
+        </Group>
+      )}
+    </Stack>
   );
 }

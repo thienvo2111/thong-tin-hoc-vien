@@ -126,7 +126,10 @@ function NoiDung({ d }: { d: TrangLop }) {
                 <Table.Tr key={h.dang_ky_hoc_id}>
                   <Table.Td fw={600}>{h.ho_ten}</Table.Td>
                   <Table.Td>{h.don_vi}</Table.Td>
-                  <Table.Td>{h.muc_dau_vao ? NHAN_MUC[h.muc_dau_vao] ?? h.muc_dau_vao : '—'}</Table.Td>
+                  <Table.Td>
+                    {h.muc_dau_vao ? NHAN_MUC[h.muc_dau_vao] ?? h.muc_dau_vao : '—'}
+                    {h.muc_hoc_chon && <> (tự chọn: {NHAN_MUC[h.muc_hoc_chon] ?? h.muc_hoc_chon})</>}
+                  </Table.Td>
                   <Table.Td>
                     {d.buoi.map((b) => {
                       const dd = h.diem_danh[b.id];

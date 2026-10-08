@@ -309,6 +309,8 @@ export interface KhoaBoiDuong {
   created_at: string;
   updated_at: string;
   created_by: string | null;
+  // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học (chỉ xuống mức thấp hơn).
+  mo_dieu_chinh_muc: boolean;
 }
 
 // Thêm 2026-09-30 — enum thật của backend (prisma/schema.prisma) dùng cho form CRUD giai đoạn/nhân
@@ -642,6 +644,8 @@ export interface KhoaHocDangKy {
   ngay_hoan_thanh: string | null;
   muc_dau_vao: MucNangLuc | null;
   muc_dau_ra: MucNangLuc | null;
+  // 2026-10-08: mức lớp học tự chọn (≤ muc_dau_vao); null = học theo mức đánh giá.
+  muc_hoc_chon: MucNangLuc | null;
   cum_id: string | null;
   khoa: {
     id: string;
@@ -651,6 +655,7 @@ export interface KhoaHocDangKy {
     thoi_gian_bat_dau: string;
     thoi_gian_ket_thuc: string;
     trang_thai: TrangThaiKhoa;
+    mo_dieu_chinh_muc: boolean;
   };
   cum: CumHocVien | null;
   // Phân lớp theo giai đoạn (spec 2026-10-02) — thay lop_truc_tiep/lop_zoom/lop_vle/tien_do_giai_doan.

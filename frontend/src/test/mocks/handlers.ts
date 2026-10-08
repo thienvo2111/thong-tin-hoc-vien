@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import type { ImportChiTiet, KhoaBoiDuong, LoaiLop, YeuCauHoTro, YeuCauHoTroQuanTri } from '@/api/types';
+import type { ImportChiTiet, KhoaBoiDuong, KhoaHocDangKy, LoaiLop, MucNangLuc, YeuCauHoTro, YeuCauHoTroQuanTri } from '@/api/types';
 import { thongKeHandlers } from './thongKe';
 import { DIA_DANH, DON_VI, MON_HOC, db } from './db';
 
@@ -11,6 +11,23 @@ function timDangKyTheoId(id: string) {
     if (found) return found;
   }
   return undefined;
+}
+
+const THU_TU_MUC_MOCK: MucNangLuc[] = ['co_ban', 'thanh_thao', 'nang_cao'];
+
+async function luuMucHocMock(dk: KhoaHocDangKy, request: Request) {
+  const { muc } = (await request.json()) as { muc: MucNangLuc | null };
+  if (!dk.muc_dau_vao) {
+    throw loi(400, 'VALIDATION_ERROR', 'Chưa có kết quả đánh giá đầu vào', {
+      fields: [{ field: 'muc', message: 'Chưa có kết quả đánh giá đầu vào' }],
+    });
+  }
+  if (muc && THU_TU_MUC_MOCK.indexOf(muc) > THU_TU_MUC_MOCK.indexOf(dk.muc_dau_vao)) {
+    const thongDiep = 'Chỉ được chọn mức bằng hoặc thấp hơn mức đánh giá';
+    throw loi(400, 'VALIDATION_ERROR', thongDiep, { fields: [{ field: 'muc', message: thongDiep }] });
+  }
+  dk.muc_hoc_chon = muc === dk.muc_dau_vao ? null : muc;
+  return { muc_dau_vao: dk.muc_dau_vao, muc_hoc_chon: dk.muc_hoc_chon, muc_hoc: dk.muc_hoc_chon ?? dk.muc_dau_vao };
 }
 
 function fileMoPhong() {
@@ -387,6 +404,23 @@ export const handlers = [
 
   http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json(db.khoaHocToi)),
 
+  // 2026-10-08: học viên tự điều chỉnh mức lớp học — mô phỏng đúng quy tắc backend (công tắc khóa,
+  // chưa có đánh giá, chỉ ≤ mức đánh giá, bằng mức đánh giá -> lưu null).
+  http.put('/hoc-vien/toi/khoa-hoc/:khoaId/muc-hoc', async ({ params, request }) => {
+    const dk = db.khoaHocToi.find((d) => d.khoa_id === params.khoaId);
+    if (!dk) return loi(404, 'NOT_FOUND', 'Không tìm thấy đăng ký học');
+    if (!dk.khoa.mo_dieu_chinh_muc) {
+      return loi(403, 'DIEU_CHINH_MUC_DONG', 'Khóa học chưa mở điều chỉnh mức lớp học');
+    }
+    return HttpResponse.json(await luuMucHocMock(dk, request));
+  }),
+
+  http.patch('/dang-ky-hoc/:id/muc-hoc', async ({ params, request }) => {
+    const dk = timDangKyTheoId(params.id as string);
+    if (!dk) return loi(404, 'NOT_FOUND', 'Không tìm thấy đăng ký học');
+    return HttpResponse.json(await luuMucHocMock(dk, request));
+  }),
+
   http.post('/hoc-vien/toi/xac-nhan', () => {
     if (db.dotXacNhan.ap_dung_dot && !db.dotXacNhan.dot) {
       return HttpResponse.json(
@@ -612,6 +646,7 @@ export const handlers = [
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       created_by: 'nd-1',
+      mo_dieu_chinh_muc: false,
     };
     db.danhSachKhoa = [moi, ...db.danhSachKhoa];
     db.chiTietKhoa[id] = { ...moi, pham_vi_hoc_vien: 'toan_bo', giai_doan: [], lop_hoc: [], cum_hoc_vien: [] };

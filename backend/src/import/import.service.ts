@@ -873,7 +873,7 @@ export class ImportService {
           'Tùy chọn — "truc_tiep", "zoom" hoặc "vle". Mặc định "truc_tiep" nếu để trống.',
         nhom_hoc_vien: 'Tùy chọn — số nguyên từ 1 đến 20.',
         muc_nang_luc:
-          'Tùy chọn — "co_ban", "thanh_thao" hoặc "nang_cao". Dùng để cảnh báo khi phân lớp nếu khác mức đầu vào của học viên.',
+          'Tùy chọn — "co_ban", "thanh_thao" hoặc "nang_cao". Dùng để cảnh báo khi phân lớp nếu khác mức học của học viên (mức tự điều chỉnh nếu có, không thì mức đầu vào).',
         si_so_toi_da: 'Tùy chọn — số nguyên dương.',
         bat_dau: 'Bắt buộc — định dạng "dd/mm/yyyy hh:mm", giờ Việt Nam.',
         ket_thuc:

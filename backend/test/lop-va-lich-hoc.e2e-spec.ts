@@ -639,6 +639,84 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
       });
       expect(lopGan).not.toBeNull();
     });
+
+    // 2026-10-08: so lớp với MỨC HỌC hiệu lực (muc_hoc_chon ?? muc_dau_vao).
+    it('học viên tự điều chỉnh mức -> so với mức đã chọn, câu cảnh báo ghi rõ mức đánh giá gốc', async () => {
+      const suf = uniqueSuffix();
+      const khoa = await taoKhoa();
+      const { hocVien, tenDangNhap } = await taoHocVienMoet(suf);
+      await prisma.dang_ky_hoc.create({
+        data: {
+          hoc_vien_id: hocVien.id,
+          khoa_id: khoa.id,
+          trang_thai: 'da_duyet',
+          muc_dau_vao: 'nang_cao',
+          muc_hoc_chon: 'co_ban',
+        },
+      });
+      await taoGiaiDoan(khoa.id, 1);
+      const tenLopNangCao = `Lop-nc-${suf}`;
+      const tenLopCoBan = `Lop-cb-${suf}`;
+      await prisma.lop_hoc.createMany({
+        data: [
+          {
+            khoa_id: khoa.id,
+            loai_lop: 'truc_tiep',
+            ten_lop: tenLopNangCao,
+            muc_nang_luc: 'nang_cao',
+          },
+          {
+            khoa_id: khoa.id,
+            loai_lop: 'truc_tiep',
+            ten_lop: tenLopCoBan,
+            muc_nang_luc: 'co_ban',
+          },
+        ],
+      });
+
+      const preview = async (tenLop: string) => {
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('data');
+        sheet.addRow([
+          'so_dinh_danh_ca_nhan',
+          'ma_dinh_danh_moet',
+          'GĐ1',
+          'ten_cum',
+        ]);
+        sheet.addRow([undefined, tenDangNhap, tenLop, '']);
+        const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+        const res = await request(app.getHttpServer())
+          .post(`/import/phan_lop_hoc_vien?ma_khoa=${khoa.ma_khoa}`)
+          .set('Authorization', `Bearer ${tokenQuanTri}`)
+          .attach('file', buffer, 'phan-lop-muc-hoc.xlsx')
+          .expect(201);
+        importIds.push(res.body.import_id);
+        const ketQua = await request(app.getHttpServer())
+          .get(`/import/${res.body.import_id}`)
+          .set('Authorization', `Bearer ${tokenQuanTri}`)
+          .expect(200);
+        return ketQua.body;
+      };
+
+      // Lớp nâng cao (= mức đánh giá) nhưng học viên đã chọn cơ bản -> cảnh báo.
+      const lechMuc = await preview(tenLopNangCao);
+      expect(lechMuc.danh_sach_canh_bao).toHaveLength(1);
+      expect(lechMuc.danh_sach_canh_bao[0].ly_do).toEqual(
+        expect.stringContaining('mức học "co_ban"'),
+      );
+      expect(lechMuc.danh_sach_canh_bao[0].ly_do).toEqual(
+        expect.stringContaining('tự điều chỉnh từ "nang_cao"'),
+      );
+
+      // Lớp cơ bản khớp mức đã chọn -> không cảnh báo.
+      const khopMuc = await preview(tenLopCoBan);
+      expect(khopMuc.so_dong_loi).toBe(0);
+      // (cảnh báo lớp không có buổi trong giai đoạn vẫn có — không liên quan mức)
+      const lyDo = (khopMuc.danh_sach_canh_bao as { ly_do: string }[])
+        .map((c) => c.ly_do)
+        .join('; ');
+      expect(lyDo).not.toContain('mức học');
+    });
   });
 
   describe('Cảnh báo 🟡 giai_doan_thu_tu nghi nhập nhầm (không chặn dòng)', () => {

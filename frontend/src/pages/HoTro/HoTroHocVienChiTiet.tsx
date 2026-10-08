@@ -98,6 +98,7 @@ function HocTap({
             </Text>
             {dk.cum && <Badge variant="light">{dk.cum.ten_cum}</Badge>}
             {dk.muc_dau_vao && <Badge variant="outline">Đầu vào: {nhanMucNangLuc(dk.muc_dau_vao)}</Badge>}
+            {dk.muc_hoc_chon && <Badge variant="outline">Mức học tự chọn: {nhanMucNangLuc(dk.muc_hoc_chon)}</Badge>}
           </Group>
           {dk.giai_doan.map((gd) => (
             <Paper key={gd.id} withBorder radius={10} p="sm" bg="gray.0">

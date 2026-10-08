@@ -115,6 +115,8 @@ export interface CapNhatKhoaDto {
   thoi_gian_bat_dau?: string;
   thoi_gian_ket_thuc?: string;
   don_vi_dat_hang_id?: string;
+  // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học.
+  mo_dieu_chinh_muc?: boolean;
 }
 
 export function capNhatKhoa(id: string, dto: CapNhatKhoaDto) {
@@ -184,6 +186,25 @@ export function useCapNhatCumDangKy(hocVienId: string) {
   return useMutation({
     mutationFn: ({ dangKyHocId, dto }: { dangKyHocId: string; dto: CapNhatCumDangKyDto }) =>
       capNhatCumDangKy(dangKyHocId, dto),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: khoaHocCuaHocVienKey(hocVienId) });
+    },
+  });
+}
+
+// 2026-10-08: Quản trị sửa hộ mức lớp học (bỏ qua công tắc khóa, vẫn chỉ ≤ mức đánh giá).
+export function capNhatMucHoc(dangKyHocId: string, muc: MucNangLuc | null) {
+  return apiFetch<{ muc_dau_vao: MucNangLuc; muc_hoc_chon: MucNangLuc | null; muc_hoc: MucNangLuc }>(
+    `/dang-ky-hoc/${dangKyHocId}/muc-hoc`,
+    { method: 'PATCH', body: JSON.stringify({ muc }) },
+  );
+}
+
+export function useCapNhatMucHoc(hocVienId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dangKyHocId, muc }: { dangKyHocId: string; muc: MucNangLuc | null }) =>
+      capNhatMucHoc(dangKyHocId, muc),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: khoaHocCuaHocVienKey(hocVienId) });
     },

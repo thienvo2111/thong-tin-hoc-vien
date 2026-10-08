@@ -755,6 +755,8 @@ model khoa_boi_duong {
   // Thêm 2026-09-28: tài khoản đã gọi POST /khoa-boi-duong lúc tạo khóa —
   // NULL cho khóa tạo trước migration này (không truy ngược được), xem
   // docs/database-ddl.sql comment tại đây.
+  // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học (xuống mức thấp hơn).
+  mo_dieu_chinh_muc  Boolean             @default(false)
 
   don_vi_dat_hang don_vi_cong_tac @relation(fields: [don_vi_dat_hang_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   nguoi_duyet     nguoi_dung?     @relation("khoa_boi_duong_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -1024,6 +1026,9 @@ model dang_ky_hoc {
   // đúng cột theo cột "loai" (dau_vao|dau_ra) của dòng import.
   muc_dau_vao     muc_nang_luc?
   muc_dau_ra      muc_nang_luc?
+  // 2026-10-08: mức lớp học học viên tự chọn (chỉ ≤ muc_dau_vao). NULL = học
+  // theo mức đánh giá; mức học hiệu lực = muc_hoc_chon ?? muc_dau_vao.
+  muc_hoc_chon    muc_nang_luc?
   // QĐ10: cụm học viên (nhóm Zalo hỗ trợ) — gán trực tiếp học viên, không
   // qua lớp nào. NULL = chưa gán cụm.
   cum_id          String?            @db.Uuid

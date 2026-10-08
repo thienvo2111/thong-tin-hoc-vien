@@ -78,6 +78,64 @@ describe('Admin — Chi tiết hồ sơ học viên — Khóa & lớp (QĐ10)', 
   });
 });
 
+// 2026-10-08: mức lớp học hiệu lực + Quản trị sửa hộ (PATCH /dang-ky-hoc/{id}/muc-hoc).
+describe('Admin — Chi tiết hồ sơ học viên — Mức lớp học', () => {
+  function datMuc(muc_dau_vao: 'co_ban' | 'thanh_thao' | 'nang_cao' | null, muc_hoc_chon: 'co_ban' | 'thanh_thao' | null = null) {
+    const dk = db.khoaHocCuaHocVien['hv-duyet-1'][0];
+    dk.muc_dau_vao = muc_dau_vao;
+    dk.muc_hoc_chon = muc_hoc_chon;
+  }
+
+  it('chưa có kết quả đánh giá -> chỉ hiện dòng thông báo, không có ô sửa', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    datMuc(null);
+    renderTrang('hv-duyet-1');
+    expect(await screen.findByText('Mức lớp học: chưa có kết quả đánh giá đầu vào')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Sửa mức lớp học' })).not.toBeInTheDocument();
+  });
+
+  it('đã tự điều chỉnh -> hiện mức hiệu lực kèm mức đánh giá gốc', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    datMuc('nang_cao', 'thanh_thao');
+    renderTrang('hv-duyet-1');
+    const dong = within(await screen.findByTestId('dong-muc-hoc'));
+    expect(dong.getByText('Thành thạo', { selector: 'b' })).toBeInTheDocument();
+    expect(dong.getByText(/học viên tự điều chỉnh từ Nâng cao/)).toBeInTheDocument();
+  });
+
+  it('quản trị: Select chỉ có các mức ≤ đánh giá; chọn + Lưu mức -> PATCH đúng body, báo thành công', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    datMuc('thanh_thao');
+    let body: unknown;
+    server.use(
+      http.patch('/dang-ky-hoc/:id/muc-hoc', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ muc_dau_vao: 'thanh_thao', muc_hoc_chon: 'co_ban', muc_hoc: 'co_ban' });
+      }),
+    );
+    const user = userEvent.setup();
+    renderTrang('hv-duyet-1');
+    const dong = within(await screen.findByTestId('dong-muc-hoc'));
+    await user.click(dong.getByRole('textbox', { name: 'Sửa mức lớp học' }));
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(
+      expect.arrayContaining(['Cơ bản', 'Thành thạo (theo kết quả đánh giá)']),
+    );
+    expect(screen.queryByRole('option', { name: /Nâng cao/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('option', { name: 'Cơ bản' }));
+    await user.click(dong.getByRole('button', { name: 'Lưu mức' }));
+    expect(await screen.findByText('Đã lưu mức lớp học')).toBeInTheDocument();
+    expect(body).toEqual({ muc: 'co_ban' });
+  });
+
+  it('tài khoản đơn vị (trường) -> chỉ xem mức, không có ô sửa', async () => {
+    db.nguoiDung.vai_tro = 'truong';
+    datMuc('nang_cao');
+    renderTrang('hv-duyet-1');
+    expect(await screen.findByTestId('dong-muc-hoc')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Sửa mức lớp học' })).not.toBeInTheDocument();
+  });
+});
+
 describe('Admin — Chi tiết hồ sơ học viên — Nhật ký hoạt động (2026-10-04)', () => {
   it('quản trị -> thấy mục Nhật ký hoạt động với dòng thời gian từ API', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';

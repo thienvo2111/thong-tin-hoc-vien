@@ -19,6 +19,7 @@ import { chuanHoaLienKet } from '@/lib/lienKet';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
 import { nhanMucNangLuc } from '@/lib/mucNangLuc';
+import { ChonMucLopHoc } from './ChonMucLopHoc';
 
 // T12 (mo-rong-nls-an-giang.md, 2026-09-30) — điểm danh nhập qua IMPORT EXCEL, không có giao diện
 // chấm tay. null (chưa điểm danh) không hiện badge nào — tránh gây nhầm học viên nghĩ là "vắng".
@@ -171,6 +172,7 @@ function KhoiKhoaHoc({
           <Stack gap="xs">
             <DongKetQua nhan="Đầu vào" mucChot={muc_dau_vao} bai={baiDauVao} />
             <DongKetQua nhan="Đầu ra" mucChot={muc_dau_ra} bai={baiDauRa} />
+            <ChonMucLopHoc dangKy={dangKy} />
           </Stack>
         </Box>
       </Stack>

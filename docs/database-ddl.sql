@@ -552,6 +552,9 @@ CREATE TABLE khoa_boi_duong (
         -- truong trong đơn vị — sai nếu 1 Trường có nhiều tài khoản). Nay ghi
         -- rõ đúng tài khoản đã gọi POST /khoa-boi-duong lúc tạo, NULL cho các
         -- khóa tạo trước migration này (dữ liệu cũ không truy ngược được).
+    mo_dieu_chinh_muc   boolean NOT NULL DEFAULT false,
+        -- 2026-10-08 (migration 20261008120000_dieu_chinh_muc_hoc): công tắc
+        -- Quản trị bật/tắt cho học viên tự điều chỉnh mức lớp học.
 
     CONSTRAINT uq_khoa_ma UNIQUE (ma_khoa),
     CONSTRAINT chk_khoa_thoi_gian CHECK (thoi_gian_ket_thuc >= thoi_gian_bat_dau)
@@ -711,6 +714,10 @@ CREATE TABLE dang_ky_hoc (
     -- upsert theo (hoc_vien_id, khoa_id) đã tồn tại (phải ghi danh T3 trước).
     muc_dau_vao         muc_nang_luc,
     muc_dau_ra          muc_nang_luc,
+    -- 2026-10-08 (migration 20261008120000_dieu_chinh_muc_hoc): mức lớp học
+    -- học viên tự chọn, chỉ ≤ muc_dau_vao. NULL = học theo mức đánh giá.
+    -- Mức học hiệu lực = COALESCE(muc_hoc_chon, muc_dau_vao).
+    muc_hoc_chon        muc_nang_luc,
 
     CONSTRAINT uq_dang_ky_hoc_vien_khoa UNIQUE (hoc_vien_id, khoa_id),
     CONSTRAINT chk_dang_ky_lop_thuoc_khoa

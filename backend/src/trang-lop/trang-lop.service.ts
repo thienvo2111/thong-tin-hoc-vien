@@ -44,6 +44,8 @@ export interface HocVienDot {
   doi_tuong: string | null;
   chuc_vu: string | null;
   muc_dau_vao: string | null;
+  /** 2026-10-08: mức học viên tự điều chỉnh (null = theo mức đánh giá). */
+  muc_hoc_chon: string | null;
   so_dien_thoai?: string | null;
   email?: string | null;
   cum?: {
@@ -127,6 +129,7 @@ export async function layDotLop(
             select: {
               id: true,
               muc_dau_vao: true,
+              muc_hoc_chon: true,
               hoc_vien: {
                 select: {
                   id: true,
@@ -261,6 +264,7 @@ export async function layDotLop(
         doi_tuong: dk.hoc_vien.doi_tuong,
         chuc_vu: dk.hoc_vien.chuc_vu,
         muc_dau_vao: dk.muc_dau_vao,
+        muc_hoc_chon: dk.muc_hoc_chon,
         so_dien_thoai: dk.hoc_vien.so_dien_thoai_lien_he,
         email: dk.hoc_vien.email_lien_he,
         cum: dk.cum
