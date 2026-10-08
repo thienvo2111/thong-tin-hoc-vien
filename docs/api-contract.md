@@ -612,6 +612,10 @@ Response `POST /sso/doi-ma`:
 {
   "hoc_vien_id": "uuid — định danh ổn định trong cổng (dùng khi không có mã MOET)",
   "ho_ten": "Nguyễn Văn A",
+  "so_dinh_danh_ca_nhan": "089123456789",
+  "email": "a@example.com",
+  "gioi_tinh": "Nam",
+  "dia_chi": "Phường Long Xuyên, Tỉnh An Giang",
   "ma_dinh_danh_moet": "9115131060",
   "vai_tro": "giao_vien",
   "ma_don_vi": "DV01",
@@ -627,7 +631,8 @@ Response `POST /sso/doi-ma`:
 - `ma_khoa` (2026-10-02): khóa **đã duyệt** mới nhất học viên đã ghi danh — để bên khảo sát biết người làm bài thuộc tỉnh/khóa nào; `null` nếu chưa ghi danh.
 - `ma_don_vi`: có thể `null` nếu đơn vị chưa có mã. `lop`: rỗng nếu chưa được phân lớp (thường gặp ở giai đoạn đánh giá đầu vào).
 - `ho_ten` (thêm 2026-10-07): họ tên học viên theo hồ sơ — để bên khảo sát hiển thị/đối chiếu người làm bài.
-- **Cố ý KHÔNG trả** CCCD, ngày sinh, email, SĐT (tối thiểu hóa dữ liệu).
+- `so_dinh_danh_ca_nhan` (CCCD), `email` (email liên hệ), `gioi_tinh`, `dia_chi` (thêm 2026-10-08, theo yêu cầu bên khảo sát): `null` nếu hồ sơ chưa có. `dia_chi` = nơi cư trú `"Phường/xã, Tỉnh"` (thiếu cấp nào bỏ cấp đó). CCCD chỉ đi qua kênh máy chủ–máy chủ này, **không** bao giờ nằm trên URL.
+- **Vẫn KHÔNG trả** ngày sinh, SĐT.
 
 Lỗi `POST /sso/doi-ma` (cùng thân lỗi chung `{ error: { code, message } }`):
 

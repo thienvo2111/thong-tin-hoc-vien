@@ -208,15 +208,16 @@ describe('SSO sang hệ thống khảo sát (e2e)', () => {
     expect(doi.body).toMatchObject({
       hoc_vien_id: hocVien.id,
       ho_ten: 'Học Viên Sso',
+      so_dinh_danh_ca_nhan: hocVien.so_dinh_danh_ca_nhan,
+      email: hocVien.email_lien_he,
+      gioi_tinh: null,
+      dia_chi: null,
       ma_dinh_danh_moet: tenDangNhap,
       vai_tro: 'can_bo_quan_ly',
       ma_don_vi: donViFixture.donVi.ma_don_vi,
       target: 'danh-gia',
       lop: [],
     });
-    expect(JSON.stringify(doi.body)).not.toContain(
-      hocVien.so_dinh_danh_ca_nhan!,
-    );
 
     const lan2 = await doiMa(code).expect(400);
     expect(lan2.body.error.code).toBe('SSO_MA_KHONG_HOP_LE');
@@ -327,6 +328,52 @@ describe('SSO sang hệ thống khảo sát (e2e)', () => {
         vai_tro: null,
         target: 'khao-sat',
       });
+    });
+
+    it('doi-ma trả giới tính + địa chỉ cư trú "Phường/xã, Tỉnh" khi hồ sơ có', async () => {
+      const { hocVien, tenDangNhap } = await taoHocVien('giao_vien', false);
+      const suf = uniqueSuffix();
+      const tinh = await prisma.dia_danh.create({
+        data: { ma: `SSOT${suf}`, ten: 'Tỉnh Sso', cap: 'tinh_thanh' },
+      });
+      const xa = await prisma.dia_danh.create({
+        data: {
+          ma: `SSOX${suf}`,
+          ten: 'Phường Sso',
+          cap: 'phuong_xa_dac_khu',
+          parent_id: tinh.id,
+        },
+      });
+      try {
+        await prisma.hoc_vien.update({
+          where: { id: hocVien.id },
+          data: {
+            gioi_tinh: 'Nữ',
+            cu_tru_tinh_id: tinh.id,
+            cu_tru_phuong_xa_id: xa.id,
+          },
+        });
+        const res = await request(app.getHttpServer())
+          .post('/sso/ma-thu')
+          .set('Authorization', `Bearer ${tokenQuanTri}`)
+          .send({ ma_dinh_danh_moet: tenDangNhap })
+          .expect(201);
+        const doi = await doiMa(res.body.code).expect(200);
+        expect(doi.body).toMatchObject({
+          gioi_tinh: 'Nữ',
+          dia_chi: 'Phường Sso, Tỉnh Sso',
+          email: hocVien.email_lien_he,
+          so_dinh_danh_ca_nhan: hocVien.so_dinh_danh_ca_nhan,
+        });
+      } finally {
+        await prisma.hoc_vien.update({
+          where: { id: hocVien.id },
+          data: { cu_tru_tinh_id: null, cu_tru_phuong_xa_id: null },
+        });
+        await prisma.dia_danh.deleteMany({
+          where: { id: { in: [xa.id, tinh.id] } },
+        });
+      }
     });
 
     it('mã MOET không tồn tại -> 404; học viên gọi -> 403; không token -> 401', async () => {

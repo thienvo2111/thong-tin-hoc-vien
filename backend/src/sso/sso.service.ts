@@ -32,6 +32,12 @@ function bamMa(ma: string): string {
 export interface ThongTinSso {
   hoc_vien_id: string;
   ho_ten: string;
+  // 2026-10-08: thêm theo yêu cầu bên khảo sát (null nếu hồ sơ chưa có).
+  so_dinh_danh_ca_nhan: string | null;
+  email: string | null;
+  gioi_tinh: string | null;
+  /** Nơi cư trú "Phường/xã, Tỉnh" — null nếu chưa khai. */
+  dia_chi: string | null;
   ma_dinh_danh_moet: string | null;
   vai_tro: 'giao_vien' | 'can_bo_quan_ly' | 'nhan_vien' | null;
   ma_don_vi: string | null;
@@ -168,6 +174,8 @@ export class SsoService {
         hoc_vien: {
           include: {
             don_vi_cong_tac: true,
+            cu_tru_tinh: { select: { ten: true } },
+            cu_tru_phuong_xa: { select: { ten: true } },
             dang_ky_hoc: {
               include: {
                 khoa: true,
@@ -193,10 +201,17 @@ export class SsoService {
           (b.khoa.ngay_duyet?.getTime() ?? 0) -
           (a.khoa.ngay_duyet?.getTime() ?? 0),
       )[0]?.khoa;
+    const diaChi = [hv.cu_tru_phuong_xa?.ten, hv.cu_tru_tinh?.ten]
+      .filter(Boolean)
+      .join(', ');
 
     return {
       hoc_vien_id: hv.id,
       ho_ten: hv.ho_ten,
+      so_dinh_danh_ca_nhan: hv.so_dinh_danh_ca_nhan,
+      email: hv.email_lien_he,
+      gioi_tinh: hv.gioi_tinh,
+      dia_chi: diaChi || null,
       ma_dinh_danh_moet: hv.ma_dinh_danh_moet,
       vai_tro: hv.doi_tuong,
       ma_don_vi: hv.don_vi_cong_tac.ma_don_vi,
