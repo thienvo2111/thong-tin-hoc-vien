@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
 import { renderVoiRouter } from '@/test/testUtils';
@@ -120,5 +121,28 @@ describe('DashboardThongKe', () => {
     );
     const r = renderDashboard('/thong-ke?khoa_id=khoa-ngoai&doi_tuong=giao_vien');
     await waitFor(() => expect(r.router.state.location.search).toBe('?doi_tuong=giao_vien'));
+  });
+  it('nút Xuất biểu mẫu ĐK & truy cập gửi bộ lọc hiện tại và kích hoạt tải file', async () => {
+    let url: URL | null = null;
+    server.use(
+      http.get('/thong-ke/bieu-mau/dang-ky-truy-cap/xuat-excel', ({ request }) => {
+        url = new URL(request.url);
+        return new HttpResponse('x', { headers: { 'Content-Type': 'application/octet-stream' } });
+      }),
+    );
+    URL.createObjectURL = vi.fn(() => 'blob:gia-lap');
+    URL.revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    renderDashboard('/thong-ke?khoa_id=khoa-1&doi_tuong=giao_vien');
+    await userEvent.click(await screen.findByRole('button', { name: 'Xuất biểu mẫu ĐK & truy cập' }));
+    await waitFor(() => expect((url as URL | null)?.searchParams.get('khoa_id')).toBe('khoa-1'));
+    expect((url as URL | null)?.searchParams.get('doi_tuong')).toBe('giao_vien');
+    await waitFor(() => expect(click).toHaveBeenCalled());
+    expect(URL.createObjectURL).toHaveBeenCalled();
+  });
+
+  it('nút Xuất biểu mẫu có ở chế độ ho_tro', async () => {
+    renderDashboard('/thong-ke', 'ho_tro');
+    expect(await screen.findByRole('button', { name: 'Xuất biểu mẫu ĐK & truy cập' })).toBeInTheDocument();
   });
 });

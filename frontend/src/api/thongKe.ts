@@ -71,3 +71,10 @@ export async function xuatTienDoTruong(loc: LocThongKe): Promise<void> {
   const blob = await apiFetchBlob(`/thong-ke/tien-do-truong/xuat-excel${xayQuery(loc)}`);
   taiFileTuBlob(blob, 'tien-do-theo-truong.xlsx');
 }
+
+export const taiBieuMauDangKyTruyCap = (loc: LocThongKe): Promise<Blob> =>
+  apiFetchBlob(`/thong-ke/bieu-mau/dang-ky-truy-cap/xuat-excel${xayQuery(loc)}`);
+
+export async function xuatBieuMauDangKyTruyCap(loc: LocThongKe): Promise<void> {
+  taiFileTuBlob(await taiBieuMauDangKyTruyCap(loc), 'bieu-mau-dang-ky-truy-cap.xlsx');
+}

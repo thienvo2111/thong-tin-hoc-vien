@@ -173,3 +173,60 @@ export interface TienDoTruongDong {
   so_dat: number;
   ty_le_dat: number | null;
 }
+
+// Biểu mẫu "Thống kê đăng ký và truy cập hệ thống".
+export const DOI_TUONG_BIEU_MAU = [
+  'giao_vien',
+  'can_bo_quan_ly',
+  'nhan_vien',
+  'chua_xac_dinh',
+] as const;
+export type DoiTuongKey = (typeof DOI_TUONG_BIEU_MAU)[number];
+
+export const CAP_BIEU_MAU = [
+  'mam_non',
+  'tieu_hoc',
+  'thcs',
+  'thpt',
+  'trung_cap_nghe',
+  'chua_xac_dinh',
+] as const;
+export type CapKey = (typeof CAP_BIEU_MAU)[number];
+
+/** dk = số HV phân biệt đăng ký; tc = trong số đó đã truy cập hệ thống. */
+export interface DemDkTc {
+  dk: number;
+  tc: number;
+}
+
+export interface DongHocVienBieuMau {
+  hoc_vien_id: string;
+  doi_tuong: string | null;
+  cap_giang_day: string | null;
+  don_vi_id: string;
+  ten_don_vi: string;
+  ten_don_vi_cha: string | null;
+  da_truy_cap: boolean;
+}
+
+export interface DongTruongBieuMau {
+  don_vi_id: string;
+  ten_don_vi: string;
+  ten_don_vi_cha: string | null;
+  tong: DemDkTc;
+  theo_doi_tuong: Record<DoiTuongKey, DemDkTc>;
+  theo_cap: Record<CapKey, DemDkTc>;
+}
+
+export interface BieuMauDangKyTruyCap {
+  tong: DemDkTc;
+  ma_tran: Record<DoiTuongKey, Record<CapKey, DemDkTc>>;
+  theo_truong: DongTruongBieuMau[];
+}
+
+export interface MoTaBieuMau {
+  khoa: string;
+  pham_vi: string;
+  doi_tuong: string;
+  ngay_xuat: Date;
+}

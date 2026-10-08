@@ -2,10 +2,12 @@ import * as ExcelJS from 'exceljs';
 import {
   buildTongHopWorkbook,
   buildTienDoTruongWorkbook,
+  buildBieuMauDangKyTruyCapWorkbook,
   buildTongQuanWorkbook,
   buildVanHanhWorkbook,
 } from './report-excel.util';
-import { TienDoTruongDong } from '../../thong-ke/thong-ke.types';
+import { TienDoTruongDong, DongHocVienBieuMau } from '../../thong-ke/thong-ke.types';
+import { tongHopDangKyTruyCap } from '../../thong-ke/bieu-mau.service';
 import { TongHopResult, TongQuanResult, VanHanhResult } from '../bao-cao.types';
 
 async function readSheetValues(buffer: Buffer, sheetIndex = 0): Promise<unknown[][]> {
@@ -397,5 +399,143 @@ describe('report-excel.util', () => {
       0, 0, undefined, // ô trống đọc lại là undefined
       8, 3, 37.5,
     ]);
+  });
+});
+
+describe('buildBieuMauDangKyTruyCapWorkbook', () => {
+  const hv = (
+    id: string,
+    donVi: string,
+    doiTuong: string | null,
+    cap: string | null,
+    tc: boolean,
+  ): DongHocVienBieuMau => ({
+    hoc_vien_id: id,
+    doi_tuong: doiTuong,
+    cap_giang_day: cap,
+    don_vi_id: donVi,
+    ten_don_vi: `Trường ${donVi}`,
+    ten_don_vi_cha: 'Sở A',
+    da_truy_cap: tc,
+  });
+  // 4 giáo viên THCS (3 đã truy cập) ở t1, 1 CBQL chưa xác định cấp ở t2.
+  const data = tongHopDangKyTruyCap([
+    hv('1', 't1', 'giao_vien', 'thcs', true),
+    hv('2', 't1', 'giao_vien', 'thcs', true),
+    hv('3', 't1', 'giao_vien', 'thcs', true),
+    hv('4', 't1', 'giao_vien', 'thcs', false),
+    hv('5', 't2', 'can_bo_quan_ly', null, false),
+  ]);
+  const moTa = {
+    khoa: 'Tất cả khóa',
+    pham_vi: 'Toàn bộ phạm vi tài khoản',
+    doi_tuong: 'Tất cả đối tượng',
+    ngay_xuat: new Date('2026-10-08T03:30:00Z'),
+  };
+
+  async function mo(d = data) {
+    const wb = new ExcelJS.Workbook();
+    const buf = await buildBieuMauDangKyTruyCapWorkbook(d, moTa);
+    await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+    return wb;
+  }
+  const hangCua = (s: ExcelJS.Worksheet, r: number) =>
+    (s.getRow(r).values as unknown[]).slice(1);
+
+  it('3 sheet đúng tên và thứ tự', async () => {
+    const wb = await mo();
+    expect(wb.worksheets.map((s) => s.name)).toEqual([
+      'Tổng hợp',
+      'Theo đối tượng',
+      'Theo cấp',
+    ]);
+  });
+
+  it('4 dòng tiêu đề (gộp ô) ở mỗi sheet', async () => {
+    const wb = await mo();
+    for (const s of wb.worksheets) {
+      expect(s.getCell('A1').value).toBe(
+        'BIỂU THỐNG KÊ SỐ LƯỢNG ĐĂNG KÝ VÀ TRUY CẬP HỆ THỐNG',
+      );
+      expect(s.getCell('A1').font?.bold).toBe(true);
+      expect(s.getCell('A1').font?.size).toBe(14);
+      expect(s.getCell('A2').value).toBe('Khóa: Tất cả khóa');
+      expect(s.getCell('A3').value).toBe(
+        'Phạm vi: Toàn bộ phạm vi tài khoản · Đối tượng: Tất cả đối tượng',
+      );
+      expect(s.getCell('A4').value).toBe('Ngày xuất: 08/10/2026 10:30');
+      expect(s.getCell('A1').isMerged).toBe(true);
+    }
+  });
+
+  it('Tổng hợp: header nhóm/cột con và số liệu', async () => {
+    const s = (await mo()).getWorksheet('Tổng hợp')!;
+    expect(s.getCell('B6').value).toBe('Mầm non');
+    expect(s.getCell('E6').value).toBe('Tiểu học');
+    expect(s.getCell('N6').value).toBe('Trung cấp nghề');
+    expect(s.getCell('Q6').value).toBe('Chưa xác định');
+    expect(s.getCell('T6').value).toBe('Tổng');
+    expect(hangCua(s, 7).slice(1, 4)).toEqual(['ĐK', 'Đã truy cập', 'Tỷ lệ (%)']);
+    expect(hangCua(s, 8)[0]).toBe('Giáo viên');
+    expect(hangCua(s, 9)[0]).toBe('Cán bộ quản lý');
+    expect(hangCua(s, 10)[0]).toBe('Nhân viên');
+    expect(hangCua(s, 11)[0]).toBe('Chưa xác định');
+    const gv = hangCua(s, 8);
+    // THCS (nhóm thứ 3): cột H,I,J -> 4, 3, 75.
+    expect(s.getCell('H8').value).toBe(4);
+    expect(s.getCell('I8').value).toBe(3);
+    expect(s.getCell('J8').value).toBe(75);
+    // ĐK = 0 -> % trống.
+    expect(s.getCell('B8').value).toBe(0);
+    expect(s.getCell('D8').value).toBeNull();
+    expect(gv.length).toBeGreaterThan(20);
+    const tong = hangCua(s, 12);
+    expect(tong[0]).toBe('Tổng cộng');
+    expect(s.getCell('T12').value).toBe(5);
+    expect(s.getCell('U12').value).toBe(3);
+    expect(s.getCell('V12').value).toBe(60);
+    expect(s.getCell('A12').font?.bold).toBe(true);
+  });
+
+  it('Theo đối tượng: dòng trường, nhóm Tổng, dòng Tổng cộng', async () => {
+    const s = (await mo()).getWorksheet('Theo đối tượng')!;
+    expect(hangCua(s, 6).slice(0, 3)).toEqual(['STT', 'Trường', 'Đơn vị quản lý']);
+    expect(s.getCell('D6').value).toBe('Tổng');
+    expect(s.getCell('G6').value).toBe('Giáo viên');
+    expect(s.getCell('M6').value).toBe('Nhân viên');
+    expect(s.getCell('P6').value).toBe('Chưa xác định');
+    expect(hangCua(s, 8).slice(0, 3)).toEqual([1, 'Trường t1', 'Sở A']);
+    expect(s.getCell('D8').value).toBe(4);
+    expect(s.getCell('F8').value).toBe(75);
+    expect(s.getCell('G8').value).toBe(4);
+    expect(hangCua(s, 9).slice(0, 3)).toEqual([2, 'Trường t2', 'Sở A']);
+    expect(s.getCell('D9').value).toBe(1);
+    expect(s.getCell('F9').value).toBe(0);
+    expect(s.getCell('B10').value).toBe('Tổng cộng');
+    expect(s.getCell('D10').value).toBe(5);
+    expect(s.getCell('E10').value).toBe(3);
+    expect(s.getCell('F10').value).toBe(60);
+    expect(s.getCell('B10').font?.bold).toBe(true);
+    expect(s.views[0]).toMatchObject({ state: 'frozen', xSplit: 3, ySplit: 7 });
+  });
+
+  it('Theo cấp: nhóm theo cấp, ĐK 0 để % trống', async () => {
+    const s = (await mo()).getWorksheet('Theo cấp')!;
+    expect(s.getCell('D6').value).toBe('Tổng');
+    expect(s.getCell('G6').value).toBe('Mầm non');
+    expect(s.getCell('S6').value).toBe('Trung cấp nghề');
+    expect(s.getCell('V6').value).toBe('Chưa xác định');
+    expect(s.getCell('M6').value).toBe('THCS');
+    expect(s.getCell('M8').value).toBe(4);
+    expect(s.getCell('O8').value).toBe(75);
+    expect(s.getCell('G8').value).toBe(0);
+    expect(s.getCell('I8').value).toBeNull();
+  });
+
+  it('dữ liệu rỗng: vẫn đủ 3 sheet, Tổng cộng = 0, % trống', async () => {
+    const s = (await mo(tongHopDangKyTruyCap([]))).getWorksheet('Theo đối tượng')!;
+    expect(s.getCell('B8').value).toBe('Tổng cộng');
+    expect(s.getCell('D8').value).toBe(0);
+    expect(s.getCell('F8').value).toBeNull();
   });
 });

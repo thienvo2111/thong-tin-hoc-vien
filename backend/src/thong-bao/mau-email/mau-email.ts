@@ -433,7 +433,7 @@ const CAP_HOC_LABEL: Record<cap_hoc, string> = {
   trung_cap_nghe: 'Trung cấp nghề',
 };
 
-const DOI_TUONG_LABEL: Record<doi_tuong_hoc_vien, string> = {
+export const DOI_TUONG_LABEL: Record<doi_tuong_hoc_vien, string> = {
   giao_vien: 'Giáo viên',
   can_bo_quan_ly: 'Cán bộ quản lý',
   nhan_vien: 'Nhân viên',

@@ -1,5 +1,16 @@
 import * as ExcelJS from 'exceljs';
-import { CanDonDocDong, TienDoTruongDong } from '../../thong-ke/thong-ke.types';
+import {
+  BieuMauDangKyTruyCap,
+  CAP_BIEU_MAU,
+  CanDonDocDong,
+  CapKey,
+  DemDkTc,
+  DOI_TUONG_BIEU_MAU,
+  DoiTuongKey,
+  MoTaBieuMau,
+  TienDoTruongDong,
+} from '../../thong-ke/thong-ke.types';
+import { DOI_TUONG_LABEL } from '../../thong-bao/mau-email/mau-email';
 import {
   CAP_GIANG_DAY,
   KHONG_XAC_DINH,
@@ -42,7 +53,7 @@ const NHAN_TRANG_THAI_HO_SO: Record<string, string> = {
   loi: 'Lỗi',
 };
 
-const NHAN_CAP_GIANG_DAY: Record<string, string> = {
+export const NHAN_CAP_GIANG_DAY: Record<string, string> = {
   mam_non: 'Mầm non',
   tieu_hoc: 'Tiểu học',
   thcs: 'THCS',
@@ -500,6 +511,240 @@ export async function buildTienDoTruongWorkbook(
       phanTram(row.ty_le_dat),
     ]);
   });
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+// Biểu mẫu "Thống kê đăng ký và truy cập hệ thống" — 3 sheet, header 2 tầng.
+const NHAN_CHUA_XAC_DINH = 'Chưa xác định';
+const NHAN_CAP_BIEU_MAU = (c: CapKey): string =>
+  c === 'chua_xac_dinh' ? NHAN_CHUA_XAC_DINH : NHAN_CAP_GIANG_DAY[c];
+const NHAN_DOI_TUONG_BIEU_MAU = (d: DoiTuongKey): string =>
+  d === 'chua_xac_dinh' ? NHAN_CHUA_XAC_DINH : DOI_TUONG_LABEL[d];
+
+const BORDER_MONG: Partial<ExcelJS.Borders> = {
+  top: { style: 'thin' },
+  left: { style: 'thin' },
+  bottom: { style: 'thin' },
+  right: { style: 'thin' },
+};
+const NEN_HEADER: ExcelJS.Fill = {
+  type: 'pattern',
+  pattern: 'solid',
+  fgColor: { argb: 'FFE7E6E6' },
+};
+const CON_DK_TC = ['ĐK', 'Đã truy cập', 'Tỷ lệ (%)'];
+
+type NhomCot = { nhan: string; dem: (hang: HangBieuMau) => DemDkTc };
+interface HangBieuMau {
+  nhan: (string | number)[]; // các ô nhãn đầu dòng (STT, trường... hoặc tên đối tượng)
+  tong?: boolean;
+  tong_dem: DemDkTc;
+  theo_doi_tuong: Record<DoiTuongKey, DemDkTc>;
+  theo_cap: Record<CapKey, DemDkTc>;
+}
+
+const cong = (a: DemDkTc, b: DemDkTc): DemDkTc => ({
+  dk: a.dk + b.dk,
+  tc: a.tc + b.tc,
+});
+const KHONG: DemDkTc = { dk: 0, tc: 0 };
+
+const phanTramDkTc = (d: DemDkTc): number | null =>
+  d.dk === 0 ? null : Math.round((d.tc / d.dk) * 1000) / 10;
+
+function ngayXuatVn(d: Date): string {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(d)
+      .map((x) => [x.type, x.value]),
+  );
+  return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`;
+}
+
+function themSheetBieuMau(
+  workbook: ExcelJS.Workbook,
+  ten: string,
+  cotDau: { nhan: string; rong: number }[],
+  nhom: NhomCot[],
+  hang: HangBieuMau[],
+  moTa: MoTaBieuMau,
+  codinhCot: number,
+): void {
+  const sheet = workbook.addWorksheet(ten);
+  const soCotDau = cotDau.length;
+  const tongCot = soCotDau + nhom.length * 3;
+  const dongTieuDe: [string, Partial<ExcelJS.Font>?][] = [
+    [
+      'BIỂU THỐNG KÊ SỐ LƯỢNG ĐĂNG KÝ VÀ TRUY CẬP HỆ THỐNG',
+      { bold: true, size: 14 },
+    ],
+    [`Khóa: ${moTa.khoa}`],
+    [`Phạm vi: ${moTa.pham_vi} · Đối tượng: ${moTa.doi_tuong}`],
+    [`Ngày xuất: ${ngayXuatVn(moTa.ngay_xuat)}`],
+  ];
+  dongTieuDe.forEach(([chu, font], i) => {
+    const r = i + 1;
+    sheet.mergeCells(r, 1, r, tongCot);
+    const o = sheet.getCell(r, 1);
+    o.value = chu;
+    if (font) o.font = font as ExcelJS.Font;
+    o.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+
+  // Header 2 tầng (dòng 6-7; dòng 5 để trống).
+  cotDau.forEach((c, i) => {
+    sheet.mergeCells(6, i + 1, 7, i + 1);
+    sheet.getCell(6, i + 1).value = c.nhan;
+    sheet.getColumn(i + 1).width = c.rong;
+  });
+  nhom.forEach((n, g) => {
+    const dau = soCotDau + g * 3 + 1;
+    sheet.mergeCells(6, dau, 6, dau + 2);
+    sheet.getCell(6, dau).value = n.nhan;
+    CON_DK_TC.forEach((con, k) => {
+      sheet.getCell(7, dau + k).value = con;
+      sheet.getColumn(dau + k).width = k === 1 ? 13 : 10;
+    });
+  });
+  for (let r = 6; r <= 7; r++) {
+    for (let c = 1; c <= tongCot; c++) {
+      const o = sheet.getCell(r, c);
+      o.font = { bold: true };
+      o.fill = NEN_HEADER;
+      o.border = BORDER_MONG;
+      o.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    }
+  }
+
+  hang.forEach((h, i) => {
+    const r = 8 + i;
+    h.nhan.forEach((chu, c) => {
+      sheet.getCell(r, c + 1).value = chu;
+    });
+    nhom.forEach((n, g) => {
+      const d = n.dem(h);
+      const dau = soCotDau + g * 3 + 1;
+      sheet.getCell(r, dau).value = d.dk;
+      sheet.getCell(r, dau + 1).value = d.tc;
+      const pt = phanTramDkTc(d);
+      if (pt !== null) sheet.getCell(r, dau + 2).value = pt;
+    });
+    for (let c = 1; c <= tongCot; c++) {
+      const o = sheet.getCell(r, c);
+      o.border = BORDER_MONG;
+      if (h.tong) o.font = { bold: true };
+    }
+  });
+  sheet.views = [
+    { state: 'frozen', xSplit: codinhCot, ySplit: 7 } as ExcelJS.WorksheetView,
+  ];
+}
+
+export async function buildBieuMauDangKyTruyCapWorkbook(
+  data: BieuMauDangKyTruyCap,
+  moTa: MoTaBieuMau,
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const cotTheoCap = (): NhomCot[] =>
+    CAP_BIEU_MAU.map((c) => ({
+      nhan: NHAN_CAP_BIEU_MAU(c),
+      dem: (h) => h.theo_cap[c],
+    }));
+  const nhomTong: NhomCot = { nhan: 'Tổng', dem: (h) => h.tong_dem };
+
+  const tongTheoDoiTuong = (c: CapKey): DemDkTc =>
+    DOI_TUONG_BIEU_MAU.reduce((s, d) => cong(s, data.ma_tran[d][c]), KHONG);
+  const tongHang = (cap: Record<CapKey, DemDkTc>): DemDkTc =>
+    CAP_BIEU_MAU.reduce((s, c) => cong(s, cap[c]), KHONG);
+
+  // Sheet 1: đối tượng × cấp.
+  const hangDoiTuong: HangBieuMau[] = DOI_TUONG_BIEU_MAU.map((d) => {
+    const cap = data.ma_tran[d];
+    return {
+      nhan: [NHAN_DOI_TUONG_BIEU_MAU(d)],
+      tong_dem: tongHang(cap),
+      theo_doi_tuong: {} as Record<DoiTuongKey, DemDkTc>,
+      theo_cap: cap,
+    };
+  });
+  const capCuaTong = Object.fromEntries(
+    CAP_BIEU_MAU.map((c) => [c, tongTheoDoiTuong(c)]),
+  ) as Record<CapKey, DemDkTc>;
+  hangDoiTuong.push({
+    nhan: ['Tổng cộng'],
+    tong: true,
+    tong_dem: data.tong,
+    theo_doi_tuong: {} as Record<DoiTuongKey, DemDkTc>,
+    theo_cap: capCuaTong,
+  });
+  themSheetBieuMau(
+    workbook,
+    'Tổng hợp',
+    [{ nhan: 'Đối tượng', rong: 20 }],
+    [...cotTheoCap(), nhomTong],
+    hangDoiTuong,
+    moTa,
+    1,
+  );
+
+  // Sheet 2/3: theo trường.
+  const hangTruong = (): HangBieuMau[] => {
+    const hang: HangBieuMau[] = data.theo_truong.map((t, i) => ({
+      nhan: [i + 1, t.ten_don_vi, t.ten_don_vi_cha ?? ''],
+      tong_dem: t.tong,
+      theo_doi_tuong: t.theo_doi_tuong,
+      theo_cap: t.theo_cap,
+    }));
+    const tongDt = Object.fromEntries(
+      DOI_TUONG_BIEU_MAU.map((d) => [d, tongHang(data.ma_tran[d])]),
+    ) as Record<DoiTuongKey, DemDkTc>;
+    hang.push({
+      nhan: ['', 'Tổng cộng', ''],
+      tong: true,
+      tong_dem: data.tong,
+      theo_doi_tuong: tongDt,
+      theo_cap: capCuaTong,
+    });
+    return hang;
+  };
+  const cotDauTruong = [
+    { nhan: 'STT', rong: 6 },
+    { nhan: 'Trường', rong: 45 },
+    { nhan: 'Đơn vị quản lý', rong: 35 },
+  ];
+  themSheetBieuMau(
+    workbook,
+    'Theo đối tượng',
+    cotDauTruong,
+    [
+      nhomTong,
+      ...DOI_TUONG_BIEU_MAU.map((d) => ({
+        nhan: NHAN_DOI_TUONG_BIEU_MAU(d),
+        dem: (h: HangBieuMau) => h.theo_doi_tuong[d],
+      })),
+    ],
+    hangTruong(),
+    moTa,
+    3,
+  );
+  themSheetBieuMau(
+    workbook,
+    'Theo cấp',
+    cotDauTruong,
+    [nhomTong, ...cotTheoCap()],
+    hangTruong(),
+    moTa,
+    3,
+  );
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }
