@@ -80,6 +80,28 @@ describe('DashboardThongKe', () => {
     expect(tienDo.nextElementSibling).toBe(chatLuong);
   });
 
+  it('khối Đánh giá NLS theo mức nằm ngay sau Kết quả khảo sát', async () => {
+    renderDashboard();
+    const khaoSat = await screen.findByRole('region', { name: 'Kết quả khảo sát' });
+    const muc = await screen.findByRole('region', { name: 'Đánh giá NLS theo mức — theo trường' });
+    expect(khaoSat.nextElementSibling).toBe(muc);
+  });
+
+  it('tài khoản trường (đơn vị cố định) vẫn thấy khối Đánh giá NLS theo mức', async () => {
+    server.use(
+      http.get('/thong-ke/bo-loc', () =>
+        HttpResponse.json({
+          khoa: [],
+          don_vi: null,
+          cum: null,
+          don_vi_co_dinh: { id: 'dv-2', ten_don_vi: 'Trường THPT Long Xuyên' },
+        }),
+      ),
+    );
+    renderDashboard();
+    expect(await screen.findByRole('region', { name: 'Đánh giá NLS theo mức — theo trường' })).toBeInTheDocument();
+  });
+
   it('admin → có khối Tiến độ theo trường', async () => {
     renderDashboard();
     expect(await screen.findByRole('region', { name: 'Tiến độ theo trường' })).toBeInTheDocument();

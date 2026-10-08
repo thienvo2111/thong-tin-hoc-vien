@@ -56,3 +56,11 @@ export class CanDonDocQueryDto extends ThongKeQueryDto {
   @Min(1)
   page?: number;
 }
+
+export const LOAI_MUC_NLS = ['dau_vao', 'dau_ra'] as const;
+
+export class MucNlsQueryDto extends ThongKeQueryDto {
+  @IsOptional()
+  @IsIn(LOAI_MUC_NLS)
+  loai?: (typeof LOAI_MUC_NLS)[number];
+}

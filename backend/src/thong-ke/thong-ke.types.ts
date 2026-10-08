@@ -266,3 +266,47 @@ export interface DongHoSoHocVien {
   ten_don_vi: string;
   ten_don_vi_cha: string | null;
 }
+
+// Báo cáo "Đánh giá NLS theo mức". Mẫu số: % mức/chưa xếp mức theo đã làm; % đã làm/chưa làm theo số HV.
+export type LoaiMucNls = 'dau_vao' | 'dau_ra';
+
+export interface DemMucNls {
+  so_hv: number;
+  da_lam: number;
+  chua_lam: number;
+  theo_muc: { ma: string; nhan: string; so_luong: number }[];
+  chua_xep_muc: number;
+}
+
+export interface MucNlsTruongDong extends DemMucNls {
+  don_vi_id: string;
+  ten_don_vi: string;
+  ten_don_vi_cha: string | null;
+}
+
+export interface MucNlsResult {
+  loai: LoaiMucNls;
+  thang: { ma: string; nhan: string }[];
+  tong: DemMucNls;
+  /** Sắp theo ten_don_vi (vi). */
+  theo_truong: MucNlsTruongDong[];
+}
+
+/** Một HV đã khử trùng. ho_ten chỉ có khi xuất Excel (còn lại ''). */
+export interface DongHocVienMuc {
+  hoc_vien_id: string;
+  ho_ten: string;
+  doi_tuong: string | null;
+  cap_giang_day: string | null;
+  don_vi_id: string;
+  ten_don_vi: string;
+  ten_don_vi_cha: string | null;
+  da_lam: boolean;
+  muc_goc: string | null;
+  hoan_thanh_luc: Date | null;
+}
+
+export interface MucNlsTongHop extends Omit<MucNlsResult, 'loai'> {
+  theo_doi_tuong: Record<DoiTuongKey, DemMucNls>;
+  theo_cap: Record<CapKey, DemMucNls>;
+}
