@@ -28,12 +28,12 @@ const them = (o: DemDkTc, daTruyCap: boolean) => {
   if (daTruyCap) o.tc += 1;
 };
 
-const chuanDoiTuong = (v: string | null): DoiTuongKey =>
+export const chuanDoiTuong = (v: string | null): DoiTuongKey =>
   (DOI_TUONG_BIEU_MAU as readonly string[]).includes(v ?? '')
     ? (v as DoiTuongKey)
     : 'chua_xac_dinh';
 
-const chuanCap = (v: string | null): CapKey =>
+export const chuanCap = (v: string | null): CapKey =>
   (CAP_BIEU_MAU as readonly string[]).includes(v ?? '')
     ? (v as CapKey)
     : 'chua_xac_dinh';

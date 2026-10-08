@@ -703,9 +703,7 @@ describe('Thống kê dashboard (e2e)', () => {
         du_ho_so: 0,
         ty_le_du: 0,
       });
-      expect(b.tong.so_hv).toBe(
-        b.theo_truong.reduce((s, r) => s + r.so_hv, 0),
-      );
+      expect(b.tong.so_hv).toBe(b.theo_truong.reduce((s, r) => s + r.so_hv, 0));
     });
 
     it('truong T1: chỉ dòng T1', async () => {
@@ -756,6 +754,156 @@ describe('Thống kê dashboard (e2e)', () => {
       expect(wb.worksheets.map((x) => x.name)).toEqual([
         'Theo trường',
         'Cần bổ sung',
+      ]);
+    });
+  });
+  describe('đánh giá NLS theo mức', () => {
+    type Dem = {
+      so_hv: number;
+      da_lam: number;
+      chua_lam: number;
+      theo_muc: { ma: string; so_luong: number }[];
+      chua_xep_muc: number;
+    };
+    type Kq = {
+      loai: string;
+      thang: { ma: string }[];
+      tong: Dem;
+      theo_truong: (Dem & { don_vi_id: string })[];
+    };
+    const mucCua = (d: Dem) =>
+      Object.fromEntries(d.theo_muc.map((m) => [m.ma, m.so_luong]));
+    const dong = (b: Kq, id: string) =>
+      b.theo_truong.find((r) => r.don_vi_id === id)!;
+
+    // Phiếu danh-gia hoàn thành: t1-1 M1, t1-2 M2, t1-3 M2, t1-4 M9 (ngoài thang),
+    // t2-1 M4, t2-4 không mức. Phiếu dau-ra: t1-1 M3 (hoàn thành), t1-2 đang làm (không tính).
+    beforeAll(async () => {
+      const ghi = async (
+        nhan: string,
+        loai: string,
+        trang_thai: 'hoan_thanh' | 'dang_lam',
+        muc_goc: string | null,
+      ) => {
+        const hv = await prisma.hoc_vien.findFirstOrThrow({
+          where: { ma_dinh_danh_moet: `TK-${nhan}-${SUF}` },
+        });
+        const data = {
+          trang_thai,
+          muc_goc,
+          nguon: 'import',
+          hoan_thanh_luc: new Date(),
+        };
+        await prisma.ket_qua_khao_sat.upsert({
+          where: {
+            hoc_vien_id_loai: { hoc_vien_id: hv.id, loai },
+          },
+          create: { hoc_vien_id: hv.id, loai, ...data },
+          update: data,
+        });
+      };
+      await ghi('t1-1', 'danh-gia', 'hoan_thanh', 'M1');
+      await ghi('t1-2', 'danh-gia', 'hoan_thanh', 'M2');
+      await ghi('t1-3', 'danh-gia', 'hoan_thanh', 'M2');
+      await ghi('t1-4', 'danh-gia', 'hoan_thanh', 'M9');
+      await ghi('t2-1', 'danh-gia', 'hoan_thanh', 'M4');
+      await ghi('t2-4', 'danh-gia', 'hoan_thanh', null);
+      await ghi('t1-1', 'dau-ra', 'hoan_thanh', 'M3');
+      await ghi('t1-2', 'dau-ra', 'dang_lam', 'M3');
+    });
+
+    it('quan_tri lọc theo Sở (mặc định đầu vào): số theo mức đúng, tổng = tổng các trường', async () => {
+      const res = await get(
+        `/thong-ke/muc-nls?don_vi_id=${dv.so}`,
+        tok.quanTri,
+      );
+      expect(res.status).toBe(200);
+      const b = res.body as Kq;
+      expect(b.loai).toBe('dau_vao');
+      expect(b.thang.map((m) => m.ma)).toEqual(['M1', 'M2', 'M3', 'M4']);
+      const t1 = dong(b, dv.t1);
+      expect(t1).toMatchObject({
+        so_hv: 6,
+        da_lam: 4,
+        chua_lam: 2,
+        chua_xep_muc: 1,
+      });
+      expect(mucCua(t1)).toEqual({ M1: 1, M2: 2, M3: 0, M4: 0 });
+      const t2 = dong(b, dv.t2);
+      expect(t2).toMatchObject({ so_hv: 5, da_lam: 2, chua_xep_muc: 1 });
+      expect(mucCua(t2)).toEqual({ M1: 0, M2: 0, M3: 0, M4: 1 });
+      expect(b.tong.so_hv).toBe(19);
+      expect(b.tong.da_lam).toBe(6);
+      expect(b.tong.da_lam + b.tong.chua_lam).toBe(b.tong.so_hv);
+      expect(b.tong.so_hv).toBe(b.theo_truong.reduce((s, r) => s + r.so_hv, 0));
+    });
+
+    it('loai=dau_ra chỉ tính phiếu dau-ra hoàn thành', async () => {
+      const res = await get(
+        `/thong-ke/muc-nls?don_vi_id=${dv.so}&loai=dau_ra`,
+        tok.quanTri,
+      );
+      expect(res.status).toBe(200);
+      const b = res.body as Kq;
+      expect(b.loai).toBe('dau_ra');
+      expect(b.tong.da_lam).toBe(1);
+      expect(mucCua(dong(b, dv.t1))).toEqual({ M1: 0, M2: 0, M3: 1, M4: 0 });
+    });
+
+    it('doi_tuong=giao_vien theo Sở: 3 GV, 3 đã làm', async () => {
+      const res = await get(
+        `/thong-ke/muc-nls?don_vi_id=${dv.so}&doi_tuong=giao_vien`,
+        tok.quanTri,
+      );
+      expect(res.status).toBe(200);
+      const b = res.body as Kq;
+      expect(b.tong).toMatchObject({ so_hv: 3, da_lam: 3, chua_lam: 0 });
+    });
+
+    it('truong T1: chỉ dòng T1', async () => {
+      const res = await get('/thong-ke/muc-nls', tok.truong1);
+      expect(res.status).toBe(200);
+      const b = res.body as Kq;
+      expect(b.theo_truong.map((r) => r.don_vi_id)).toEqual([dv.t1]);
+      expect(b.tong.so_hv).toBe(6);
+    });
+
+    it('loai không hợp lệ -> 400', async () => {
+      const res = await get('/thong-ke/muc-nls?loai=xyz', tok.quanTri);
+      expect(res.status).toBe(400);
+    });
+
+    it('hoc_vien -> 403', async () => {
+      const res = await get('/thong-ke/muc-nls', tok.hocVien);
+      expect(res.status).toBe(403);
+    });
+
+    it.each([
+      ['', 'muc-nls-dau-vao.xlsx'],
+      ['&loai=dau_ra', 'muc-nls-dau-ra.xlsx'],
+    ])('xuất Excel %s -> 200 xlsx, 4 sheet', async (them, tenFile) => {
+      const res = await get(
+        `/thong-ke/muc-nls/xuat-excel?don_vi_id=${dv.so}${them}`,
+        tok.quanTri,
+      )
+        .buffer(true)
+        .parse((r, cb) => {
+          const chunks: Buffer[] = [];
+          r.on('data', (c: Buffer) => chunks.push(c));
+          r.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      expect(res.headers['content-disposition']).toContain(tenFile);
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(res.body as ExcelJS.Buffer);
+      expect(wb.worksheets.map((x) => x.name)).toEqual([
+        'Tổng hợp',
+        'Theo trường',
+        'Danh sách học viên',
+        'Chưa làm',
       ]);
     });
   });

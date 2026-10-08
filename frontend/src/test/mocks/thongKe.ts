@@ -4,6 +4,8 @@ import type {
   CanDonDocResult,
   ChatLuongHoSoDong,
   ChatLuongHoSoResult,
+  MucNlsResult,
+  MucNlsTruongDong,
   ChuyenCanResult,
   ChuyenMucResult,
   KetQuaHocCot,
@@ -225,7 +227,76 @@ export const chatLuongHoSoMau: ChatLuongHoSoResult = {
   ],
 };
 
+const THANG_MAU = [
+  { ma: 'M1', nhan: 'Chưa đạt' },
+  { ma: 'M2', nhan: 'Cơ bản' },
+  { ma: 'M3', nhan: 'Thành thạo' },
+  { ma: 'M4', nhan: 'Nâng cao' },
+];
+
+const dongMucNls = (
+  don_vi_id: string,
+  ten_don_vi: string,
+  so_hv: number,
+  muc: [number, number, number, number],
+  chua_xep_muc: number,
+  chua_lam: number,
+): MucNlsTruongDong => ({
+  don_vi_id,
+  ten_don_vi,
+  ten_don_vi_cha: 'Sở GD&ĐT An Giang',
+  so_hv,
+  da_lam: so_hv - chua_lam,
+  chua_lam,
+  theo_muc: THANG_MAU.map((m, i) => ({ ...m, so_luong: muc[i] })),
+  chua_xep_muc,
+});
+
+export const mucNlsDauVaoMau: MucNlsResult = {
+  loai: 'dau_vao',
+  thang: THANG_MAU,
+  tong: {
+    so_hv: 100,
+    da_lam: 61,
+    chua_lam: 39,
+    theo_muc: THANG_MAU.map((m, i) => ({ ...m, so_luong: [6, 21, 22, 10][i] })),
+    chua_xep_muc: 2,
+  },
+  theo_truong: [
+    dongMucNls('dv-a', 'Trường THPT Nguyễn Du', 40, [3, 12, 10, 4], 1, 10),
+    dongMucNls('dv-b', 'Trường THCS Lê Lợi', 25, [1, 2, 1, 0], 1, 20),
+    dongMucNls('dv-c', 'Trường Tiểu học Trần Phú', 30, [2, 6, 10, 6], 0, 6),
+    dongMucNls('dv-d', 'Trường THPT Phan Chu Trinh', 5, [0, 1, 1, 0], 0, 3),
+    dongMucNls('dv-e', 'Trường Mầm non Hoa Sen', 0, [0, 0, 0, 0], 0, 0),
+  ],
+};
+
+export const mucNlsDauRaMau: MucNlsResult = {
+  loai: 'dau_ra',
+  thang: THANG_MAU,
+  tong: {
+    so_hv: 40,
+    da_lam: 8,
+    chua_lam: 32,
+    theo_muc: THANG_MAU.map((m, i) => ({ ...m, so_luong: [0, 1, 3, 4][i] })),
+    chua_xep_muc: 0,
+  },
+  theo_truong: [dongMucNls('dv-a', 'Trường THPT Nguyễn Du', 40, [0, 1, 3, 4], 0, 32)],
+};
+
 export const thongKeHandlers = [
+  http.get(
+    '/thong-ke/muc-nls/xuat-excel',
+    () =>
+      new HttpResponse('noi-dung-file-mo-phong', {
+        headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      }),
+  ),
+  http.get('/thong-ke/muc-nls', ({ request }) =>
+    HttpResponse.json(
+      new URL(request.url).searchParams.get('loai') === 'dau_ra' ? mucNlsDauRaMau : mucNlsDauVaoMau,
+    ),
+  ),
   http.get(
     '/thong-ke/chat-luong-ho-so/xuat-excel',
     () =>

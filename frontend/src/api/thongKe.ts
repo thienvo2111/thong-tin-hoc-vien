@@ -10,6 +10,8 @@ import type {
   KetQuaHocCot,
   KetQuaHocTruongDong,
   KhaoSatResult,
+  LoaiMucNls,
+  MucNlsResult,
   PheuResult,
   SoSanhKhoaCot,
   TienDoTruongDong,
@@ -86,4 +88,12 @@ export const useChatLuongHoSo = (loc: LocThongKe, enabled = true) =>
 export async function xuatChatLuongHoSo(loc: LocThongKe): Promise<void> {
   const blob = await apiFetchBlob(`/thong-ke/chat-luong-ho-so/xuat-excel${xayQuery(loc)}`);
   taiFileTuBlob(blob, 'chat-luong-ho-so.xlsx');
+}
+
+export const useMucNls = (loc: LocThongKe, loai: LoaiMucNls) =>
+  useKhoi<MucNlsResult>('muc-nls', 'muc-nls', { ...loc, loai });
+
+export async function xuatMucNls(loc: LocThongKe, loai: LoaiMucNls): Promise<void> {
+  const blob = await apiFetchBlob(`/thong-ke/muc-nls/xuat-excel${xayQuery({ ...loc, loai })}`);
+  taiFileTuBlob(blob, `muc-nls-${loai === 'dau_ra' ? 'dau-ra' : 'dau-vao'}.xlsx`);
 }

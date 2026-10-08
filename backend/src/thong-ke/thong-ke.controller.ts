@@ -7,12 +7,14 @@ import { ThongKeScopeService } from './thong-ke-scope.service';
 import { ThongKeService } from './thong-ke.service';
 import {
   CanDonDocQueryDto,
+  MucNlsQueryDto,
   ThongKeQueryDto,
   XepHangQueryDto,
 } from './dto/thong-ke-query.dto';
 import { BieuMauService } from './bieu-mau.service';
 import { ChatLuongHoSoService } from './chat-luong-ho-so.service';
 import { CanDonDocService } from './can-don-doc.service';
+import { MucNlsService } from './muc-nls.service';
 import { TienDoTruongService } from './tien-do-truong.service';
 import { XepHangService } from './xep-hang.service';
 
@@ -28,6 +30,7 @@ export class ThongKeController {
     private readonly tienDoTruongService: TienDoTruongService,
     private readonly bieuMauService: BieuMauService,
     private readonly chatLuongHoSoService: ChatLuongHoSoService,
+    private readonly mucNlsService: MucNlsService,
   ) {}
 
   @Get('bo-loc')
@@ -156,6 +159,29 @@ export class ThongKeController {
         'Content-Type':
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': 'attachment; filename="chat-luong-ho-so.xlsx"',
+      })
+      .send(buffer);
+  }
+
+  @Get('muc-nls')
+  mucNls(@CurrentUser() user: AuthenticatedUser, @Query() q: MucNlsQueryDto) {
+    return this.mucNlsService.danhSach(user, q);
+  }
+
+  @Get('muc-nls/xuat-excel')
+  async mucNlsXuatExcel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: MucNlsQueryDto,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.mucNlsService.xuatExcel(user, q);
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="muc-nls-${
+          q.loai === 'dau_ra' ? 'dau-ra' : 'dau-vao'
+        }.xlsx"`,
       })
       .send(buffer);
   }

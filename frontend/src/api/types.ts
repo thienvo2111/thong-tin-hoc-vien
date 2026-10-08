@@ -1144,3 +1144,28 @@ export interface ChatLuongHoSoResult {
   /** Sắp theo ten_don_vi (vi). */
   theo_truong: ChatLuongHoSoDong[];
 }
+
+/** Đánh giá NLS theo mức: % mức/chưa xếp mức tính trên đã làm; % đã làm/chưa làm tính trên số HV. */
+export type LoaiMucNls = 'dau_vao' | 'dau_ra';
+
+export interface DemMucNls {
+  so_hv: number;
+  da_lam: number;
+  chua_lam: number;
+  theo_muc: { ma: string; nhan: string; so_luong: number }[];
+  chua_xep_muc: number;
+}
+
+export interface MucNlsTruongDong extends DemMucNls {
+  don_vi_id: string;
+  ten_don_vi: string;
+  ten_don_vi_cha: string | null;
+}
+
+export interface MucNlsResult {
+  loai: LoaiMucNls;
+  thang: { ma: string; nhan: string }[];
+  tong: DemMucNls;
+  /** Sắp theo ten_don_vi (vi). */
+  theo_truong: MucNlsTruongDong[];
+}
