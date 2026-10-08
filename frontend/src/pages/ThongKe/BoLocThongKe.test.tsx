@@ -22,6 +22,13 @@ async function chon(ten: string, nhan: string) {
 }
 
 describe('BoLocThongKe', () => {
+  it('đổi bộ lọc giữ nguyên query param không thuộc bộ lọc (tdt_tab)', async () => {
+    const r = renderBoLoc('/thong-ke?khoa_id=khoa-1&tdt_tab=hoc-tap');
+    await chon('Khóa', 'Khóa 2');
+    await waitFor(() => expect(search(r).get('khoa_id')).toBe('khoa-2'));
+    expect(search(r).get('tdt_tab')).toBe('hoc-tap');
+  });
+
   it('quan_tri: ô cụm disabled khi chưa chọn khóa', async () => {
     renderBoLoc();
     expect(await o('Cụm')).toBeDisabled();

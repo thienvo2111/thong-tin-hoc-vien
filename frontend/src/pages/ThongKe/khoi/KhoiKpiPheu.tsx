@@ -1,4 +1,4 @@
-import { BarChart } from '@mantine/charts';
+﻿import { BarChart } from '@mantine/charts';
 import { Group, Paper, SimpleGrid, Stack, Text } from '@mantine/core';
 import { Link } from 'react-router-dom';
 import { usePheu, type LocThongKe } from '@/api/thongKe';
@@ -15,7 +15,7 @@ interface TheKpi {
   id: string;
   nhan: string;
   so: number;
-  /** so với thẻ trước; undefined = thẻ đầu, không hiện */
+  /** so với số tham gia; undefined = không hiện */
   ty_le?: number | null;
 }
 
@@ -23,9 +23,9 @@ function dungKpi(d: PheuResult): TheKpi[] {
   return [
     { id: 'kpi-tham-gia', nhan: 'Tham gia', so: d.tham_gia },
     { id: 'kpi-da-truy-cap', nhan: 'Đã truy cập', so: d.da_truy_cap, ty_le: tyLe(d.da_truy_cap, d.tham_gia) },
-    { id: 'kpi-ky-nang-so', nhan: 'Đã làm KS kĩ năng số', so: d.khao_sat_ky_nang_so, ty_le: tyLe(d.khao_sat_ky_nang_so, d.da_truy_cap) },
-    { id: 'kpi-dau-vao', nhan: 'Đã làm đánh giá NLS đầu vào', so: d.danh_gia_dau_vao, ty_le: tyLe(d.danh_gia_dau_vao, d.khao_sat_ky_nang_so) },
-    { id: 'kpi-dau-ra', nhan: 'Đã làm đánh giá NLS đầu ra', so: d.danh_gia_dau_ra, ty_le: tyLe(d.danh_gia_dau_ra, d.danh_gia_dau_vao) },
+    { id: 'kpi-ky-nang-so', nhan: 'Đã làm KS kĩ năng số', so: d.khao_sat_ky_nang_so, ty_le: tyLe(d.khao_sat_ky_nang_so, d.tham_gia) },
+    { id: 'kpi-dau-vao', nhan: 'Đã làm đánh giá NLS đầu vào', so: d.danh_gia_dau_vao, ty_le: tyLe(d.danh_gia_dau_vao, d.tham_gia) },
+    { id: 'kpi-dau-ra', nhan: 'Đã làm đánh giá NLS đầu ra', so: d.danh_gia_dau_ra, ty_le: tyLe(d.danh_gia_dau_ra, d.tham_gia) },
   ];
 }
 
@@ -38,8 +38,7 @@ function dungPheu(d: PheuResult) {
     { id: 'pheu-dau-ra', nhan: 'Đánh giá NLS đầu ra', so: d.danh_gia_dau_ra },
   ];
   return buoc.map((b, i) => {
-    const giu = i === 0 ? null : tyLe(b.so, buoc[i - 1].so);
-    return { ...b, roi: giu === null ? null : 1 - giu };
+    return { ...b, ty_le: i === 0 ? undefined : tyLe(b.so, d.tham_gia) };
   });
 }
 
@@ -62,7 +61,7 @@ export function KhoiKpiPheu({ loc }: { loc: LocThongKe }) {
                 </Text>
                 {t.ty_le !== undefined && (
                   <Text size="xs" c="dimmed">
-                    {dinhDangTyLe(t.ty_le)} so với thẻ trước
+                    {dinhDangTyLe(t.ty_le)} số tham gia
                   </Text>
                 )}
               </Paper>
@@ -117,9 +116,9 @@ function Pheu({ d }: { d: PheuResult }) {
               <Text size="sm" fw={600}>
                 {b.so}
               </Text>
-              {b.roi !== null && (
+              {b.ty_le !== undefined && (
                 <Text size="xs" c="dimmed">
-                  rơi {dinhDangTyLe(b.roi)}
+                  {dinhDangTyLe(b.ty_le)} số tham gia
                 </Text>
               )}
             </Group>
