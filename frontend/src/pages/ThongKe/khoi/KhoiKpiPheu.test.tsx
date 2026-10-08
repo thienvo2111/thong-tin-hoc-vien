@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
@@ -22,15 +22,16 @@ describe('KhoiKpiPheu', () => {
     expect(within(screen.getByTestId('kpi-dau-ra')).getByText('45')).toBeInTheDocument();
   });
 
-  it('% so với thẻ trước', async () => {
+  it('% mỗi thẻ tính trên số tham gia', async () => {
     renderKhoi();
     await screen.findByTestId('kpi-da-truy-cap');
-    expect(within(screen.getByTestId('kpi-da-truy-cap')).getByText(/75,0%/)).toBeInTheDocument(); // 150/200
-    expect(within(screen.getByTestId('kpi-ky-nang-so')).getByText(/66,7%/)).toBeInTheDocument(); // 100/150
-    expect(within(screen.getByTestId('kpi-dau-vao')).getByText(/90,0%/)).toBeInTheDocument(); // 90/100
-    expect(within(screen.getByTestId('kpi-dau-ra')).getByText(/50,0%/)).toBeInTheDocument(); // 45/90
+    expect(within(screen.getByTestId('kpi-da-truy-cap')).getByText('75,0% số tham gia')).toBeInTheDocument(); // 150/200
+    expect(within(screen.getByTestId('kpi-ky-nang-so')).getByText('50,0% số tham gia')).toBeInTheDocument(); // 100/200
+    expect(within(screen.getByTestId('kpi-dau-vao')).getByText('45,0% số tham gia')).toBeInTheDocument(); // 90/200
+    expect(within(screen.getByTestId('kpi-dau-ra')).getByText('22,5% số tham gia')).toBeInTheDocument(); // 45/200
+    expect(within(screen.getByTestId('kpi-tham-gia')).queryByText(/số tham gia/)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('so với thẻ trước');
   });
-
   it("tham_gia 0 → '—' (không NaN)", async () => {
     server.use(
       http.get('/thong-ke/pheu', () =>
@@ -46,7 +47,7 @@ describe('KhoiKpiPheu', () => {
     );
     renderKhoi();
     await screen.findByTestId('kpi-da-truy-cap');
-    expect(within(screen.getByTestId('kpi-da-truy-cap')).getByText(/—/)).toBeInTheDocument();
+    expect(within(screen.getByTestId('kpi-da-truy-cap')).getByText('— số tham gia')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('NaN');
   });
 
@@ -79,11 +80,13 @@ describe('KhoiKpiPheu', () => {
     expect(screen.queryByTestId('kpi-cho-duyet')).not.toBeInTheDocument();
   });
 
-  it('phễu liệt kê 5 bước kèm % rơi rụng', async () => {
+  it('phễu liệt kê 5 bước kèm % trên số tham gia, không có chữ rơi', async () => {
     renderKhoi();
     const buoc = await screen.findByTestId('pheu-ks-ky-nang-so');
     expect(within(buoc).getByText('100')).toBeInTheDocument();
-    expect(within(buoc).getByText(/rơi 33,3%/)).toBeInTheDocument(); // 100/150
+    expect(within(buoc).getByText('50,0% số tham gia')).toBeInTheDocument(); // 100/200
+    expect(within(screen.getByTestId('pheu-tham-gia')).queryByText(/số tham gia/)).not.toBeInTheDocument();
     expect(screen.getAllByTestId(/^pheu-/)).toHaveLength(5);
+    expect(document.body.textContent).not.toMatch(/rơi/);
   });
 });
