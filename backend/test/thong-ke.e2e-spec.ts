@@ -641,4 +641,122 @@ describe('Thống kê dashboard (e2e)', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('chất lượng hồ sơ', () => {
+    type Dem = {
+      so_hv: number;
+      thieu_doi_tuong: number;
+      thieu_cap: number;
+      thieu_email: number;
+      thieu_sdt: number;
+      du_ho_so: number;
+      ty_le_du: number | null;
+    };
+    type Kq = {
+      tong: Dem;
+      theo_truong: (Dem & { don_vi_id: string })[];
+    };
+    const timDong = (b: Kq, id: string) =>
+      b.theo_truong.find((r) => r.don_vi_id === id);
+
+    // T1: t1-1 đủ hồ sơ; t1-2 email trắng; t1-3 SĐT trắng; t1-4..6 thiếu đối tượng+cấp+email.
+    // T2: t2-1 giao_vien (thiếu cấp, email); t2-2..5 thiếu hết trừ SĐT.
+    beforeAll(async () => {
+      const sua = (
+        nhan: string,
+        data: Parameters<typeof prisma.hoc_vien.update>[0]['data'],
+      ) =>
+        prisma.hoc_vien.update({
+          where: { ma_dinh_danh_moet: `TK-${nhan}-${SUF}` },
+          data,
+        });
+      await sua('t1-1', { cap_giang_day: 'thcs', email_lien_he: 'a@x.vn' });
+      await sua('t1-2', { cap_giang_day: 'thcs', email_lien_he: '   ' });
+      await sua('t1-3', {
+        cap_giang_day: 'thpt',
+        email_lien_he: 'c@x.vn',
+        so_dien_thoai_lien_he: '   ',
+      });
+    });
+
+    it('quan_tri lọc theo Sở: số liệu T1 và T2 đúng, tổng = tổng các trường', async () => {
+      const res = await get(
+        `/thong-ke/chat-luong-ho-so?don_vi_id=${dv.so}`,
+        tok.quanTri,
+      );
+      expect(res.status).toBe(200);
+      const b = res.body as Kq;
+      expect(timDong(b, dv.t1)).toMatchObject({
+        so_hv: 6,
+        thieu_doi_tuong: 3,
+        thieu_cap: 3,
+        thieu_email: 4,
+        thieu_sdt: 1,
+        du_ho_so: 1,
+      });
+      expect(timDong(b, dv.t2)).toMatchObject({
+        so_hv: 5,
+        thieu_doi_tuong: 4,
+        thieu_cap: 5,
+        thieu_email: 5,
+        thieu_sdt: 0,
+        du_ho_so: 0,
+        ty_le_du: 0,
+      });
+      expect(b.tong.so_hv).toBe(
+        b.theo_truong.reduce((s, r) => s + r.so_hv, 0),
+      );
+    });
+
+    it('truong T1: chỉ dòng T1', async () => {
+      const res = await get('/thong-ke/chat-luong-ho-so', tok.truong1);
+      expect(res.status).toBe(200);
+      const b = res.body as Kq;
+      expect(b.theo_truong.map((r) => r.don_vi_id)).toEqual([dv.t1]);
+      expect(b.tong.so_hv).toBe(6);
+    });
+
+    it('doi_tuong=giao_vien theo Sở: chỉ 3 GV fixture', async () => {
+      const res = await get(
+        `/thong-ke/chat-luong-ho-so?don_vi_id=${dv.so}&doi_tuong=giao_vien`,
+        tok.quanTri,
+      );
+      expect(res.status).toBe(200);
+      const b = res.body as Kq;
+      expect(b.tong.so_hv).toBe(3);
+      expect(b.tong.thieu_doi_tuong).toBe(0);
+      expect(timDong(b, dv.t1)).toMatchObject({ so_hv: 2, du_ho_so: 1 });
+    });
+
+    it('hoc_vien -> 403', async () => {
+      const res = await get('/thong-ke/chat-luong-ho-so', tok.hocVien);
+      expect(res.status).toBe(403);
+    });
+
+    it('xuất Excel -> 200 xlsx, 2 sheet', async () => {
+      const res = await get(
+        `/thong-ke/chat-luong-ho-so/xuat-excel?don_vi_id=${dv.so}`,
+        tok.quanTri,
+      )
+        .buffer(true)
+        .parse((r, cb) => {
+          const chunks: Buffer[] = [];
+          r.on('data', (c: Buffer) => chunks.push(c));
+          r.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toContain(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      expect(res.headers['content-disposition']).toContain(
+        'chat-luong-ho-so.xlsx',
+      );
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(res.body as ExcelJS.Buffer);
+      expect(wb.worksheets.map((x) => x.name)).toEqual([
+        'Theo trường',
+        'Cần bổ sung',
+      ]);
+    });
+  });
 });

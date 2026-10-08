@@ -3,13 +3,16 @@ import {
   BieuMauDangKyTruyCap,
   CAP_BIEU_MAU,
   CanDonDocDong,
+  ChatLuongHoSoResult,
   CapKey,
   DemDkTc,
   DOI_TUONG_BIEU_MAU,
   DoiTuongKey,
+  DongHoSoHocVien,
   MoTaBieuMau,
   TienDoTruongDong,
 } from '../../thong-ke/thong-ke.types';
+import { mucThieuHoSo } from '../../thong-ke/ho-so-thieu';
 import { DOI_TUONG_LABEL } from '../../thong-bao/mau-email/mau-email';
 import {
   CAP_GIANG_DAY,
@@ -481,7 +484,10 @@ export async function buildTienDoTruongWorkbook(
     '% Đạt',
   ]);
   sheet.getRow(1).font = { bold: true };
-  const doRong = [6, 45, 35, 12, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 12, 12];
+  const doRong = [
+    6, 45, 35, 12, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14,
+    12, 12,
+  ];
   doRong.forEach((width, i) => {
     sheet.getColumn(i + 1).width = width;
   });
@@ -570,6 +576,29 @@ function ngayXuatVn(d: Date): string {
   return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`;
 }
 
+/** 4 dòng tiêu đề gộp ô: tên biểu mẫu, Khóa, Phạm vi · Đối tượng, Ngày xuất. */
+function themTieuDeBieuMau(
+  sheet: ExcelJS.Worksheet,
+  tieuDe: string,
+  moTa: MoTaBieuMau,
+  tongCot: number,
+): void {
+  const dong: [string, Partial<ExcelJS.Font>?][] = [
+    [tieuDe, { bold: true, size: 14 }],
+    [`Khóa: ${moTa.khoa}`],
+    [`Phạm vi: ${moTa.pham_vi} · Đối tượng: ${moTa.doi_tuong}`],
+    [`Ngày xuất: ${ngayXuatVn(moTa.ngay_xuat)}`],
+  ];
+  dong.forEach(([chu, font], i) => {
+    const r = i + 1;
+    sheet.mergeCells(r, 1, r, tongCot);
+    const o = sheet.getCell(r, 1);
+    o.value = chu;
+    if (font) o.font = font as ExcelJS.Font;
+    o.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+}
+
 function themSheetBieuMau(
   workbook: ExcelJS.Workbook,
   ten: string,
@@ -582,23 +611,12 @@ function themSheetBieuMau(
   const sheet = workbook.addWorksheet(ten);
   const soCotDau = cotDau.length;
   const tongCot = soCotDau + nhom.length * 3;
-  const dongTieuDe: [string, Partial<ExcelJS.Font>?][] = [
-    [
-      'BIỂU THỐNG KÊ SỐ LƯỢNG ĐĂNG KÝ VÀ TRUY CẬP HỆ THỐNG',
-      { bold: true, size: 14 },
-    ],
-    [`Khóa: ${moTa.khoa}`],
-    [`Phạm vi: ${moTa.pham_vi} · Đối tượng: ${moTa.doi_tuong}`],
-    [`Ngày xuất: ${ngayXuatVn(moTa.ngay_xuat)}`],
-  ];
-  dongTieuDe.forEach(([chu, font], i) => {
-    const r = i + 1;
-    sheet.mergeCells(r, 1, r, tongCot);
-    const o = sheet.getCell(r, 1);
-    o.value = chu;
-    if (font) o.font = font as ExcelJS.Font;
-    o.alignment = { horizontal: 'center', vertical: 'middle' };
-  });
+  themTieuDeBieuMau(
+    sheet,
+    'BIỂU THỐNG KÊ SỐ LƯỢNG ĐĂNG KÝ VÀ TRUY CẬP HỆ THỐNG',
+    moTa,
+    tongCot,
+  );
 
   // Header 2 tầng (dòng 6-7; dòng 5 để trống).
   cotDau.forEach((c, i) => {
@@ -621,7 +639,11 @@ function themSheetBieuMau(
       o.font = { bold: true };
       o.fill = NEN_HEADER;
       o.border = BORDER_MONG;
-      o.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      o.alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+        wrapText: true,
+      };
     }
   }
 
@@ -744,6 +766,130 @@ export async function buildBieuMauDangKyTruyCapWorkbook(
     hangTruong(),
     moTa,
     3,
+  );
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+// Báo cáo chất lượng hồ sơ — sheet 1 theo trường, sheet 2 danh sách HV cần bổ sung.
+const TIEU_DE_CHAT_LUONG = 'BÁO CÁO CHẤT LƯỢNG HỒ SƠ HỌC VIÊN';
+const HANG_DAU_CHAT_LUONG = 6;
+
+function themSheetChatLuong(
+  workbook: ExcelJS.Workbook,
+  ten: string,
+  cot: { nhan: string; rong: number }[],
+  hang: { o: (string | number | null)[]; tong?: boolean }[],
+  moTa: MoTaBieuMau,
+  codinhCot: number,
+): void {
+  const sheet = workbook.addWorksheet(ten);
+  themTieuDeBieuMau(sheet, TIEU_DE_CHAT_LUONG, moTa, cot.length);
+  cot.forEach((c, i) => {
+    const o = sheet.getCell(HANG_DAU_CHAT_LUONG, i + 1);
+    o.value = c.nhan;
+    o.font = { bold: true };
+    o.fill = NEN_HEADER;
+    o.border = BORDER_MONG;
+    o.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    sheet.getColumn(i + 1).width = c.rong;
+  });
+  hang.forEach((h, i) => {
+    h.o.forEach((v, c) => {
+      const o = sheet.getCell(HANG_DAU_CHAT_LUONG + 1 + i, c + 1);
+      if (v !== null) o.value = v;
+      o.border = BORDER_MONG;
+      if (h.tong) o.font = { bold: true };
+    });
+  });
+  sheet.views = [
+    {
+      state: 'frozen',
+      xSplit: codinhCot,
+      ySplit: HANG_DAU_CHAT_LUONG,
+    } as ExcelJS.WorksheetView,
+  ];
+}
+
+export async function buildChatLuongHoSoWorkbook(
+  data: ChatLuongHoSoResult,
+  canBoSung: DongHoSoHocVien[],
+  moTa: MoTaBieuMau,
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const dongDem = (d: ChatLuongHoSoResult['tong']) => [
+    d.so_hv,
+    d.thieu_doi_tuong,
+    d.thieu_cap,
+    d.thieu_email,
+    d.thieu_sdt,
+    d.du_ho_so,
+    phanTram(d.ty_le_du),
+  ];
+  themSheetChatLuong(
+    workbook,
+    'Theo trường',
+    [
+      { nhan: 'STT', rong: 6 },
+      { nhan: 'Trường', rong: 45 },
+      { nhan: 'Đơn vị quản lý', rong: 35 },
+      { nhan: 'Số HV', rong: 10 },
+      { nhan: 'Thiếu đối tượng', rong: 14 },
+      { nhan: 'Thiếu cấp giảng dạy', rong: 14 },
+      { nhan: 'Thiếu email', rong: 12 },
+      { nhan: 'Thiếu SĐT', rong: 12 },
+      { nhan: 'Đủ hồ sơ', rong: 12 },
+      { nhan: 'Tỷ lệ đủ (%)', rong: 14 },
+    ],
+    [
+      ...data.theo_truong.map((t, i) => ({
+        o: [i + 1, t.ten_don_vi, t.ten_don_vi_cha ?? '', ...dongDem(t)],
+      })),
+      { o: ['Tổng cộng', '', '', ...dongDem(data.tong)], tong: true },
+    ],
+    moTa,
+    3,
+  );
+
+  const sapXep = [...canBoSung].sort(
+    (a, b) =>
+      a.ten_don_vi.localeCompare(b.ten_don_vi, 'vi') ||
+      a.ho_ten.localeCompare(b.ho_ten, 'vi'),
+  );
+  themSheetChatLuong(
+    workbook,
+    'Cần bổ sung',
+    [
+      { nhan: 'STT', rong: 6 },
+      { nhan: 'Họ tên', rong: 30 },
+      { nhan: 'Trường', rong: 45 },
+      { nhan: 'Đơn vị quản lý', rong: 35 },
+      { nhan: 'Đối tượng', rong: 16 },
+      { nhan: 'Cấp giảng dạy', rong: 16 },
+      { nhan: 'Email', rong: 30 },
+      { nhan: 'SĐT', rong: 16 },
+      { nhan: 'Còn thiếu', rong: 34 },
+    ],
+    sapXep.map((r, i) => ({
+      o: [
+        i + 1,
+        r.ho_ten,
+        r.ten_don_vi,
+        r.ten_don_vi_cha ?? '',
+        r.doi_tuong
+          ? (DOI_TUONG_LABEL[r.doi_tuong as keyof typeof DOI_TUONG_LABEL] ??
+            r.doi_tuong)
+          : '',
+        r.cap_giang_day
+          ? (NHAN_CAP_GIANG_DAY[r.cap_giang_day] ?? r.cap_giang_day)
+          : '',
+        r.email ?? '',
+        r.so_dien_thoai ?? '',
+        mucThieuHoSo(r).join('; '),
+      ],
+    })),
+    moTa,
+    2,
   );
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);

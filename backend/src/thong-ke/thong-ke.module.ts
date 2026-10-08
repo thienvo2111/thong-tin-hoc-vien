@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { HoTroHocVienModule } from '../ho-tro-hoc-vien/ho-tro-hoc-vien.module';
 import { SsoModule } from '../sso/sso.module';
 import { BieuMauService } from './bieu-mau.service';
+import { ChatLuongHoSoService } from './chat-luong-ho-so.service';
 import { CanDonDocService } from './can-don-doc.service';
 import { ThongKeController } from './thong-ke.controller';
 import { ThongKeScopeService } from './thong-ke-scope.service';
@@ -22,6 +23,7 @@ import { XepHangService } from './xep-hang.service';
     CanDonDocService,
     TienDoTruongService,
     BieuMauService,
+    ChatLuongHoSoService,
   ],
   exports: [ThongKeScopeService],
 })

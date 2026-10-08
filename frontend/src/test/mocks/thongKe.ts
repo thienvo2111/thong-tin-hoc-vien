@@ -2,6 +2,8 @@ import { http, HttpResponse } from 'msw';
 import type {
   BoLocResult,
   CanDonDocResult,
+  ChatLuongHoSoDong,
+  ChatLuongHoSoResult,
   ChuyenCanResult,
   ChuyenMucResult,
   KetQuaHocCot,
@@ -185,7 +187,53 @@ export const tienDoTruongMau: TienDoTruongDong[] = [
   }),
 ];
 
+const dongHoSo = (
+  don_vi_id: string,
+  ten_don_vi: string,
+  so_hv: number,
+  thieu: [number, number, number, number],
+  du_ho_so: number,
+): ChatLuongHoSoDong => ({
+  don_vi_id,
+  ten_don_vi,
+  ten_don_vi_cha: 'Sở GD&ĐT An Giang',
+  so_hv,
+  thieu_doi_tuong: thieu[0],
+  thieu_cap: thieu[1],
+  thieu_email: thieu[2],
+  thieu_sdt: thieu[3],
+  du_ho_so,
+  ty_le_du: so_hv === 0 ? null : du_ho_so / so_hv,
+});
+
+export const chatLuongHoSoMau: ChatLuongHoSoResult = {
+  tong: {
+    so_hv: 100,
+    thieu_doi_tuong: 20,
+    thieu_cap: 30,
+    thieu_email: 40,
+    thieu_sdt: 10,
+    du_ho_so: 50,
+    ty_le_du: 0.5,
+  },
+  theo_truong: [
+    dongHoSo('dv-a', 'Trường THPT Nguyễn Du', 40, [5, 10, 20, 2], 20),
+    dongHoSo('dv-b', 'Trường THCS Lê Lợi', 25, [10, 12, 15, 5], 5),
+    dongHoSo('dv-c', 'Trường Tiểu học Trần Phú', 30, [5, 8, 5, 3], 24),
+    dongHoSo('dv-d', 'Trường THPT Phan Chu Trinh', 5, [0, 0, 3, 0], 2),
+    dongHoSo('dv-e', 'Trường Mầm non Hoa Sen', 0, [0, 0, 0, 0], 0),
+  ],
+};
+
 export const thongKeHandlers = [
+  http.get(
+    '/thong-ke/chat-luong-ho-so/xuat-excel',
+    () =>
+      new HttpResponse('noi-dung-file-mo-phong', {
+        headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      }),
+  ),
+  http.get('/thong-ke/chat-luong-ho-so', () => HttpResponse.json(chatLuongHoSoMau)),
   http.get(
     '/thong-ke/tien-do-truong/xuat-excel',
     () =>

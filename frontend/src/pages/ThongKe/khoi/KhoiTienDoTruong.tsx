@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Anchor, Button, Group, Progress, Table, Tabs, Text, TextInput, UnstyledButton } from '@mantine/core';
+import { Anchor, Button, Group, Progress, Table, Tabs, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useSearchParams } from 'react-router-dom';
 import { useTienDoTruong, xuatTienDoTruong, type LocThongKe } from '@/api/thongKe';
@@ -7,7 +7,10 @@ import type { TienDoTruongDong } from '@/api/types';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { useLocTuUrl } from '../BoLocThongKe';
 import { KhoiThongKe } from '../KhoiThongKe';
+import { boDau, doiChieuSapXep, mauTheoNguong, sapXepTheoCot, TieuDeSapXep, type Chieu } from '../bangTheoTruong';
 import { dinhDangTyLe } from '../mauMuc';
+
+export { mauTheoNguong };
 
 type KhoaSapXep = 'ten_don_vi' | 'so_hv' | TyLeKey;
 type TyLeKey =
@@ -18,7 +21,6 @@ type TyLeKey =
   | 'ty_le_co_mat'
   | 'ty_le_vle_dat'
   | 'ty_le_dat';
-type Chieu = 'asc' | 'desc';
 
 interface CotTyLe {
   key: TyLeKey;
@@ -77,29 +79,6 @@ const sapXepMacDinh = (tab: (typeof TABS)[number]): { cot: KhoaSapXep; chieu: Ch
   chieu: 'asc',
 });
 
-/** Màu thanh tiến độ theo ngưỡng; null (không có mẫu số) → không thanh. */
-export function mauTheoNguong(x: number | null): string | null {
-  if (x === null) return null;
-  if (x < 0.5) return 'red.6';
-  if (x < 0.8) return 'yellow.6';
-  return 'teal.6';
-}
-
-const boDau = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/đ/gi, 'd').toLowerCase();
-
-function sapXep(ds: TienDoTruongDong[], cot: KhoaSapXep, chieu: Chieu): TienDoTruongDong[] {
-  const dau = chieu === 'asc' ? 1 : -1;
-  return [...ds].sort((a, b) => {
-    const x = a[cot];
-    const y = b[cot];
-    if (x === null && y === null) return 0;
-    if (x === null) return 1; // null luôn cuối, bất kể chiều
-    if (y === null) return -1;
-    if (typeof x === 'string' && typeof y === 'string') return dau * x.localeCompare(y, 'vi');
-    return dau * ((x as number) - (y as number));
-  });
-}
-
 function OTyLe({ r, c }: { r: TienDoTruongDong; c: CotTyLe }) {
   const x = r[c.key];
   const mau = mauTheoNguong(x);
@@ -109,28 +88,6 @@ function OTyLe({ r, c }: { r: TienDoTruongDong; c: CotTyLe }) {
       <Progress value={(x ?? 0) * 100} color={mau} size="sm" w={56} aria-hidden />
       <Text size="sm">{`${r[c.tu]}/${r[c.mau]}${c.hauTo} · ${dinhDangTyLe(x)}`}</Text>
     </Group>
-  );
-}
-
-interface TieuDeProps {
-  nhan: string;
-  cot: KhoaSapXep;
-  dangSap: KhoaSapXep;
-  chieu: Chieu;
-  onSap: (cot: KhoaSapXep) => void;
-  canPhai?: boolean;
-}
-
-function TieuDeSapXep({ nhan, cot, dangSap, chieu, onSap, canPhai }: TieuDeProps) {
-  const dang = dangSap === cot;
-  const ariaSort = dang ? (chieu === 'asc' ? 'ascending' : 'descending') : 'none';
-  return (
-    <Table.Th aria-sort={ariaSort} ta={canPhai ? 'right' : undefined}>
-      <UnstyledButton onClick={() => onSap(cot)} fw={700} fz="sm">
-        {nhan}
-        {dang && <span aria-hidden> {chieu === 'asc' ? '↑' : '↓'}</span>}
-      </UnstyledButton>
-    </Table.Th>
   );
 }
 
@@ -148,11 +105,11 @@ export function KhoiTienDoTruong({ loc }: { loc: LocThongKe }) {
     if (!d) return [];
     const t = boDau(tim.trim());
     const loc2 = t ? d.filter((r) => boDau(r.ten_don_vi).includes(t)) : d;
-    return sapXep(loc2, sap.cot, sap.chieu);
+    return sapXepTheoCot(loc2, sap.cot, sap.chieu);
   }, [d, tim, sap]);
 
   function doiSapXep(cot: KhoaSapXep) {
-    setSap((cu) => (cu.cot === cot ? { cot, chieu: cu.chieu === 'asc' ? 'desc' : 'asc' } : { cot, chieu: 'asc' }));
+    setSap((cu) => doiChieuSapXep(cu, cot));
   }
 
   function doiTab(v: string | null) {
