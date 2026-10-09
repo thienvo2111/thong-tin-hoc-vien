@@ -184,12 +184,13 @@ export const huongDan: NoiDungHuongDan = {
     {
       id: 'dang-nhap',
       tieuDe: 'Đăng nhập lần đầu',
-      tomTat: 'Đăng nhập lần đầu bằng mã định danh và mật khẩu là ngày sinh.',
+      tomTat: 'Đăng nhập lần đầu bằng mã định danh MOET hoặc số điện thoại, mật khẩu là ngày sinh.',
       moTa:
         'Mở **boiduongnls.hcmue.edu.vn**, bấm [[Đăng nhập cổng học viên]] (hoặc gõ thẳng boiduongnls.hcmue.edu.vn/dang-nhap). Mọi việc tiếp theo, kể cả làm khảo sát, đều thực hiện sau khi đăng nhập.',
       hinh: 'dang-nhap',
       buoc: [
-        'Nhập **tên tài khoản hoặc mã định danh MOET**. Mã định danh trên CSDL MOET do nhà trường cung cấp (lấy từ danh sách học viên) — chỉ gồm chữ số, không có dấu cách.',
+        'Chọn cách đăng nhập ở thanh phía trên ô nhập: [[Mã định danh MOET]] (mặc định) hoặc [[Số điện thoại]]. Hệ thống nhớ lựa chọn cho lần sau.',
+        'Nếu chọn **Mã định danh MOET**: nhập mã do nhà trường cung cấp (lấy từ danh sách học viên), chỉ gồm chữ số. **Có hay không có số 0 ở đầu đều được**, ví dụ 09115131060 hoặc 9115131060. Nếu chọn **Số điện thoại**: nhập số điện thoại Thầy/Cô đã cung cấp cho nhà trường, ví dụ 0912345678.',
         'Nhập **mật khẩu**. Lần đầu là ngày sinh viết liền 8 chữ số. Bấm biểu tượng con mắt ở cuối ô để xem lại mình đã gõ đúng chưa.',
         'Bấm [[Đăng nhập]]. Lần đầu, hệ thống sẽ chuyển sang màn hình đổi mật khẩu.',
       ],
@@ -204,6 +205,12 @@ export const huongDan: NoiDungHuongDan = {
         },
       ],
       ghiChu: [
+        {
+          loai: 'info',
+          tieuDe: 'Khi nào dùng số điện thoại?',
+          noiDung:
+            'Khi Thầy/Cô không nhớ mã định danh. Nếu số điện thoại **dùng chung với người khác** (ví dụ vợ/chồng cùng là giáo viên) hoặc **đã thay đổi** so với số đã cung cấp cho nhà trường, hệ thống không nhận ra — hãy chọn lại [[Mã định danh MOET]].',
+        },
         {
           loai: 'warning',
           tieuDe: 'Nhập đúng mà vẫn báo sai?',
@@ -467,7 +474,7 @@ export const huongDan: NoiDungHuongDan = {
           hang: [
             [
               '**Email đã xác minh**',
-              'Ở màn hình đăng nhập, bấm [[Quên mật khẩu?]]. Nhập tên tài khoản hoặc mã định danh MOET, bấm [[Gửi yêu cầu]]. Mở email (xem cả Thư rác), bấm liên kết đặt lại mật khẩu, đặt mật khẩu mới.',
+              'Ở màn hình đăng nhập, bấm [[Quên mật khẩu?]]. Chọn [[Mã định danh MOET]] hoặc [[Số điện thoại]], nhập mã hoặc số tương ứng, bấm [[Gửi yêu cầu]]. Mở email (xem cả Thư rác), bấm liên kết đặt lại mật khẩu, đặt mật khẩu mới.',
             ],
             [
               '**Email chưa xác minh** hoặc không nhận được thư sau 15 phút',
@@ -554,7 +561,8 @@ export const huongDan: NoiDungHuongDan = {
       nguyenNhan:
         'Sai mã hoặc sai mật khẩu. Cũng có thể do Thầy/Cô chưa có tên trong danh sách học viên (chưa có tài khoản) hoặc ngày sinh trong danh sách bị sai. Vì lý do bảo mật, hệ thống không nói rõ nguyên nhân nào.',
       cachXuLy: [
-        'Kiểm tra mã định danh: chỉ chữ số, không dấu cách, đúng mã nhà trường gửi.',
+        'Kiểm tra mã định danh: chỉ chữ số, không dấu cách, đúng mã nhà trường gửi (có hay không có số 0 ở đầu đều được).',
+        'Không nhớ mã: chọn [[Số điện thoại]] rồi nhập số đã cung cấp cho nhà trường. Số dùng chung với người khác hoặc đã đổi thì quay lại [[Mã định danh MOET]].',
         'Lần đầu: mật khẩu là ngày sinh đủ 8 số, có số 0 ở đầu ngày/tháng (dùng công cụ ở Phần 3).',
         'Nếu đã đổi mật khẩu trước đó: dùng mật khẩu mới, không dùng ngày sinh.',
         'Bấm biểu tượng con mắt để xem lại mật khẩu đã gõ; chú ý chữ hoa, chữ thường.',

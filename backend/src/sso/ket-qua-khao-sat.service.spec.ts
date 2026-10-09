@@ -24,6 +24,7 @@ describe('KetQuaKhaoSatService', () => {
     };
     hoc_vien: { findUnique: jest.Mock; findMany: jest.Mock; count: jest.Mock };
     $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
     cau_hinh_he_thong: { findUnique: jest.Mock };
   };
 
@@ -66,6 +67,7 @@ describe('KetQuaKhaoSatService', () => {
         count: jest.fn().mockResolvedValue(0),
       },
       $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'hv-1', chinh_xac: true }]),
       cau_hinh_he_thong: { findUnique: jest.fn().mockResolvedValue(null) },
     };
     service = new KetQuaKhaoSatService(
@@ -124,9 +126,22 @@ describe('KetQuaKhaoSatService', () => {
         loai: 'khao-sat',
         trang_thai: 'dang_lam',
       });
-      expect(prisma.hoc_vien.findUnique.mock.calls[0][0].where).toEqual({
-        ma_dinh_danh_moet: '9115131060',
+      const sql = prisma.$queryRaw.mock.calls[0][0] as { values: unknown[] };
+      expect(sql.values[0]).toBe('9115131060');
+      expect(prisma.ket_qua_khao_sat.upsert.mock.calls[0][0].where).toEqual({
+        hoc_vien_id_loai: { hoc_vien_id: 'hv-1', loai: 'khao-sat' },
       });
+    });
+
+    // Spec 2026-10-09 Q-A: hệ thống khảo sát gửi mã mất số 0 đầu vẫn khớp.
+    it('mã lệch số 0 đầu khớp đúng 1 học viên -> ghi cho học viên đó', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'hv-7', chinh_xac: false }]);
+      const kq = await service.nhanKetQua({
+        ma_dinh_danh_moet: '115131060',
+        loai: 'khao-sat',
+        trang_thai: 'dang_lam',
+      });
+      expect(kq.hoc_vien_id).toBe('hv-7');
     });
 
     it('thiếu cả 2 định danh -> 400, không ghi', async () => {
@@ -137,7 +152,7 @@ describe('KetQuaKhaoSatService', () => {
     });
 
     it('không tìm thấy học viên -> 404, không ghi', async () => {
-      prisma.hoc_vien.findUnique.mockResolvedValue(null);
+      prisma.$queryRaw.mockResolvedValue([]);
       await expect(
         service.nhanKetQua({
           ma_dinh_danh_moet: 'khong-co',

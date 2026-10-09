@@ -15,6 +15,7 @@ import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
 import { CauHinhKhaoSatService } from '../cau-hinh-khao-sat/cau-hinh-khao-sat.service';
+import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 
 const namHopLe = new Date().getUTCFullYear() - 20;
 
@@ -148,6 +149,9 @@ describe('HocVienService', () => {
       thongBaoService as unknown as ThongBaoService,
       dotXacNhanService as unknown as DotXacNhanService,
       cauHinhKhaoSatService as unknown as CauHinhKhaoSatService,
+      {
+        ghi: jest.fn().mockResolvedValue(undefined),
+      } as unknown as NhatKyService,
     );
 
     // Fixture mặc định: mọi FK tra cứu hợp lệ (test override khi cần âm tính).
@@ -1012,12 +1016,71 @@ describe('HocVienService', () => {
     });
 
     it('ma_dinh_danh_moet đã tồn tại -> ValidationException (rule #36f)', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'khac', chinh_xac: true }]);
       prisma.hoc_vien.findUnique.mockImplementation(({ where }) =>
         where.ma_dinh_danh_moet ? { id: 'khac' } : null,
       );
       await expect(
         service.checkValidMoetImportRow(baseMoetInput()),
-      ).rejects.toBeInstanceOf(ValidationException);
+      ).rejects.toMatchObject({
+        response: {
+          error: {
+            fields: [
+              expect.objectContaining({
+                message: 'Mã định danh CSDL MOET đã tồn tại (rule #36f)',
+              }),
+            ],
+          },
+        },
+      });
+    });
+
+    // Spec 2026-10-09 Q-A: mã mới trùng-bỏ-số-0 với hồ sơ có sẵn -> lỗi dòng.
+    it('ma_dinh_danh_moet trùng hồ sơ có sẵn khác số 0 đầu -> lỗi rõ ràng', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'khac', chinh_xac: false }]);
+      prisma.hoc_vien.findUnique.mockResolvedValue(null);
+      await expect(
+        service.checkValidMoetImportRow({
+          ...baseMoetInput(),
+          ma_dinh_danh_moet: '1234567890',
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          error: {
+            fields: [
+              expect.objectContaining({
+                message:
+                  'Mã định danh CSDL MOET trùng với hồ sơ đã có (khác số 0 đầu)',
+              }),
+            ],
+          },
+        },
+      });
+    });
+
+    it('2 dòng cùng file khác số 0 đầu -> dòng sau lỗi trùng trong file', async () => {
+      const dupKeys = new Set<string>();
+      await service.checkValidMoetImportRow(
+        { ...baseMoetInput(), ma_dinh_danh_moet: '01234567890' },
+        dupKeys,
+      );
+      await expect(
+        service.checkValidMoetImportRow(
+          { ...baseMoetInput(), ma_dinh_danh_moet: '1234567890' },
+          dupKeys,
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          error: {
+            fields: [
+              expect.objectContaining({
+                message:
+                  'Mã định danh CSDL MOET bị trùng với dòng khác trong cùng file',
+              }),
+            ],
+          },
+        },
+      });
     });
 
     it('chuyen_mon rỗng sau khi tách -> hợp lệ (T4c, bổ sung sau)', async () => {

@@ -70,6 +70,15 @@ function loi(status: number, code: string, message: string, extra: Record<string
   return HttpResponse.json({ error: { code, message, ...extra } }, { status });
 }
 
+// Giả lập logic tìm tài khoản của backend (spec 2026-10-09 Q-A/Q-B) — đủ cho test FE, không đầy đủ như server.
+function khopTaiKhoanGiaLap(nhap: string, kieu: 'ma' | 'sdt' = 'ma') {
+  const chiSo = (x: string) => x.replace(/\D/g, '');
+  if (kieu === 'sdt') return chiSo(nhap) !== '' && chiSo(nhap) === chiSo(db.hoSo.so_dien_thoai_lien_he ?? '');
+  const boSo0 = (x: string) => x.replace(/[\s.-]/g, '').replace(/^0+/, '');
+  const ma = db.hoSo.ma_dinh_danh_moet ?? '';
+  return nhap.trim() === ma || (boSo0(nhap) !== '' && boSo0(nhap) === boSo0(ma));
+}
+
 export const handlers = [
   ...thongKeHandlers,
   // ADR 0004 L4 (issue #17): bảng kiểm.
@@ -333,16 +342,16 @@ export const handlers = [
     return HttpResponse.json(found);
   }),
 
+  // 2026-10-09: kieu_dang_nhap 'ma' (mặc định, khớp cả khi lệch số 0 đầu) | 'sdt' (khớp SĐT hồ sơ).
   http.post('/auth/dang-nhap', async ({ request }) => {
-    const body = (await request.json()) as { ten_dang_nhap: string; mat_khau: string };
-    const maSach = body.ten_dang_nhap.trim();
-    if (maSach !== db.hoSo.ma_dinh_danh_moet) {
+    const body = (await request.json()) as { ten_dang_nhap: string; mat_khau: string; kieu_dang_nhap?: 'ma' | 'sdt' };
+    if (!khopTaiKhoanGiaLap(body.ten_dang_nhap, body.kieu_dang_nhap)) {
       return loi(401, 'UNAUTHORIZED', 'Mã định danh hoặc mật khẩu không đúng');
     }
     return HttpResponse.json({
       token: 'token-gia-lap',
       phai_doi_mat_khau: true,
-      nguoi_dung: { id: 'nd-1', ten_dang_nhap: maSach, vai_tro: db.nguoiDung.vai_tro, hoc_vien_id: db.hoSo.id },
+      nguoi_dung: { id: 'nd-1', ten_dang_nhap: db.hoSo.ma_dinh_danh_moet, vai_tro: db.nguoiDung.vai_tro, hoc_vien_id: db.hoSo.id },
     });
   }),
 
@@ -478,6 +487,21 @@ export const handlers = [
     const found = db.danhSachHocVien.find((h) => h.id === params.id);
     if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy hồ sơ học viên');
     return HttpResponse.json({ ...found, chuyen_mon: [], don_vi_cong_tac_ten: 'THPT Long Xuyên' });
+  }),
+
+  // 2026-10-09: Quản trị sửa mã định danh MOET (spec khớp mã MOET Q-E).
+  http.patch('/hoc-vien/:id/ma-dinh-danh-moet', async ({ params, request }) => {
+    const body = (await request.json()) as { ma_dinh_danh_moet: string; ly_do: string };
+    const found = db.danhSachHocVien.find((h) => h.id === params.id);
+    if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy hồ sơ học viên');
+    const doiTen = found.ma_dinh_danh_moet !== null;
+    found.ma_dinh_danh_moet = body.ma_dinh_danh_moet;
+    return HttpResponse.json({
+      id: found.id,
+      ma_dinh_danh_moet: body.ma_dinh_danh_moet,
+      ten_dang_nhap: doiTen ? body.ma_dinh_danh_moet : null,
+      da_doi_ten_dang_nhap: doiTen,
+    });
   }),
 
   // Thêm 2026-09-30 (QĐ10) — admin xem lại khóa/lớp của 1 học viên cụ thể (AdminHocVienChiTiet).

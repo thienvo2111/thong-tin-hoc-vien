@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
+import { loi } from '@/test/mocks/handlers';
 import { db } from '@/test/mocks/db';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
@@ -177,5 +178,154 @@ describe('Admin — Chi tiết hồ sơ học viên — Nhật ký hoạt độn
     expect(await screen.findByText('Nhật ký hoạt động')).toBeInTheDocument();
     expect(await screen.findByText('Không kết nối được máy chủ. Kiểm tra mạng và thử lại.')).toBeInTheDocument();
     expect(screen.getByText('Bồi dưỡng NLS – Mức cơ bản')).toBeInTheDocument();
+  });
+});
+
+// Spec 2026-10-09 Q-E: Quản trị sửa mã định danh MOET (PATCH /hoc-vien/{id}/ma-dinh-danh-moet).
+describe('Admin — Chi tiết hồ sơ học viên — Sửa mã MOET (2026-10-09)', () => {
+  async function moModal() {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const user = userEvent.setup();
+    renderTrang('hv-duyet-1');
+    await user.click(await screen.findByRole('button', { name: 'Sửa mã MOET' }));
+    const modal = within(await screen.findByRole('dialog', { name: 'Sửa mã định danh MOET' }));
+    const oMa = modal.getByRole('textbox', { name: /Mã định danh MOET mới/ });
+    const oLyDo = modal.getByRole('textbox', { name: /Lý do/ });
+    return { user, modal, oMa, oLyDo };
+  }
+
+  function batBody() {
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch('/hoc-vien/:id/ma-dinh-danh-moet', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({ id: 'hv-duyet-1', ma_dinh_danh_moet: '09115131099', ten_dang_nhap: '09115131099', da_doi_ten_dang_nhap: true });
+      }),
+    );
+    return bodies;
+  }
+
+  it('tài khoản đơn vị (trường) -> không có nút "Sửa mã MOET"', async () => {
+    db.nguoiDung.vai_tro = 'truong';
+    renderTrang('hv-duyet-1');
+    expect(await screen.findByText('Bồi dưỡng NLS – Mức cơ bản')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sửa mã MOET' })).not.toBeInTheDocument();
+  });
+
+  it('mở modal -> điền sẵn mã hiện tại', async () => {
+    const { oMa } = await moModal();
+    expect(oMa).toHaveValue('9115131099');
+  });
+
+  it('thiếu lý do -> báo "Bắt buộc nhập lý do", không gọi API', async () => {
+    const bodies = batBody();
+    const { user, modal, oMa } = await moModal();
+    await user.clear(oMa);
+    await user.type(oMa, '09115131099');
+    await user.click(modal.getByRole('button', { name: 'Lưu mã mới' }));
+    expect(await modal.findByText('Bắt buộc nhập lý do')).toBeInTheDocument();
+    expect(bodies).toHaveLength(0);
+  });
+
+  it('mã có ký tự không phải số -> báo lỗi, không gọi API', async () => {
+    const bodies = batBody();
+    const { user, modal, oMa, oLyDo } = await moModal();
+    await user.clear(oMa);
+    await user.type(oMa, '0911513a099');
+    await user.type(oLyDo, 'Sai mã');
+    await user.click(modal.getByRole('button', { name: 'Lưu mã mới' }));
+    expect(await modal.findByText('Mã định danh MOET chỉ gồm chữ số')).toBeInTheDocument();
+    expect(bodies).toHaveLength(0);
+  });
+
+  it('độ dài khác 11/12 -> chỉ cảnh báo, vẫn lưu được', async () => {
+    const bodies = batBody();
+    const { user, modal, oMa, oLyDo } = await moModal();
+    await user.clear(oMa);
+    await user.type(oMa, '12345678');
+    expect(modal.getByText(/Mã có 8 chữ số — mã MOET thường có 11 hoặc 12 chữ số/)).toBeInTheDocument();
+    await user.type(oLyDo, 'Mã đúng theo Sở');
+    await user.click(modal.getByRole('button', { name: 'Lưu mã mới' }));
+    expect(await screen.findByText(/Đã sửa mã định danh MOET/)).toBeInTheDocument();
+    expect(bodies).toEqual([{ ma_dinh_danh_moet: '12345678', ly_do: 'Mã đúng theo Sở' }]);
+  });
+
+  it('mã 11 hoặc 12 chữ số -> không cảnh báo độ dài', async () => {
+    const { user, modal, oMa } = await moModal();
+    await user.clear(oMa);
+    await user.type(oMa, '091151310991');
+    expect(modal.queryByText(/mã MOET thường có 11 hoặc 12 chữ số/)).not.toBeInTheDocument();
+  });
+
+  it('thành công -> gửi đúng body, báo đổi cả tên đăng nhập, đóng modal, tải lại hồ sơ', async () => {
+    const bodies = batBody();
+    let soLanTaiHoSo = 0;
+    server.use(
+      http.get('/hoc-vien/:id', ({ params }) => {
+        soLanTaiHoSo += 1;
+        const found = db.danhSachHocVien.find((h) => h.id === params.id);
+        return HttpResponse.json({ ...found, chuyen_mon: [], don_vi_cong_tac_ten: 'THPT Long Xuyên' });
+      }),
+    );
+    const { user, modal, oMa, oLyDo } = await moModal();
+    await user.clear(oMa);
+    await user.type(oMa, '09115131099');
+    await user.type(oLyDo, '  Mất số 0 đầu  ');
+    await user.click(modal.getByRole('button', { name: 'Lưu mã mới' }));
+
+    expect(await screen.findByText('Đã sửa mã định danh MOET, tên đăng nhập đổi theo mã mới')).toBeInTheDocument();
+    expect(bodies).toEqual([{ ma_dinh_danh_moet: '09115131099', ly_do: 'Mất số 0 đầu' }]);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(soLanTaiHoSo).toBe(2));
+  });
+
+  it('409 đã vào hệ thống khảo sát -> hiện thông điệp server trong modal, modal vẫn mở', async () => {
+    server.use(
+      http.patch('/hoc-vien/:id/ma-dinh-danh-moet', () =>
+        loi(409, 'CONFLICT', 'Học viên đã vào hệ thống khảo sát, không thể đổi mã định danh MOET.'),
+      ),
+    );
+    const { user, modal, oMa, oLyDo } = await moModal();
+    await user.clear(oMa);
+    await user.type(oMa, '09115131099');
+    await user.type(oLyDo, 'Mất số 0');
+    await user.click(modal.getByRole('button', { name: 'Lưu mã mới' }));
+
+    expect(
+      await modal.findByText('Học viên đã vào hệ thống khảo sát, không thể đổi mã định danh MOET.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('409 trùng học viên khác -> hiện đúng thông điệp server (không phải câu về CCCD)', async () => {
+    server.use(
+      http.patch('/hoc-vien/:id/ma-dinh-danh-moet', () =>
+        loi(409, 'CONFLICT', 'Mã định danh MOET trùng với học viên khác (kể cả khác số 0 đầu)'),
+      ),
+    );
+    const { user, modal, oMa, oLyDo } = await moModal();
+    await user.clear(oMa);
+    await user.type(oMa, '09115131099');
+    await user.type(oLyDo, 'Mất số 0');
+    await user.click(modal.getByRole('button', { name: 'Lưu mã mới' }));
+
+    expect(await modal.findByText('Mã định danh MOET trùng với học viên khác (kể cả khác số 0 đầu)')).toBeInTheDocument();
+    expect(modal.queryByText(/CCCD/)).not.toBeInTheDocument();
+  });
+
+  it('400 VALIDATION_ERROR (mã trùng mã hiện tại) -> lỗi gắn vào ô mã', async () => {
+    server.use(
+      http.patch('/hoc-vien/:id/ma-dinh-danh-moet', () =>
+        loi(400, 'VALIDATION_ERROR', 'Mã mới trùng mã hiện tại', {
+          fields: [{ field: 'ma_dinh_danh_moet', message: 'Phải khác mã hiện tại' }],
+        }),
+      ),
+    );
+    const { user, modal, oLyDo } = await moModal();
+    await user.type(oLyDo, 'Thử');
+    await user.click(modal.getByRole('button', { name: 'Lưu mã mới' }));
+
+    expect(await modal.findByText('Phải khác mã hiện tại')).toBeInTheDocument();
+    expect(modal.getByText('Mã mới trùng mã hiện tại')).toBeInTheDocument();
   });
 });

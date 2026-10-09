@@ -21,6 +21,12 @@ import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
 import { CauHinhKhaoSatService } from '../cau-hinh-khao-sat/cau-hinh-khao-sat.service';
 import { normalizeNfcName } from '../common/utils/normalize-text.util';
 import { dieuKienKhongDau } from '../common/utils/tim-kiem-khong-dau.util';
+import {
+  boSo0DauDeTimKiem,
+  chuanHoaMaMoet,
+  timCacHocVienIdTheoMaMoet,
+} from '../common/utils/ma-moet.util';
+import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import { decryptVleMatKhau } from '../common/utils/vle-crypto.util';
 import {
   layFrontendUrl,
@@ -48,6 +54,7 @@ import { UpdateHocVienDto } from './dto/update-hoc-vien.dto';
 import { QueryHocVienDto } from './dto/query-hoc-vien.dto';
 import { DuyetHocVienDto } from './dto/duyet-hoc-vien.dto';
 import { ChuyenMonDto } from './dto/chuyen-mon.dto';
+import { SuaMaMoetDto } from './dto/sua-ma-moet.dto';
 
 const BCRYPT_SALT_ROUNDS = 10;
 
@@ -126,6 +133,7 @@ export class HocVienService {
     private readonly thongBaoService: ThongBaoService,
     private readonly dotXacNhanService: DotXacNhanService,
     private readonly cauHinhKhaoSatService: CauHinhKhaoSatService,
+    private readonly nhatKy: NhatKyService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -685,6 +693,120 @@ export class HocVienService {
       true,
       lyDo,
     );
+  }
+
+  // PATCH /hoc-vien/{id}/ma-dinh-danh-moet (quan_tri, spec 2026-10-09 Q-E):
+  // sửa tay mã MOET sai. Chặn khi học viên đã vào hệ thống khảo sát (bất kỳ
+  // ket_qua_khao_sat nào — bên khảo sát đã lưu theo mã cũ) và khi trùng (kể
+  // cả khác số 0 đầu) với học viên khác. Tên đăng nhập = mã cũ thì đổi theo;
+  // tên đăng nhập = CCCD giữ nguyên. Mật khẩu không đổi.
+  async suaMaDinhDanhMoet(
+    id: string,
+    dto: SuaMaMoetDto,
+    caller: AuthenticatedUser,
+  ) {
+    const maMoi = dto.ma_dinh_danh_moet;
+    const ketQua = await this.prisma
+      .$transaction(async (tx) => {
+        const hv = await tx.hoc_vien.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            ma_dinh_danh_moet: true,
+            nguoi_dung_account: { select: { id: true, ten_dang_nhap: true } },
+            _count: { select: { ket_qua_khao_sat: true } },
+          },
+        });
+        if (!hv)
+          throw new NotFoundAppException('Không tìm thấy hồ sơ học viên');
+        if (maMoi === hv.ma_dinh_danh_moet) {
+          throw new ValidationException('Mã mới trùng mã hiện tại', [
+            { field: 'ma_dinh_danh_moet', message: 'Phải khác mã hiện tại' },
+          ]);
+        }
+        if (hv._count.ket_qua_khao_sat > 0) {
+          throw new ConflictAppException(
+            'Học viên đã vào hệ thống khảo sát, không thể đổi mã định danh MOET.',
+          );
+        }
+        const trung = (await timCacHocVienIdTheoMaMoet(tx, maMoi)).filter(
+          (x) => x !== id,
+        );
+        if (trung.length > 0) {
+          throw new ConflictAppException(
+            'Mã định danh MOET trùng với học viên khác (kể cả khác số 0 đầu)',
+          );
+        }
+
+        const tk = hv.nguoi_dung_account;
+        const doiTenDangNhap =
+          !!tk &&
+          !!hv.ma_dinh_danh_moet &&
+          tk.ten_dang_nhap === hv.ma_dinh_danh_moet;
+        if (doiTenDangNhap) {
+          const trungTen = await tx.nguoi_dung.findUnique({
+            where: { ten_dang_nhap: maMoi },
+            select: { id: true },
+          });
+          if (trungTen) {
+            throw new ConflictAppException(
+              'Mã mới đã là tên đăng nhập của tài khoản khác',
+            );
+          }
+          await tx.nguoi_dung.update({
+            where: { id: tk.id },
+            data: { ten_dang_nhap: maMoi },
+          });
+        }
+        await tx.hoc_vien.update({
+          where: { id },
+          data: { ma_dinh_danh_moet: maMoi },
+        });
+        await tx.lich_su_thay_doi_ho_so.create({
+          data: {
+            hoc_vien_id: id,
+            truong: 'ma_dinh_danh_moet',
+            gia_tri_cu: hv.ma_dinh_danh_moet,
+            gia_tri_moi: maMoi,
+            la_truong_goc_moet: true,
+            nguoi_sua_id: caller.id,
+            vai_tro_nguoi_sua: caller.vai_tro,
+            ly_do: dto.ly_do,
+          },
+        });
+        return {
+          id,
+          ma_cu: hv.ma_dinh_danh_moet,
+          ma_dinh_danh_moet: maMoi,
+          ten_dang_nhap: doiTenDangNhap ? maMoi : (tk?.ten_dang_nhap ?? null),
+          da_doi_ten_dang_nhap: doiTenDangNhap,
+        };
+      })
+      .catch((e: unknown) => {
+        // Ghi đồng thời trùng unique (mã hoặc tên đăng nhập) -> 409.
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === 'P2002'
+        ) {
+          throw new ConflictAppException(
+            'Mã định danh MOET hoặc tên đăng nhập đã tồn tại',
+          );
+        }
+        throw e;
+      });
+    await this.nhatKy.ghi({
+      hanh_dong: 'sua_ma_dinh_danh_moet',
+      hoc_vien_id: id,
+      mo_ta: `Đổi mã định danh MOET ${ketQua.ma_cu ?? '(trống)'} → ${maMoi}${
+        ketQua.da_doi_ten_dang_nhap ? ' (đổi theo tên đăng nhập)' : ''
+      }. Lý do: ${dto.ly_do}`,
+    });
+    return {
+      id: ketQua.id,
+      ma_dinh_danh_moet: ketQua.ma_dinh_danh_moet,
+      ten_dang_nhap: ketQua.ten_dang_nhap,
+      da_doi_ten_dang_nhap: ketQua.da_doi_ten_dang_nhap,
+    };
   }
 
   // Lõi dùng chung cho capNhatHoSoCuaToi (học viên) + suaHoSoByAdmin (quan_tri)
@@ -1331,7 +1453,13 @@ export class HocVienService {
       where.OR = [
         { id: { in: idsTheoTen } },
         { so_dinh_danh_ca_nhan: { contains: query.q } },
-        { ma_dinh_danh_moet: { contains: query.q, mode: 'insensitive' } },
+        // Spec 2026-10-09 Q-A: gõ mã có/không số 0 đầu đều thấy.
+        {
+          ma_dinh_danh_moet: {
+            contains: boSo0DauDeTimKiem(query.q),
+            mode: 'insensitive',
+          },
+        },
       ];
     }
 
@@ -1556,7 +1684,9 @@ export class HocVienService {
     }
 
     if (input.ma_dinh_danh_moet) {
-      const moetKey = `moet:${input.ma_dinh_danh_moet}`;
+      // Spec 2026-10-09 Q-A: trùng xét theo khóa đã bỏ số 0 đầu (cả trong
+      // file lẫn với hồ sơ có sẵn); giá trị lưu vẫn nguyên như trong file.
+      const moetKey = `moet:${chuanHoaMaMoet(input.ma_dinh_danh_moet) || input.ma_dinh_danh_moet}`;
       if (dupKeys?.has(moetKey)) {
         loi.push({
           field: 'ma_dinh_danh_moet',
@@ -1564,13 +1694,20 @@ export class HocVienService {
             'Mã định danh CSDL MOET bị trùng với dòng khác trong cùng file',
         });
       } else {
-        const trungMoet = await this.prisma.hoc_vien.findUnique({
-          where: { ma_dinh_danh_moet: input.ma_dinh_danh_moet },
-        });
-        if (trungMoet) {
+        const trungMoet = await timCacHocVienIdTheoMaMoet(
+          this.prisma,
+          input.ma_dinh_danh_moet,
+        );
+        if (trungMoet.length > 0) {
+          const trungChinhXac = await this.prisma.hoc_vien.findUnique({
+            where: { ma_dinh_danh_moet: input.ma_dinh_danh_moet },
+            select: { id: true },
+          });
           loi.push({
             field: 'ma_dinh_danh_moet',
-            message: 'Mã định danh CSDL MOET đã tồn tại (rule #36f)',
+            message: trungChinhXac
+              ? 'Mã định danh CSDL MOET đã tồn tại (rule #36f)'
+              : 'Mã định danh CSDL MOET trùng với hồ sơ đã có (khác số 0 đầu)',
           });
         }
         dupKeys?.add(moetKey);

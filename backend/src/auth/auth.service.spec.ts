@@ -46,6 +46,7 @@ describe('AuthService', () => {
       update: jest.Mock;
     };
     $transaction: jest.Mock;
+    $queryRaw: jest.Mock;
   };
   let jwtService: { signAsync: jest.Mock };
   let scopeService: { getAccessibleDonViIds: jest.Mock };
@@ -101,6 +102,7 @@ describe('AuthService', () => {
         update: jest.fn(),
       },
       $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     jwtService = { signAsync: jest.fn().mockResolvedValue('fake.jwt.token') };
     scopeService = {
@@ -339,6 +341,146 @@ describe('AuthService', () => {
       await expect(
         service.dangNhap({ ten_dang_nhap: 'khong-khop-gi-ca', mat_khau: 'x' }),
       ).rejects.toBeInstanceOf(UnauthorizedAppException);
+    });
+  });
+
+  // Spec 2026-10-09 Q-A/Q-B: khớp mã MOET bỏ số 0 đầu + đăng nhập bằng SĐT.
+  describe('dangNhap — kieu_dang_nhap', () => {
+    const taiKhoanHv = () => ({
+      ...baseUser,
+      vai_tro: 'hoc_vien' as const,
+      ten_dang_nhap: '01234567890',
+      hoc_vien_id: 'hv-1',
+      don_vi_id: null,
+    });
+
+    it('chế độ ma (mặc định): logic cũ tìm thấy -> KHÔNG chạy khớp bỏ số 0', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue(taiKhoanHv());
+      await service.dangNhap({
+        ten_dang_nhap: '01234567890',
+        mat_khau: 'MatKhauGoc',
+      });
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+      expect(prisma.nguoi_dung.findFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it('chế độ ma: logic cũ không thấy -> khớp bỏ số 0, chỉ tài khoản hoc_vien', async () => {
+      prisma.nguoi_dung.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(taiKhoanHv());
+      prisma.$queryRaw.mockResolvedValue([{ id: 'hv-1', chinh_xac: false }]);
+      const res = await service.dangNhap({
+        ten_dang_nhap: '1234567890',
+        mat_khau: 'MatKhauGoc',
+      });
+      expect(res.token).toBe('fake.jwt.token');
+      expect(prisma.nguoi_dung.findFirst).toHaveBeenLastCalledWith({
+        where: { hoc_vien_id: 'hv-1', vai_tro: 'hoc_vien' },
+        include: { hoc_vien: true },
+      });
+    });
+
+    it('chế độ ma: mã bỏ số 0 khớp >= 2 học viên -> 401 chung', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue(null);
+      prisma.$queryRaw.mockResolvedValue([
+        { id: 'hv-1', chinh_xac: false },
+        { id: 'hv-2', chinh_xac: false },
+      ]);
+      await expect(
+        service.dangNhap({ ten_dang_nhap: '123', mat_khau: 'MatKhauGoc' }),
+      ).rejects.toBeInstanceOf(UnauthorizedAppException);
+      expect(prisma.nguoi_dung.findFirst).toHaveBeenCalledTimes(1);
+    });
+
+    it('chế độ ma: chuỗi toàn số 0 -> không khớp gì (không truy vấn), 401', async () => {
+      prisma.nguoi_dung.findFirst.mockResolvedValue(null);
+      await expect(
+        service.dangNhap({ ten_dang_nhap: '   ', mat_khau: 'x' }),
+      ).rejects.toBeInstanceOf(UnauthorizedAppException);
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('chế độ sdt: BỎ QUA logic tên đăng nhập, đúng 1 học viên -> đăng nhập', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'hv-1' }]);
+      prisma.nguoi_dung.findFirst.mockResolvedValue(taiKhoanHv());
+      const res = await service.dangNhap({
+        ten_dang_nhap: '+84 912 345 678',
+        mat_khau: 'MatKhauGoc',
+        kieu_dang_nhap: 'sdt',
+      });
+      expect(res.token).toBe('fake.jwt.token');
+      expect(prisma.nguoi_dung.findFirst).toHaveBeenCalledTimes(1);
+      expect(prisma.nguoi_dung.findFirst).toHaveBeenCalledWith({
+        where: { hoc_vien_id: 'hv-1', vai_tro: 'hoc_vien' },
+        include: { hoc_vien: true },
+      });
+    });
+
+    it('chế độ sdt: SĐT dùng chung (2 học viên) -> 401 chung, không đụng tài khoản nào', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'hv-1' }, { id: 'hv-2' }]);
+      await expect(
+        service.dangNhap({
+          ten_dang_nhap: '0912345678',
+          mat_khau: 'MatKhauGoc',
+          kieu_dang_nhap: 'sdt',
+        }),
+      ).rejects.toBeInstanceOf(UnauthorizedAppException);
+      expect(prisma.nguoi_dung.findFirst).not.toHaveBeenCalled();
+      expect(prisma.nguoi_dung.update).not.toHaveBeenCalled();
+    });
+
+    it('chế độ sdt: sai mật khẩu -> đếm sai trên tài khoản tìm được', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'hv-1' }]);
+      prisma.nguoi_dung.findFirst.mockResolvedValue(taiKhoanHv());
+      await expect(
+        service.dangNhap({
+          ten_dang_nhap: '0912345678',
+          mat_khau: 'sai',
+          kieu_dang_nhap: 'sdt',
+        }),
+      ).rejects.toBeInstanceOf(UnauthorizedAppException);
+      expect(prisma.nguoi_dung.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'user-1' },
+          data: expect.objectContaining({ so_lan_dang_nhap_sai: 1 }),
+        }),
+      );
+    });
+
+    it('quenMatKhau chế độ sdt dùng cùng logic tìm tài khoản', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'hv-1' }]);
+      prisma.nguoi_dung.findFirst.mockResolvedValue({
+        ...taiKhoanHv(),
+        hoc_vien: {
+          id: 'hv-1',
+          ho_ten: 'A',
+          email_lien_he: 'a@example.com',
+          email_da_xac_minh: true,
+        },
+      });
+      const res = await service.quenMatKhau({
+        ten_dang_nhap: '0912345678',
+        kieu_dang_nhap: 'sdt',
+      });
+      expect(res).toEqual({ da_gui: true });
+      expect(thongBaoService.guiDatLaiMatKhau).toHaveBeenCalled();
+    });
+
+    it('quenMatKhau chế độ ma: khớp bỏ số 0 khi logic cũ không thấy', async () => {
+      prisma.nguoi_dung.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          ...taiKhoanHv(),
+          hoc_vien: {
+            id: 'hv-1',
+            ho_ten: 'A',
+            email_lien_he: 'a@example.com',
+            email_da_xac_minh: true,
+          },
+        });
+      prisma.$queryRaw.mockResolvedValue([{ id: 'hv-1', chinh_xac: false }]);
+      await service.quenMatKhau({ ten_dang_nhap: '1234567890' });
+      expect(thongBaoService.guiDatLaiMatKhau).toHaveBeenCalled();
     });
   });
 

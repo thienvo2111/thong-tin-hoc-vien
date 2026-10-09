@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Alert, Box, Button, Container, Group, Paper, Select, Skeleton, Stack, Text } from '@mantine/core';
+import { Alert, Box, Button, Container, Group, Modal, Paper, Select, Skeleton, Stack, Text, TextInput, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useHocVienTheoId } from '@/api/admin';
+import { useHocVienTheoId, useSuaMaDinhDanhMoet } from '@/api/admin';
 import { useNhatKyHocVien } from '@/api/taiKhoanHocVien';
 import { useToi } from '@/auth/AuthContext';
 import { DongThoiGianNhatKy } from '@/components/DongThoiGianNhatKy';
@@ -14,7 +14,8 @@ import {
 } from '@/api/khoaBoiDuong';
 import type { KhoaHocDangKy, MucNangLuc } from '@/api/types';
 import { cacMucDuocChon, mucHocHieuLuc, nhanMucNangLuc } from '@/lib/mucNangLuc';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { loiFieldsThanhMap, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
+import { chuanHoaNfc } from '@/lib/nfc';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { TrangThaiBadge } from '@/components/TrangThaiBadge';
@@ -81,6 +82,10 @@ export default function AdminHocVienChiTiet() {
                 </Group>
               ))}
             </Stack>
+
+            {nguoiDung?.vai_tro === 'quan_tri' && (
+              <SuaMaMoet hocVienId={data.id} maHienTai={data.ma_dinh_danh_moet} />
+            )}
           </Paper>
         )}
 
@@ -107,6 +112,115 @@ export default function AdminHocVienChiTiet() {
           </Paper>
         )}
       </Container>
+    </>
+  );
+}
+
+// Spec 2026-10-09 Q-E: Quản trị sửa mã định danh MOET (vd mã bị mất số 0 / sai từ Sở). Trang không có dữ
+// liệu khảo sát của học viên nên không khóa trước nút Lưu — backend trả 409 "đã vào hệ thống khảo sát".
+function SuaMaMoet({ hocVienId, maHienTai }: { hocVienId: string; maHienTai: string | null }) {
+  const [mo, setMo] = useState(false);
+  const [ma, setMa] = useState('');
+  const [lyDo, setLyDo] = useState('');
+  const [loi, setLoi] = useState<{ ma?: string; lyDo?: string }>({});
+  const suaMa = useSuaMaDinhDanhMoet(hocVienId);
+
+  function moModal() {
+    setMa(maHienTai ?? '');
+    setLyDo('');
+    setLoi({});
+    suaMa.reset();
+    setMo(true);
+  }
+
+  function luu() {
+    const maSach = ma.trim();
+    const lyDoSach = chuanHoaNfc(lyDo.trim());
+    const loiMoi: { ma?: string; lyDo?: string } = {};
+    if (!maSach) loiMoi.ma = 'Vui lòng nhập mã định danh MOET';
+    else if (!/^\d+$/.test(maSach)) loiMoi.ma = 'Mã định danh MOET chỉ gồm chữ số';
+    else if (maSach.length > 20) loiMoi.ma = 'Mã định danh MOET tối đa 20 chữ số';
+    if (!lyDoSach) loiMoi.lyDo = 'Bắt buộc nhập lý do';
+    setLoi(loiMoi);
+    if (loiMoi.ma || loiMoi.lyDo) return;
+
+    suaMa.mutate(
+      { ma_dinh_danh_moet: maSach, ly_do: lyDoSach },
+      {
+        onSuccess: (kq) => {
+          notifications.show({
+            color: 'green',
+            message: kq.da_doi_ten_dang_nhap
+              ? 'Đã sửa mã định danh MOET, tên đăng nhập đổi theo mã mới'
+              : 'Đã sửa mã định danh MOET',
+          });
+          setMo(false);
+        },
+        onError: (err) => {
+          const f = loiFieldsThanhMap(err);
+          setLoi({ ma: f.ma_dinh_danh_moet, lyDo: f.ly_do });
+        },
+      },
+    );
+  }
+
+  const maSach = ma.trim();
+  const canhBaoDoDai =
+    /^\d+$/.test(maSach) && maSach.length !== 11 && maSach.length !== 12
+      ? `Mã có ${maSach.length} chữ số — mã MOET thường có 11 hoặc 12 chữ số. Kiểm tra lại trước khi lưu.`
+      : null;
+
+  return (
+    <>
+      <Group justify="flex-end" mt="md">
+        <Button size="xs" variant="light" onClick={moModal}>
+          Sửa mã MOET
+        </Button>
+      </Group>
+      <Modal opened={mo} onClose={() => setMo(false)} title="Sửa mã định danh MOET" centered>
+        <Stack gap="md">
+          <Text fz="sm" c="dimmed">
+            Mã hiện tại: <b>{maHienTai ?? '—'}</b>. Nếu tên đăng nhập đang là mã cũ thì sẽ đổi theo mã mới; mật khẩu
+            không đổi. Không sửa được khi học viên đã vào hệ thống khảo sát.
+          </Text>
+          {suaMa.isError && <Alert color="red">{thongDiepLoiXungDot(suaMa.error)}</Alert>}
+          <Box>
+            <TextInput
+              label="Mã định danh MOET mới"
+              inputMode="numeric"
+              autoComplete="off"
+              value={ma}
+              onChange={(e) => setMa(e.currentTarget.value)}
+              error={loi.ma}
+              required
+            />
+            {canhBaoDoDai && (
+              <Text fz="xs" c="orange.8" mt={4}>
+                {canhBaoDoDai}
+              </Text>
+            )}
+          </Box>
+          <Textarea
+            label="Lý do"
+            placeholder="Ví dụ: mã bị mất số 0 đầu theo danh sách của Sở"
+            autosize
+            minRows={2}
+            maxLength={500}
+            value={lyDo}
+            onChange={(e) => setLyDo(e.currentTarget.value)}
+            error={loi.lyDo}
+            required
+          />
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={() => setMo(false)}>
+              Hủy
+            </Button>
+            <Button loading={suaMa.isPending} onClick={luu}>
+              Lưu mã mới
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </>
   );
 }

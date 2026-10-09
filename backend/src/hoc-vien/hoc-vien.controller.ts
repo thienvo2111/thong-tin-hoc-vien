@@ -22,6 +22,7 @@ import { QueryHocVienDto } from './dto/query-hoc-vien.dto';
 import { DuyetHocVienDto } from './dto/duyet-hoc-vien.dto';
 import { ChuyenMonDto } from './dto/chuyen-mon.dto';
 import { KiemTraTrungQueryDto } from './dto/kiem-tra-trung-query.dto';
+import { SuaMaMoetDto } from './dto/sua-ma-moet.dto';
 
 // Dịch vụ Học viên — docs/api-contract.md mục 2.
 @Controller('hoc-vien')
@@ -143,6 +144,18 @@ export class HocVienController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.hocVienService.duyet(id, dto, user);
+  }
+
+  // Spec 2026-10-09 Q-E: quan_tri sửa mã định danh MOET (bắt buộc lý do).
+  // Khác số đoạn với PATCH ':id' nên không tranh route.
+  @Roles('quan_tri')
+  @Patch(':id/ma-dinh-danh-moet')
+  suaMaDinhDanhMoet(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SuaMaMoetDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.hocVienService.suaMaDinhDanhMoet(id, dto, user);
   }
 
   // T14: quan_tri sửa hồ sơ import_moet NGOÀI thời gian đợt xác nhận (học
