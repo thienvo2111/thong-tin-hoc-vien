@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from './client';
+import { apiFetch, apiFetchBlob } from './client';
+import { taiFileTuBlob } from '@/lib/taiFile';
 import { layDonViCongTac } from './danhMuc';
 import type {
   CumHocVien,
@@ -90,6 +91,13 @@ export function useChiTietKhoa(id: string | undefined) {
     queryFn: () => layChiTietKhoa(id as string),
     enabled: !!id,
   });
+}
+
+// Thêm 2026-10-09: Excel "Danh sách chia lớp" — chia lớp ngoài hệ thống rồi nhập lại thẳng qua
+// Nhập dữ liệu → Phân lớp học viên (xem KhoaBoiDuongService.xuatDanhSachChiaLop).
+export async function xuatDanhSachChiaLop(khoaId: string, maKhoa: string): Promise<void> {
+  const blob = await apiFetchBlob(`/khoa-boi-duong/${khoaId}/danh-sach-chia-lop/xuat-excel`);
+  taiFileTuBlob(blob, `danh-sach-chia-lop-${maKhoa}.xlsx`);
 }
 
 export function taoKhoa(dto: TaoKhoaBoiDuongDto) {

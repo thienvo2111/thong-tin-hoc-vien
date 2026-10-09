@@ -817,6 +817,48 @@ describe('KhoaBoiDuongService', () => {
       });
       expect(thongBaoService.guiDangKyHocPhanLop).not.toHaveBeenCalled();
     });
+
+    // Dòng "chỉ mã định danh" (mọi cột GĐ/ten_cum trống) là đúng nội dung các
+    // dòng chưa điền trong Excel "Danh sách chia lớp" (2026-10-09) khi nhập
+    // lại thẳng — trên học viên ĐÃ GHI DANH (dang_ky_hoc đã tồn tại) không
+    // được đụng tới lớp/cụm hiện có, không ghi nhật ký, không gửi lại email.
+    it('resolvePhanLopRow + commitPhanLop: dòng chỉ mã định danh trên học viên đã ghi danh -> không đổi gì, không nhật ký, không email', async () => {
+      const { dto, error } = await service.resolvePhanLopRow(
+        {
+          so_dinh_danh_ca_nhan: '123456789012',
+          'gd:2': '',
+          'gd:3': '',
+          ten_cum: '',
+        },
+        khoa,
+      );
+      expect(error).toBeUndefined();
+      expect(dto).toEqual({
+        hoc_vien_id: 'hv-1',
+        khoa_id: 'khoa-1',
+        cum_id: undefined,
+        gan: [],
+      });
+
+      prisma.dang_ky_hoc.upsert.mockResolvedValue({ id: 'dk-1' });
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        cum_id: 'cum-cu',
+        phan_lop_giai_doan: [
+          { giai_doan_id: 'gd-2', lop_id: 'lop-zoom', lop: { ten_lop: 'Lớp Zoom' } },
+        ],
+      });
+
+      const res = await service.commitPhanLop(dto!);
+
+      expect(prisma.dang_ky_hoc.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ update: {} }),
+      );
+      expect(prisma.phan_lop_giai_doan.upsert).not.toHaveBeenCalled();
+      expect(prisma.phan_lop_giai_doan.deleteMany).not.toHaveBeenCalled();
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
+      expect(thongBaoService.guiDangKyHocPhanLop).not.toHaveBeenCalled();
+      expect(res).toEqual({ hocVienChuaCoEmail: false });
+    });
   });
 
   describe('resolveLopVaLichHocRow — loai_lop (QĐ10)', () => {

@@ -61,6 +61,10 @@ import {
   mucHocHieuLuc,
 } from './util/muc-hoc.util';
 import { ThangMucService, nhanMucGoc } from '../sso/thang-muc.service';
+import {
+  DongChiaLop,
+  buildDanhSachChiaLopWorkbook,
+} from './util/danh-sach-chia-lop-excel.util';
 
 type LopHocVoiKhoa = lop_hoc & { khoa: khoa_boi_duong };
 
@@ -1622,6 +1626,121 @@ export class KhoaBoiDuongService {
         `${dangKy.khoa.ten_khoa}: ${ten(cumCuId)} → ${ten(cumMoiId)}` +
         (nguon === 'nhap_file' ? ' (nhập file)' : ''),
     });
+  }
+
+  // Export "Danh sách chia lớp" (2026-10-09, quan_tri only) — Excel đọc được
+  // bởi readPhanLopWorkbook (cột "GĐ<n> - <tên>"/ten_cum để trống có chủ ý,
+  // xem danh-sach-chia-lop-excel.util.ts) để chia lớp ngoài hệ thống rồi
+  // nhập lại thẳng qua import phan_lop_hoc_vien.
+  async xuatDanhSachChiaLop(
+    khoaId: string,
+  ): Promise<{ buffer: Buffer; maKhoa: string }> {
+    const khoa = await this.prisma.khoa_boi_duong.findUnique({
+      where: { id: khoaId },
+      select: {
+        ma_khoa: true,
+        giai_doan: {
+          where: { trang_thai: 'active' },
+          orderBy: { thu_tu: 'asc' },
+          select: { id: true, thu_tu: true, ten_giai_doan: true },
+        },
+        lop_hoc: {
+          select: {
+            ten_lop: true,
+            loai_lop: true,
+            muc_nang_luc: true,
+            si_so_toi_da: true,
+          },
+          orderBy: { ten_lop: 'asc' },
+        },
+      },
+    });
+    if (!khoa) throw new NotFoundAppException('Không tìm thấy khóa bồi dưỡng');
+
+    const dangKyList = await this.prisma.dang_ky_hoc.findMany({
+      where: { khoa_id: khoaId },
+      select: {
+        muc_dau_vao: true,
+        muc_hoc_chon: true,
+        muc_hoc_chon_luc: true,
+        cum: { select: { ten_cum: true } },
+        phan_lop_giai_doan: {
+          select: {
+            giai_doan_id: true,
+            lop: { select: { ten_lop: true, loai_lop: true } },
+          },
+        },
+        hoc_vien: {
+          select: {
+            ho_ten: true,
+            ma_dinh_danh_moet: true,
+            trang_thai: true,
+            doi_tuong: true,
+            cap_giang_day: true,
+            don_vi_cong_tac: {
+              select: {
+                ten_don_vi: true,
+                don_vi_cha: { select: { ten_don_vi: true } },
+              },
+            },
+            ket_qua_khao_sat: {
+              where: { loai: LOAI_BAI_DAU_VAO },
+              select: {
+                trang_thai: true,
+                muc: true,
+                muc_goc: true,
+                diem: true,
+                diem_toi_da: true,
+                hoan_thanh_luc: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const thang = await this.thangMuc.thang();
+    const rows: DongChiaLop[] = dangKyList.map((dk) => {
+      const bai = dk.hoc_vien.ket_qua_khao_sat[0];
+      return {
+        ho_ten: dk.hoc_vien.ho_ten,
+        ma_dinh_danh_moet: dk.hoc_vien.ma_dinh_danh_moet,
+        trang_thai_ho_so: dk.hoc_vien.trang_thai,
+        doi_tuong: dk.hoc_vien.doi_tuong,
+        cap_giang_day: dk.hoc_vien.cap_giang_day,
+        ten_truong: dk.hoc_vien.don_vi_cong_tac.ten_don_vi,
+        ten_don_vi_quan_ly:
+          dk.hoc_vien.don_vi_cong_tac.don_vi_cha?.ten_don_vi ?? null,
+        bai_dau_vao: bai
+          ? {
+              trang_thai: bai.trang_thai,
+              muc: bai.muc,
+              muc_goc: bai.muc_goc,
+              diem: bai.diem === null ? null : Number(bai.diem),
+              diem_toi_da: bai.diem_toi_da === null ? null : Number(bai.diem_toi_da),
+              hoan_thanh_luc: bai.hoan_thanh_luc,
+            }
+          : null,
+        muc_dau_vao: dk.muc_dau_vao,
+        muc_hoc_chon: dk.muc_hoc_chon,
+        muc_hoc_chon_luc: dk.muc_hoc_chon_luc,
+        ten_cum: dk.cum?.ten_cum ?? null,
+        phan_lop: dk.phan_lop_giai_doan.map((p) => ({
+          giai_doan_id: p.giai_doan_id,
+          ten_lop: p.lop.ten_lop,
+          loai_lop: p.lop.loai_lop,
+        })),
+      };
+    });
+
+    const buffer = await buildDanhSachChiaLopWorkbook(
+      khoa.ma_khoa,
+      khoa.giai_doan,
+      khoa.lop_hoc,
+      rows,
+      thang,
+    );
+    return { buffer, maKhoa: khoa.ma_khoa };
   }
 
   // ---------------------------------------------------------------------

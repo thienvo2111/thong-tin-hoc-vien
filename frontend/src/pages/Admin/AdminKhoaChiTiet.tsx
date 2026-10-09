@@ -39,6 +39,7 @@ import {
   useThemLichHoc,
   useThemNhanSu,
   useXoaNhanSu,
+  xuatDanhSachChiaLop,
 } from '@/api/khoaBoiDuong';
 import type {
   CumHocVien,
@@ -313,6 +314,19 @@ export default function AdminKhoaChiTiet() {
 
   const [lopMoRong, setLopMoRong] = useState<Set<string>>(new Set());
   const [modalImport, setModalImport] = useState(false);
+  const [dangXuatChiaLop, setDangXuatChiaLop] = useState(false);
+
+  async function xuLyXuatDanhSachChiaLop() {
+    if (!khoa) return;
+    setDangXuatChiaLop(true);
+    try {
+      await xuatDanhSachChiaLop(khoa.id, khoa.ma_khoa);
+    } catch (err) {
+      notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+    } finally {
+      setDangXuatChiaLop(false);
+    }
+  }
 
   function moModalTaoLop() {
     setFormTaoLop(FORM_TAO_LOP_RONG);
@@ -872,17 +886,35 @@ export default function AdminKhoaChiTiet() {
               <Tabs.Panel value="lop-hoc" pt="md">
                 <Stack gap="sm">
                   {laQuanTri && (
-                    <Group justify="flex-end">
-                      {/* /import chỉ QuảnTrị gọi được — Trường không thấy nút này. */}
-                      {vaiTro === 'quan_tri' && (
-                        <Button variant="default" onClick={() => setModalImport(true)}>
-                          ⇪ Import Excel
+                    <>
+                      <Group justify="flex-end">
+                        {/* /import chỉ QuảnTrị gọi được — Trường không thấy nút này. */}
+                        {vaiTro === 'quan_tri' && (
+                          <>
+                            <Button variant="default" onClick={() => setModalImport(true)}>
+                              ⇪ Import Excel
+                            </Button>
+                            <Button
+                              variant="light"
+                              size="xs"
+                              loading={dangXuatChiaLop}
+                              onClick={() => void xuLyXuatDanhSachChiaLop()}
+                            >
+                              Xuất danh sách chia lớp
+                            </Button>
+                          </>
+                        )}
+                        <Button color="accent" onClick={moModalTaoLop}>
+                          + Tạo lớp mới
                         </Button>
+                      </Group>
+                      {vaiTro === 'quan_tri' && (
+                        <Text size="xs" c="dimmed" ta="right">
+                          Mỗi học viên 1 dòng kèm kết quả đánh giá, mức học viên chọn và lớp hiện tại. Điền cột GĐ rồi
+                          nhập lại qua Nhập dữ liệu → Phân lớp học viên.
+                        </Text>
                       )}
-                      <Button color="accent" onClick={moModalTaoLop}>
-                        + Tạo lớp mới
-                      </Button>
-                    </Group>
+                    </>
                   )}
                   <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
                     <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
