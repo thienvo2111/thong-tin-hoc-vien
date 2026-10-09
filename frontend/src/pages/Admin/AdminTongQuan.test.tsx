@@ -4,10 +4,10 @@ import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import AdminTongQuan from './AdminTongQuan';
 
-function renderTrang() {
+function renderTrang(url = '/admin/tong-quan') {
   datToken('token-gia-lap');
   return renderVoiRouter([{ path: '/admin/tong-quan', element: <AdminTongQuan /> }], {
-    initialEntries: ['/admin/tong-quan'],
+    initialEntries: [url],
   });
 }
 
@@ -18,8 +18,9 @@ describe('Admin — Tổng quan (dashboard thống kê)', () => {
     expect(await screen.findByTestId('kpi-tham-gia')).toBeInTheDocument();
   });
 
-  it('che_do admin → có khối "Xếp hạng đơn vị"', async () => {
-    renderTrang();
+  // Xếp hạng nằm ở tab "Học tập" (dashboard chia tab 2026-10-09).
+  it('che_do admin → tab Học tập có khối "Xếp hạng đơn vị"', async () => {
+    renderTrang('/admin/tong-quan?tab=hoc_tap');
     expect(await screen.findByRole('region', { name: 'Xếp hạng đơn vị' })).toBeInTheDocument();
   });
 });
