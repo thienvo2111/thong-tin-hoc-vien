@@ -15,6 +15,7 @@ import {
 import { SsoTarget } from './dto/sso.dto';
 import { kiemTraApiKeyKhaoSat } from './sso-api-key';
 import { KetQuaKhaoSatService } from './ket-qua-khao-sat.service';
+import { timHocVienIdTheoMaMoet } from '../common/utils/ma-moet.util';
 
 // SSO sang hệ thống khảo sát (2026-10-02, docs/api-contract.md mục 10).
 // Luồng: học viên đã đăng nhập cổng bấm nút -> cổng cấp mã ngẫu nhiên dùng 1
@@ -87,15 +88,19 @@ export class SsoService {
   // kiện kênh + hồ sơ đầy đủ (mục đích là thử). Không mở thêm quyền: quản trị
   // vốn xem được mọi hồ sơ, và đổi mã vẫn bắt buộc API key của máy chủ khảo sát.
   async taoMaThu(maDinhDanhMoet: string, target?: SsoTarget) {
-    const hocVien = await this.prisma.hoc_vien.findUnique({
-      where: { ma_dinh_danh_moet: maDinhDanhMoet },
-      select: {
-        id: true,
-        ho_ten: true,
-        ma_dinh_danh_moet: true,
-        doi_tuong: true,
-      },
-    });
+    // Spec 2026-10-09 Q-A: khớp cả khi lệch số 0 đầu (đúng 1 học viên).
+    const hocVienId = await timHocVienIdTheoMaMoet(this.prisma, maDinhDanhMoet);
+    const hocVien = hocVienId
+      ? await this.prisma.hoc_vien.findUnique({
+          where: { id: hocVienId },
+          select: {
+            id: true,
+            ho_ten: true,
+            ma_dinh_danh_moet: true,
+            doi_tuong: true,
+          },
+        })
+      : null;
     if (!hocVien) {
       throw new NotFoundAppException(
         'Không tìm thấy học viên có mã định danh này',

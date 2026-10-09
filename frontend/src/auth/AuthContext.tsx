@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { KieuDangNhap } from '@/lib/kieuDangNhap';
 import { dangNhap as apiDangNhap, dangXuat as apiDangXuat, layThongTinToi } from '@/api/auth';
 import type { NguoiDung } from '@/api/types';
 import { datToken, layToken, xoaToken } from './tokenStore';
@@ -15,7 +16,7 @@ interface AuthContextValue {
   phaiDoiMatKhau: boolean;
   /** Mật khẩu vừa dùng để đăng nhập — chỉ giữ trong bộ nhớ, dùng để tự điền ô "mật khẩu hiện tại" ở M2. */
   matKhauVuaDung: string | null;
-  dangNhap: (tenDangNhap: string, matKhau: string) => Promise<{ phaiDoiMatKhau: boolean; vaiTro: string }>;
+  dangNhap: (tenDangNhap: string, matKhau: string, kieuDangNhap?: KieuDangNhap) => Promise<{ phaiDoiMatKhau: boolean; vaiTro: string }>;
   dangXuat: () => Promise<void>;
   xacNhanDaDoiMatKhau: () => void;
 }
@@ -61,8 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => theoDoiPhienHetHan(donDep), [donDep]);
 
-  const dangNhap = useCallback(async (tenDangNhap: string, matKhau: string) => {
-    const res = await apiDangNhap(tenDangNhap, matKhau);
+  const dangNhap = useCallback(async (tenDangNhap: string, matKhau: string, kieuDangNhap?: KieuDangNhap) => {
+    const res = await apiDangNhap(tenDangNhap, matKhau, kieuDangNhap);
     datToken(res.token);
     setNguoiDung(res.nguoi_dung);
     setPhaiDoiMatKhau(res.phai_doi_mat_khau);

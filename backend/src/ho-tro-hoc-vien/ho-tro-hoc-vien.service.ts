@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { NhacLichService } from '../nhac-lich/nhac-lich.service';
 import { khoangNgayVn } from '../common/utils/khoang-ngay-vn.util';
+import { boSo0DauDeTimKiem } from '../common/utils/ma-moet.util';
 import * as bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -457,7 +458,13 @@ export class HoTroHocVienService {
         OR: [
           { id: { in: idsTheoTen } },
           { so_dinh_danh_ca_nhan: { contains: q } },
-          { ma_dinh_danh_moet: { contains: q, mode: 'insensitive' } },
+          // Spec 2026-10-09 Q-A: gõ mã có/không số 0 đầu đều thấy.
+          {
+            ma_dinh_danh_moet: {
+              contains: boSo0DauDeTimKiem(q),
+              mode: 'insensitive',
+            },
+          },
           {
             nguoi_dung_account: {
               ten_dang_nhap: { contains: q, mode: 'insensitive' },

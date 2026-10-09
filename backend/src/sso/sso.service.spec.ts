@@ -27,6 +27,7 @@ describe('SsoService', () => {
       findUnique: jest.Mock;
     };
     hoc_vien: { findUnique: jest.Mock };
+    $queryRaw: jest.Mock;
   };
   let hocVienService: {
     danhGiaDauVaoCuaToi: jest.Mock;
@@ -49,6 +50,7 @@ describe('SsoService', () => {
         findUnique: jest.fn(),
       },
       hoc_vien: { findUnique: jest.fn() },
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     hocVienService = {
       danhGiaDauVaoCuaToi: jest
@@ -218,13 +220,18 @@ describe('SsoService', () => {
     });
 
     it('có học viên -> tạo mã cho đúng học viên, BỎ QUA điều kiện kênh/hồ sơ, trả code + URL + thông tin để đối chiếu', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'hv-9', chinh_xac: false }]);
       prisma.hoc_vien.findUnique.mockResolvedValue({
         id: 'hv-9',
         ho_ten: 'Nguyễn Văn Thử',
         ma_dinh_danh_moet: '9115131060',
         doi_tuong: null,
       });
-      const kq = await service.taoMaThu('9115131060', 'khao-sat');
+      // Spec 2026-10-09 Q-A: gõ có số 0 đầu vẫn tìm được (khớp bỏ số 0).
+      const kq = await service.taoMaThu('09115131060', 'khao-sat');
+      expect(prisma.hoc_vien.findUnique.mock.calls[0][0].where).toEqual({
+        id: 'hv-9',
+      });
 
       expect(hocVienService.danhGiaDauVaoCuaToi).not.toHaveBeenCalled();
       const data = prisma.ma_sso_mot_lan.create.mock.calls[0][0].data;

@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type { BaoCaoTheo, HocVien, HocVienDanhSachItem, PaginatedResult, TongHopResult } from './types';
 
@@ -51,6 +51,37 @@ export function useHocVienTheoId(id: string | undefined) {
     queryKey: hocVienTheoIdKey(id ?? ''),
     queryFn: () => layHocVienTheoId(id as string),
     enabled: !!id,
+  });
+}
+
+// 2026-10-09 (spec khớp mã MOET Q-E): Quản trị sửa mã định danh MOET — chỉ quan_tri; 409 khi trùng
+// học viên khác (kể cả khác số 0 đầu), mã mới là tên đăng nhập của TK khác, hoặc HV đã có kết quả khảo sát.
+export interface SuaMaMoetDto {
+  ma_dinh_danh_moet: string;
+  ly_do: string;
+}
+
+export interface SuaMaMoetResult {
+  id: string;
+  ma_dinh_danh_moet: string;
+  ten_dang_nhap: string | null;
+  da_doi_ten_dang_nhap: boolean;
+}
+
+export function suaMaDinhDanhMoet(id: string, dto: SuaMaMoetDto) {
+  return apiFetch<SuaMaMoetResult>(`/hoc-vien/${id}/ma-dinh-danh-moet`, {
+    method: 'PATCH',
+    body: JSON.stringify(dto),
+  });
+}
+
+export function useSuaMaDinhDanhMoet(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: SuaMaMoetDto) => suaMaDinhDanhMoet(id, dto),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: hocVienTheoIdKey(id) });
+    },
   });
 }
 

@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, ket_qua_khao_sat } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  boSo0DauDeTimKiem,
+  timHocVienIdTheoMaMoet,
+} from '../common/utils/ma-moet.util';
 import { ThangMucService, nhanMucGoc } from './thang-muc.service';
 import {
   NotFoundAppException,
@@ -155,19 +159,23 @@ export class KetQuaKhaoSatService {
   }
 
   private async timHocVien(dto: BaoKetQuaDto): Promise<string> {
-    const where: Prisma.hoc_vienWhereUniqueInput | null = dto.hoc_vien_id
-      ? { id: dto.hoc_vien_id }
-      : dto.ma_dinh_danh_moet
-        ? { ma_dinh_danh_moet: dto.ma_dinh_danh_moet.trim() }
-        : null;
-    if (!where) {
+    if (!dto.hoc_vien_id && !dto.ma_dinh_danh_moet) {
       throw new ValidationException(
         'Cần hoc_vien_id hoặc ma_dinh_danh_moet để xác định học viên',
         [{ field: 'hoc_vien_id', message: 'Bắt buộc 1 trong 2 trường' }],
       );
     }
+    if (!dto.hoc_vien_id) {
+      // Spec 2026-10-09 Q-A: khớp cả khi lệch số 0 đầu (đúng 1 học viên).
+      const id = await timHocVienIdTheoMaMoet(
+        this.prisma,
+        dto.ma_dinh_danh_moet,
+      );
+      if (!id) throw new NotFoundAppException('Không tìm thấy học viên');
+      return id;
+    }
     const hv = await this.prisma.hoc_vien.findUnique({
-      where,
+      where: { id: dto.hoc_vien_id },
       select: { id: true },
     });
     if (!hv) throw new NotFoundAppException('Không tìm thấy học viên');
@@ -398,7 +406,7 @@ export class KetQuaKhaoSatService {
       dieuKien.push({
         OR: [
           { ho_ten: { contains: q, mode: 'insensitive' } },
-          { ma_dinh_danh_moet: { contains: q } },
+          { ma_dinh_danh_moet: { contains: boSo0DauDeTimKiem(q) } },
         ],
       });
     }

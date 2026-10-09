@@ -325,8 +325,11 @@ footer{border-top:1px solid var(--line);padding-inline:16px;padding-block:24px;t
             <div class="body">
               <div class="m-h">Đăng nhập</div>
               <div class="m-sub">Sử dụng mã định danh được cấp để truy cập hệ thống.</div>
-              <div class="m-label">Tên tài khoản hoặc mã định danh MOET <span class="pin">1</span></div>
+              <div class="m-label">Đăng nhập bằng <span class="pin">1</span></div>
+              <div class="m-input"><b>Mã định danh MOET</b> | Số điện thoại</div>
+              <div class="m-label">Tên tài khoản hoặc mã định danh MOET</div>
               <div class="m-input">7900012345</div>
+              <div class="m-hint">Nhập mã định danh MOET, có hoặc không có số 0 ở đầu đều được.</div>
               <div class="m-label">Mật khẩu <span class="pin">2</span></div>
               <div class="m-input">••••••••<span class="eye" aria-hidden="true"></span></div>
               <div class="m-hint">Lần đầu đăng nhập: mật khẩu là ngày sinh dạng ngày-tháng-năm viết liền, ví dụ 08121983.</div>
@@ -339,7 +342,7 @@ footer{border-top:1px solid var(--line);padding-inline:16px;padding-block:24px;t
         </figure>
         <div class="do">
           <ol>
-            <li><span class="pin">1</span><p>Nhập <b>mã định danh</b> do nhà trường cung cấp. Chỉ gồm chữ số, không có dấu cách.</p></li>
+            <li><span class="pin">1</span><p>Chọn <span class="ui">Mã định danh MOET</span> (mặc định) rồi nhập <b>mã định danh</b> do nhà trường cung cấp, chỉ gồm chữ số. <b>Có hay không có số 0 ở đầu đều được</b>, ví dụ 09115131060 hoặc 9115131060. Không nhớ mã: chọn <span class="ui">Số điện thoại</span> và nhập số đã cung cấp cho nhà trường, ví dụ 0912345678. Số dùng chung với người khác hoặc đã đổi thì quay lại <span class="ui">Mã định danh MOET</span>. Hệ thống nhớ lựa chọn cho lần sau.</p></li>
             <li><span class="pin">2</span><p>Nhập <b>mật khẩu</b>. Lần đầu là ngày sinh viết liền 8 chữ số. Bấm biểu tượng con mắt ở cuối ô để xem lại mình đã gõ đúng chưa.</p></li>
             <li><span class="pin">3</span><p>Bấm <span class="ui">Đăng nhập</span>. Lần đầu, hệ thống sẽ chuyển sang màn hình đổi mật khẩu.</p></li>
           </ol>
@@ -608,7 +611,7 @@ footer{border-top:1px solid var(--line);padding-inline:16px;padding-block:24px;t
           <tr><td><b>Email đã xác minh</b></td><td>
             <ol style="margin:0;padding-left:18px">
               <li>Ở màn hình đăng nhập, bấm <span class="ui">Quên mật khẩu?</span></li>
-              <li>Nhập tên tài khoản hoặc mã định danh MOET, bấm <span class="ui">Gửi yêu cầu</span>.</li>
+              <li>Chọn <span class="ui">Mã định danh MOET</span> hoặc <span class="ui">Số điện thoại</span>, nhập mã hoặc số tương ứng, bấm <span class="ui">Gửi yêu cầu</span>.</li>
               <li>Mở email (xem cả Thư rác), bấm liên kết đặt lại mật khẩu, đặt mật khẩu mới.</li>
             </ol></td></tr>
           <tr><td><b>Email chưa xác minh</b> hoặc không nhận được thư sau 15 phút</td><td>Gửi email tới <b>boiduongnls@hcmue.edu.vn</b> theo mẫu ở <a href="#lien-he">Phần 13</a>. Sau khi xác minh, cán bộ hỗ trợ đặt lại mật khẩu về ngày sinh để Thầy/Cô đăng nhập và đổi lại.</td></tr>
@@ -678,7 +681,7 @@ footer{border-top:1px solid var(--line);padding-inline:16px;padding-block:24px;t
           <div class="err-body"><p class="why">Trình duyệt đang dùng bản lưu tạm cũ.</p><ol><li>Tải lại trang: trên máy tính nhấn <kbd>Ctrl</kbd> + <kbd>F5</kbd>; trên điện thoại kéo màn hình xuống hoặc bấm biểu tượng tải lại.</li><li>Nếu chưa được, đóng hẳn trình duyệt rồi mở lại.</li></ol></div></details>
 
         <details class="err" data-g="dang-nhap"><summary><span class="err-group">Đăng nhập</span><span class="err-msg"><q>Mã định danh hoặc mật khẩu không đúng</q></span></summary>
-          <div class="err-body"><p class="why">Sai mã hoặc sai mật khẩu. Vì lý do bảo mật, hệ thống không nói rõ sai phần nào.</p><ol><li>Kiểm tra mã định danh: chỉ chữ số, không dấu cách, đúng mã nhà trường gửi.</li><li>Lần đầu: mật khẩu là ngày sinh đủ 8 số, có số 0 ở đầu ngày/tháng (dùng <a href="#dang-nhap">công cụ ở Phần 3</a>).</li><li>Nếu đã đổi mật khẩu trước đó: dùng mật khẩu mới, không dùng ngày sinh.</li><li>Bấm biểu tượng con mắt để xem lại mật khẩu đã gõ; chú ý chữ hoa, chữ thường.</li><li>Đừng thử quá 5 lần liên tiếp. Nếu vẫn không được, xem <a href="#quen-mat-khau">Phần 10</a>.</li></ol></div></details>
+          <div class="err-body"><p class="why">Sai mã hoặc sai mật khẩu. Vì lý do bảo mật, hệ thống không nói rõ sai phần nào.</p><ol><li>Kiểm tra mã định danh: chỉ chữ số, không dấu cách, đúng mã nhà trường gửi (có hay không có số 0 ở đầu đều được).</li><li>Không nhớ mã: chọn <span class="ui">Số điện thoại</span> rồi nhập số đã cung cấp cho nhà trường. Số dùng chung với người khác hoặc đã đổi thì quay lại <span class="ui">Mã định danh MOET</span>.</li><li>Lần đầu: mật khẩu là ngày sinh đủ 8 số, có số 0 ở đầu ngày/tháng (dùng <a href="#dang-nhap">công cụ ở Phần 3</a>).</li><li>Nếu đã đổi mật khẩu trước đó: dùng mật khẩu mới, không dùng ngày sinh.</li><li>Bấm biểu tượng con mắt để xem lại mật khẩu đã gõ; chú ý chữ hoa, chữ thường.</li><li>Đừng thử quá 5 lần liên tiếp. Nếu vẫn không được, xem <a href="#quen-mat-khau">Phần 10</a>.</li></ol></div></details>
 
         <details class="err" data-g="dang-nhap"><summary><span class="err-group">Đăng nhập</span><span class="err-msg"><q>Tài khoản tạm khóa do nhập sai nhiều lần. Thử lại sau …</q></span></summary>
           <div class="err-body"><p class="why">Nhập sai mật khẩu 5 lần liên tiếp, tài khoản bị khóa 15 phút để chống người lạ dò mật khẩu.</p><ol><li>Chờ đến giờ ghi trong thông báo. Trong lúc khóa, nhập đúng mật khẩu cũng không vào được.</li><li>Kiểm tra lại mật khẩu trước khi thử lần nữa.</li><li>Không nhớ mật khẩu: làm theo <a href="#quen-mat-khau">Phần 10</a>.</li></ol></div></details>

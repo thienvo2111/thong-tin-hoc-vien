@@ -1,5 +1,6 @@
 import { hoc_vien } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { timCacHocVienIdTheoMaMoet } from '../../common/utils/ma-moet.util';
 
 // "Bộ giải định danh học viên dùng chung" (mo-rong-nls-an-giang.md mục 2,
 // quy tắc chung #3) — dùng cho mọi import có cột học viên: nhận
@@ -46,9 +47,17 @@ export async function resolveHocVienImportRow(
     }
   }
   if (maMoet) {
-    byMoet = await prisma.hoc_vien.findUnique({
-      where: { ma_dinh_danh_moet: maMoet },
-    });
+    // Spec 2026-10-09 Q-A: khớp chính xác trước, không có thì bỏ số 0 đầu
+    // (file của trường thường mất số 0). >= 2 hồ sơ -> không đoán, lỗi dòng.
+    const ids = await timCacHocVienIdTheoMaMoet(prisma, maMoet);
+    if (ids.length > 1) {
+      return {
+        error: `Mã định danh MOET "${maMoet}" khớp nhiều hồ sơ học viên (khác số 0 đầu) — không xác định được`,
+      };
+    }
+    byMoet = ids.length
+      ? await prisma.hoc_vien.findUnique({ where: { id: ids[0] } })
+      : null;
     if (!byMoet) {
       return {
         error: `Mã định danh MOET "${maMoet}" không tồn tại (chưa có hồ sơ học viên)`,

@@ -19,7 +19,12 @@ import {
   layFrontendUrl,
   taoTokenXacThuc,
 } from '../common/utils/token-xac-thuc.util';
+import {
+  timHocVienIdTheoMaMoet,
+  timHocVienIdTheoSoDienThoai,
+} from '../common/utils/ma-moet.util';
 import { DangNhapDto } from './dto/dang-nhap.dto';
+import { KieuDangNhap } from './dto/kieu-dang-nhap';
 import { DoiMatKhauDto } from './dto/doi-mat-khau.dto';
 import { QuenMatKhauDto } from './dto/quen-mat-khau.dto';
 import { DatLaiMatKhauDto } from './dto/dat-lai-mat-khau.dto';
@@ -96,8 +101,31 @@ export class AuthService {
     });
   }
 
+  // Spec 2026-10-09 Q-B: chế độ 'ma' (mặc định) = logic cũ nguyên vẹn, không
+  // thấy mới khớp mã MOET bỏ số 0 đầu trên hoc_vien.ma_dinh_danh_moet (kể cả
+  // TK có tên đăng nhập = CCCD). Chế độ 'sdt' = SĐT liên hệ, đúng 1 học viên.
+  // Cả 2 nhánh mới chỉ trả tài khoản vai trò hoc_vien.
+  private async timTaiKhoan(tenDangNhap: string, kieu: KieuDangNhap = 'ma') {
+    if (kieu === 'ma') {
+      const cu = await this.timTaiKhoanTheoTenDangNhap(tenDangNhap);
+      if (cu) return cu;
+    }
+    const hocVienId =
+      kieu === 'sdt'
+        ? await timHocVienIdTheoSoDienThoai(this.prisma, tenDangNhap)
+        : await timHocVienIdTheoMaMoet(this.prisma, tenDangNhap);
+    if (!hocVienId) return null;
+    return this.prisma.nguoi_dung.findFirst({
+      where: { hoc_vien_id: hocVienId, vai_tro: 'hoc_vien' },
+      include: { hoc_vien: true },
+    });
+  }
+
   async dangNhap(dto: DangNhapDto) {
-    const nguoiDung = await this.timTaiKhoanTheoTenDangNhap(dto.ten_dang_nhap);
+    const nguoiDung = await this.timTaiKhoan(
+      dto.ten_dang_nhap,
+      dto.kieu_dang_nhap,
+    );
 
     // Không tiết lộ "tài khoản không tồn tại" khác với "sai mật khẩu" —
     // cùng một thông báo chung để tránh dò tài khoản.
@@ -315,7 +343,10 @@ export class AuthService {
   // (đăng nhập). Chỉ thực sự tạo token + gửi email khi tài khoản là học viên,
   // có email_lien_he VÀ email_lien_he đã xác minh (quyết định đã chốt).
   async quenMatKhau(dto: QuenMatKhauDto): Promise<{ da_gui: true }> {
-    const nguoiDung = await this.timTaiKhoanTheoTenDangNhap(dto.ten_dang_nhap);
+    const nguoiDung = await this.timTaiKhoan(
+      dto.ten_dang_nhap,
+      dto.kieu_dang_nhap,
+    );
 
     if (
       nguoiDung &&

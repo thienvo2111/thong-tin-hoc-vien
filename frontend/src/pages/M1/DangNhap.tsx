@@ -12,6 +12,8 @@ import { gioiThieu } from '@/content/gioiThieu';
 import { EMAIL_HO_TRO } from '@/content/hoTro';
 import { StatusBanner } from '@/components/StatusBanner';
 import { trangChuTheoVaiTro } from '@/lib/trangChuTheoVaiTro';
+import { docKieuDangNhapDaLuu, luuKieuDangNhap, nhapTheoKieu, type KieuDangNhap } from '@/lib/kieuDangNhap';
+import { ChonKieuDangNhap } from '@/components/ChonKieuDangNhap';
 import logoHcmue from '@/assets/logo-hcmue.png';
 
 /** Panel giới thiệu — chỉ hiện ở màn hình rộng (>= sm); mobile chỉ hiện form đăng nhập. */
@@ -54,23 +56,35 @@ export default function DangNhap() {
   const { dangNhap } = useToi();
   const navigate = useNavigate();
   const [hienHuongDan, setHienHuongDan] = useState(false);
+  const [kieuBanDau] = useState(docKieuDangNhapDaLuu);
 
   const {
     register,
     handleSubmit,
     setValue,
+    clearErrors,
+    watch,
     formState: { errors },
   } = useForm<DangNhapForm>({
     resolver: zodResolver(dangNhapSchema),
-    defaultValues: { ten_dang_nhap: '', mat_khau: '' },
+    defaultValues: { kieu_dang_nhap: kieuBanDau, ten_dang_nhap: '', mat_khau: '' },
   });
+  const kieu = watch('kieu_dang_nhap');
 
   const mutation = useMutation({
-    mutationFn: ({ ten_dang_nhap, mat_khau }: DangNhapForm) => dangNhap(ten_dang_nhap, mat_khau),
+    mutationFn: ({ ten_dang_nhap, mat_khau, kieu_dang_nhap }: DangNhapForm) =>
+      dangNhap(ten_dang_nhap, mat_khau, kieu_dang_nhap),
     onSuccess: ({ phaiDoiMatKhau, vaiTro }) => {
       navigate(phaiDoiMatKhau ? '/doi-mat-khau' : trangChuTheoVaiTro(vaiTro), { replace: true });
     },
   });
+
+  function doiKieu(moi: KieuDangNhap) {
+    setValue('kieu_dang_nhap', moi);
+    luuKieuDangNhap(moi);
+    clearErrors('ten_dang_nhap');
+    mutation.reset();
+  }
 
   function onSubmit(values: DangNhapForm) {
     mutation.mutate(values);
@@ -88,13 +102,18 @@ export default function DangNhap() {
   const loiChung = mutation.isError
     ? mutation.error instanceof ApiError && maLoiCoThongDiepRieng.includes(mutation.error.code)
       ? thongDiepLoiChung(mutation.error)
-      : 'Mã định danh hoặc mật khẩu không đúng'
+      : kieu === 'sdt'
+        ? 'Số điện thoại hoặc mật khẩu không đúng'
+        : 'Mã định danh hoặc mật khẩu không đúng'
     : null;
   // Học viên đã đổi mật khẩu thường gõ lại ngày sinh rồi bấm liên tục tới 429
   // (2026-10-07) — nhắc nguyên nhân thật cho sai mật khẩu và 429, không cho 423
   // (thông báo khóa đã có giờ mở khóa riêng).
   const hienGoiYMatKhau =
     mutation.isError && !(mutation.error instanceof ApiError && mutation.error.code === 'ACCOUNT_LOCKED');
+
+  // Spec 2026-10-09 Q-C: sai thông tin (401) → gợi ý thử chế độ còn lại.
+  const hienGoiYCheo = mutation.error instanceof ApiError && mutation.error.status === 401;
 
   return (
     <Box style={{ display: 'flex', minHeight: '100vh' }} bg="white">
@@ -132,16 +151,22 @@ export default function DangNhap() {
                     nhóm Zalo hỗ trợ của trường.
                   </Text>
                 )}
+                {hienGoiYCheo && (
+                  <Text size="sm" mt={4}>
+                    {kieu === 'sdt'
+                      ? "Nếu số điện thoại dùng chung với người khác hoặc đã thay đổi, hãy chọn 'Mã định danh MOET'."
+                      : "Thử chọn 'Số điện thoại' nếu Thầy/Cô không nhớ mã định danh."}
+                  </Text>
+                )}
               </StatusBanner>
             )}
 
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
               <Stack gap="md">
+                <ChonKieuDangNhap value={kieu} onChange={doiKieu} />
+
                 <TextInput
-                  label="Tên tài khoản hoặc mã định danh MOET"
-                  description="Mã định danh trên CSDL MOET do nhà trường cung cấp"
-                  inputMode="numeric"
-                  autoComplete="username"
+                  {...nhapTheoKieu(kieu)}
                   onPaste={xuLyDan}
                   error={errors.ten_dang_nhap?.message}
                   {...register('ten_dang_nhap')}
