@@ -11,6 +11,7 @@ import { DangKyHocThaoTacController } from './dang-ky-hoc-thao-tac.controller';
 import { HocVienKhoaHocController } from './hoc-vien-khoa-hoc.controller';
 import { KhoaBoiDuongService } from './khoa-boi-duong.service';
 import { LichHocThayDoiService } from './lich-hoc-thay-doi.service';
+import { ThangMucService } from '../sso/thang-muc.service';
 
 // Dịch vụ Khóa bồi dưỡng & Lớp học — xem docs/api-contract.md mục 3. Export
 // service ra để ImportModule tái dùng (import phan_lop_hoc_vien — nguồn duy
@@ -30,7 +31,8 @@ import { LichHocThayDoiService } from './lich-hoc-thay-doi.service';
     DangKyHocThaoTacController,
     HocVienKhoaHocController,
   ],
-  providers: [KhoaBoiDuongService, LichHocThayDoiService],
+  // ThangMucService chỉ đọc cấu hình (Prisma) — khai báo thẳng, tránh import SsoModule.
+  providers: [KhoaBoiDuongService, LichHocThayDoiService, ThangMucService],
   exports: [KhoaBoiDuongService, LichHocThayDoiService],
 })
 export class KhoaBoiDuongModule {}

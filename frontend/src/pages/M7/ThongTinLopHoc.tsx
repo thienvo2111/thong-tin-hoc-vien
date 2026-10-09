@@ -142,9 +142,10 @@ function KhoiKhoaHoc({
     if (gd.thu_tu === thuTuDauRa) return <KhuKetQua tieuDe="Kết quả đánh giá đầu ra">{ketQuaDauRa}</KhuKetQua>;
     return null;
   };
-  // Khóa thiếu giai đoạn đánh giá tương ứng -> giữ khối cuối thẻ để không mất kết quả.
-  const thieuDauVao = thuTuDauVao == null;
-  const thieuDauRa = thuTuDauRa == null;
+  // Khóa thiếu giai đoạn đánh giá tương ứng -> giữ khối cuối thẻ để không mất kết quả,
+  // nhưng chỉ hiện mục có dữ liệu (mức đã chốt hoặc bài đã hoàn thành) — 2026-10-09.
+  const cuoiDauVao = thuTuDauVao == null && coKetQua(muc_dau_vao, baiDauVao);
+  const cuoiDauRa = thuTuDauRa == null && coKetQua(muc_dau_ra, baiDauRa);
 
   return (
     <Box p="lg" style={{ borderRadius: 14, border: '1px solid var(--mantine-color-gray-3)', background: 'var(--mantine-color-white)' }}>
@@ -187,20 +188,24 @@ function KhoiKhoaHoc({
           <StatusBanner loai="info">Lịch các giai đoạn của khóa học sẽ được cập nhật sau.</StatusBanner>
         )}
 
-        {(thieuDauVao || thieuDauRa) && (
+        {(cuoiDauVao || cuoiDauRa) && (
           <Box data-testid="ket-qua-cuoi-trang">
             <Text fw={700} size="sm" mb={4}>
               Kết quả đánh giá
             </Text>
             <Stack gap="xs">
-              {thieuDauVao && ketQuaDauVao}
-              {thieuDauRa && ketQuaDauRa}
+              {cuoiDauVao && ketQuaDauVao}
+              {cuoiDauRa && ketQuaDauRa}
             </Stack>
           </Box>
         )}
       </Stack>
     </Box>
   );
+}
+
+function coKetQua(mucChot: MucNangLuc | null, bai?: TinhTrangBaiKhaoSat): boolean {
+  return !!mucChot || bai?.trang_thai === 'hoan_thanh';
 }
 
 function KhuKetQua({ tieuDe, children }: { tieuDe: string; children: ReactNode }) {

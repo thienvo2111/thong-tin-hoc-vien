@@ -84,8 +84,55 @@ describe('Admin — Chi tiết hồ sơ học viên — Mức lớp học', () =
   function datMuc(muc_dau_vao: 'co_ban' | 'thanh_thao' | 'nang_cao' | null, muc_hoc_chon: 'co_ban' | 'thanh_thao' | null = null) {
     const dk = db.khoaHocCuaHocVien['hv-duyet-1'][0];
     dk.muc_dau_vao = muc_dau_vao;
+    dk.muc_danh_gia = muc_dau_vao;
+    dk.nguon_muc_danh_gia = muc_dau_vao ? 'chot' : null;
     dk.muc_hoc_chon = muc_hoc_chon;
   }
+
+  // 2026-10-09: chưa chốt muc_dau_vao, mốc lấy từ bài khảo sát đầu vào.
+  function datMucKhaoSat(muc_danh_gia: 'co_ban' | 'thanh_thao' | 'nang_cao') {
+    const dk = db.khoaHocCuaHocVien['hv-duyet-1'][0];
+    dk.muc_dau_vao = null;
+    dk.muc_danh_gia = muc_danh_gia;
+    dk.nguon_muc_danh_gia = 'khao_sat';
+    dk.muc_goc_danh_gia = 'M3';
+    dk.nhan_muc_goc_danh_gia = 'M3 – Thành thạo';
+    dk.muc_hoc_chon = null;
+  }
+
+  it('mốc theo khảo sát chưa chốt -> "Kết quả: M3 – Thành thạo (khảo sát, chưa chốt) → xếp lớp", Select theo mốc', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    datMucKhaoSat('thanh_thao');
+    const user = userEvent.setup();
+    renderTrang('hv-duyet-1');
+    const dong = within(await screen.findByTestId('dong-muc-hoc'));
+    expect(dong.getByText('Thành thạo', { selector: 'b' })).toBeInTheDocument();
+    expect(dong.getByText(/Kết quả: M3 – Thành thạo \(khảo sát, chưa chốt\) → xếp lớp Thành thạo/)).toBeInTheDocument();
+    await user.click(dong.getByRole('textbox', { name: 'Sửa mức lớp học' }));
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(
+      expect.arrayContaining(['Cơ bản', 'Thành thạo (theo kết quả đánh giá)']),
+    );
+    expect(screen.queryByRole('option', { name: /Nâng cao/ })).not.toBeInTheDocument();
+  });
+
+  it('mốc đã chốt -> không có ghi chú khảo sát', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    datMuc('thanh_thao');
+    renderTrang('hv-duyet-1');
+    const dong = within(await screen.findByTestId('dong-muc-hoc'));
+    expect(dong.queryByText(/khảo sát, chưa chốt/)).not.toBeInTheDocument();
+  });
+
+  it('khảo sát M1 -> giữ nhãn kết quả "M1 – Chưa đạt", xếp lớp Cơ bản', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    datMucKhaoSat('co_ban');
+    const dk = db.khoaHocCuaHocVien['hv-duyet-1'][0];
+    dk.muc_goc_danh_gia = 'M1';
+    dk.nhan_muc_goc_danh_gia = 'M1 – Chưa đạt';
+    renderTrang('hv-duyet-1');
+    const dong = within(await screen.findByTestId('dong-muc-hoc'));
+    expect(dong.getByText(/Kết quả: M1 – Chưa đạt \(khảo sát, chưa chốt\) → xếp lớp Cơ bản/)).toBeInTheDocument();
+  });
 
   it('chưa có kết quả đánh giá -> chỉ hiện dòng thông báo, không có ô sửa', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';

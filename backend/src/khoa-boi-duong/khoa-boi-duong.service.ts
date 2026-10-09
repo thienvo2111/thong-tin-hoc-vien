@@ -53,7 +53,14 @@ import { KetQuaGiaiDoanRowDto } from './dto/ket-qua-giai-doan-row.dto';
 import { RowBuildResult } from '../import/import.types';
 import { resolveHocVienImportRow } from '../import/util/hoc-vien-resolver.util';
 import { parseVnDateTime } from '../common/utils/vn-datetime.util';
-import { THU_TU_MUC, duocChonMuc, mucHocHieuLuc } from './util/muc-hoc.util';
+import {
+  LOAI_BAI_DAU_VAO,
+  THU_TU_MUC,
+  duocChonMuc,
+  mucDanhGiaLamMoc,
+  mucHocHieuLuc,
+} from './util/muc-hoc.util';
+import { ThangMucService, nhanMucGoc } from '../sso/thang-muc.service';
 
 type LopHocVoiKhoa = lop_hoc & { khoa: khoa_boi_duong };
 
@@ -99,6 +106,7 @@ export class KhoaBoiDuongService {
     private readonly diemHocService: DiemHocService,
     private readonly lichHocThayDoi: LichHocThayDoiService,
     private readonly phanCongGiangDay: PhanCongGiangDayService,
+    private readonly thangMuc: ThangMucService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -1127,6 +1135,16 @@ export class KhoaBoiDuongService {
     // T12: trạng thái điểm danh từng buổi + tiến độ từng giai đoạn — truy
     // vấn RIÊNG rồi map thủ công (Prisma không lọc nested theo field anh em).
     const dangKyIds = dangKyList.map((dk) => dk.id);
+    // Mốc điều chỉnh mức khi quản trị chưa chốt muc_dau_vao (2026-10-09) —
+    // bài khảo sát gắn theo học viên nên chỉ tra 1 lần cho mọi đăng ký.
+    const baiDauVao = dangKyList.some((dk) => !dk.muc_dau_vao)
+      ? await this.baiDauVaoCuaHocVien(hocVienId)
+      : null;
+    // Mức quy đổi chỉ để XẾP LỚP; học viên vẫn xem kết quả theo mã/nhãn thang khảo sát.
+    const mucGocDanhGia = baiDauVao?.muc_goc ?? null;
+    const nhanMucGocDanhGia = mucGocDanhGia
+      ? nhanMucGoc(mucGocDanhGia, await this.thangMuc.thang())
+      : null;
     const [diemDanhList, ketQuaGiaiDoanList] = dangKyIds.length
       ? await Promise.all([
           this.prisma.diem_danh.findMany({
@@ -1185,8 +1203,15 @@ export class KhoaBoiDuongService {
     return dangKyList.map((dk) => {
       const { phan_lop_giai_doan, khoa, ...rest } = dk;
       const { giai_doan: dsGiaiDoan, ...khoaGon } = khoa;
+      const mocDanhGia = mucDanhGiaLamMoc(dk.muc_dau_vao, baiDauVao);
       return {
         ...rest,
+        muc_danh_gia: mocDanhGia.muc,
+        nguon_muc_danh_gia: mocDanhGia.nguon,
+        muc_goc_danh_gia:
+          mocDanhGia.nguon === 'khao_sat' ? mucGocDanhGia : null,
+        nhan_muc_goc_danh_gia:
+          mocDanhGia.nguon === 'khao_sat' ? nhanMucGocDanhGia : null,
         khoa: khoaGon,
         giai_doan: dsGiaiDoan.map((gd) => {
           const lop = phan_lop_giai_doan.find(
@@ -1492,12 +1517,14 @@ export class KhoaBoiDuongService {
     },
     muc: muc_nang_luc | null,
   ) {
-    if (!dangKy.muc_dau_vao) {
+    // Mốc = mức quản trị chốt ?? mức quy đổi từ bài đánh giá đầu vào (2026-10-09).
+    const { muc: mucDanhGia } = await this.mucDanhGiaCuaDangKy(dangKy);
+    if (!mucDanhGia) {
       throw new ValidationException('Chưa có kết quả đánh giá đầu vào', [
         { field: 'muc', message: 'Chưa có kết quả đánh giá đầu vào' },
       ]);
     }
-    if (muc && !duocChonMuc(dangKy.muc_dau_vao, muc)) {
+    if (muc && !duocChonMuc(mucDanhGia, muc)) {
       throw new ValidationException(
         'Chỉ được chọn mức bằng hoặc thấp hơn mức đánh giá',
         [
@@ -1508,7 +1535,7 @@ export class KhoaBoiDuongService {
         ],
       );
     }
-    const mucMoi = muc === dangKy.muc_dau_vao ? null : muc;
+    const mucMoi = muc === mucDanhGia ? null : muc;
     let luc = dangKy.muc_hoc_chon_luc;
     // Chỉ ghi thời điểm + nhật ký khi giá trị thật sự đổi (lưu lại cùng mức thì giữ nguyên).
     if (mucMoi !== dangKy.muc_hoc_chon) {
@@ -1517,8 +1544,8 @@ export class KhoaBoiDuongService {
         where: { id: dangKy.id },
         data: { muc_hoc_chon: mucMoi, muc_hoc_chon_luc: luc },
       });
-      const mucCu = mucHocHieuLuc(dangKy);
-      const mucHoc = mucMoi ?? dangKy.muc_dau_vao;
+      const mucCu = mucHocHieuLuc(dangKy.muc_hoc_chon, mucDanhGia);
+      const mucHoc = mucMoi ?? mucDanhGia;
       await this.nhatKy.ghi({
         hanh_dong: 'dieu_chinh_muc_hoc',
         hoc_vien_id: dangKy.hoc_vien_id,
@@ -1529,9 +1556,31 @@ export class KhoaBoiDuongService {
     return {
       muc_dau_vao: dangKy.muc_dau_vao,
       muc_hoc_chon: mucMoi,
-      muc_hoc: mucMoi ?? dangKy.muc_dau_vao,
+      muc_hoc: mucMoi ?? mucDanhGia,
       muc_hoc_chon_luc: luc,
     };
+  }
+
+  // Mức đánh giá làm mốc của 1 đăng ký: muc_dau_vao (chốt) ?? bài khảo sát
+  // đầu vào đã hoàn thành (quy đổi M1..M4). KHÔNG ghi ngược vào muc_dau_vao.
+  async mucDanhGiaCuaDangKy(dangKy: {
+    hoc_vien_id: string;
+    muc_dau_vao: muc_nang_luc | null;
+  }) {
+    if (dangKy.muc_dau_vao) return mucDanhGiaLamMoc(dangKy.muc_dau_vao, null);
+    return mucDanhGiaLamMoc(
+      null,
+      await this.baiDauVaoCuaHocVien(dangKy.hoc_vien_id),
+    );
+  }
+
+  private baiDauVaoCuaHocVien(hocVienId: string) {
+    return this.prisma.ket_qua_khao_sat.findUnique({
+      where: {
+        hoc_vien_id_loai: { hoc_vien_id: hocVienId, loai: LOAI_BAI_DAU_VAO },
+      },
+      select: { trang_thai: true, muc: true, muc_goc: true },
+    });
   }
 
   // Nhật ký phân lớp / đổi cụm — dựng câu mô tả lúc ghi vì tên lớp/cụm có thể đổi về sau.
@@ -1637,7 +1686,7 @@ export class KhoaBoiDuongService {
     // Mức đầu vào của học viên: tra tối đa 1 lần/dòng, chỉ khi có lớp gắn mức.
     let mucDauVao:
       | Promise<{
-          muc_dau_vao: muc_nang_luc | null;
+          muc_danh_gia: muc_nang_luc | null;
           muc_hoc_chon: muc_nang_luc | null;
         } | null>
       | undefined;
@@ -1688,13 +1737,25 @@ export class KhoaBoiDuongService {
             },
             select: { muc_dau_vao: true, muc_hoc_chon: true },
           })
-          .then((dk) => dk ?? null);
-        // So với mức học hiệu lực (muc_hoc_chon ?? muc_dau_vao, 2026-10-08).
+          .then(async (dk) =>
+            dk
+              ? {
+                  muc_hoc_chon: dk.muc_hoc_chon,
+                  muc_danh_gia: (
+                    await this.mucDanhGiaCuaDangKy({
+                      hoc_vien_id: hocVien.id,
+                      muc_dau_vao: dk.muc_dau_vao,
+                    })
+                  ).muc,
+                }
+              : null,
+          );
+        // So với mức học hiệu lực (muc_hoc_chon ?? mốc đánh giá, 2026-10-09).
         const dk = await mucDauVao;
-        const muc = dk ? mucHocHieuLuc(dk) : null;
+        const muc = dk ? mucHocHieuLuc(dk.muc_hoc_chon, dk.muc_danh_gia) : null;
         if (dk && muc && muc !== lop.muc_nang_luc) {
           const dieuChinh = dk.muc_hoc_chon
-            ? ` (học viên tự điều chỉnh từ "${dk.muc_dau_vao}")`
+            ? ` (học viên tự điều chỉnh từ "${dk.muc_danh_gia}")`
             : '';
           canhBaoList.push(
             `Học viên "${ma}" có mức học "${muc}"${dieuChinh} khác mức năng lực "${lop.muc_nang_luc}" của lớp "${lop.ten_lop}" — kiểm tra lại phân lớp`,

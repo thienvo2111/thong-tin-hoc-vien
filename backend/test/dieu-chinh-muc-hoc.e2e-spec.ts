@@ -362,6 +362,142 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
     expect(sau.muc_hoc_chon_luc).toBeNull();
   });
 
+  // 2026-10-09: quản trị chưa chốt muc_dau_vao -> mốc = bài khảo sát đầu vào
+  // (loai 'danh-gia') đã hoàn thành, quy đổi M1/M2 co_ban, M3 thanh_thao, M4 nang_cao.
+  const ghiKhaoSat = (
+    hocVienId: string,
+    trang_thai: 'da_mo' | 'dang_lam' | 'hoan_thanh',
+    muc_goc: string | null,
+  ) =>
+    prisma.ket_qua_khao_sat.create({
+      data: {
+        hoc_vien_id: hocVienId,
+        loai: 'danh-gia',
+        trang_thai,
+        muc_goc,
+        nguon: 'api',
+        hoan_thanh_luc: trang_thai === 'hoan_thanh' ? new Date() : null,
+      },
+    });
+
+  describe('mốc theo khảo sát khi chưa chốt muc_dau_vao', () => {
+    it('khảo sát M4 hoàn thành -> chọn thanh_thao 200, GET trả muc_danh_gia + nguồn khao_sat; không ghi muc_dau_vao', async () => {
+      const { hocVien, token, dangKy } = await taoHocVien(null);
+      await ghiKhaoSat(hocVien.id, 'hoan_thanh', 'M4');
+
+      const truoc = await http()
+        .get('/hoc-vien/toi/khoa-hoc')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const entry = truoc.body.find(
+        (r: { khoa: { id: string } }) => r.khoa.id === khoaId,
+      );
+      expect(entry).toMatchObject({
+        muc_dau_vao: null,
+        muc_danh_gia: 'nang_cao',
+        nguon_muc_danh_gia: 'khao_sat',
+        muc_goc_danh_gia: 'M4',
+        nhan_muc_goc_danh_gia: expect.stringContaining('M4'),
+      });
+
+      const res = await chon(token, 'thanh_thao').expect(200);
+      expect(res.body).toMatchObject({
+        muc_hoc_chon: 'thanh_thao',
+        muc_hoc: 'thanh_thao',
+      });
+      const sau = await docDangKy(dangKy!.id);
+      expect(sau.muc_hoc_chon).toBe('thanh_thao');
+      expect(sau.muc_dau_vao).toBeNull();
+
+      const nhatKy = await prisma.nhat_ky_hoat_dong.findFirstOrThrow({
+        where: { hoc_vien_id: hocVien.id, hanh_dong: 'dieu_chinh_muc_hoc' },
+      });
+      expect(nhatKy.chi_tiet).toMatchObject({
+        muc_cu: 'nang_cao',
+        muc_moi: 'thanh_thao',
+      });
+
+      // Chọn bằng mốc khảo sát -> lưu NULL.
+      const ve = await chon(token, 'nang_cao').expect(200);
+      expect(ve.body.muc_hoc_chon).toBeNull();
+      expect(ve.body.muc_hoc).toBe('nang_cao');
+    });
+
+    it('khảo sát M3 + chọn nang_cao -> 400', async () => {
+      const { hocVien, token, dangKy } = await taoHocVien(null);
+      await ghiKhaoSat(hocVien.id, 'hoan_thanh', 'M3');
+      const res = await chon(token, 'nang_cao').expect(400);
+      expect(res.body.error.fields[0].field).toBe('muc');
+      expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBeNull();
+      await chon(token, 'co_ban').expect(200);
+    });
+
+    it('bài chưa hoàn thành -> 400 "Chưa có kết quả đánh giá đầu vào"', async () => {
+      const { hocVien, token } = await taoHocVien(null);
+      await ghiKhaoSat(hocVien.id, 'dang_lam', 'M4');
+      const res = await chon(token, 'co_ban').expect(400);
+      expect(res.body.error.fields[0].message).toBe(
+        'Chưa có kết quả đánh giá đầu vào',
+      );
+      const khoaHoc = await http()
+        .get('/hoc-vien/toi/khoa-hoc')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const entry = khoaHoc.body.find(
+        (r: { khoa: { id: string } }) => r.khoa.id === khoaId,
+      );
+      expect(entry.muc_danh_gia).toBeNull();
+      expect(entry.nguon_muc_danh_gia).toBeNull();
+    });
+
+    it('chọn thanh_thao theo khảo sát M4, quản trị chốt thanh_thao -> reset NULL, nguồn chot', async () => {
+      const { hocVien, tenDangNhap, token, dangKy } = await taoHocVien(null);
+      await ghiKhaoSat(hocVien.id, 'hoan_thanh', 'M4');
+      await chon(token, 'thanh_thao').expect(200);
+
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('data');
+      sheet.addRow([
+        'so_dinh_danh_ca_nhan',
+        'ma_dinh_danh_moet',
+        'ma_khoa',
+        'loai',
+        'muc',
+      ]);
+      sheet.addRow([undefined, tenDangNhap, maKhoa, 'dau_vao', 'thanh_thao']);
+      const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+      const up = await http()
+        .post('/import/ket_qua_danh_gia')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .attach('file', buffer, 'kqdg-dcm-ks.xlsx')
+        .expect(201);
+      importIds.push(up.body.import_id);
+      await http()
+        .post(`/import/${up.body.import_id}/xac-nhan`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(201);
+
+      const sau = await docDangKy(dangKy!.id);
+      expect(sau.muc_dau_vao).toBe('thanh_thao');
+      expect(sau.muc_hoc_chon).toBeNull();
+      expect(sau.muc_hoc_chon_luc).toBeNull();
+
+      const khoaHoc = await http()
+        .get('/hoc-vien/toi/khoa-hoc')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      const entry = khoaHoc.body.find(
+        (r: { khoa: { id: string } }) => r.khoa.id === khoaId,
+      );
+      expect(entry).toMatchObject({
+        muc_danh_gia: 'thanh_thao',
+        nguon_muc_danh_gia: 'chot',
+        muc_goc_danh_gia: null,
+        nhan_muc_goc_danh_gia: null,
+      });
+    });
+  });
+
   it('PATCH khóa bật/tắt mo_dieu_chinh_muc', async () => {
     const tat = await http()
       .patch(`/khoa-boi-duong/${khoaId}`)

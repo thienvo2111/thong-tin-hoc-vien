@@ -313,14 +313,15 @@ function KhoiDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHocD
 }
 
 // 2026-10-08: mức lớp học hiệu lực (tự chọn ?? đánh giá). Quản trị sửa hộ — bỏ qua công tắc khóa nhưng
-// chỉ chọn được mức ≤ mức đánh giá (backend kiểm lại).
+// chỉ chọn được mức ≤ mức đánh giá làm mốc (chốt ?? khảo sát, 2026-10-09; backend kiểm lại).
 function MucHocDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHocDangKy }) {
   const { nguoiDung } = useToi();
   const capNhatMuc = useCapNhatMucHoc(hocVienId);
   const mucHoc = mucHocHieuLuc(dangKy);
   const [chonMuc, setChonMuc] = useState<string>(mucHoc ?? '');
 
-  if (!dangKy.muc_dau_vao) {
+  const mucDanhGia = dangKy.muc_danh_gia;
+  if (!mucDanhGia) {
     return (
       <Text fz="sm" c="dimmed">
         Mức lớp học: chưa có kết quả đánh giá đầu vào
@@ -342,8 +343,14 @@ function MucHocDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHo
     <Stack gap={4} data-testid="dong-muc-hoc">
       <Text fz="sm">
         Mức lớp học: <b>{nhanMucNangLuc(mucHoc)}</b>
-        {dangKy.muc_hoc_chon && <> (học viên tự điều chỉnh từ {nhanMucNangLuc(dangKy.muc_dau_vao)})</>}
+        {dangKy.muc_hoc_chon && <> (học viên tự điều chỉnh từ {nhanMucNangLuc(mucDanhGia)})</>}
       </Text>
+      {dangKy.nguon_muc_danh_gia === 'khao_sat' && (
+        <Text fz="xs" c="dimmed">
+          Kết quả: {dangKy.nhan_muc_goc_danh_gia ?? nhanMucNangLuc(mucDanhGia)} (khảo sát, chưa chốt) → xếp lớp{' '}
+          {nhanMucNangLuc(mucDanhGia)}
+        </Text>
+      )}
       {dangKy.muc_hoc_chon_luc && (
         <Text fz="xs" c="dimmed">
           Đã điều chỉnh lúc {dinhDangNgayGio(dangKy.muc_hoc_chon_luc)}
@@ -353,9 +360,9 @@ function MucHocDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHo
         <Group gap="sm" wrap="wrap" align="flex-end">
           <Select
             label="Sửa mức lớp học"
-            data={cacMucDuocChon(dangKy.muc_dau_vao).map((m) => ({
+            data={cacMucDuocChon(mucDanhGia).map((m) => ({
               value: m,
-              label: m === dangKy.muc_dau_vao ? `${nhanMucNangLuc(m)} (theo kết quả đánh giá)` : nhanMucNangLuc(m),
+              label: m === mucDanhGia ? `${nhanMucNangLuc(m)} (theo kết quả đánh giá)` : nhanMucNangLuc(m),
             }))}
             value={chonMuc}
             onChange={(v) => setChonMuc(v ?? '')}
