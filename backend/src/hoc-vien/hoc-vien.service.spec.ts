@@ -1,3 +1,4 @@
+import * as ExcelJS from 'exceljs';
 import {
   HocVienService,
   THONG_BAO_KHAO_SAT_NHAN_VIEN,
@@ -597,6 +598,132 @@ describe('HocVienService', () => {
     it('không truyền q -> KHÔNG gọi $queryRaw', async () => {
       await service.findAll({} as never, callerAll);
       expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('xuatTheoTruong — GET /hoc-vien/xuat-excel', () => {
+    const callerTruong = {
+      id: 'nd-truong',
+      vai_tro: 'truong',
+      don_vi_id: 'truong-1',
+    } as AuthenticatedUser;
+    const callerQuanTri = {
+      id: 'nd-qt',
+      vai_tro: 'quan_tri',
+    } as AuthenticatedUser;
+    let ghi: jest.Mock;
+
+    function hv(id: string, ho_ten: string) {
+      return {
+        id,
+        ho_ten,
+        ma_dinh_danh_moet: '00' + id,
+        ngay_sinh: 1,
+        thang_sinh: 2,
+        nam_sinh: 1990,
+        gioi_tinh: null,
+        so_dinh_danh_ca_nhan: null,
+        chuc_vu: null,
+        doi_tuong: null,
+        cap_giang_day: null,
+        so_dien_thoai_lien_he: null,
+        email_lien_he: null,
+        nguon_tao: 'import_moet',
+        trang_thai: 'nhap',
+        chuyen_mon: [],
+        mon_giang_day: null,
+        nguoi_dung_account: null,
+      };
+    }
+
+    beforeEach(() => {
+      ghi = (service as unknown as { nhatKy: { ghi: jest.Mock } }).nhatKy.ghi;
+      prisma.don_vi_cong_tac.findUnique.mockReset();
+      prisma.don_vi_cong_tac.findUnique.mockResolvedValue({
+        id: 'truong-1',
+        ten_don_vi: 'Trường TH A',
+        loai_don_vi: 'truong',
+        don_vi_cha: { ten_don_vi: 'Phòng VHXH B' },
+      });
+      jest
+        .spyOn(service, 'danhGiaDayDu')
+        .mockResolvedValue({ day_du: true, thieu: [] });
+    });
+
+    it('trường ngoài phạm vi quyền -> ForbiddenAppException, không truy vấn học viên', async () => {
+      scopeService.getAccessibleDonViIds.mockResolvedValue(['truong-2']);
+      await expect(
+        service.xuatTheoTruong('truong-1', callerTruong),
+      ).rejects.toBeInstanceOf(ForbiddenAppException);
+      expect(prisma.hoc_vien.findMany).not.toHaveBeenCalled();
+      expect(ghi).not.toHaveBeenCalled();
+    });
+
+    it('đơn vị không phải trường -> ValidationException (400)', async () => {
+      scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
+      prisma.don_vi_cong_tac.findUnique.mockResolvedValue({
+        id: 'phong-1',
+        ten_don_vi: 'Phòng VHXH',
+        loai_don_vi: 'phong_vhxh',
+        don_vi_cha: null,
+      });
+      const p = service.xuatTheoTruong('phong-1', callerQuanTri);
+      await expect(p).rejects.toBeInstanceOf(ValidationException);
+      await expect(p).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('không tìm thấy đơn vị -> NotFoundAppException', async () => {
+      scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
+      prisma.don_vi_cong_tac.findUnique.mockResolvedValue(null);
+      await expect(
+        service.xuatTheoTruong('khong-co', callerQuanTri),
+      ).rejects.toBeInstanceOf(NotFoundAppException);
+    });
+
+    it('trong phạm vi -> lấy học viên đúng trường, sắp theo họ tên (vi), ghi nhật ký với so_dong', async () => {
+      scopeService.getAccessibleDonViIds.mockResolvedValue(['truong-1']);
+      prisma.hoc_vien.findMany.mockResolvedValue([
+        hv('3', 'Trần Văn C'),
+        hv('1', 'Đặng Thị B'),
+        hv('2', 'Âu Văn A'),
+      ]);
+
+      const buffer = await service.xuatTheoTruong('truong-1', callerTruong);
+
+      expect(prisma.hoc_vien.findMany.mock.calls[0][0].where).toEqual({
+        don_vi_cong_tac_id: 'truong-1',
+      });
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
+      const sheet = workbook.worksheets[0];
+      expect(sheet.getCell(1, 1).value).toBe(
+        'DANH SÁCH HỌC VIÊN — Trường TH A',
+      );
+      expect(sheet.getCell(2, 1).value).toBe('Đơn vị quản lý: Phòng VHXH B');
+      expect(sheet.getCell(4, 1).value).toBe('Tổng số: 3');
+      expect([7, 8, 9].map((r) => sheet.getCell(r, 3).value)).toEqual([
+        'Âu Văn A',
+        'Đặng Thị B',
+        'Trần Văn C',
+      ]);
+      expect(ghi).toHaveBeenCalledWith({
+        hanh_dong: 'xuat_danh_sach_hoc_vien_truong',
+        nguoi_dung: { id: 'nd-truong', vai_tro: 'truong' },
+        chi_tiet: { don_vi_cong_tac_id: 'truong-1', so_dong: 3 },
+      });
+    });
+
+    it('quan_tri (scope ALL) -> xuất được trường bất kỳ', async () => {
+      scopeService.getAccessibleDonViIds.mockResolvedValue('ALL');
+      prisma.hoc_vien.findMany.mockResolvedValue([]);
+      await expect(
+        service.xuatTheoTruong('truong-1', callerQuanTri),
+      ).resolves.toBeInstanceOf(Buffer);
+      expect(ghi).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chi_tiet: { don_vi_cong_tac_id: 'truong-1', so_dong: 0 },
+        }),
+      );
     });
   });
 

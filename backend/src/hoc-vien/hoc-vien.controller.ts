@@ -8,8 +8,10 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { HocVienService } from './hoc-vien.service';
 import { Public } from '../auth/decorators/public.decorator';
@@ -23,6 +25,7 @@ import { DuyetHocVienDto } from './dto/duyet-hoc-vien.dto';
 import { ChuyenMonDto } from './dto/chuyen-mon.dto';
 import { KiemTraTrungQueryDto } from './dto/kiem-tra-trung-query.dto';
 import { SuaMaMoetDto } from './dto/sua-ma-moet.dto';
+import { XuatHocVienTheoTruongDto } from './dto/xuat-hoc-vien-theo-truong.dto';
 
 // Dịch vụ Học viên — docs/api-contract.md mục 2.
 @Controller('hoc-vien')
@@ -125,6 +128,32 @@ export class HocVienController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.hocVienService.findAll(query, user);
+  }
+
+  // Khai báo TRƯỚC ':id' để 'xuat-excel' không bị route động chắn.
+  @Roles('truong', 'phong_vhxh', 'so_gddt', 'quan_tri')
+  @Get('xuat-excel')
+  async xuatExcel(
+    @Query() query: XuatHocVienTheoTruongDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.hocVienService.xuatTheoTruong(
+      query.don_vi_cong_tac_id,
+      user,
+    );
+    const ngay = new Date(Date.now() + 7 * 3600 * 1000)
+      .toISOString()
+      .slice(0, 10)
+      .replace(/-/g, '');
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="ds-hoc-vien-truong-${ngay}.xlsx"`,
+        'Cache-Control': 'no-store',
+      })
+      .send(buffer);
   }
 
   @Roles('truong', 'phong_vhxh', 'so_gddt', 'quan_tri')

@@ -439,7 +439,7 @@ export const DOI_TUONG_LABEL: Record<doi_tuong_hoc_vien, string> = {
   nhan_vien: 'Nhân viên',
 };
 
-const GIOI_TINH_LABEL: Record<string, string> = {
+export const GIOI_TINH_LABEL: Record<string, string> = {
   nam: 'Nam',
   nu: 'Nữ',
   khac: 'Khác',

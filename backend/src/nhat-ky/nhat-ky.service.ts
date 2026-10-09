@@ -22,7 +22,8 @@ export type HanhDongNhatKy =
   | 'de_nghi_doi_lop'
   | 'duyet_doi_lop'
   | 'dieu_chinh_muc_hoc'
-  | 'sua_ma_dinh_danh_moet';
+  | 'sua_ma_dinh_danh_moet'
+  | 'xuat_danh_sach_hoc_vien_truong';
 
 const TIEU_DE: Record<HanhDongNhatKy, string> = {
   dang_nhap_thanh_cong: 'Đăng nhập thành công',
@@ -43,6 +44,7 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   duyet_doi_lop: 'Duyệt đổi lớp',
   dieu_chinh_muc_hoc: 'Điều chỉnh mức lớp học',
   sua_ma_dinh_danh_moet: 'Quản trị sửa mã định danh MOET',
+  xuat_danh_sach_hoc_vien_truong: 'Xuất danh sách học viên theo trường',
 };
 
 const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
@@ -64,6 +66,7 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   duyet_doi_lop: 'hoc_tap',
   dieu_chinh_muc_hoc: 'hoc_tap',
   sua_ma_dinh_danh_moet: 'tai_khoan',
+  xuat_danh_sach_hoc_vien_truong: 'tai_khoan',
 };
 
 const NHAN_VAI_TRO: Record<vai_tro_nguoi_dung, string> = {

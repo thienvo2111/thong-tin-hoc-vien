@@ -55,7 +55,7 @@ const NHAN_TRANG_THAI_XAC_NHAN: Record<string, string> = {
   da_xac_nhan: 'Đã xác nhận',
 };
 
-const NHAN_TRANG_THAI_HO_SO: Record<string, string> = {
+export const NHAN_TRANG_THAI_HO_SO: Record<string, string> = {
   nhap: 'Nháp',
   cho_duyet: 'Chờ duyệt',
   da_duyet: 'Đã duyệt',

@@ -55,6 +55,10 @@ import { QueryHocVienDto } from './dto/query-hoc-vien.dto';
 import { DuyetHocVienDto } from './dto/duyet-hoc-vien.dto';
 import { ChuyenMonDto } from './dto/chuyen-mon.dto';
 import { SuaMaMoetDto } from './dto/sua-ma-moet.dto';
+import {
+  DongHocVienTruong,
+  buildDanhSachHocVienTruongWorkbook,
+} from './util/danh-sach-hoc-vien-truong-excel.util';
 
 const BCRYPT_SALT_ROUNDS = 10;
 
@@ -1501,6 +1505,84 @@ export class HocVienService {
       this.prisma.hoc_vien.count({ where }),
     ]);
     return paginate(data, total, page, pageSize);
+  }
+
+  // GET /hoc-vien/xuat-excel — toàn bộ học viên 1 trường (có PII) để trường
+  // đối chiếu; cùng kiểm phạm vi như findAll, ghi nhật ký mỗi lần xuất.
+  async xuatTheoTruong(
+    donViId: string,
+    caller: AuthenticatedUser,
+  ): Promise<Buffer> {
+    const scope = await this.scopeService.getAccessibleDonViIds(caller);
+    if (scope !== 'ALL' && !scope.includes(donViId)) {
+      throw new ForbiddenAppException(
+        'Đơn vị công tác nằm ngoài phạm vi quyền',
+      );
+    }
+    const donVi = await this.prisma.don_vi_cong_tac.findUnique({
+      where: { id: donViId },
+      include: { don_vi_cha: true },
+    });
+    if (!donVi)
+      throw new NotFoundAppException('Không tìm thấy đơn vị công tác');
+    if (donVi.loai_don_vi !== 'truong') {
+      throw new ValidationException('Chỉ xuất được theo một trường');
+    }
+
+    const hocViens = await this.prisma.hoc_vien.findMany({
+      where: { don_vi_cong_tac_id: donViId },
+      include: {
+        chuyen_mon: true,
+        mon_giang_day: { select: { ten_mon: true } },
+        nguoi_dung_account: {
+          select: { ten_dang_nhap: true, dang_nhap_lan_cuoi: true },
+        },
+      },
+    });
+    hocViens.sort((a, b) => a.ho_ten.localeCompare(b.ho_ten, 'vi'));
+
+    const dong: DongHocVienTruong[] = await Promise.all(
+      hocViens.map(async (hv) => {
+        const { day_du, thieu } = await this.danhGiaDayDu(hv);
+        return {
+          ma_dinh_danh_moet: hv.ma_dinh_danh_moet,
+          ho_ten: hv.ho_ten,
+          ngay_sinh: hv.ngay_sinh,
+          thang_sinh: hv.thang_sinh,
+          nam_sinh: hv.nam_sinh,
+          gioi_tinh: hv.gioi_tinh,
+          so_dinh_danh_ca_nhan: hv.so_dinh_danh_ca_nhan,
+          chuc_vu: hv.chuc_vu,
+          doi_tuong: hv.doi_tuong,
+          cap_giang_day: hv.cap_giang_day,
+          mon_giang_day: hv.mon_giang_day?.ten_mon ?? null,
+          chuyen_mon: hv.chuyen_mon.map((c) => c.chuyen_mon),
+          so_dien_thoai_lien_he: hv.so_dien_thoai_lien_he,
+          email_lien_he: hv.email_lien_he,
+          nguon_tao: hv.nguon_tao,
+          trang_thai: hv.trang_thai,
+          day_du,
+          thieu: thieu.map((t) => t.message),
+          ten_dang_nhap: hv.nguoi_dung_account?.ten_dang_nhap ?? null,
+          dang_nhap_lan_cuoi: hv.nguoi_dung_account?.dang_nhap_lan_cuoi ?? null,
+        };
+      }),
+    );
+
+    const buffer = await buildDanhSachHocVienTruongWorkbook(
+      {
+        ten_truong: donVi.ten_don_vi,
+        ten_don_vi_quan_ly: donVi.don_vi_cha?.ten_don_vi ?? null,
+        thoi_diem_xuat: new Date(),
+      },
+      dong,
+    );
+    await this.nhatKy.ghi({
+      hanh_dong: 'xuat_danh_sach_hoc_vien_truong',
+      nguoi_dung: { id: caller.id, vai_tro: caller.vai_tro },
+      chi_tiet: { don_vi_cong_tac_id: donViId, so_dong: dong.length },
+    });
+    return buffer;
   }
 
   async findOne(id: string, caller: AuthenticatedUser) {
