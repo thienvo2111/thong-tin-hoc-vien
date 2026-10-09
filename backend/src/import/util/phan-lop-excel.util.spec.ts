@@ -69,6 +69,38 @@ describe('readPhanLopWorkbook', () => {
     expect(rows[0].values.ten_cum).toBe('');
   });
 
+  it('cột tiêu đề bắt đầu bằng "#" là cột tham khảo -> bỏ qua hoàn toàn (2026-10-09)', async () => {
+    const buf = await xlsx([
+      [
+        'so_dinh_danh_ca_nhan',
+        'ma_dinh_danh_moet',
+        '# Họ tên',
+        'GĐ1 - x',
+        '# Mức học',
+        'ten_cum',
+      ],
+      ['', '1', 'Nguyễn Văn A', 'Lớp 1', 'co_ban', 'Cụm 1'],
+    ]);
+    const { headers, rows } = await readPhanLopWorkbook(buf, hopLe);
+    expect(headers).toEqual([
+      'so_dinh_danh_ca_nhan',
+      'ma_dinh_danh_moet',
+      'GĐ1 - x',
+      'ten_cum',
+    ]);
+    expect(rows).toEqual([
+      {
+        dong: 2,
+        values: {
+          so_dinh_danh_ca_nhan: '',
+          ma_dinh_danh_moet: '1',
+          'gd:1': 'Lớp 1',
+          ten_cum: 'Cụm 1',
+        },
+      },
+    ]);
+  });
+
   it.each([
     [['so_dinh_danh_ca_nhan', 'ma_dinh_danh_moet', 'ten_lop'], 'mẫu cũ'],
     [['so_dinh_danh_ca_nhan', 'ma_dinh_danh_moet', 'ten_lop_zoom'], 'mẫu cũ'],

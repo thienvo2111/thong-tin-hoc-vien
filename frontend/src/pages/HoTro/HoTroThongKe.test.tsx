@@ -5,18 +5,24 @@ import { datToken } from '@/auth/tokenStore';
 import HoTroLayout from './HoTroLayout';
 import HoTroThongKe from './HoTroThongKe';
 
-function renderTrang() {
+function renderTrang(url = '/ho-tro/thong-ke') {
   datToken('token-gia-lap');
   return renderVoiRouter(
     [{ element: <HoTroLayout />, children: [{ path: '/ho-tro/thong-ke', element: <HoTroThongKe /> }] }],
-    { initialEntries: ['/ho-tro/thong-ke'] },
+    { initialEntries: [url] },
   );
 }
 
+// Dashboard chia tab (2026-10-09): "Cần đôn đốc" ở tab Hồ sơ, "Xếp hạng" (chỉ admin) ở tab Học tập.
 describe('Người hỗ trợ — Thống kê', () => {
-  it('không có khối "Xếp hạng đơn vị" nhưng có "Cần đôn đốc"', async () => {
-    renderTrang();
+  it('tab Hồ sơ & đôn đốc có khối "Cần đôn đốc"', async () => {
+    renderTrang('/ho-tro/thong-ke?tab=ho_so');
     expect(await screen.findByRole('region', { name: 'Cần đôn đốc' })).toBeInTheDocument();
+  });
+
+  it('tab Học tập không có khối "Xếp hạng đơn vị"', async () => {
+    renderTrang('/ho-tro/thong-ke?tab=hoc_tap');
+    expect(await screen.findByRole('region', { name: 'Chuyên cần' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Xếp hạng đơn vị' })).not.toBeInTheDocument();
   });
 

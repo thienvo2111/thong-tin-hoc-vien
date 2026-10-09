@@ -26,9 +26,13 @@ export function tieuDeCotGiaiDoan(gd: {
   return `GĐ${gd.thu_tu} - ${gd.ten_giai_doan}`;
 }
 
-// Tiêu đề cột -> key trong values ("gd:<thu_tu>" hoặc tên cột cố định);
-// ném lỗi cả file cho mẫu cũ, cột lạ, GĐ không tồn tại/đã ngừng, cột trùng.
-function keyCuaCot(header: string, thuTuHopLe: Set<number>): string {
+// Tiêu đề cột -> key trong values ("gd:<thu_tu>" hoặc tên cột cố định), hoặc
+// null nếu là cột tham khảo (2026-10-09: tiêu đề bắt đầu bằng "#" — dùng để
+// xuất kèm thông tin tham khảo, vd Excel "Danh sách chia lớp", bỏ qua hoàn
+// toàn khi nhập). Ném lỗi cả file cho mẫu cũ, cột lạ, GĐ không tồn tại/đã
+// ngừng, cột trùng.
+function keyCuaCot(header: string, thuTuHopLe: Set<number>): string | null {
+  if (header.trim().startsWith('#')) return null;
   const thuong = header.toLowerCase();
   if (COT_MAU_CU.includes(thuong)) {
     throw new ValidationException(
@@ -79,6 +83,10 @@ export async function readPhanLopWorkbook(
       continue;
     }
     const key = keyCuaCot(h, thuTuHopLe);
+    if (key === null) {
+      keys.push(null);
+      continue;
+    }
     if (daGap.has(key)) {
       throw new ValidationException(
         `Cột "${h}" trùng với cột khác cùng ${key.startsWith('gd:') ? 'giai đoạn' : 'tên'}`,
@@ -102,7 +110,10 @@ export async function readPhanLopWorkbook(
       rows.push({ dong: rowNumber, values });
     }
   });
-  return { headers: headers.filter(Boolean), rows };
+  return {
+    headers: headers.filter((h) => h && !h.trim().startsWith('#')),
+    rows,
+  };
 }
 
 // File lỗi re-export dòng gốc theo đúng tiêu đề người dùng đã nộp: đổi key

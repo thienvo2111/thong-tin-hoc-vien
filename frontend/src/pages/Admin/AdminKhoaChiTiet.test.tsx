@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -459,6 +459,29 @@ describe('Admin — Chi tiết khóa: Import Excel trong tab Lớp học', () =>
     const url = new URL(urls[0]);
     expect(url.pathname).toBe('/import/nhan_su_lop');
     expect(url.searchParams.get('ma_khoa')).toBe('AG-2026-014');
+  });
+
+  it('quan_tri: nút "Xuất danh sách chia lớp" gọi đúng endpoint của khóa đang xem', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    let url: URL | null = null;
+    server.use(
+      http.get('/khoa-boi-duong/:id/danh-sach-chia-lop/xuat-excel', ({ request }) => {
+        url = new URL(request.url);
+        return new HttpResponse('x', { headers: { 'Content-Type': 'application/octet-stream' } });
+      }),
+    );
+    URL.createObjectURL = vi.fn(() => 'blob:gia-lap');
+    URL.revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+
+    await user.click(screen.getByRole('button', { name: 'Xuất danh sách chia lớp' }));
+
+    await waitFor(() => expect((url as URL | null)?.pathname).toBe('/khoa-boi-duong/khoa-1/danh-sach-chia-lop/xuat-excel'));
+    await waitFor(() => expect(click).toHaveBeenCalled());
+    expect(URL.createObjectURL).toHaveBeenCalled();
   });
 
   it('quan_tri: xác nhận nạp → đóng modal và tải lại chi tiết khóa', async () => {

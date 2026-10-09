@@ -8,7 +8,9 @@ import {
   Post,
   Put,
   Query,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { KhoaBoiDuongService } from './khoa-boi-duong.service';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -66,6 +68,25 @@ export class KhoaBoiDuongController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.khoaBoiDuongService.findOne(id, user);
+  }
+
+  // Thêm 2026-10-09: Excel chia lớp để chia ngoài hệ thống rồi nhập lại thẳng
+  // qua import phan_lop_hoc_vien (xem KhoaBoiDuongService.xuatDanhSachChiaLop).
+  @Roles('quan_tri')
+  @Get(':id/danh-sach-chia-lop/xuat-excel')
+  async xuatDanhSachChiaLop(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, maKhoa } =
+      await this.khoaBoiDuongService.xuatDanhSachChiaLop(id);
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="danh-sach-chia-lop-${maKhoa}.xlsx"`,
+      })
+      .send(buffer);
   }
 
   @Roles('quan_tri')
