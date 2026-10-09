@@ -68,6 +68,7 @@ import { SelectDiemHoc } from '@/components/SelectDiemHoc';
 import { ModalPhanCongBuoi } from './ModalPhanCongBuoi';
 import { ChonNhomHoTroGv } from './ChonNhomHoTroGv';
 import { BangKiemEditor } from './BangKiemEditor';
+import { CauHinhDiemDanhZoom } from './CauHinhDiemDanhZoom';
 
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 const MAU_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'blue', zoom: 'grape', vle: 'teal' };
@@ -871,6 +872,8 @@ export default function AdminKhoaChiTiet() {
                 />
               </Paper>
             )}
+
+            {laQuanTri && <CauHinhDiemDanhZoom khoa={khoa} />}
 
             {khoa.pham_vi_hoc_vien === 'don_vi' && (
               <Alert color="blue" variant="light">

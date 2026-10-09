@@ -294,6 +294,9 @@ export type DanhGiaDauVao = DanhGiaDauVaoDuDieuKien | DanhGiaDauVaoSsoDuDieuKien
 // join tên đơn vị), giống HocVienDanhSachItem — FE tự dựng map id->tên qua GET /danh-muc/don-vi-cong-tac.
 export type TrangThaiKhoa = 'nhap' | 'cho_duyet' | 'da_duyet' | 'tu_choi' | 'dong_dang_ky';
 
+// ADR 0005 Z8: cách tính chuyên cần khi học viên chuyển lớp Zoom cùng giai đoạn.
+export type CheDoChuyenCan = 'theo_lop_hien_tai' | 'cong_nhan_lop_cu';
+
 export interface KhoaBoiDuong {
   id: string;
   ma_khoa: string;
@@ -311,6 +314,11 @@ export interface KhoaBoiDuong {
   created_by: string | null;
   // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học (chỉ xuống mức thấp hơn).
   mo_dieu_chinh_muc: boolean;
+  // ADR 0005 (issue #23): tự điểm danh lớp Zoom — mốc bật (null = tắt) + cửa sổ (phút).
+  bat_diem_danh_zoom_luc: string | null;
+  diem_danh_mo_truoc_phut: number;
+  diem_danh_dong_sau_phut: number;
+  che_do_chuyen_can: CheDoChuyenCan;
 }
 
 // Thêm 2026-09-30 — enum thật của backend (prisma/schema.prisma) dùng cho form CRUD giai đoạn/nhân

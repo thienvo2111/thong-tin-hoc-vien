@@ -360,11 +360,29 @@ export class KhoaBoiDuongService {
             ? new Date(dto.thoi_gian_ket_thuc)
             : undefined,
           mo_dieu_chinh_muc: dto.mo_dieu_chinh_muc,
+          bat_diem_danh_zoom_luc: this.mocBatDiemDanhZoom(
+            dto.bat_diem_danh_zoom,
+            khoa.bat_diem_danh_zoom_luc,
+          ),
+          diem_danh_mo_truoc_phut: dto.diem_danh_mo_truoc_phut,
+          diem_danh_dong_sau_phut: dto.diem_danh_dong_sau_phut,
+          che_do_chuyen_can: dto.che_do_chuyen_can,
         },
       });
     } catch (e) {
       throw this.mapUniqueViolation(e, 'Mã khóa đã tồn tại');
     }
+  }
+
+  // ADR 0005 Z6: chỉ chốt vắng buổi bắt đầu sau mốc bật — gửi bật khi đang
+  // bật phải giữ mốc cũ, nếu không các buổi đã qua sẽ thoát khỏi diện chốt.
+  private mocBatDiemDanhZoom(
+    bat: boolean | undefined,
+    mocHienTai: Date | null,
+  ): Date | null | undefined {
+    if (bat === undefined) return undefined;
+    if (!bat) return null;
+    return mocHienTai ?? new Date();
   }
 
   // ---------------------------------------------------------------------

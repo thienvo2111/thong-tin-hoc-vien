@@ -287,6 +287,13 @@ enum nguon_diem_danh {
   thu_cong
 }
 
+// ADR 0005 Z8 (issue #23): cách tính chuyên cần khi học viên chuyển lớp Zoom
+// cùng giai đoạn — theo lớp hiện tại (học lại) hay công nhận buổi có mặt ở lớp cũ.
+enum che_do_chuyen_can {
+  theo_lop_hien_tai
+  cong_nhan_lop_cu
+}
+
 // M8 (2026-10-01): Yêu cầu hỗ trợ — ticket 1 câu hỏi/1 câu trả lời của
 // hoc_vien, không phải chat real-time. Enum MỚI hoàn toàn nên CREATE TYPE
 // dùng ngay trong migration tạo bảng (không bị ràng buộc "ALTER TYPE khác
@@ -477,6 +484,9 @@ model nguoi_dung {
   de_nghi_doi_lop_tao   de_nghi_doi_lop[]   @relation("de_nghi_nguoi_tao")
   de_nghi_doi_lop_xu_ly de_nghi_doi_lop[]   @relation("de_nghi_nguoi_xu_ly")
   nhac_lich_da_gui      nhat_ky_nhac_lich[] @relation("nhac_lich_nguoi_gui")
+
+  // ADR 0005 Z7 (issue #23)
+  diem_danh_da_sua diem_danh[] @relation("diem_danh_nguoi_sua")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -738,25 +748,31 @@ model tai_khoan_vle {
 // =====================================================================
 
 model khoa_boi_duong {
-  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ma_khoa            String              @unique(map: "uq_khoa_ma") @db.VarChar(30)
-  ten_khoa           String              @db.VarChar(255)
-  don_vi_dat_hang_id String              @db.Uuid
-  dia_diem           String?             @db.VarChar(255)
-  thoi_gian_bat_dau  DateTime            @db.Date
-  thoi_gian_ket_thuc DateTime            @db.Date
-  trang_thai         trang_thai_khoa     @default(nhap)
-  nguoi_duyet_id     String?             @db.Uuid
-  cap_duyet_thuc_te  vai_tro_nguoi_dung?
-  ngay_duyet         DateTime?           @db.Timestamptz(6)
-  created_at         DateTime            @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime            @default(now()) @db.Timestamptz(6)
-  created_by         String?             @db.Uuid
+  id                      String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ma_khoa                 String              @unique(map: "uq_khoa_ma") @db.VarChar(30)
+  ten_khoa                String              @db.VarChar(255)
+  don_vi_dat_hang_id      String              @db.Uuid
+  dia_diem                String?             @db.VarChar(255)
+  thoi_gian_bat_dau       DateTime            @db.Date
+  thoi_gian_ket_thuc      DateTime            @db.Date
+  trang_thai              trang_thai_khoa     @default(nhap)
+  nguoi_duyet_id          String?             @db.Uuid
+  cap_duyet_thuc_te       vai_tro_nguoi_dung?
+  ngay_duyet              DateTime?           @db.Timestamptz(6)
+  created_at              DateTime            @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime            @default(now()) @db.Timestamptz(6)
+  created_by              String?             @db.Uuid
   // Thêm 2026-09-28: tài khoản đã gọi POST /khoa-boi-duong lúc tạo khóa —
   // NULL cho khóa tạo trước migration này (không truy ngược được), xem
   // docs/database-ddl.sql comment tại đây.
   // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học (xuống mức thấp hơn).
-  mo_dieu_chinh_muc  Boolean             @default(false)
+  mo_dieu_chinh_muc       Boolean             @default(false)
+  // ADR 0005 (issue #23): tự điểm danh lớp Zoom — mốc bật (NULL = tắt), cửa sổ
+  // điểm danh tính theo giờ bắt đầu buổi (CHECK 0–180 / 15–720 bằng raw SQL).
+  bat_diem_danh_zoom_luc  DateTime?           @db.Timestamptz(6)
+  diem_danh_mo_truoc_phut Int                 @default(30) @db.SmallInt
+  diem_danh_dong_sau_phut Int                 @default(120) @db.SmallInt
+  che_do_chuyen_can       che_do_chuyen_can   @default(theo_lop_hien_tai)
 
   don_vi_dat_hang don_vi_cong_tac @relation(fields: [don_vi_dat_hang_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   nguoi_duyet     nguoi_dung?     @relation("khoa_boi_duong_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -910,6 +926,8 @@ model lich_hoc_lop {
   diem_hoc_id        String?             @db.Uuid
   phong              String?             @db.VarChar(100)
   cap_nhat_luc       DateTime            @default(now()) @db.Timestamptz(6)
+  // ADR 0005 Z6: mốc cron đã chốt vắng buổi Zoom (NULL = chưa chốt).
+  chot_diem_danh_luc DateTime?           @db.Timestamptz(6)
 
   lop       lop_hoc               @relation(fields: [lop_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   diem_hoc  diem_hoc?             @relation(fields: [diem_hoc_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -1080,18 +1098,23 @@ model phan_lop_giai_doan {
 // UNIQUE (dang_ky_hoc_id, lich_hoc_id) — chạy lại file import ghi đè
 // (upsert), không cộng dồn.
 model diem_danh {
-  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  dang_ky_hoc_id  String               @db.Uuid
-  lich_hoc_id     String               @db.Uuid
-  trang_thai      trang_thai_diem_danh
-  nguon           nguon_diem_danh
-  ghi_chu         String?
-  nguon_import_id String?              @db.Uuid
-  cap_nhat_luc    DateTime             @default(now()) @db.Timestamptz(6)
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dang_ky_hoc_id   String               @db.Uuid
+  lich_hoc_id      String               @db.Uuid
+  trang_thai       trang_thai_diem_danh
+  nguon            nguon_diem_danh
+  ghi_chu          String?
+  nguon_import_id  String?              @db.Uuid
+  cap_nhat_luc     DateTime             @default(now()) @db.Timestamptz(6)
+  // ADR 0005: lúc học viên tự bấm "Điểm danh & vào Zoom" (giữ nguyên khi import
+  // ghi đè); nguoi_sua = nhân sự sửa tay gần nhất (Z7).
+  tu_diem_danh_luc DateTime?            @db.Timestamptz(6)
+  nguoi_sua        String?              @db.Uuid
 
   dang_ky_hoc  dang_ky_hoc     @relation(fields: [dang_ky_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   lich_hoc     lich_hoc_lop    @relation(fields: [lich_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   nguon_import nhat_ky_import? @relation(fields: [nguon_import_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sua_boi      nguoi_dung?     @relation("diem_danh_nguoi_sua", fields: [nguoi_sua], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@unique([dang_ky_hoc_id, lich_hoc_id], map: "uq_diem_danh")
   @@index([lich_hoc_id], map: "idx_diem_danh_lich_hoc")

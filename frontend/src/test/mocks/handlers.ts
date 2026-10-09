@@ -680,6 +680,10 @@ export const handlers = [
       updated_at: new Date().toISOString(),
       created_by: 'nd-1',
       mo_dieu_chinh_muc: false,
+      bat_diem_danh_zoom_luc: null,
+      diem_danh_mo_truoc_phut: 30,
+      diem_danh_dong_sau_phut: 120,
+      che_do_chuyen_can: 'theo_lop_hien_tai',
     };
     db.danhSachKhoa = [moi, ...db.danhSachKhoa];
     db.chiTietKhoa[id] = { ...moi, pham_vi_hoc_vien: 'toan_bo', giai_doan: [], lop_hoc: [], cum_hoc_vien: [] };
@@ -692,7 +696,11 @@ export const handlers = [
     const id = params.id as string;
     const khoa = db.chiTietKhoa[id];
     if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
-    const body = (await request.json()) as Record<string, unknown>;
+    const { bat_diem_danh_zoom: bat, ...body } = (await request.json()) as Record<string, unknown>;
+    // ADR 0005: bật giữ mốc cũ nếu đã bật, tắt = null, không gửi = giữ nguyên (như backend).
+    if (bat !== undefined) {
+      body.bat_diem_danh_zoom_luc = bat ? (khoa.bat_diem_danh_zoom_luc ?? new Date().toISOString()) : null;
+    }
     Object.assign(khoa, body);
     db.danhSachKhoa = db.danhSachKhoa.map((k) => (k.id === id ? { ...k, ...body } : k));
     return HttpResponse.json(khoa);

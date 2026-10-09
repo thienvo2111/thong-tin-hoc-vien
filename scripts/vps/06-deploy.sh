@@ -24,6 +24,17 @@ else
   git clone --branch "${GIT_BRANCH}" "${GIT_REPO}" "${APP_DIR}"
 fi
 
+echo "==> Kiem tra dong ho VPS dong bo NTP"
+# ADR 0005: cua so diem danh lop Zoom + cron chot vang tinh theo gio may chu
+# (VPS tung lech ~1 gio). Chi canh bao, khong dung deploy.
+NTP_OK="$(timedatectl show -p NTPSynchronized --value 2>/dev/null || true)"
+if [ "${NTP_OK}" = "yes" ]; then
+  echo "    OK"
+else
+  echo "    !! CANH BAO: dong ho VPS chua dong bo NTP (NTPSynchronized=${NTP_OK:-?}) - cua so diem danh lop Zoom phu thuoc gio may chu"
+  echo "    !! Chay: sudo timedatectl set-ntp true  (roi kiem tra lai: timedatectl)"
+fi
+
 # ---------- Backend ----------
 echo "==> Backend: cai dependencies"
 cd "${APP_DIR}/backend"

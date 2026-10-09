@@ -211,6 +211,10 @@ export function taoDanhSachKhoaMau(): KhoaBoiDuong[] {
       updated_at: '2026-09-20T00:00:00.000Z',
       created_by: 'nd-1',
       mo_dieu_chinh_muc: false,
+      bat_diem_danh_zoom_luc: null,
+      diem_danh_mo_truoc_phut: 30,
+      diem_danh_dong_sau_phut: 120,
+      che_do_chuyen_can: 'theo_lop_hien_tai',
     },
     {
       id: 'khoa-2',
@@ -228,6 +232,10 @@ export function taoDanhSachKhoaMau(): KhoaBoiDuong[] {
       updated_at: '2026-09-21T00:00:00.000Z',
       created_by: 'nd-1',
       mo_dieu_chinh_muc: false,
+      bat_diem_danh_zoom_luc: null,
+      diem_danh_mo_truoc_phut: 30,
+      diem_danh_dong_sau_phut: 120,
+      che_do_chuyen_can: 'theo_lop_hien_tai',
     },
   ];
 }

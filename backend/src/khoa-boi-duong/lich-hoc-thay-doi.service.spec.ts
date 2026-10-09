@@ -18,6 +18,7 @@ const lichCu: lich_hoc_lop = {
   diem_hoc_id: 'dh-1',
   phong: 'P.101',
   cap_nhat_luc: new Date('2026-10-01T00:00:00Z'),
+  chot_diem_danh_luc: null,
 };
 
 describe('soSanhLichHoc', () => {

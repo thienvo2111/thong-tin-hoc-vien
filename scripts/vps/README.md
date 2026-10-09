@@ -176,6 +176,11 @@ Từ 2026-10-02, `06-deploy.sh` tự so prefix `@Controller` với site config N
 (chỉ cảnh báo, không dừng deploy). Đã từng bị lọt: `yeu-cau-ho-tro` (M8) và
 `cau-hinh-khao-sat` — đã bổ sung vào regex cùng ngày.
 
+Từ 2026-10-09 (ADR 0005), `06-deploy.sh` kiểm tra `timedatectl` có
+`NTPSynchronized=yes` và in `!! CANH BAO: dong ho VPS chua dong bo NTP ...`
+nếu chưa (chỉ cảnh báo) — điểm danh lớp Zoom tính cửa sổ theo giờ máy chủ;
+bật bằng `sudo timedatectl set-ntp true` trước khi bật tính năng trên prod.
+
 ## Vẫn còn ngoài phạm vi script (chưa tự động hoá)
 
 - Khôi phục backup thật sự (script chỉ tạo backup, lệnh restore ghi ở cuối

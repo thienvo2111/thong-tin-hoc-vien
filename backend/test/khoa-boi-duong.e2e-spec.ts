@@ -541,6 +541,97 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       });
     });
 
+    // ADR 0005 (issue #23): công tắc + cấu hình tự điểm danh lớp Zoom.
+    describe('Điểm danh lớp Zoom', () => {
+      const patch = (body: object) =>
+        request(app.getHttpServer())
+          .patch(`/khoa-boi-duong/${khoaId}`)
+          .set('Authorization', `Bearer ${tokenQuanTri}`)
+          .send(body);
+
+      it('khóa mới: tắt, mặc định 30/120, theo_lop_hien_tai; GET chi tiết trả đủ trường', async () => {
+        const res = await request(app.getHttpServer())
+          .get(`/khoa-boi-duong/${khoaId}`)
+          .set('Authorization', `Bearer ${tokenQuanTri}`)
+          .expect(200);
+        expect(res.body).toMatchObject({
+          bat_diem_danh_zoom_luc: null,
+          diem_danh_mo_truoc_phut: 30,
+          diem_danh_dong_sau_phut: 120,
+          che_do_chuyen_can: 'theo_lop_hien_tai',
+        });
+      });
+
+      it('bật -> ghi mốc; bật lại -> giữ mốc cũ; tắt -> null', async () => {
+        const truoc = Date.now();
+        const bat = await patch({ bat_diem_danh_zoom: true }).expect(200);
+        const moc = bat.body.bat_diem_danh_zoom_luc as string;
+        expect(moc).toEqual(expect.any(String));
+        expect(new Date(moc).getTime()).toBeGreaterThanOrEqual(truoc - 1000);
+
+        const batLai = await patch({ bat_diem_danh_zoom: true }).expect(200);
+        expect(batLai.body.bat_diem_danh_zoom_luc).toBe(moc);
+
+        // Không gửi trường -> giữ nguyên.
+        const khac = await patch({ ten_khoa: 'Tên đã sửa' }).expect(200);
+        expect(khac.body.bat_diem_danh_zoom_luc).toBe(moc);
+
+        const tat = await patch({ bat_diem_danh_zoom: false }).expect(200);
+        expect(tat.body.bat_diem_danh_zoom_luc).toBeNull();
+      });
+
+      it('lưu số phút mở trước/đóng sau và chế độ chuyên cần', async () => {
+        const res = await patch({
+          diem_danh_mo_truoc_phut: 0,
+          diem_danh_dong_sau_phut: 720,
+          che_do_chuyen_can: 'cong_nhan_lop_cu',
+        }).expect(200);
+        expect(res.body).toMatchObject({
+          diem_danh_mo_truoc_phut: 0,
+          diem_danh_dong_sau_phut: 720,
+          che_do_chuyen_can: 'cong_nhan_lop_cu',
+        });
+        const bien = await patch({
+          diem_danh_mo_truoc_phut: 180,
+          diem_danh_dong_sau_phut: 15,
+        }).expect(200);
+        expect(bien.body.diem_danh_mo_truoc_phut).toBe(180);
+        expect(bien.body.diem_danh_dong_sau_phut).toBe(15);
+      });
+
+      it.each([
+        [{ diem_danh_mo_truoc_phut: -1 }],
+        [{ diem_danh_mo_truoc_phut: 181 }],
+        [{ diem_danh_mo_truoc_phut: 1.5 }],
+        [{ diem_danh_dong_sau_phut: 14 }],
+        [{ diem_danh_dong_sau_phut: 721 }],
+        [{ che_do_chuyen_can: 'khong_co' }],
+        [{ bat_diem_danh_zoom: 'co' }],
+      ])('giá trị không hợp lệ %j -> 400', async (body) => {
+        await patch(body).expect(400);
+      });
+
+      it('đóng sau ngoài khoảng không làm đổi dữ liệu đã lưu', async () => {
+        await patch({ diem_danh_dong_sau_phut: 721 }).expect(400);
+        const res = await request(app.getHttpServer())
+          .get(`/khoa-boi-duong/${khoaId}`)
+          .set('Authorization', `Bearer ${tokenQuanTri}`)
+          .expect(200);
+        expect(res.body.diem_danh_dong_sau_phut).toBe(15);
+      });
+
+      it.each([
+        ['truong', () => tokenTruong1],
+        ['so_gddt', () => tokenSo],
+      ])('%s bật điểm danh Zoom -> 403', async (_vaiTro, layToken) => {
+        await request(app.getHttpServer())
+          .patch(`/khoa-boi-duong/${khoaId}`)
+          .set('Authorization', `Bearer ${layToken()}`)
+          .send({ bat_diem_danh_zoom: true })
+          .expect(403);
+      });
+    });
+
     it.each([
       ['truong', () => tokenTruong1],
       ['so_gddt', () => tokenSo],
