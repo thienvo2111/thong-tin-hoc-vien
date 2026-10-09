@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type { DiaDanh, DonViCongTac, MonHoc, PaginatedResult } from './types';
 
@@ -47,6 +47,30 @@ export async function layDonViCongTacTheoId(id: string): Promise<DonViCongTac | 
     `/danh-muc/don-vi-cong-tac?id=${encodeURIComponent(id)}&page_size=1`,
   );
   return ket_qua.data[0] ?? null;
+}
+
+// Tra tên nhiều đơn vị theo id khi danh sách đã tải sẵn (daBiet, vd nhóm so_gddt/khac nhỏ load
+// trọn) không có đủ — fetch RIÊNG từng id còn thiếu qua layDonViCongTacTheoId (id đơn, không phân
+// trang backend chỉ nhận @IsUUID đơn, không có batch). Dùng cho bảng danh sách (học viên/khóa) và
+// các dòng hiển thị tên đơn vị khi đơn vị liên quan có thể nằm ngoài danh sách đã tải sẵn (bug: đơn
+// vị xếp sau trang page_size=200 không tìm được tên, vd "Trường THPT Châu Thị Tế").
+export function useTenDonViTheoId(
+  ids: (string | null | undefined)[],
+  daBiet: Map<string, string>,
+): Map<string, string> {
+  const canTra = Array.from(new Set(ids.filter((id): id is string => !!id && !daBiet.has(id))));
+  const ketQua = useQueries({
+    queries: canTra.map((id) => ({
+      queryKey: ['danh-muc', 'don-vi-cong-tac', 'theo-id', id],
+      queryFn: () => layDonViCongTacTheoId(id),
+    })),
+  });
+  const ra = new Map(daBiet);
+  canTra.forEach((id, i) => {
+    const ten = ketQua[i]?.data?.ten_don_vi;
+    if (ten) ra.set(id, ten);
+  });
+  return ra;
 }
 
 export interface DonViCongTacPhanTrangParams {

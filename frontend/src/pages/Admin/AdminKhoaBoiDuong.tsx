@@ -18,12 +18,14 @@ import {
 import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useDanhSachKhoa, useDonViChoKhoa, useTaoKhoa } from '@/api/khoaBoiDuong';
+import { useTenDonViTheoId } from '@/api/danhMuc';
 import { useToi } from '@/auth/AuthContext';
 import { thongDiepLoiChung, loiFieldsThanhMap } from '@/lib/loiApi';
 import { dinhDangNgay } from '@/lib/ngay';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { KhoaTrangThaiBadge } from '@/components/KhoaTrangThaiBadge';
+import { SelectDonViTimKiem } from '@/components/SelectDonViTimKiem';
 import { AdminPageHeader } from './AdminPageHeader';
 
 const KICH_THUOC_TRANG = 20;
@@ -85,24 +87,25 @@ export default function AdminKhoaBoiDuong() {
 
   const { data, isLoading, isError, error, isFetching } = useDanhSachKhoa(params);
   const donVi = useDonViChoKhoa();
+  // Chỉ gồm so_gddt + khac (danh mục nhỏ, xem useDonViChoKhoa) — "Trường" không còn ở đây, chọn qua
+  // SelectDonViTimKiem (laTruongDatHang bên dưới dựa vào: KHÔNG có trong map này = phải là 1 trường,
+  // theo đúng 3 loại hợp lệ của don_vi_dat_hang).
   const donViMap = new Map((donVi.data ?? []).map((d) => [d.id, d.ten_don_vi]));
-  const tuyChonDonVi = [
-    { value: '', label: 'Tất cả đơn vị đặt hàng' },
-    ...(donVi.data?.map((d) => ({ value: d.id, label: d.ten_don_vi })) ?? []),
-  ];
+  // Tên đơn vị đặt hàng để hiện ở cột bảng — tra thêm theo id khi là trường (không có trong donViMap).
+  const tenDonViDatHang = useTenDonViTheoId((data?.data ?? []).map((k) => k.don_vi_dat_hang_id), donViMap);
 
   // Select "Đơn vị đặt hàng" (form tạo khóa) — nhóm theo loại, đúng thứ tự spec mục 6: Sở GD&ĐT →
-  // Đơn vị khác → Trường (phong_vhxh không hợp lệ làm đơn vị đặt hàng nên không có nhóm riêng).
+  // Đơn vị khác (phong_vhxh không hợp lệ làm đơn vị đặt hàng nên không có nhóm riêng). Trường chọn
+  // riêng qua SelectDonViTimKiem bên dưới (danh mục trường quá lớn để tải trọn vào 1 Select tĩnh).
   const nhomDonViDatHang = useMemo(() => {
     const list = donVi.data ?? [];
     const nhom = (loai: string, group: string) => ({
       group,
       items: list.filter((d) => d.loai_don_vi === loai).map((d) => ({ value: d.id, label: d.ten_don_vi })),
     });
-    return [nhom('so_gddt', 'Sở GD&ĐT'), nhom('khac', 'Đơn vị khác'), nhom('truong', 'Trường')].filter(
-      (n) => n.items.length > 0,
-    );
+    return [nhom('so_gddt', 'Sở GD&ĐT'), nhom('khac', 'Đơn vị khác')].filter((n) => n.items.length > 0);
   }, [donVi.data]);
+  const laTruongDatHang = !!form.don_vi_dat_hang_id && !donViMap.has(form.don_vi_dat_hang_id);
 
   const taoKhoa = useTaoKhoa();
 
@@ -181,14 +184,12 @@ export default function AdminKhoaBoiDuong() {
               allowDeselect={false}
               w={190}
             />
-            <Select
-              data={tuyChonDonVi}
-              value={donViId}
-              onChange={(v) => datBoLoc(setDonViId)(v ?? '')}
-              allowDeselect={false}
-              searchable
-              filter={locTiengViet}
-              w={220}
+            <SelectDonViTimKiem
+              placeholder="Tất cả đơn vị đặt hàng — gõ tên để tìm"
+              loaiDonVi={['so_gddt', 'khac', 'truong']}
+              value={donViId || null}
+              onChange={(id) => datBoLoc(setDonViId)(id ?? '')}
+              w={240}
             />
             <Text fz={12.5} c="dimmed" ml="auto">
               {data ? `${data.total.toLocaleString('vi-VN')} khóa bồi dưỡng` : ''}
@@ -240,7 +241,7 @@ export default function AdminKhoaBoiDuong() {
                     >
                       <Table.Td fw={600}>{khoa.ma_khoa}</Table.Td>
                       <Table.Td>{khoa.ten_khoa}</Table.Td>
-                      <Table.Td>{donViMap.get(khoa.don_vi_dat_hang_id) ?? '—'}</Table.Td>
+                      <Table.Td>{tenDonViDatHang.get(khoa.don_vi_dat_hang_id) ?? '—'}</Table.Td>
                       <Table.Td style={{ whiteSpace: 'nowrap' }}>
                         {dinhDangNgay(khoa.thoi_gian_bat_dau)} – {dinhDangNgay(khoa.thoi_gian_ket_thuc)}
                       </Table.Td>
@@ -311,14 +312,19 @@ export default function AdminKhoaBoiDuong() {
             />
           </Group>
           <Select
-            label="Đơn vị đặt hàng"
-            required
+            label="Đơn vị đặt hàng (Sở GD&ĐT / đơn vị khác)"
             searchable
             filter={locTiengViet}
             data={nhomDonViDatHang}
-            value={form.don_vi_dat_hang_id || null}
+            value={laTruongDatHang ? null : form.don_vi_dat_hang_id || null}
             error={loiField.don_vi_dat_hang_id}
             onChange={(v) => setForm((f) => ({ ...f, don_vi_dat_hang_id: v ?? '' }))}
+          />
+          <SelectDonViTimKiem
+            label="Hoặc chọn trường (gõ tên để tìm)"
+            loaiDonVi="truong"
+            value={laTruongDatHang ? form.don_vi_dat_hang_id || null : null}
+            onChange={(id) => setForm((f) => ({ ...f, don_vi_dat_hang_id: id ?? '' }))}
           />
 
           <Button mt="sm" loading={taoKhoa.isPending} disabled={!formHopLe} onClick={xuLyTao} fullWidth>

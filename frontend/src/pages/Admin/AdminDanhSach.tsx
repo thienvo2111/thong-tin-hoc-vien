@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Alert,
@@ -19,10 +18,11 @@ import {
 import { notifications } from '@mantine/notifications';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useDanhSachHocVien, xuatHocVienTheoTruong } from '@/api/admin';
-import { layDonViCongTac } from '@/api/danhMuc';
+import { useTenDonViTheoId } from '@/api/danhMuc';
+import type { DonViCongTac } from '@/api/types';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { chuanHoaNfc } from '@/lib/nfc';
-import { locTiengViet } from '@/lib/timKiemTiengViet';
+import { SelectDonViTimKiem } from '@/components/SelectDonViTimKiem';
 import { TrangThaiBadge } from '@/components/TrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
 
@@ -57,6 +57,7 @@ export default function AdminDanhSach() {
   const [qDebounced] = useDebouncedValue(q, 300);
   const [trangThai, setTrangThai] = useState(searchParams.get('trang_thai') ?? '');
   const [donViId, setDonViId] = useState('');
+  const [donViDaChon, setDonViDaChon] = useState<DonViCongTac | null>(null);
   const [capGiangDay, setCapGiangDay] = useState('');
   const [page, setPage] = useState(1);
   const [dangXuat, setDangXuat] = useState(false);
@@ -85,17 +86,11 @@ export default function AdminDanhSach() {
   );
 
   const { data, isLoading, isError, error, isFetching } = useDanhSachHocVien(params);
-  const donVi = useQuery({
-    queryKey: ['danh-muc', 'don-vi-cong-tac', 'all'],
-    queryFn: () => layDonViCongTac({ page_size: 200 }),
-  });
-  const donViMap = new Map((donVi.data?.data ?? []).map((d) => [d.id, d.ten_don_vi]));
+  // Tên đơn vị để hiện ở cột bảng — tra riêng từng id xuất hiện trên trang hiện tại (không tải cả
+  // danh mục ~5.000 đơn vị): xem useTenDonViTheoId trong api/danhMuc.ts.
+  const donViMap = useTenDonViTheoId((data?.data ?? []).map((hv) => hv.don_vi_cong_tac_id), new Map());
   // Chỉ xuất theo đúng 1 trường (BE trả 400 với Phòng/Sở).
-  const coTheXuat = donVi.data?.data.find((d) => d.id === donViId)?.loai_don_vi === 'truong';
-  const tuyChonDonVi = [
-    { value: '', label: 'Tất cả đơn vị' },
-    ...(donVi.data?.data.map((d) => ({ value: d.id, label: d.ten_don_vi })) ?? []),
-  ];
+  const coTheXuat = donViDaChon?.loai_don_vi === 'truong';
 
   function datBoLoc<T>(setter: (v: T) => void) {
     return (v: T) => {
@@ -125,14 +120,15 @@ export default function AdminDanhSach() {
               allowDeselect={false}
               w={180}
             />
-            <Select
-              data={tuyChonDonVi}
-              value={donViId}
-              onChange={(v) => datBoLoc(setDonViId)(v ?? '')}
-              allowDeselect={false}
-              searchable
-              filter={locTiengViet}
-              w={220}
+            <SelectDonViTimKiem
+              placeholder="Tất cả đơn vị — gõ tên để tìm"
+              loaiDonVi="truong"
+              value={donViId || null}
+              onChange={(id, donVi) => {
+                datBoLoc(setDonViId)(id ?? '');
+                setDonViDaChon(donVi);
+              }}
+              w={260}
             />
             <Select
               data={TUY_CHON_CAP_GIANG_DAY}

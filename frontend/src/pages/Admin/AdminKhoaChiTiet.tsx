@@ -25,6 +25,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { ApiError } from '@/api/client';
+import { useTenDonViTheoId } from '@/api/danhMuc';
 import {
   useCapNhatCum,
   useCapNhatGiaiDoan,
@@ -59,6 +60,7 @@ import { thongDiepLoiChung, loiFieldsThanhMap } from '@/lib/loiApi';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { KhoaTrangThaiBadge } from '@/components/KhoaTrangThaiBadge';
+import { SelectDonViTimKiem } from '@/components/SelectDonViTimKiem';
 import { AdminPageHeader } from './AdminPageHeader';
 import { ModalImportLopHoc } from './ModalImportLopHoc';
 import { ChonNguoiHoTroCum } from './ChonNguoiHoTroCum';
@@ -229,18 +231,20 @@ export default function AdminKhoaChiTiet() {
   const laQuanTri = vaiTro === 'quan_tri';
   const { data: khoa, isLoading, isError, error } = useChiTietKhoa(id);
   const donVi = useDonViChoKhoa();
+  // Chỉ gồm so_gddt + khac (danh mục nhỏ, xem useDonViChoKhoa) — Trường chọn qua SelectDonViTimKiem.
   const donViMap = new Map((donVi.data ?? []).map((d) => [d.id, d.ten_don_vi]));
+  // Tên đơn vị đặt hàng để hiện ở header "Đặt hàng: ..." — tra thêm theo id khi là trường.
+  const tenDonViDatHang = useTenDonViTheoId([khoa?.don_vi_dat_hang_id], donViMap);
 
   // Select "Đơn vị đặt hàng" (form sửa khóa) — cùng cách nhóm với form tạo khóa ở AdminKhoaBoiDuong.
+  // Trường chọn riêng qua SelectDonViTimKiem (danh mục trường quá lớn để tải trọn vào 1 Select tĩnh).
   const nhomDonViDatHang = useMemo(() => {
     const list = donVi.data ?? [];
     const nhom = (loai: string, group: string) => ({
       group,
       items: list.filter((d) => d.loai_don_vi === loai).map((d) => ({ value: d.id, label: d.ten_don_vi })),
     });
-    return [nhom('so_gddt', 'Sở GD&ĐT'), nhom('khac', 'Đơn vị khác'), nhom('truong', 'Trường')].filter(
-      (n) => n.items.length > 0,
-    );
+    return [nhom('so_gddt', 'Sở GD&ĐT'), nhom('khac', 'Đơn vị khác')].filter((n) => n.items.length > 0);
   }, [donVi.data]);
 
   // --- Sửa khóa (chỉ quan_tri) ------------------------------------------
@@ -251,6 +255,7 @@ export default function AdminKhoaChiTiet() {
   const [modalSuaKhoa, setModalSuaKhoa] = useState(false);
   const [formSuaKhoa, setFormSuaKhoa] = useState<FormSuaKhoa | null>(null);
   const [loiSuaKhoa, setLoiSuaKhoa] = useState<Record<string, string>>({});
+  const laTruongDatHangSua = !!formSuaKhoa?.don_vi_dat_hang_id && !donViMap.has(formSuaKhoa.don_vi_dat_hang_id);
 
   function moModalSuaKhoa() {
     if (!khoa) return;
@@ -828,7 +833,7 @@ export default function AdminKhoaChiTiet() {
                   {dinhDangNgay(khoa.thoi_gian_ket_thuc)} · {khoa.lop_hoc.length} lớp học
                 </Text>
                 <Text fz={13} c="dimmed">
-                  Đặt hàng: {donViMap.get(khoa.don_vi_dat_hang_id) ?? '—'} · Tổ chức: Trường ĐHSP TP.HCM
+                  Đặt hàng: {tenDonViDatHang.get(khoa.don_vi_dat_hang_id) ?? '—'} · Tổ chức: Trường ĐHSP TP.HCM
                 </Text>
               </Box>
 
@@ -1365,14 +1370,19 @@ export default function AdminKhoaChiTiet() {
               />
             </Group>
             <Select
-              label="Đơn vị đặt hàng"
-              required
+              label="Đơn vị đặt hàng (Sở GD&ĐT / đơn vị khác)"
               searchable
               filter={locTiengViet}
               data={nhomDonViDatHang}
-              value={formSuaKhoa.don_vi_dat_hang_id || null}
+              value={laTruongDatHangSua ? null : formSuaKhoa.don_vi_dat_hang_id || null}
               error={loiSuaKhoa.don_vi_dat_hang_id}
               onChange={(v) => setFormSuaKhoa((f) => (f ? { ...f, don_vi_dat_hang_id: v ?? '' } : f))}
+            />
+            <SelectDonViTimKiem
+              label="Hoặc chọn trường (gõ tên để tìm)"
+              loaiDonVi="truong"
+              value={laTruongDatHangSua ? formSuaKhoa.don_vi_dat_hang_id || null : null}
+              onChange={(id) => setFormSuaKhoa((f) => (f ? { ...f, don_vi_dat_hang_id: id ?? '' } : f))}
             />
             <Button mt="sm" loading={capNhatKhoa.isPending} disabled={!formSuaKhoaHopLe} onClick={xuLySuaKhoa} fullWidth>
               Lưu thay đổi

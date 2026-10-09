@@ -179,6 +179,22 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     expect(await screen.findByText('Bồi dưỡng NLS – Mức cơ bản (đã sửa)')).toBeInTheDocument();
   });
 
+  // Fix: "Trường" không còn ở Select nhóm tĩnh (danh mục quá lớn) — chọn qua ô tìm kiếm riêng.
+  it('quan_tri: sửa khóa, đổi đơn vị đặt hàng sang TRƯỜNG qua ô tìm kiếm → lưu thành công', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+
+    await user.click(screen.getByRole('button', { name: 'Sửa khóa' }));
+    await user.type(await screen.findByRole('textbox', { name: /^Hoặc chọn trường/ }), 'Long Xuyên');
+    await user.click(await screen.findByRole('option', { name: 'THPT Long Xuyên — Phường Long Xuyên' }));
+    await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(await screen.findByText(/Đặt hàng: THPT Long Xuyên/)).toBeInTheDocument();
+  });
+
   it('tạo lớp mới (Quản trị): điền form hợp lệ → gọi API, hiện lớp mới trong bảng', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();

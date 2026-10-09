@@ -116,6 +116,21 @@ describe('BoLocThongKe', () => {
     expect(search(r).get('doi_tuong')).toBe('nhan_vien');
   });
 
+  it('gõ không dấu "chau thi te" vẫn tìm thấy "Trường THPT Châu Thị Tế" trong ô Đơn vị', async () => {
+    server.use(
+      http.get('/thong-ke/bo-loc', () =>
+        HttpResponse.json({
+          ...boLocQuanTri,
+          don_vi: [...(boLocQuanTri.don_vi ?? []), { id: 'dv-ctt', ten_don_vi: 'Trường THPT Châu Thị Tế', loai_don_vi: 'truong' }],
+        }),
+      ),
+    );
+    renderBoLoc();
+    await userEvent.click(await o('Đơn vị'));
+    await userEvent.type(await o('Đơn vị'), 'chau thi te');
+    expect(await screen.findByRole('option', { name: 'Trường THPT Châu Thị Tế' })).toBeInTheDocument();
+  });
+
   it('hiện ô đối tượng cả với tài khoản trường', async () => {
     server.use(
       http.get('/thong-ke/bo-loc', () =>

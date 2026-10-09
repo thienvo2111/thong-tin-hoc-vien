@@ -95,8 +95,8 @@ describe('Admin — Danh sách học viên', () => {
     renderTrang();
     await screen.findByText('Lê Văn Bình');
 
-    await user.click(screen.getByDisplayValue('Tất cả đơn vị'));
-    await user.click(await screen.findByRole('option', { name: 'THPT Long Xuyên' }));
+    await user.type(screen.getByPlaceholderText('Tất cả đơn vị — gõ tên để tìm'), 'Long Xuyên');
+    await user.click(await screen.findByRole('option', { name: 'THPT Long Xuyên — Phường Long Xuyên' }));
     const nut = screen.getByRole('button', { name: 'Xuất Excel theo trường' });
     await waitFor(() => expect(nut).toHaveAttribute('aria-disabled', 'false'));
     await user.click(nut);
@@ -106,22 +106,65 @@ describe('Admin — Danh sách học viên', () => {
     click.mockRestore();
   });
 
+  // Đơn vị xếp sau trang đầu (page_size=200) của danh mục ~5.000 trường vẫn tìm được, vì ô lọc giờ
+  // tìm qua server (q) chứ không tải cả danh mục rồi lọc phía client — bug đã gặp "Châu Thị Tế".
+  it('tìm được trường KHÔNG nằm trong 200 dòng đầu danh mục (tìm qua server, không bị cắt trang)', async () => {
+    server.use(
+      http.get('/danh-muc/don-vi-cong-tac', ({ request }) => {
+        const q = new URL(request.url).searchParams.get('q')?.toLowerCase() ?? '';
+        if (!q.includes('châu thị tế')) return HttpResponse.json({ data: [] });
+        return HttpResponse.json({
+          data: [
+            {
+              id: 'dv-xa-200',
+              ma_don_vi: 'TR-AG-9999',
+              ten_don_vi: 'Trường THPT Châu Thị Tế',
+              loai_don_vi: 'truong',
+              dia_ban_id: 'phuong-1',
+              dia_ban_ten: 'Phường Long Xuyên',
+              tinh_id: 'tinh-1',
+              trang_thai: 'active',
+            },
+          ],
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderTrang();
+    await screen.findByText('Lê Văn Bình');
+
+    await user.type(screen.getByPlaceholderText('Tất cả đơn vị — gõ tên để tìm'), 'Châu Thị Tế');
+    const tuyChon = await screen.findByRole('option', { name: 'Trường THPT Châu Thị Tế — Phường Long Xuyên' });
+    await user.click(tuyChon);
+
+    const nut = screen.getByRole('button', { name: 'Xuất Excel theo trường' });
+    await waitFor(() => expect(nut).toHaveAttribute('aria-disabled', 'false'));
+  });
+
   it('chọn đơn vị không phải trường (Sở) → nút vẫn vô hiệu', async () => {
     server.use(
       http.get('/danh-muc/don-vi-cong-tac', () =>
         HttpResponse.json({
-          data: [{ id: 'dv-so-1', ten_don_vi: 'Sở GD&ĐT An Giang', loai_don_vi: 'so_gddt' }],
-          total: 1,
-          page: 1,
-          page_size: 200,
+          data: [
+            {
+              id: 'dv-so-1',
+              ma_don_vi: 'SOGDDT-AG',
+              ten_don_vi: 'Sở GD&ĐT An Giang',
+              loai_don_vi: 'so_gddt',
+              dia_ban_id: 'tinh-1',
+              dia_ban_ten: 'An Giang',
+              tinh_id: 'tinh-1',
+              trang_thai: 'active',
+            },
+          ],
         }),
       ),
     );
     const user = userEvent.setup();
     renderTrang();
     await screen.findByText('Lê Văn Bình');
-    await user.click(screen.getByDisplayValue('Tất cả đơn vị'));
-    await user.click(await screen.findByRole('option', { name: 'Sở GD&ĐT An Giang' }));
+    await user.type(screen.getByPlaceholderText('Tất cả đơn vị — gõ tên để tìm'), 'Sở GD');
+    await user.click(await screen.findByRole('option', { name: /^Sở GD&ĐT An Giang/ }));
     expect(screen.getByRole('button', { name: 'Xuất Excel theo trường' })).toHaveAttribute('aria-disabled', 'true');
   });
 
@@ -137,8 +180,8 @@ describe('Admin — Danh sách học viên', () => {
     const user = userEvent.setup();
     renderTrang();
     await screen.findByText('Lê Văn Bình');
-    await user.click(screen.getByDisplayValue('Tất cả đơn vị'));
-    await user.click(await screen.findByRole('option', { name: 'THPT Long Xuyên' }));
+    await user.type(screen.getByPlaceholderText('Tất cả đơn vị — gõ tên để tìm'), 'Long Xuyên');
+    await user.click(await screen.findByRole('option', { name: 'THPT Long Xuyên — Phường Long Xuyên' }));
     await user.click(screen.getByRole('button', { name: 'Xuất Excel theo trường' }));
     expect(await screen.findByText('Đơn vị công tác nằm ngoài phạm vi quyền')).toBeInTheDocument();
   });

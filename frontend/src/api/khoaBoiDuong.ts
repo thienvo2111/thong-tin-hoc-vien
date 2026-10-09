@@ -25,21 +25,20 @@ import type {
 
 // don_vi_dat_hang_id của khóa có thể là đơn vị loại 'so_gddt', 'truong' hoặc 'khac' (QĐ2 — vd. HCMUE
 // không thuộc cây đơn vị An Giang, không được là 'phong_vhxh' — xem validateDonViDatHang() ở backend).
-// layDonViCongTac() mặc định chỉ lọc loai_don_vi='truong' (dùng cho màn học viên) nên ở đây gộp đủ 3
-// loại để map id->tên không bị thiếu, và để Select "Đơn vị đặt hàng" (form tạo khóa) nhóm theo loại.
-// page_size: 200 (tối đa backend cho phép, xem PaginationQueryDto) — hook này lấy TOÀN BỘ danh sách
-// để xây dropdown/map id->tên, không phải search phân trang, nếu không đơn vị xếp sau trang 1 (vd.
-// HCMUE) sẽ bị rớt khỏi danh sách mặc định 20 dòng/trang.
+// Hook này CHỈ lấy 'so_gddt' + 'khac' — 2 loại nhỏ (vài chục đơn vị do quản trị tự khai báo), đủ để
+// tải trọn làm Select tĩnh "Đơn vị đặt hàng". KHÔNG còn gộp 'truong' (có thể hơn 5.000 trường — tải
+// trọn/lọc client bỏ sót trường xếp sau trang page_size=200, bug đã gặp "Châu Thị Tế" không tìm
+// được): chọn trường đặt hàng dùng SelectDonViTimKiem (tìm qua server), tên trường hiển thị tra theo
+// id qua useTenDonViTheoId (xem AdminKhoaBoiDuong/AdminKhoaChiTiet).
 export function useDonViChoKhoa() {
   return useQuery({
     queryKey: ['danh-muc', 'don-vi-cong-tac', 'khoa-boi-duong'],
     queryFn: async () => {
-      const [soGddt, khac, truong] = await Promise.all([
+      const [soGddt, khac] = await Promise.all([
         layDonViCongTac({ loai_don_vi: 'so_gddt', page_size: 200 }),
         layDonViCongTac({ loai_don_vi: 'khac', page_size: 200 }),
-        layDonViCongTac({ loai_don_vi: 'truong', page_size: 200 }),
       ]);
-      return [...soGddt.data, ...khac.data, ...truong.data];
+      return [...soGddt.data, ...khac.data];
     },
   });
 }
