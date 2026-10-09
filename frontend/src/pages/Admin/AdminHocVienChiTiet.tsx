@@ -313,12 +313,16 @@ function KhoiDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHocD
 }
 
 // 2026-10-08: mức lớp học hiệu lực (tự chọn ?? đánh giá). Quản trị sửa hộ — bỏ qua công tắc khóa nhưng
-// chỉ chọn được mức ≤ mức đánh giá làm mốc (chốt ?? khảo sát, 2026-10-09; backend kiểm lại).
+// chỉ chọn được mức đánh giá làm mốc hoặc thấp hơn 1 mức (chốt ?? khảo sát, 2026-10-09; backend kiểm lại).
 function MucHocDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHocDangKy }) {
   const { nguoiDung } = useToi();
   const capNhatMuc = useCapNhatMucHoc(hocVienId);
   const mucHoc = mucHocHieuLuc(dangKy);
-  const [chonMuc, setChonMuc] = useState<string>(mucHoc ?? '');
+  const cacMuc = cacMucDuocChon(dangKy.muc_danh_gia);
+  // Lựa chọn cũ thấp hơn 2 mức không còn trong danh sách -> chọn sẵn mốc.
+  const [chonMuc, setChonMuc] = useState<string>(
+    mucHoc && cacMuc.includes(mucHoc) ? mucHoc : (dangKy.muc_danh_gia ?? ''),
+  );
 
   const mucDanhGia = dangKy.muc_danh_gia;
   if (!mucDanhGia) {
@@ -360,7 +364,7 @@ function MucHocDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHo
         <Group gap="sm" wrap="wrap" align="flex-end">
           <Select
             label="Sửa mức lớp học"
-            data={cacMucDuocChon(mucDanhGia).map((m) => ({
+            data={cacMuc.map((m) => ({
               value: m,
               label: m === mucDanhGia ? `${nhanMucNangLuc(m)} (theo kết quả đánh giá)` : nhanMucNangLuc(m),
             }))}

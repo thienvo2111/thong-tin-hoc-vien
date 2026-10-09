@@ -98,17 +98,52 @@ describe('M7 — Điều chỉnh mức lớp học', () => {
     ]);
     expect(screen.getByRole('radio', { name: 'Thành thạo (theo kết quả đánh giá)' })).toBeChecked();
     expect(screen.queryByRole('radio', { name: /Nâng cao/ })).not.toBeInTheDocument();
-    expect(screen.getByText(/chỉ có thể chọn học ở mức bằng hoặc thấp hơn kết quả đánh giá/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/chỉ có thể chọn học ở mức bằng kết quả đánh giá hoặc thấp hơn 1 mức/),
+    ).toBeInTheDocument();
+  });
+
+  // 2026-10-09: chỉ được thấp hơn ĐÚNG 1 mức.
+  it('đánh giá nâng cao: chỉ có Thành thạo và Nâng cao, không có Cơ bản', async () => {
+    datDangKy('nang_cao', true);
+    renderDaDangNhap();
+    await userEvent.click(await screen.findByRole('button', { name: 'Điều chỉnh mức lớp' }));
+    expect(screen.getAllByRole('radio').map((r) => r.closest('.mantine-Radio-root')?.textContent)).toEqual([
+      'Thành thạo',
+      'Nâng cao (theo kết quả đánh giá)',
+    ]);
+    expect(screen.queryByRole('radio', { name: 'Cơ bản' })).not.toBeInTheDocument();
+  });
+
+  it('lựa chọn cũ Cơ bản dưới mốc Nâng cao: vẫn hiện là mức hiện tại, mở chọn thì chọn sẵn mốc', async () => {
+    datDangKy('nang_cao', true, 'co_ban');
+    renderDaDangNhap();
+    expect(await screen.findByText('Cơ bản', { selector: 'b' })).toBeInTheDocument();
+    expect(screen.getByText(/đã điều chỉnh từ Nâng cao/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Điều chỉnh mức lớp' }));
+    expect(screen.queryByRole('radio', { name: 'Cơ bản' })).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Nâng cao (theo kết quả đánh giá)' })).toBeChecked();
+  });
+
+  it('lựa chọn cũ Cơ bản: lưu mốc -> quay về Nâng cao (lưu NULL)', async () => {
+    datDangKy('nang_cao', true, 'co_ban');
+    renderDaDangNhap();
+    await userEvent.click(await screen.findByRole('button', { name: 'Điều chỉnh mức lớp' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu' }));
+    const hop = await screen.findByRole('dialog', { name: 'Xác nhận điều chỉnh mức lớp học' });
+    await userEvent.click(within(hop).getByRole('button', { name: 'Xác nhận' }));
+    expect(await screen.findByText(/Đã lưu mức lớp học/)).toBeInTheDocument();
+    expect(db.khoaHocToi[0].muc_hoc_chon).toBeNull();
   });
 
   it('lưu thành công: gửi mức đã chọn, báo thành công, cập nhật dòng mức', async () => {
-    datDangKy('nang_cao', true);
+    datDangKy('thanh_thao', true);
     let body: unknown;
     server.use(
       http.put('/hoc-vien/toi/khoa-hoc/:khoaId/muc-hoc', async ({ request }) => {
         body = await request.json();
         db.khoaHocToi[0].muc_hoc_chon = 'co_ban';
-        return HttpResponse.json({ muc_dau_vao: 'nang_cao', muc_hoc_chon: 'co_ban', muc_hoc: 'co_ban' });
+        return HttpResponse.json({ muc_dau_vao: 'thanh_thao', muc_hoc_chon: 'co_ban', muc_hoc: 'co_ban' });
       }),
     );
     renderDaDangNhap();
@@ -117,7 +152,7 @@ describe('M7 — Điều chỉnh mức lớp học', () => {
     // Bấm Lưu chỉ mở hộp xác nhận, chưa gọi API.
     const hop = await screen.findByRole('dialog', { name: 'Xác nhận điều chỉnh mức lớp học' });
     expect(within(hop).getByText(/chuyển từ mức/)).toHaveTextContent(
-      'Thầy/Cô xác nhận chuyển từ mức Nâng cao sang mức Cơ bản? Lớp học sẽ được xếp theo mức đã chọn.',
+      'Thầy/Cô xác nhận chuyển từ mức Thành thạo sang mức Cơ bản? Lớp học sẽ được xếp theo mức đã chọn.',
     );
     expect(body).toBeUndefined();
 
@@ -127,7 +162,7 @@ describe('M7 — Điều chỉnh mức lớp học', () => {
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Xác nhận điều chỉnh mức lớp học' })).not.toBeInTheDocument(),
     );
-    await waitFor(() => expect(screen.getByText(/đã điều chỉnh từ Nâng cao/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/đã điều chỉnh từ Thành thạo/)).toBeInTheDocument());
     expect(screen.getByText('Cơ bản', { selector: 'b' })).toBeInTheDocument();
   });
 
@@ -153,14 +188,14 @@ describe('M7 — Điều chỉnh mức lớp học', () => {
     datDangKy('nang_cao', true);
     const dem = demGoiApi();
     renderDaDangNhap();
-    await chonVaLuu('Cơ bản');
+    await chonVaLuu('Thành thạo');
     const hop = await screen.findByRole('dialog', { name: 'Xác nhận điều chỉnh mức lớp học' });
     await userEvent.click(within(hop).getByRole('button', { name: 'Quay lại' }));
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Xác nhận điều chỉnh mức lớp học' })).not.toBeInTheDocument(),
     );
     expect(dem.soLan).toBe(0);
-    expect(screen.getByRole('radio', { name: 'Cơ bản' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Thành thạo' })).toBeChecked();
     expect(db.khoaHocToi[0].muc_hoc_chon).toBeNull();
   });
 

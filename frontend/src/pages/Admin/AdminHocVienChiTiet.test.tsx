@@ -185,6 +185,30 @@ describe('Admin — Chi tiết hồ sơ học viên — Mức lớp học', () =
     expect(body).toEqual({ muc: 'co_ban' });
   });
 
+  // 2026-10-09: quản trị cũng chỉ được thấp hơn 1 mức.
+  it('quản trị, mốc nâng cao: Select chỉ có Thành thạo + Nâng cao', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    datMuc('nang_cao');
+    const user = userEvent.setup();
+    renderTrang('hv-duyet-1');
+    const dong = within(await screen.findByTestId('dong-muc-hoc'));
+    await user.click(dong.getByRole('textbox', { name: 'Sửa mức lớp học' }));
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Thành thạo',
+      'Nâng cao (theo kết quả đánh giá)',
+    ]);
+  });
+
+  it('lựa chọn cũ Cơ bản dưới mốc Nâng cao: dòng mức vẫn hiện Cơ bản, Select chọn sẵn mốc', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    datMuc('nang_cao', 'co_ban');
+    renderTrang('hv-duyet-1');
+    const dong = within(await screen.findByTestId('dong-muc-hoc'));
+    expect(dong.getByText('Cơ bản', { selector: 'b' })).toBeInTheDocument();
+    expect(dong.getByText(/học viên tự điều chỉnh từ Nâng cao/)).toBeInTheDocument();
+    expect(dong.getByRole('textbox', { name: 'Sửa mức lớp học' })).toHaveValue('Nâng cao (theo kết quả đánh giá)');
+  });
+
   it('tài khoản đơn vị (trường) -> chỉ xem mức, không có ô sửa', async () => {
     db.nguoiDung.vai_tro = 'truong';
     datMuc('nang_cao');

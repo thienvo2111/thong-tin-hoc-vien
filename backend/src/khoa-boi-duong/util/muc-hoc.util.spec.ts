@@ -28,10 +28,13 @@ describe('mucHocHieuLuc', () => {
 });
 
 describe('duocChonMuc', () => {
-  it('thấp hơn mức đánh giá -> được', () => {
+  it('thấp hơn đúng 1 mức -> được', () => {
     expect(duocChonMuc('nang_cao', 'thanh_thao')).toBe(true);
-    expect(duocChonMuc('nang_cao', 'co_ban')).toBe(true);
     expect(duocChonMuc('thanh_thao', 'co_ban')).toBe(true);
+  });
+
+  it('thấp hơn 2 mức (nang_cao -> co_ban) -> không được', () => {
+    expect(duocChonMuc('nang_cao', 'co_ban')).toBe(false);
   });
 
   it('bằng mức đánh giá -> được', () => {

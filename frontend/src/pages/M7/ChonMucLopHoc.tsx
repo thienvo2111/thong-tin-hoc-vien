@@ -7,7 +7,7 @@ import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { StatusBanner } from '@/components/StatusBanner';
 
-/** Điều chỉnh mức lớp học (2026-10-08): học viên chọn mức BẰNG hoặc THẤP HƠN kết quả đánh giá đầu vào,
+/** Điều chỉnh mức lớp học (2026-10-08): học viên chọn mức BẰNG hoặc THẤP HƠN 1 mức (2026-10-09) so với kết quả đánh giá đầu vào,
  * chỉ khi khóa mở điều chỉnh. Mốc = muc_danh_gia (mức chốt ?? quy đổi từ bài khảo sát, 2026-10-09). Khu chọn mở ngay trong thẻ; bấm Lưu -> hộp xác nhận trong trang rồi mới gọi API. */
 export function ChonMucLopHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
   const { khoa, muc_danh_gia, muc_hoc_chon, muc_hoc_chon_luc } = dangKy;
@@ -24,7 +24,8 @@ export function ChonMucLopHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
   const duocDieuChinh = khoa.mo_dieu_chinh_muc && muc_danh_gia !== 'co_ban';
 
   const moChon = () => {
-    setGiaTri(mucHoc);
+    // Lựa chọn cũ thấp hơn 2 mức (trước quy tắc 1 mức) không còn trong danh sách -> chọn sẵn mốc.
+    setGiaTri(mucHoc && cacMucDuocChon(muc_danh_gia).includes(mucHoc) ? mucHoc : muc_danh_gia);
     setDaLuu(false);
     chonMuc.reset();
     setDangChon(true);
@@ -83,8 +84,8 @@ export function ChonMucLopHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
       {duocDieuChinh && dangChon && (
         <Stack gap="sm" mt="xs" p="sm" style={{ borderRadius: 8, border: '1px solid var(--mantine-color-gray-3)' }}>
           <Text size="sm">
-            Thầy/Cô chỉ có thể chọn học ở mức bằng hoặc thấp hơn kết quả đánh giá. Lớp học sẽ được xếp theo mức
-            đã chọn.
+            Thầy/Cô chỉ có thể chọn học ở mức bằng kết quả đánh giá hoặc thấp hơn 1 mức. Lớp học sẽ được xếp theo
+            mức đã chọn.
           </Text>
           <Radio.Group
             label="Chọn mức lớp học"

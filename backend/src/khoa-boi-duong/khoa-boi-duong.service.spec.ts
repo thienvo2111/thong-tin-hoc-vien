@@ -1479,6 +1479,41 @@ describe('KhoaBoiDuongService', () => {
       expect(nhatKy.ghi).not.toHaveBeenCalled();
     });
 
+    // 2026-10-09: chỉ giữ muc_hoc_chon khi vẫn thấp hơn ĐÚNG 1 mức so với mốc mới.
+    it.each([
+      ['co_ban', 'nang_cao', true], // thấp hơn 2 mức -> reset
+      ['thanh_thao', 'thanh_thao', true], // bằng -> reset
+      ['thanh_thao', 'co_ban', true], // cao hơn -> reset
+      ['thanh_thao', 'nang_cao', false], // thấp hơn 1 mức -> giữ
+      ['co_ban', 'thanh_thao', false], // thấp hơn 1 mức -> giữ
+    ] as const)(
+      'import đầu vào: muc_hoc_chon %s, mốc mới %s -> reset=%s',
+      async (mucChon, mucMoi, reset) => {
+        prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+          muc_dau_vao: null,
+          muc_dau_ra: null,
+          muc_hoc_chon: mucChon,
+          khoa: { ten_khoa: 'Khóa A' },
+        });
+        await service.commitKetQuaDanhGia({
+          hoc_vien_id: 'hv-1',
+          khoa_id: 'khoa-1',
+          loai: 'dau_vao',
+          muc: mucMoi,
+        });
+        const data = prisma.dang_ky_hoc.update.mock.calls[0][0].data;
+        expect(data.muc_dau_vao).toBe(mucMoi);
+        if (reset) {
+          expect(data).toMatchObject({
+            muc_hoc_chon: null,
+            muc_hoc_chon_luc: null,
+          });
+        } else {
+          expect(data).not.toHaveProperty('muc_hoc_chon');
+        }
+      },
+    );
+
     it('nhập file phân lớp đổi lớp -> ghi lớp cũ → lớp mới', async () => {
       prisma.dang_ky_hoc.findUnique.mockResolvedValue({
         cum_id: null,
