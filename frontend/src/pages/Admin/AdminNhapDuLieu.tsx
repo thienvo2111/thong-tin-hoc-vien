@@ -110,7 +110,8 @@ export default function AdminNhapDuLieu() {
         onSuccess: (res) => {
           setImportId(res.import_id);
           setLoaiDangXacNhan(loai);
-          notifications.show({ color: 'blue', message: 'Đã tải file lên, đang kiểm tra dữ liệu...' });
+          notifications.show({ color: 'blue', position: 'top-center', message: 'Đã tải file lên, đang kiểm tra dữ liệu...' });
+          cuonToiPanel();
         },
         onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
       },
@@ -129,7 +130,11 @@ export default function AdminNhapDuLieu() {
   function moLaiXacNhan(id: string, loaiJob: LoaiDanhMucImport) {
     setImportId(id);
     setLoaiDangXacNhan(loaiJob);
-    requestAnimationFrame(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    cuonToiPanel();
+  }
+
+  function cuonToiPanel() {
+    requestAnimationFrame(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
   }
 
   return (
@@ -178,6 +183,12 @@ export default function AdminNhapDuLieu() {
           </Paper>
 
           <Box style={{ flexGrow: 1, minWidth: 340 }}>
+            {/* Kết quả kiểm tra đặt ngay đầu cột, cạnh khu tải file — không bị đẩy xuống dưới bảng lịch sử dài. */}
+            {importId && (
+              <Box ref={panelRef} mt={-20} mb="lg">
+                <PanelXemTruocImport importId={importId} loai={loaiDangXacNhan} onXongViec={dongXongViec} />
+              </Box>
+            )}
             <Text fz={14.5} fw={700} mb={14}>
               Lịch sử nhập dữ liệu
             </Text>
@@ -266,11 +277,6 @@ export default function AdminNhapDuLieu() {
           </Box>
         </Group>
 
-        {importId && (
-          <div ref={panelRef}>
-            <PanelXemTruocImport importId={importId} loai={loaiDangXacNhan} onXongViec={dongXongViec} />
-          </div>
-        )}
       </Container>
     </>
   );
