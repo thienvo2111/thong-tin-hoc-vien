@@ -167,4 +167,43 @@ describe('Admin — Danh sách khóa bồi dưỡng', () => {
 
     expect(await screen.findByText('Sai loại đơn vị')).toBeInTheDocument();
   });
+
+  // Fix: "Trường" không còn nằm trong Select nhóm tĩnh (danh mục trường quá lớn để tải trọn) — chọn
+  // qua ô tìm kiếm riêng, tìm được bất kỳ trường nào (không bị cắt ở page_size=200).
+  it('tạo khóa (Quản trị): chọn đơn vị đặt hàng là TRƯỜNG qua ô tìm kiếm → gọi API, điều hướng sang trang chi tiết', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const user = userEvent.setup();
+    renderTrang();
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+
+    await user.click(screen.getByRole('button', { name: '+ Tạo khóa mới' }));
+    await user.type(await screen.findByLabelText(/^Mã khóa/), 'AG-2026-023');
+    await user.type(screen.getByLabelText(/^Tên khóa/), 'Khóa chọn trường đặt hàng');
+    await user.type(screen.getByLabelText(/^Ngày bắt đầu/), '2026-11-01');
+    await user.type(screen.getByLabelText(/^Ngày kết thúc/), '2026-12-01');
+
+    await user.type(screen.getByRole('textbox', { name: /^Hoặc chọn trường/ }), 'Long Xuyên');
+    await user.click(await screen.findByRole('option', { name: 'THPT Long Xuyên — Phường Long Xuyên' }));
+    await user.click(screen.getByRole('button', { name: 'Tạo khóa' }));
+
+    expect(await screen.findByText('Màn hình chi tiết khóa')).toBeInTheDocument();
+  });
+
+  it('lọc danh sách theo đơn vị đặt hàng là TRƯỜNG (ngoài danh mục so_gddt/khac tĩnh) → gửi đúng don_vi_dat_hang_id', async () => {
+    let donViIdNhan: string | null = null;
+    server.use(
+      http.get('/khoa-boi-duong', ({ request }) => {
+        donViIdNhan = new URL(request.url).searchParams.get('don_vi_dat_hang_id');
+        return HttpResponse.json({ data: db.danhSachKhoa, total: db.danhSachKhoa.length, page: 1, page_size: 20 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderTrang();
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+
+    await user.type(screen.getByPlaceholderText('Tất cả đơn vị đặt hàng — gõ tên để tìm'), 'Long Xuyên');
+    await user.click(await screen.findByRole('option', { name: 'THPT Long Xuyên — Phường Long Xuyên' }));
+
+    await waitFor(() => expect(donViIdNhan).toBe('dv-1'));
+  });
 });

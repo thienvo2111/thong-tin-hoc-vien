@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Alert, Button, Group, Select, Skeleton, Text } from '@mantine/core';
 import { useBoLocThongKe, type DoiTuongLoc, type LocThongKe } from '@/api/thongKe';
+import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { DOI_TUONG_OPTIONS } from '@/lib/tuyChonHoSo';
 
 const KHOA_URL = ['khoa_id', 'don_vi_id', 'cum_id'] as const;
@@ -81,6 +82,8 @@ export function BoLocThongKe() {
           placeholder="Tất cả đơn vị"
           searchable
           clearable
+          filter={locTiengViet}
+          limit={50}
           data={don_vi.map((d) => ({ value: d.id, label: d.ten_don_vi }))}
           value={loc.don_vi_id ?? null}
           onChange={(v) => setLoc({ ...loc, don_vi_id: v ?? undefined, cum_id: undefined })}
