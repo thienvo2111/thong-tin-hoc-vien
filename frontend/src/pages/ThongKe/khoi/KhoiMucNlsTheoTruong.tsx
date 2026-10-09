@@ -97,7 +97,7 @@ export function KhoiMucNlsTheoTruong({ loc }: { loc: LocThongKe }) {
 
   return (
     <KhoiThongKe
-      tieu_de="Đánh giá NLS theo mức — theo trường"
+      tieu_de="Đánh giá NLS thực tế theo mức — theo trường"
       query={query}
       rong={d?.theo_truong.length === 0}
       thong_bao_rong="Chưa có học viên trong phạm vi lọc"

@@ -15,6 +15,7 @@ import { BieuMauService } from './bieu-mau.service';
 import { ChatLuongHoSoService } from './chat-luong-ho-so.service';
 import { CanDonDocService } from './can-don-doc.service';
 import { MucNlsService } from './muc-nls.service';
+import { NhuCauMucHocService } from './nhu-cau-muc-hoc.service';
 import { TienDoTruongService } from './tien-do-truong.service';
 import { XepHangService } from './xep-hang.service';
 
@@ -31,6 +32,7 @@ export class ThongKeController {
     private readonly bieuMauService: BieuMauService,
     private readonly chatLuongHoSoService: ChatLuongHoSoService,
     private readonly mucNlsService: MucNlsService,
+    private readonly nhuCauMucHocService: NhuCauMucHocService,
   ) {}
 
   @Get('bo-loc')
@@ -54,6 +56,30 @@ export class ThongKeController {
     @Query() q: ThongKeQueryDto,
   ) {
     return this.service.chuyenMuc(user, q);
+  }
+
+  @Get('nhu-cau-muc-hoc')
+  nhuCauMucHoc(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: ThongKeQueryDto,
+  ) {
+    return this.nhuCauMucHocService.danhSach(user, q);
+  }
+
+  @Get('nhu-cau-muc-hoc/xuat-excel')
+  async nhuCauMucHocXuatExcel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: ThongKeQueryDto,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.nhuCauMucHocService.xuatExcel(user, q);
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="nhu-cau-muc-hoc.xlsx"',
+      })
+      .send(buffer);
   }
 
   @Get('ket-qua')

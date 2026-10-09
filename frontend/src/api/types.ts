@@ -1186,3 +1186,43 @@ export interface MucNlsResult {
   /** Sắp theo ten_don_vi (vi). */
   theo_truong: MucNlsTruongDong[];
 }
+
+/**
+ * "Nhu cầu mức học" (thêm 2026-10-09) — khác thang với MucNlsResult (M1..M4, khảo sát NLS thực
+ * tế): dựa trên mức đánh giá làm mốc (muc_dau_vao ?? quy đổi từ bài khảo sát đầu vào, 3 bậc) và
+ * muc_hoc_chon (học viên tự đề nghị học
+ * mức thấp hơn). Đếm theo lượt đăng ký (dang_ky_hoc), không khử trùng học viên.
+ */
+export interface NhuCauMucHocTheoMuc {
+  muc: MucNangLuc;
+  nhan: string;
+  theo_danh_gia: number;
+  theo_nhu_cau: number;
+}
+
+export interface NhuCauMucHocTruongDong {
+  don_vi_id: string;
+  ten_don_vi: string;
+  ten_don_vi_cha: string | null;
+  so_dang_ky: number;
+  chua_co_muc: number;
+  da_dieu_chinh: number;
+  moc_tu_khao_sat: number;
+  theo_muc: NhuCauMucHocTheoMuc[];
+}
+
+export interface NhuCauMucHocResult {
+  so_dang_ky: number;
+  /** Không có mức đánh giá làm mốc. */
+  chua_co_muc: number;
+  /** muc_hoc_chon khác null và khác mức đánh giá làm mốc. */
+  da_dieu_chinh: number;
+  /** Trong số có mức đánh giá, mốc lấy từ bài khảo sát (chưa chốt). */
+  moc_tu_khao_sat: number;
+  /** Luôn đủ 3 dòng, thứ tự co_ban, thanh_thao, nang_cao; loại trừ chua_co_muc. */
+  theo_muc: NhuCauMucHocTheoMuc[];
+  /** Chỉ cặp có so_luong > 0; sắp theo tu giảm dần rồi den giảm dần. */
+  dieu_chinh: { tu: MucNangLuc; den: MucNangLuc; so_luong: number }[];
+  /** Sắp theo ten_don_vi (vi). */
+  theo_truong: NhuCauMucHocTruongDong[];
+}

@@ -67,7 +67,7 @@ export function KhoiKhaoSat({ loc }: { loc: LocThongKe }) {
         <Stack gap="sm">
           <KyNangSo k={d.ky_nang_so} />
           <Text fw={600} size="sm">
-            Đánh giá năng lực số
+            Đánh giá năng lực số — kết quả thực tế (hệ thống khảo sát trả về)
           </Text>
           <SimpleGrid cols={{ base: 1, sm: 2 }}>
             <Donut tieu_de="Đánh giá NLS đầu vào" testId="donut-dau-vao" k={d.dau_vao} />

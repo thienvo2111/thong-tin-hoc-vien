@@ -1,4 +1,5 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, muc_nang_luc } from '@prisma/client';
+import type { NguonMucDanhGia } from '../khoa-boi-duong/util/muc-hoc.util';
 
 export interface PhamViThongKe {
   /** Phạm vi ∩ bộ lọc, dùng trực tiếp cho truy vấn dang_ky_hoc. */
@@ -309,4 +310,64 @@ export interface DongHocVienMuc {
 export interface MucNlsTongHop extends Omit<MucNlsResult, 'loai'> {
   theo_doi_tuong: Record<DoiTuongKey, DemMucNls>;
   theo_cap: Record<CapKey, DemMucNls>;
+}
+
+/**
+ * "Nhu cầu mức học" (2026-10-09) — khác thang với khảo sát NLS (M1..M4): mức đánh giá làm
+ * mốc = dang_ky_hoc.muc_dau_vao (admin chốt) ?? mức quy đổi từ bài khảo sát NLS đầu vào ĐÃ
+ * hoàn thành (xem muc-hoc.util.ts#mucDanhGiaLamMoc), và muc_hoc_chon (học viên tự chọn mức
+ * thấp hơn hoặc bằng mốc, xem muc-hoc.util.ts#mucHocHieuLuc). muc_hoc_chon gắn với TỪNG khóa
+ * (dang_ky_hoc), không phải học viên — đếm theo lượt đăng ký, không khử trùng HV.
+ */
+export interface NhuCauMucHocTheoMuc {
+  muc: muc_nang_luc;
+  nhan: string;
+  theo_danh_gia: number;
+  theo_nhu_cau: number;
+}
+
+export interface NhuCauMucHocResult {
+  /** Tổng lượt đăng ký trong phạm vi. */
+  so_dang_ky: number;
+  /** Không có mức đánh giá làm mốc (chưa chốt và chưa hoàn thành khảo sát đầu vào). */
+  chua_co_muc: number;
+  /** muc_hoc_chon khác null và khác mức đánh giá làm mốc. */
+  da_dieu_chinh: number;
+  /** Trong số có mức đánh giá, mốc lấy từ bài khảo sát (chưa chốt muc_dau_vao). */
+  moc_tu_khao_sat: number;
+  /** Luôn đủ 3 dòng, thứ tự co_ban, thanh_thao, nang_cao; loại trừ chua_co_muc. */
+  theo_muc: NhuCauMucHocTheoMuc[];
+  /** Chỉ các cặp có so_luong > 0; sắp theo tu giảm dần rồi den giảm dần (theo thứ tự mức). */
+  dieu_chinh: { tu: muc_nang_luc; den: muc_nang_luc; so_luong: number }[];
+  /** Sắp theo ten_don_vi (vi). */
+  theo_truong: NhuCauMucHocTruongDong[];
+}
+
+export interface NhuCauMucHocTruongDong {
+  don_vi_id: string;
+  ten_don_vi: string;
+  ten_don_vi_cha: string | null;
+  so_dang_ky: number;
+  chua_co_muc: number;
+  da_dieu_chinh: number;
+  moc_tu_khao_sat: number;
+  theo_muc: NhuCauMucHocTheoMuc[];
+}
+
+/** Một lượt đăng ký (dang_ky_hoc) — nguồn cho tongHopNhuCauMucHoc. ho_ten/ma_dinh_danh_moet/
+ * ma_khoa/ten_khoa chỉ có khi xuất Excel (còn lại rỗng). */
+export interface DongDangKyNhuCauMuc {
+  /** Mức đánh giá làm mốc — xem mucDanhGiaLamMoc. */
+  muc_danh_gia: muc_nang_luc | null;
+  /** Nguồn của muc_danh_gia: 'chot' = muc_dau_vao đã chốt, 'khao_sat' = quy đổi từ khảo sát. */
+  nguon_muc: NguonMucDanhGia | null;
+  muc_hoc_chon: muc_nang_luc | null;
+  muc_hoc_chon_luc: Date | null;
+  don_vi_id: string;
+  ten_don_vi: string;
+  ten_don_vi_cha: string | null;
+  ho_ten: string;
+  ma_dinh_danh_moet: string | null;
+  ma_khoa: string;
+  ten_khoa: string;
 }

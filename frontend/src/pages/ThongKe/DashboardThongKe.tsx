@@ -12,6 +12,7 @@ import { KhoiChuyenMuc } from './khoi/KhoiChuyenMuc';
 import { KhoiKetQuaHoc } from './khoi/KhoiKetQuaHoc';
 import { KhoiKhaoSat } from './khoi/KhoiKhaoSat';
 import { KhoiMucNlsTheoTruong } from './khoi/KhoiMucNlsTheoTruong';
+import { KhoiNhuCauMucHoc } from './khoi/KhoiNhuCauMucHoc';
 import { KhoiKpiPheu } from './khoi/KhoiKpiPheu';
 import { KhoiTienDoTruong } from './khoi/KhoiTienDoTruong';
 import { KhoiSoSanhKhoa } from './khoi/KhoiSoSanhKhoa';
@@ -69,6 +70,7 @@ export default function DashboardThongKe({ che_do }: Props) {
           <KhoiSoSanhKhoa loc={loc} />
           <KhoiKhaoSat loc={loc} />
           <KhoiMucNlsTheoTruong loc={loc} />
+          <KhoiNhuCauMucHoc loc={loc} />
           <KhoiChuyenMuc loc={loc} />
           <KhoiKetQuaHoc loc={loc} />
           <KhoiChuyenCan loc={loc} />
