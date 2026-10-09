@@ -83,7 +83,7 @@ describe('DashboardThongKe', () => {
   it('khối Đánh giá NLS theo mức nằm ngay sau Kết quả khảo sát', async () => {
     renderDashboard();
     const khaoSat = await screen.findByRole('region', { name: 'Kết quả khảo sát' });
-    const muc = await screen.findByRole('region', { name: 'Đánh giá NLS theo mức — theo trường' });
+    const muc = await screen.findByRole('region', { name: 'Đánh giá NLS thực tế theo mức — theo trường' });
     expect(khaoSat.nextElementSibling).toBe(muc);
   });
 
@@ -99,7 +99,7 @@ describe('DashboardThongKe', () => {
       ),
     );
     renderDashboard();
-    expect(await screen.findByRole('region', { name: 'Đánh giá NLS theo mức — theo trường' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Đánh giá NLS thực tế theo mức — theo trường' })).toBeInTheDocument();
   });
 
   it('admin → có khối Tiến độ theo trường', async () => {

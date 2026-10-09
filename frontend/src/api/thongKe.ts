@@ -12,6 +12,7 @@ import type {
   KhaoSatResult,
   LoaiMucNls,
   MucNlsResult,
+  NhuCauMucHocResult,
   PheuResult,
   SoSanhKhoaCot,
   TienDoTruongDong,
@@ -50,6 +51,13 @@ export const useBoLocThongKe = () => useKhoi<BoLocResult>('bo-loc', 'bo-loc', {}
 export const usePheu = (loc: LocThongKe) => useKhoi<PheuResult>('pheu', 'pheu', loc);
 export const useKhaoSat = (loc: LocThongKe) => useKhoi<KhaoSatResult>('khao-sat', 'khao-sat', loc);
 export const useChuyenMuc = (loc: LocThongKe) => useKhoi<ChuyenMucResult>('chuyen-muc', 'chuyen-muc', loc);
+export const useNhuCauMucHoc = (loc: LocThongKe) =>
+  useKhoi<NhuCauMucHocResult>('nhu-cau-muc-hoc', 'nhu-cau-muc-hoc', loc);
+
+export async function xuatNhuCauMucHoc(loc: LocThongKe): Promise<void> {
+  const blob = await apiFetchBlob(`/thong-ke/nhu-cau-muc-hoc/xuat-excel${xayQuery(loc)}`);
+  taiFileTuBlob(blob, 'nhu-cau-muc-hoc.xlsx');
+}
 export const useKetQuaHoc = (loc: LocThongKe, enabled = true) =>
   useKhoi<KetQuaHocCot[]>('ket-qua', 'ket-qua', loc, enabled);
 export const useKetQuaHocTheoTruong = (loc: LocThongKe, enabled = true) =>

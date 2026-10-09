@@ -11,6 +11,8 @@ import type {
   KetQuaHocCot,
   KetQuaHocTruongDong,
   KhaoSatResult,
+  NhuCauMucHocResult,
+  NhuCauMucHocTruongDong,
   PheuResult,
   SoSanhKhoaCot,
   TienDoTruongDong,
@@ -82,6 +84,56 @@ export const chuyenMucMau: ChuyenMucResult = {
   tang: 6,
   giu: 20,
   giam: 6,
+};
+
+// Phần theo_truong: dữ liệu riêng cho các bài test "Theo trường" (không cần khớp tổng top-level).
+const nhuCauMucHocTruongMau: NhuCauMucHocTruongDong[] = [
+  {
+    don_vi_id: 'dv-a',
+    ten_don_vi: 'Trường THPT Nguyễn Du',
+    ten_don_vi_cha: 'Sở GD&ĐT An Giang',
+    so_dang_ky: 8,
+    chua_co_muc: 1,
+    da_dieu_chinh: 3,
+    moc_tu_khao_sat: 1,
+    theo_muc: [
+      { muc: 'co_ban', nhan: 'Cơ bản', theo_danh_gia: 3, theo_nhu_cau: 4 },
+      { muc: 'thanh_thao', nhan: 'Thành thạo', theo_danh_gia: 2, theo_nhu_cau: 2 },
+      { muc: 'nang_cao', nhan: 'Nâng cao', theo_danh_gia: 2, theo_nhu_cau: 1 },
+    ],
+  },
+  {
+    don_vi_id: 'dv-b',
+    ten_don_vi: 'Trường THCS Lê Lợi',
+    ten_don_vi_cha: 'Sở GD&ĐT An Giang',
+    so_dang_ky: 4,
+    chua_co_muc: 1,
+    da_dieu_chinh: 1,
+    moc_tu_khao_sat: 0,
+    theo_muc: [
+      { muc: 'co_ban', nhan: 'Cơ bản', theo_danh_gia: 2, theo_nhu_cau: 2 },
+      { muc: 'thanh_thao', nhan: 'Thành thạo', theo_danh_gia: 0, theo_nhu_cau: 1 },
+      { muc: 'nang_cao', nhan: 'Nâng cao', theo_danh_gia: 1, theo_nhu_cau: 0 },
+    ],
+  },
+];
+
+// Cùng số liệu với backend/src/thong-ke/nhu-cau-muc-hoc.service.spec.ts (tongHopNhuCauMucHoc).
+export const nhuCauMucHocMau: NhuCauMucHocResult = {
+  so_dang_ky: 9,
+  chua_co_muc: 2,
+  da_dieu_chinh: 3,
+  moc_tu_khao_sat: 0,
+  theo_muc: [
+    { muc: 'co_ban', nhan: 'Cơ bản', theo_danh_gia: 3, theo_nhu_cau: 4 },
+    { muc: 'thanh_thao', nhan: 'Thành thạo', theo_danh_gia: 1, theo_nhu_cau: 3 },
+    { muc: 'nang_cao', nhan: 'Nâng cao', theo_danh_gia: 3, theo_nhu_cau: 0 },
+  ],
+  dieu_chinh: [
+    { tu: 'nang_cao', den: 'thanh_thao', so_luong: 2 },
+    { tu: 'nang_cao', den: 'co_ban', so_luong: 1 },
+  ],
+  theo_truong: nhuCauMucHocTruongMau,
 };
 
 export const ketQuaHocMau: KetQuaHocCot[] = [
@@ -317,6 +369,14 @@ export const thongKeHandlers = [
   http.get('/thong-ke/pheu', () => HttpResponse.json(pheuMau)),
   http.get('/thong-ke/khao-sat', () => HttpResponse.json(khaoSatMau)),
   http.get('/thong-ke/chuyen-muc', () => HttpResponse.json(chuyenMucMau)),
+  http.get('/thong-ke/nhu-cau-muc-hoc', () => HttpResponse.json(nhuCauMucHocMau)),
+  http.get(
+    '/thong-ke/nhu-cau-muc-hoc/xuat-excel',
+    () =>
+      new HttpResponse('noi-dung-file-mo-phong', {
+        headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      }),
+  ),
   http.get('/thong-ke/ket-qua-theo-truong', () => HttpResponse.json(ketQuaHocTruongMau)),
   http.get('/thong-ke/ket-qua', () => HttpResponse.json(ketQuaHocMau)),
   http.get('/thong-ke/so-sanh-khoa', () => HttpResponse.json(soSanhKhoaMau)),

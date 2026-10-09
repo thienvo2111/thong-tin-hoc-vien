@@ -34,7 +34,7 @@ describe('KhoiKhaoSat', () => {
     renderTrang(<KhoiKhaoSat loc={{}} />);
     const dauVao = await screen.findByTestId('donut-dau-vao');
     const dauRa = screen.getByTestId('donut-dau-ra');
-    expect(screen.getByText('Đánh giá năng lực số')).toBeInTheDocument();
+    expect(screen.getByText('Đánh giá năng lực số — kết quả thực tế (hệ thống khảo sát trả về)')).toBeInTheDocument();
     expect(within(dauVao).getByText('Đánh giá NLS đầu vào')).toBeInTheDocument();
     expect(within(dauRa).getByText('Đánh giá NLS đầu ra')).toBeInTheDocument();
     expect(within(dauVao).getByText('Chưa làm: 110 (55,0% tổng HV)')).toBeInTheDocument();

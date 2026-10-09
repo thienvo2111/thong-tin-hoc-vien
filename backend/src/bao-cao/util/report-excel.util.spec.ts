@@ -5,8 +5,15 @@ import {
   buildBieuMauDangKyTruyCapWorkbook,
   buildTongQuanWorkbook,
   buildVanHanhWorkbook,
+  buildNhuCauMucHocWorkbook,
 } from './report-excel.util';
-import { TienDoTruongDong, DongHocVienBieuMau } from '../../thong-ke/thong-ke.types';
+import {
+  TienDoTruongDong,
+  DongHocVienBieuMau,
+  DongDangKyNhuCauMuc,
+  NhuCauMucHocResult,
+  MoTaBieuMau,
+} from '../../thong-ke/thong-ke.types';
 import { tongHopDangKyTruyCap } from '../../thong-ke/bieu-mau.service';
 import { TongHopResult, TongQuanResult, VanHanhResult } from '../bao-cao.types';
 
@@ -537,5 +544,199 @@ describe('buildBieuMauDangKyTruyCapWorkbook', () => {
     expect(s.getCell('B8').value).toBe('Tổng cộng');
     expect(s.getCell('D8').value).toBe(0);
     expect(s.getCell('F8').value).toBeNull();
+  });
+});
+
+describe('buildNhuCauMucHocWorkbook', () => {
+  const moTa: MoTaBieuMau = {
+    khoa: 'Khóa X',
+    pham_vi: 'Toàn bộ phạm vi tài khoản',
+    doi_tuong: 'Tất cả đối tượng',
+    ngay_xuat: new Date('2026-10-09T10:00:00Z'),
+  };
+
+  const theoMuc = [
+    { muc: 'co_ban' as const, nhan: 'Cơ bản', theo_danh_gia: 2, theo_nhu_cau: 3 },
+    { muc: 'thanh_thao' as const, nhan: 'Thành thạo', theo_danh_gia: 1, theo_nhu_cau: 1 },
+    { muc: 'nang_cao' as const, nhan: 'Nâng cao', theo_danh_gia: 1, theo_nhu_cau: 0 },
+  ];
+
+  const data: NhuCauMucHocResult = {
+    so_dang_ky: 5,
+    chua_co_muc: 1,
+    da_dieu_chinh: 1,
+    moc_tu_khao_sat: 1,
+    theo_muc: theoMuc,
+    dieu_chinh: [{ tu: 'nang_cao', den: 'co_ban', so_luong: 1 }],
+    theo_truong: [
+      {
+        don_vi_id: 't1',
+        ten_don_vi: 'Trường t1',
+        ten_don_vi_cha: 'Sở A',
+        so_dang_ky: 5,
+        chua_co_muc: 1,
+        da_dieu_chinh: 1,
+        moc_tu_khao_sat: 1,
+        theo_muc: theoMuc,
+      },
+    ],
+  };
+
+  const dangKy: DongDangKyNhuCauMuc[] = [
+    {
+      muc_danh_gia: 'nang_cao',
+      nguon_muc: 'khao_sat',
+      muc_hoc_chon: 'co_ban',
+      muc_hoc_chon_luc: new Date('2026-10-05T17:30:00Z'), // 06/10/2026 00:30 giờ VN
+      don_vi_id: 't1',
+      ten_don_vi: 'Trường t1',
+      ten_don_vi_cha: 'Sở A',
+      ho_ten: 'Nguyễn Văn A',
+      ma_dinh_danh_moet: 'GV001',
+      ma_khoa: 'K1',
+      ten_khoa: 'Khóa 1',
+    },
+  ];
+
+  async function mo(): Promise<ExcelJS.Workbook> {
+    const buf = await buildNhuCauMucHocWorkbook(data, dangKy, moTa);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+    return wb;
+  }
+
+  it('đủ 3 sheet đúng tên và thứ tự; tiêu đề dòng 1', async () => {
+    const wb = await mo();
+    expect(wb.worksheets.map((s) => s.name)).toEqual([
+      'Tổng hợp',
+      'Theo trường',
+      'Danh sách điều chỉnh',
+    ]);
+    for (const s of wb.worksheets) {
+      expect(s.getCell('A1').value).toBe(
+        'BÁO CÁO NHU CẦU MỨC HỌC THEO ĐỀ NGHỊ CỦA HỌC VIÊN',
+      );
+    }
+  });
+
+  it('Tổng hợp: bảng theo mức, tóm tắt và bảng điều chỉnh', async () => {
+    const s = (await mo()).getWorksheet('Tổng hợp')!;
+    expect([1, 2, 3, 4].map((c) => s.getRow(6).getCell(c).value)).toEqual([
+      'Mức',
+      'Theo mức đánh giá',
+      'Theo nhu cầu',
+      'Chênh lệch',
+    ]);
+    expect([1, 2, 3, 4].map((c) => s.getRow(7).getCell(c).value)).toEqual([
+      'Cơ bản',
+      2,
+      3,
+      1,
+    ]);
+    expect([1, 2, 3, 4].map((c) => s.getRow(10).getCell(c).value)).toEqual([
+      'Tổng cộng',
+      4,
+      4,
+      0,
+    ]);
+    expect(s.getRow(10).getCell(1).font?.bold).toBe(true);
+    expect(s.getCell('A13').value).toBe('Số đăng ký');
+    expect(s.getCell('B13').value).toBe(5);
+    expect(s.getCell('A16').value).toBe('Chưa có mức đánh giá');
+    expect(s.getCell('B16').value).toBe(1);
+    expect(s.getCell('A17').value).toBe(
+      'Trong đó mức lấy từ bài khảo sát (chưa chốt)',
+    );
+    expect(s.getCell('B17').value).toBe(1);
+    expect(s.getCell('A19').value).toBe('Điều chỉnh');
+    expect([1, 2, 3].map((c) => s.getRow(20).getCell(c).value)).toEqual([
+      'Từ mức',
+      'Sang mức',
+      'Số lượng',
+    ]);
+    expect([1, 2, 3].map((c) => s.getRow(21).getCell(c).value)).toEqual([
+      'Nâng cao',
+      'Cơ bản',
+      1,
+    ]);
+  });
+
+  it('Theo trường: header đủ cột theo mức, dòng trường và Tổng cộng', async () => {
+    const s = (await mo()).getWorksheet('Theo trường')!;
+    expect([1, 2, 3, 4, 5, 6].map((c) => s.getRow(6).getCell(c).value)).toEqual([
+      'STT',
+      'Trường',
+      'Đơn vị cấp trên',
+      'Số đăng ký',
+      'Có mức',
+      'Đã điều chỉnh',
+    ]);
+    expect([7, 8, 9, 10, 11, 12, 13].map((c) => s.getRow(6).getCell(c).value)).toEqual([
+      'Cơ bản – đánh giá',
+      'Cơ bản – nhu cầu',
+      'Thành thạo – đánh giá',
+      'Thành thạo – nhu cầu',
+      'Nâng cao – đánh giá',
+      'Nâng cao – nhu cầu',
+      'Chưa có mức',
+    ]);
+    const dong = s.getRow(7);
+    expect([1, 2, 3, 4, 5, 6].map((c) => dong.getCell(c).value)).toEqual([
+      1,
+      'Trường t1',
+      'Sở A',
+      5,
+      4,
+      1,
+    ]);
+    expect([7, 8, 9, 10, 11, 12, 13].map((c) => dong.getCell(c).value)).toEqual([
+      2, 3, 1, 1, 1, 0, 1,
+    ]);
+    const tong = s.getRow(8);
+    expect(tong.getCell(2).value).toBe('Tổng cộng');
+    expect(tong.getCell(4).value).toBe(5);
+    expect(tong.getCell(2).font?.bold).toBe(true);
+    expect(s.views[0]).toMatchObject({ state: 'frozen', xSplit: 2, ySplit: 6 });
+  });
+
+  it('Danh sách điều chỉnh: PII, chỉ HV có muc_hoc_chon, giờ VN', async () => {
+    const s = (await mo()).getWorksheet('Danh sách điều chỉnh')!;
+    expect([1, 2, 3, 4, 5, 6, 7, 8, 9].map((c) => s.getRow(6).getCell(c).value)).toEqual([
+      'STT',
+      'Họ tên',
+      'Mã định danh',
+      'Trường',
+      'Khóa',
+      'Mức đánh giá',
+      'Nguồn mức đánh giá',
+      'Mức học viên chọn',
+      'Thời điểm chọn',
+    ]);
+    const dong = s.getRow(7);
+    expect([1, 2, 3, 4, 5, 6, 7, 8, 9].map((c) => dong.getCell(c).value)).toEqual([
+      1,
+      'Nguyễn Văn A',
+      'GV001',
+      'Trường t1',
+      'K1',
+      'Nâng cao',
+      'Từ bài khảo sát',
+      'Cơ bản',
+      '06/10/2026 00:30',
+    ]);
+  });
+
+  it('không có điều chỉnh nào: sheet 3 chỉ có header, bảng Điều chỉnh sheet 1 không có dòng', async () => {
+    const buf = await buildNhuCauMucHocWorkbook(
+      { ...data, da_dieu_chinh: 0, dieu_chinh: [] },
+      dangKy.map((d) => ({ ...d, muc_hoc_chon: null })),
+      moTa,
+    );
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+    const s3 = wb.getWorksheet('Danh sách điều chỉnh')!;
+    expect(s3.getRow(7).getCell(1).value).toBeNull();
+    const s1 = wb.getWorksheet('Tổng hợp')!;
+    expect(s1.getRow(21).getCell(1).value).toBeNull();
   });
 });

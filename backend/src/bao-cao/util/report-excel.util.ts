@@ -9,11 +9,14 @@ import {
   DemMucNls,
   DOI_TUONG_BIEU_MAU,
   DoiTuongKey,
+  DongDangKyNhuCauMuc,
   DongHoSoHocVien,
   DongHocVienMuc,
   LoaiMucNls,
   MoTaBieuMau,
   MucNlsTongHop,
+  NhuCauMucHocResult,
+  NhuCauMucHocTruongDong,
   TienDoTruongDong,
 } from '../../thong-ke/thong-ke.types';
 import { mucThieuHoSo } from '../../thong-ke/ho-so-thieu';
@@ -1187,6 +1190,221 @@ export async function buildMucNlsWorkbook(
     sapXep(hocVien.filter((r) => !r.da_lam)).map(dongChung),
     moTa,
   );
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+// Báo cáo "Nhu cầu mức học theo đề nghị của học viên" — 3 sheet. Đếm theo LƯỢT ĐĂNG KÝ
+// (dang_ky_hoc), không khử trùng HV — khác mọi báo cáo NLS khác ở trên (khử trùng theo hoc_vien_id).
+const TIEU_DE_NHU_CAU_MUC = 'BÁO CÁO NHU CẦU MỨC HỌC THEO ĐỀ NGHỊ CỦA HỌC VIÊN';
+const HANG_DAU_NHU_CAU_MUC = 6;
+
+/** Bảng 4 cột Mức/Theo mức đánh giá/Theo nhu cầu/Chênh lệch; trả về dòng trống kế tiếp. */
+function dongBangNhuCauMuc(
+  sheet: ExcelJS.Worksheet,
+  hangDau: number,
+  hang: {
+    nhan: string;
+    theo_danh_gia: number;
+    theo_nhu_cau: number;
+    tong?: boolean;
+  }[],
+): number {
+  ['Mức', 'Theo mức đánh giá', 'Theo nhu cầu', 'Chênh lệch'].forEach((c, i) => {
+    sheet.getCell(hangDau, i + 1).value = c;
+  });
+  kieuHeader(sheet, hangDau, hangDau, 4);
+  hang.forEach((h, i) => {
+    const r = hangDau + 1 + i;
+    sheet.getCell(r, 1).value = h.nhan;
+    sheet.getCell(r, 2).value = h.theo_danh_gia;
+    sheet.getCell(r, 3).value = h.theo_nhu_cau;
+    sheet.getCell(r, 4).value = h.theo_nhu_cau - h.theo_danh_gia;
+    for (let c = 1; c <= 4; c++) {
+      const o = sheet.getCell(r, c);
+      o.border = BORDER_MONG;
+      if (h.tong) o.font = { bold: true };
+    }
+  });
+  return hangDau + 1 + hang.length;
+}
+
+type DongTruongNhuCauMucXuat = Pick<
+  NhuCauMucHocTruongDong,
+  'ten_don_vi' | 'ten_don_vi_cha' | 'so_dang_ky' | 'chua_co_muc' | 'da_dieu_chinh' | 'theo_muc'
+>;
+
+export async function buildNhuCauMucHocWorkbook(
+  data: NhuCauMucHocResult,
+  dangKy: DongDangKyNhuCauMuc[],
+  moTa: MoTaBieuMau,
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const coMuc = data.so_dang_ky - data.chua_co_muc;
+
+  // Sheet 1: bảng theo mức, tóm tắt số lượng, bảng điều chỉnh.
+  const sheet1 = workbook.addWorksheet('Tổng hợp');
+  themTieuDeBieuMau(sheet1, TIEU_DE_NHU_CAU_MUC, moTa, 4);
+  [1, 2, 3, 4].forEach((c) => (sheet1.getColumn(c).width = 22));
+  const cuoiBangMuc = dongBangNhuCauMuc(sheet1, HANG_DAU_NHU_CAU_MUC, [
+    ...data.theo_muc.map((m) => ({
+      nhan: m.nhan,
+      theo_danh_gia: m.theo_danh_gia,
+      theo_nhu_cau: m.theo_nhu_cau,
+    })),
+    { nhan: 'Tổng cộng', theo_danh_gia: coMuc, theo_nhu_cau: coMuc, tong: true },
+  ]);
+
+  const dongTomTat = cuoiBangMuc + 2;
+  const tomTat: [string, number][] = [
+    ['Số đăng ký', data.so_dang_ky],
+    ['Có mức đánh giá', coMuc],
+    ['Đề nghị học mức thấp hơn', data.da_dieu_chinh],
+    ['Chưa có mức đánh giá', data.chua_co_muc],
+    ['Trong đó mức lấy từ bài khảo sát (chưa chốt)', data.moc_tu_khao_sat],
+  ];
+  tomTat.forEach(([nhan, giaTri], i) => {
+    sheet1.getCell(dongTomTat + i, 1).value = nhan;
+    sheet1.getCell(dongTomTat + i, 2).value = giaTri;
+  });
+
+  const dongDieuChinh = dongTomTat + tomTat.length + 1;
+  const oDieuChinh = sheet1.getCell(dongDieuChinh, 1);
+  oDieuChinh.value = 'Điều chỉnh';
+  oDieuChinh.font = { bold: true };
+  const hangHeaderDc = dongDieuChinh + 1;
+  ['Từ mức', 'Sang mức', 'Số lượng'].forEach((c, i) => {
+    sheet1.getCell(hangHeaderDc, i + 1).value = c;
+  });
+  kieuHeader(sheet1, hangHeaderDc, hangHeaderDc, 3);
+  data.dieu_chinh.forEach((o, i) => {
+    const r = hangHeaderDc + 1 + i;
+    sheet1.getCell(r, 1).value = NHAN_MUC_NANG_LUC[o.tu] ?? o.tu;
+    sheet1.getCell(r, 2).value = NHAN_MUC_NANG_LUC[o.den] ?? o.den;
+    sheet1.getCell(r, 3).value = o.so_luong;
+    for (let c = 1; c <= 3; c++) sheet1.getCell(r, c).border = BORDER_MONG;
+  });
+  sheet1.views = [
+    { state: 'frozen', ySplit: HANG_DAU_NHU_CAU_MUC } as ExcelJS.WorksheetView,
+  ];
+
+  // Sheet 2: theo trường — mỗi mức 2 cột (đánh giá / nhu cầu).
+  const sheet2 = workbook.addWorksheet('Theo trường');
+  const header2 = [
+    'STT',
+    'Trường',
+    'Đơn vị cấp trên',
+    'Số đăng ký',
+    'Có mức',
+    'Đã điều chỉnh',
+    ...data.theo_muc.flatMap((m) => [`${m.nhan} – đánh giá`, `${m.nhan} – nhu cầu`]),
+    'Chưa có mức',
+  ];
+  themTieuDeBieuMau(sheet2, TIEU_DE_NHU_CAU_MUC, moTa, header2.length);
+  header2.forEach((c, i) => {
+    sheet2.getCell(HANG_DAU_NHU_CAU_MUC, i + 1).value = c;
+  });
+  kieuHeader(sheet2, HANG_DAU_NHU_CAU_MUC, HANG_DAU_NHU_CAU_MUC, header2.length);
+  [6, 32, 32, 12, 10, 12, 13, 13, 13, 13, 13, 13, 12].forEach((w, i) => {
+    sheet2.getColumn(i + 1).width = w;
+  });
+
+  const dongTruong2 = (don: DongTruongNhuCauMucXuat, stt: number | string) => [
+    stt,
+    don.ten_don_vi,
+    don.ten_don_vi_cha ?? '',
+    don.so_dang_ky,
+    don.so_dang_ky - don.chua_co_muc,
+    don.da_dieu_chinh,
+    ...don.theo_muc.flatMap((m) => [m.theo_danh_gia, m.theo_nhu_cau]),
+    don.chua_co_muc,
+  ];
+  data.theo_truong.forEach((t, i) => {
+    const r = HANG_DAU_NHU_CAU_MUC + 1 + i;
+    dongTruong2(t, i + 1).forEach((v, c) => {
+      const o = sheet2.getCell(r, c + 1);
+      o.value = v;
+      o.border = BORDER_MONG;
+    });
+  });
+  const rTongTruong = HANG_DAU_NHU_CAU_MUC + 1 + data.theo_truong.length;
+  dongTruong2(
+    {
+      ten_don_vi: 'Tổng cộng',
+      ten_don_vi_cha: '',
+      so_dang_ky: data.so_dang_ky,
+      chua_co_muc: data.chua_co_muc,
+      da_dieu_chinh: data.da_dieu_chinh,
+      theo_muc: data.theo_muc,
+    },
+    '',
+  ).forEach((v, c) => {
+    const o = sheet2.getCell(rTongTruong, c + 1);
+    o.value = v;
+    o.border = BORDER_MONG;
+    o.font = { bold: true };
+  });
+  sheet2.views = [
+    {
+      state: 'frozen',
+      xSplit: 2,
+      ySplit: HANG_DAU_NHU_CAU_MUC,
+    } as ExcelJS.WorksheetView,
+  ];
+
+  // Sheet 3: danh sách điều chỉnh — chứa dữ liệu cá nhân (cùng tiền lệ sheet "Cần bổ sung").
+  const sheet3 = workbook.addWorksheet('Danh sách điều chỉnh');
+  const cot3 = [
+    { nhan: 'STT', rong: 6 },
+    { nhan: 'Họ tên', rong: 30 },
+    { nhan: 'Mã định danh', rong: 16 },
+    { nhan: 'Trường', rong: 40 },
+    { nhan: 'Khóa', rong: 20 },
+    { nhan: 'Mức đánh giá', rong: 16 },
+    { nhan: 'Nguồn mức đánh giá', rong: 20 },
+    { nhan: 'Mức học viên chọn', rong: 18 },
+    { nhan: 'Thời điểm chọn', rong: 18 },
+  ];
+  themTieuDeBieuMau(sheet3, TIEU_DE_NHU_CAU_MUC, moTa, cot3.length);
+  cot3.forEach((c, i) => {
+    sheet3.getCell(HANG_DAU_NHU_CAU_MUC, i + 1).value = c.nhan;
+    sheet3.getColumn(i + 1).width = c.rong;
+  });
+  kieuHeader(sheet3, HANG_DAU_NHU_CAU_MUC, HANG_DAU_NHU_CAU_MUC, cot3.length);
+  const dsDieuChinh = dangKy
+    .filter((r) => r.muc_hoc_chon !== null)
+    .sort(
+      (a, b) =>
+        a.ten_don_vi.localeCompare(b.ten_don_vi, 'vi') ||
+        a.ho_ten.localeCompare(b.ho_ten, 'vi'),
+    );
+  dsDieuChinh.forEach((r, i) => {
+    const row = HANG_DAU_NHU_CAU_MUC + 1 + i;
+    const vals: (string | number)[] = [
+      i + 1,
+      r.ho_ten,
+      r.ma_dinh_danh_moet ?? '',
+      r.ten_don_vi,
+      r.ma_khoa,
+      r.muc_danh_gia ? (NHAN_MUC_NANG_LUC[r.muc_danh_gia] ?? r.muc_danh_gia) : '',
+      r.nguon_muc === 'khao_sat' ? 'Từ bài khảo sát' : r.nguon_muc === 'chot' ? 'Đã chốt' : '',
+      r.muc_hoc_chon ? (NHAN_MUC_NANG_LUC[r.muc_hoc_chon] ?? r.muc_hoc_chon) : '',
+      r.muc_hoc_chon_luc ? ngayXuatVn(r.muc_hoc_chon_luc) : '',
+    ];
+    vals.forEach((v, c) => {
+      const o = sheet3.getCell(row, c + 1);
+      o.value = v;
+      o.border = BORDER_MONG;
+    });
+  });
+  sheet3.views = [
+    {
+      state: 'frozen',
+      xSplit: 2,
+      ySplit: HANG_DAU_NHU_CAU_MUC,
+    } as ExcelJS.WorksheetView,
+  ];
+
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }
