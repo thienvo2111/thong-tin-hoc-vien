@@ -1,9 +1,24 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Alert, Container, Group, Pagination, Paper, Select, Skeleton, Stack, Table, Text, TextInput } from '@mantine/core';
+import {
+  Alert,
+  Button,
+  Container,
+  Group,
+  Pagination,
+  Paper,
+  Select,
+  Skeleton,
+  Stack,
+  Table,
+  Text,
+  TextInput,
+  Tooltip,
+} from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { useDebouncedValue } from '@mantine/hooks';
-import { useDanhSachHocVien } from '@/api/admin';
+import { useDanhSachHocVien, xuatHocVienTheoTruong } from '@/api/admin';
 import { layDonViCongTac } from '@/api/danhMuc';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { chuanHoaNfc } from '@/lib/nfc';
@@ -44,6 +59,18 @@ export default function AdminDanhSach() {
   const [donViId, setDonViId] = useState('');
   const [capGiangDay, setCapGiangDay] = useState('');
   const [page, setPage] = useState(1);
+  const [dangXuat, setDangXuat] = useState(false);
+
+  async function xuatTheoTruong() {
+    setDangXuat(true);
+    try {
+      await xuatHocVienTheoTruong(donViId);
+    } catch (e) {
+      notifications.show({ color: 'red', message: thongDiepLoiChung(e) });
+    } finally {
+      setDangXuat(false);
+    }
+  }
 
   const params = useMemo(
     () => ({
@@ -63,6 +90,8 @@ export default function AdminDanhSach() {
     queryFn: () => layDonViCongTac({ page_size: 200 }),
   });
   const donViMap = new Map((donVi.data?.data ?? []).map((d) => [d.id, d.ten_don_vi]));
+  // Chỉ xuất theo đúng 1 trường (BE trả 400 với Phòng/Sở).
+  const coTheXuat = donVi.data?.data.find((d) => d.id === donViId)?.loai_don_vi === 'truong';
   const tuyChonDonVi = [
     { value: '', label: 'Tất cả đơn vị' },
     ...(donVi.data?.data.map((d) => ({ value: d.id, label: d.ten_don_vi })) ?? []),
@@ -112,6 +141,20 @@ export default function AdminDanhSach() {
               allowDeselect={false}
               w={160}
             />
+            {/* data-disabled thay vì disabled: nút disabled không phát mouseleave nên Tooltip kẹt (Mantine). */}
+            <Tooltip label="Chọn một trường để xuất" disabled={coTheXuat}>
+              <Button
+                variant="light"
+                loading={dangXuat}
+                data-disabled={!coTheXuat || undefined}
+                aria-disabled={!coTheXuat}
+                onClick={() => {
+                  if (coTheXuat) void xuatTheoTruong();
+                }}
+              >
+                Xuất Excel theo trường
+              </Button>
+            </Tooltip>
             <Text fz={12.5} c="dimmed" ml="auto">
               {data ? `${data.total.toLocaleString('vi-VN')} học viên` : ''}
             </Text>

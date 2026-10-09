@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from './client';
+import { apiFetch, apiFetchBlob } from './client';
+import { taiFileTuBlob } from '@/lib/taiFile';
 import type { BaoCaoTheo, HocVien, HocVienDanhSachItem, PaginatedResult, TongHopResult } from './types';
 
 export interface DanhSachHocVienParams {
@@ -36,6 +37,12 @@ export function useDanhSachHocVien(params: DanhSachHocVienParams) {
     queryFn: () => layDanhSachHocVien(params),
     placeholderData: keepPreviousData,
   });
+}
+
+/** GET /hoc-vien/xuat-excel — danh sách học viên 1 trường (có PII) để trường đối chiếu. */
+export async function xuatHocVienTheoTruong(donViId: string): Promise<void> {
+  const blob = await apiFetchBlob(`/hoc-vien/xuat-excel?don_vi_cong_tac_id=${encodeURIComponent(donViId)}`);
+  taiFileTuBlob(blob, 'ds-hoc-vien-truong.xlsx');
 }
 
 export function layHocVienTheoId(id: string) {

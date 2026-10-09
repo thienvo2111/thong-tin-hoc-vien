@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
-import { Button, Container, Group, Stack, Title } from '@mantine/core';
+import { Button, Container, Group, Stack, Title, Tooltip } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { xuatHocVienTheoTruong } from '@/api/admin';
 import { useBoLocThongKe, xuatBieuMauDangKyTruyCap } from '@/api/thongKe';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { BoLocThongKe, useLocTuUrl } from './BoLocThongKe';
@@ -42,6 +43,22 @@ export default function DashboardThongKe({ che_do }: Props) {
     }
   }
 
+  // Danh sách học viên có PII — chỉ chế độ admin (ho_tro không có nút này).
+  const truongXuat = loc.don_vi_id ?? boLoc.data?.don_vi_co_dinh?.id;
+  const [dangXuatDs, setDangXuatDs] = useState(false);
+
+  async function xuatDsTruong() {
+    if (!truongXuat) return;
+    setDangXuatDs(true);
+    try {
+      await xuatHocVienTheoTruong(truongXuat);
+    } catch (e) {
+      notifications.show({ color: 'red', message: thongDiepLoiChung(e) });
+    } finally {
+      setDangXuatDs(false);
+    }
+  }
+
   const khiNgoaiPhamVi = useCallback(() => {
     notifications.show({
       id: 'thong-ke-ngoai-pham-vi',
@@ -57,9 +74,25 @@ export default function DashboardThongKe({ che_do }: Props) {
         <Stack gap="md" data-che-do={che_do}>
           <Group justify="space-between" align="center">
             <Title order={2}>Thống kê</Title>
-            <Button size="sm" variant="light" loading={dangXuat} onClick={() => void xuatBieuMau()}>
-              Xuất biểu mẫu ĐK & truy cập
-            </Button>
+            <Group gap="sm">
+              {che_do === 'admin' && (
+                <Tooltip label="Chọn một trường trong bộ lọc" disabled={!!truongXuat}>
+                  <Button
+                    size="sm"
+                    variant="light"
+                    loading={dangXuatDs}
+                    data-disabled={!truongXuat || undefined}
+                    aria-disabled={!truongXuat}
+                    onClick={() => void xuatDsTruong()}
+                  >
+                    Xuất DS học viên theo trường
+                  </Button>
+                </Tooltip>
+              )}
+              <Button size="sm" variant="light" loading={dangXuat} onClick={() => void xuatBieuMau()}>
+                Xuất biểu mẫu ĐK & truy cập
+              </Button>
+            </Group>
           </Group>
           <BoLocThongKe />
           {/* Thứ tự spec §4: 1-2 KPI + phễu → 3 so sánh khóa → 4 khảo sát → 5 chuyển mức

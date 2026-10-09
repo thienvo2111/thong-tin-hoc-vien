@@ -176,4 +176,59 @@ describe('DashboardThongKe', () => {
     renderDashboard('/thong-ke', 'ho_tro');
     expect(await screen.findByRole('button', { name: 'Xuất biểu mẫu ĐK & truy cập' })).toBeInTheDocument();
   });
+
+  it('che_do ho_tro → không có nút Xuất DS học viên theo trường (PII)', async () => {
+    renderDashboard('/thong-ke', 'ho_tro');
+    expect(await screen.findByRole('button', { name: 'Xuất biểu mẫu ĐK & truy cập' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Xuất DS học viên theo trường' })).not.toBeInTheDocument();
+  });
+
+  it('admin chưa chọn trường → nút Xuất DS học viên theo trường bị vô hiệu', async () => {
+    renderDashboard();
+    const nut = await screen.findByRole('button', { name: 'Xuất DS học viên theo trường' });
+    expect(nut).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('admin + tài khoản trường (don_vi_co_dinh) → nút bật, gọi xuat-excel với id trường cố định', async () => {
+    let url: URL | null = null;
+    server.use(
+      http.get('/thong-ke/bo-loc', () =>
+        HttpResponse.json({
+          khoa: [],
+          don_vi: null,
+          cum: null,
+          don_vi_co_dinh: { id: 'dv-2', ten_don_vi: 'Trường THPT Long Xuyên' },
+        }),
+      ),
+      http.get('/hoc-vien/xuat-excel', ({ request }) => {
+        url = new URL(request.url);
+        return new HttpResponse('x', { headers: { 'Content-Type': 'application/octet-stream' } });
+      }),
+    );
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    renderDashboard();
+    const nut = await screen.findByRole('button', { name: 'Xuất DS học viên theo trường' });
+    await waitFor(() => expect(nut).toHaveAttribute('aria-disabled', 'false'));
+    await userEvent.click(nut);
+    await waitFor(() => expect((url as URL | null)?.searchParams.get('don_vi_cong_tac_id')).toBe('dv-2'));
+    await waitFor(() => expect(click).toHaveBeenCalled());
+    click.mockRestore();
+  });
+
+  it('admin chọn trường trong bộ lọc (don_vi_id trên URL) → xuất theo trường đó', async () => {
+    let url: URL | null = null;
+    server.use(
+      http.get('/hoc-vien/xuat-excel', ({ request }) => {
+        url = new URL(request.url);
+        return new HttpResponse('x', { headers: { 'Content-Type': 'application/octet-stream' } });
+      }),
+    );
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    renderDashboard('/thong-ke?don_vi_id=dv-1');
+    const nut = await screen.findByRole('button', { name: 'Xuất DS học viên theo trường' });
+    expect(nut).toHaveAttribute('aria-disabled', 'false');
+    await userEvent.click(nut);
+    await waitFor(() => expect((url as URL | null)?.searchParams.get('don_vi_cong_tac_id')).toBe('dv-1'));
+    click.mockRestore();
+  });
 });
