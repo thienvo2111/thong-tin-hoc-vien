@@ -634,6 +634,8 @@ export interface GiaiDoanCuaToi {
   thuc_dia?: { ho_ten: string; so_dien_thoai: string; nhiem_vu: string | null }[];
 }
 
+export type NguonMucDanhGia = 'chot' | 'khao_sat';
+
 export interface KhoaHocDangKy {
   id: string;
   hoc_vien_id: string;
@@ -644,10 +646,18 @@ export interface KhoaHocDangKy {
   ngay_hoan_thanh: string | null;
   muc_dau_vao: MucNangLuc | null;
   muc_dau_ra: MucNangLuc | null;
-  // 2026-10-08: mức lớp học tự chọn (≤ muc_dau_vao); null = học theo mức đánh giá.
+  // 2026-10-08: mức lớp học tự chọn (≤ muc_danh_gia); null = học theo mức đánh giá.
   muc_hoc_chon: MucNangLuc | null;
   // Thời điểm điều chỉnh mức gần nhất (UTC ISO); null = chưa điều chỉnh.
   muc_hoc_chon_luc: string | null;
+  // 2026-10-09: mức đánh giá làm mốc điều chỉnh = muc_dau_vao (chốt) ?? mức quy đổi từ bài khảo sát
+  // đầu vào đã hoàn thành (M1/M2 cơ bản, M3 thành thạo, M4 nâng cao).
+  muc_danh_gia: MucNangLuc | null;
+  nguon_muc_danh_gia: NguonMucDanhGia | null;
+  // Mã/nhãn kết quả gốc theo thang khảo sát (vd 'M1' / 'M1 – Chưa đạt') — chỉ có khi nguồn = khao_sat.
+  // Quy đổi M1 -> co_ban chỉ để xếp lớp; kết quả hiển thị luôn giữ nhãn khảo sát.
+  muc_goc_danh_gia: string | null;
+  nhan_muc_goc_danh_gia: string | null;
   cum_id: string | null;
   khoa: {
     id: string;

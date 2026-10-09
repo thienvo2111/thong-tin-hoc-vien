@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
 import { db } from '@/test/mocks/db';
+import { datTinhTrangBai } from '@/test/mocks/sso';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import type { MucNangLuc } from '@/api/types';
@@ -19,6 +20,8 @@ function datDangKy(
 ) {
   const dk = db.khoaHocToi[0];
   dk.muc_dau_vao = muc_dau_vao;
+  dk.muc_danh_gia = muc_dau_vao;
+  dk.nguon_muc_danh_gia = muc_dau_vao ? 'chot' : null;
   dk.muc_hoc_chon = muc_hoc_chon;
   dk.muc_hoc_chon_luc = muc_hoc_chon_luc;
   dk.khoa.mo_dieu_chinh_muc = mo_dieu_chinh_muc;
@@ -195,6 +198,74 @@ describe('M7 — Điều chỉnh mức lớp học', () => {
     await userEvent.click(within(hop).getByRole('button', { name: 'Xác nhận' }));
     expect(await screen.findByText(/Đã điều chỉnh lúc \d{2}\/\d{2}\/\d{4} \d{2}:\d{2}/)).toBeInTheDocument();
     expect(db.khoaHocToi[0].muc_hoc_chon).toBe('thanh_thao');
+  });
+
+  // 2026-10-09: quản trị chưa chốt muc_dau_vao, mốc lấy từ bài khảo sát đầu vào (M4 -> nâng cao).
+  describe('mốc theo khảo sát (chưa chốt)', () => {
+    const NHAN_GOC: Record<MucNangLuc, [string, string]> = {
+      co_ban: ['M2', 'M2 – Cơ bản'],
+      thanh_thao: ['M3', 'M3 – Thành thạo'],
+      nang_cao: ['M4', 'M4 – Nâng cao'],
+    };
+    function datKhaoSat(muc_danh_gia: MucNangLuc, goc = NHAN_GOC[muc_danh_gia]) {
+      datDangKy(null, true);
+      const dk = db.khoaHocToi[0];
+      dk.muc_danh_gia = muc_danh_gia;
+      dk.nguon_muc_danh_gia = 'khao_sat';
+      [dk.muc_goc_danh_gia, dk.nhan_muc_goc_danh_gia] = goc;
+    }
+
+    it('khảo sát M1: badge giữ "M1 – Chưa đạt", dòng lớp "Cơ bản" kèm ghi chú xếp lớp, không có nút', async () => {
+      datKhaoSat('co_ban', ['M1', 'M1 – Chưa đạt']);
+      datTinhTrangBai({ loai: 'danh-gia', trang_thai: 'hoan_thanh', muc_goc: 'M1', nhan_muc_goc: 'M1 – Chưa đạt' });
+      renderDaDangNhap();
+      expect(await screen.findByText(/Đầu vào: M1 – Chưa đạt/)).toBeInTheDocument();
+      expect(screen.queryByText(/Đầu vào: Cơ bản/)).not.toBeInTheDocument();
+      expect(screen.getByText('Cơ bản', { selector: 'b' })).toBeInTheDocument();
+      expect(screen.getByText(/xếp lớp Cơ bản theo kết quả M1 – Chưa đạt/)).toBeInTheDocument();
+      expect(nutDieuChinh()).not.toBeInTheDocument();
+    });
+
+    it('khảo sát M2: nhãn trùng tên mức lớp -> không có ghi chú xếp lớp', async () => {
+      datKhaoSat('co_ban');
+      renderDaDangNhap();
+      expect(await screen.findByText('Cơ bản', { selector: 'b' })).toBeInTheDocument();
+      expect(screen.queryByText(/xếp lớp/)).not.toBeInTheDocument();
+    });
+
+    it('chỉ có kết quả khảo sát M4: hiện mức lớp học + nút điều chỉnh', async () => {
+      datKhaoSat('nang_cao');
+      renderDaDangNhap();
+      expect(await screen.findByText('Nâng cao', { selector: 'b' })).toBeInTheDocument();
+      expect(nutDieuChinh()).toBeInTheDocument();
+    });
+
+    it('các mức chọn giới hạn theo mốc khảo sát', async () => {
+      datKhaoSat('thanh_thao');
+      renderDaDangNhap();
+      await userEvent.click(await screen.findByRole('button', { name: 'Điều chỉnh mức lớp' }));
+      expect(screen.getAllByRole('radio').map((r) => r.closest('.mantine-Radio-root')?.textContent)).toEqual([
+        'Cơ bản',
+        'Thành thạo (theo kết quả đánh giá)',
+      ]);
+    });
+
+    it('lưu qua handler mặc định: mức thấp hơn mốc được ghi, dòng hiện "đã điều chỉnh từ"', async () => {
+      datKhaoSat('nang_cao');
+      renderDaDangNhap();
+      await chonVaLuu('Thành thạo');
+      const hop = await screen.findByRole('dialog', { name: 'Xác nhận điều chỉnh mức lớp học' });
+      await userEvent.click(within(hop).getByRole('button', { name: 'Xác nhận' }));
+      expect(await screen.findByText(/đã điều chỉnh từ Nâng cao/)).toBeInTheDocument();
+      expect(db.khoaHocToi[0].muc_hoc_chon).toBe('thanh_thao');
+    });
+
+    it('mốc khảo sát cơ bản: ẩn nút', async () => {
+      datKhaoSat('co_ban');
+      renderDaDangNhap();
+      expect(await screen.findByText(/Mức lớp học:/)).toBeInTheDocument();
+      expect(nutDieuChinh()).not.toBeInTheDocument();
+    });
   });
 
   it('bấm Hủy: đóng khu chọn, không gọi API', async () => {

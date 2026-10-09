@@ -2,24 +2,26 @@ import { useState } from 'react';
 import { Box, Button, Group, Modal, Radio, Stack, Text } from '@mantine/core';
 import { useChonMucHoc } from '@/api/hocVien';
 import type { KhoaHocDangKy, MucNangLuc } from '@/api/types';
-import { cacMucDuocChon, mucHocHieuLuc, nhanMucNangLuc } from '@/lib/mucNangLuc';
+import { cacMucDuocChon, ghiChuXepLopTheoKhaoSat, mucHocHieuLuc, nhanMucNangLuc } from '@/lib/mucNangLuc';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { StatusBanner } from '@/components/StatusBanner';
 
 /** Điều chỉnh mức lớp học (2026-10-08): học viên chọn mức BẰNG hoặc THẤP HƠN kết quả đánh giá đầu vào,
- * chỉ khi khóa mở điều chỉnh. Khu chọn mở ngay trong thẻ; bấm Lưu -> hộp xác nhận trong trang rồi mới gọi API. */
+ * chỉ khi khóa mở điều chỉnh. Mốc = muc_danh_gia (mức chốt ?? quy đổi từ bài khảo sát, 2026-10-09). Khu chọn mở ngay trong thẻ; bấm Lưu -> hộp xác nhận trong trang rồi mới gọi API. */
 export function ChonMucLopHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
-  const { khoa, muc_dau_vao, muc_hoc_chon, muc_hoc_chon_luc } = dangKy;
+  const { khoa, muc_danh_gia, muc_hoc_chon, muc_hoc_chon_luc } = dangKy;
   const [dangChon, setDangChon] = useState(false);
   const [xacNhan, setXacNhan] = useState(false);
   const [giaTri, setGiaTri] = useState<MucNangLuc | null>(null);
   const [daLuu, setDaLuu] = useState(false);
   const chonMuc = useChonMucHoc();
 
-  if (!muc_dau_vao) return null;
+  if (!muc_danh_gia) return null;
   const mucHoc = mucHocHieuLuc(dangKy);
-  const duocDieuChinh = khoa.mo_dieu_chinh_muc && muc_dau_vao !== 'co_ban';
+  // Kết quả khảo sát (vd M1 – Chưa đạt) giữ nguyên nhãn; ở đây chỉ nói mức LỚP được xếp.
+  const ghiChuXepLop = ghiChuXepLopTheoKhaoSat(dangKy);
+  const duocDieuChinh = khoa.mo_dieu_chinh_muc && muc_danh_gia !== 'co_ban';
 
   const moChon = () => {
     setGiaTri(mucHoc);
@@ -57,7 +59,8 @@ export function ChonMucLopHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
     <Box>
       <Text size="sm">
         Mức lớp học: <b>{nhanMucNangLuc(mucHoc)}</b>
-        {muc_hoc_chon && <> (đã điều chỉnh từ {nhanMucNangLuc(muc_dau_vao)})</>}
+        {muc_hoc_chon && <> (đã điều chỉnh từ {nhanMucNangLuc(muc_danh_gia)})</>}
+        {!muc_hoc_chon && ghiChuXepLop && <> ({ghiChuXepLop})</>}
       </Text>
       {muc_hoc_chon_luc && (
         <Text size="xs" c="dimmed">
@@ -89,11 +92,11 @@ export function ChonMucLopHoc({ dangKy }: { dangKy: KhoaHocDangKy }) {
             onChange={(v) => setGiaTri(v as MucNangLuc)}
           >
             <Stack gap="xs" mt="xs">
-              {cacMucDuocChon(muc_dau_vao).map((m) => (
+              {cacMucDuocChon(muc_danh_gia).map((m) => (
                 <Radio
                   key={m}
                   value={m}
-                  label={m === muc_dau_vao ? `${nhanMucNangLuc(m)} (theo kết quả đánh giá)` : nhanMucNangLuc(m)}
+                  label={m === muc_danh_gia ? `${nhanMucNangLuc(m)} (theo kết quả đánh giá)` : nhanMucNangLuc(m)}
                 />
               ))}
             </Stack>

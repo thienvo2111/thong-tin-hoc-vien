@@ -570,6 +570,10 @@ export function taoKhoaHocToiMau(): KhoaHocDangKy[] {
       muc_dau_ra: null,
       muc_hoc_chon: null,
       muc_hoc_chon_luc: null,
+      muc_danh_gia: 'co_ban',
+      nguon_muc_danh_gia: 'chot',
+      muc_goc_danh_gia: null,
+      nhan_muc_goc_danh_gia: null,
       cum_id: 'cum-1',
       khoa: {
         id: 'khoa-1',
@@ -670,6 +674,10 @@ export function taoKhoaHocCuaHocVienMau(): Record<string, KhoaHocDangKy[]> {
         muc_dau_ra: null,
         muc_hoc_chon: null,
         muc_hoc_chon_luc: null,
+        muc_danh_gia: null,
+        nguon_muc_danh_gia: null,
+        muc_goc_danh_gia: null,
+        nhan_muc_goc_danh_gia: null,
         cum_id: null,
         khoa: {
           id: 'khoa-1',
