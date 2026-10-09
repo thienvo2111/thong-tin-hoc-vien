@@ -55,7 +55,6 @@ import { resolveHocVienImportRow } from '../import/util/hoc-vien-resolver.util';
 import { parseVnDateTime } from '../common/utils/vn-datetime.util';
 import {
   LOAI_BAI_DAU_VAO,
-  THU_TU_MUC,
   duocChonMuc,
   mucDanhGiaLamMoc,
   mucHocHieuLuc,
@@ -1530,11 +1529,11 @@ export class KhoaBoiDuongService {
     }
     if (muc && !duocChonMuc(mucDanhGia, muc)) {
       throw new ValidationException(
-        'Chỉ được chọn mức bằng hoặc thấp hơn mức đánh giá',
+        'Chỉ được chọn mức đánh giá hoặc thấp hơn 1 mức',
         [
           {
             field: 'muc',
-            message: 'Chỉ được chọn mức bằng hoặc thấp hơn mức đánh giá',
+            message: 'Chỉ được chọn mức đánh giá hoặc thấp hơn 1 mức',
           },
         ],
       );
@@ -2145,12 +2144,12 @@ export class KhoaBoiDuongService {
         khoa: { select: { ten_khoa: true } },
       },
     });
-    // Mức tự chọn chỉ còn ý nghĩa khi THẤP HƠN mức đánh giá mới — không thì
-    // reset về học theo mức đánh giá.
+    // Mức tự chọn chỉ giữ khi vẫn THẤP HƠN ĐÚNG 1 mức so với mức đánh giá mới —
+    // bằng/cao hơn hoặc thấp hơn quá 1 mức thì reset về học theo mức đánh giá.
     const resetMucChon =
       dto.loai === 'dau_vao' &&
       !!cu?.muc_hoc_chon &&
-      THU_TU_MUC[cu.muc_hoc_chon] >= THU_TU_MUC[dto.muc];
+      (cu.muc_hoc_chon === dto.muc || !duocChonMuc(dto.muc, cu.muc_hoc_chon));
     await this.prisma.dang_ky_hoc.update({
       where: {
         hoc_vien_id_khoa_id: {

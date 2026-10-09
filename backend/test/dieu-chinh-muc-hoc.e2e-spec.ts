@@ -20,6 +20,7 @@ function ddmmyyyy(ngay: number, thang: number, nam: number): string {
 
 // Điều chỉnh mức lớp học (2026-10-08): học viên tự chọn mức ≤ mức đánh giá
 // đầu vào khi khóa mở công tắc mo_dieu_chinh_muc; Quản trị sửa hộ bỏ qua công tắc.
+// Sửa 2026-10-09: chỉ được thấp hơn ĐÚNG 1 mức (nang_cao -> thanh_thao, không co_ban).
 describe('Điều chỉnh mức lớp học (e2e)', () => {
   let app: INestApplication;
   let donViFixture: Awaited<ReturnType<typeof taoDonViTest>>;
@@ -117,6 +118,31 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
 
   const docDangKy = (id: string) =>
     prisma.dang_ky_hoc.findUniqueOrThrow({ where: { id } });
+
+  // Import ket_qua_danh_gia loai dau_vao cho 1 học viên rồi xác nhận.
+  async function importMucDauVao(tenDangNhap: string, muc: string) {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('data');
+    sheet.addRow([
+      'so_dinh_danh_ca_nhan',
+      'ma_dinh_danh_moet',
+      'ma_khoa',
+      'loai',
+      'muc',
+    ]);
+    sheet.addRow([undefined, tenDangNhap, maKhoa, 'dau_vao', muc]);
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const res = await http()
+      .post('/import/ket_qua_danh_gia')
+      .set('Authorization', `Bearer ${tokenQuanTri}`)
+      .attach('file', buffer, 'kqdg-dcm.xlsx')
+      .expect(201);
+    importIds.push(res.body.import_id);
+    await http()
+      .post(`/import/${res.body.import_id}/xac-nhan`)
+      .set('Authorization', `Bearer ${tokenQuanTri}`)
+      .expect(201);
+  }
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -238,7 +264,7 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
 
   it('chọn null -> quay về học theo mức đánh giá', async () => {
     const { token, dangKy } = await taoHocVien('nang_cao');
-    await chon(token, 'co_ban').expect(200);
+    await chon(token, 'thanh_thao').expect(200);
     const res = await chon(token, null).expect(200);
     expect(res.body).toEqual({
       muc_dau_vao: 'nang_cao',
@@ -255,6 +281,25 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
     expect(res.body.error.fields[0].field).toBe('muc');
     expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBeNull();
+  });
+
+  it('nâng cao -> cơ bản (thấp hơn 2 mức) -> 400, không lưu', async () => {
+    const { token, dangKy } = await taoHocVien('nang_cao');
+    const res = await chon(token, 'co_ban').expect(400);
+    expect(res.body.error.fields[0]).toEqual({
+      field: 'muc',
+      message: 'Chỉ được chọn mức đánh giá hoặc thấp hơn 1 mức',
+    });
+    const sau = await docDangKy(dangKy!.id);
+    expect(sau.muc_hoc_chon).toBeNull();
+    expect(sau.muc_hoc_chon_luc).toBeNull();
+  });
+
+  it('thành thạo -> cơ bản (thấp hơn 1 mức) -> 200', async () => {
+    const { token, dangKy } = await taoHocVien('thanh_thao');
+    const res = await chon(token, 'co_ban').expect(200);
+    expect(res.body.muc_hoc).toBe('co_ban');
+    expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBe('co_ban');
   });
 
   it('giá trị muc không hợp lệ -> 400', async () => {
@@ -281,7 +326,7 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
         muc_dau_vao: 'nang_cao',
       },
     });
-    const res = await chon(token, 'co_ban', khoaKhacId).expect(403);
+    const res = await chon(token, 'thanh_thao', khoaKhacId).expect(403);
     expect(res.body.error.code).toBe('DIEU_CHINH_MUC_DONG');
   });
 
@@ -320,35 +365,31 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
     expect((await docDangKy(dangKy.id)).muc_hoc_chon).toBe('co_ban');
   });
 
+  it('quản trị sửa hộ cũng chỉ 1 mức: nang_cao -> co_ban 400, -> thanh_thao 200', async () => {
+    const { dangKy } = await taoHocVien('nang_cao');
+    const sua = (muc: string | null) =>
+      http()
+        .patch(`/dang-ky-hoc/${dangKy!.id}/muc-hoc`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ muc });
+
+    const loi = await sua('co_ban').expect(400);
+    expect(loi.body.error.fields[0].message).toBe(
+      'Chỉ được chọn mức đánh giá hoặc thấp hơn 1 mức',
+    );
+    expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBeNull();
+
+    await sua('thanh_thao').expect(200);
+    expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBe('thanh_thao');
+  });
+
   it('import lại ket_qua_danh_gia hạ mức xuống ≤ lựa chọn -> muc_hoc_chon reset null; vẫn cao hơn thì giữ', async () => {
     const { tenDangNhap, token, dangKy } = await taoHocVien('nang_cao');
     await chon(token, 'thanh_thao').expect(200);
 
-    const importMuc = async (muc: string) => {
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('data');
-      sheet.addRow([
-        'so_dinh_danh_ca_nhan',
-        'ma_dinh_danh_moet',
-        'ma_khoa',
-        'loai',
-        'muc',
-      ]);
-      sheet.addRow([undefined, tenDangNhap, maKhoa, 'dau_vao', muc]);
-      const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
-      const res = await http()
-        .post('/import/ket_qua_danh_gia')
-        .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .attach('file', buffer, 'kqdg-dcm.xlsx')
-        .expect(201);
-      importIds.push(res.body.import_id);
-      await http()
-        .post(`/import/${res.body.import_id}/xac-nhan`)
-        .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .expect(201);
-    };
+    const importMuc = (muc: string) => importMucDauVao(tenDangNhap, muc);
 
-    // Mức mới vẫn cao hơn lựa chọn -> giữ lựa chọn.
+    // Mức mới vẫn cao hơn lựa chọn đúng 1 mức -> giữ lựa chọn.
     await importMuc('nang_cao');
     const giu = await docDangKy(dangKy!.id);
     expect(giu.muc_hoc_chon).toBe('thanh_thao');
@@ -432,6 +473,29 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
       await chon(token, 'co_ban').expect(200);
     });
 
+    it('khảo sát M4 + chọn co_ban (thấp hơn 2 mức) -> 400', async () => {
+      const { hocVien, token, dangKy } = await taoHocVien(null);
+      await ghiKhaoSat(hocVien.id, 'hoan_thanh', 'M4');
+      const res = await chon(token, 'co_ban').expect(400);
+      expect(res.body.error.fields[0].message).toBe(
+        'Chỉ được chọn mức đánh giá hoặc thấp hơn 1 mức',
+      );
+      expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBeNull();
+    });
+
+    it('chọn co_ban theo khảo sát M3, quản trị chốt nang_cao (co_ban thấp hơn 2 mức) -> reset NULL', async () => {
+      const { hocVien, tenDangNhap, token, dangKy } = await taoHocVien(null);
+      await ghiKhaoSat(hocVien.id, 'hoan_thanh', 'M3');
+      await chon(token, 'co_ban').expect(200);
+      expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBe('co_ban');
+
+      await importMucDauVao(tenDangNhap, 'nang_cao');
+      const sau = await docDangKy(dangKy!.id);
+      expect(sau.muc_dau_vao).toBe('nang_cao');
+      expect(sau.muc_hoc_chon).toBeNull();
+      expect(sau.muc_hoc_chon_luc).toBeNull();
+    });
+
     it('bài chưa hoàn thành -> 400 "Chưa có kết quả đánh giá đầu vào"', async () => {
       const { hocVien, token } = await taoHocVien(null);
       await ghiKhaoSat(hocVien.id, 'dang_lam', 'M4');
@@ -455,27 +519,7 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
       await ghiKhaoSat(hocVien.id, 'hoan_thanh', 'M4');
       await chon(token, 'thanh_thao').expect(200);
 
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet('data');
-      sheet.addRow([
-        'so_dinh_danh_ca_nhan',
-        'ma_dinh_danh_moet',
-        'ma_khoa',
-        'loai',
-        'muc',
-      ]);
-      sheet.addRow([undefined, tenDangNhap, maKhoa, 'dau_vao', 'thanh_thao']);
-      const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
-      const up = await http()
-        .post('/import/ket_qua_danh_gia')
-        .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .attach('file', buffer, 'kqdg-dcm-ks.xlsx')
-        .expect(201);
-      importIds.push(up.body.import_id);
-      await http()
-        .post(`/import/${up.body.import_id}/xac-nhan`)
-        .set('Authorization', `Bearer ${tokenQuanTri}`)
-        .expect(201);
+      await importMucDauVao(tenDangNhap, 'thanh_thao');
 
       const sau = await docDangKy(dangKy!.id);
       expect(sau.muc_dau_vao).toBe('thanh_thao');
@@ -513,7 +557,7 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
     expect(chiTiet.body.mo_dieu_chinh_muc).toBe(false);
 
     const { token } = await taoHocVien('nang_cao');
-    const res = await chon(token, 'co_ban').expect(403);
+    const res = await chon(token, 'thanh_thao').expect(403);
     expect(res.body.error.code).toBe('DIEU_CHINH_MUC_DONG');
 
     const bat = await http()
@@ -522,7 +566,7 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
       .send({ mo_dieu_chinh_muc: true })
       .expect(200);
     expect(bat.body.mo_dieu_chinh_muc).toBe(true);
-    await chon(token, 'co_ban').expect(200);
+    await chon(token, 'thanh_thao').expect(200);
 
     await http()
       .patch(`/khoa-boi-duong/${khoaId}`)

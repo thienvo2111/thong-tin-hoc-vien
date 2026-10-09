@@ -650,20 +650,20 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
           hoc_vien_id: hocVien.id,
           khoa_id: khoa.id,
           trang_thai: 'da_duyet',
-          muc_dau_vao: 'nang_cao',
+          muc_dau_vao: 'thanh_thao',
           muc_hoc_chon: 'co_ban',
         },
       });
       await taoGiaiDoan(khoa.id, 1);
-      const tenLopNangCao = `Lop-nc-${suf}`;
+      const tenLopThanhThao = `Lop-tt-${suf}`;
       const tenLopCoBan = `Lop-cb-${suf}`;
       await prisma.lop_hoc.createMany({
         data: [
           {
             khoa_id: khoa.id,
             loai_lop: 'truc_tiep',
-            ten_lop: tenLopNangCao,
-            muc_nang_luc: 'nang_cao',
+            ten_lop: tenLopThanhThao,
+            muc_nang_luc: 'thanh_thao',
           },
           {
             khoa_id: khoa.id,
@@ -698,14 +698,14 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         return ketQua.body;
       };
 
-      // Lớp nâng cao (= mức đánh giá) nhưng học viên đã chọn cơ bản -> cảnh báo.
-      const lechMuc = await preview(tenLopNangCao);
+      // Lớp thành thạo (= mức đánh giá) nhưng học viên đã chọn cơ bản -> cảnh báo.
+      const lechMuc = await preview(tenLopThanhThao);
       expect(lechMuc.danh_sach_canh_bao).toHaveLength(1);
       expect(lechMuc.danh_sach_canh_bao[0].ly_do).toEqual(
         expect.stringContaining('mức học "co_ban"'),
       );
       expect(lechMuc.danh_sach_canh_bao[0].ly_do).toEqual(
-        expect.stringContaining('tự điều chỉnh từ "nang_cao"'),
+        expect.stringContaining('tự điều chỉnh từ "thanh_thao"'),
       );
 
       // Lớp cơ bản khớp mức đã chọn -> không cảnh báo.

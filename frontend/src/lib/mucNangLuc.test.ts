@@ -20,8 +20,8 @@ describe('ghiChuXepLopTheoKhaoSat', () => {
 });
 
 describe('cacMucDuocChon', () => {
-  it('nâng cao -> cả 3 mức', () => {
-    expect(cacMucDuocChon('nang_cao')).toEqual(['co_ban', 'thanh_thao', 'nang_cao']);
+  it('nâng cao -> thành thạo, nâng cao (không có cơ bản — chỉ thấp hơn 1 mức)', () => {
+    expect(cacMucDuocChon('nang_cao')).toEqual(['thanh_thao', 'nang_cao']);
   });
 
   it('thành thạo -> cơ bản, thành thạo (không có nâng cao)', () => {

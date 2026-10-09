@@ -1,7 +1,8 @@
 import type { muc_nang_luc } from '@prisma/client';
 
 // Điều chỉnh mức lớp học (2026-10-08): học viên chỉ được chọn mức BẰNG hoặc
-// THẤP HƠN mức đánh giá làm mốc. Mức học hiệu lực = muc_hoc_chon ?? mốc.
+// THẤP HƠN mức đánh giá làm mốc — sửa 2026-10-09: thấp hơn ĐÚNG 1 mức.
+// Mức học hiệu lực = muc_hoc_chon ?? mốc.
 export const THU_TU_MUC: Record<muc_nang_luc, number> = {
   co_ban: 1,
   thanh_thao: 2,
@@ -56,10 +57,12 @@ export function mucHocHieuLuc(
   return mucHocChon ?? mucDanhGia;
 }
 
+/** Được chọn mức bằng mốc hoặc thấp hơn đúng 1 mức (nang_cao→thanh_thao, thanh_thao→co_ban). */
 export function duocChonMuc(
   mucDanhGia: muc_nang_luc | null,
   mucChon: muc_nang_luc | null,
 ): boolean {
   if (!mucDanhGia || !mucChon) return false;
-  return THU_TU_MUC[mucChon] <= THU_TU_MUC[mucDanhGia];
+  const chenh = THU_TU_MUC[mucDanhGia] - THU_TU_MUC[mucChon];
+  return chenh === 0 || chenh === 1;
 }

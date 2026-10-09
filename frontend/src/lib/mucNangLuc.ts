@@ -30,8 +30,9 @@ export function ghiChuXepLopTheoKhaoSat(dk: {
   return `xếp lớp ${tenMuc} theo kết quả ${dk.nhan_muc_goc_danh_gia}`;
 }
 
-/** Các mức được chọn: bằng hoặc thấp hơn mức đánh giá (thấp -> cao). Chưa có đánh giá -> rỗng. */
+/** Các mức được chọn: bằng mức đánh giá hoặc thấp hơn ĐÚNG 1 mức (thấp -> cao, 2026-10-09). Chưa có đánh giá -> rỗng. */
 export function cacMucDuocChon(mucDanhGia: MucNangLuc | null): MucNangLuc[] {
   if (!mucDanhGia) return [];
-  return THU_TU_MUC.slice(0, THU_TU_MUC.indexOf(mucDanhGia) + 1);
+  const viTri = THU_TU_MUC.indexOf(mucDanhGia);
+  return THU_TU_MUC.slice(Math.max(0, viTri - 1), viTri + 1);
 }
