@@ -851,7 +851,7 @@ export default function AdminKhoaChiTiet() {
               <Paper withBorder radius={14} p="md">
                 <Switch
                   label="Cho học viên điều chỉnh mức lớp học"
-                  description="Học viên chỉ được chọn mức bằng hoặc thấp hơn kết quả đánh giá đầu vào; có hiệu lực ngay."
+                  description="Học viên chỉ được chọn mức bằng kết quả đánh giá đầu vào hoặc thấp hơn 1 mức; có hiệu lực ngay."
                   checked={khoa.mo_dieu_chinh_muc}
                   disabled={batTatDieuChinhMuc.isPending}
                   onChange={(e) =>

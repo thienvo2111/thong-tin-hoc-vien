@@ -23,8 +23,10 @@ async function luuMucHocMock(dk: KhoaHocDangKy, request: Request) {
       fields: [{ field: 'muc', message: 'Chưa có kết quả đánh giá đầu vào' }],
     });
   }
-  if (muc && THU_TU_MUC_MOCK.indexOf(muc) > THU_TU_MUC_MOCK.indexOf(mucDanhGia)) {
-    const thongDiep = 'Chỉ được chọn mức bằng hoặc thấp hơn mức đánh giá';
+  // Như backend (2026-10-09): bằng mốc hoặc thấp hơn đúng 1 mức.
+  const chenh = muc ? THU_TU_MUC_MOCK.indexOf(mucDanhGia) - THU_TU_MUC_MOCK.indexOf(muc) : 0;
+  if (chenh !== 0 && chenh !== 1) {
+    const thongDiep = 'Chỉ được chọn mức đánh giá hoặc thấp hơn 1 mức';
     throw loi(400, 'VALIDATION_ERROR', thongDiep, { fields: [{ field: 'muc', message: thongDiep }] });
   }
   const mucMoi = muc === mucDanhGia ? null : muc;

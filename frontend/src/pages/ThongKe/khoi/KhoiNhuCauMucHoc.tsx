@@ -60,7 +60,7 @@ function TongHop({ d }: { d: NhuCauMucHocResult }) {
       </Text>
       <Text size="xs" c="dimmed">
         Mức đánh giá: mức đầu vào đã chốt; chưa chốt thì quy đổi từ bài đánh giá NLS đầu vào (M1, M2 → Cơ bản; M3 →
-        Thành thạo; M4 → Nâng cao). Nhu cầu: mức học viên chọn để xếp lớp (chỉ bằng hoặc thấp hơn mức đánh giá).
+        Thành thạo; M4 → Nâng cao). Nhu cầu: mức học viên chọn để xếp lớp (bằng mức đánh giá hoặc thấp hơn 1 mức).
         Tính theo đăng ký khóa học.
       </Text>
       <BarChart
