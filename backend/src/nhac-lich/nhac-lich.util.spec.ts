@@ -134,5 +134,24 @@ describe('soạn tin nhắn (G10)', () => {
     expect(s).toContain('Lịch học Thứ ba, 10/11/2026:');
     expect(s).toContain('• Lớp 01 – Buổi 1: 08:00–11:00');
     expect(s).toContain('Hỗ trợ tại điểm học: Lê Đạt – 0911');
+    expect(s).not.toContain('Điểm danh & vào Zoom');
+  });
+
+  it('ngày có buổi Zoom khóa bật điểm danh → thêm 1 dòng nhắc bấm, không link', () => {
+    const s = soanTinNhanCum({
+      ten_cum: 'Cụm Long Xuyên',
+      ngay: new Date('2026-11-10T01:00:00Z'),
+      buoi: [
+        { ...buoi, ten_lop: 'Lớp 01', thuc_dia: [] },
+        { ...buoi, buoi_so: 2, ten_lop: 'Lớp 01', thuc_dia: [] },
+      ],
+      nhac_diem_danh_zoom: true,
+    });
+    const dong = s
+      .split('\n')
+      .filter((l) => l.includes('Điểm danh & vào Zoom'));
+    expect(dong).toEqual([
+      'Nhớ bấm *Điểm danh & vào Zoom* trên Cổng thông tin cho từng buổi.',
+    ]);
   });
 });

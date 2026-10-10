@@ -491,6 +491,8 @@ export interface KhoaBoiDuongChiTiet extends KhoaBoiDuong {
   pham_vi_hoc_vien: 'toan_bo' | 'don_vi';
   /** ADR 0004 G3 — chỉ có khi người xem là quan_tri. */
   nhom_ho_tro_gv?: NguoiHoTroRutGon[];
+  /** ADR 0005 §9 (issue #28) — chỉ quan_tri: số buổi lớp Zoom sắp diễn ra chưa có link. */
+  so_buoi_zoom_thieu_link?: number;
 }
 
 // Body POST /khoa-boi-duong — backend/src/khoa-boi-duong/dto/create-khoa-boi-duong.dto.ts. Chỉ
@@ -608,6 +610,9 @@ export interface LichHocLopToi {
   // ADR 0005 (issue #24): chỉ có với buổi lớp Zoom của khóa đã bật điểm danh — khi đó
   // dia_diem_hoac_link luôn null, link chỉ lấy qua POST /lich-hoc/{id}/vao-hoc.
   diem_danh_zoom?: DiemDanhZoomBuoi;
+  // ADR 0005 Z8 (issue #27): buổi chưa có dòng ở lớp hiện tại nhưng đã có ở lớp cũ cùng giai
+  // đoạn, cùng buoi_so (học viên chuyển lớp) — chỉ để hiển thị.
+  diem_danh_lop_cu?: { trang_thai: TrangThaiDiemDanh; ten_lop: string };
 }
 
 export type PhaDiemDanh = 'chua_mo' | 'dang_mo' | 'da_dong';

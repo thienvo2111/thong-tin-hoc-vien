@@ -24,15 +24,18 @@ else
   git clone --branch "${GIT_BRANCH}" "${GIT_REPO}" "${APP_DIR}"
 fi
 
-echo "==> Kiem tra dong ho VPS dong bo NTP"
+echo "==> Kiem tra dong ho VPS duoc dong bo"
 # ADR 0005: cua so diem danh lop Zoom + cron chot vang tinh theo gio may chu
-# (VPS tung lech ~1 gio). Chi canh bao, khong dung deploy.
+# (VPS tung lech ~1 gio). Mang HCMUE chan NTP (UDP 123) nen VPS dong bo bang
+# htpdate (timesyncd tat) — dat neu htpdate chay HOAC NTP da dong bo.
+# Chi canh bao, khong dung deploy.
+HTPDATE="$(systemctl is-active htpdate 2>/dev/null || true)"
 NTP_OK="$(timedatectl show -p NTPSynchronized --value 2>/dev/null || true)"
-if [ "${NTP_OK}" = "yes" ]; then
-  echo "    OK"
+if [ "${HTPDATE}" = "active" ] || [ "${NTP_OK}" = "yes" ]; then
+  echo "    OK ($(date '+%Y-%m-%d %H:%M:%S %Z'))"
 else
-  echo "    !! CANH BAO: dong ho VPS chua dong bo NTP (NTPSynchronized=${NTP_OK:-?}) - cua so diem danh lop Zoom phu thuoc gio may chu"
-  echo "    !! Chay: sudo timedatectl set-ntp true  (roi kiem tra lai: timedatectl)"
+  echo "    !! CANH BAO: dong ho VPS khong duoc dong bo (htpdate=${HTPDATE:-?}, NTPSynchronized=${NTP_OK:-?}) - cua so diem danh lop Zoom phu thuoc gio may chu"
+  echo "    !! Kiem tra: sudo systemctl status htpdate ; sudo systemctl restart htpdate"
 fi
 
 # ---------- Backend ----------

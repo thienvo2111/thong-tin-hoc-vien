@@ -420,6 +420,12 @@ function DanhSachBuoi({ lichHoc }: { lichHoc: LichHocLopToi[] }) {
               )
             )}
           </Group>
+          {buoi.diem_danh_lop_cu && (
+            <Text size="xs" c="dimmed" data-testid="diem-danh-lop-cu">
+              Buổi {buoi.buoi_so}: đã {NHAN_DIEM_DANH[buoi.diem_danh_lop_cu.trang_thai].toLowerCase()} ở{' '}
+              {buoi.diem_danh_lop_cu.ten_lop} (lớp cũ)
+            </Text>
+          )}
           <Text size="sm" c="dimmed">
             {dinhDangNgayGio(buoi.thoi_gian_bat_dau)} – {dinhDangNgayGio(buoi.thoi_gian_ket_thuc)}
           </Text>

@@ -158,7 +158,7 @@ export const huongDan: NoiDungHuongDan = {
           loai: 'info',
           tieuDe: 'Việc cần làm ngay bây giờ',
           noiDung:
-            'Đăng nhập (Phần 3) → bổ sung hồ sơ, chọn đúng Đối tượng (Phần 6) → làm 2 phiếu khảo sát (Phần 7) → kiểm tra cả hai phiếu đã hiện "Đã hoàn thành". Chưa có tên trong danh sách học viên nên không đăng nhập được? Xem Phần 13 hoặc gửi email hỗ trợ.',
+            'Đăng nhập (Phần 3) → bổ sung hồ sơ, chọn đúng Đối tượng (Phần 6) → làm 2 phiếu khảo sát (Phần 7) → kiểm tra cả hai phiếu đã hiện "Đã hoàn thành". Chưa có tên trong danh sách học viên nên không đăng nhập được? Xem Phần 14 hoặc gửi email hỗ trợ.',
         },
       ],
     },
@@ -171,7 +171,7 @@ export const huongDan: NoiDungHuongDan = {
         {
           loai: 'warning',
           tieuDe: 'Chưa có tên trong danh sách học viên?',
-          noiDung: `Tài khoản không tự đăng ký được. Ban tổ chức tạo sẵn tài khoản cho từng người có tên trong **danh sách học viên**, lấy từ cơ sở dữ liệu ngành (CSDL MOET) do Sở/Phòng/nhà trường gửi. Nếu chưa có tên trong danh sách này, Thầy/Cô chưa đăng nhập được, dù nhập đúng thông tin cũng chỉ hiện thông báo lỗi đăng nhập chung (xem Phần 3). Hãy liên hệ cán bộ phụ trách của nhà trường để được bổ sung vào danh sách, hoặc gửi email tới **${EMAIL_HO_TRO}** kèm họ tên, ngày sinh, mã định danh MOET (nếu biết), trường, xã/phường, số điện thoại (mẫu ở Phần 13).`,
+          noiDung: `Tài khoản không tự đăng ký được. Ban tổ chức tạo sẵn tài khoản cho từng người có tên trong **danh sách học viên**, lấy từ cơ sở dữ liệu ngành (CSDL MOET) do Sở/Phòng/nhà trường gửi. Nếu chưa có tên trong danh sách này, Thầy/Cô chưa đăng nhập được, dù nhập đúng thông tin cũng chỉ hiện thông báo lỗi đăng nhập chung (xem Phần 3). Hãy liên hệ cán bộ phụ trách của nhà trường để được bổ sung vào danh sách, hoặc gửi email tới **${EMAIL_HO_TRO}** kèm họ tên, ngày sinh, mã định danh MOET (nếu biết), trường, xã/phường, số điện thoại (mẫu ở Phần 14).`,
         },
         {
           loai: 'warning',
@@ -214,7 +214,7 @@ export const huongDan: NoiDungHuongDan = {
         {
           loai: 'warning',
           tieuDe: 'Nhập đúng mà vẫn báo sai?',
-          noiDung: `Hai nguyên nhân thường gặp: (1) Thầy/Cô **chưa có tên trong danh sách học viên** nên chưa có tài khoản; (2) **ngày sinh trong danh sách bị sai** nên mật khẩu lần đầu không đúng như Thầy/Cô nghĩ. Cả hai trường hợp, hệ thống đều chỉ hiện cùng một thông báo lỗi, không phân biệt sai phần nào. Đừng thử lại nhiều lần — sai 5 lần liên tiếp sẽ bị khóa 15 phút. Hãy liên hệ cán bộ phụ trách của nhà trường, hoặc gửi email tới **${EMAIL_HO_TRO}** kèm họ tên, ngày sinh, mã định danh MOET (nếu biết), trường, xã/phường, số điện thoại (mẫu ở Phần 13).`,
+          noiDung: `Hai nguyên nhân thường gặp: (1) Thầy/Cô **chưa có tên trong danh sách học viên** nên chưa có tài khoản; (2) **ngày sinh trong danh sách bị sai** nên mật khẩu lần đầu không đúng như Thầy/Cô nghĩ. Cả hai trường hợp, hệ thống đều chỉ hiện cùng một thông báo lỗi, không phân biệt sai phần nào. Đừng thử lại nhiều lần — sai 5 lần liên tiếp sẽ bị khóa 15 phút. Hãy liên hệ cán bộ phụ trách của nhà trường, hoặc gửi email tới **${EMAIL_HO_TRO}** kèm họ tên, ngày sinh, mã định danh MOET (nếu biết), trường, xã/phường, số điện thoại (mẫu ở Phần 14).`,
         },
       ],
     },
@@ -268,7 +268,7 @@ export const huongDan: NoiDungHuongDan = {
             [
               'Hồ sơ đã đủ, cần kiểm tra và xác nhận',
               'Đã đủ thông tin nhưng chưa xác nhận.',
-              'Bấm [[Xem lại & xác nhận]], xem Phần 9.',
+              'Bấm [[Xem lại & xác nhận]], xem Phần 10.',
             ],
             ['Đã xác nhận lúc …', 'Đã hoàn tất. Vẫn sửa được tới hạn, nhưng sửa xong phải xác nhận lại.', 'Không cần làm gì thêm.'],
             ['Đợt … mở lúc …', 'Sắp đến thời gian chỉnh sửa hồ sơ.', 'Chờ đến giờ mở rồi quay lại.'],
@@ -443,6 +443,32 @@ export const huongDan: NoiDungHuongDan = {
       ],
     },
     {
+      id: 'diem-danh-zoom',
+      tieuDe: 'Điểm danh lớp Zoom',
+      tomTat: 'Bấm Điểm danh & vào Zoom cho từng buổi học Zoom để được ghi nhận có mặt.',
+      moTa:
+        'Với lớp học qua Zoom có áp dụng điểm danh trên Cổng thông tin, Thầy/Cô **phải bấm điểm danh cho từng buổi**. Buổi nào không bấm trong thời gian điểm danh sẽ bị tính **vắng**. Email lịch học không còn kèm link Zoom, Thầy/Cô vào lớp bằng nút trên Cổng thông tin.',
+      buoc: [
+        'Bấm **Lớp học** trên menu, tìm lịch các buổi Zoom của giai đoạn đang học.',
+        'Đến giờ học, bấm [[Điểm danh & vào Zoom]] của **đúng buổi** đó. Màn hình báo *"Đã điểm danh buổi … lúc …"*.',
+        'Bấm [[Mở phòng Zoom]] để vào lớp.',
+      ],
+      ghiChu: [
+        {
+          loai: 'warning',
+          tieuDe: 'Thời gian điểm danh',
+          noiDung:
+            'Nút điểm danh mở **trước giờ học 30 phút** và đóng **sau giờ bắt đầu 2 giờ** (theo mặc định, có thể khác theo khóa). Thẻ của từng buổi ghi rõ giờ mở điểm danh.',
+        },
+        {
+          loai: 'info',
+          tieuDe: 'Mỗi buổi bấm một lần riêng',
+          noiDung:
+            'Buổi sáng và buổi chiều dù dùng chung phòng Zoom vẫn là 2 buổi. Vào Zoom bằng link khác hoặc ở lại phòng từ buổi trước sẽ **không được ghi nhận**.',
+        },
+      ],
+    },
+    {
       id: 'xac-nhan',
       tieuDe: 'Xác nhận thông tin cuối khóa',
       tomTat: 'Kiểm tra và xác nhận thông tin cuối khóa trước khi được cấp chứng nhận.',
@@ -478,7 +504,7 @@ export const huongDan: NoiDungHuongDan = {
             ],
             [
               '**Email chưa xác minh** hoặc không nhận được thư sau 15 phút',
-              `Gửi email tới **${EMAIL_HO_TRO}** theo mẫu ở Phần 13. Sau khi xác minh, cán bộ hỗ trợ đặt lại mật khẩu về ngày sinh để Thầy/Cô đăng nhập và đổi lại.`,
+              `Gửi email tới **${EMAIL_HO_TRO}** theo mẫu ở Phần 14. Sau khi xác minh, cán bộ hỗ trợ đặt lại mật khẩu về ngày sinh để Thầy/Cô đăng nhập và đổi lại.`,
             ],
           ],
         },
@@ -508,7 +534,7 @@ export const huongDan: NoiDungHuongDan = {
         {
           loai: 'warning',
           tieuDe: 'Không đăng nhập được?',
-          noiDung: `Hãy gửi email tới **${EMAIL_HO_TRO}** theo mẫu ở Phần 13.`,
+          noiDung: `Hãy gửi email tới **${EMAIL_HO_TRO}** theo mẫu ở Phần 14.`,
         },
       ],
     },
@@ -566,8 +592,8 @@ export const huongDan: NoiDungHuongDan = {
         'Lần đầu: mật khẩu là ngày sinh đủ 8 số, có số 0 ở đầu ngày/tháng (dùng công cụ ở Phần 3).',
         'Nếu đã đổi mật khẩu trước đó: dùng mật khẩu mới, không dùng ngày sinh.',
         'Bấm biểu tượng con mắt để xem lại mật khẩu đã gõ; chú ý chữ hoa, chữ thường.',
-        'Đừng thử quá 5 lần liên tiếp. Nếu vẫn không được, xem Phần 10.',
-        `Vẫn không vào được dù chắc chắn đúng: có thể chưa có tên trong danh sách học viên, hoặc ngày sinh trong danh sách bị sai. Liên hệ cán bộ phụ trách của nhà trường, hoặc gửi email tới ${EMAIL_HO_TRO} theo mẫu ở Phần 13.`,
+        'Đừng thử quá 5 lần liên tiếp. Nếu vẫn không được, xem Phần 11.',
+        `Vẫn không vào được dù chắc chắn đúng: có thể chưa có tên trong danh sách học viên, hoặc ngày sinh trong danh sách bị sai. Liên hệ cán bộ phụ trách của nhà trường, hoặc gửi email tới ${EMAIL_HO_TRO} theo mẫu ở Phần 14.`,
       ],
     },
     {
@@ -578,7 +604,7 @@ export const huongDan: NoiDungHuongDan = {
       cachXuLy: [
         'Chờ đến giờ ghi trong thông báo. Trong lúc khóa, nhập đúng mật khẩu cũng không vào được.',
         'Kiểm tra lại mật khẩu trước khi thử lần nữa.',
-        'Không nhớ mật khẩu: làm theo Phần 10.',
+        'Không nhớ mật khẩu: làm theo Phần 11.',
       ],
     },
     {
@@ -589,7 +615,7 @@ export const huongDan: NoiDungHuongDan = {
       cachXuLy: [
         'Chờ 1 phút rồi thử lại.',
         'Nếu đã từng đổi mật khẩu: ngày sinh không còn dùng được, hãy dùng mật khẩu mới.',
-        'Không nhớ mật khẩu: làm theo Phần 10.',
+        'Không nhớ mật khẩu: làm theo Phần 11.',
       ],
     },
     {
@@ -607,7 +633,7 @@ export const huongDan: NoiDungHuongDan = {
         'Tài khoản không tự đăng ký được. Ban tổ chức chỉ tạo tài khoản cho người có tên trong danh sách học viên, lấy từ cơ sở dữ liệu ngành (CSDL MOET) do Sở/Phòng/nhà trường gửi. Chưa có tên trong danh sách này thì chưa có tài khoản để đăng nhập.',
       cachXuLy: [
         'Liên hệ cán bộ phụ trách của nhà trường để được bổ sung vào danh sách học viên.',
-        `Hoặc gửi email tới ${EMAIL_HO_TRO} kèm họ tên, ngày sinh, mã định danh MOET (nếu biết), trường, xã/phường, số điện thoại (mẫu ở Phần 13).`,
+        `Hoặc gửi email tới ${EMAIL_HO_TRO} kèm họ tên, ngày sinh, mã định danh MOET (nếu biết), trường, xã/phường, số điện thoại (mẫu ở Phần 14).`,
       ],
     },
     {
@@ -693,7 +719,7 @@ export const huongDan: NoiDungHuongDan = {
       nhanNhom: 'Xác nhận',
       tinhHuong: 'Hộp thông báo "Cần xác nhận lại"',
       nguyenNhan: 'Thầy/Cô đã sửa hồ sơ sau khi xác nhận, nên lần xác nhận cũ không còn hiệu lực.',
-      cachXuLy: ['Bấm [[Xác nhận lại]].', 'Làm lại các bước ở Phần 9 trước hạn chót.'],
+      cachXuLy: ['Bấm [[Xác nhận lại]].', 'Làm lại các bước ở Phần 10 trước hạn chót.'],
     },
     {
       nhom: 'khao-sat',
@@ -811,6 +837,51 @@ export const huongDan: NoiDungHuongDan = {
       cachXuLy: ['Chờ thông báo xếp lớp.', 'Nếu bạn bè cùng trường đã có lớp mà Thầy/Cô chưa có, gửi yêu cầu hỗ trợ.'],
     },
     {
+      nhom: 'khao-sat',
+      nhanNhom: 'Điểm danh Zoom',
+      tinhHuong: 'Quên bấm "Điểm danh & vào Zoom", buổi học bị tính vắng',
+      nguyenNhan: 'Hết thời gian điểm danh mà chưa bấm nút của buổi đó, hệ thống tự ghi vắng.',
+      cachXuLy: [
+        'Nếu đã tham gia buổi học, báo ngay cho người hỗ trợ lớp qua nhóm Zalo, ghi họ tên, lớp và buổi học.',
+        'Ban tổ chức đối chiếu với danh sách tham gia Zoom để điều chỉnh. Các buổi sau nhớ bấm nút trong thời gian điểm danh (Phần 9).',
+      ],
+    },
+    {
+      nhom: 'khao-sat',
+      nhanNhom: 'Điểm danh Zoom',
+      tinhHuong: 'Vào Zoom bằng link cũ (trong email, tin nhắn, link người khác gửi)',
+      nguyenNhan:
+        'Chỉ cú bấm [[Điểm danh & vào Zoom]] trên Cổng thông tin mới được ghi nhận. Vào bằng link khác thì buổi đó vẫn bị tính vắng.',
+      cachXuLy: [
+        'Trong thời gian điểm danh, mở **Lớp học** trên Cổng thông tin và bấm [[Điểm danh & vào Zoom]] của buổi đó. Đang ở trong phòng Zoom thì không cần rời phòng.',
+        'Lần sau vào lớp bằng nút trên Cổng thông tin.',
+      ],
+    },
+    {
+      nhom: 'khao-sat',
+      nhanNhom: 'Điểm danh Zoom',
+      tinhHuong: 'Ở lại phòng Zoom từ buổi sáng sang buổi chiều',
+      nguyenNhan: 'Mỗi buổi điểm danh riêng, kể cả khi 2 buổi dùng chung phòng Zoom.',
+      cachXuLy: [
+        'Buổi chiều cũng cần bấm điểm danh, kể cả khi Thầy/Cô vẫn đang ở trong phòng Zoom.',
+        'Khi nút của buổi chiều mở (trước giờ học 30 phút theo mặc định), bấm [[Điểm danh & vào Zoom]] của buổi chiều.',
+      ],
+    },
+    {
+      nhom: 'khao-sat',
+      nhanNhom: 'Điểm danh Zoom',
+      tinhHuong: '"Chưa đến thời gian điểm danh — mở lúc …"',
+      nguyenNhan: 'Bấm sớm, trước giờ mở điểm danh. Lượt bấm này không được ghi nhận và chưa vào được Zoom.',
+      cachXuLy: ['Chờ đến giờ ghi trong thông báo rồi bấm lại [[Điểm danh & vào Zoom]].'],
+    },
+    {
+      nhom: 'khao-sat',
+      nhanNhom: 'Điểm danh Zoom',
+      tinhHuong: '"Đã quá thời gian điểm danh … nên lượt vào này không được ghi nhận"',
+      nguyenNhan: 'Bấm muộn, sau giờ đóng điểm danh. Thầy/Cô vẫn vào được Zoom nhưng buổi này bị tính vắng.',
+      cachXuLy: ['Bấm [[Vẫn vào Zoom]] nếu vẫn muốn vào lớp.', 'Nếu có lý do chính đáng, báo người hỗ trợ lớp qua nhóm Zalo.'],
+    },
+    {
       nhom: 'email',
       nhanNhom: 'Email',
       tinhHuong: 'Không nhận được email từ hệ thống',
@@ -836,7 +907,7 @@ export const huongDan: NoiDungHuongDan = {
   contact: {
     email: EMAIL_HO_TRO,
     gioiThieu:
-      'Viết email đủ thông tin theo mẫu dưới đây giúp cán bộ hỗ trợ xử lý ngay, không phải hỏi lại. Thầy/Cô **chưa đăng nhập được vì chưa có tên trong danh sách học viên** cũng dùng email này — đây là cách duy nhất để liên hệ trong trường hợp đó, vì mục Hỗ trợ trong hệ thống (Phần 11) cần đăng nhập mới dùng được.',
+      'Viết email đủ thông tin theo mẫu dưới đây giúp cán bộ hỗ trợ xử lý ngay, không phải hỏi lại. Thầy/Cô **chưa đăng nhập được vì chưa có tên trong danh sách học viên** cũng dùng email này — đây là cách duy nhất để liên hệ trong trường hợp đó, vì mục Hỗ trợ trong hệ thống (Phần 12) cần đăng nhập mới dùng được.',
     mauEmail: [
       'Tiêu đề: [Hỗ trợ BDNLS] Họ tên – vấn đề gặp phải',
       '',
@@ -875,7 +946,7 @@ export const TOM_TAT_PHU_LUC_ZALO =
   'Tra tên trường để tìm đúng nhóm Zalo hỗ trợ của cụm khi chưa thấy nút Vào nhóm Zalo.';
 
 /** Danh sách phần theo đúng thứ tự hiển thị ở trang Hướng dẫn (M9) — nguồn duy nhất cho việc đánh
- * số "Phần N": parts[] rồi tới "Lỗi thường gặp" (Phần 12) và "Liên hệ hỗ trợ" (Phần 13). Dùng để
+ * số "Phần N": parts[] rồi tới "Lỗi thường gặp" (Phần 13) và "Liên hệ hỗ trợ" (Phần 14). Dùng để
  * build mục lục (HuongDan.tsx) và để tra id phần cho các mention "Phần N" trong nội dung (xem
  * idPhanTheoSo). Nơi khác không tự đánh số lại. */
 export const DANH_SACH_PHAN_THEO_THU_TU: { id: string; tieuDe: string; tomTat?: string }[] = [

@@ -3,8 +3,9 @@ import { Alert, Anchor, Container, Paper, Skeleton, Stack, Table, Text, Title } 
 import { useDotCuaLop } from '@/api/hoTroGv';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgay } from '@/lib/ngay';
+import { BangDiemDanhLop } from '@/components/BangDiemDanhLop';
 
-/** Các đợt học trực tiếp của 1 lớp (ADR 0004 L2) — mỗi đợt mở Hồ sơ chuẩn bị lớp. */
+/** Các đợt học trực tiếp của 1 lớp (ADR 0004 L2) — mỗi đợt mở Hồ sơ chuẩn bị lớp; kèm bảng điểm danh (ADR 0005 Z7). */
 export default function HoTroGvDotLop() {
   const { lopId = '' } = useParams();
   const { data, isLoading, isError, error } = useDotCuaLop(lopId);
@@ -56,6 +57,11 @@ export default function HoTroGvDotLop() {
                 </Table>
               </Paper>
             )}
+            <Title order={4}>Điểm danh</Title>
+            <Text fz="sm" c="dimmed">
+              Bấm vào ô để sửa. Thầy/Cô sửa được buổi đã diễn ra trong vòng 3 ngày; buổi cũ hơn liên hệ Quản trị.
+            </Text>
+            <BangDiemDanhLop lopId={lopId} />
           </>
         )}
       </Stack>

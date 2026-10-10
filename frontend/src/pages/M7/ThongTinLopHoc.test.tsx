@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
-import { db, taoKhoaHocToiZoomMau } from '@/test/mocks/db';
+import { db, taoKhoaHocToiMau, taoKhoaHocToiZoomMau } from '@/test/mocks/db';
 import { datTinhTrangBai, ssoDaYeuCau } from '@/test/mocks/sso';
 import { datCauHinhKhaoSatMock } from '@/test/mocks/cauHinhKhaoSat';
 import { renderVoiRouter } from '@/test/testUtils';
@@ -484,6 +484,35 @@ describe('M7 — Điểm danh & vào Zoom', () => {
     renderDaDangNhap();
     const canhBao = await screen.findByTestId('canh-bao-diem-danh-zoom');
     expect(canhBao.textContent).toContain('(mở trước giờ học 15 phút, đóng sau giờ bắt đầu 90 phút)');
+  });
+
+  // ADR 0005 Z8 (issue #27): chuyển lớp — buổi chưa có dòng ở lớp mới nhưng đã có ở lớp cũ (chỉ hiển thị).
+  it('buổi có điểm danh ở lớp cũ -> dòng mờ "Buổi N: đã … ở {lớp} (lớp cũ)", không đổi nhãn Zoom', async () => {
+    const mau = taoKhoaHocToiZoomMau();
+    const lich = mau[0].giai_doan[2].lop!.lich_hoc;
+    lich[3] = { ...lich[3], diem_danh_lop_cu: { trang_thai: 'co_mat', ten_lop: 'Lớp Zoom 07' } };
+    lich[2] = { ...lich[2], diem_danh_lop_cu: { trang_thai: 'vang_co_phep', ten_lop: 'Lớp Zoom 07' } };
+    server.use(http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json(mau)));
+    renderDaDangNhap();
+    const the = await theBuoiZoom();
+    expect(within(the[3]).getByTestId('diem-danh-lop-cu')).toHaveTextContent(
+      'Buổi 4: đã có mặt ở Lớp Zoom 07 (lớp cũ)',
+    );
+    expect(within(the[3]).getByText('Đã đóng điểm danh')).toBeInTheDocument();
+    expect(within(the[2]).getByTestId('diem-danh-lop-cu')).toHaveTextContent(
+      'Buổi 3: đã vắng có phép ở Lớp Zoom 07 (lớp cũ)',
+    );
+    expect(within(the[0]).queryByTestId('diem-danh-lop-cu')).not.toBeInTheDocument();
+  });
+
+  it('lớp không bật điểm danh Zoom vẫn hiện dòng lớp cũ (vắng)', async () => {
+    const mau = taoKhoaHocToiMau();
+    const lich = mau[0].giai_doan[1].lop!.lich_hoc;
+    lich[1] = { ...lich[1], diem_danh_lop_cu: { trang_thai: 'vang', ten_lop: 'Lớp 02' } };
+    server.use(http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json(mau)));
+    renderDaDangNhap();
+    const gd2 = (await cacTheGiaiDoan())[1];
+    expect(within(gd2).getByTestId('diem-danh-lop-cu')).toHaveTextContent('Buổi 2: đã vắng ở Lớp 02 (lớp cũ)');
   });
 
   it('đã điểm danh buổi khác cùng ngày -> nhắc ở buổi chưa bấm cùng ngày, không nhắc buổi ngày khác', async () => {

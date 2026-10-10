@@ -189,6 +189,36 @@ describe('mauLichHoc', () => {
     expect(html).not.toContain('href="javascript:');
     expect(html).toContain('Sẽ thông báo sau');
   });
+
+  it('buổi Zoom điểm danh trên Cổng -> không có link Zoom, dẫn về trang lớp; buổi khác giữ link', () => {
+    const { html } = mauLichHoc({
+      ...coBan,
+      lop: [{ loaiLop: 'zoom', tenLop: 'Z1', nhanSu: [] }],
+      giaiDoan: [
+        gd(1, 'GĐ', [
+          {
+            loaiLop: 'zoom',
+            buoiSo: 1,
+            batDau: new Date('2026-10-04T00:00:00Z'),
+            ketThuc: new Date('2026-10-04T01:00:00Z'),
+            diaDiemHoacLink: 'https://zoom.us/j/an-di',
+            diemDanhTrenCong: true,
+          },
+          {
+            loaiLop: 'zoom',
+            buoiSo: 2,
+            batDau: new Date('2026-10-05T00:00:00Z'),
+            ketThuc: new Date('2026-10-05T01:00:00Z'),
+            diaDiemHoacLink: 'https://zoom.us/j/giu-lai',
+          },
+        ]),
+      ],
+    });
+    expect(html).not.toContain('an-di');
+    expect(html).toContain('Vào học và điểm danh bằng nút trên Cổng thông tin');
+    expect(html).toContain(`href="${coBan.linkLopHoc}"`);
+    expect(html).toContain('href="https://zoom.us/j/giu-lai"');
+  });
 });
 
 describe('mauKetQuaHocTap', () => {

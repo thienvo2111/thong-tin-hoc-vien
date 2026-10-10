@@ -108,7 +108,7 @@ Enum mới → `CREATE TYPE` cùng migration được. Không sửa/xóa dữ li
 ## 11. Triển khai
 
 - Deploy không ảnh hưởng khóa nào (mặc định tắt). Hiện chưa khóa nào tới giai đoạn Zoom.
-- **Tiên quyết trước khi bật trên prod:** `timedatectl` trên VPS phải `NTP synchronized: yes` (VPS từng lệch ~1 giờ). Thêm bước kiểm tra vào script deploy.
+- **Tiên quyết trước khi bật trên prod:** đồng hồ VPS phải được đồng bộ — `htpdate` active (mạng HCMUE chặn NTP) hoặc `NTP synchronized: yes` (VPS từng lệch ~1 giờ). Script deploy có bước kiểm tra.
 
 ## 12. Kiểm thử (theo yêu cầu)
 

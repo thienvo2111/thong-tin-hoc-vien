@@ -44,8 +44,12 @@ export class HoTroGiangVienScopeService {
     if (!co) throw new NotFoundAppException('Không tìm thấy lớp học');
   }
 
+  async khoaTrongPhamVi(nguoiDungId: string, khoaId: string) {
+    return (await this.khoaIdsCuaToi(nguoiDungId)).includes(khoaId);
+  }
+
   async damBaoKhoaTrongPhamVi(nguoiDungId: string, khoaId: string) {
-    if (!(await this.khoaIdsCuaToi(nguoiDungId)).includes(khoaId)) {
+    if (!(await this.khoaTrongPhamVi(nguoiDungId, khoaId))) {
       throw new NotFoundAppException('Không tìm thấy khóa bồi dưỡng');
     }
   }

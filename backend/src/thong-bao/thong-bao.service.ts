@@ -9,6 +9,7 @@ import { paginate } from '../common/dto/pagination-query.dto';
 import { getTestMessageUrl, guiEmail } from './util/mailer.util';
 import { layFrontendUrl } from '../common/utils/token-xac-thuc.util';
 import { bienNgayVietNam } from './util/gio-viet-nam.util';
+import { apDungDiemDanhZoom } from '../khoa-boi-duong/util/diem-danh-zoom.util';
 import { LichSuThongBaoQueryDto } from './dto/lich-su-thong-bao-query.dto';
 import {
   bangThongTin,
@@ -249,6 +250,7 @@ export class ThongBaoService {
           batDau: l.thoi_gian_bat_dau,
           ketThuc: l.thoi_gian_ket_thuc,
           diaDiemHoacLink: l.dia_diem_hoac_link,
+          diemDanhTrenCong: apDungDiemDanhZoom(lop, dangKy.khoa),
         })),
     );
 

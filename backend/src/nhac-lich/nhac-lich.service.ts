@@ -8,6 +8,7 @@ import {
 } from '../common/exceptions/app.exceptions';
 import { khoangNgayVn } from '../common/utils/khoang-ngay-vn.util';
 import { layDotLop } from '../trang-lop/trang-lop.service';
+import { apDungDiemDanhZoom } from '../khoa-boi-duong/util/diem-danh-zoom.util';
 import {
   TrangThaiNhac,
   gopTrangThaiNhac,
@@ -207,7 +208,13 @@ export class NhacLichService {
         dia_diem_hoac_link: true,
         phong: true,
         cap_nhat_luc: true,
-        lop: { select: { ten_lop: true } },
+        lop: {
+          select: {
+            ten_lop: true,
+            loai_lop: true,
+            khoa: { select: { bat_diem_danh_zoom_luc: true } },
+          },
+        },
         diem_hoc: { select: { ten: true, dia_chi: true } },
       },
       orderBy: [{ thoi_gian_bat_dau: 'asc' }, { buoi_so: 'asc' }],
@@ -266,7 +273,14 @@ export class NhacLichService {
       })),
       lich_hoc_ids: ds.map((b) => b.id),
       noi_dung: ds.length
-        ? soanTinNhanCum({ ten_cum: cum.ten_cum, ngay: tu, buoi: ds })
+        ? soanTinNhanCum({
+            ten_cum: cum.ten_cum,
+            ngay: tu,
+            buoi: ds,
+            nhac_diem_danh_zoom: ds.some((b) =>
+              apDungDiemDanhZoom(b.lop, b.lop.khoa),
+            ),
+          })
         : null,
       trang_thai_nhac: ds.length
         ? gopTrangThaiNhac(ds.map((b) => b.trang_thai_nhac))

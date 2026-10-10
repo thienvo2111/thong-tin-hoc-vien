@@ -47,6 +47,8 @@ import { NhanSuLopRowDto } from './dto/nhan-su-lop-row.dto';
 import {
   canhBaoBuoiHocGiaiDoan,
   canhBaoLoaiLopGiaiDoan,
+  canhBaoChongCuaSoDiemDanh,
+  demBuoiZoomThieuLink,
 } from './util/canh-bao-buoi-hoc.util';
 import { DiemDanhRowDto } from './dto/diem-danh-row.dto';
 import { KetQuaGiaiDoanRowDto } from './dto/ket-qua-giai-doan-row.dto';
@@ -65,6 +67,7 @@ import {
   diemDanhZoomCuaBuoi,
   giauLinkZoomCuaKhoa,
 } from './util/diem-danh-zoom.util';
+import { khoaBuoi, tinhChuyenCan } from '../common/utils/chuyen-can.util';
 import {
   DongChiaLop,
   buildDanhSachChiaLopWorkbook,
@@ -219,6 +222,31 @@ export class KhoaBoiDuongService {
       bat_dau: lich.thoi_gian_bat_dau,
       ket_thuc: lich.thoi_gian_ket_thuc,
     });
+  }
+
+  // ADR 0005 §9 (issue #28): lớp Zoom — cửa sổ điểm danh chồng buổi khác
+  // cùng lớp -> cảnh báo, không chặn. Tính theo cấu hình khóa kể cả khi khóa
+  // chưa bật (Quản trị chuẩn bị lịch trước).
+  private async canhBaoChongCuaSo(
+    lop: {
+      id: string;
+      loai_lop: loai_lop_hoc;
+      khoa: {
+        diem_danh_mo_truoc_phut: number;
+        diem_danh_dong_sau_phut: number;
+      };
+    },
+    buoi: { giai_doan_id: string; buoi_so: number; thoi_gian_bat_dau: Date },
+  ): Promise<string[]> {
+    if (lop.loai_lop !== 'zoom') return [];
+    const khac = await this.prisma.lich_hoc_lop.findMany({
+      where: {
+        lop_id: lop.id,
+        NOT: { giai_doan_id: buoi.giai_doan_id, buoi_so: buoi.buoi_so },
+      },
+      select: { buoi_so: true, thoi_gian_bat_dau: true },
+    });
+    return canhBaoChongCuaSoDiemDanh(buoi.thoi_gian_bat_dau, khac, lop.khoa);
   }
 
   // Rule mới (2026-09-30): PATCH không cho phép body rỗng/không có trường
@@ -606,6 +634,15 @@ export class KhoaBoiDuongService {
       ...(caller.vai_tro === 'quan_tri'
         ? { nhom_ho_tro_gv: await this.nhomHoTroGv(khoa.id) }
         : {}),
+      // ADR 0005 §9 (issue #28): cảnh báo vận hành — chỉ Quản trị.
+      ...(caller.vai_tro === 'quan_tri'
+        ? {
+            so_buoi_zoom_thieu_link: demBuoiZoomThieuLink(
+              khoa.lop_hoc,
+              new Date(),
+            ),
+          }
+        : {}),
     };
   }
 
@@ -985,7 +1022,13 @@ export class KhoaBoiDuongService {
           phong: dto.phong?.trim() || undefined,
         },
       });
-      return { ...lich, canh_bao: await this.canhBaoSoPhong(lich) };
+      return {
+        ...lich,
+        canh_bao: [
+          ...(await this.canhBaoSoPhong(lich)),
+          ...(await this.canhBaoChongCuaSo(lop, lich)),
+        ],
+      };
     } catch (e) {
       throw this.mapUniqueViolation(
         e,
@@ -1005,7 +1048,7 @@ export class KhoaBoiDuongService {
     dto: UpdateLichHocDto,
     caller: AuthenticatedUser,
   ) {
-    await this.getLopOrThrow(lopId);
+    const lop = await this.getLopOrThrow(lopId);
     const lich = await this.getLichHocTrongLopOrThrow(lopId, lichHocId);
     const { ly_do, ...thayDoi } = dto;
     this.assertCoTruongSua(thayDoi);
@@ -1063,7 +1106,13 @@ export class KhoaBoiDuongService {
         },
         { ly_do: ly_do?.trim(), nguon: 'sua_tay' },
       );
-      return { ...capNhat, canh_bao: await this.canhBaoSoPhong(capNhat) };
+      return {
+        ...capNhat,
+        canh_bao: [
+          ...(await this.canhBaoSoPhong(capNhat)),
+          ...(await this.canhBaoChongCuaSo(lop, capNhat)),
+        ],
+      };
     } catch (e) {
       throw this.mapUniqueViolation(
         e,
@@ -1195,6 +1244,14 @@ export class KhoaBoiDuongService {
               lich_hoc_id: true,
               trang_thai: true,
               tu_diem_danh_luc: true,
+              lich_hoc: {
+                select: {
+                  lop_id: true,
+                  giai_doan_id: true,
+                  buoi_so: true,
+                  lop: { select: { ten_lop: true, loai_lop: true } },
+                },
+              },
             },
           }),
           this.prisma.ket_qua_giai_doan.findMany({
@@ -1205,6 +1262,9 @@ export class KhoaBoiDuongService {
 
     const diemDanhMap = new Map(
       diemDanhList.map((d) => [`${d.dang_ky_hoc_id}|${d.lich_hoc_id}`, d]),
+    );
+    const tenLopDiemDanh = new Map(
+      diemDanhList.map((d) => [d.lich_hoc.lop_id, d.lich_hoc.lop.ten_lop]),
     );
     const now = new Date();
     // ADR 0004 G4 (issue #16): người hỗ trợ thực địa của các đợt học viên được
@@ -1244,6 +1304,21 @@ export class KhoaBoiDuongService {
       const { phan_lop_giai_doan, khoa, ...rest } = dk;
       const { giai_doan: dsGiaiDoan, ...khoaGon } = khoa;
       const mocDanhGia = mucDanhGiaLamMoc(dk.muc_dau_vao, baiDauVao);
+      // ADR 0005 Z8 (issue #27): buổi chưa có dòng ở lớp hiện tại nhưng đã có
+      // ở lớp cũ cùng giai đoạn, cùng buoi_so — chỉ để hiển thị, mọi chế độ.
+      const chuyenCanLopCu = tinhChuyenCan(
+        new Map(phan_lop_giai_doan.map((p) => [p.giai_doan_id, p.lop_id])),
+        diemDanhList
+          .filter((d) => d.dang_ky_hoc_id === dk.id)
+          .map((d) => ({
+            lop_id: d.lich_hoc.lop_id,
+            loai_lop: d.lich_hoc.lop.loai_lop,
+            giai_doan_id: d.lich_hoc.giai_doan_id,
+            buoi_so: d.lich_hoc.buoi_so,
+            trang_thai: d.trang_thai,
+          })),
+        'cong_nhan_lop_cu',
+      );
       return {
         ...rest,
         muc_danh_gia: mocDanhGia.muc,
@@ -1277,6 +1352,9 @@ export class KhoaBoiDuongService {
                   ...lop,
                   lich_hoc: lichHocGd.map(({ phan_cong, ...b }) => {
                     const dd = diemDanhMap.get(`${dk.id}|${b.id}`) ?? null;
+                    const lopCu = dd
+                      ? undefined
+                      : chuyenCanLopCu.get(khoaBuoi(gd.id, b.buoi_so));
                     return {
                       ...b,
                       giang_vien: phan_cong.map((p) => ({
@@ -1284,6 +1362,14 @@ export class KhoaBoiDuongService {
                         vai_tro: p.vai_tro,
                       })),
                       trang_thai_diem_danh: dd?.trang_thai ?? null,
+                      ...(lopCu?.tu_lop_cu
+                        ? {
+                            diem_danh_lop_cu: {
+                              trang_thai: lopCu.trang_thai,
+                              ten_lop: tenLopDiemDanh.get(lopCu.lop_id) ?? '',
+                            },
+                          }
+                        : {}),
                       ...(giauLink
                         ? {
                             dia_diem_hoac_link: null,
@@ -2475,6 +2561,17 @@ export class KhoaBoiDuongService {
           ket_thuc: ketThuc,
         })
       : [];
+    // Chỉ so với buổi đã lưu của lớp — các dòng khác trong cùng file chưa có.
+    const canhBaoChong = lopCu
+      ? await this.canhBaoChongCuaSo(
+          { id: lopCu.id, loai_lop: loaiLop, khoa },
+          {
+            giai_doan_id: giaiDoan.id,
+            buoi_so: buoiSo,
+            thoi_gian_bat_dau: batDau,
+          },
+        )
+      : [];
 
     return {
       dto: {
@@ -2500,6 +2597,7 @@ export class KhoaBoiDuongService {
             giaiDoan,
           ),
           ...canhBaoPhong,
+          ...canhBaoChong,
         ]
           .filter(Boolean)
           .join('; ') || undefined,
@@ -2932,12 +3030,16 @@ export class KhoaBoiDuongService {
         ghi_chu: dto.ghi_chu,
         nguon_import_id: importId,
       },
+      // ADR 0005 Z3: import luôn ghi đè trạng thái/nguồn nhưng GIỮ
+      // tu_diem_danh_luc (không liệt kê ở đây); xóa nguoi_sua vì dòng không
+      // còn là bản sửa tay.
       update: {
         trang_thai: dto.trang_thai,
         nguon: dto.nguon,
         ghi_chu: dto.ghi_chu,
         nguon_import_id: importId,
         cap_nhat_luc: new Date(),
+        nguoi_sua: null,
       },
     });
   }

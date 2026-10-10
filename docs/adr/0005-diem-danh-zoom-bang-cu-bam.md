@@ -36,4 +36,4 @@ Lớp Zoom có nhiều buổi; điểm danh hiện chỉ nhập bằng import Ex
 - Thêm 1 cron (5 phút) — khác G10 ADR 0004 (G10 chỉ cấm cron **nhắc lịch**).
 - G12: buổi có điểm danh không đổi giờ được → với tự điểm danh, buổi bị khóa giờ từ lần bấm đầu tiên (~30' trước giờ học).
 - Dashboard chuyên cần đổi sang hàm chuyên cần → sửa lỗi đếm 1 học viên 2 lần khi có dòng ở 2 lớp cùng buổi số.
-- Phụ thuộc đồng hồ máy chủ: phải bật NTP trên VPS trước khi bật tính năng.
+- Phụ thuộc đồng hồ máy chủ: đồng hồ VPS phải được đồng bộ (htpdate — mạng HCMUE chặn NTP) trước khi bật tính năng.
