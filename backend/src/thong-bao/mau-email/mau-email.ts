@@ -187,6 +187,8 @@ export type BuoiHocTrongEmail = {
   batDau: Date;
   ketThuc: Date;
   diaDiemHoacLink: string | null;
+  // ADR 0005 Z4: buổi Zoom của khóa bật điểm danh -> giấu link, chỉ dẫn về Cổng.
+  diemDanhTrenCong?: boolean;
 };
 
 export type GiaiDoanTrongEmail = {
@@ -207,7 +209,11 @@ function oDiaDiem(giaTri: string | null): string {
   return e(giaTri);
 }
 
-function bangBuoiHoc(buoi: BuoiHocTrongEmail[]): string {
+function oDiemDanhTrenCong(linkLopHoc: string): string {
+  return `<a href="${e(linkLopHoc)}" target="_blank" style="color:${MAU.navy};font-weight:600;">Vào học và điểm danh bằng nút trên Cổng thông tin</a>`;
+}
+
+function bangBuoiHoc(buoi: BuoiHocTrongEmail[], linkLopHoc: string): string {
   if (!buoi.length) {
     return chuNho(
       'Chưa có lịch chi tiết cho giai đoạn này — Ban Tổ chức sẽ thông báo sau.',
@@ -221,7 +227,7 @@ function bangBuoiHoc(buoi: BuoiHocTrongEmail[]): string {
       (b) => `
   <tr>
     <td style="padding:10px;border-top:1px solid ${MAU.vien};font-size:14px;line-height:20px;color:${MAU.chu};vertical-align:top;"><b>${e(thuNgay(b.batDau))}</b><br><span style="color:${MAU.chuPhu};">${gio(b.batDau)} – ${gio(b.ketThuc)} · Buổi ${b.buoiSo}</span></td>
-    <td style="padding:10px;border-top:1px solid ${MAU.vien};font-size:14px;line-height:20px;color:${MAU.chu};vertical-align:top;">${e(LOAI_LOP_LABEL[b.loaiLop])}<br>${oDiaDiem(b.diaDiemHoacLink)}</td>
+    <td style="padding:10px;border-top:1px solid ${MAU.vien};font-size:14px;line-height:20px;color:${MAU.chu};vertical-align:top;">${e(LOAI_LOP_LABEL[b.loaiLop])}<br>${b.diemDanhTrenCong ? oDiemDanhTrenCong(linkLopHoc) : oDiaDiem(b.diaDiemHoacLink)}</td>
   </tr>`,
     )
     .join('');
@@ -277,7 +283,7 @@ export function mauLichHoc(p: {
       <div style="font-size:13px;line-height:20px;color:${MAU.chuPhu};">${e(HINH_THUC_LABEL[g.hinhThuc])} · ${ngay(g.tuNgay)} – ${ngay(g.denNgay)}</div>
     </td>
   </tr>
-</table>${bangBuoiHoc(g.buoi)}`,
+</table>${bangBuoiHoc(g.buoi, p.linkLopHoc)}`,
     )
     .join('');
 

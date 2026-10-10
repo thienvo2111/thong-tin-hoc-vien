@@ -28,6 +28,7 @@ import {
   timCacHocVienIdTheoMaMoet,
 } from '../common/utils/ma-moet.util';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
+import { KhoaBoiDuongService } from '../khoa-boi-duong/khoa-boi-duong.service';
 import { decryptVleMatKhau } from '../common/utils/vle-crypto.util';
 import {
   layFrontendUrl,
@@ -56,6 +57,7 @@ import { QueryHocVienDto } from './dto/query-hoc-vien.dto';
 import { DuyetHocVienDto } from './dto/duyet-hoc-vien.dto';
 import { ChuyenMonDto } from './dto/chuyen-mon.dto';
 import { SuaMaMoetDto } from './dto/sua-ma-moet.dto';
+import { TaoHocVienLeDto } from './dto/tao-hoc-vien-le.dto';
 import {
   DongHocVienTruong,
   buildDanhSachHocVienTruongWorkbook,
@@ -139,6 +141,7 @@ export class HocVienService {
     private readonly dotXacNhanService: DotXacNhanService,
     private readonly cauHinhKhaoSatService: CauHinhKhaoSatService,
     private readonly nhatKy: NhatKyService,
+    private readonly khoaBoiDuongService: KhoaBoiDuongService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -615,6 +618,76 @@ export class HocVienService {
       }
       throw e;
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // POST /hoc-vien/tao-le — Quản trị tạo lẻ 1 học viên (cùng quy tắc + cùng
+  // kết quả với 1 dòng import ho_so_nhan_su_moet), tùy chọn ghi danh luôn.
+  // ---------------------------------------------------------------------
+  async taoLeBoiQuanTri(dto: TaoHocVienLeDto, nguoiTaoId: string) {
+    if (dto.cum_id && !dto.khoa_id) {
+      throw new ValidationException('Chọn khóa bồi dưỡng trước khi chọn cụm', [
+        { field: 'khoa_id', message: 'Bắt buộc khi có cụm' },
+      ]);
+    }
+    // Kiểm tra khóa/cụm TRƯỚC khi tạo gì — không để lại hồ sơ dở dang.
+    if (dto.khoa_id) {
+      await this.khoaBoiDuongService.kiemTraGhiDanhLe(dto.khoa_id, dto.cum_id);
+    }
+
+    // Ô bỏ trống trên form -> undefined (như ô trống trong file import).
+    const rong = (v?: string) => v?.trim() || undefined;
+    const maMoet = rong(dto.ma_dinh_danh_moet);
+    const cccd = rong(dto.so_dinh_danh_ca_nhan);
+    let hocVien: hoc_vien;
+    try {
+      hocVien = await this.createFromMoetImport(
+        {
+          ma_dinh_danh_moet: maMoet,
+          so_dinh_danh_ca_nhan: cccd,
+          ho_ten: dto.ho_ten,
+          ngay_sinh: dto.ngay_sinh,
+          thang_sinh: dto.thang_sinh,
+          nam_sinh: dto.nam_sinh,
+          chuc_vu: rong(dto.chuc_vu),
+          don_vi_cong_tac_id: dto.don_vi_cong_tac_id,
+          so_dien_thoai_lien_he: rong(dto.so_dien_thoai_lien_he),
+          ghi_chu: rong(dto.ghi_chu),
+          chuyen_mon: dto.chuyen_mon ?? [],
+        },
+        nguoiTaoId,
+      );
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        throw new ConflictAppException(
+          'Mã định danh, số định danh cá nhân hoặc tên đăng nhập đã tồn tại',
+        );
+      }
+      throw e;
+    }
+    const tenDangNhap = maMoet ?? cccd!;
+    await this.nhatKy.ghi({
+      hanh_dong: 'tao_hoc_vien_le',
+      hoc_vien_id: hocVien.id,
+      mo_ta: `Quản trị tạo tài khoản học viên (tên đăng nhập ${tenDangNhap})`,
+    });
+
+    const dangKy = dto.khoa_id
+      ? await this.khoaBoiDuongService.ghiDanhLe({
+          hoc_vien_id: hocVien.id,
+          khoa_id: dto.khoa_id,
+          cum_id: dto.cum_id,
+        })
+      : null;
+
+    return {
+      hoc_vien_id: hocVien.id,
+      ten_dang_nhap: tenDangNhap,
+      dang_ky_hoc_id: dangKy?.id ?? null,
+    };
   }
 
   // ---------------------------------------------------------------------

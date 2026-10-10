@@ -253,14 +253,14 @@ describe('SsoService', () => {
       target: 'khao-sat',
       hoc_vien: {
         id: 'hv-1',
-        ho_ten: 'Nguyễn Văn A',
+        ho_ten: 'Nguyễn Văn Thử',
         ma_dinh_danh_moet: '9115131060',
         doi_tuong: 'can_bo_quan_ly',
         so_dinh_danh_ca_nhan: '012345678901',
-        email_lien_he: 'a@example.com',
+        email_lien_he: 'thu@example.com',
         gioi_tinh: 'nam',
-        cu_tru_phuong_xa: { ten: 'Phường X' },
-        cu_tru_tinh: { ten: 'An Giang' },
+        cu_tru_tinh: { ten: 'Tỉnh An Giang' },
+        cu_tru_phuong_xa: { ten: 'Phường Long Xuyên' },
         don_vi_cong_tac: { ma_don_vi: 'DV01', ten_don_vi: 'Trường A' },
         dang_ky_hoc: [
           {
@@ -319,19 +319,20 @@ describe('SsoService', () => {
       expect(data.da_dung_luc).toBeInstanceOf(Date);
     });
 
-    // 77cb6a9: hệ thống khảo sát được nhận thêm CCCD, email, giới tính, địa chỉ cư trú (user xác
-    // nhận 2026-10-10 vẫn cho trả CCCD). toEqual giữ chặt: không trả trường nào ngoài danh sách này.
-    it('hợp lệ -> trả định danh (gồm CCCD), liên hệ, vai trò, đơn vị, target, lớp', async () => {
+    // 77cb6a9 (2026-10-08, theo yêu cầu bên khảo sát): doi-ma trả thêm CCCD,
+    // email, giới tính, nơi cư trú — chỉ qua kênh máy chủ–máy chủ, CCCD không
+    // bao giờ lên URL (kiểm ở e2e sso-khao-sat).
+    it('hợp lệ -> trả mã định danh, CCCD, liên hệ, nơi cư trú, vai trò, đơn vị, target, lớp', async () => {
       prisma.ma_sso_mot_lan.updateMany.mockResolvedValue({ count: 1 });
       prisma.ma_sso_mot_lan.findUnique.mockResolvedValue(banGhi);
       const kq = await service.doiMa('khoa-bi-mat-dung', 'm'.repeat(43));
       expect(kq).toEqual({
         hoc_vien_id: 'hv-1',
-        ho_ten: 'Nguyễn Văn A',
+        ho_ten: 'Nguyễn Văn Thử',
         so_dinh_danh_ca_nhan: '012345678901',
-        email: 'a@example.com',
+        email: 'thu@example.com',
         gioi_tinh: 'nam',
-        dia_chi: 'Phường X, An Giang',
+        dia_chi: 'Phường Long Xuyên, Tỉnh An Giang',
         ma_dinh_danh_moet: '9115131060',
         vai_tro: 'can_bo_quan_ly',
         ma_don_vi: 'DV01',
@@ -347,6 +348,22 @@ describe('SsoService', () => {
           },
         ],
       });
+    });
+
+    it('hồ sơ chưa khai nơi cư trú / email / giới tính -> các trường đó null', async () => {
+      prisma.ma_sso_mot_lan.updateMany.mockResolvedValue({ count: 1 });
+      prisma.ma_sso_mot_lan.findUnique.mockResolvedValue({
+        ...banGhi,
+        hoc_vien: {
+          ...banGhi.hoc_vien,
+          email_lien_he: null,
+          gioi_tinh: null,
+          cu_tru_tinh: null,
+          cu_tru_phuong_xa: null,
+        },
+      });
+      const kq = await service.doiMa('khoa-bi-mat-dung', 'm'.repeat(43));
+      expect(kq).toMatchObject({ email: null, gioi_tinh: null, dia_chi: null });
     });
 
     it('đổi mã thành công có target -> ghi "đã mở" cho đúng học viên + loại bài', async () => {

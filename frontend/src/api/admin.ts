@@ -45,6 +45,43 @@ export async function xuatHocVienTheoTruong(donViId: string): Promise<void> {
   taiFileTuBlob(blob, 'ds-hoc-vien-truong.xlsx');
 }
 
+// POST /hoc-vien/tao-le (chỉ quan_tri) — tạo lẻ 1 học viên, cùng quy tắc import MOET: cần ít nhất 1 trong
+// mã MOET/CCCD, tên đăng nhập = mã MOET ?? CCCD, mật khẩu ban đầu = ngày sinh ddmmyyyy (không trả về).
+export interface TaoHocVienLeDto {
+  ma_dinh_danh_moet?: string;
+  so_dinh_danh_ca_nhan?: string;
+  ho_ten: string;
+  ngay_sinh: number;
+  thang_sinh: number;
+  nam_sinh: number;
+  chuc_vu?: string;
+  don_vi_cong_tac_id: string;
+  so_dien_thoai_lien_he?: string;
+  chuyen_mon?: string[];
+  khoa_id?: string;
+  cum_id?: string;
+}
+
+export interface TaoHocVienLeResult {
+  hoc_vien_id: string;
+  ten_dang_nhap: string;
+  dang_ky_hoc_id: string | null;
+}
+
+export function taoHocVienLe(dto: TaoHocVienLeDto) {
+  return apiFetch<TaoHocVienLeResult>('/hoc-vien/tao-le', { method: 'POST', body: JSON.stringify(dto) });
+}
+
+export function useTaoHocVienLe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: taoHocVienLe,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'hoc-vien'] });
+    },
+  });
+}
+
 export function layHocVienTheoId(id: string) {
   return apiFetch<HocVien>(`/hoc-vien/${id}`);
 }

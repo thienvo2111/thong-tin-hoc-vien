@@ -8,6 +8,11 @@ import { ThangMucService, MucThang } from '../sso/thang-muc.service';
 import { ValidationException } from '../common/exceptions/app.exceptions';
 import { HOC_VIEN_PHAI_KHAO_SAT } from '../common/utils/doi-tuong-khao-sat.util';
 import {
+  CheDoChuyenCan,
+  DongDiemDanhBuoi,
+  tinhChuyenCan,
+} from '../common/utils/chuyen-can.util';
+import {
   BuoiChuyenCan,
   ChuyenCanResult,
   ChuyenMucResult,
@@ -335,46 +340,92 @@ export class ThongKeService {
     return { truc_tiep, vle };
   }
 
+  // ADR 0005 Z8 (issue #27): mỗi đăng ký đếm tối đa 1 lần mỗi (giai_doan,
+  // buoi_so) — áp tinhChuyenCan theo chế độ của khóa (học viên chuyển lớp có
+  // dòng ở cả lớp cũ và lớp mới).
   private async diemDanhTheoBuoi(
     where: Prisma.dang_ky_hocWhereInput,
   ): Promise<BuoiChuyenCan[]> {
-    const nhom = await this.prisma.diem_danh.groupBy({
-      by: ['lich_hoc_id', 'trang_thai'],
+    const dsDong = await this.prisma.diem_danh.findMany({
       where: {
         dang_ky_hoc: where,
         lich_hoc: { lop: { loai_lop: { in: ['truc_tiep', 'zoom'] } } },
       },
-      _count: { _all: true },
-    });
-    if (nhom.length === 0) return [];
-
-    const lich = await this.prisma.lich_hoc_lop.findMany({
-      where: { id: { in: [...new Set(nhom.map((n) => n.lich_hoc_id))] } },
       select: {
-        id: true,
-        buoi_so: true,
-        giai_doan: { select: { thu_tu: true } },
+        dang_ky_hoc_id: true,
+        trang_thai: true,
+        lich_hoc: {
+          select: {
+            lop_id: true,
+            giai_doan_id: true,
+            buoi_so: true,
+            giai_doan: { select: { thu_tu: true } },
+            lop: { select: { loai_lop: true } },
+          },
+        },
+        dang_ky_hoc: {
+          select: { khoa: { select: { che_do_chuyen_can: true } } },
+        },
       },
     });
-    const buoiCuaLich = new Map(lich.map((l) => [l.id, l]));
+    if (dsDong.length === 0) return [];
+
+    const phanLop = await this.prisma.phan_lop_giai_doan.findMany({
+      where: { dang_ky_hoc: where },
+      select: { dang_ky_hoc_id: true, giai_doan_id: true, lop_id: true },
+    });
+    const lopHienTai = new Map<string, Map<string, string>>();
+    for (const p of phanLop) {
+      const m = lopHienTai.get(p.dang_ky_hoc_id) ?? new Map<string, string>();
+      m.set(p.giai_doan_id, p.lop_id);
+      lopHienTai.set(p.dang_ky_hoc_id, m);
+    }
+
+    const thuTuGiaiDoan = new Map<string, number>();
+    const theoDangKy = new Map<
+      string,
+      { cheDo: CheDoChuyenCan; dong: DongDiemDanhBuoi[] }
+    >();
+    for (const d of dsDong) {
+      thuTuGiaiDoan.set(d.lich_hoc.giai_doan_id, d.lich_hoc.giai_doan.thu_tu);
+      const nhom = theoDangKy.get(d.dang_ky_hoc_id) ?? {
+        cheDo: d.dang_ky_hoc.khoa.che_do_chuyen_can,
+        dong: [],
+      };
+      nhom.dong.push({
+        lop_id: d.lich_hoc.lop_id,
+        loai_lop: d.lich_hoc.lop.loai_lop,
+        giai_doan_id: d.lich_hoc.giai_doan_id,
+        buoi_so: d.lich_hoc.buoi_so,
+        trang_thai: d.trang_thai,
+      });
+      theoDangKy.set(d.dang_ky_hoc_id, nhom);
+    }
 
     const cot = new Map<string, BuoiChuyenCan>();
-    for (const n of nhom) {
-      const l = buoiCuaLich.get(n.lich_hoc_id);
-      if (!l) continue;
-      const thuTu = l.giai_doan.thu_tu;
-      const khoa = `${thuTu}|${l.buoi_so}`;
-      const c = cot.get(khoa) ?? {
-        nhan: `GĐ${thuTu} · Buổi ${l.buoi_so}`,
-        giai_doan_thu_tu: thuTu,
-        buoi_so: l.buoi_so,
-        co_mat: 0,
-        vang_co_phep: 0,
-        vang: 0,
-        ty_le_co_mat: null,
-      };
-      c[n.trang_thai] += n._count._all;
-      cot.set(khoa, c);
+    for (const [dangKyId, { cheDo, dong }] of theoDangKy) {
+      const kq = tinhChuyenCan(
+        lopHienTai.get(dangKyId) ?? new Map(),
+        dong,
+        cheDo,
+      );
+      for (const [khoa, { trang_thai }] of kq) {
+        const [giaiDoanId, buoi] = khoa.split('|');
+        const thuTu = thuTuGiaiDoan.get(giaiDoanId) ?? 0;
+        const buoiSo = Number(buoi);
+        const k = `${thuTu}|${buoiSo}`;
+        const c = cot.get(k) ?? {
+          nhan: `GĐ${thuTu} · Buổi ${buoiSo}`,
+          giai_doan_thu_tu: thuTu,
+          buoi_so: buoiSo,
+          co_mat: 0,
+          vang_co_phep: 0,
+          vang: 0,
+          ty_le_co_mat: null,
+        };
+        c[trang_thai] += 1;
+        cot.set(k, c);
+      }
     }
     return [...cot.values()]
       .sort(

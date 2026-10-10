@@ -4,6 +4,7 @@ import { ScopeService } from '../auth/scope/scope.service';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
+  ConflictAppException,
   ForbiddenAppException,
   NotFoundAppException,
   ValidationException,
@@ -55,6 +56,7 @@ describe('KhoaBoiDuongService', () => {
       findMany: jest.Mock;
       upsert: jest.Mock;
       update: jest.Mock;
+      create: jest.Mock;
     };
     phan_lop_giai_doan: {
       findUnique: jest.Mock;
@@ -123,6 +125,7 @@ describe('KhoaBoiDuongService', () => {
         findMany: jest.fn(),
         upsert: jest.fn(),
         update: jest.fn(),
+        create: jest.fn(),
       },
       phan_lop_giai_doan: {
         findUnique: jest.fn().mockResolvedValue(null),
@@ -498,6 +501,88 @@ describe('KhoaBoiDuongService', () => {
       // mảng nội bộ không lọt ra response cuối.
       expect(res[0]).not.toHaveProperty('phan_lop_giai_doan');
       expect(res[0].khoa).not.toHaveProperty('giai_doan');
+    });
+
+    // ADR 0005 Z8 (issue #27): buổi chưa có dòng ở lớp hiện tại nhưng đã có ở
+    // lớp cũ cùng giai đoạn, cùng buoi_so -> diem_danh_lop_cu (chỉ hiển thị).
+    it('chuyển lớp: buổi có điểm danh ở lớp cũ -> diem_danh_lop_cu', async () => {
+      const buoi = (id: string, buoi_so: number) => ({
+        id,
+        giai_doan_id: 'gd-1',
+        buoi_so,
+        phan_cong: [],
+      });
+      prisma.dang_ky_hoc.findMany.mockResolvedValue([
+        {
+          id: 'dk-1',
+          hoc_vien_id: 'hv-1',
+          khoa: {
+            id: 'khoa-1',
+            che_do_chuyen_can: 'theo_lop_hien_tai',
+            giai_doan: [
+              {
+                id: 'gd-1',
+                thu_tu: 1,
+                ten_giai_doan: 'GĐ 1',
+                hinh_thuc: 'truc_tuyen',
+              },
+            ],
+          },
+          phan_lop_giai_doan: [
+            {
+              giai_doan_id: 'gd-1',
+              lop_id: 'lop-moi',
+              lop: {
+                id: 'lop-moi',
+                ten_lop: 'Lớp mới',
+                lich_hoc: [buoi('m-1', 1), buoi('m-2', 2), buoi('m-3', 3)],
+              },
+            },
+          ],
+        },
+      ]);
+      const dong = (
+        lich_hoc_id: string,
+        lop_id: string,
+        buoi_so: number,
+        trang_thai: string,
+      ) => ({
+        dang_ky_hoc_id: 'dk-1',
+        lich_hoc_id,
+        trang_thai,
+        tu_diem_danh_luc: null,
+        lich_hoc: {
+          lop_id,
+          giai_doan_id: 'gd-1',
+          buoi_so,
+          lop: {
+            ten_lop: lop_id === 'lop-cu' ? 'Lớp cũ' : 'Lớp mới',
+            loai_lop: 'zoom',
+          },
+        },
+      });
+      prisma.diem_danh.findMany.mockResolvedValue([
+        dong('c-1', 'lop-cu', 1, 'co_mat'),
+        dong('m-1', 'lop-moi', 1, 'vang'),
+        dong('c-2', 'lop-cu', 2, 'vang_co_phep'),
+      ]);
+
+      const res = await service.khoaHocCuaToi({
+        ...truong,
+        vai_tro: 'hoc_vien',
+        hoc_vien_id: 'hv-1',
+      });
+
+      const [b1, b2, b3] = res[0].giai_doan[0].lop!.lich_hoc;
+      // Đã có dòng ở lớp hiện tại -> không kèm thông tin lớp cũ.
+      expect(b1.trang_thai_diem_danh).toBe('vang');
+      expect(b1).not.toHaveProperty('diem_danh_lop_cu');
+      expect(b2.trang_thai_diem_danh).toBeNull();
+      expect(b2).toHaveProperty('diem_danh_lop_cu', {
+        trang_thai: 'vang_co_phep',
+        ten_lop: 'Lớp cũ',
+      });
+      expect(b3).not.toHaveProperty('diem_danh_lop_cu');
     });
 
     it('không có hoc_vien_id -> ForbiddenAppException', async () => {
@@ -901,7 +986,11 @@ describe('KhoaBoiDuongService', () => {
       prisma.dang_ky_hoc.findUnique.mockResolvedValue({
         cum_id: 'cum-cu',
         phan_lop_giai_doan: [
-          { giai_doan_id: 'gd-2', lop_id: 'lop-zoom', lop: { ten_lop: 'Lớp Zoom' } },
+          {
+            giai_doan_id: 'gd-2',
+            lop_id: 'lop-zoom',
+            lop: { ten_lop: 'Lớp Zoom' },
+          },
         ],
       });
 
@@ -1315,6 +1404,118 @@ describe('KhoaBoiDuongService', () => {
           truong,
         ),
       ).rejects.toBeInstanceOf(NotFoundAppException);
+    });
+  });
+
+  describe('ghiDanhLe — POST /dang-ky-hoc (ghi danh lẻ)', () => {
+    const khoa = { id: 'khoa-1', ten_khoa: 'Khóa NLS 1' };
+    const cum = { id: 'cum-1', khoa_id: 'khoa-1', ten_cum: 'Cụm A' };
+
+    beforeEach(() => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoa);
+      prisma.hoc_vien.findUnique.mockResolvedValue({
+        id: 'hv-1',
+        trang_thai: 'da_duyet',
+      });
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue(null);
+      prisma.dang_ky_hoc.create.mockImplementation(async ({ data }) => ({
+        id: 'dk-moi',
+        ...data,
+      }));
+    });
+
+    it('không chọn cụm -> tạo dang_ky_hoc da_duyet, cum_id null, ghi nhật ký', async () => {
+      const kq = await service.ghiDanhLe({
+        hoc_vien_id: 'hv-1',
+        khoa_id: 'khoa-1',
+      });
+
+      expect(prisma.dang_ky_hoc.create).toHaveBeenCalledWith({
+        data: {
+          hoc_vien_id: 'hv-1',
+          khoa_id: 'khoa-1',
+          trang_thai: 'da_duyet',
+          cum_id: null,
+        },
+      });
+      expect(kq.id).toBe('dk-moi');
+      expect(prisma.cum_hoc_vien.findUnique).not.toHaveBeenCalled();
+      expect(nhatKy.ghi).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hanh_dong: 'ghi_danh_le',
+          hoc_vien_id: 'hv-1',
+        }),
+      );
+    });
+
+    it('có cụm cùng khóa -> lưu cum_id', async () => {
+      prisma.cum_hoc_vien.findUnique.mockResolvedValue(cum);
+      await service.ghiDanhLe({
+        hoc_vien_id: 'hv-1',
+        khoa_id: 'khoa-1',
+        cum_id: 'cum-1',
+      });
+      expect(prisma.dang_ky_hoc.create.mock.calls[0][0].data.cum_id).toBe(
+        'cum-1',
+      );
+      expect(nhatKy.ghi.mock.calls[0][0].mo_ta).toContain('Cụm A');
+    });
+
+    it('khóa không tồn tại -> NotFoundAppException', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue(null);
+      await expect(
+        service.ghiDanhLe({ hoc_vien_id: 'hv-1', khoa_id: 'khoa-x' }),
+      ).rejects.toBeInstanceOf(NotFoundAppException);
+      expect(prisma.dang_ky_hoc.create).not.toHaveBeenCalled();
+    });
+
+    it('học viên chưa duyệt -> ValidationException', async () => {
+      prisma.hoc_vien.findUnique.mockResolvedValue({
+        id: 'hv-1',
+        trang_thai: 'cho_duyet',
+      });
+      await expect(
+        service.ghiDanhLe({ hoc_vien_id: 'hv-1', khoa_id: 'khoa-1' }),
+      ).rejects.toBeInstanceOf(ValidationException);
+      expect(prisma.dang_ky_hoc.create).not.toHaveBeenCalled();
+    });
+
+    it('học viên không tồn tại -> ValidationException', async () => {
+      prisma.hoc_vien.findUnique.mockResolvedValue(null);
+      await expect(
+        service.ghiDanhLe({ hoc_vien_id: 'hv-x', khoa_id: 'khoa-1' }),
+      ).rejects.toBeInstanceOf(ValidationException);
+    });
+
+    it('đã ghi danh vào khóa -> ConflictAppException', async () => {
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({ id: 'dk-cu' });
+      await expect(
+        service.ghiDanhLe({ hoc_vien_id: 'hv-1', khoa_id: 'khoa-1' }),
+      ).rejects.toBeInstanceOf(ConflictAppException);
+      expect(prisma.dang_ky_hoc.create).not.toHaveBeenCalled();
+    });
+
+    it('cụm thuộc khóa khác -> ValidationException, không kiểm tra học viên', async () => {
+      prisma.cum_hoc_vien.findUnique.mockResolvedValue({
+        ...cum,
+        khoa_id: 'khoa-khac',
+      });
+      await expect(
+        service.ghiDanhLe({
+          hoc_vien_id: 'hv-1',
+          khoa_id: 'khoa-1',
+          cum_id: 'cum-1',
+        }),
+      ).rejects.toBeInstanceOf(ValidationException);
+      expect(prisma.hoc_vien.findUnique).not.toHaveBeenCalled();
+      expect(prisma.dang_ky_hoc.create).not.toHaveBeenCalled();
+    });
+
+    it('cụm không tồn tại -> ValidationException', async () => {
+      prisma.cum_hoc_vien.findUnique.mockResolvedValue(null);
+      await expect(
+        service.kiemTraGhiDanhLe('khoa-1', 'cum-x'),
+      ).rejects.toBeInstanceOf(ValidationException);
     });
   });
 

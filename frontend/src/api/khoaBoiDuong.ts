@@ -3,6 +3,7 @@ import { apiFetch, apiFetchBlob } from './client';
 import { taiFileTuBlob } from '@/lib/taiFile';
 import { layDonViCongTac } from './danhMuc';
 import type {
+  CheDoChuyenCan,
   CumHocVien,
   NguoiHoTroRutGon,
   GiaiDoanKhoa,
@@ -124,6 +125,11 @@ export interface CapNhatKhoaDto {
   don_vi_dat_hang_id?: string;
   // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học.
   mo_dieu_chinh_muc?: boolean;
+  // ADR 0005: true = bật (giữ mốc cũ nếu đã bật), false = tắt.
+  bat_diem_danh_zoom?: boolean;
+  diem_danh_mo_truoc_phut?: number;
+  diem_danh_dong_sau_phut?: number;
+  che_do_chuyen_can?: CheDoChuyenCan;
 }
 
 export function capNhatKhoa(id: string, dto: CapNhatKhoaDto) {
@@ -157,6 +163,28 @@ export function useKhoaHocCuaHocVien(hocVienId: string | undefined) {
     queryKey: khoaHocCuaHocVienKey(hocVienId ?? ''),
     queryFn: () => layKhoaHocCuaHocVien(hocVienId as string),
     enabled: !!hocVienId,
+  });
+}
+
+// POST /dang-ky-hoc (chỉ quan_tri) — ghi danh lẻ học viên đã duyệt vào khóa, không gán lớp (phân lớp
+// sau theo từng giai đoạn). 409 nếu đã ghi danh, 400 nếu hồ sơ chưa duyệt / cụm khác khóa.
+export interface GhiDanhLeDto {
+  hoc_vien_id: string;
+  khoa_id: string;
+  cum_id?: string;
+}
+
+export function ghiDanhLe(dto: GhiDanhLeDto) {
+  return apiFetch<{ id: string }>('/dang-ky-hoc', { method: 'POST', body: JSON.stringify(dto) });
+}
+
+export function useGhiDanhLe(hocVienId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ghiDanhLe,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: khoaHocCuaHocVienKey(hocVienId) });
+    },
   });
 }
 

@@ -1,4 +1,5 @@
 import { hinh_thuc_giai_doan, loai_lop_hoc } from '@prisma/client';
+import { formatVnDateTime } from '../../common/utils/vn-datetime.util';
 
 const LECH_GIO_VN_MS = 7 * 60 * 60 * 1000;
 const MOT_NGAY_MS = 24 * 60 * 60 * 1000;
@@ -54,4 +55,45 @@ export function canhBaoLoaiLopGiaiDoan(
     return `lớp ${loaiLop} nhưng giai đoạn là trực tiếp`;
   }
   return undefined;
+}
+
+// ADR 0005 §9 (issue #28): 2 buổi cùng lớp Zoom có cửa sổ điểm danh
+// [bắt đầu − mở trước, bắt đầu + đóng sau] chồng nhau -> học viên dễ bấm nhầm
+// buổi. Chỉ cảnh báo, không chặn. Chồng ⇔ |lệch giờ bắt đầu| < mở + đóng
+// (chạm đúng 1 thời điểm không tính). cacBuoiKhac: nơi gọi đã loại chính buổi.
+export function canhBaoChongCuaSoDiemDanh(
+  batDau: Date,
+  cacBuoiKhac: { buoi_so: number; thoi_gian_bat_dau: Date }[],
+  khoa: { diem_danh_mo_truoc_phut: number; diem_danh_dong_sau_phut: number },
+): string[] {
+  const doRong =
+    (khoa.diem_danh_mo_truoc_phut + khoa.diem_danh_dong_sau_phut) * 60 * 1000;
+  return cacBuoiKhac
+    .filter(
+      (b) =>
+        Math.abs(b.thoi_gian_bat_dau.getTime() - batDau.getTime()) < doRong,
+    )
+    .sort(
+      (a, b) => a.thoi_gian_bat_dau.getTime() - b.thoi_gian_bat_dau.getTime(),
+    )
+    .map(
+      (b) =>
+        `Cửa sổ điểm danh Zoom chồng với buổi ${b.buoi_so} (${formatVnDateTime(b.thoi_gian_bat_dau)}) cùng lớp — học viên dễ bấm nhầm buổi`,
+    );
+}
+
+// ADR 0005 §9 (issue #28): số buổi lớp Zoom sắp diễn ra (bắt đầu sau now)
+// chưa có link — đếm cả khi khóa chưa bật để Quản trị chuẩn bị trước.
+export function demBuoiZoomThieuLink(
+  lopHoc: {
+    loai_lop: loai_lop_hoc;
+    lich_hoc: { thoi_gian_bat_dau: Date; dia_diem_hoac_link: string | null }[];
+  }[],
+  now: Date,
+): number {
+  return lopHoc
+    .filter((l) => l.loai_lop === 'zoom')
+    .flatMap((l) => l.lich_hoc)
+    .filter((b) => b.thoi_gian_bat_dau > now && !b.dia_diem_hoac_link?.trim())
+    .length;
 }

@@ -8,6 +8,10 @@ import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import AdminKhoaChiTiet from './AdminKhoaChiTiet';
 
+// Trang chi tiết khóa render nhiều khối (giai đoạn, lớp, điểm danh Zoom, ghi
+// danh lẻ...) — các test gõ form dài vượt 15s mặc định trên máy chậm.
+vi.setConfig({ testTimeout: 30000 });
+
 function renderTrang(id: string) {
   datToken('token-gia-lap');
   return renderVoiRouter([{ path: '/admin/khoa-boi-duong/:id', element: <AdminKhoaChiTiet /> }], {
@@ -135,6 +139,103 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
       renderTrang('khoa-1');
       await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
       expect(screen.queryByRole('switch', { name: /điều chỉnh mức lớp học/ })).not.toBeInTheDocument();
+    });
+  });
+
+  // ADR 0005 (issue #23): cấu hình tự điểm danh lớp Zoom.
+  describe('Khối "Điểm danh lớp Zoom"', () => {
+    // Ghi lại body PATCH rồi trả undefined để rơi xuống handler mặc định (áp dụng ngữ nghĩa bật/giữ/tắt).
+    function ghiLaiPatch() {
+      const bodies: Record<string, unknown>[] = [];
+      server.use(
+        http.patch('/khoa-boi-duong/:id', async ({ request }) => {
+          bodies.push((await request.clone().json()) as Record<string, unknown>);
+          return undefined;
+        }),
+      );
+      return bodies;
+    }
+
+    it('vai_tro khác quan_tri: không hiện khối', async () => {
+      db.nguoiDung.vai_tro = 'truong';
+      renderTrang('khoa-1');
+      await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+      expect(screen.queryByText('Điểm danh lớp Zoom')).not.toBeInTheDocument();
+      expect(screen.queryByRole('switch', { name: /Bật tự điểm danh lớp Zoom/ })).not.toBeInTheDocument();
+    });
+
+    it('quan_tri: bật -> PATCH bat_diem_danh_zoom=true, hiện "Bật từ"; tắt -> ẩn', async () => {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      const bodies = ghiLaiPatch();
+      const user = userEvent.setup();
+      renderTrang('khoa-1');
+      const sw = await screen.findByRole('switch', { name: /Bật tự điểm danh lớp Zoom/ });
+      expect(sw).not.toBeChecked();
+      expect(screen.queryByText(/^Bật từ/)).not.toBeInTheDocument();
+
+      await user.click(sw);
+      await waitFor(() => expect(sw).toBeChecked());
+      expect(await screen.findByText(/^Bật từ \d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/)).toBeInTheDocument();
+      expect(await screen.findByText('Đã bật tự điểm danh lớp Zoom')).toBeInTheDocument();
+
+      await user.click(sw);
+      await waitFor(() => expect(sw).not.toBeChecked());
+      expect(screen.queryByText(/^Bật từ/)).not.toBeInTheDocument();
+      expect(bodies).toEqual([{ bat_diem_danh_zoom: true }, { bat_diem_danh_zoom: false }]);
+    });
+
+    it('lưu số phút mở trước/đóng sau -> PATCH đúng giá trị', async () => {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      const bodies = ghiLaiPatch();
+      const user = userEvent.setup();
+      renderTrang('khoa-1');
+      const moTruoc = await screen.findByLabelText('Mở trước giờ bắt đầu (phút)');
+      const dongSau = screen.getByLabelText('Đóng sau giờ bắt đầu (phút)');
+      const nutLuu = screen.getByRole('button', { name: 'Lưu' });
+      expect(moTruoc).toHaveValue('30');
+      expect(dongSau).toHaveValue('120');
+      expect(nutLuu).toBeDisabled(); // chưa đổi
+
+      await user.clear(moTruoc);
+      await user.type(moTruoc, '15');
+      await user.clear(dongSau);
+      await user.type(dongSau, '90');
+      expect(nutLuu).toBeEnabled();
+      await user.click(nutLuu);
+
+      expect(await screen.findByText('Đã lưu cửa sổ điểm danh')).toBeInTheDocument();
+      expect(bodies).toEqual([{ diem_danh_mo_truoc_phut: 15, diem_danh_dong_sau_phut: 90 }]);
+      await waitFor(() => expect(nutLuu).toBeDisabled());
+    });
+
+    it.each([
+      ['Mở trước giờ bắt đầu (phút)', '181'],
+      ['Đóng sau giờ bắt đầu (phút)', '14'],
+      ['Đóng sau giờ bắt đầu (phút)', '721'],
+    ])('"%s" = %s (ngoài khoảng) -> nút Lưu bị khóa', async (nhan, giaTri) => {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      const user = userEvent.setup();
+      renderTrang('khoa-1');
+      const o = await screen.findByLabelText(nhan);
+      await user.clear(o);
+      await user.type(o, giaTri);
+      expect(screen.getByRole('button', { name: 'Lưu' })).toBeDisabled();
+    });
+
+    it('đổi chế độ chuyên cần -> PATCH che_do_chuyen_can ngay', async () => {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      const bodies = ghiLaiPatch();
+      const user = userEvent.setup();
+      renderTrang('khoa-1');
+      const select = await screen.findByRole('textbox', { name: 'Chuyên cần khi học viên chuyển lớp Zoom' });
+      expect(select).toHaveValue('Theo lớp hiện tại (học lại các buổi ở lớp mới)');
+
+      await user.click(select);
+      await user.click(await screen.findByRole('option', { name: 'Công nhận buổi đã có mặt ở lớp cũ' }));
+
+      expect(await screen.findByText('Đã lưu cách tính chuyên cần')).toBeInTheDocument();
+      expect(bodies).toEqual([{ che_do_chuyen_can: 'cong_nhan_lop_cu' }]);
+      await waitFor(() => expect(select).toHaveValue('Công nhận buổi đã có mặt ở lớp cũ'));
     });
   });
 

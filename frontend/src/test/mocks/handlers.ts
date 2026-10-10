@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import type { ImportChiTiet, KhoaBoiDuong, KhoaHocDangKy, LoaiLop, MucNangLuc, YeuCauHoTro, YeuCauHoTroQuanTri } from '@/api/types';
 import { thongKeHandlers } from './thongKe';
+import { diemDanhHandlers } from './diemDanh';
 import { DIA_DANH, DON_VI, MON_HOC, db } from './db';
 
 // QĐ10 (2026-09-30): dang_ky_hoc mẫu nằm rải trong db.khoaHocCuaHocVien (map theo hoc_vien_id) — tìm
@@ -84,6 +85,7 @@ function khopTaiKhoanGiaLap(nhap: string, kieu: 'ma' | 'sdt' = 'ma') {
 
 export const handlers = [
   ...thongKeHandlers,
+  ...diemDanhHandlers,
   // ADR 0004 L4 (issue #17): bảng kiểm.
   http.get('/bang-kiem/quy-tac', () =>
     HttpResponse.json([
@@ -424,6 +426,9 @@ export const handlers = [
 
   http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json(db.khoaHocToi)),
 
+  // ADR 0005 (issue #24): học viên bấm "Điểm danh & vào Zoom".
+  http.post('/lich-hoc/:id/vao-hoc', () => HttpResponse.json(db.vaoHocZoom)),
+
   // 2026-10-08: học viên tự điều chỉnh mức lớp học — mô phỏng đúng quy tắc backend (công tắc khóa,
   // chưa có đánh giá, chỉ ≤ mức đánh giá, bằng mức đánh giá -> lưu null).
   http.put('/hoc-vien/toi/khoa-hoc/:khoaId/muc-hoc', async ({ params, request }) => {
@@ -682,6 +687,10 @@ export const handlers = [
       updated_at: new Date().toISOString(),
       created_by: 'nd-1',
       mo_dieu_chinh_muc: false,
+      bat_diem_danh_zoom_luc: null,
+      diem_danh_mo_truoc_phut: 30,
+      diem_danh_dong_sau_phut: 120,
+      che_do_chuyen_can: 'theo_lop_hien_tai',
     };
     db.danhSachKhoa = [moi, ...db.danhSachKhoa];
     db.chiTietKhoa[id] = { ...moi, pham_vi_hoc_vien: 'toan_bo', giai_doan: [], lop_hoc: [], cum_hoc_vien: [] };
@@ -694,7 +703,11 @@ export const handlers = [
     const id = params.id as string;
     const khoa = db.chiTietKhoa[id];
     if (!khoa) return loi(404, 'NOT_FOUND', 'Không tìm thấy khóa bồi dưỡng');
-    const body = (await request.json()) as Record<string, unknown>;
+    const { bat_diem_danh_zoom: bat, ...body } = (await request.json()) as Record<string, unknown>;
+    // ADR 0005: bật giữ mốc cũ nếu đã bật, tắt = null, không gửi = giữ nguyên (như backend).
+    if (bat !== undefined) {
+      body.bat_diem_danh_zoom_luc = bat ? (khoa.bat_diem_danh_zoom_luc ?? new Date().toISOString()) : null;
+    }
     Object.assign(khoa, body);
     db.danhSachKhoa = db.danhSachKhoa.map((k) => (k.id === id ? { ...k, ...body } : k));
     return HttpResponse.json(khoa);

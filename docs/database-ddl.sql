@@ -532,6 +532,10 @@ CREATE TABLE tai_khoan_vle (
 -- PHẦN 3 — KHÓA BỒI DƯỠNG & LỚP HỌC (board MoHinhKhoaHoc.dc.html)
 -- =====================================================================
 
+-- ADR 0005 Z8 (issue #23, migration 20261009120000_diem_danh_zoom): cách tính
+-- chuyên cần khi học viên chuyển lớp Zoom cùng giai đoạn.
+CREATE TYPE che_do_chuyen_can AS ENUM ('theo_lop_hien_tai', 'cong_nhan_lop_cu');
+
 CREATE TABLE khoa_boi_duong (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     ma_khoa             varchar(30) NOT NULL,
@@ -555,9 +559,18 @@ CREATE TABLE khoa_boi_duong (
     mo_dieu_chinh_muc   boolean NOT NULL DEFAULT false,
         -- 2026-10-08 (migration 20261008120000_dieu_chinh_muc_hoc): công tắc
         -- Quản trị bật/tắt cho học viên tự điều chỉnh mức lớp học.
+    -- ADR 0005 (issue #23, migration 20261009120000_diem_danh_zoom): tự điểm
+    -- danh lớp Zoom — mốc bật (NULL = tắt), cửa sổ [bắt đầu − mở trước,
+    -- bắt đầu + đóng sau] tính theo giờ bắt đầu buổi, chế độ chuyên cần (Z8).
+    bat_diem_danh_zoom_luc  timestamptz,
+    diem_danh_mo_truoc_phut smallint NOT NULL DEFAULT 30,
+    diem_danh_dong_sau_phut smallint NOT NULL DEFAULT 120,
+    che_do_chuyen_can       che_do_chuyen_can NOT NULL DEFAULT 'theo_lop_hien_tai',
 
     CONSTRAINT uq_khoa_ma UNIQUE (ma_khoa),
-    CONSTRAINT chk_khoa_thoi_gian CHECK (thoi_gian_ket_thuc >= thoi_gian_bat_dau)
+    CONSTRAINT chk_khoa_thoi_gian CHECK (thoi_gian_ket_thuc >= thoi_gian_bat_dau),
+    CONSTRAINT chk_khoa_diem_danh_mo_truoc CHECK (diem_danh_mo_truoc_phut BETWEEN 0 AND 180),
+    CONSTRAINT chk_khoa_diem_danh_dong_sau CHECK (diem_danh_dong_sau_phut BETWEEN 15 AND 720)
 );
 
 CREATE INDEX idx_khoa_don_vi ON khoa_boi_duong(don_vi_dat_hang_id);
@@ -642,6 +655,8 @@ CREATE TABLE lich_hoc_lop (
     diem_hoc_id             uuid REFERENCES diem_hoc(id),
     phong                   varchar(100),
     cap_nhat_luc            timestamptz NOT NULL DEFAULT now(),
+    -- ADR 0005 Z6 (issue #23): mốc cron đã chốt vắng buổi Zoom (NULL = chưa chốt).
+    chot_diem_danh_luc      timestamptz,
 
     -- T6: thay uq_lich_hoc_lop_giai_doan (1 lịch/giai đoạn/lớp) bằng ràng
     -- buộc có thêm buoi_so.

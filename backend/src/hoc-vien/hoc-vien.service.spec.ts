@@ -17,6 +17,7 @@ import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
 import { CauHinhKhaoSatService } from '../cau-hinh-khao-sat/cau-hinh-khao-sat.service';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
+import { KhoaBoiDuongService } from '../khoa-boi-duong/khoa-boi-duong.service';
 
 const namHopLe = new Date().getUTCFullYear() - 20;
 
@@ -82,6 +83,11 @@ describe('HocVienService', () => {
     layKenhDanhGia: jest.Mock;
     khaoSatDauRaDangMo: jest.Mock;
   };
+  let nhatKy: { ghi: jest.Mock };
+  let khoaBoiDuongService: {
+    kiemTraGhiDanhLe: jest.Mock;
+    ghiDanhLe: jest.Mock;
+  };
 
   beforeEach(() => {
     // 2026-10-02: mặc định kênh 'vle' = hành vi cũ, test SSO tự override.
@@ -144,15 +150,19 @@ describe('HocVienService', () => {
       coXacNhanTruocDanhGiaConHieuLuc: jest.fn().mockResolvedValue(false),
       dotXacNhanTruocDanhGiaApDung: jest.fn().mockResolvedValue(null),
     };
+    nhatKy = { ghi: jest.fn().mockResolvedValue(undefined) };
+    khoaBoiDuongService = {
+      kiemTraGhiDanhLe: jest.fn().mockResolvedValue({}),
+      ghiDanhLe: jest.fn().mockResolvedValue({ id: 'dk-1' }),
+    };
     service = new HocVienService(
       prisma as unknown as PrismaService,
       scopeService as unknown as ScopeService,
       thongBaoService as unknown as ThongBaoService,
       dotXacNhanService as unknown as DotXacNhanService,
       cauHinhKhaoSatService as unknown as CauHinhKhaoSatService,
-      {
-        ghi: jest.fn().mockResolvedValue(undefined),
-      } as unknown as NhatKyService,
+      nhatKy as unknown as NhatKyService,
+      khoaBoiDuongService as unknown as KhoaBoiDuongService,
     );
 
     // Fixture mặc định: mọi FK tra cứu hợp lệ (test override khi cần âm tính).
@@ -1512,6 +1522,183 @@ describe('HocVienService', () => {
           data: expect.objectContaining({ ten_dang_nhap: 'MOET-002' }),
         }),
       );
+    });
+  });
+
+  describe('taoLeBoiQuanTri — POST /hoc-vien/tao-le (cùng quy tắc import MOET)', () => {
+    let txHocVien: { create: jest.Mock; update: jest.Mock };
+    let txNguoiDung: { create: jest.Mock };
+
+    const dtoLe = (over: Record<string, unknown> = {}) => ({
+      ma_dinh_danh_moet: '0123456789',
+      so_dinh_danh_ca_nhan: '123456789012',
+      ho_ten: 'Lê Văn Lẻ',
+      ngay_sinh: 5,
+      thang_sinh: 3,
+      nam_sinh: namHopLe,
+      don_vi_cong_tac_id: 'truong-1',
+      chuyen_mon: ['Toán'],
+      ...over,
+    });
+
+    beforeEach(() => {
+      txHocVien = {
+        create: jest.fn().mockResolvedValue({ id: 'hv-le' }),
+        update: jest.fn().mockResolvedValue({ id: 'hv-le' }),
+      };
+      txNguoiDung = {
+        create: jest.fn().mockImplementation(({ data }) => ({
+          id: 'nd-le',
+          ten_dang_nhap: data.ten_dang_nhap,
+        })),
+      };
+      prisma.$transaction.mockImplementation(async (cb) =>
+        cb({ hoc_vien: txHocVien, nguoi_dung: txNguoiDung }),
+      );
+    });
+
+    it('không chọn khóa -> tạo import_moet da_duyet, tên đăng nhập = mã MOET, ghi nhật ký', async () => {
+      const kq = await service.taoLeBoiQuanTri(dtoLe(), 'quan-tri-1');
+
+      expect(kq).toEqual({
+        hoc_vien_id: 'hv-le',
+        ten_dang_nhap: '0123456789',
+        dang_ky_hoc_id: null,
+      });
+      expect(txHocVien.create.mock.calls[0][0].data).toEqual(
+        expect.objectContaining({
+          nguon_tao: 'import_moet',
+          trang_thai: 'da_duyet',
+          nguoi_duyet_id: 'quan-tri-1',
+        }),
+      );
+      expect(txNguoiDung.create.mock.calls[0][0].data).toEqual(
+        expect.objectContaining({
+          ten_dang_nhap: '0123456789',
+          phai_doi_mat_khau: true,
+        }),
+      );
+      expect(nhatKy.ghi).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hanh_dong: 'tao_hoc_vien_le',
+          hoc_vien_id: 'hv-le',
+        }),
+      );
+      expect(khoaBoiDuongService.kiemTraGhiDanhLe).not.toHaveBeenCalled();
+      expect(khoaBoiDuongService.ghiDanhLe).not.toHaveBeenCalled();
+    });
+
+    it('không có mã MOET (ô trống) -> tên đăng nhập = CCCD', async () => {
+      const kq = await service.taoLeBoiQuanTri(
+        dtoLe({ ma_dinh_danh_moet: '  ' }),
+        'quan-tri-1',
+      );
+      expect(kq.ten_dang_nhap).toBe('123456789012');
+      expect(
+        txHocVien.create.mock.calls[0][0].data.ma_dinh_danh_moet,
+      ).toBeUndefined();
+    });
+
+    it('thiếu cả mã MOET lẫn CCCD -> ValidationException, không tạo gì', async () => {
+      await expect(
+        service.taoLeBoiQuanTri(
+          dtoLe({ ma_dinh_danh_moet: undefined, so_dinh_danh_ca_nhan: '' }),
+          'quan-tri-1',
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          error: {
+            fields: expect.arrayContaining([
+              expect.objectContaining({ field: 'ma_dinh_danh_moet' }),
+            ]),
+          },
+        },
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('mã MOET trùng hồ sơ có sẵn khác số 0 đầu -> ValidationException', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ id: 'khac', chinh_xac: false }]);
+      await expect(
+        service.taoLeBoiQuanTri(
+          dtoLe({ ma_dinh_danh_moet: '123456789' }),
+          'quan-tri-1',
+        ),
+      ).rejects.toBeInstanceOf(ValidationException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('đơn vị không phải Trường -> ValidationException trên don_vi_cong_tac_id', async () => {
+      prisma.don_vi_cong_tac.findUnique.mockResolvedValue({
+        id: 'phong-1',
+        trang_thai: 'active',
+        loai_don_vi: 'phong_vhxh',
+      });
+      await expect(
+        service.taoLeBoiQuanTri(dtoLe(), 'quan-tri-1'),
+      ).rejects.toMatchObject({
+        response: {
+          error: {
+            fields: [expect.objectContaining({ field: 'don_vi_cong_tac_id' })],
+          },
+        },
+      });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('trùng unique ở DB (P2002, vd tên đăng nhập) -> ConflictAppException', async () => {
+      const { Prisma } = await import('@prisma/client');
+      prisma.$transaction.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('trung', {
+          code: 'P2002',
+          clientVersion: '6.0.0',
+        }),
+      );
+      await expect(
+        service.taoLeBoiQuanTri(dtoLe(), 'quan-tri-1'),
+      ).rejects.toBeInstanceOf(ConflictAppException);
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
+    });
+
+    it('khóa không hợp lệ -> lỗi từ kiểm tra khóa, không tạo hồ sơ nào', async () => {
+      khoaBoiDuongService.kiemTraGhiDanhLe.mockRejectedValue(
+        new NotFoundAppException('Không tìm thấy khóa bồi dưỡng'),
+      );
+      await expect(
+        service.taoLeBoiQuanTri(
+          dtoLe({ khoa_id: 'khoa-x', cum_id: 'cum-x' }),
+          'quan-tri-1',
+        ),
+      ).rejects.toBeInstanceOf(NotFoundAppException);
+      expect(khoaBoiDuongService.kiemTraGhiDanhLe).toHaveBeenCalledWith(
+        'khoa-x',
+        'cum-x',
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(khoaBoiDuongService.ghiDanhLe).not.toHaveBeenCalled();
+    });
+
+    it('có cụm mà không có khóa -> ValidationException, không tạo gì', async () => {
+      await expect(
+        service.taoLeBoiQuanTri(dtoLe({ cum_id: 'cum-1' }), 'quan-tri-1'),
+      ).rejects.toBeInstanceOf(ValidationException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('khóa hợp lệ -> kiểm tra khóa trước, tạo hồ sơ rồi ghi danh, trả dang_ky_hoc_id', async () => {
+      const kq = await service.taoLeBoiQuanTri(
+        dtoLe({ khoa_id: 'khoa-1', cum_id: 'cum-1' }),
+        'quan-tri-1',
+      );
+      expect(khoaBoiDuongService.ghiDanhLe).toHaveBeenCalledWith({
+        hoc_vien_id: 'hv-le',
+        khoa_id: 'khoa-1',
+        cum_id: 'cum-1',
+      });
+      expect(kq.dang_ky_hoc_id).toBe('dk-1');
+      expect(
+        khoaBoiDuongService.kiemTraGhiDanhLe.mock.invocationCallOrder[0],
+      ).toBeLessThan(prisma.$transaction.mock.invocationCallOrder[0]);
     });
   });
 
