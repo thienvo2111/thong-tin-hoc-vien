@@ -26,6 +26,7 @@ import { ChuyenMonDto } from './dto/chuyen-mon.dto';
 import { KiemTraTrungQueryDto } from './dto/kiem-tra-trung-query.dto';
 import { SuaMaMoetDto } from './dto/sua-ma-moet.dto';
 import { XuatHocVienTheoTruongDto } from './dto/xuat-hoc-vien-theo-truong.dto';
+import { TaoHocVienLeDto } from './dto/tao-hoc-vien-le.dto';
 
 // Dịch vụ Học viên — docs/api-contract.md mục 2.
 @Controller('hoc-vien')
@@ -128,6 +129,13 @@ export class HocVienController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.hocVienService.findAll(query, user);
+  }
+
+  // Quản trị tạo lẻ 1 học viên (thay import MOET cho vài trường hợp lẻ).
+  @Roles('quan_tri')
+  @Post('tao-le')
+  taoLe(@Body() dto: TaoHocVienLeDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.hocVienService.taoLeBoiQuanTri(dto, user.id);
   }
 
   // Khai báo TRƯỚC ':id' để 'xuat-excel' không bị route động chắn.

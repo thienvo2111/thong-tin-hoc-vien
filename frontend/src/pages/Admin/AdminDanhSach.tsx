@@ -18,6 +18,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { useDebouncedValue } from '@mantine/hooks';
 import { useDanhSachHocVien, xuatHocVienTheoTruong } from '@/api/admin';
+import { useToi } from '@/auth/AuthContext';
 import { useTenDonViTheoId } from '@/api/danhMuc';
 import type { DonViCongTac } from '@/api/types';
 import { thongDiepLoiChung } from '@/lib/loiApi';
@@ -25,6 +26,7 @@ import { chuanHoaNfc } from '@/lib/nfc';
 import { SelectDonViTimKiem } from '@/components/SelectDonViTimKiem';
 import { TrangThaiBadge } from '@/components/TrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
+import { ModalTaoHocVienLe } from './ModalTaoHocVienLe';
 
 const KICH_THUOC_TRANG = 20;
 
@@ -52,6 +54,8 @@ const TUY_CHON_CAP_GIANG_DAY = [
 export default function AdminDanhSach() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { nguoiDung } = useToi();
+  const [moTaoLe, setMoTaoLe] = useState(false);
 
   const [q, setQ] = useState('');
   const [qDebounced] = useDebouncedValue(q, 300);
@@ -103,7 +107,17 @@ export default function AdminDanhSach() {
 
   return (
     <>
-      <AdminPageHeader title="Danh sách học viên" />
+      <AdminPageHeader
+        title="Danh sách học viên"
+        actions={
+          nguoiDung?.vai_tro === 'quan_tri' && (
+            <Button size="sm" onClick={() => setMoTaoLe(true)}>
+              Thêm học viên
+            </Button>
+          )
+        }
+      />
+      <ModalTaoHocVienLe opened={moTaoLe} onClose={() => setMoTaoLe(false)} />
       <Container size="xl" py="lg" px={{ base: 'md', md: 28 }}>
         <Stack gap="md">
           <Group gap="sm" wrap="wrap">

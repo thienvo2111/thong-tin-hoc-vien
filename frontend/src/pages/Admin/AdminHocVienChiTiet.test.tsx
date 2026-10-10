@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { notifications } from '@mantine/notifications';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -398,5 +399,93 @@ describe('Admin — Chi tiết hồ sơ học viên — Sửa mã MOET (2026-10-
 
     expect(await modal.findByText('Phải khác mã hiện tại')).toBeInTheDocument();
     expect(modal.getByText('Mã mới trùng mã hiện tại')).toBeInTheDocument();
+  });
+});
+
+// POST /dang-ky-hoc — Quản trị ghi danh lẻ học viên đã duyệt vào khóa.
+describe('Admin — Chi tiết hồ sơ học viên — Ghi danh vào khóa', () => {
+  // Store notifications của Mantine là toàn cục — thông báo còn hạn từ test trước chiếm chỗ (giới hạn 5).
+  beforeEach(() => notifications.clean());
+
+  it('chọn khóa + cụm rồi bấm Ghi danh -> gửi hoc_vien_id/khoa_id/cum_id, hiện thông báo thành công', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    let body: Record<string, unknown> | null = null;
+    server.use(
+      http.get('/hoc-vien/:id/khoa-hoc', () => HttpResponse.json([])),
+      http.post('/dang-ky-hoc', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 'dk-moi' }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderTrang('hv-duyet-1');
+
+    const khoi = within(await screen.findByTestId('ghi-danh-vao-khoa'));
+    await user.click(khoi.getByRole('textbox', { name: 'Khóa bồi dưỡng' }));
+    await user.click(await screen.findByRole('option', { name: 'Bồi dưỡng NLS – Mức cơ bản (AG-2026-014)' }));
+    await user.click(khoi.getByRole('textbox', { name: 'Cụm hỗ trợ' }));
+    await user.click(await screen.findByRole('option', { name: 'Cụm Long Xuyên' }));
+    await user.click(khoi.getByRole('button', { name: 'Ghi danh' }));
+
+    expect(await screen.findByText('Đã ghi danh vào khóa')).toBeInTheDocument();
+    expect(body).toEqual({ hoc_vien_id: 'hv-duyet-1', khoa_id: 'khoa-1', cum_id: 'cum-1' });
+  });
+
+  it('không chọn cụm -> không gửi cum_id; khóa đã ghi danh không có trong danh sách chọn', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    let body: Record<string, unknown> | null = null;
+    server.use(
+      http.post('/dang-ky-hoc', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 'dk-moi' }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderTrang('hv-duyet-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+
+    const khoi = within(await screen.findByTestId('ghi-danh-vao-khoa'));
+    await user.click(khoi.getByRole('textbox', { name: 'Khóa bồi dưỡng' }));
+    expect(screen.queryByRole('option', { name: /AG-2026-014/ })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('option', { name: 'Bồi dưỡng NLS – Mức thành thạo (AG-2026-015)' }));
+    await user.click(khoi.getByRole('button', { name: 'Ghi danh' }));
+
+    await waitFor(() => expect(body).toEqual({ hoc_vien_id: 'hv-duyet-1', khoa_id: 'khoa-2' }));
+  });
+
+  it('API trả 409 -> hiện thông điệp của server', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    server.use(
+      http.get('/hoc-vien/:id/khoa-hoc', () => HttpResponse.json([])),
+      http.post('/dang-ky-hoc', () =>
+        HttpResponse.json(
+          { error: { code: 'CONFLICT', message: 'Học viên đã được ghi danh vào khóa này' } },
+          { status: 409 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderTrang('hv-duyet-1');
+    const khoi = within(await screen.findByTestId('ghi-danh-vao-khoa'));
+    await user.click(khoi.getByRole('textbox', { name: 'Khóa bồi dưỡng' }));
+    await user.click(await screen.findByRole('option', { name: 'Bồi dưỡng NLS – Mức cơ bản (AG-2026-014)' }));
+    await user.click(khoi.getByRole('button', { name: 'Ghi danh' }));
+
+    expect(await screen.findByText('Học viên đã được ghi danh vào khóa này')).toBeInTheDocument();
+  });
+
+  it('hồ sơ chưa duyệt -> không hiện khối ghi danh', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    renderTrang('hv-cho-1');
+    expect(await screen.findByText('Chưa ghi danh khóa nào.')).toBeInTheDocument();
+    await screen.findByText('Chờ duyệt');
+    expect(screen.queryByTestId('ghi-danh-vao-khoa')).not.toBeInTheDocument();
+  });
+
+  it('không phải quản trị -> không hiện khối ghi danh', async () => {
+    db.nguoiDung.vai_tro = 'truong';
+    renderTrang('hv-duyet-1');
+    await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+    expect(screen.queryByTestId('ghi-danh-vao-khoa')).not.toBeInTheDocument();
   });
 });

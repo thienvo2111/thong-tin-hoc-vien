@@ -1481,6 +1481,86 @@ export class KhoaBoiDuongService {
   }
 
   // ---------------------------------------------------------------------
+  // Ghi danh lẻ (POST /dang-ky-hoc, quan_tri) — tương đương 1 dòng import
+  // phan_lop_hoc_vien không gán lớp; phân lớp sau qua PUT .../giai-doan/.../lop.
+  // ---------------------------------------------------------------------
+  // Tách riêng để POST /hoc-vien/tao-le kiểm tra khóa/cụm TRƯỚC khi tạo học
+  // viên (không để lại hồ sơ dở dang khi khóa/cụm sai).
+  async kiemTraGhiDanhLe(khoaId: string, cumId?: string) {
+    const khoa = await this.getKhoaOrThrow(khoaId);
+    const cum = cumId
+      ? await this.prisma.cum_hoc_vien.findUnique({ where: { id: cumId } })
+      : null;
+    if (cumId && (!cum || cum.khoa_id !== khoaId)) {
+      throw new ValidationException('Cụm không thuộc khóa bồi dưỡng đã chọn', [
+        { field: 'cum_id', message: 'Phải thuộc cùng khóa bồi dưỡng' },
+      ]);
+    }
+    return { khoa, cum };
+  }
+
+  async ghiDanhLe(dto: {
+    hoc_vien_id: string;
+    khoa_id: string;
+    cum_id?: string;
+  }) {
+    const { khoa, cum } = await this.kiemTraGhiDanhLe(dto.khoa_id, dto.cum_id);
+    const hocVien = await this.prisma.hoc_vien.findUnique({
+      where: { id: dto.hoc_vien_id },
+      select: { id: true, trang_thai: true },
+    });
+    if (!hocVien) {
+      throw new ValidationException('Học viên không tồn tại', [
+        { field: 'hoc_vien_id', message: 'Không tồn tại' },
+      ]);
+    }
+    if (hocVien.trang_thai !== 'da_duyet') {
+      throw new ValidationException(
+        `Học viên chưa được duyệt (trang_thai hiện tại: "${hocVien.trang_thai}")`,
+        [{ field: 'hoc_vien_id', message: 'Hồ sơ phải ở trạng thái đã duyệt' }],
+      );
+    }
+    const daCo = await this.prisma.dang_ky_hoc.findUnique({
+      where: {
+        hoc_vien_id_khoa_id: { hoc_vien_id: hocVien.id, khoa_id: khoa.id },
+      },
+      select: { id: true },
+    });
+    if (daCo) {
+      throw new ConflictAppException('Học viên đã được ghi danh vào khóa này', [
+        { field: 'khoa_id', message: 'Đã ghi danh' },
+      ]);
+    }
+
+    const dangKy = await this.prisma.dang_ky_hoc
+      .create({
+        data: {
+          hoc_vien_id: hocVien.id,
+          khoa_id: khoa.id,
+          trang_thai: 'da_duyet',
+          cum_id: cum?.id ?? null,
+        },
+      })
+      .catch((e: unknown) => {
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === 'P2002'
+        ) {
+          throw new ConflictAppException(
+            'Học viên đã được ghi danh vào khóa này',
+          );
+        }
+        throw e;
+      });
+    await this.nhatKy.ghi({
+      hanh_dong: 'ghi_danh_le',
+      hoc_vien_id: hocVien.id,
+      mo_ta: `Ghi danh vào khóa ${khoa.ten_khoa}${cum ? ` — cụm ${cum.ten_cum}` : ''}`,
+    });
+    return dangKy;
+  }
+
+  // ---------------------------------------------------------------------
   // Điều chỉnh mức lớp học (2026-10-08): học viên tự chọn khi khóa mở công
   // tắc (PUT /hoc-vien/toi/khoa-hoc/{khoaId}/muc-hoc); Quản trị sửa hộ bỏ qua
   // công tắc (PATCH /dang-ky-hoc/{id}/muc-hoc). Cả 2 vẫn áp quy tắc ≤ mức
@@ -1716,7 +1796,8 @@ export class KhoaBoiDuongService {
               muc: bai.muc,
               muc_goc: bai.muc_goc,
               diem: bai.diem === null ? null : Number(bai.diem),
-              diem_toi_da: bai.diem_toi_da === null ? null : Number(bai.diem_toi_da),
+              diem_toi_da:
+                bai.diem_toi_da === null ? null : Number(bai.diem_toi_da),
               hoan_thanh_luc: bai.hoan_thanh_luc,
             }
           : null,

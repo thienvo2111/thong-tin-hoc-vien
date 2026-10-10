@@ -4,6 +4,7 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   Put,
 } from '@nestjs/common';
 import { KhoaBoiDuongService } from './khoa-boi-duong.service';
@@ -13,14 +14,22 @@ import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { CapNhatCumDangKyDto } from './dto/capnhat-cum-dang-ky.dto';
 import { GanLopGiaiDoanDto } from './dto/gan-lop-giai-doan.dto';
 import { ChonMucHocDto } from './dto/chon-muc-hoc.dto';
+import { GhiDanhLeDto } from './dto/ghi-danh-le.dto';
 
-// PUT /dang-ky-hoc/{id}/giai-doan/{giaiDoanId}/lop (phân lớp theo giai đoạn,
-// spec 2026-10-02), PATCH /dang-ky-hoc/{id}/cum — thao tác thủ công từng đăng
+// POST /dang-ky-hoc (ghi danh lẻ), PUT /dang-ky-hoc/{id}/giai-doan/
+// {giaiDoanId}/lop (phân lớp theo giai đoạn, spec 2026-10-02), PATCH /dang-ky-hoc/{id}/cum — thao tác thủ công từng đăng
 // ký học một ở màn admin chi tiết học viên. D6 (2026-10-03-don-vi-dat-hang):
 // chỉ quan_tri thao tác.
 @Controller('dang-ky-hoc')
 export class DangKyHocThaoTacController {
   constructor(private readonly khoaBoiDuongService: KhoaBoiDuongService) {}
+
+  // Ghi danh lẻ 1 học viên đã duyệt vào khóa (không gán lớp).
+  @Roles('quan_tri')
+  @Post()
+  ghiDanhLe(@Body() dto: GhiDanhLeDto) {
+    return this.khoaBoiDuongService.ghiDanhLe(dto);
+  }
 
   @Roles('quan_tri')
   @Patch(':id/cum')
