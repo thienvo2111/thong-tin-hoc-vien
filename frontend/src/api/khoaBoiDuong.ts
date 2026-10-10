@@ -160,6 +160,28 @@ export function useKhoaHocCuaHocVien(hocVienId: string | undefined) {
   });
 }
 
+// POST /dang-ky-hoc (chỉ quan_tri) — ghi danh lẻ học viên đã duyệt vào khóa, không gán lớp (phân lớp
+// sau theo từng giai đoạn). 409 nếu đã ghi danh, 400 nếu hồ sơ chưa duyệt / cụm khác khóa.
+export interface GhiDanhLeDto {
+  hoc_vien_id: string;
+  khoa_id: string;
+  cum_id?: string;
+}
+
+export function ghiDanhLe(dto: GhiDanhLeDto) {
+  return apiFetch<{ id: string }>('/dang-ky-hoc', { method: 'POST', body: JSON.stringify(dto) });
+}
+
+export function useGhiDanhLe(hocVienId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ghiDanhLe,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: khoaHocCuaHocVienKey(hocVienId) });
+    },
+  });
+}
+
 // Phân lớp theo giai đoạn (spec 2026-10-02 mục 5.3): gán/thay/gỡ lớp của 1 giai đoạn (lopId null = gỡ).
 // canh_bao: lớp không có buổi trong giai đoạn / loại lớp lệch hình thức — không chặn.
 export function ganLopGiaiDoan(dangKyHocId: string, giaiDoanId: string, lopId: string | null) {

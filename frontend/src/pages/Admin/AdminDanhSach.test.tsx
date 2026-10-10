@@ -3,6 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
+import { db } from '@/test/mocks/db';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import AdminDanhSach from './AdminDanhSach';
@@ -184,5 +185,113 @@ describe('Admin — Danh sách học viên', () => {
     await user.click(await screen.findByRole('option', { name: 'THPT Long Xuyên — Phường Long Xuyên' }));
     await user.click(screen.getByRole('button', { name: 'Xuất Excel theo trường' }));
     expect(await screen.findByText('Đơn vị công tác nằm ngoài phạm vi quyền')).toBeInTheDocument();
+  });
+});
+
+// POST /hoc-vien/tao-le — Quản trị tạo lẻ 1 học viên (cùng quy tắc import MOET).
+describe('Admin — Danh sách học viên — Thêm học viên lẻ', () => {
+  async function moModal(user: ReturnType<typeof userEvent.setup>) {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    renderTrang();
+    await screen.findByText('Lê Văn Bình');
+    await user.click(await screen.findByRole('button', { name: 'Thêm học viên' }));
+    return within(await screen.findByRole('dialog', { name: 'Thêm học viên' }));
+  }
+
+  async function dienBatBuoc(user: ReturnType<typeof userEvent.setup>, modal: ReturnType<typeof within>) {
+    await user.type(modal.getByRole('textbox', { name: 'Họ và tên' }), 'Trần Văn Lẻ');
+    await user.type(modal.getByRole('textbox', { name: 'Ngày sinh' }), '5');
+    await user.type(modal.getByRole('textbox', { name: 'Tháng sinh' }), '3');
+    await user.type(modal.getByRole('textbox', { name: 'Năm sinh' }), '1985');
+    await user.type(modal.getByRole('textbox', { name: 'Trường (đơn vị công tác)' }), 'Long Xuyên');
+    await user.click(await screen.findByRole('option', { name: 'THPT Long Xuyên — Phường Long Xuyên' }));
+  }
+
+  it('không phải quản trị -> không có nút Thêm học viên', async () => {
+    db.nguoiDung.vai_tro = 'truong';
+    renderTrang();
+    await screen.findByText('Lê Văn Bình');
+    expect(screen.queryByRole('button', { name: 'Thêm học viên' })).not.toBeInTheDocument();
+  });
+
+  it('điền form + chọn khóa/cụm -> gửi đúng payload, hiện tên đăng nhập và quy tắc mật khẩu ban đầu', async () => {
+    let body: Record<string, unknown> | null = null;
+    server.use(
+      http.post('/hoc-vien/tao-le', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ hoc_vien_id: 'hv-moi', ten_dang_nhap: '0123456789', dang_ky_hoc_id: 'dk-moi' });
+      }),
+    );
+    const user = userEvent.setup();
+    const modal = await moModal(user);
+
+    await user.type(modal.getByRole('textbox', { name: 'Mã định danh MOET' }), ' 0123456789 ');
+    await dienBatBuoc(user, modal);
+    await user.type(modal.getByRole('textbox', { name: 'Chuyên môn' }), 'Toán, Tin học,');
+    await user.click(modal.getByRole('textbox', { name: 'Khóa bồi dưỡng' }));
+    await user.click(await screen.findByRole('option', { name: 'Bồi dưỡng NLS – Mức cơ bản (AG-2026-014)' }));
+    await user.click(modal.getByRole('textbox', { name: 'Cụm hỗ trợ' }));
+    await user.click(await screen.findByRole('option', { name: 'Cụm Long Xuyên' }));
+    await user.click(modal.getByRole('button', { name: 'Tạo học viên' }));
+
+    expect(await screen.findByText('0123456789')).toBeInTheDocument();
+    expect(screen.getByText(/Mật khẩu ban đầu: ngày sinh dạng ddmmyyyy/)).toBeInTheDocument();
+    expect(body).toEqual({
+      ma_dinh_danh_moet: '0123456789',
+      ho_ten: 'Trần Văn Lẻ',
+      ngay_sinh: 5,
+      thang_sinh: 3,
+      nam_sinh: 1985,
+      don_vi_cong_tac_id: 'dv-1',
+      chuyen_mon: ['Toán', 'Tin học'],
+      khoa_id: 'khoa-1',
+      cum_id: 'cum-1',
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Xem hồ sơ' }));
+    expect(await screen.findByText('Màn hình chi tiết học viên')).toBeInTheDocument();
+  });
+
+  it('thiếu cả mã MOET lẫn CCCD -> báo lỗi ngay, không gọi API', async () => {
+    let daGoi = false;
+    server.use(
+      http.post('/hoc-vien/tao-le', () => {
+        daGoi = true;
+        return HttpResponse.json({});
+      }),
+    );
+    const user = userEvent.setup();
+    const modal = await moModal(user);
+    await dienBatBuoc(user, modal);
+    await user.click(modal.getByRole('button', { name: 'Tạo học viên' }));
+
+    expect(await modal.findByText('Cần ít nhất 1 trong 2: Mã định danh MOET hoặc Số ĐDCN/CCCD')).toBeInTheDocument();
+    expect(daGoi).toBe(false);
+  });
+
+  it('lỗi field từ API -> hiện đúng dưới ô tương ứng', async () => {
+    server.use(
+      http.post('/hoc-vien/tao-le', () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'Dòng dữ liệu không hợp lệ',
+              fields: [{ field: 'so_dinh_danh_ca_nhan', message: 'Số định danh cá nhân đã tồn tại ở hồ sơ học viên khác' }],
+            },
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    const modal = await moModal(user);
+    await user.type(modal.getByRole('textbox', { name: 'Số ĐDCN/CCCD' }), '123456789012');
+    await dienBatBuoc(user, modal);
+    await user.click(modal.getByRole('button', { name: 'Tạo học viên' }));
+
+    const o = modal.getByRole('textbox', { name: 'Số ĐDCN/CCCD' });
+    await waitFor(() => expect(o).toHaveAttribute('aria-invalid', 'true'));
+    expect(modal.getByText('Số định danh cá nhân đã tồn tại ở hồ sơ học viên khác')).toBeInTheDocument();
   });
 });

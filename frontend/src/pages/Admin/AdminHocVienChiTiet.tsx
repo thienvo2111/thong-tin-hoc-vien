@@ -10,6 +10,7 @@ import {
   useCapNhatCumDangKy,
   useCapNhatMucHoc,
   useChiTietKhoa,
+  useGhiDanhLe,
   useKhoaHocCuaHocVien,
 } from '@/api/khoaBoiDuong';
 import type { KhoaHocDangKy, MucNangLuc } from '@/api/types';
@@ -21,6 +22,7 @@ import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { TrangThaiBadge } from '@/components/TrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
 import { PhanLopTheoGiaiDoan } from './PhanLopTheoGiaiDoan';
+import { ChonKhoaVaCum } from './ChonKhoaVaCum';
 
 // Placeholder tối thiểu cho phase này (yêu cầu phase 3 mục 4: "chưa cần đẹp, sẽ hoàn thiện ở phase
 // sau") — hiện vài field chính từ GET /hoc-vien/{id}, không phải màn chi tiết đầy đủ.
@@ -94,7 +96,10 @@ export default function AdminHocVienChiTiet() {
             <Text fz={16} fw={700} mb="md">
               Khóa & lớp
             </Text>
-            <KhoaVaLopCuaHocVien hocVienId={id} />
+            <KhoaVaLopCuaHocVien
+              hocVienId={id}
+              choGhiDanh={nguoiDung?.vai_tro === 'quan_tri' && data?.trang_thai === 'da_duyet'}
+            />
           </Paper>
         )}
 
@@ -236,7 +241,7 @@ function NhatKyCuaHocVien({ hocVienId }: { hocVienId: string }) {
 // 2026-10-02, xem PhanLopTheoGiaiDoan) và cụm hỗ trợ Zalo cho từng khóa mà học viên đã ghi danh.
 // Thao tác sửa tay ít dùng — giao diện đơn giản (Select + nút Lưu), không cần đẹp phức tạp, đúng tính
 // chất "placeholder, hoàn thiện sau" của trang này.
-function KhoaVaLopCuaHocVien({ hocVienId }: { hocVienId: string }) {
+function KhoaVaLopCuaHocVien({ hocVienId, choGhiDanh }: { hocVienId: string; choGhiDanh: boolean }) {
   const { data, isLoading, isError, error } = useKhoaHocCuaHocVien(hocVienId);
 
   if (isLoading) {
@@ -249,14 +254,67 @@ function KhoaVaLopCuaHocVien({ hocVienId }: { hocVienId: string }) {
     );
   }
   if (isError) return <Alert color="red">{thongDiepLoiChung(error)}</Alert>;
-  if (!data || data.length === 0) return <Text c="dimmed">Chưa ghi danh khóa nào.</Text>;
 
   return (
     <Stack gap="xl">
-      {data.map((dangKy) => (
+      {(!data || data.length === 0) && <Text c="dimmed">Chưa ghi danh khóa nào.</Text>}
+      {data?.map((dangKy) => (
         <KhoiDangKy key={dangKy.id} hocVienId={hocVienId} dangKy={dangKy} />
       ))}
+      {choGhiDanh && <GhiDanhVaoKhoa hocVienId={hocVienId} daGhiDanh={(data ?? []).map((d) => d.khoa_id)} />}
     </Stack>
+  );
+}
+
+// Quản trị ghi danh lẻ (POST /dang-ky-hoc) — chỉ hồ sơ đã duyệt; phân lớp làm tiếp ở khối khóa vừa thêm.
+function GhiDanhVaoKhoa({ hocVienId, daGhiDanh }: { hocVienId: string; daGhiDanh: string[] }) {
+  const ghiDanh = useGhiDanhLe(hocVienId);
+  const [khoaId, setKhoaId] = useState('');
+  const [cumId, setCumId] = useState('');
+  const [loi, setLoi] = useState<Record<string, string>>({});
+
+  function luu() {
+    setLoi({});
+    ghiDanh.mutate(
+      { hoc_vien_id: hocVienId, khoa_id: khoaId, cum_id: cumId || undefined },
+      {
+        onSuccess: () => {
+          notifications.show({ color: 'green', message: 'Đã ghi danh vào khóa' });
+          setKhoaId('');
+          setCumId('');
+        },
+        onError: (err) => {
+          const f = loiFieldsThanhMap(err);
+          if (f.khoa_id || f.cum_id) setLoi(f);
+          else notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
+        },
+      },
+    );
+  }
+
+  return (
+    <Box data-testid="ghi-danh-vao-khoa" pt="md" style={{ borderTop: '1px solid #F1F3F6' }}>
+      <Text fw={600} mb="xs">
+        Ghi danh vào khóa
+      </Text>
+      <ChonKhoaVaCum
+        khoaId={khoaId}
+        cumId={cumId}
+        onChange={(k, c) => {
+          setKhoaId(k);
+          setCumId(c);
+        }}
+        boQuaKhoaIds={daGhiDanh}
+        loiKhoa={loi.khoa_id}
+        loiCum={loi.cum_id}
+        khoaBatBuoc
+      />
+      <Group justify="flex-end" mt="sm">
+        <Button size="xs" loading={ghiDanh.isPending} disabled={!khoaId} onClick={luu}>
+          Ghi danh
+        </Button>
+      </Group>
+    </Box>
   );
 }
 
