@@ -61,6 +61,11 @@ import {
 } from './util/muc-hoc.util';
 import { ThangMucService, nhanMucGoc } from '../sso/thang-muc.service';
 import {
+  apDungDiemDanhZoom,
+  diemDanhZoomCuaBuoi,
+  giauLinkZoomCuaKhoa,
+} from './util/diem-danh-zoom.util';
+import {
   DongChiaLop,
   buildDanhSachChiaLopWorkbook,
 } from './util/danh-sach-chia-lop-excel.util';
@@ -583,8 +588,18 @@ export class KhoaBoiDuongService {
           ? { ...cum, nguoi_ho_tro: phan_cong_ho_tro.map((p) => p.nguoi_dung) }
           : cum,
       ),
+      // ADR 0005 Z4: học viên không nhận link buổi/giai đoạn Zoom khi khóa bật.
+      ...(caller.vai_tro === 'hoc_vien' ? giauLinkZoomCuaKhoa(khoa) : {}),
       lop_hoc: khoa.lop_hoc.map((l) => ({
-        ...l,
+        ...(caller.vai_tro === 'hoc_vien' && apDungDiemDanhZoom(l, khoa)
+          ? {
+              ...l,
+              lich_hoc: l.lich_hoc.map((b) => ({
+                ...b,
+                dia_diem_hoac_link: null,
+              })),
+            }
+          : l),
         si_so_hien_tai: siSoTheoLop.get(l.id) ?? 0,
       })),
       // ADR 0004 G3: nhóm hỗ trợ giảng viên — chỉ Quản trị thấy.
@@ -1108,7 +1123,12 @@ export class KhoaBoiDuongService {
   //
   // Dùng chung cho GET /hoc-vien/toi/khoa-hoc, GET /hoc-vien/{id}/khoa-hoc VÀ
   // chi tiết học viên của người hỗ trợ (ADR 0003 — nơi gọi tự kiểm phạm vi).
-  async khoaHocTheoHocVienId(hocVienId: string) {
+  // giauLinkZoom (chỉ GET /hoc-vien/toi/khoa-hoc — ADR 0005 Z4): buổi lớp Zoom
+  // của khóa đã bật điểm danh -> không trả link, thay bằng diem_danh_zoom.
+  async khoaHocTheoHocVienId(
+    hocVienId: string,
+    { giauLinkZoom = false }: { giauLinkZoom?: boolean } = {},
+  ) {
     const dangKyList = await this.prisma.dang_ky_hoc.findMany({
       where: { hoc_vien_id: hocVienId },
       include: {
@@ -1174,6 +1194,7 @@ export class KhoaBoiDuongService {
               dang_ky_hoc_id: true,
               lich_hoc_id: true,
               trang_thai: true,
+              tu_diem_danh_luc: true,
             },
           }),
           this.prisma.ket_qua_giai_doan.findMany({
@@ -1183,11 +1204,9 @@ export class KhoaBoiDuongService {
       : [[], []];
 
     const diemDanhMap = new Map(
-      diemDanhList.map((d) => [
-        `${d.dang_ky_hoc_id}|${d.lich_hoc_id}`,
-        d.trang_thai,
-      ]),
+      diemDanhList.map((d) => [`${d.dang_ky_hoc_id}|${d.lich_hoc_id}`, d]),
     );
+    const now = new Date();
     // ADR 0004 G4 (issue #16): người hỗ trợ thực địa của các đợt học viên được
     // phân lớp (lớp × giai đoạn) — học viên thấy họ tên + SĐT.
     const capDot = dangKyList.flatMap((dk) =>
@@ -1238,6 +1257,11 @@ export class KhoaBoiDuongService {
           const lop = phan_lop_giai_doan.find(
             (p) => p.giai_doan_id === gd.id,
           )?.lop;
+          const giauLink =
+            giauLinkZoom && !!lop && apDungDiemDanhZoom(lop, khoa);
+          const lichHocGd = lop
+            ? lop.lich_hoc.filter((b) => b.giai_doan_id === gd.id)
+            : [];
           return {
             id: gd.id,
             thu_tu: gd.thu_tu,
@@ -1245,22 +1269,34 @@ export class KhoaBoiDuongService {
             hinh_thuc: gd.hinh_thuc,
             thoi_gian_bat_dau: gd.thoi_gian_bat_dau,
             thoi_gian_ket_thuc: gd.thoi_gian_ket_thuc,
-            link_hoac_dia_diem: gd.link_hoac_dia_diem,
+            link_hoac_dia_diem:
+              giauLink && lichHocGd.length > 0 ? null : gd.link_hoac_dia_diem,
             huong_dan: gd.huong_dan,
             lop: lop
               ? {
                   ...lop,
-                  lich_hoc: lop.lich_hoc
-                    .filter((b) => b.giai_doan_id === gd.id)
-                    .map(({ phan_cong, ...b }) => ({
+                  lich_hoc: lichHocGd.map(({ phan_cong, ...b }) => {
+                    const dd = diemDanhMap.get(`${dk.id}|${b.id}`) ?? null;
+                    return {
                       ...b,
                       giang_vien: phan_cong.map((p) => ({
                         ho_ten: p.giang_vien.ho_ten,
                         vai_tro: p.vai_tro,
                       })),
-                      trang_thai_diem_danh:
-                        diemDanhMap.get(`${dk.id}|${b.id}`) ?? null,
-                    })),
+                      trang_thai_diem_danh: dd?.trang_thai ?? null,
+                      ...(giauLink
+                        ? {
+                            dia_diem_hoac_link: null,
+                            diem_danh_zoom: diemDanhZoomCuaBuoi(
+                              b,
+                              khoa,
+                              dd,
+                              now,
+                            ),
+                          }
+                        : {}),
+                    };
+                  }),
                 }
               : null,
             tien_do: tienDoMap.get(`${dk.id}|${gd.id}`) ?? null,
@@ -1283,7 +1319,7 @@ export class KhoaBoiDuongService {
 
   async khoaHocCuaToi(caller: AuthenticatedUser) {
     const hocVienId = this.assertHocVienId(caller);
-    return this.khoaHocTheoHocVienId(hocVienId);
+    return this.khoaHocTheoHocVienId(hocVienId, { giauLinkZoom: true });
   }
 
   // GET /hoc-vien/{id}/khoa-hoc — Thêm 2026-09-30 (QĐ10): admin/Trường/Sở/

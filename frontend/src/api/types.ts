@@ -605,7 +605,29 @@ export interface LichHocLopToi {
   phong?: string | null;
   // T11 (issue #3): giảng viên của buổi — chỉ họ tên + vai trò.
   giang_vien?: { ho_ten: string; vai_tro: VaiTroNhanSuLop }[];
+  // ADR 0005 (issue #24): chỉ có với buổi lớp Zoom của khóa đã bật điểm danh — khi đó
+  // dia_diem_hoac_link luôn null, link chỉ lấy qua POST /lich-hoc/{id}/vao-hoc.
+  diem_danh_zoom?: DiemDanhZoomBuoi;
 }
+
+export type PhaDiemDanh = 'chua_mo' | 'dang_mo' | 'da_dong';
+
+/** Cửa sổ + trạng thái tự điểm danh 1 buổi Zoom, tính theo giờ máy chủ (UTC ISO). */
+export interface DiemDanhZoomBuoi {
+  co_link: boolean;
+  mo: string;
+  dong: string;
+  pha: PhaDiemDanh;
+  trang_thai: TrangThaiDiemDanh | null;
+  tu_diem_danh_luc: string | null;
+}
+
+// POST /lich-hoc/{id}/vao-hoc — chỉ có link khi cửa sổ đã mở (đang mở hoặc đã đóng).
+export type KetQuaVaoHoc =
+  | { ket_qua: 'chua_mo'; mo: string; dong: string }
+  | { ket_qua: 'da_ghi_nhan'; luc: string; link: string; mo: string; dong: string }
+  | { ket_qua: 'da_co'; trang_thai: TrangThaiDiemDanh; luc: string; link: string; mo: string; dong: string }
+  | { ket_qua: 'qua_gio'; mo: string; dong: string; link: string };
 
 export interface NhanSuLopToi {
   id: string;

@@ -424,6 +424,9 @@ export const handlers = [
 
   http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json(db.khoaHocToi)),
 
+  // ADR 0005 (issue #24): học viên bấm "Điểm danh & vào Zoom".
+  http.post('/lich-hoc/:id/vao-hoc', () => HttpResponse.json(db.vaoHocZoom)),
+
   // 2026-10-08: học viên tự điều chỉnh mức lớp học — mô phỏng đúng quy tắc backend (công tắc khóa,
   // chưa có đánh giá, chỉ ≤ mức đánh giá, bằng mức đánh giá -> lưu null).
   http.put('/hoc-vien/toi/khoa-hoc/:khoaId/muc-hoc', async ({ params, request }) => {

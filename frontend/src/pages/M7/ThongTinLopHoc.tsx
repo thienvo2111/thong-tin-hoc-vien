@@ -21,6 +21,7 @@ import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
 import { nhanMucNangLuc } from '@/lib/mucNangLuc';
 import { ChonMucLopHoc } from './ChonMucLopHoc';
+import { CanhBaoDiemDanhZoom, NhanDiemDanhZoom, NutDiemDanhZoom, canNhacCungNgay } from './DiemDanhZoom';
 
 // T12 (mo-rong-nls-an-giang.md, 2026-09-30) — điểm danh nhập qua IMPORT EXCEL, không có giao diện
 // chấm tay. null (chưa điểm danh) không hiện badge nào — tránh gây nhầm học viên nghĩ là "vắng".
@@ -398,18 +399,25 @@ function KhoiCum({ cum }: { cum: CumHocVien }) {
 
 function DanhSachBuoi({ lichHoc }: { lichHoc: LichHocLopToi[] }) {
   if (lichHoc.length === 0) return null;
+  // ADR 0005 (issue #24): buổi Zoom của khóa đã bật điểm danh — backend giấu link, trả diem_danh_zoom.
+  const buoiZoom = lichHoc.find((b) => b.diem_danh_zoom);
   return (
     <Stack gap="xs">
+      {buoiZoom?.diem_danh_zoom && <CanhBaoDiemDanhZoom buoi={{ ...buoiZoom, diem_danh_zoom: buoiZoom.diem_danh_zoom }} />}
       {lichHoc.map((buoi) => (
-        <Box key={buoi.id} p="sm" style={{ borderRadius: 10, background: 'var(--mantine-color-gray-0)' }}>
+        <Box key={buoi.id} p="sm" data-testid="the-buoi" style={{ borderRadius: 10, background: 'var(--mantine-color-gray-0)' }}>
           <Group gap="xs">
             <Text size="sm" fw={600}>
               Buổi {buoi.buoi_so}
             </Text>
-            {buoi.trang_thai_diem_danh && (
-              <Badge size="sm" color={MAU_DIEM_DANH[buoi.trang_thai_diem_danh]}>
-                {NHAN_DIEM_DANH[buoi.trang_thai_diem_danh]}
-              </Badge>
+            {buoi.diem_danh_zoom ? (
+              <NhanDiemDanhZoom dz={buoi.diem_danh_zoom} />
+            ) : (
+              buoi.trang_thai_diem_danh && (
+                <Badge size="sm" color={MAU_DIEM_DANH[buoi.trang_thai_diem_danh]}>
+                  {NHAN_DIEM_DANH[buoi.trang_thai_diem_danh]}
+                </Badge>
+              )
             )}
           </Group>
           <Text size="sm" c="dimmed">
@@ -456,6 +464,12 @@ function DanhSachBuoi({ lichHoc }: { lichHoc: LichHocLopToi[] }) {
                 </Text>
               );
             })()}
+          {buoi.diem_danh_zoom?.co_link && <NutDiemDanhZoom buoi={buoi} />}
+          {canNhacCungNgay(buoi, lichHoc) && (
+            <Text size="sm" c="orange.8" mt={4}>
+              Buổi này cũng cần bấm điểm danh, kể cả khi bạn vẫn đang ở trong phòng Zoom.
+            </Text>
+          )}
         </Box>
       ))}
     </Stack>

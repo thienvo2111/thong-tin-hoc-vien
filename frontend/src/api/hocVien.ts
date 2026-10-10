@@ -5,6 +5,7 @@ import type {
   DanhGiaDauVao,
   DotXacNhan,
   HocVien,
+  KetQuaVaoHoc,
   KhoaHocDangKy,
   KiemTraTruocXacNhan,
   MucDoDayDu,
@@ -136,6 +137,21 @@ export function useChonMucHoc() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ khoaId, muc }: { khoaId: string; muc: MucNangLuc | null }) => chonMucHoc(khoaId, muc),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: khoaHocToiKey });
+    },
+  });
+}
+
+// ADR 0005 (issue #24): học viên bấm "Điểm danh & vào Zoom" của 1 buổi.
+export function vaoHocZoom(lichHocId: string) {
+  return apiFetch<KetQuaVaoHoc>(`/lich-hoc/${lichHocId}/vao-hoc`, { method: 'POST' });
+}
+
+export function useVaoHocZoom() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: vaoHocZoom,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: khoaHocToiKey });
     },
