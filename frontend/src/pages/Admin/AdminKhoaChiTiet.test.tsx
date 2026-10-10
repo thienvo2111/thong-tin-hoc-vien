@@ -8,6 +8,10 @@ import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import AdminKhoaChiTiet from './AdminKhoaChiTiet';
 
+// Trang chi tiết khóa render nhiều khối (giai đoạn, lớp, điểm danh Zoom, ghi
+// danh lẻ...) — các test gõ form dài vượt 15s mặc định trên máy chậm.
+vi.setConfig({ testTimeout: 30000 });
+
 function renderTrang(id: string) {
   datToken('token-gia-lap');
   return renderVoiRouter([{ path: '/admin/khoa-boi-duong/:id', element: <AdminKhoaChiTiet /> }], {
