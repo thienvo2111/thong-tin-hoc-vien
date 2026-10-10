@@ -132,6 +132,24 @@ const NHAN_TRANG_THAI_HO_SO_CHUA_DUYET: Record<string, string> = {
   loi: 'Lỗi',
 };
 
+// 2026-10-10: nhân viên không tham gia khảo sát/đánh giá/tập huấn đợt này
+// (xem doi-tuong-khao-sat.util.ts#phaiXepLop) — loại hẳn khỏi "Phân lớp" và
+// "Tổng hợp theo mức học", dồn về sheet riêng này (kể cả chưa duyệt).
+const TEN_SHEET_NHAN_VIEN = 'Nhân viên (không xếp lớp)';
+
+function lopHienTaiNhanVien(
+  r: DongTinhToan,
+  giaiDoan: GiaiDoanChiaLop[],
+): string {
+  return giaiDoan
+    .map((gd) => {
+      const p = r.phan_lop.find((x) => x.giai_doan_id === gd.id);
+      return p ? `GĐ${gd.thu_tu}: ${p.ten_lop}` : null;
+    })
+    .filter((x): x is string => x !== null)
+    .join('; ');
+}
+
 interface DongTinhToan extends DongChiaLop {
   mocMuc: muc_nang_luc | null;
   nguonMoc: NguonMucDanhGia | null;
@@ -213,8 +231,10 @@ export async function buildDanhSachChiaLopWorkbook(
   thang: MucThang[],
 ): Promise<Buffer> {
   const daTinh = dsRow.map(tinhToanDong);
-  const daDuyet = daTinh.filter((r) => r.trang_thai_ho_so === 'da_duyet');
-  const chuaDuyet = daTinh.filter((r) => r.trang_thai_ho_so !== 'da_duyet');
+  const nhanVien = daTinh.filter((r) => r.doi_tuong === 'nhan_vien');
+  const conLai = daTinh.filter((r) => r.doi_tuong !== 'nhan_vien');
+  const daDuyet = conLai.filter((r) => r.trang_thai_ho_so === 'da_duyet');
+  const chuaDuyet = conLai.filter((r) => r.trang_thai_ho_so !== 'da_duyet');
 
   const thuTu = (m: muc_nang_luc | null) => (m ? THU_TU_MUC[m] : 0);
   daDuyet.sort(
@@ -258,8 +278,18 @@ export async function buildDanhSachChiaLopWorkbook(
 
   // ---- Sheet 2: Hướng dẫn ----
   const sheet2 = workbook.addWorksheet('Hướng dẫn');
+  const canhBaoNhanVien = (() => {
+    if (nhanVien.length === 0) return null;
+    const coLop = nhanVien.filter((r) => r.phan_lop.length > 0).length;
+    const hau =
+      coLop > 0
+        ? `, trong đó ${coLop} người đang có lớp — cần gỡ nếu không học`
+        : '';
+    return `Đã loại ${nhanVien.length} nhân viên khỏi danh sách chia lớp (xem sheet "${TEN_SHEET_NHAN_VIEN}")${hau}.`;
+  })();
   const dongHuongDan = [
     'Cách điền:',
+    ...(canhBaoNhanVien ? [canhBaoNhanVien] : []),
     '- Ô "GĐ<n> - <tên>": điền ĐÚNG tên lớp hiện có của giai đoạn đó (xem bảng dưới) để gán/đổi lớp.',
     '- Điền "-" để gỡ khỏi lớp của giai đoạn đó; để trống = giữ nguyên lớp hiện tại.',
     '- Cột "ten_cum": điền đúng tên cụm học viên để gán/đổi; để trống = giữ nguyên cụm hiện tại.',
@@ -270,6 +300,11 @@ export async function buildDanhSachChiaLopWorkbook(
   ];
   dongHuongDan.forEach((line) => sheet2.addRow([line]));
   sheet2.getRow(1).font = { bold: true };
+  if (canhBaoNhanVien) {
+    const hangCanhBao = sheet2.getRow(2);
+    hangCanhBao.font = { bold: true };
+    hangCanhBao.getCell(1).fill = NEN_HEADER_NHAP_DUOC;
+  }
   sheet2.getColumn(1).width = 100;
 
   const hangBangLop = dongHuongDan.length + 2;
@@ -340,6 +375,34 @@ export async function buildDanhSachChiaLopWorkbook(
   ]);
   sheet3.getRow(sheet3.rowCount).font = { bold: true };
   [20, 14].forEach((w, i) => (sheet3.getColumn(i + 1).width = w));
+
+  // ---- Sheet "Nhân viên (không xếp lớp)" (chỉ thêm khi có) ----
+  if (nhanVien.length > 0) {
+    const sheetNv = workbook.addWorksheet(TEN_SHEET_NHAN_VIEN);
+    sheetNv.addRow([
+      'Nhân viên hiện không tham gia khảo sát – đánh giá và tập huấn nên không đưa vào danh sách chia lớp.',
+    ]);
+    const headerNv = ['STT', 'Họ tên', 'Mã định danh', 'Trường', 'Lớp hiện tại'];
+    sheetNv.mergeCells(1, 1, 1, headerNv.length);
+    sheetNv.addRow(headerNv);
+    sheetNv.getRow(2).font = { bold: true };
+    nhanVien
+      .sort(
+        (a, b) =>
+          a.ten_truong.localeCompare(b.ten_truong, 'vi') ||
+          a.ho_ten.localeCompare(b.ho_ten, 'vi'),
+      )
+      .forEach((r, i) => {
+        sheetNv.addRow([
+          i + 1,
+          r.ho_ten,
+          r.ma_dinh_danh_moet ?? '',
+          r.ten_truong,
+          lopHienTaiNhanVien(r, giaiDoan),
+        ]);
+      });
+    [6, 26, 16, 32, 36].forEach((w, i) => (sheetNv.getColumn(i + 1).width = w));
+  }
 
   // ---- Sheet 4: Chưa duyệt (chỉ thêm khi có) ----
   if (chuaDuyet.length > 0) {

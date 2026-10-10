@@ -37,6 +37,7 @@ export const boLocQuanTri: BoLocResult = {
 
 export const pheuMau: PheuResult = {
   tham_gia: 200,
+  tham_gia_khao_sat: 190,
   da_truy_cap: 150,
   khao_sat_ky_nang_so: 100,
   danh_gia_dau_vao: 90,
@@ -101,6 +102,7 @@ const nhuCauMucHocTruongMau: NhuCauMucHocTruongDong[] = [
       { muc: 'thanh_thao', nhan: 'Thành thạo', theo_danh_gia: 2, theo_nhu_cau: 2 },
       { muc: 'nang_cao', nhan: 'Nâng cao', theo_danh_gia: 2, theo_nhu_cau: 1 },
     ],
+    so_nhan_vien_loai_tru: 0,
   },
   {
     don_vi_id: 'dv-b',
@@ -115,6 +117,7 @@ const nhuCauMucHocTruongMau: NhuCauMucHocTruongDong[] = [
       { muc: 'thanh_thao', nhan: 'Thành thạo', theo_danh_gia: 0, theo_nhu_cau: 1 },
       { muc: 'nang_cao', nhan: 'Nâng cao', theo_danh_gia: 1, theo_nhu_cau: 0 },
     ],
+    so_nhan_vien_loai_tru: 0,
   },
 ];
 
@@ -134,6 +137,7 @@ export const nhuCauMucHocMau: NhuCauMucHocResult = {
     { tu: 'nang_cao', den: 'co_ban', so_luong: 1 },
   ],
   theo_truong: nhuCauMucHocTruongMau,
+  so_nhan_vien_loai_tru: 0,
 };
 
 export const ketQuaHocMau: KetQuaHocCot[] = [
@@ -208,6 +212,7 @@ const dongTienDo = (
   so_hv,
   so_truy_cap: ty_le_truy_cap === null ? 0 : Math.round(ty_le_truy_cap * so_hv),
   ty_le_truy_cap,
+  so_hv_khao_sat: so_hv,
   so_ky_nang_so: Math.round(0.6 * so_hv),
   ty_le_ky_nang_so: 0.6,
   so_dau_vao: Math.round(0.55 * so_hv),

@@ -19,15 +19,39 @@ interface TheKpi {
   ty_le?: number | null;
 }
 
+// 3 chỉ số khảo sát (ky_nang_so/dau_vao/dau_ra) dùng tham_gia_khao_sat (trừ
+// nhân viên) làm mẫu số, khác với "Đã truy cập" (tham_gia, không phải khảo sát).
 function dungKpi(d: PheuResult): TheKpi[] {
   return [
     { id: 'kpi-tham-gia', nhan: 'Tham gia', so: d.tham_gia },
     { id: 'kpi-da-truy-cap', nhan: 'Đã truy cập', so: d.da_truy_cap, ty_le: tyLe(d.da_truy_cap, d.tham_gia) },
-    { id: 'kpi-ky-nang-so', nhan: 'Đã làm KS kĩ năng số', so: d.khao_sat_ky_nang_so, ty_le: tyLe(d.khao_sat_ky_nang_so, d.tham_gia) },
-    { id: 'kpi-dau-vao', nhan: 'Đã làm đánh giá NLS đầu vào', so: d.danh_gia_dau_vao, ty_le: tyLe(d.danh_gia_dau_vao, d.tham_gia) },
-    { id: 'kpi-dau-ra', nhan: 'Đã làm đánh giá NLS đầu ra', so: d.danh_gia_dau_ra, ty_le: tyLe(d.danh_gia_dau_ra, d.tham_gia) },
+    {
+      id: 'kpi-ky-nang-so',
+      nhan: 'Đã làm KS kĩ năng số',
+      so: d.khao_sat_ky_nang_so,
+      ty_le: tyLe(d.khao_sat_ky_nang_so, d.tham_gia_khao_sat),
+    },
+    {
+      id: 'kpi-dau-vao',
+      nhan: 'Đã làm đánh giá NLS đầu vào',
+      so: d.danh_gia_dau_vao,
+      ty_le: tyLe(d.danh_gia_dau_vao, d.tham_gia_khao_sat),
+    },
+    {
+      id: 'kpi-dau-ra',
+      nhan: 'Đã làm đánh giá NLS đầu ra',
+      so: d.danh_gia_dau_ra,
+      ty_le: tyLe(d.danh_gia_dau_ra, d.tham_gia_khao_sat),
+    },
   ];
 }
+
+const MAU_PHEU: Record<string, keyof PheuResult> = {
+  'pheu-da-truy-cap': 'tham_gia',
+  'pheu-ks-ky-nang-so': 'tham_gia_khao_sat',
+  'pheu-dau-vao': 'tham_gia_khao_sat',
+  'pheu-dau-ra': 'tham_gia_khao_sat',
+};
 
 function dungPheu(d: PheuResult) {
   const buoc = [
@@ -38,7 +62,8 @@ function dungPheu(d: PheuResult) {
     { id: 'pheu-dau-ra', nhan: 'Đánh giá NLS đầu ra', so: d.danh_gia_dau_ra },
   ];
   return buoc.map((b, i) => {
-    return { ...b, ty_le: i === 0 ? undefined : tyLe(b.so, d.tham_gia) };
+    const mau = MAU_PHEU[b.id];
+    return { ...b, ty_le: i === 0 ? undefined : tyLe(b.so, mau ? (d[mau] as number) : d.tham_gia) };
   });
 }
 
@@ -86,6 +111,16 @@ export function KhoiKpiPheu({ loc }: { loc: LocThongKe }) {
               </Paper>
             )}
           </SimpleGrid>
+        )}
+        {d && (
+          <Text size="xs" c="dimmed" mt="xs">
+            Không tính nhân viên (không thực hiện khảo sát – đánh giá) ở 3 chỉ số khảo sát/đánh giá.
+          </Text>
+        )}
+        {d && loc.doi_tuong === 'nhan_vien' && (
+          <Text size="xs" c="dimmed">
+            Nhân viên hiện không thực hiện khảo sát – đánh giá.
+          </Text>
         )}
       </KhoiThongKe>
       <KhoiThongKe tieu_de="Phễu tham gia" query={query} rong={false}>

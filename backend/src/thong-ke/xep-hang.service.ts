@@ -6,6 +6,7 @@ import { ForbiddenAppException } from '../common/exceptions/app.exceptions';
 import { locDoiTuong, ThongKeScopeService } from './thong-ke-scope.service';
 import { ChiSoXepHang, XepHangQueryDto } from './dto/thong-ke-query.dto';
 import { XepHangDong, XepHangResult } from './thong-ke.types';
+import { phaiKhaoSat } from '../common/utils/doi-tuong-khao-sat.util';
 
 const SO_HV_TOI_THIEU = 5;
 const SO_DONG = 10;
@@ -23,6 +24,7 @@ interface DangKyRow {
   ket_qua: string | null;
   hoc_vien: {
     don_vi_cong_tac_id: string | null;
+    doi_tuong: string | null;
     nguoi_dung_account: { dang_nhap_lan_cuoi: Date | null } | null;
     ket_qua_khao_sat: { id: string }[];
   };
@@ -30,6 +32,8 @@ interface DangKyRow {
 
 interface NhomDem {
   hv: Set<string>;
+  /** hv trừ nhân viên — mẫu số của chỉ số 'khao_sat' (chưa triển khai khảo sát). */
+  hvKhaoSat: Set<string>;
   truyCap: Set<string>;
   khaoSat: Set<string>;
   luot: number;
@@ -142,6 +146,7 @@ export class XepHangService {
         hoc_vien: {
           select: {
             don_vi_cong_tac_id: true,
+            doi_tuong: true,
             nguoi_dung_account: { select: { dang_nhap_lan_cuoi: true } },
             ket_qua_khao_sat: {
               where: { loai: 'danh-gia', trang_thai: 'hoan_thanh' },
@@ -163,6 +168,7 @@ export class XepHangService {
       if (!d) {
         d = {
           hv: new Set(),
+          hvKhaoSat: new Set(),
           truyCap: new Set(),
           khaoSat: new Set(),
           luot: 0,
@@ -171,6 +177,7 @@ export class XepHangService {
         dem.set(g, d);
       }
       d.hv.add(r.hoc_vien_id);
+      if (phaiKhaoSat(r.hoc_vien.doi_tuong)) d.hvKhaoSat.add(r.hoc_vien_id);
       if (r.hoc_vien.nguoi_dung_account?.dang_nhap_lan_cuoi) {
         d.truyCap.add(r.hoc_vien_id);
       }
@@ -186,7 +193,11 @@ export class XepHangService {
         chiSo === 'truy_cap'
           ? d.truyCap.size / d.hv.size
           : chiSo === 'khao_sat'
-            ? d.khaoSat.size / d.hv.size
+            // Nhân viên chưa triển khai khảo sát -> mẫu số trừ nhân viên; 0
+            // khi đơn vị chỉ gồm nhân viên (không có ai để tính tỷ lệ).
+            ? d.hvKhaoSat.size > 0
+              ? d.khaoSat.size / d.hvKhaoSat.size
+              : 0
             : d.dat / d.luot;
       dong.push({
         don_vi_id: id,

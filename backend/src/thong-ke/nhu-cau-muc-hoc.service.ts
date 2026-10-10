@@ -76,6 +76,10 @@ const theoMucTu = (acc: MucAcc): NhuCauMucHocTheoMuc[] =>
 /**
  * Tổng hợp "nhu cầu mức học" từ các lượt đăng ký (dang_ky_hoc) — mỗi dòng là 1 lượt, không
  * khử trùng học viên. Hàm thuần, không phụ thuộc Prisma, dễ unit test.
+ *
+ * 2026-10-10: nhân viên (`doi_tuong = 'nhan_vien'`) không xếp lớp đợt này (xem
+ * doi-tuong-khao-sat.util.ts#phaiXepLop) — loại hẳn khỏi mọi đếm, chỉ còn lại trong
+ * so_nhan_vien_loai_tru (tổng và theo từng trường).
  */
 export function tongHopNhuCauMucHoc(
   rows: DongDangKyNhuCauMuc[],
@@ -84,25 +88,41 @@ export function tongHopNhuCauMucHoc(
   const dieuChinh = new Map<string, number>();
   const truong = new Map<
     string,
-    { acc: MucAcc; ten_don_vi: string; ten_don_vi_cha: string | null }
-  >();
-
-  for (const r of rows) {
-    them(tong, r);
-    if (r.muc_danh_gia && r.muc_hoc_chon && r.muc_hoc_chon !== r.muc_danh_gia) {
-      const khoa = `${r.muc_danh_gia}|${r.muc_hoc_chon}`;
-      dieuChinh.set(khoa, (dieuChinh.get(khoa) ?? 0) + 1);
+    {
+      acc: MucAcc;
+      ten_don_vi: string;
+      ten_don_vi_cha: string | null;
+      so_nhan_vien_loai_tru: number;
     }
+  >();
+  let soNhanVienLoaiTru = 0;
+
+  const truongCua = (r: DongDangKyNhuCauMuc) => {
     let t = truong.get(r.don_vi_id);
     if (!t) {
       t = {
         acc: accTrong(),
         ten_don_vi: r.ten_don_vi,
         ten_don_vi_cha: r.ten_don_vi_cha,
+        so_nhan_vien_loai_tru: 0,
       };
       truong.set(r.don_vi_id, t);
     }
-    them(t.acc, r);
+    return t;
+  };
+
+  for (const r of rows) {
+    if (r.doi_tuong === 'nhan_vien') {
+      soNhanVienLoaiTru += 1;
+      truongCua(r).so_nhan_vien_loai_tru += 1;
+      continue;
+    }
+    them(tong, r);
+    if (r.muc_danh_gia && r.muc_hoc_chon && r.muc_hoc_chon !== r.muc_danh_gia) {
+      const khoa = `${r.muc_danh_gia}|${r.muc_hoc_chon}`;
+      dieuChinh.set(khoa, (dieuChinh.get(khoa) ?? 0) + 1);
+    }
+    them(truongCua(r).acc, r);
   }
 
   const dieu_chinh = [...dieuChinh.entries()]
@@ -126,6 +146,7 @@ export function tongHopNhuCauMucHoc(
       da_dieu_chinh: t.acc.da_dieu_chinh,
       moc_tu_khao_sat: t.acc.moc_tu_khao_sat,
       theo_muc: theoMucTu(t.acc),
+      so_nhan_vien_loai_tru: t.so_nhan_vien_loai_tru,
     }))
     .sort((a, b) => a.ten_don_vi.localeCompare(b.ten_don_vi, 'vi'));
 
@@ -137,6 +158,7 @@ export function tongHopNhuCauMucHoc(
     theo_muc: theoMucTu(tong),
     dieu_chinh,
     theo_truong,
+    so_nhan_vien_loai_tru: soNhanVienLoaiTru,
   };
 }
 
@@ -179,6 +201,7 @@ export class NhuCauMucHocService {
         hoc_vien: {
           select: {
             don_vi_cong_tac_id: true,
+            doi_tuong: true,
             don_vi_cong_tac: {
               select: {
                 ten_don_vi: true,
@@ -218,6 +241,7 @@ export class NhuCauMucHocService {
         ma_dinh_danh_moet: h.ma_dinh_danh_moet ?? null,
         ma_khoa: k?.ma_khoa ?? '',
         ten_khoa: k?.ten_khoa ?? '',
+        doi_tuong: h.doi_tuong,
       };
     });
   }

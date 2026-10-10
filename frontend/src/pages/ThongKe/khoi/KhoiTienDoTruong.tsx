@@ -38,14 +38,24 @@ const cotHv = (key: TyLeKey, nhan: string, tu: keyof TienDoTruongDong): CotTyLe 
   hauTo: '',
 });
 
+// Nhân viên chưa thực hiện khảo sát/đánh giá -> mẫu số riêng (so_hv_khao_sat,
+// không tính nhân viên), khác với cotHv (so_hv) dùng cho cột "Truy cập".
+const cotHvKhaoSat = (key: TyLeKey, nhan: string, tu: keyof TienDoTruongDong): CotTyLe => ({
+  key,
+  nhan,
+  tu,
+  mau: 'so_hv_khao_sat',
+  hauTo: '',
+});
+
 const TABS = [
   {
     value: 'dau-vao',
     nhan: 'Đầu vào',
     cot: [
       cotHv('ty_le_truy_cap', 'Truy cập', 'so_truy_cap'),
-      cotHv('ty_le_ky_nang_so', 'KS kĩ năng số', 'so_ky_nang_so'),
-      cotHv('ty_le_dau_vao', 'Đánh giá NLS đầu vào', 'so_dau_vao'),
+      cotHvKhaoSat('ty_le_ky_nang_so', 'KS kĩ năng số', 'so_ky_nang_so'),
+      cotHvKhaoSat('ty_le_dau_vao', 'Đánh giá NLS đầu vào', 'so_dau_vao'),
     ],
   },
   {
@@ -60,7 +70,7 @@ const TABS = [
     value: 'dau-ra',
     nhan: 'Đầu ra',
     cot: [
-      cotHv('ty_le_dau_ra', 'Đánh giá NLS đầu ra', 'so_dau_ra'),
+      cotHvKhaoSat('ty_le_dau_ra', 'Đánh giá NLS đầu ra', 'so_dau_ra'),
       { key: 'ty_le_dat', nhan: 'Đạt', tu: 'so_dat', mau: 'so_dang_ky', hauTo: ' lượt ĐK' },
     ],
   },
@@ -161,6 +171,11 @@ export function KhoiTienDoTruong({ loc }: { loc: LocThongKe }) {
         </Group>
       }
     >
+      {d && loc.doi_tuong === 'nhan_vien' && (
+        <Text size="xs" c="dimmed" mb="xs">
+          Nhân viên hiện không thực hiện khảo sát – đánh giá, các cột KS kĩ năng số/Đánh giá NLS hiển thị "—".
+        </Text>
+      )}
       {d && (
         <Tabs value={tabHienTai.value} onChange={doiTab} keepMounted={false}>
           <Tabs.List mb="sm">

@@ -12,6 +12,28 @@ import {
 } from '../common/exceptions/app.exceptions';
 import { kiemTraApiKeyKhaoSat } from './sso-api-key';
 import { ThangMucService } from './thang-muc.service';
+import { HOC_VIEN_PHAI_KHAO_SAT } from '../common/utils/doi-tuong-khao-sat.util';
+
+// Mô phỏng tối giản ngữ nghĩa Prisma cho đúng hình dạng where dùng ở đây
+// (AND[ {OR:[{doi_tuong:null},{doi_tuong:{notIn}}]}, ... ]) — KHÔNG dùng lại
+// phaiKhaoSat() để test độc lập với cách service dựng where.
+function khopDieuKienDoiTuong(
+  doiTuong: string | null,
+  where: Prisma.hoc_vienWhereInput,
+): boolean {
+  const and = (where.AND as Prisma.hoc_vienWhereInput[]) ?? [where];
+  return and.every((dk) => {
+    if (!dk.OR) return true;
+    return dk.OR.some((o) => {
+      const dt = (o as { doi_tuong?: unknown }).doi_tuong;
+      if (dt === null) return doiTuong === null;
+      if (dt && typeof dt === 'object' && 'notIn' in dt) {
+        return !(dt.notIn as string[]).includes(doiTuong as string);
+      }
+      return false;
+    });
+  });
+}
 
 describe('KetQuaKhaoSatService', () => {
   let service: KetQuaKhaoSatService;
@@ -526,13 +548,34 @@ describe('KetQuaKhaoSatService', () => {
       });
       expect(kq.theo_loai[1]).toMatchObject({ chua_lam: 9, dang_lam: 1 });
       expect(prisma.hoc_vien.count.mock.calls[0][0].where).toEqual({
-        dang_ky_hoc: { some: { khoa_id: 'khoa-1' } },
+        AND: [HOC_VIEN_PHAI_KHAO_SAT, { dang_ky_hoc: { some: { khoa_id: 'khoa-1' } } }],
       });
     });
 
-    it('không chọn khóa -> phạm vi toàn bộ học viên', async () => {
+    it('không chọn khóa -> phạm vi toàn bộ học viên, vẫn loại nhân viên (chưa triển khai khảo sát)', async () => {
       await service.thongKe();
-      expect(prisma.hoc_vien.count.mock.calls[0][0].where).toEqual({});
+      expect(prisma.hoc_vien.count.mock.calls[0][0].where).toEqual({
+        AND: [HOC_VIEN_PHAI_KHAO_SAT],
+      });
+    });
+
+    // Mô phỏng ngữ nghĩa Prisma (OR/notIn, NULL bị notIn bỏ) để chứng minh
+    // tong_hoc_vien thật sự đếm 2 (giáo viên + chưa khai), không phải 3.
+    it('1 giáo_viên + 1 nhân_viên + 1 chưa khai đối tượng -> tong_hoc_vien = 2 (loại nhân viên, giữ NULL)', async () => {
+      const hocVien = [
+        { doi_tuong: 'giao_vien' },
+        { doi_tuong: 'nhan_vien' },
+        { doi_tuong: null },
+      ];
+      prisma.hoc_vien.count.mockImplementation(
+        async ({ where }: { where: Prisma.hoc_vienWhereInput }) =>
+          hocVien.filter((hv) => khopDieuKienDoiTuong(hv.doi_tuong, where))
+            .length,
+      );
+      prisma.ket_qua_khao_sat.groupBy.mockResolvedValue([]);
+
+      const kq = await service.thongKe();
+      expect(kq.tong_hoc_vien).toBe(2);
     });
 
     it('mã không còn trong thang (đã bị xóa khỏi cấu hình) -> nối cuối, nhãn = chính mã đó', async () => {

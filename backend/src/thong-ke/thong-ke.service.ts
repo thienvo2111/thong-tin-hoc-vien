@@ -6,6 +6,7 @@ import { ThongKeQueryDto } from './dto/thong-ke-query.dto';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { ThangMucService, MucThang } from '../sso/thang-muc.service';
 import { ValidationException } from '../common/exceptions/app.exceptions';
+import { HOC_VIEN_PHAI_KHAO_SAT } from '../common/utils/doi-tuong-khao-sat.util';
 import {
   CheDoChuyenCan,
   DongDiemDanhBuoi,
@@ -33,6 +34,7 @@ const LOAI_DAU_RA = 'dau-ra';
 
 const PHEU_RONG: PheuCounts = {
   tham_gia: 0,
+  tham_gia_khao_sat: 0,
   da_truy_cap: 0,
   khao_sat_ky_nang_so: 0,
   danh_gia_dau_vao: 0,
@@ -80,12 +82,15 @@ export class ThongKeService {
 
     const [
       tham_gia,
+      tham_gia_khao_sat,
       da_truy_cap,
       khao_sat_ky_nang_so,
       danh_gia_dau_vao,
       danh_gia_dau_ra,
     ] = await Promise.all([
       dem(),
+      // Nhân viên chưa triển khai khảo sát -> mẫu số riêng cho 3 tỷ lệ dưới.
+      dem(HOC_VIEN_PHAI_KHAO_SAT),
       dem({ nguoi_dung_account: { dang_nhap_lan_cuoi: { not: null } } }),
       dem(hoanThanh(LOAI_KY_NANG_SO)),
       dem(hoanThanh(LOAI_DAU_VAO)),
@@ -93,6 +98,7 @@ export class ThongKeService {
     ]);
     return {
       tham_gia,
+      tham_gia_khao_sat,
       da_truy_cap,
       khao_sat_ky_nang_so,
       danh_gia_dau_vao,
@@ -110,7 +116,7 @@ export class ThongKeService {
     ]);
     if (rong) return this.khaoSatRong(thang);
 
-    const [{ tham_gia }, nhom] = await Promise.all([
+    const [{ tham_gia_khao_sat }, nhom] = await Promise.all([
       this.demPheu(where),
       this.prisma.ket_qua_khao_sat.groupBy({
         by: ['loai', 'muc_goc'],
@@ -125,7 +131,7 @@ export class ThongKeService {
     const theoLoai = (loai: string) => {
       const dong = nhom.filter((n) => n.loai === loai);
       const hoanThanh = dong.reduce((t, n) => t + n._count._all, 0);
-      return { dong, hoanThanh, chua_lam: tham_gia - hoanThanh };
+      return { dong, hoanThanh, chua_lam: tham_gia_khao_sat - hoanThanh };
     };
     const khoiMuc = (loai: string) => {
       const { dong, hoanThanh, chua_lam } = theoLoai(loai);
@@ -301,15 +307,15 @@ export class ThongKeService {
             where: { AND: [where, { khoa_id, ket_qua: 'dat' }] },
           }),
         ]);
-        const tyLe = (tu: number) =>
-          pheu.tham_gia > 0 ? tu / pheu.tham_gia : null;
+        const tyLe = (tu: number, mau: number) => (mau > 0 ? tu / mau : null);
         return {
           khoa_id,
           ten_khoa: tenKhoa.get(khoa_id) ?? '',
           tham_gia: pheu.tham_gia,
-          ty_le_truy_cap: tyLe(pheu.da_truy_cap),
-          ty_le_dau_vao: tyLe(pheu.danh_gia_dau_vao),
-          ty_le_dat: tyLe(dat),
+          ty_le_truy_cap: tyLe(pheu.da_truy_cap, pheu.tham_gia),
+          // Nhân viên chưa triển khai khảo sát -> mẫu số riêng (tham_gia_khao_sat).
+          ty_le_dau_vao: tyLe(pheu.danh_gia_dau_vao, pheu.tham_gia_khao_sat),
+          ty_le_dat: tyLe(dat, pheu.tham_gia),
         };
       }),
     );

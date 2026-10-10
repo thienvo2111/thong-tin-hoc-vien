@@ -21,6 +21,7 @@ import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
 import { CauHinhKhaoSatService } from '../cau-hinh-khao-sat/cau-hinh-khao-sat.service';
 import { normalizeNfcName } from '../common/utils/normalize-text.util';
 import { dieuKienKhongDau } from '../common/utils/tim-kiem-khong-dau.util';
+import { phaiKhaoSat } from '../common/utils/doi-tuong-khao-sat.util';
 import {
   boSo0DauDeTimKiem,
   chuanHoaMaMoet,
@@ -1259,7 +1260,7 @@ export class HocVienService {
   async danhGiaDauVaoCuaToi(caller: AuthenticatedUser) {
     const hocVien = await this.getHocVienCuaToi(caller);
     const kenh = await this.cauHinhKhaoSatService.layKenhDanhGia(hocVien.id);
-    if (hocVien.doi_tuong === 'nhan_vien') {
+    if (!phaiKhaoSat(hocVien.doi_tuong)) {
       return { kenh, du_dieu_kien: false, ...KHAO_SAT_CHUA_TRIEN_KHAI };
     }
     if (kenh === 'sso') {
@@ -1278,7 +1279,7 @@ export class HocVienService {
     if (!(await this.cauHinhKhaoSatService.khaoSatDauRaDangMo(hocVien.id))) {
       return { mo: false as const };
     }
-    if (hocVien.doi_tuong === 'nhan_vien') {
+    if (!phaiKhaoSat(hocVien.doi_tuong)) {
       return {
         mo: true as const,
         du_dieu_kien: false,

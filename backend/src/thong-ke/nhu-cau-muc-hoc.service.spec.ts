@@ -32,6 +32,7 @@ function dk(
     ma_dinh_danh_moet: null,
     ma_khoa: '',
     ten_khoa: '',
+    doi_tuong: null,
     ...ghiDe,
   };
 }
@@ -51,6 +52,30 @@ describe('tongHopNhuCauMucHoc (hàm thuần)', () => {
       ],
       dieu_chinh: [],
       theo_truong: [],
+      so_nhan_vien_loai_tru: 0,
+    });
+  });
+
+  it('loại nhân viên khỏi mọi đếm (tổng và theo trường), giữ nguyên NULL/giáo viên', () => {
+    const r = tongHopNhuCauMucHoc([
+      dk('t1', { muc_danh_gia: 'co_ban', muc_hoc_chon: null, doi_tuong: 'giao_vien' }),
+      dk('t1', {
+        muc_danh_gia: 'nang_cao',
+        muc_hoc_chon: 'co_ban',
+        doi_tuong: 'nhan_vien',
+      }),
+      dk('t1', { muc_danh_gia: null, nguon_muc: null, muc_hoc_chon: null, doi_tuong: null }),
+    ]);
+    expect(r.so_dang_ky).toBe(2);
+    expect(r.chua_co_muc).toBe(1);
+    expect(r.da_dieu_chinh).toBe(0);
+    expect(r.dieu_chinh).toEqual([]);
+    expect(r.so_nhan_vien_loai_tru).toBe(1);
+    expect(r.theo_truong).toHaveLength(1);
+    expect(r.theo_truong[0]).toMatchObject({
+      don_vi_id: 't1',
+      so_dang_ky: 2,
+      so_nhan_vien_loai_tru: 1,
     });
   });
 

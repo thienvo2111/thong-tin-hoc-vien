@@ -4,6 +4,15 @@ import { NHAN_MUC_NANG_LUC as NHAN_MUC } from '@/lib/mucNangLuc';
 import type { TrangThaiKhaoSat } from '@/api/ketQuaKhaoSat';
 export { NHAN_MUC_NANG_LUC } from '@/lib/mucNangLuc';
 
+// Khớp backend common/utils/doi-tuong-khao-sat.util.ts (2026-10-10): nhân viên chưa triển khai khảo
+// sát – đánh giá. null (chưa khai đối tượng) vẫn phải khảo sát.
+const DOI_TUONG_KHONG_KHAO_SAT: readonly string[] = ['nhan_vien'];
+export const NHAN_KHONG_AP_DUNG_KHAO_SAT = 'Không áp dụng';
+
+export function phaiKhaoSat(doiTuong: string | null | undefined): boolean {
+  return doiTuong == null || !DOI_TUONG_KHONG_KHAO_SAT.includes(doiTuong);
+}
+
 export const TEN_BAI_KHAO_SAT: Record<SsoTarget, string> = {
   'khao-sat': 'Phiếu khảo sát kĩ năng số',
   'danh-gia': 'Phiếu đánh giá năng lực số',

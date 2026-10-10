@@ -18,6 +18,7 @@ import { DonViScope, ScopeService } from '../auth/scope/scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { normalizeNfcName } from '../common/utils/normalize-text.util';
+import { phaiXepLop } from '../common/utils/doi-tuong-khao-sat.util';
 import { paginate } from '../common/dto/pagination-query.dto';
 import {
   ConflictAppException,
@@ -2101,6 +2102,15 @@ export class KhoaBoiDuongService {
           );
         }
       }
+    }
+
+    // 2026-10-10: nhân viên không tham gia tập huấn đợt này (xem
+    // doi-tuong-khao-sat.util.ts#phaiXepLop) — không chặn dòng, chỉ cảnh báo
+    // để Quản trị biết nếu lỡ gán lớp cho nhân viên.
+    if (!phaiXepLop(hocVien.doi_tuong) && gan.some((g) => g.lop_id)) {
+      canhBaoList.push(
+        `Học viên "${ma}" là nhân viên — hiện không tham gia tập huấn`,
+      );
     }
 
     let cumId: string | undefined;

@@ -85,6 +85,12 @@ describe('Admin — Tình hình khảo sát', () => {
     expect(await screen.findByText('Không có học viên nào khớp bộ lọc.')).toBeInTheDocument();
   });
 
+  it('luôn hiện chú thích "Không tính nhân viên" dưới các ô thống kê', async () => {
+    renderTrang();
+    expect(await screen.findByText('Hà Thị Thanh')).toBeInTheDocument();
+    expect(screen.getByText('Không tính nhân viên (không thực hiện khảo sát – đánh giá).')).toBeInTheDocument();
+  });
+
   it('API lỗi -> hiện lỗi', async () => {
     server.use(
       http.get('/sso/ket-qua', () =>

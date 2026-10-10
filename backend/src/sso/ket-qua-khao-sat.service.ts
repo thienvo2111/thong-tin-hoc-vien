@@ -5,6 +5,7 @@ import {
   boSo0DauDeTimKiem,
   timHocVienIdTheoMaMoet,
 } from '../common/utils/ma-moet.util';
+import { HOC_VIEN_PHAI_KHAO_SAT } from '../common/utils/doi-tuong-khao-sat.util';
 import { ThangMucService, nhanMucGoc } from './thang-muc.service';
 import {
   NotFoundAppException,
@@ -286,8 +287,12 @@ export class KetQuaKhaoSatService {
     });
   }
 
+  // 2026-10-10: nhân viên chưa triển khai khảo sát -> loại khỏi cả mẫu số
+  // (thongKe) và danh sách (danhSach) cho mọi loại bài.
   private phamViHocVien(khoaId?: string): Prisma.hoc_vienWhereInput {
-    return khoaId ? { dang_ky_hoc: { some: { khoa_id: khoaId } } } : {};
+    const and: Prisma.hoc_vienWhereInput[] = [HOC_VIEN_PHAI_KHAO_SAT];
+    if (khoaId) and.push({ dang_ky_hoc: { some: { khoa_id: khoaId } } });
+    return { AND: and };
   }
 
   private locTrangThai(

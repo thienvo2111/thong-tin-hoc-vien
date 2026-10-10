@@ -139,6 +139,9 @@ export default function AdminTinhHinhKhaoSat() {
               );
             })}
           </SimpleGrid>
+          <Text fz={12.5} c="dimmed">
+            Không tính nhân viên (không thực hiện khảo sát – đánh giá).
+          </Text>
           {/* Phiếu khảo sát kĩ năng số chỉ theo dõi đã làm/chưa làm, không có mức -> không hiện dòng này. */}
           {loai !== 'khao-sat' && tkLoai && tkLoai.hoan_thanh > 0 && (
             <Text fz={13} c="dimmed">

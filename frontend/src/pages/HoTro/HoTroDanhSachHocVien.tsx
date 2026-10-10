@@ -23,7 +23,7 @@ import { useCumCuaToi, useDanhSachHocVienHoTro, xuatDanhSachHoTro } from '@/api/
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { taiFileTuBlob } from '@/lib/taiFile';
-import { TEN_BAI_KHAO_SAT } from '@/lib/trangThaiKhaoSat';
+import { NHAN_KHONG_AP_DUNG_KHAO_SAT, TEN_BAI_KHAO_SAT, phaiKhaoSat } from '@/lib/trangThaiKhaoSat';
 
 const KICH_THUOC_TRANG = 20;
 
@@ -209,7 +209,11 @@ export default function HoTroDanhSachHocVien() {
                         </Badge>
                       </Table.Td>
                       <Table.Td>
-                        {hv.khao_sat.length === 0 ? (
+                        {!phaiKhaoSat(hv.doi_tuong) ? (
+                          <Text fz="sm" c="dimmed">
+                            {NHAN_KHONG_AP_DUNG_KHAO_SAT}
+                          </Text>
+                        ) : hv.khao_sat.length === 0 ? (
                           <Text fz="sm" c="dimmed">
                             Chưa làm
                           </Text>

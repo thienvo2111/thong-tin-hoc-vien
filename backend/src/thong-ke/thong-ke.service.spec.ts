@@ -48,6 +48,7 @@ describe('ThongKeService.pheu', () => {
     const r = await service.pheu(caller('quan_tri'), {});
     expect(r).toEqual({
       tham_gia: 0,
+      tham_gia_khao_sat: 0,
       da_truy_cap: 0,
       khao_sat_ky_nang_so: 0,
       danh_gia_dau_vao: 0,
@@ -63,14 +64,15 @@ describe('ThongKeService.pheu', () => {
     expect(r.ho_so_cho_duyet).toBeNull();
   });
 
-  it('đếm học viên phân biệt: 5 phễu + 1 chờ duyệt, mọi where chứa dang_ky_hoc.some = where scope', async () => {
+  it('đếm học viên phân biệt: 6 phễu (gồm tham_gia_khao_sat) + 1 chờ duyệt, mọi where chứa dang_ky_hoc.some = where scope', async () => {
     const r = await service.pheu(caller('quan_tri'), {});
-    expect(prisma.hoc_vien.count).toHaveBeenCalledTimes(6);
+    expect(prisma.hoc_vien.count).toHaveBeenCalledTimes(7);
     for (const [arg] of prisma.hoc_vien.count.mock.calls) {
       expect(arg.where.dang_ky_hoc).toEqual({ some: WHERE_SCOPE });
     }
     expect(r).toEqual({
       tham_gia: 7,
+      tham_gia_khao_sat: 7,
       da_truy_cap: 7,
       khao_sat_ky_nang_so: 7,
       danh_gia_dau_vao: 7,
@@ -114,10 +116,10 @@ describe('ThongKeService.pheu', () => {
     });
   });
 
-  it('ho_tro_hoc_vien -> ho_so_cho_duyet null, chỉ 5 lần count', async () => {
+  it('ho_tro_hoc_vien -> ho_so_cho_duyet null, chỉ 6 lần count (không gọi demHoSoChoDuyet)', async () => {
     const r = await service.pheu(caller('ho_tro_hoc_vien'), {});
     expect(r.ho_so_cho_duyet).toBeNull();
-    expect(prisma.hoc_vien.count).toHaveBeenCalledTimes(5);
+    expect(prisma.hoc_vien.count).toHaveBeenCalledTimes(6);
   });
 
   it('truyền đúng user và q vào ThongKeScopeService.resolve', async () => {
@@ -482,6 +484,7 @@ describe('ThongKeService khối kết quả học tập + so sánh khóa', () =>
         const k1 = khoaCua(w) === 'k1';
         return {
           tham_gia: k1 ? 10 : 4,
+          tham_gia_khao_sat: k1 ? 10 : 4,
           da_truy_cap: k1 ? 5 : 4,
           khao_sat_ky_nang_so: 0,
           danh_gia_dau_vao: k1 ? 2 : 1,

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { BarChart } from '@mantine/charts';
-import { Anchor, Box, Button, Group, SegmentedControl, Stack, Table, Text, TextInput } from '@mantine/core';
+import { Alert, Anchor, Box, Button, Group, SegmentedControl, Stack, Table, Text, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useSearchParams } from 'react-router-dom';
 import { useNhuCauMucHoc, xuatNhuCauMucHoc, type LocThongKe } from '@/api/thongKe';
@@ -252,6 +252,11 @@ export function KhoiNhuCauMucHoc({ loc }: { loc: LocThongKe }) {
         </Group>
       }
     >
+      {d && d.so_nhan_vien_loai_tru > 0 && (
+        <Alert color="orange" variant="light" p="xs" mb="xs">
+          {`Không tính ${d.so_nhan_vien_loai_tru} đăng ký của nhân viên (không tham gia khảo sát – đánh giá và tập huấn).`}
+        </Alert>
+      )}
       {d && (cach === 'theo_truong' ? <TheoTruong d={d} loc={loc} /> : <TongHop d={d} />)}
     </KhoiThongKe>
   );

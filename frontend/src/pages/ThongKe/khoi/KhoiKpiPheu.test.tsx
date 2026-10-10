@@ -22,13 +22,13 @@ describe('KhoiKpiPheu', () => {
     expect(within(screen.getByTestId('kpi-dau-ra')).getByText('45')).toBeInTheDocument();
   });
 
-  it('% mỗi thẻ tính trên số tham gia', async () => {
+  it('% mỗi thẻ tính trên số tham gia (3 chỉ số khảo sát trên tham_gia_khao_sat, trừ nhân viên)', async () => {
     renderKhoi();
     await screen.findByTestId('kpi-da-truy-cap');
     expect(within(screen.getByTestId('kpi-da-truy-cap')).getByText('75,0% số tham gia')).toBeInTheDocument(); // 150/200
-    expect(within(screen.getByTestId('kpi-ky-nang-so')).getByText('50,0% số tham gia')).toBeInTheDocument(); // 100/200
-    expect(within(screen.getByTestId('kpi-dau-vao')).getByText('45,0% số tham gia')).toBeInTheDocument(); // 90/200
-    expect(within(screen.getByTestId('kpi-dau-ra')).getByText('22,5% số tham gia')).toBeInTheDocument(); // 45/200
+    expect(within(screen.getByTestId('kpi-ky-nang-so')).getByText('52,6% số tham gia')).toBeInTheDocument(); // 100/190
+    expect(within(screen.getByTestId('kpi-dau-vao')).getByText('47,4% số tham gia')).toBeInTheDocument(); // 90/190
+    expect(within(screen.getByTestId('kpi-dau-ra')).getByText('23,7% số tham gia')).toBeInTheDocument(); // 45/190
     expect(within(screen.getByTestId('kpi-tham-gia')).queryByText(/số tham gia/)).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain('so với thẻ trước');
   });
@@ -80,11 +80,21 @@ describe('KhoiKpiPheu', () => {
     expect(screen.queryByTestId('kpi-cho-duyet')).not.toBeInTheDocument();
   });
 
+  it('luôn hiện chú thích "Không tính nhân viên"; chọn doi_tuong=nhan_vien -> thêm ghi chú riêng', async () => {
+    datToken('token-gia-lap');
+    renderTrang(<KhoiKpiPheu loc={{ doi_tuong: 'nhan_vien' }} />);
+    await screen.findByTestId('kpi-tham-gia');
+    expect(
+      screen.getByText('Không tính nhân viên (không thực hiện khảo sát – đánh giá) ở 3 chỉ số khảo sát/đánh giá.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Nhân viên hiện không thực hiện khảo sát – đánh giá.')).toBeInTheDocument();
+  });
+
   it('phễu liệt kê 5 bước kèm % trên số tham gia, không có chữ rơi', async () => {
     renderKhoi();
     const buoc = await screen.findByTestId('pheu-ks-ky-nang-so');
     expect(within(buoc).getByText('100')).toBeInTheDocument();
-    expect(within(buoc).getByText('50,0% số tham gia')).toBeInTheDocument(); // 100/200
+    expect(within(buoc).getByText('52,6% số tham gia')).toBeInTheDocument(); // 100/190 (trừ nhân viên)
     expect(within(screen.getByTestId('pheu-tham-gia')).queryByText(/số tham gia/)).not.toBeInTheDocument();
     expect(screen.getAllByTestId(/^pheu-/)).toHaveLength(5);
     expect(document.body.textContent).not.toMatch(/rơi/);

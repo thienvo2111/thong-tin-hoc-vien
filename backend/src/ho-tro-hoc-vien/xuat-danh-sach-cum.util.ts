@@ -1,4 +1,5 @@
 import * as ExcelJS from 'exceljs';
+import { phaiKhaoSat } from '../common/utils/doi-tuong-khao-sat.util';
 
 // ADR 0003 H6: file xuất danh sách cụm cho người hỗ trợ — tối thiểu hóa dữ
 // liệu vì file nằm trên máy cá nhân/có thể bị chuyển qua Zalo: KHÔNG có số
@@ -81,11 +82,14 @@ export async function buildDanhSachCumWorkbook(
         ...s.giai_doan.map((g) => h.lop_theo_giai_doan[g.id] ?? ''),
         h.day_du ? 'Đủ' : 'Chưa đủ',
         h.dang_nhap_lan_cuoi ? 'Rồi' : 'Chưa',
-        h.khao_sat
-          .map(
-            (k) => `${k.loai}: ${NHAN_KHAO_SAT[k.trang_thai] ?? k.trang_thai}`,
-          )
-          .join('; '),
+        phaiKhaoSat(h.doi_tuong)
+          ? h.khao_sat
+              .map(
+                (k) =>
+                  `${k.loai}: ${NHAN_KHAO_SAT[k.trang_thai] ?? k.trang_thai}`,
+              )
+              .join('; ')
+          : 'Không áp dụng',
       ]);
     });
     ws.columns.forEach((c) => (c.width = 18));

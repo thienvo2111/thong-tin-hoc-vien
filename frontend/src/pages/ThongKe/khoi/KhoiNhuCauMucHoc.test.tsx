@@ -46,6 +46,26 @@ describe('KhoiNhuCauMucHoc', () => {
     ).toBeInTheDocument();
   });
 
+  it('so_nhan_vien_loai_tru > 0 -> hiện cảnh báo loại nhân viên', async () => {
+    server.use(
+      http.get('/thong-ke/nhu-cau-muc-hoc', () =>
+        HttpResponse.json({ ...nhuCauMucHocMau, so_nhan_vien_loai_tru: 5 }),
+      ),
+    );
+    renderKhoi();
+    expect(
+      await screen.findByText(
+        'Không tính 5 đăng ký của nhân viên (không tham gia khảo sát – đánh giá và tập huấn).',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('so_nhan_vien_loai_tru = 0 -> không hiện cảnh báo', async () => {
+    renderKhoi();
+    await screen.findByText(/Có mức đánh giá/);
+    expect(screen.queryByText(/Không tính.*nhân viên/)).not.toBeInTheDocument();
+  });
+
   it('chưa có HV nào có mức đánh giá -> rỗng', async () => {
     server.use(
       http.get('/thong-ke/nhu-cau-muc-hoc', () =>
