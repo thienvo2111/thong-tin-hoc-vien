@@ -9,6 +9,7 @@ import { ThangMucService } from '../sso/thang-muc.service';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { DongHocVienMuc } from './thong-ke.types';
+import { HOC_VIEN_PHAI_KHAO_SAT } from '../common/utils/doi-tuong-khao-sat.util';
 
 const caller: AuthenticatedUser = {
   id: 'u-1',
@@ -259,7 +260,10 @@ describe('MucNlsService', () => {
     ]);
     const kq = await service.danhSach(caller, { khoa_id: 'k' });
     const arg = prisma.dang_ky_hoc.findMany.mock.calls[0][0];
-    expect(arg.where).toBe(phamVi.where);
+    // Nhân viên chưa triển khai khảo sát -> loại khỏi truy vấn nguồn.
+    expect(arg.where).toEqual({
+      AND: [phamVi.where, { hoc_vien: HOC_VIEN_PHAI_KHAO_SAT }],
+    });
     const ks = arg.select.hoc_vien.select.ket_qua_khao_sat;
     expect(ks.where).toEqual({ loai: 'danh-gia', trang_thai: 'hoan_thanh' });
     expect(arg.select.hoc_vien.select.ho_ten).toBeUndefined();
@@ -351,7 +355,7 @@ describe('MucNlsService', () => {
       );
     });
 
-    it('Tổng hợp: 2 bảng có tên in đậm, dòng Tổng cộng, nhãn đối tượng/cấp', () => {
+    it('Tổng hợp: 2 bảng có tên in đậm, dòng Tổng cộng, nhãn đối tượng/cấp; bỏ dòng Nhân viên (báo cáo khảo sát)', () => {
       const s = wb.getWorksheet('Tổng hợp')!;
       const cotA = cot(s, 1);
       expect(cotA).toEqual(
@@ -359,13 +363,14 @@ describe('MucNlsService', () => {
           'Theo đối tượng',
           'Giáo viên',
           'Cán bộ quản lý',
-          'Nhân viên',
           'Chưa xác định',
           'Theo cấp giảng dạy',
           'Mầm non',
           'Trung cấp nghề',
         ]),
       );
+      // Nhân viên chưa triển khai khảo sát -> bỏ dòng này khỏi "Theo đối tượng".
+      expect(cotA).not.toContain('Nhân viên');
       expect(cotA.filter((v) => v === 'Tổng cộng')).toHaveLength(2);
       let dongTen: ExcelJS.Row | undefined;
       let tong: ExcelJS.Row | undefined;

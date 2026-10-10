@@ -253,9 +253,14 @@ describe('SsoService', () => {
       target: 'khao-sat',
       hoc_vien: {
         id: 'hv-1',
+        ho_ten: 'Nguyễn Văn A',
         ma_dinh_danh_moet: '9115131060',
         doi_tuong: 'can_bo_quan_ly',
         so_dinh_danh_ca_nhan: '012345678901',
+        email_lien_he: 'a@example.com',
+        gioi_tinh: 'nam',
+        cu_tru_phuong_xa: { ten: 'Phường X' },
+        cu_tru_tinh: { ten: 'An Giang' },
         don_vi_cong_tac: { ma_don_vi: 'DV01', ten_don_vi: 'Trường A' },
         dang_ky_hoc: [
           {
@@ -314,12 +319,19 @@ describe('SsoService', () => {
       expect(data.da_dung_luc).toBeInstanceOf(Date);
     });
 
-    it('hợp lệ -> trả mã định danh, vai trò, đơn vị, target, lớp; KHÔNG trả CCCD', async () => {
+    // 77cb6a9: hệ thống khảo sát được nhận thêm CCCD, email, giới tính, địa chỉ cư trú (user xác
+    // nhận 2026-10-10 vẫn cho trả CCCD). toEqual giữ chặt: không trả trường nào ngoài danh sách này.
+    it('hợp lệ -> trả định danh (gồm CCCD), liên hệ, vai trò, đơn vị, target, lớp', async () => {
       prisma.ma_sso_mot_lan.updateMany.mockResolvedValue({ count: 1 });
       prisma.ma_sso_mot_lan.findUnique.mockResolvedValue(banGhi);
       const kq = await service.doiMa('khoa-bi-mat-dung', 'm'.repeat(43));
       expect(kq).toEqual({
         hoc_vien_id: 'hv-1',
+        ho_ten: 'Nguyễn Văn A',
+        so_dinh_danh_ca_nhan: '012345678901',
+        email: 'a@example.com',
+        gioi_tinh: 'nam',
+        dia_chi: 'Phường X, An Giang',
         ma_dinh_danh_moet: '9115131060',
         vai_tro: 'can_bo_quan_ly',
         ma_don_vi: 'DV01',
@@ -335,7 +347,6 @@ describe('SsoService', () => {
           },
         ],
       });
-      expect(JSON.stringify(kq)).not.toContain('012345678901');
     });
 
     it('đổi mã thành công có target -> ghi "đã mở" cho đúng học viên + loại bài', async () => {

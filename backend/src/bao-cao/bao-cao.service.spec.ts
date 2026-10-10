@@ -71,8 +71,8 @@ describe('BaoCaoService.tongQuan', () => {
 
   it('đếm đúng tổng học viên tham gia + đã đăng nhập + đã chỉnh sửa hồ sơ (theo tập hoc_vien phân biệt)', async () => {
     prisma.dang_ky_hoc.findMany.mockResolvedValue([
-      { hoc_vien_id: 'hv-1' },
-      { hoc_vien_id: 'hv-2' },
+      { hoc_vien_id: 'hv-1', hoc_vien: { doi_tuong: null } },
+      { hoc_vien_id: 'hv-2', hoc_vien: { doi_tuong: null } },
     ]);
     prisma.nguoi_dung.count.mockResolvedValue(1);
     prisma.lich_su_thay_doi_ho_so.findMany.mockResolvedValue([
@@ -107,12 +107,13 @@ describe('BaoCaoService.tongQuan', () => {
 
   // Sửa 2026-10-07: portal KHÔNG quy đổi muc_goc -> muc (quyết định
   // 2026-10-05) — mức đếm thẳng theo muc_goc, thứ tự theo thang quản trị.
-  it('khảo sát đầu vào/đầu ra đếm theo muc_goc của ket_qua_khao_sat (hoàn thành), đúng thứ tự thang', async () => {
+  it('khảo sát đầu vào/đầu ra đếm theo muc_goc của ket_qua_khao_sat (hoàn thành), đúng thứ tự thang; loại nhân viên khỏi mẫu số và tử số', async () => {
     prisma.dang_ky_hoc.findMany.mockResolvedValue([
-      { hoc_vien_id: 'hv-1' },
-      { hoc_vien_id: 'hv-2' },
-      { hoc_vien_id: 'hv-3' },
-      { hoc_vien_id: 'hv-4' },
+      { hoc_vien_id: 'hv-1', hoc_vien: { doi_tuong: 'giao_vien' } },
+      { hoc_vien_id: 'hv-2', hoc_vien: { doi_tuong: null } },
+      { hoc_vien_id: 'hv-3', hoc_vien: { doi_tuong: 'can_bo_quan_ly' } },
+      // hv-4: nhân viên -> loại khỏi khao_sat dù ket_qua_khao_sat có hoàn thành.
+      { hoc_vien_id: 'hv-4', hoc_vien: { doi_tuong: 'nhan_vien' } },
     ]);
     prisma.ket_qua_khao_sat.findMany.mockResolvedValue([
       // hv-1: chỉ làm phiếu khảo sát kĩ năng số -> KHÔNG tính đầu vào/đầu ra
@@ -122,6 +123,8 @@ describe('BaoCaoService.tongQuan', () => {
       { hoc_vien_id: 'hv-2', loai: 'dau-ra', muc_goc: 'M4' },
       // hv-3: đánh giá đã nộp nhưng chưa có mức -> chưa xếp mức
       { hoc_vien_id: 'hv-3', loai: 'danh-gia', muc_goc: null },
+      // hv-4 (nhân viên): có kết quả nhưng phải bị loại khỏi khao_sat.
+      { hoc_vien_id: 'hv-4', loai: 'danh-gia', muc_goc: 'M3' },
     ]);
 
     const result = await service.tongQuan({}, caller());
@@ -156,7 +159,7 @@ describe('BaoCaoService.tongQuan', () => {
   });
 
   it('mã muc_goc không có trong thang -> nối cuối theo_muc, nhãn = chính mã đó', async () => {
-    prisma.dang_ky_hoc.findMany.mockResolvedValue([{ hoc_vien_id: 'hv-1' }]);
+    prisma.dang_ky_hoc.findMany.mockResolvedValue([{ hoc_vien_id: 'hv-1', hoc_vien: { doi_tuong: null } }]);
     prisma.ket_qua_khao_sat.findMany.mockResolvedValue([
       { hoc_vien_id: 'hv-1', loai: 'danh-gia', muc_goc: 'X9' },
     ]);
@@ -172,7 +175,7 @@ describe('BaoCaoService.tongQuan', () => {
   // Sửa 2026-10-07: thay "Kết quả theo hình thức" (dang_ky_hoc_lop, đã bỏ)
   // bằng tình hình tham gia học THEO ĐIỂM DANH thật, nhóm theo giai đoạn.
   it('tham_gia_hoc: nhóm điểm danh theo giai đoạn; so_buoi = số buổi có ít nhất 1 lượt điểm danh', async () => {
-    prisma.dang_ky_hoc.findMany.mockResolvedValue([{ hoc_vien_id: 'hv-1' }]);
+    prisma.dang_ky_hoc.findMany.mockResolvedValue([{ hoc_vien_id: 'hv-1', hoc_vien: { doi_tuong: null } }]);
     // gd-1 (K-001): 2 buổi (lh-1, lh-2); gd-2 (K-001): 1 buổi (lh-3).
     prisma.diem_danh.groupBy.mockResolvedValue([
       { lich_hoc_id: 'lh-1', trang_thai: 'co_mat', _count: { _all: 2 } },
@@ -237,7 +240,7 @@ describe('BaoCaoService.tongQuan', () => {
   });
 
   it('không có lượt điểm danh nào -> tham_gia_hoc rỗng, không truy vấn lich_hoc_lop', async () => {
-    prisma.dang_ky_hoc.findMany.mockResolvedValue([{ hoc_vien_id: 'hv-1' }]);
+    prisma.dang_ky_hoc.findMany.mockResolvedValue([{ hoc_vien_id: 'hv-1', hoc_vien: { doi_tuong: null } }]);
     prisma.diem_danh.groupBy.mockResolvedValue([]);
 
     const result = await service.tongQuan({}, caller());
@@ -280,7 +283,7 @@ describe('BaoCaoService.tongQuan', () => {
           },
         ],
       },
-      select: { hoc_vien_id: true },
+      select: { hoc_vien_id: true, hoc_vien: { select: { doi_tuong: true } } },
     });
   });
 
@@ -299,7 +302,7 @@ describe('BaoCaoService.tongQuan', () => {
 
     expect(prisma.dang_ky_hoc.findMany).toHaveBeenCalledWith({
       where: { AND: [where] },
-      select: { hoc_vien_id: true },
+      select: { hoc_vien_id: true, hoc_vien: { select: { doi_tuong: true } } },
     });
   });
 

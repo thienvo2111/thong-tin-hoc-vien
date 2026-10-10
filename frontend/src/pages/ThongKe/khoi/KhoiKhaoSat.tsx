@@ -65,6 +65,14 @@ export function KhoiKhaoSat({ loc }: { loc: LocThongKe }) {
     <KhoiThongKe tieu_de="Kết quả khảo sát" query={query} rong={false}>
       {d && (
         <Stack gap="sm">
+          <Text size="xs" c="dimmed">
+            Không tính nhân viên (không thực hiện khảo sát – đánh giá).
+          </Text>
+          {loc.doi_tuong === 'nhan_vien' && (
+            <Text size="sm" c="dimmed">
+              Nhân viên hiện không thực hiện khảo sát – đánh giá.
+            </Text>
+          )}
           <KyNangSo k={d.ky_nang_so} />
           <Text fw={600} size="sm">
             Đánh giá năng lực số — kết quả thực tế (hệ thống khảo sát trả về)

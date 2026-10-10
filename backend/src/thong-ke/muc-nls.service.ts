@@ -8,6 +8,7 @@ import { ThongKeScopeService } from './thong-ke-scope.service';
 import { MucNlsQueryDto } from './dto/thong-ke-query.dto';
 import { chuanCap, chuanDoiTuong } from './bieu-mau.service';
 import { moTaBieuMau } from './mo-ta-bieu-mau';
+import { HOC_VIEN_PHAI_KHAO_SAT } from '../common/utils/doi-tuong-khao-sat.util';
 import {
   CAP_BIEU_MAU,
   DemMucNls,
@@ -128,8 +129,10 @@ export class MucNlsService {
     loai: LoaiMucNls,
     kemTen: boolean,
   ): Promise<DongHocVienMuc[]> {
+    // Nhân viên chưa triển khai khảo sát -> loại khỏi báo cáo "Đánh giá NLS
+    // theo mức" (tong/theo_truong/theo_doi_tuong và sheet Đã làm/Chưa làm).
     const dks = await this.prisma.dang_ky_hoc.findMany({
-      where,
+      where: { AND: [where, { hoc_vien: HOC_VIEN_PHAI_KHAO_SAT }] },
       select: {
         hoc_vien_id: true,
         hoc_vien: {

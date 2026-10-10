@@ -69,4 +69,18 @@ describe('KhoiKhaoSat', () => {
     expect(within(dauVao).getByText('Chưa làm: 50 (100,0% tổng HV)')).toBeInTheDocument();
     expect(dauVao.textContent).not.toMatch(/NaN/);
   });
+
+  it('luôn hiện chú thích "Không tính nhân viên"', async () => {
+    datToken('token-gia-lap');
+    renderTrang(<KhoiKhaoSat loc={{}} />);
+    await screen.findByTestId('donut-dau-vao');
+    expect(screen.getByText('Không tính nhân viên (không thực hiện khảo sát – đánh giá).')).toBeInTheDocument();
+  });
+
+  it('loc.doi_tuong = nhan_vien -> hiện ghi chú riêng', async () => {
+    datToken('token-gia-lap');
+    renderTrang(<KhoiKhaoSat loc={{ doi_tuong: 'nhan_vien' }} />);
+    await screen.findByTestId('donut-dau-vao');
+    expect(screen.getByText('Nhân viên hiện không thực hiện khảo sát – đánh giá.')).toBeInTheDocument();
+  });
 });

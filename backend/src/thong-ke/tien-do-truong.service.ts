@@ -7,6 +7,7 @@ import { buildTienDoTruongWorkbook } from '../bao-cao/util/report-excel.util';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { ThongKeQueryDto } from './dto/thong-ke-query.dto';
 import { TienDoTruongDong } from './thong-ke.types';
+import { phaiKhaoSat } from '../common/utils/doi-tuong-khao-sat.util';
 
 const NGUONG_VLE = 50;
 
@@ -15,6 +16,8 @@ interface Tong {
   ten_don_vi: string;
   ten_don_vi_cha: string | null;
   hv: Set<string>;
+  /** hv trừ nhân viên — mẫu số cho kyNangSo/dauVao/dauRa (chưa triển khai khảo sát). */
+  hvKhaoSat: Set<string>;
   truyCap: Set<string>;
   kyNangSo: Set<string>;
   dauVao: Set<string>;
@@ -81,6 +84,7 @@ export class TienDoTruongService {
                   don_vi_cha: { select: { ten_don_vi: true } },
                 },
               },
+              doi_tuong: true,
               nguoi_dung_account: { select: { dang_nhap_lan_cuoi: true } },
               ket_qua_khao_sat: {
                 where: { trang_thai: 'hoan_thanh' },
@@ -115,6 +119,7 @@ export class TienDoTruongService {
           ten_don_vi: h.don_vi_cong_tac.ten_don_vi,
           ten_don_vi_cha: h.don_vi_cong_tac.don_vi_cha?.ten_don_vi ?? null,
           hv: new Set(),
+          hvKhaoSat: new Set(),
           truyCap: new Set(),
           kyNangSo: new Set(),
           dauVao: new Set(),
@@ -128,6 +133,7 @@ export class TienDoTruongService {
         theoTruong.set(donViId, t);
       }
       t.hv.add(d.hoc_vien_id);
+      if (phaiKhaoSat(h.doi_tuong)) t.hvKhaoSat.add(d.hoc_vien_id);
       t.soDangKy += 1;
       if (d.ket_qua === 'dat') t.soDat += 1;
       if (h.nguoi_dung_account?.dang_nhap_lan_cuoi) {
@@ -165,6 +171,7 @@ export class TienDoTruongService {
 
 function toDong(t: Tong): TienDoTruongDong {
   const soHv = t.hv.size;
+  const soHvKhaoSat = t.hvKhaoSat.size;
   const vleDat = [...t.vle.values()].filter(Boolean).length;
   return {
     don_vi_id: t.don_vi_id,
@@ -173,12 +180,13 @@ function toDong(t: Tong): TienDoTruongDong {
     so_hv: soHv,
     so_truy_cap: t.truyCap.size,
     ty_le_truy_cap: tyLe(t.truyCap.size, soHv),
+    so_hv_khao_sat: soHvKhaoSat,
     so_ky_nang_so: t.kyNangSo.size,
-    ty_le_ky_nang_so: tyLe(t.kyNangSo.size, soHv),
+    ty_le_ky_nang_so: tyLe(t.kyNangSo.size, soHvKhaoSat),
     so_dau_vao: t.dauVao.size,
-    ty_le_dau_vao: tyLe(t.dauVao.size, soHv),
+    ty_le_dau_vao: tyLe(t.dauVao.size, soHvKhaoSat),
     so_dau_ra: t.dauRa.size,
-    ty_le_dau_ra: tyLe(t.dauRa.size, soHv),
+    ty_le_dau_ra: tyLe(t.dauRa.size, soHvKhaoSat),
     so_luot_diem_danh: t.tongDiemDanh,
     so_luot_co_mat: t.coMat,
     ty_le_co_mat: tyLe(t.coMat, t.tongDiemDanh),

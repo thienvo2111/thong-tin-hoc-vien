@@ -10,6 +10,7 @@ import {
   ForbiddenAppException,
   NotFoundAppException,
 } from '../common/exceptions/app.exceptions';
+import { phaiKhaoSat } from '../common/utils/doi-tuong-khao-sat.util';
 import { TongHopQueryDto } from './dto/tong-hop-query.dto';
 import { XacNhanQueryDto } from './dto/xac-nhan-query.dto';
 import { VanHanhQueryDto } from './dto/van-hanh-query.dto';
@@ -686,7 +687,7 @@ export class BaoCaoService {
     const [dangKyRows, thang] = await Promise.all([
       this.prisma.dang_ky_hoc.findMany({
         where,
-        select: { hoc_vien_id: true },
+        select: { hoc_vien_id: true, hoc_vien: { select: { doi_tuong: true } } },
       }),
       this.thangMuc.thang(),
     ]);
@@ -728,7 +729,13 @@ export class BaoCaoService {
       tong_hoc_vien_tham_gia: dangKyRows.length,
       da_dang_nhap: daDangNhap,
       da_chinh_sua_ho_so: hoSoDaSuaRows.length,
-      khao_sat: this.gopKhaoSat(dangKyRows, ketQuaKhaoSatRows, thang),
+      // Nhân viên chưa triển khai khảo sát -> loại khỏi mẫu số khảo sát,
+      // không ảnh hưởng các số liệu tham gia/truy cập/hồ sơ ở trên.
+      khao_sat: this.gopKhaoSat(
+        dangKyRows.filter((r) => phaiKhaoSat(r.hoc_vien.doi_tuong)),
+        ketQuaKhaoSatRows,
+        thang,
+      ),
       tham_gia_hoc: thamGiaHoc,
     };
   }

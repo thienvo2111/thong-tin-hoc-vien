@@ -27,7 +27,7 @@ import { chuanHoaLienKet } from '@/lib/lienKet';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
-import { TEN_BAI_KHAO_SAT } from '@/lib/trangThaiKhaoSat';
+import { TEN_BAI_KHAO_SAT, phaiKhaoSat } from '@/lib/trangThaiKhaoSat';
 import { nhanMucNangLuc } from '@/lib/mucNangLuc';
 import { DOI_TUONG_OPTIONS, nhanTuTuyChon } from '@/lib/tuyChonHoSo';
 import { ModalMatKhauTam } from '@/pages/Admin/ModalMatKhauTam';
@@ -314,7 +314,9 @@ export default function HoTroHocVienChiTiet() {
             </Khung>
 
             <Khung tieuDe="Khảo sát">
-              {data.khao_sat.length === 0 ? (
+              {!phaiKhaoSat(data.ho_so.doi_tuong) ? (
+                <Text c="dimmed">Nhân viên hiện không thực hiện khảo sát – đánh giá.</Text>
+              ) : data.khao_sat.length === 0 ? (
                 <Text c="dimmed">Chưa mở bài khảo sát nào.</Text>
               ) : (
                 <Stack gap={4}>

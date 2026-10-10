@@ -36,12 +36,18 @@ export function KhoiCanDonDoc({ loc }: { loc: LocThongKe }) {
     }
   }
 
+  const laKhaoSat = loai === 'chua_ky_nang_so' || loai === 'chua_khao_sat';
+
   return (
     <KhoiThongKe
       tieu_de="Cần đôn đốc"
       query={query}
       rong={d?.tong === 0}
-      thong_bao_rong="Không có học viên cần đôn đốc"
+      thong_bao_rong={
+        laKhaoSat && loc.doi_tuong === 'nhan_vien'
+          ? 'Nhân viên hiện không thực hiện khảo sát – đánh giá'
+          : 'Không có học viên cần đôn đốc'
+      }
       dieu_khien={
         <Group justify="space-between" align="flex-end">
           <Tabs

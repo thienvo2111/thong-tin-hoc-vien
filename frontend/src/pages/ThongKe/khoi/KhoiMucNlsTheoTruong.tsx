@@ -123,6 +123,11 @@ export function KhoiMucNlsTheoTruong({ loc }: { loc: LocThongKe }) {
         </Group>
       }
     >
+      {d && loc.doi_tuong === 'nhan_vien' && (
+        <Text size="xs" c="dimmed">
+          Nhân viên hiện không thực hiện khảo sát – đánh giá.
+        </Text>
+      )}
       {d && (
         <Table.ScrollContainer minWidth={900} maxHeight={520}>
           <Table striped stickyHeader>

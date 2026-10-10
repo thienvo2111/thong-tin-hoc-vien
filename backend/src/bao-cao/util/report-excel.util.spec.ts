@@ -359,6 +359,7 @@ describe('report-excel.util', () => {
       so_hv: 8,
       so_truy_cap: 6,
       ty_le_truy_cap: 0.75,
+      so_hv_khao_sat: 8,
       so_ky_nang_so: 4,
       ty_le_ky_nang_so: 0.5,
       so_dau_vao: 2,
@@ -578,8 +579,10 @@ describe('buildNhuCauMucHocWorkbook', () => {
         da_dieu_chinh: 1,
         moc_tu_khao_sat: 1,
         theo_muc: theoMuc,
+        so_nhan_vien_loai_tru: 0,
       },
     ],
+    so_nhan_vien_loai_tru: 0,
   };
 
   const dangKy: DongDangKyNhuCauMuc[] = [
@@ -595,6 +598,7 @@ describe('buildNhuCauMucHocWorkbook', () => {
       ma_dinh_danh_moet: 'GV001',
       ma_khoa: 'K1',
       ten_khoa: 'Khóa 1',
+      doi_tuong: null,
     },
   ];
 
@@ -648,13 +652,15 @@ describe('buildNhuCauMucHocWorkbook', () => {
       'Trong đó mức lấy từ bài khảo sát (chưa chốt)',
     );
     expect(s.getCell('B17').value).toBe(1);
-    expect(s.getCell('A19').value).toBe('Điều chỉnh');
-    expect([1, 2, 3].map((c) => s.getRow(20).getCell(c).value)).toEqual([
+    expect(s.getCell('A18').value).toBe('Không tính nhân viên');
+    expect(s.getCell('B18').value).toBe(0);
+    expect(s.getCell('A20').value).toBe('Điều chỉnh');
+    expect([1, 2, 3].map((c) => s.getRow(21).getCell(c).value)).toEqual([
       'Từ mức',
       'Sang mức',
       'Số lượng',
     ]);
-    expect([1, 2, 3].map((c) => s.getRow(21).getCell(c).value)).toEqual([
+    expect([1, 2, 3].map((c) => s.getRow(22).getCell(c).value)).toEqual([
       'Nâng cao',
       'Cơ bản',
       1,
@@ -726,6 +732,21 @@ describe('buildNhuCauMucHocWorkbook', () => {
     ]);
   });
 
+  it('nhân viên có muc_hoc_chon vẫn bị loại khỏi "Danh sách điều chỉnh"; dòng "Không tính nhân viên" phản ánh đúng số', async () => {
+    const buf = await buildNhuCauMucHocWorkbook(
+      { ...data, so_nhan_vien_loai_tru: 1 },
+      [...dangKy, { ...dangKy[0], ho_ten: 'Nhân Viên B', doi_tuong: 'nhan_vien' }],
+      moTa,
+    );
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+    const s3 = wb.getWorksheet('Danh sách điều chỉnh')!;
+    expect(s3.getRow(7).getCell(2).value).toBe('Nguyễn Văn A');
+    expect(s3.getRow(8).getCell(1).value).toBeNull();
+    const s1 = wb.getWorksheet('Tổng hợp')!;
+    expect(s1.getCell('B18').value).toBe(1);
+  });
+
   it('không có điều chỉnh nào: sheet 3 chỉ có header, bảng Điều chỉnh sheet 1 không có dòng', async () => {
     const buf = await buildNhuCauMucHocWorkbook(
       { ...data, da_dieu_chinh: 0, dieu_chinh: [] },
@@ -737,6 +758,6 @@ describe('buildNhuCauMucHocWorkbook', () => {
     const s3 = wb.getWorksheet('Danh sách điều chỉnh')!;
     expect(s3.getRow(7).getCell(1).value).toBeNull();
     const s1 = wb.getWorksheet('Tổng hợp')!;
-    expect(s1.getRow(21).getCell(1).value).toBeNull();
+    expect(s1.getRow(22).getCell(1).value).toBeNull();
   });
 });

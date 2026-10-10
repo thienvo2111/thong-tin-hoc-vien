@@ -726,6 +726,63 @@ describe('KhoaBoiDuongService', () => {
       expect(canhBao).toContain('nang_cao');
     });
 
+    it('nhân viên được gán lớp -> cảnh báo "hiện không tham gia tập huấn", không chặn', async () => {
+      prisma.hoc_vien.findUnique.mockImplementation(({ where }) =>
+        where.so_dinh_danh_ca_nhan === '123456789012'
+          ? { ...hocVienDaDuyet, doi_tuong: 'nhan_vien' }
+          : null,
+      );
+      prisma.lop_hoc.findMany.mockResolvedValue([
+        {
+          id: 'lop-zoom',
+          ten_lop: 'Lớp Zoom',
+          loai_lop: 'zoom',
+          muc_nang_luc: null,
+        },
+      ]);
+      const { dto, error, canhBao } = await service.resolvePhanLopRow(
+        { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': 'Lớp Zoom' },
+        khoa,
+      );
+      expect(error).toBeUndefined();
+      expect(dto).toBeDefined();
+      expect(canhBao).toContain('là nhân viên — hiện không tham gia tập huấn');
+    });
+
+    it('nhân viên chỉ gỡ lớp ("-") -> KHÔNG cảnh báo', async () => {
+      prisma.hoc_vien.findUnique.mockImplementation(({ where }) =>
+        where.so_dinh_danh_ca_nhan === '123456789012'
+          ? { ...hocVienDaDuyet, doi_tuong: 'nhan_vien' }
+          : null,
+      );
+      const { canhBao } = await service.resolvePhanLopRow(
+        { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': '-' },
+        khoa,
+      );
+      expect(canhBao).toBeUndefined();
+    });
+
+    it('giáo viên được gán lớp -> không có cảnh báo nhân viên', async () => {
+      prisma.hoc_vien.findUnique.mockImplementation(({ where }) =>
+        where.so_dinh_danh_ca_nhan === '123456789012'
+          ? { ...hocVienDaDuyet, doi_tuong: 'giao_vien' }
+          : null,
+      );
+      prisma.lop_hoc.findMany.mockResolvedValue([
+        {
+          id: 'lop-zoom',
+          ten_lop: 'Lớp Zoom',
+          loai_lop: 'zoom',
+          muc_nang_luc: null,
+        },
+      ]);
+      const { canhBao } = await service.resolvePhanLopRow(
+        { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': 'Lớp Zoom' },
+        khoa,
+      );
+      expect(canhBao).toBeUndefined();
+    });
+
     it('chưa chốt mức, có bài đánh giá M4 + tự chọn thanh_thao -> cảnh báo theo mức hiệu lực', async () => {
       prisma.lop_hoc.findMany.mockResolvedValue([
         {

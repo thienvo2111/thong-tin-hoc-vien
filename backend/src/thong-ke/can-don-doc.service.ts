@@ -6,6 +6,7 @@ import { buildCanDonDocWorkbook } from '../bao-cao/util/report-excel.util';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { CanDonDocQueryDto } from './dto/thong-ke-query.dto';
 import { CanDonDocDong, CanDonDocResult } from './thong-ke.types';
+import { HOC_VIEN_PHAI_KHAO_SAT } from '../common/utils/doi-tuong-khao-sat.util';
 
 const PAGE_SIZE = 20;
 const NGUONG_VANG = 2;
@@ -40,11 +41,17 @@ interface DieuKien {
 }
 
 // Chưa hoàn thành phiếu `loai` (khao-sat = kĩ năng số, danh-gia = NLS đầu vào).
+// Nhân viên chưa triển khai khảo sát -> loại khỏi danh sách "cần đôn đốc".
 const chuaHoanThanhPhieu = (loai: 'khao-sat' | 'danh-gia'): DieuKien => ({
   loc: {
-    hoc_vien: {
-      ket_qua_khao_sat: { none: { loai, trang_thai: 'hoan_thanh' } },
-    },
+    AND: [
+      { hoc_vien: HOC_VIEN_PHAI_KHAO_SAT },
+      {
+        hoc_vien: {
+          ket_qua_khao_sat: { none: { loai, trang_thai: 'hoan_thanh' } },
+        },
+      },
+    ],
   },
   chiTiet: new Map(),
 });

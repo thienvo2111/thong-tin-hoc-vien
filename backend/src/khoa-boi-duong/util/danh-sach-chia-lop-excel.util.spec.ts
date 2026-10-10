@@ -180,4 +180,107 @@ describe('buildDanhSachChiaLopWorkbook', () => {
       expect(Object.keys(r.values).some((k) => k.startsWith('#'))).toBe(false);
     }
   });
+
+  describe('2026-10-10: nhân viên không xếp lớp', () => {
+    const nhanVienCoLop = hocVien({
+      ho_ten: 'Nhân Viên Có Lớp',
+      ma_dinh_danh_moet: '2000000001',
+      ten_truong: 'Trường B',
+      doi_tuong: 'nhan_vien',
+      phan_lop: [{ giai_doan_id: 'gd-1', ten_lop: 'Lớp A', loai_lop: 'truc_tiep' }],
+    });
+    const nhanVienChuaDuyet = hocVien({
+      ho_ten: 'Nhân Viên Chưa Duyệt',
+      ma_dinh_danh_moet: '2000000002',
+      ten_truong: 'Trường C',
+      doi_tuong: 'nhan_vien',
+      trang_thai_ho_so: 'cho_duyet',
+    });
+    const chuaKhaiDoiTuong = hocVien({
+      ho_ten: 'Chưa Khai Đối Tượng',
+      ma_dinh_danh_moet: '2000000003',
+      ten_truong: 'Trường D',
+      doi_tuong: null,
+    });
+
+    it('nhân viên (kể cả chưa duyệt) bị loại khỏi "Phân lớp" và "Tổng hợp theo mức học"; học viên NULL doi_tuong vẫn ở "Phân lớp"', async () => {
+      const buf = await buildDanhSachChiaLopWorkbook(
+        'K1',
+        giaiDoan,
+        lopHoc,
+        [nangCao, nhanVienCoLop, nhanVienChuaDuyet, chuaKhaiDoiTuong],
+        THANG_MUC_MAC_DINH,
+      );
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+
+      const sheet1 = wb.getWorksheet('Phân lớp')!;
+      const ten1 = sheet1
+        .getRows(2, sheet1.rowCount - 1)
+        ?.map((r) => r.getCell(2).value);
+      expect(ten1).not.toContain('Nhân Viên Có Lớp');
+      expect(ten1).not.toContain('Nhân Viên Chưa Duyệt');
+      expect(ten1).toContain('Chưa Khai Đối Tượng');
+
+      const sheet3 = wb.getWorksheet('Tổng hợp theo mức học')!;
+      const tongSoHv = sheet3.getRow(sheet3.rowCount).getCell(2).value as number;
+      // Tổng chỉ gồm nangCao + chuaKhaiDoiTuong (2 HV, cả 2 đã duyệt) — không tính 2 nhân viên.
+      expect(tongSoHv).toBe(2);
+
+      // Không có "Chưa duyệt" vì học viên chưa duyệt duy nhất là nhân viên (đi hẳn sheet riêng).
+      expect(wb.worksheets.map((s) => s.name)).not.toContain('Chưa duyệt');
+    });
+
+    it('sheet "Nhân viên (không xếp lớp)" liệt kê cả 2, có cột "Lớp hiện tại" cho người đang có lớp', async () => {
+      const buf = await buildDanhSachChiaLopWorkbook(
+        'K1',
+        giaiDoan,
+        lopHoc,
+        [nangCao, nhanVienCoLop, nhanVienChuaDuyet],
+        THANG_MUC_MAC_DINH,
+      );
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+      expect(wb.worksheets.map((s) => s.name)).toContain('Nhân viên (không xếp lớp)');
+
+      const sheetNv = wb.getWorksheet('Nhân viên (không xếp lớp)')!;
+      const dongCoLop = sheetNv.getRow(3);
+      expect(dongCoLop.getCell(2).value).toBe('Nhân Viên Có Lớp');
+      expect(dongCoLop.getCell(5).value).toBe('GĐ1: Lớp A');
+      const dongChuaDuyet = sheetNv.getRow(4);
+      expect(dongChuaDuyet.getCell(2).value).toBe('Nhân Viên Chưa Duyệt');
+      expect(dongChuaDuyet.getCell(5).value).toBe('');
+    });
+
+    it('sheet "Hướng dẫn" có dòng cảnh báo số nhân viên bị loại, kèm số người đang có lớp', async () => {
+      const buf = await buildDanhSachChiaLopWorkbook(
+        'K1',
+        giaiDoan,
+        lopHoc,
+        [nangCao, nhanVienCoLop, nhanVienChuaDuyet],
+        THANG_MUC_MAC_DINH,
+      );
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+      const sheet2 = wb.getWorksheet('Hướng dẫn')!;
+      const canhBao = sheet2.getRow(2).getCell(1).value as string;
+      expect(canhBao).toContain('Đã loại 2 nhân viên');
+      expect(canhBao).toContain('trong đó 1 người đang có lớp');
+    });
+
+    it('không có nhân viên -> không tạo sheet riêng, "Hướng dẫn" không có dòng cảnh báo', async () => {
+      const buf = await buildDanhSachChiaLopWorkbook(
+        'K1',
+        giaiDoan,
+        lopHoc,
+        [nangCao, coBan],
+        THANG_MUC_MAC_DINH,
+      );
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+      expect(wb.worksheets.map((s) => s.name)).not.toContain('Nhân viên (không xếp lớp)');
+      const sheet2 = wb.getWorksheet('Hướng dẫn')!;
+      expect(sheet2.getRow(2).getCell(1).value).toContain('Ô "GĐ<n>');
+    });
+  });
 });

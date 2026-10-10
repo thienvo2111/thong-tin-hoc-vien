@@ -1,4 +1,4 @@
-import { Prisma, muc_nang_luc } from '@prisma/client';
+import { Prisma, doi_tuong_hoc_vien, muc_nang_luc } from '@prisma/client';
 import type { NguonMucDanhGia } from '../khoa-boi-duong/util/muc-hoc.util';
 
 export interface PhamViThongKe {
@@ -22,6 +22,9 @@ export interface BoLocResult {
 
 export interface PheuCounts {
   tham_gia: number;
+  /** tham_gia trừ nhân viên — mẫu số đúng cho 3 tỷ lệ khảo sát dưới đây
+   * (nhân viên chưa triển khai khảo sát, xem doi-tuong-khao-sat.util.ts). */
+  tham_gia_khao_sat: number;
   da_truy_cap: number;
   khao_sat_ky_nang_so: number;
   danh_gia_dau_vao: number;
@@ -155,6 +158,9 @@ export interface TienDoTruongDong {
   so_hv: number;
   so_truy_cap: number;
   ty_le_truy_cap: number | null;
+  /** Mẫu số của ty_le_ky_nang_so/dau_vao/dau_ra: so_hv trừ nhân viên (chưa
+   * triển khai khảo sát — xem doi-tuong-khao-sat.util.ts). */
+  so_hv_khao_sat: number;
   so_ky_nang_so: number;
   ty_le_ky_nang_so: number | null;
   so_dau_vao: number;
@@ -341,6 +347,8 @@ export interface NhuCauMucHocResult {
   dieu_chinh: { tu: muc_nang_luc; den: muc_nang_luc; so_luong: number }[];
   /** Sắp theo ten_don_vi (vi). */
   theo_truong: NhuCauMucHocTruongDong[];
+  /** 2026-10-10: số lượt đăng ký của nhân viên (không xếp lớp đợt này) đã loại khỏi mọi đếm trên. */
+  so_nhan_vien_loai_tru: number;
 }
 
 export interface NhuCauMucHocTruongDong {
@@ -352,6 +360,8 @@ export interface NhuCauMucHocTruongDong {
   da_dieu_chinh: number;
   moc_tu_khao_sat: number;
   theo_muc: NhuCauMucHocTheoMuc[];
+  /** Xem NhuCauMucHocResult.so_nhan_vien_loai_tru, tính riêng cho trường này. */
+  so_nhan_vien_loai_tru: number;
 }
 
 /** Một lượt đăng ký (dang_ky_hoc) — nguồn cho tongHopNhuCauMucHoc. ho_ten/ma_dinh_danh_moet/
@@ -370,4 +380,6 @@ export interface DongDangKyNhuCauMuc {
   ma_dinh_danh_moet: string | null;
   ma_khoa: string;
   ten_khoa: string;
+  /** 2026-10-10: nhan_vien -> loại khỏi mọi đếm (xem doi-tuong-khao-sat.util.ts#phaiXepLop). */
+  doi_tuong: doi_tuong_hoc_vien | null;
 }

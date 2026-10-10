@@ -3,6 +3,7 @@ import { CanDonDocService } from './can-don-doc.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { HOC_VIEN_PHAI_KHAO_SAT } from '../common/utils/doi-tuong-khao-sat.util';
 
 const user: AuthenticatedUser = {
   id: 'u-1',
@@ -104,25 +105,35 @@ describe('CanDonDocService', () => {
     });
   });
 
-  it('chua_khao_sat: không có đánh giá đầu vào hoàn thành', async () => {
+  it('chua_khao_sat: không có đánh giá đầu vào hoàn thành, loại nhân viên (chưa triển khai khảo sát)', async () => {
     await service.danhSach(user, { loai: 'chua_khao_sat' });
     expect(whereDaGoi().AND[1]).toEqual({
-      hoc_vien: {
-        ket_qua_khao_sat: {
-          none: { loai: 'danh-gia', trang_thai: 'hoan_thanh' },
+      AND: [
+        { hoc_vien: HOC_VIEN_PHAI_KHAO_SAT },
+        {
+          hoc_vien: {
+            ket_qua_khao_sat: {
+              none: { loai: 'danh-gia', trang_thai: 'hoan_thanh' },
+            },
+          },
         },
-      },
+      ],
     });
   });
 
-  it('chua_ky_nang_so: không có phiếu khao-sat hoàn thành', async () => {
+  it('chua_ky_nang_so: không có phiếu khao-sat hoàn thành, loại nhân viên (chưa triển khai khảo sát)', async () => {
     await service.danhSach(user, { loai: 'chua_ky_nang_so' });
     expect(whereDaGoi().AND[1]).toEqual({
-      hoc_vien: {
-        ket_qua_khao_sat: {
-          none: { loai: 'khao-sat', trang_thai: 'hoan_thanh' },
+      AND: [
+        { hoc_vien: HOC_VIEN_PHAI_KHAO_SAT },
+        {
+          hoc_vien: {
+            ket_qua_khao_sat: {
+              none: { loai: 'khao-sat', trang_thai: 'hoan_thanh' },
+            },
+          },
         },
-      },
+      ],
     });
   });
 

@@ -906,6 +906,11 @@ export async function buildChatLuongHoSoWorkbook(
 const HANG_DAU_MUC_NLS = 6;
 const NHAN_CHUA_XEP_MUC = 'Chưa xếp mức';
 
+// Báo cáo khảo sát — nhân viên không thực hiện khảo sát/đánh giá, bỏ dòng
+// "Nhân viên" khỏi bảng "Theo đối tượng" (khác bieu-mau dang-ky-truy-cap,
+// không phải khảo sát, vẫn giữ dòng này).
+const DOI_TUONG_MUC_NLS = DOI_TUONG_BIEU_MAU.filter((d) => d !== 'nhan_vien');
+
 const phanTramMuc = (tu: number, mau: number): number | null =>
   mau === 0 ? null : Math.round((tu / mau) * 1000) / 10;
 
@@ -1091,7 +1096,7 @@ export async function buildMucNlsWorkbook(
     HANG_DAU_MUC_NLS,
     'Theo đối tượng',
     'Đối tượng',
-    DOI_TUONG_BIEU_MAU.map((d) => ({
+    DOI_TUONG_MUC_NLS.map((d) => ({
       nhan: NHAN_DOI_TUONG_BIEU_MAU(d),
       dem: data.theo_doi_tuong[d],
     })),
@@ -1262,6 +1267,8 @@ export async function buildNhuCauMucHocWorkbook(
     ['Đề nghị học mức thấp hơn', data.da_dieu_chinh],
     ['Chưa có mức đánh giá', data.chua_co_muc],
     ['Trong đó mức lấy từ bài khảo sát (chưa chốt)', data.moc_tu_khao_sat],
+    // 2026-10-10: nhân viên không xếp lớp đợt này — đã loại khỏi mọi số ở trên.
+    ['Không tính nhân viên', data.so_nhan_vien_loai_tru],
   ];
   tomTat.forEach(([nhan, giaTri], i) => {
     sheet1.getCell(dongTomTat + i, 1).value = nhan;
@@ -1372,7 +1379,7 @@ export async function buildNhuCauMucHocWorkbook(
   });
   kieuHeader(sheet3, HANG_DAU_NHU_CAU_MUC, HANG_DAU_NHU_CAU_MUC, cot3.length);
   const dsDieuChinh = dangKy
-    .filter((r) => r.muc_hoc_chon !== null)
+    .filter((r) => r.muc_hoc_chon !== null && r.doi_tuong !== 'nhan_vien')
     .sort(
       (a, b) =>
         a.ten_don_vi.localeCompare(b.ten_don_vi, 'vi') ||

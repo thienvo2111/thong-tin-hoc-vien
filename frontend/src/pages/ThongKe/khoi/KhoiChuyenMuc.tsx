@@ -59,7 +59,11 @@ export function KhoiChuyenMuc({ loc }: { loc: LocThongKe }) {
       tieu_de="Chuyển mức đầu vào → đầu ra"
       query={query}
       rong={d?.tong === 0}
-      thong_bao_rong="Chưa có học viên đủ kết quả đầu vào và đầu ra"
+      thong_bao_rong={
+        loc.doi_tuong === 'nhan_vien'
+          ? 'Nhân viên hiện không thực hiện khảo sát – đánh giá'
+          : 'Chưa có học viên đủ kết quả đầu vào và đầu ra'
+      }
     >
       {d && (
         <Stack gap="sm">
