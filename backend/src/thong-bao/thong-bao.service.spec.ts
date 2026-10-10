@@ -244,6 +244,30 @@ describe('ThongBaoService', () => {
       expect(res).toEqual({ chuaCoEmail: false });
     });
 
+    it('khóa bật điểm danh Zoom -> buổi Zoom không chứa link, dẫn về Cổng; buổi trực tiếp giữ nguyên', async () => {
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        id: 'dk-1',
+        hoc_vien_id: 'hv-1',
+        hoc_vien: hocVienDayDu,
+        khoa: {
+          ten_khoa: 'Khóa A',
+          ma_khoa: 'KA',
+          giai_doan: giaiDoanKhoa,
+          bat_diem_danh_zoom_luc: new Date('2026-01-01T00:00:00Z'),
+        },
+        phan_lop_giai_doan: [gan('gd-1', lopTrucTiep), gan('gd-2', lopZoom)],
+      });
+      await service.guiDangKyHocPhanLop('dk-1');
+      const html = prisma.hang_doi_email.create.mock.calls[0][0].data
+        .noi_dung_html as string;
+      expect(html).not.toContain('zoom.us');
+      expect(html).toContain(
+        'Vào học và điểm danh bằng nút trên Cổng thông tin',
+      );
+      expect(html).toContain('/toi/lop-hoc');
+      expect(html).toContain('Hội trường');
+    });
+
     it('chỉ có lớp Zoom, không có lớp trực tiếp -> KHÔNG gửi (giữ điều kiện cũ)', async () => {
       prisma.dang_ky_hoc.findUnique.mockResolvedValue({
         id: 'dk-1',

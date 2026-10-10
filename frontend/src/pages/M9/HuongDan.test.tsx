@@ -12,19 +12,19 @@ function render() {
   return renderVoiRouter(routes, { initialEntries: ['/huong-dan'] });
 }
 
-const TIEU_DE_13_PHAN = [
+const TIEU_DE_14_PHAN = [
   ...huongDan.parts.map((p) => p.tieuDe),
   'Lỗi thường gặp và cách khắc phục',
   'Liên hệ hỗ trợ và an toàn tài khoản',
 ];
 
-describe('M9 — Hướng dẫn sử dụng: 13 phần', () => {
-  it('render đủ 13 tiêu đề phần', () => {
+describe('M9 — Hướng dẫn sử dụng: 14 phần', () => {
+  it('render đủ 14 tiêu đề phần', () => {
     const { container } = render();
-    TIEU_DE_13_PHAN.forEach((tieuDe) => {
+    TIEU_DE_14_PHAN.forEach((tieuDe) => {
       expect(screen.getByRole('heading', { level: 2, name: tieuDe })).toBeInTheDocument();
     });
-    expect(TIEU_DE_13_PHAN).toHaveLength(13);
+    expect(TIEU_DE_14_PHAN).toHaveLength(14);
     // Nội dung hướng dẫn dùng chung nhiều tỉnh; chỉ Phụ lục nhóm Zalo (dữ liệu riêng của khóa) được nêu tên tỉnh.
     const banSao = container.cloneNode(true) as HTMLElement;
     banSao.querySelector('#phu-luc-zalo')?.remove();

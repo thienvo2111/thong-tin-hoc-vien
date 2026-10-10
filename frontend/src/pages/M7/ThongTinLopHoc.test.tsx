@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
-import { db } from '@/test/mocks/db';
+import { db, taoKhoaHocToiMau, taoKhoaHocToiZoomMau } from '@/test/mocks/db';
 import { datTinhTrangBai, ssoDaYeuCau } from '@/test/mocks/sso';
 import { datCauHinhKhaoSatMock } from '@/test/mocks/cauHinhKhaoSat';
 import { renderVoiRouter } from '@/test/testUtils';
@@ -430,5 +430,199 @@ describe('M7 — Thông tin lớp học', () => {
       const gd1 = (await cacTheGiaiDoan())[0];
       expect(within(gd1).getByRole('link', { name: 'Mở liên kết' })).toBeInTheDocument();
     });
+  });
+});
+
+// ADR 0005 (issue #24): lớp Zoom của khóa đã bật điểm danh — backend giấu link, trả diem_danh_zoom.
+describe('M7 — Điểm danh & vào Zoom', () => {
+  async function theBuoiZoom() {
+    const gd3 = (await cacTheGiaiDoan())[2];
+    return within(gd3).getAllByTestId('the-buoi');
+  }
+
+  function renderZoom() {
+    db.khoaHocToi = taoKhoaHocToiZoomMau();
+    return renderDaDangNhap();
+  }
+
+  it('nhãn trạng thái từng buổi theo giờ máy chủ (hiển thị giờ VN)', async () => {
+    renderZoom();
+    const the = await theBuoiZoom();
+    expect(within(the[0]).getByText('✅ Đã điểm danh 07:45')).toBeInTheDocument();
+    expect(within(the[1]).getByText('Đang mở điểm danh')).toBeInTheDocument();
+    expect(within(the[2]).getByText('Điểm danh mở lúc 07:30')).toBeInTheDocument();
+    expect(within(the[3]).getByText('Đã đóng điểm danh')).toBeInTheDocument();
+    expect(within(the[4]).getByText('Vắng')).toBeInTheDocument();
+  });
+
+  it('nút "Điểm danh & vào Zoom" chỉ ở buổi có link; không còn nút "Vào học" thẳng', async () => {
+    renderZoom();
+    const the = await theBuoiZoom();
+    for (const t of the.slice(0, 4)) {
+      expect(within(t).getByRole('button', { name: 'Điểm danh & vào Zoom' })).toBeInTheDocument();
+    }
+    expect(within(the[4]).queryByRole('button', { name: 'Điểm danh & vào Zoom' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Vào học' })).not.toBeInTheDocument();
+  });
+
+  it('khung cảnh báo vàng với số phút theo cấu hình khóa (120 phút -> "2 giờ")', async () => {
+    renderZoom();
+    const canhBao = await screen.findByTestId('canh-bao-diem-danh-zoom');
+    expect(canhBao.textContent).toBe(
+      '⚠️ Bắt buộc điểm danh từng buổi. Mỗi buổi học, hãy bấm nút Điểm danh & vào Zoom của đúng buổi đó (mở trước giờ học 30 phút, đóng sau giờ bắt đầu 2 giờ). Vào Zoom bằng link khác hoặc ở lại phòng từ buổi trước sẽ không được ghi nhận và bị tính vắng.',
+    );
+  });
+
+  it('khung cảnh báo: khoảng đóng không tròn giờ -> "N phút"', async () => {
+    const mau = taoKhoaHocToiZoomMau();
+    const lich = mau[0].giai_doan[2].lop!.lich_hoc;
+    lich[0] = {
+      ...lich[0],
+      diem_danh_zoom: { ...lich[0].diem_danh_zoom!, mo: '2026-10-12T00:45:00.000Z', dong: '2026-10-12T02:30:00.000Z' },
+    };
+    server.use(http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json(mau)));
+    renderDaDangNhap();
+    const canhBao = await screen.findByTestId('canh-bao-diem-danh-zoom');
+    expect(canhBao.textContent).toContain('(mở trước giờ học 15 phút, đóng sau giờ bắt đầu 90 phút)');
+  });
+
+  // ADR 0005 Z8 (issue #27): chuyển lớp — buổi chưa có dòng ở lớp mới nhưng đã có ở lớp cũ (chỉ hiển thị).
+  it('buổi có điểm danh ở lớp cũ -> dòng mờ "Buổi N: đã … ở {lớp} (lớp cũ)", không đổi nhãn Zoom', async () => {
+    const mau = taoKhoaHocToiZoomMau();
+    const lich = mau[0].giai_doan[2].lop!.lich_hoc;
+    lich[3] = { ...lich[3], diem_danh_lop_cu: { trang_thai: 'co_mat', ten_lop: 'Lớp Zoom 07' } };
+    lich[2] = { ...lich[2], diem_danh_lop_cu: { trang_thai: 'vang_co_phep', ten_lop: 'Lớp Zoom 07' } };
+    server.use(http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json(mau)));
+    renderDaDangNhap();
+    const the = await theBuoiZoom();
+    expect(within(the[3]).getByTestId('diem-danh-lop-cu')).toHaveTextContent(
+      'Buổi 4: đã có mặt ở Lớp Zoom 07 (lớp cũ)',
+    );
+    expect(within(the[3]).getByText('Đã đóng điểm danh')).toBeInTheDocument();
+    expect(within(the[2]).getByTestId('diem-danh-lop-cu')).toHaveTextContent(
+      'Buổi 3: đã vắng có phép ở Lớp Zoom 07 (lớp cũ)',
+    );
+    expect(within(the[0]).queryByTestId('diem-danh-lop-cu')).not.toBeInTheDocument();
+  });
+
+  it('lớp không bật điểm danh Zoom vẫn hiện dòng lớp cũ (vắng)', async () => {
+    const mau = taoKhoaHocToiMau();
+    const lich = mau[0].giai_doan[1].lop!.lich_hoc;
+    lich[1] = { ...lich[1], diem_danh_lop_cu: { trang_thai: 'vang', ten_lop: 'Lớp 02' } };
+    server.use(http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json(mau)));
+    renderDaDangNhap();
+    const gd2 = (await cacTheGiaiDoan())[1];
+    expect(within(gd2).getByTestId('diem-danh-lop-cu')).toHaveTextContent('Buổi 2: đã vắng ở Lớp 02 (lớp cũ)');
+  });
+
+  it('đã điểm danh buổi khác cùng ngày -> nhắc ở buổi chưa bấm cùng ngày, không nhắc buổi ngày khác', async () => {
+    renderZoom();
+    const the = await theBuoiZoom();
+    const nhac = 'Buổi này cũng cần bấm điểm danh, kể cả khi bạn vẫn đang ở trong phòng Zoom.';
+    expect(within(the[1]).getByText(nhac)).toBeInTheDocument();
+    expect(within(the[0]).queryByText(nhac)).not.toBeInTheDocument();
+    expect(within(the[2]).queryByText(nhac)).not.toBeInTheDocument();
+  });
+
+  it('da_ghi_nhan: hộp thoại xác nhận + "Mở phòng Zoom" là link cùng tab; tải lại trang lớp', async () => {
+    let soLanTai = 0;
+    const mau = taoKhoaHocToiZoomMau();
+    server.use(
+      http.get('/hoc-vien/toi/khoa-hoc', () => {
+        soLanTai++;
+        return HttpResponse.json(mau);
+      }),
+    );
+    const user = userEvent.setup();
+    renderDaDangNhap();
+    const the = await theBuoiZoom();
+    await user.click(within(the[1]).getByRole('button', { name: 'Điểm danh & vào Zoom' }));
+    const hop = await screen.findByRole('dialog', { name: 'Buổi 2' });
+    expect(within(hop).getByText('✅ Đã điểm danh buổi 2 lúc 12:40.')).toBeInTheDocument();
+    const mo = within(hop).getByRole('link', { name: 'Mở phòng Zoom' });
+    expect(mo).toHaveAttribute('href', 'https://zoom.us/j/999');
+    expect(mo).not.toHaveAttribute('target');
+    await waitFor(() => expect(soLanTai).toBe(2));
+  });
+
+  it('da_co: báo đã điểm danh lúc HH:mm + "Mở phòng Zoom"', async () => {
+    db.vaoHocZoom = {
+      ket_qua: 'da_co',
+      trang_thai: 'co_mat',
+      luc: '2026-10-12T05:35:00.000Z',
+      link: 'zoom.us/j/999',
+      mo: '2026-10-12T05:30:00.000Z',
+      dong: '2026-10-12T08:00:00.000Z',
+    };
+    const user = userEvent.setup();
+    renderZoom();
+    const the = await theBuoiZoom();
+    await user.click(within(the[1]).getByRole('button', { name: 'Điểm danh & vào Zoom' }));
+    const hop = await screen.findByRole('dialog', { name: 'Buổi 2' });
+    expect(within(hop).getByText('ℹ️ Bạn đã điểm danh buổi này lúc 12:35.')).toBeInTheDocument();
+    const mo = within(hop).getByRole('link', { name: 'Mở phòng Zoom' });
+    expect(mo).toHaveAttribute('href', 'https://zoom.us/j/999');
+    expect(mo).not.toHaveAttribute('target');
+  });
+
+  it('qua_gio: cảnh báo không ghi nhận + "Vẫn vào Zoom"', async () => {
+    db.vaoHocZoom = {
+      ket_qua: 'qua_gio',
+      mo: '2026-10-14T00:30:00.000Z',
+      dong: '2026-10-14T03:00:00.000Z',
+      link: 'https://zoom.us/j/444',
+    };
+    const user = userEvent.setup();
+    renderZoom();
+    const the = await theBuoiZoom();
+    await user.click(within(the[3]).getByRole('button', { name: 'Điểm danh & vào Zoom' }));
+    const hop = await screen.findByRole('dialog', { name: 'Buổi 4' });
+    expect(
+      within(hop).getByText('⚠️ Đã quá thời gian điểm danh (đóng lúc 10:00) nên lượt vào này không được ghi nhận.'),
+    ).toBeInTheDocument();
+    const mo = within(hop).getByRole('link', { name: 'Vẫn vào Zoom' });
+    expect(mo).toHaveAttribute('href', 'https://zoom.us/j/444');
+    expect(mo).not.toHaveAttribute('target');
+  });
+
+  it('chua_mo: báo giờ mở, chỉ có nút "Đóng", không link', async () => {
+    db.vaoHocZoom = { ket_qua: 'chua_mo', mo: '2026-10-13T00:30:00.000Z', dong: '2026-10-13T03:00:00.000Z' };
+    const user = userEvent.setup();
+    renderZoom();
+    const the = await theBuoiZoom();
+    await user.click(within(the[2]).getByRole('button', { name: 'Điểm danh & vào Zoom' }));
+    const hop = await screen.findByRole('dialog', { name: 'Buổi 3' });
+    expect(within(hop).getByText('⏳ Chưa đến thời gian điểm danh — mở lúc 07:30.')).toBeInTheDocument();
+    expect(within(hop).queryByRole('link')).not.toBeInTheDocument();
+    await user.click(within(hop).getByRole('button', { name: 'Đóng' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Buổi 3' })).not.toBeInTheDocument());
+  });
+
+  it('lỗi API (vd 403 không thuộc lớp) -> hiện thông báo lỗi, không mở hộp thoại', async () => {
+    server.use(
+      http.post('/lich-hoc/:id/vao-hoc', () =>
+        HttpResponse.json(
+          { error: { code: 'FORBIDDEN', message: 'Thầy/Cô không thuộc lớp của buổi học này' } },
+          { status: 403 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderZoom();
+    const the = await theBuoiZoom();
+    await user.click(within(the[1]).getByRole('button', { name: 'Điểm danh & vào Zoom' }));
+    expect(await within(the[1]).findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('buổi không áp dụng (khóa chưa bật) vẫn hiện nút "Vào học" cũ, không cảnh báo vàng', async () => {
+    renderDaDangNhap();
+    const gd3 = (await cacTheGiaiDoan())[2];
+    expect(within(gd3).getByRole('link', { name: 'Vào học' })).toHaveAttribute(
+      'href',
+      'https://vle.example.edu.vn/lop-1/buoi-2',
+    );
+    expect(within(gd3).queryByRole('button', { name: 'Điểm danh & vào Zoom' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('canh-bao-diem-danh-zoom')).not.toBeInTheDocument();
   });
 });

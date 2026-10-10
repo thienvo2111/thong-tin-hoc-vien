@@ -28,6 +28,7 @@ import { BangKiemModule } from './bang-kiem/bang-kiem.module';
 import { CongGiangVienModule } from './cong-giang-vien/cong-giang-vien.module';
 import { NhacLichModule } from './nhac-lich/nhac-lich.module';
 import { VanHanhModule } from './van-hanh/van-hanh.module';
+import { DiemDanhModule } from './diem-danh/diem-danh.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { VanHanhModule } from './van-hanh/van-hanh.module';
     CongGiangVienModule,
     NhacLichModule,
     VanHanhModule,
+    DiemDanhModule,
     DanhMucModule,
     ImportModule,
     BaoCaoModule,

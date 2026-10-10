@@ -1,10 +1,15 @@
+import { che_do_chuyen_can } from '@prisma/client';
 import {
   IsBoolean,
   IsDateString,
+  IsEnum,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -46,4 +51,26 @@ export class UpdateKhoaBoiDuongDto {
   @IsOptional()
   @IsBoolean()
   mo_dieu_chinh_muc?: boolean;
+
+  // ADR 0005 (issue #23): bật = ghi mốc bat_diem_danh_zoom_luc (giữ mốc cũ
+  // nếu đã bật), tắt = NULL. Khoảng phút khớp CHECK trong migration.
+  @IsOptional()
+  @IsBoolean()
+  bat_diem_danh_zoom?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(180)
+  diem_danh_mo_truoc_phut?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(15)
+  @Max(720)
+  diem_danh_dong_sau_phut?: number;
+
+  @IsOptional()
+  @IsEnum(che_do_chuyen_can)
+  che_do_chuyen_can?: che_do_chuyen_can;
 }

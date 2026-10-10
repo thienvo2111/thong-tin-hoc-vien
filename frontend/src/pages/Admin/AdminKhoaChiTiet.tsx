@@ -68,6 +68,9 @@ import { SelectDiemHoc } from '@/components/SelectDiemHoc';
 import { ModalPhanCongBuoi } from './ModalPhanCongBuoi';
 import { ChonNhomHoTroGv } from './ChonNhomHoTroGv';
 import { BangKiemEditor } from './BangKiemEditor';
+import { CauHinhDiemDanhZoom } from './CauHinhDiemDanhZoom';
+import { CanhBaoZoomThieuLink } from './CanhBaoZoomThieuLink';
+import { BangDiemDanhLop } from '@/components/BangDiemDanhLop';
 
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 const MAU_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'blue', zoom: 'grape', vle: 'teal' };
@@ -229,6 +232,8 @@ export default function AdminKhoaChiTiet() {
   const { nguoiDung } = useToi();
   const vaiTro = nguoiDung?.vai_tro ?? '';
   const laQuanTri = vaiTro === 'quan_tri';
+  // ADR 0005 Z7 (issue #26): bảng điểm danh của 1 lớp, Quản trị sửa nhanh từng ô.
+  const [lopDiemDanh, setLopDiemDanh] = useState<LopHoc | null>(null);
   const { data: khoa, isLoading, isError, error } = useChiTietKhoa(id);
   const donVi = useDonViChoKhoa();
   // Chỉ gồm so_gddt + khac (danh mục nhỏ, xem useDonViChoKhoa) — Trường chọn qua SelectDonViTimKiem.
@@ -872,6 +877,9 @@ export default function AdminKhoaChiTiet() {
               </Paper>
             )}
 
+            {laQuanTri && <CauHinhDiemDanhZoom khoa={khoa} />}
+            <CanhBaoZoomThieuLink soBuoi={khoa.so_buoi_zoom_thieu_link} />
+
             {khoa.pham_vi_hoc_vien === 'don_vi' && (
               <Alert color="blue" variant="light">
                 Bạn đang xem các học viên thuộc đơn vị của mình trong khóa này.
@@ -974,6 +982,9 @@ export default function AdminKhoaChiTiet() {
                                     </Button>
                                     {laQuanTri && (
                                       <>
+                                        <Button variant="subtle" size="xs" onClick={() => setLopDiemDanh(lop)}>
+                                          Điểm danh
+                                        </Button>
                                         <Button variant="subtle" size="xs" onClick={() => moModalSuaLop(lop)}>
                                           Sửa
                                         </Button>
@@ -1553,6 +1564,10 @@ export default function AdminKhoaChiTiet() {
       </Modal>
 
       <ModalPhanCongBuoi khoaId={khoaId} buoi={buoiPhanCong} onClose={() => setBuoiPhanCong(null)} />
+
+      <Modal opened={!!lopDiemDanh} onClose={() => setLopDiemDanh(null)} title={`Điểm danh — ${lopDiemDanh?.ten_lop ?? ''}`} size="90%">
+        {lopDiemDanh && <BangDiemDanhLop lopId={lopDiemDanh.id} />}
+      </Modal>
 
       {/* ================= Modal: Sửa buổi học ================= */}
       <Modal opened={!!buoiDangSua} onClose={() => setBuoiDangSua(null)} title="Sửa buổi học" centered>

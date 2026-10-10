@@ -3,6 +3,7 @@ import { apiFetch, apiFetchBlob } from './client';
 import { taiFileTuBlob } from '@/lib/taiFile';
 import { layDonViCongTac } from './danhMuc';
 import type {
+  CheDoChuyenCan,
   CumHocVien,
   NguoiHoTroRutGon,
   GiaiDoanKhoa,
@@ -124,6 +125,11 @@ export interface CapNhatKhoaDto {
   don_vi_dat_hang_id?: string;
   // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học.
   mo_dieu_chinh_muc?: boolean;
+  // ADR 0005: true = bật (giữ mốc cũ nếu đã bật), false = tắt.
+  bat_diem_danh_zoom?: boolean;
+  diem_danh_mo_truoc_phut?: number;
+  diem_danh_dong_sau_phut?: number;
+  che_do_chuyen_can?: CheDoChuyenCan;
 }
 
 export function capNhatKhoa(id: string, dto: CapNhatKhoaDto) {

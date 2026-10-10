@@ -503,6 +503,88 @@ describe('KhoaBoiDuongService', () => {
       expect(res[0].khoa).not.toHaveProperty('giai_doan');
     });
 
+    // ADR 0005 Z8 (issue #27): buổi chưa có dòng ở lớp hiện tại nhưng đã có ở
+    // lớp cũ cùng giai đoạn, cùng buoi_so -> diem_danh_lop_cu (chỉ hiển thị).
+    it('chuyển lớp: buổi có điểm danh ở lớp cũ -> diem_danh_lop_cu', async () => {
+      const buoi = (id: string, buoi_so: number) => ({
+        id,
+        giai_doan_id: 'gd-1',
+        buoi_so,
+        phan_cong: [],
+      });
+      prisma.dang_ky_hoc.findMany.mockResolvedValue([
+        {
+          id: 'dk-1',
+          hoc_vien_id: 'hv-1',
+          khoa: {
+            id: 'khoa-1',
+            che_do_chuyen_can: 'theo_lop_hien_tai',
+            giai_doan: [
+              {
+                id: 'gd-1',
+                thu_tu: 1,
+                ten_giai_doan: 'GĐ 1',
+                hinh_thuc: 'truc_tuyen',
+              },
+            ],
+          },
+          phan_lop_giai_doan: [
+            {
+              giai_doan_id: 'gd-1',
+              lop_id: 'lop-moi',
+              lop: {
+                id: 'lop-moi',
+                ten_lop: 'Lớp mới',
+                lich_hoc: [buoi('m-1', 1), buoi('m-2', 2), buoi('m-3', 3)],
+              },
+            },
+          ],
+        },
+      ]);
+      const dong = (
+        lich_hoc_id: string,
+        lop_id: string,
+        buoi_so: number,
+        trang_thai: string,
+      ) => ({
+        dang_ky_hoc_id: 'dk-1',
+        lich_hoc_id,
+        trang_thai,
+        tu_diem_danh_luc: null,
+        lich_hoc: {
+          lop_id,
+          giai_doan_id: 'gd-1',
+          buoi_so,
+          lop: {
+            ten_lop: lop_id === 'lop-cu' ? 'Lớp cũ' : 'Lớp mới',
+            loai_lop: 'zoom',
+          },
+        },
+      });
+      prisma.diem_danh.findMany.mockResolvedValue([
+        dong('c-1', 'lop-cu', 1, 'co_mat'),
+        dong('m-1', 'lop-moi', 1, 'vang'),
+        dong('c-2', 'lop-cu', 2, 'vang_co_phep'),
+      ]);
+
+      const res = await service.khoaHocCuaToi({
+        ...truong,
+        vai_tro: 'hoc_vien',
+        hoc_vien_id: 'hv-1',
+      });
+
+      const [b1, b2, b3] = res[0].giai_doan[0].lop!.lich_hoc;
+      // Đã có dòng ở lớp hiện tại -> không kèm thông tin lớp cũ.
+      expect(b1.trang_thai_diem_danh).toBe('vang');
+      expect(b1).not.toHaveProperty('diem_danh_lop_cu');
+      expect(b2.trang_thai_diem_danh).toBeNull();
+      expect(b2).toHaveProperty('diem_danh_lop_cu', {
+        trang_thai: 'vang_co_phep',
+        ten_lop: 'Lớp cũ',
+      });
+      expect(b3).not.toHaveProperty('diem_danh_lop_cu');
+    });
+
     it('không có hoc_vien_id -> ForbiddenAppException', async () => {
       await expect(
         service.khoaHocCuaToi({

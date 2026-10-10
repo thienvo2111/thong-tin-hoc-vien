@@ -335,6 +335,36 @@ describe('Nhắc lịch — L8 (e2e)', () => {
   });
 
   describe('Nhắc cụm', () => {
+    it('ADR 0005: lớp Zoom của khóa bật điểm danh → tin nhắn cụm có 1 dòng nhắc bấm', async () => {
+      await prisma.lop_hoc.update({
+        where: { id: lopA },
+        data: { loai_lop: 'zoom' },
+      });
+      await prisma.khoa_boi_duong.update({
+        where: { id: khoaId },
+        data: { bat_diem_danh_zoom_luc: new Date() },
+      });
+      try {
+        const r = await http()
+          .get(`/ho-tro-hoc-vien/cum/${cum1}/tin-nhan-nhac`)
+          .query({ ngay: ngayVn(ngayD) })
+          .set(auth('hthv'))
+          .expect(200);
+        expect(
+          (r.body.noi_dung as string).match(/Điểm danh & vào Zoom/g),
+        ).toHaveLength(1);
+      } finally {
+        await prisma.lop_hoc.update({
+          where: { id: lopA },
+          data: { loai_lop: 'truc_tiep' },
+        });
+        await prisma.khoa_boi_duong.update({
+          where: { id: khoaId },
+          data: { bat_diem_danh_zoom_luc: null },
+        });
+      }
+    });
+
     it('K23: tin nhắn cụm chỉ buổi của lớp có học viên cụm mình, đúng ngày; cụm khác → 404', async () => {
       const r = await http()
         .get(`/ho-tro-hoc-vien/cum/${cum1}/tin-nhan-nhac`)
@@ -346,6 +376,7 @@ describe('Nhắc lịch — L8 (e2e)', () => {
       expect(r.body.noi_dung).toContain('Lớp A NL – Buổi 1');
       expect(r.body.noi_dung).not.toContain('Lớp B NL');
       expect(r.body.noi_dung).not.toContain('Buổi 3');
+      expect(r.body.noi_dung).not.toContain('Điểm danh & vào Zoom');
       expect(r.body.trang_thai_nhac).toBe('chua_nhac');
       await http()
         .get(`/ho-tro-hoc-vien/cum/${cum2}/tin-nhan-nhac`)

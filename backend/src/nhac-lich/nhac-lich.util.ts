@@ -149,6 +149,8 @@ export function soanTinNhanCum(d: {
   ten_cum: string;
   ngay: Date;
   buoi: (BuoiTinNhan & { ten_lop: string; thuc_dia: ThucDiaTinNhan[] })[];
+  // ADR 0005: ngày có ≥1 buổi lớp Zoom của khóa bật điểm danh -> nhắc bấm (không link).
+  nhac_diem_danh_zoom?: boolean;
 }): string {
   const dong: string[] = [
     `Kính gửi Thầy/Cô trong nhóm ${d.ten_cum},`,
@@ -161,6 +163,11 @@ export function soanTinNhanCum(d: {
       ...b.thuc_dia.map(
         (t) => `  Hỗ trợ tại điểm học: ${t.ho_ten} – ${t.so_dien_thoai}`,
       ),
+    );
+  }
+  if (d.nhac_diem_danh_zoom) {
+    dong.push(
+      'Nhớ bấm *Điểm danh & vào Zoom* trên Cổng thông tin cho từng buổi.',
     );
   }
   dong.push('Thầy/Cô vui lòng có mặt đúng giờ. Trân trọng.');

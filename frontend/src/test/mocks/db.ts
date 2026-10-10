@@ -1,5 +1,6 @@
 import type { LopCuaToiGv, TrangLop } from '@/api/hoTroGv';
 import type { BoBangKiem, DanhGiaDot } from '@/api/bangKiem';
+import type { DiemDanhZoomBuoi, KetQuaVaoHoc, LichHocLopToi } from '@/api/types';
 import type {
   DiemHoc,
   GiangVien,
@@ -211,6 +212,10 @@ export function taoDanhSachKhoaMau(): KhoaBoiDuong[] {
       updated_at: '2026-09-20T00:00:00.000Z',
       created_by: 'nd-1',
       mo_dieu_chinh_muc: false,
+      bat_diem_danh_zoom_luc: null,
+      diem_danh_mo_truoc_phut: 30,
+      diem_danh_dong_sau_phut: 120,
+      che_do_chuyen_can: 'theo_lop_hien_tai',
     },
     {
       id: 'khoa-2',
@@ -228,6 +233,10 @@ export function taoDanhSachKhoaMau(): KhoaBoiDuong[] {
       updated_at: '2026-09-21T00:00:00.000Z',
       created_by: 'nd-1',
       mo_dieu_chinh_muc: false,
+      bat_diem_danh_zoom_luc: null,
+      diem_danh_mo_truoc_phut: 30,
+      diem_danh_dong_sau_phut: 120,
+      che_do_chuyen_can: 'theo_lop_hien_tai',
     },
   ];
 }
@@ -654,6 +663,78 @@ export function taoKhoaHocToiMau(): KhoaHocDangKy[] {
       ],
     },
   ];
+}
+
+// ADR 0005 (issue #24): khóa đã bật điểm danh Zoom — GĐ3 (lớp Zoom) có 5 buổi kèm diem_danh_zoom (link bị
+// giấu). Cửa sổ 30' trước/120' sau giờ bắt đầu. Buổi 1 (08:00 VN 12/10) đã tự điểm danh 07:45; buổi 2 cùng
+// ngày (13:00) đang mở, chưa bấm; buổi 3 chưa mở; buổi 4 đã đóng chưa có dòng; buổi 5 vắng, chưa có link.
+function buoiZoom(
+  buoiSo: number,
+  batDau: string,
+  pha: DiemDanhZoomBuoi['pha'],
+  dd: Partial<DiemDanhZoomBuoi> = {},
+): LichHocLopToi {
+  const t = Date.parse(batDau);
+  return {
+    id: `lh-z${buoiSo}`,
+    giai_doan_id: 'gd-3',
+    buoi_so: buoiSo,
+    thoi_gian_bat_dau: batDau,
+    thoi_gian_ket_thuc: new Date(t + 3 * 3600_000).toISOString(),
+    dia_diem_hoac_link: null,
+    trang_thai: 'chua_dien_ra',
+    giai_doan: { ...GIAI_DOAN_KHOA_1[2] },
+    trang_thai_diem_danh: dd.trang_thai ?? null,
+    diem_danh_zoom: {
+      co_link: true,
+      mo: new Date(t - 30 * 60_000).toISOString(),
+      dong: new Date(t + 120 * 60_000).toISOString(),
+      pha,
+      trang_thai: null,
+      tu_diem_danh_luc: null,
+      ...dd,
+    },
+  };
+}
+
+export function taoKhoaHocToiZoomMau(): KhoaHocDangKy[] {
+  const [dk] = taoKhoaHocToiMau();
+  return [
+    {
+      ...dk,
+      giai_doan: dk.giai_doan.map((gd) =>
+        gd.id === 'gd-3' && gd.lop
+          ? {
+              ...gd,
+              lop: {
+                ...gd.lop,
+                lich_hoc: [
+                  buoiZoom(1, '2026-10-12T01:00:00.000Z', 'da_dong', {
+                    trang_thai: 'co_mat',
+                    tu_diem_danh_luc: '2026-10-12T00:45:00.000Z',
+                  }),
+                  buoiZoom(2, '2026-10-12T06:00:00.000Z', 'dang_mo'),
+                  buoiZoom(3, '2026-10-13T01:00:00.000Z', 'chua_mo'),
+                  buoiZoom(4, '2026-10-14T01:00:00.000Z', 'da_dong'),
+                  buoiZoom(5, '2026-10-15T01:00:00.000Z', 'da_dong', { trang_thai: 'vang', co_link: false }),
+                ],
+              },
+            }
+          : gd,
+      ),
+    },
+  ];
+}
+
+// Kết quả mặc định của POST /lich-hoc/{id}/vao-hoc — test đổi qua db.vaoHocZoom.
+export function taoKetQuaVaoHocMau(): KetQuaVaoHoc {
+  return {
+    ket_qua: 'da_ghi_nhan',
+    luc: '2026-10-12T05:40:00.000Z',
+    link: 'https://zoom.us/j/999',
+    mo: '2026-10-12T05:30:00.000Z',
+    dong: '2026-10-12T08:00:00.000Z',
+  };
 }
 
 // GET /hoc-vien/{id}/khoa-hoc (Thêm 2026-09-30, QĐ10) — admin xem lại khóa/lớp của 1 học viên cụ thể
@@ -1123,6 +1204,7 @@ export const db = {
   danhSachImport: taoDanhSachImportMau(),
   chiTietImport: taoChiTietImportMau(),
   khoaHocToi: taoKhoaHocToiMau(),
+  vaoHocZoom: taoKetQuaVaoHocMau(),
   khoaHocCuaHocVien: taoKhoaHocCuaHocVienMau(),
   danhSachYeuCauHoTro: taoDanhSachYeuCauHoTroMau(),
   taiKhoanDonVi: taoDanhSachTaiKhoanDonViMau(),
@@ -1164,6 +1246,7 @@ export function resetDb(): void {
   db.danhSachImport = taoDanhSachImportMau();
   db.chiTietImport = taoChiTietImportMau();
   db.khoaHocToi = taoKhoaHocToiMau();
+  db.vaoHocZoom = taoKetQuaVaoHocMau();
   db.khoaHocCuaHocVien = taoKhoaHocCuaHocVienMau();
   db.danhSachYeuCauHoTro = taoDanhSachYeuCauHoTroMau();
   db.taiKhoanDonVi = taoDanhSachTaiKhoanDonViMau();

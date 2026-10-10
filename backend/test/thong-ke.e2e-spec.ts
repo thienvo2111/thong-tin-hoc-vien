@@ -907,4 +907,192 @@ describe('Thống kê dashboard (e2e)', () => {
       ]);
     });
   });
+
+  // ADR 0005 Z8 (issue #27): học viên chuyển lớp Zoom có điểm danh ở cả lớp cũ
+  // và lớp mới — dashboard đếm mỗi học viên 1 lần mỗi (giai_doan, buoi_so).
+  // Fixture riêng (đơn vị độc lập, khóa C) đặt cuối file để không đổi số liệu
+  // các nhóm test trên.
+  describe('chuyên cần khi chuyển lớp', () => {
+    let khoaC: string;
+    let tokHvChuyen: string;
+
+    beforeAll(async () => {
+      const dvCc = await taoDonVi('cc', 'truong', diaDanhIds[0]);
+      khoaC = await taoKhoa('C', dvCc);
+      const gd = await prisma.giai_doan_khoa.create({
+        data: {
+          khoa_id: khoaC,
+          thu_tu: 1,
+          ten_giai_doan: 'Zoom CC',
+          hinh_thuc: 'truc_tuyen',
+          thoi_gian_bat_dau: new Date('2026-10-01'),
+          thoi_gian_ket_thuc: new Date('2027-01-31'),
+        },
+      });
+      const gdTt = await prisma.giai_doan_khoa.create({
+        data: {
+          khoa_id: khoaC,
+          thu_tu: 2,
+          ten_giai_doan: 'Trực tiếp CC',
+          hinh_thuc: 'truc_tiep',
+          thoi_gian_bat_dau: new Date('2026-10-01'),
+          thoi_gian_ket_thuc: new Date('2027-01-31'),
+        },
+      });
+      const taoLop = async (
+        ten_lop: string,
+        loai_lop: 'zoom' | 'truc_tiep' = 'zoom',
+        giaiDoanId = gd.id,
+      ) => {
+        const lop = await prisma.lop_hoc.create({
+          data: { khoa_id: khoaC, loai_lop, ten_lop },
+        });
+        const lich: string[] = [];
+        for (const buoi_so of loai_lop === 'zoom' ? [1, 2] : [1]) {
+          const bd = new Date(Date.now() - (10 - buoi_so) * 24 * 3600 * 1000);
+          const l = await prisma.lich_hoc_lop.create({
+            data: {
+              lop_id: lop.id,
+              giai_doan_id: giaiDoanId,
+              buoi_so,
+              thoi_gian_bat_dau: bd,
+              thoi_gian_ket_thuc: new Date(bd.getTime() + 3 * 3600 * 1000),
+            },
+          });
+          lich.push(l.id);
+        }
+        return { id: lop.id, lich };
+      };
+      const lopCu = await taoLop('Zoom CC cũ');
+      const lopMoi = await taoLop('Zoom CC mới');
+      // Trực tiếp: Z8 không áp — học bù lớp khác và HV không phân lớp vẫn tính.
+      const ttA = await taoLop('TT CC A', 'truc_tiep', gdTt.id);
+      const ttB = await taoLop('TT CC B', 'truc_tiep', gdTt.id);
+
+      const hvChuyen = await taoHocVien('cc-1', dvCc);
+      const hvO = await taoHocVien('cc-2', dvCc);
+      const dkChuyen = await dangKy(hvChuyen, khoaC);
+      const dkO = await dangKy(hvO, khoaC);
+      await prisma.phan_lop_giai_doan.createMany({
+        data: [dkChuyen.id, dkO.id].map((dang_ky_hoc_id) => ({
+          dang_ky_hoc_id,
+          giai_doan_id: gd.id,
+          lop_id: lopMoi.id,
+        })),
+      });
+      await prisma.phan_lop_giai_doan.create({
+        data: {
+          dang_ky_hoc_id: dkChuyen.id,
+          giai_doan_id: gdTt.id,
+          lop_id: ttA.id,
+        },
+      });
+      const dd = (
+        dang_ky_hoc_id: string,
+        lich_hoc_id: string,
+        trang_thai: 'co_mat' | 'vang',
+      ) => ({
+        dang_ky_hoc_id,
+        lich_hoc_id,
+        trang_thai,
+        nguon: 'zoom' as const,
+      });
+      // HV chuyển: lớp cũ có mặt B1, B2; lớp mới vắng B1 (chưa có B2).
+      await prisma.diem_danh.createMany({
+        data: [
+          dd(dkChuyen.id, lopCu.lich[0], 'co_mat'),
+          dd(dkChuyen.id, lopCu.lich[1], 'co_mat'),
+          dd(dkChuyen.id, lopMoi.lich[0], 'vang'),
+          dd(dkO.id, lopMoi.lich[0], 'co_mat'),
+          // HV chuyển: vắng ở lớp A (lớp được xếp), học bù có mặt ở lớp B.
+          dd(dkChuyen.id, ttA.lich[0], 'vang'),
+          dd(dkChuyen.id, ttB.lich[0], 'co_mat'),
+          // HV ở lại không phân lớp GĐ2 nhưng có dòng trực tiếp.
+          dd(dkO.id, ttA.lich[0], 'co_mat'),
+        ],
+      });
+
+      await prisma.nguoi_dung.update({
+        where: { ten_dang_nhap: `TK-cc-1-${SUF}` },
+        data: { mat_khau_hash: await bcrypt.hash('HocVien12345', 4) },
+      });
+      tokHvChuyen = await dangNhap(`TK-cc-1-${SUF}`, 'HocVien12345');
+    });
+
+    const chuyenCan = async () => {
+      const res = await get(
+        `/thong-ke/chuyen-can?khoa_id=${khoaC}`,
+        tok.quanTri,
+      );
+      expect(res.status).toBe(200);
+      return res.body.truc_tiep as {
+        giai_doan_thu_tu: number;
+        buoi_so: number;
+        co_mat: number;
+        vang_co_phep: number;
+        vang: number;
+      }[];
+    };
+
+    it('theo_lop_hien_tai (mặc định): chỉ lớp hiện tại, B1 = 1 có mặt + 1 vắng', async () => {
+      const cot = await chuyenCan();
+      expect(cot).toHaveLength(2);
+      expect(cot[0]).toMatchObject({
+        giai_doan_thu_tu: 1,
+        buoi_so: 1,
+        co_mat: 1,
+        vang_co_phep: 0,
+        vang: 1,
+      });
+      // Trực tiếp: mỗi HV 1 lần, học bù + HV không phân lớp vẫn tính.
+      expect(cot[1]).toMatchObject({
+        giai_doan_thu_tu: 2,
+        buoi_so: 1,
+        co_mat: 2,
+        vang: 0,
+      });
+    });
+
+    it('cong_nhan_lop_cu: lấy tốt nhất, mỗi học viên 1 lần mỗi buổi', async () => {
+      await prisma.khoa_boi_duong.update({
+        where: { id: khoaC },
+        data: { che_do_chuyen_can: 'cong_nhan_lop_cu' },
+      });
+      try {
+        const cot = await chuyenCan();
+        expect(cot).toHaveLength(3);
+        expect(cot[0]).toMatchObject({ buoi_so: 1, co_mat: 2, vang: 0 });
+        expect(cot[1]).toMatchObject({ buoi_so: 2, co_mat: 1, vang: 0 });
+        expect(cot[2]).toMatchObject({
+          giai_doan_thu_tu: 2,
+          co_mat: 2,
+          vang: 0,
+        });
+      } finally {
+        await prisma.khoa_boi_duong.update({
+          where: { id: khoaC },
+          data: { che_do_chuyen_can: 'theo_lop_hien_tai' },
+        });
+      }
+    });
+
+    it('trang lớp học viên: B2 chưa có dòng ở lớp mới -> diem_danh_lop_cu', async () => {
+      const res = await get('/hoc-vien/toi/khoa-hoc', tokHvChuyen);
+      expect(res.status).toBe(200);
+      const dk = (
+        res.body as {
+          khoa: { id: string };
+          giai_doan: { lop: { lich_hoc: Record<string, unknown>[] } | null }[];
+        }[]
+      ).find((d) => d.khoa.id === khoaC);
+      const [b1, b2] = dk!.giai_doan[0].lop!.lich_hoc;
+      expect(b1.trang_thai_diem_danh).toBe('vang');
+      expect(b1).not.toHaveProperty('diem_danh_lop_cu');
+      expect(b2.trang_thai_diem_danh).toBeNull();
+      expect(b2.diem_danh_lop_cu).toEqual({
+        trang_thai: 'co_mat',
+        ten_lop: 'Zoom CC cũ',
+      });
+    });
+  });
 });

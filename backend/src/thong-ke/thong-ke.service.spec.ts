@@ -541,17 +541,42 @@ describe('ThongKeService khối kết quả học tập + so sánh khóa', () =>
 describe('ThongKeService.chuyenCan', () => {
   let service: ThongKeService;
   let prisma: {
-    diem_danh: { groupBy: jest.Mock };
-    lich_hoc_lop: { findMany: jest.Mock };
+    diem_danh: { findMany: jest.Mock };
+    phan_lop_giai_doan: { findMany: jest.Mock };
     ket_qua_giai_doan: { findMany: jest.Mock };
     dang_ky_hoc: { count: jest.Mock };
   };
   let scope: { resolve: jest.Mock };
 
-  const lich = (id: string, thu_tu: number, buoi_so: number) => ({
-    id,
-    buoi_so,
-    giai_doan: { thu_tu },
+  const dong = (
+    dang_ky_hoc_id: string,
+    lop_id: string,
+    giai_doan_id: string,
+    thu_tu: number,
+    buoi_so: number,
+    trang_thai: string,
+    che_do_chuyen_can = 'theo_lop_hien_tai',
+    loai_lop = 'zoom',
+  ) => ({
+    dang_ky_hoc_id,
+    trang_thai,
+    lich_hoc: {
+      lop_id,
+      giai_doan_id,
+      buoi_so,
+      giai_doan: { thu_tu },
+      lop: { loai_lop },
+    },
+    dang_ky_hoc: { khoa: { che_do_chuyen_can } },
+  });
+  const phan = (
+    dang_ky_hoc_id: string,
+    giai_doan_id: string,
+    lop_id: string,
+  ) => ({
+    dang_ky_hoc_id,
+    giai_doan_id,
+    lop_id,
   });
   const vle = (...tyLe: (number | null)[]) =>
     prisma.ket_qua_giai_doan.findMany.mockResolvedValue(
@@ -560,8 +585,8 @@ describe('ThongKeService.chuyenCan', () => {
 
   beforeEach(() => {
     prisma = {
-      diem_danh: { groupBy: jest.fn().mockResolvedValue([]) },
-      lich_hoc_lop: { findMany: jest.fn().mockResolvedValue([]) },
+      diem_danh: { findMany: jest.fn().mockResolvedValue([]) },
+      phan_lop_giai_doan: { findMany: jest.fn().mockResolvedValue([]) },
       ket_qua_giai_doan: { findMany: jest.fn().mockResolvedValue([]) },
       dang_ky_hoc: { count: jest.fn().mockResolvedValue(0) },
     };
@@ -582,7 +607,7 @@ describe('ThongKeService.chuyenCan', () => {
   it('không khoa_id -> truc_tiep null, không truy vấn điểm danh', async () => {
     const r = await service.chuyenCan(caller('quan_tri'), {});
     expect(r.truc_tiep).toBeNull();
-    expect(prisma.diem_danh.groupBy).not.toHaveBeenCalled();
+    expect(prisma.diem_danh.findMany).not.toHaveBeenCalled();
   });
 
   it('có khoa_id nhưng không có điểm danh -> truc_tiep []', async () => {
@@ -592,9 +617,8 @@ describe('ThongKeService.chuyenCan', () => {
 
   it('truy vấn điểm danh chỉ lớp trực tiếp/zoom trong phạm vi', async () => {
     await service.chuyenCan(caller('quan_tri'), { khoa_id: 'k1' });
-    expect(prisma.diem_danh.groupBy).toHaveBeenCalledWith(
+    expect(prisma.diem_danh.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        by: ['lich_hoc_id', 'trang_thai'],
         where: {
           dang_ky_hoc: WHERE_SCOPE,
           lich_hoc: { lop: { loai_lop: { in: ['truc_tiep', 'zoom'] } } },
@@ -604,17 +628,24 @@ describe('ThongKeService.chuyenCan', () => {
   });
 
   it('gộp 2 lớp cùng (GĐ1, Buổi 1) vào một cột, sắp tăng, tính tỷ lệ', async () => {
-    prisma.diem_danh.groupBy.mockResolvedValue([
-      { lich_hoc_id: 'l-a', trang_thai: 'co_mat', _count: { _all: 6 } },
-      { lich_hoc_id: 'l-b', trang_thai: 'co_mat', _count: { _all: 2 } },
-      { lich_hoc_id: 'l-b', trang_thai: 'vang', _count: { _all: 1 } },
-      { lich_hoc_id: 'l-a', trang_thai: 'vang_co_phep', _count: { _all: 1 } },
-      { lich_hoc_id: 'l-c', trang_thai: 'vang', _count: { _all: 3 } },
+    prisma.diem_danh.findMany.mockResolvedValue([
+      ...Array.from({ length: 6 }, (_, i) =>
+        dong(`a${i}`, 'lop-a', 'gd1', 1, 1, 'co_mat'),
+      ),
+      dong('a6', 'lop-a', 'gd1', 1, 1, 'vang_co_phep'),
+      dong('b0', 'lop-b', 'gd1', 1, 1, 'co_mat'),
+      dong('b1', 'lop-b', 'gd1', 1, 1, 'co_mat'),
+      dong('b2', 'lop-b', 'gd1', 1, 1, 'vang'),
+      ...Array.from({ length: 3 }, (_, i) =>
+        dong(`c${i}`, 'lop-c', 'gd2', 2, 1, 'vang'),
+      ),
     ]);
-    prisma.lich_hoc_lop.findMany.mockResolvedValue([
-      lich('l-c', 2, 1),
-      lich('l-a', 1, 1),
-      lich('l-b', 1, 1),
+    prisma.phan_lop_giai_doan.findMany.mockResolvedValue([
+      ...['a0', 'a1', 'a2', 'a3', 'a4', 'a5', 'a6'].map((id) =>
+        phan(id, 'gd1', 'lop-a'),
+      ),
+      ...['b0', 'b1', 'b2'].map((id) => phan(id, 'gd1', 'lop-b')),
+      ...['c0', 'c1', 'c2'].map((id) => phan(id, 'gd2', 'lop-c')),
     ]);
     const r = await service.chuyenCan(caller('quan_tri'), { khoa_id: 'k1' });
     expect(r.truc_tiep).toEqual([
@@ -637,6 +668,62 @@ describe('ThongKeService.chuyenCan', () => {
         ty_le_co_mat: 0,
       },
     ]);
+  });
+
+  // ADR 0005 Z8 (issue #27): học viên chuyển lớp có dòng ở cả 2 lớp.
+  const chuyenLop = (che_do: 'theo_lop_hien_tai' | 'cong_nhan_lop_cu') => {
+    prisma.diem_danh.findMany.mockResolvedValue([
+      dong('dk1', 'lop-cu', 'gd1', 1, 1, 'co_mat', che_do),
+      dong('dk1', 'lop-moi', 'gd1', 1, 1, 'vang', che_do),
+      dong('dk1', 'lop-cu', 'gd1', 1, 2, 'co_mat', che_do),
+      dong('dk2', 'lop-moi', 'gd1', 1, 1, 'co_mat', che_do),
+    ]);
+    prisma.phan_lop_giai_doan.findMany.mockResolvedValue([
+      phan('dk1', 'gd1', 'lop-moi'),
+      phan('dk2', 'gd1', 'lop-moi'),
+    ]);
+  };
+
+  it('chuyển lớp, theo_lop_hien_tai: chỉ lớp hiện tại, không đếm 2 lần', async () => {
+    chuyenLop('theo_lop_hien_tai');
+    const r = await service.chuyenCan(caller('quan_tri'), { khoa_id: 'k1' });
+    expect(r.truc_tiep).toEqual([
+      expect.objectContaining({ buoi_so: 1, co_mat: 1, vang: 1 }),
+    ]);
+  });
+
+  it('chuyển lớp, cong_nhan_lop_cu: lấy tốt nhất, mỗi học viên 1 lần', async () => {
+    chuyenLop('cong_nhan_lop_cu');
+    const r = await service.chuyenCan(caller('quan_tri'), { khoa_id: 'k1' });
+    expect(r.truc_tiep).toEqual([
+      expect.objectContaining({ buoi_so: 1, co_mat: 2, vang: 0 }),
+      expect.objectContaining({ buoi_so: 2, co_mat: 1, vang: 0 }),
+    ]);
+  });
+
+  it('trực tiếp, mặc định: học bù lớp khác + HV không phân lớp vẫn tính, mỗi HV 1 lần', async () => {
+    const tt = (dk: string, lop: string, trang_thai: string) =>
+      dong(dk, lop, 'gd1', 1, 1, trang_thai, 'theo_lop_hien_tai', 'truc_tiep');
+    prisma.diem_danh.findMany.mockResolvedValue([
+      tt('dk1', 'lop-a', 'vang'),
+      tt('dk1', 'lop-b', 'co_mat'),
+      tt('dk3', 'lop-a', 'vang'),
+    ]);
+    prisma.phan_lop_giai_doan.findMany.mockResolvedValue([
+      phan('dk1', 'gd1', 'lop-a'),
+    ]);
+    const r = await service.chuyenCan(caller('quan_tri'), { khoa_id: 'k1' });
+    expect(r.truc_tiep).toEqual([
+      expect.objectContaining({ buoi_so: 1, co_mat: 1, vang: 1 }),
+    ]);
+  });
+
+  it('phân lớp lấy theo cùng phạm vi đăng ký', async () => {
+    chuyenLop('theo_lop_hien_tai');
+    await service.chuyenCan(caller('quan_tri'), { khoa_id: 'k1' });
+    expect(prisma.phan_lop_giai_doan.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { dang_ky_hoc: WHERE_SCOPE } }),
+    );
   });
 
   it('VLE chia khoảng: biên thuộc khoảng trên, 100 thuộc 75-100', async () => {
@@ -679,7 +766,7 @@ describe('ThongKeService.chuyenCan', () => {
     expect(
       (await service.chuyenCan(caller('truong'), { khoa_id: 'k1' })).truc_tiep,
     ).toEqual([]);
-    expect(prisma.diem_danh.groupBy).not.toHaveBeenCalled();
+    expect(prisma.diem_danh.findMany).not.toHaveBeenCalled();
     expect(prisma.ket_qua_giai_doan.findMany).not.toHaveBeenCalled();
   });
 });

@@ -294,6 +294,9 @@ export type DanhGiaDauVao = DanhGiaDauVaoDuDieuKien | DanhGiaDauVaoSsoDuDieuKien
 // join tên đơn vị), giống HocVienDanhSachItem — FE tự dựng map id->tên qua GET /danh-muc/don-vi-cong-tac.
 export type TrangThaiKhoa = 'nhap' | 'cho_duyet' | 'da_duyet' | 'tu_choi' | 'dong_dang_ky';
 
+// ADR 0005 Z8: cách tính chuyên cần khi học viên chuyển lớp Zoom cùng giai đoạn.
+export type CheDoChuyenCan = 'theo_lop_hien_tai' | 'cong_nhan_lop_cu';
+
 export interface KhoaBoiDuong {
   id: string;
   ma_khoa: string;
@@ -311,6 +314,11 @@ export interface KhoaBoiDuong {
   created_by: string | null;
   // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học (chỉ xuống mức thấp hơn).
   mo_dieu_chinh_muc: boolean;
+  // ADR 0005 (issue #23): tự điểm danh lớp Zoom — mốc bật (null = tắt) + cửa sổ (phút).
+  bat_diem_danh_zoom_luc: string | null;
+  diem_danh_mo_truoc_phut: number;
+  diem_danh_dong_sau_phut: number;
+  che_do_chuyen_can: CheDoChuyenCan;
 }
 
 // Thêm 2026-09-30 — enum thật của backend (prisma/schema.prisma) dùng cho form CRUD giai đoạn/nhân
@@ -483,6 +491,8 @@ export interface KhoaBoiDuongChiTiet extends KhoaBoiDuong {
   pham_vi_hoc_vien: 'toan_bo' | 'don_vi';
   /** ADR 0004 G3 — chỉ có khi người xem là quan_tri. */
   nhom_ho_tro_gv?: NguoiHoTroRutGon[];
+  /** ADR 0005 §9 (issue #28) — chỉ quan_tri: số buổi lớp Zoom sắp diễn ra chưa có link. */
+  so_buoi_zoom_thieu_link?: number;
 }
 
 // Body POST /khoa-boi-duong — backend/src/khoa-boi-duong/dto/create-khoa-boi-duong.dto.ts. Chỉ
@@ -597,7 +607,32 @@ export interface LichHocLopToi {
   phong?: string | null;
   // T11 (issue #3): giảng viên của buổi — chỉ họ tên + vai trò.
   giang_vien?: { ho_ten: string; vai_tro: VaiTroNhanSuLop }[];
+  // ADR 0005 (issue #24): chỉ có với buổi lớp Zoom của khóa đã bật điểm danh — khi đó
+  // dia_diem_hoac_link luôn null, link chỉ lấy qua POST /lich-hoc/{id}/vao-hoc.
+  diem_danh_zoom?: DiemDanhZoomBuoi;
+  // ADR 0005 Z8 (issue #27): buổi chưa có dòng ở lớp hiện tại nhưng đã có ở lớp cũ cùng giai
+  // đoạn, cùng buoi_so (học viên chuyển lớp) — chỉ để hiển thị.
+  diem_danh_lop_cu?: { trang_thai: TrangThaiDiemDanh; ten_lop: string };
 }
+
+export type PhaDiemDanh = 'chua_mo' | 'dang_mo' | 'da_dong';
+
+/** Cửa sổ + trạng thái tự điểm danh 1 buổi Zoom, tính theo giờ máy chủ (UTC ISO). */
+export interface DiemDanhZoomBuoi {
+  co_link: boolean;
+  mo: string;
+  dong: string;
+  pha: PhaDiemDanh;
+  trang_thai: TrangThaiDiemDanh | null;
+  tu_diem_danh_luc: string | null;
+}
+
+// POST /lich-hoc/{id}/vao-hoc — chỉ có link khi cửa sổ đã mở (đang mở hoặc đã đóng).
+export type KetQuaVaoHoc =
+  | { ket_qua: 'chua_mo'; mo: string; dong: string }
+  | { ket_qua: 'da_ghi_nhan'; luc: string; link: string; mo: string; dong: string }
+  | { ket_qua: 'da_co'; trang_thai: TrangThaiDiemDanh; luc: string; link: string; mo: string; dong: string }
+  | { ket_qua: 'qua_gio'; mo: string; dong: string; link: string };
 
 export interface NhanSuLopToi {
   id: string;

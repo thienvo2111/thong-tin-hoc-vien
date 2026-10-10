@@ -454,7 +454,7 @@ function PhanGenericSection({ phan, soThuTu, thietBi }: { phan: PhanHuongDan; so
   );
 }
 
-/** Phần 12 — Lỗi thường gặp: tìm kiếm không dấu + lọc theo nhóm + accordion. */
+/** Phần 13 — Lỗi thường gặp: tìm kiếm không dấu + lọc theo nhóm + accordion. */
 function LoiThuongGap({ troubleshooting, email }: { troubleshooting: TinhHuongLoi[]; email: string }) {
   const [tuKhoa, setTuKhoa] = useState('');
   const [nhom, setNhom] = useState<NhomLoi | ''>('');
@@ -495,7 +495,7 @@ function LoiThuongGap({ troubleshooting, email }: { troubleshooting: TinhHuongLo
 
         {ketQua.length === 0 ? (
           <Text c="dimmed" fz={14}>
-            Chưa tìm thấy lỗi phù hợp. Thầy/Cô gửi email tới {email} theo mẫu ở Phần 13.
+            Chưa tìm thấy lỗi phù hợp. Thầy/Cô gửi email tới {email} theo mẫu ở Phần 14.
           </Text>
         ) : (
           <Accordion variant="separated" radius="md">
@@ -532,7 +532,7 @@ function LoiThuongGap({ troubleshooting, email }: { troubleshooting: TinhHuongLo
   );
 }
 
-/** Phần 13 — Liên hệ hỗ trợ và an toàn tài khoản. */
+/** Phần 14 — Liên hệ hỗ trợ và an toàn tài khoản. */
 function LienHeSection({ contact }: { contact: LienHeHoTro }) {
   const mau = contact.mauEmail.join('\n');
 

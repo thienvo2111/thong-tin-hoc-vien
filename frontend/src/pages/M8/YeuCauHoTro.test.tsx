@@ -62,7 +62,7 @@ describe('YeuCauHoTro (M8)', () => {
     await user.click(await screen.findByRole('option', { name: TINH_HUONG.tinhHuong }));
 
     expect(await screen.findByRole('link', { name: 'Phần 3' })).toHaveAttribute('href', '/huong-dan#dang-nhap');
-    expect(screen.getByRole('link', { name: 'Phần 10' })).toHaveAttribute('href', '/huong-dan#quen-mat-khau');
+    expect(screen.getByRole('link', { name: 'Phần 11' })).toHaveAttribute('href', '/huong-dan#quen-mat-khau');
   });
 
   it('chọn tình huống -> hiện cách khắc phục, chưa hiện ô nhập cho tới khi bấm "Vẫn còn thắc mắc"', async () => {
