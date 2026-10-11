@@ -20,6 +20,10 @@ const dong = (id: string, ten = `HV ${id}`) => ({
   hoc_vien_id: id,
   hoc_vien: {
     ho_ten: ten,
+    ngay_sinh: 5,
+    thang_sinh: 3,
+    nam_sinh: 1980,
+    doi_tuong: 'giao_vien',
     so_dien_thoai_lien_he: '0900',
     email_lien_he: `${id}@x.vn`,
     don_vi_cong_tac: { ten_don_vi: 'Trường A' },
@@ -47,13 +51,11 @@ describe('CanDonDocService', () => {
       ket_qua_giai_doan: { findMany: jest.fn().mockResolvedValue([]) },
     };
     scope = {
-      resolve: jest
-        .fn()
-        .mockResolvedValue({
-          where: { SCOPE: 1 },
-          rong: false,
-          khoaIds: 'ALL',
-        }),
+      resolve: jest.fn().mockResolvedValue({
+        where: { SCOPE: 1 },
+        rong: false,
+        khoaIds: 'ALL',
+      }),
     };
     service = new CanDonDocService(
       prisma as unknown as PrismaService,
@@ -95,6 +97,8 @@ describe('CanDonDocService', () => {
         {
           hoc_vien_id: 'a',
           ho_ten: 'HV a',
+          ngay_sinh: '05/03/1980',
+          doi_tuong: 'giao_vien',
           ten_don_vi: 'Trường A',
           ten_khoa: 'Khóa 1',
           so_dien_thoai: '0900',
@@ -205,6 +209,23 @@ describe('CanDonDocService', () => {
     expect(sheet.getRow(1).getCell(2).value).toBe('Họ tên');
     expect(sheet.rowCount).toBe(3);
     expect(sheet.getRow(2).getCell(2).value).toBe('HV a');
+  });
+
+  it('xuatExcel: có Ngày sinh (dd/mm/yyyy) và Đối tượng (null -> Chưa xác định)', async () => {
+    const khongDt = dong('b');
+    khongDt.hoc_vien.doi_tuong = null as unknown as string;
+    prisma.dang_ky_hoc.findMany.mockResolvedValue([dong('a'), khongDt]);
+    const buf = await service.xuatExcel(user, { loai: 'chua_truy_cap' });
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+    const sheet = wb.worksheets[0];
+    const header = sheet.getRow(1).values as unknown[];
+    expect(header).toEqual(
+      expect.arrayContaining(['Ngày sinh', 'Đối tượng', 'SĐT', 'Email']),
+    );
+    expect(sheet.getRow(2).getCell(3).value).toBe('05/03/1980');
+    expect(sheet.getRow(2).getCell(5).value).toBe('Giáo viên');
+    expect(sheet.getRow(3).getCell(5).value).toBe('Chưa xác định');
   });
 
   it('xuatExcel: phạm vi rỗng -> workbook chỉ có header', async () => {

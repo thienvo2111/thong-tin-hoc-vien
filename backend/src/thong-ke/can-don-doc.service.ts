@@ -19,6 +19,10 @@ const SELECT_DONG = {
   hoc_vien: {
     select: {
       ho_ten: true,
+      ngay_sinh: true,
+      thang_sinh: true,
+      nam_sinh: true,
+      doi_tuong: true,
       so_dien_thoai_lien_he: true,
       email_lien_he: true,
       don_vi_cong_tac: { select: { ten_don_vi: true } },
@@ -178,10 +182,17 @@ export class CanDonDocService {
 // Tối đa 2 chữ số thập phân, bỏ số 0 thừa: 42 -> '42', 42.5 -> '42.5'.
 const dinhDangSo = (v: number): string => String(Number(v.toFixed(2)));
 
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
 function toDong(r: DangKyRow, chiTiet: Map<string, string>): CanDonDocDong {
+  const h = r.hoc_vien;
   return {
     hoc_vien_id: r.hoc_vien_id,
-    ho_ten: r.hoc_vien.ho_ten,
+    ho_ten: h.ho_ten,
+    ngay_sinh: h.nam_sinh
+      ? `${pad2(h.ngay_sinh)}/${pad2(h.thang_sinh)}/${h.nam_sinh}`
+      : '',
+    doi_tuong: h.doi_tuong ?? null,
     ten_don_vi: r.hoc_vien.don_vi_cong_tac?.ten_don_vi ?? '',
     ten_khoa: r.khoa.ten_khoa,
     so_dien_thoai: r.hoc_vien.so_dien_thoai_lien_he,

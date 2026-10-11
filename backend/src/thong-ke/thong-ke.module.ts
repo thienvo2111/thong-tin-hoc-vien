@@ -5,6 +5,7 @@ import { SsoModule } from '../sso/sso.module';
 import { BieuMauService } from './bieu-mau.service';
 import { ChatLuongHoSoService } from './chat-luong-ho-so.service';
 import { CanDonDocService } from './can-don-doc.service';
+import { DanhSachHocVienService } from './danh-sach-hoc-vien.service';
 import { MucNlsService } from './muc-nls.service';
 import { NhuCauMucHocService } from './nhu-cau-muc-hoc.service';
 import { ThongKeController } from './thong-ke.controller';
@@ -28,6 +29,7 @@ import { XepHangService } from './xep-hang.service';
     ChatLuongHoSoService,
     MucNlsService,
     NhuCauMucHocService,
+    DanhSachHocVienService,
   ],
   exports: [ThongKeScopeService],
 })

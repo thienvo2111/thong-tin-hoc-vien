@@ -19,6 +19,7 @@ import { KhoiKpiPheu } from './khoi/KhoiKpiPheu';
 import { KhoiTienDoTruong } from './khoi/KhoiTienDoTruong';
 import { KhoiSoSanhKhoa } from './khoi/KhoiSoSanhKhoa';
 import { KhoiXepHang } from './khoi/KhoiXepHang';
+import { KhoiXuatDanhSachHocVien } from './khoi/KhoiXuatDanhSachHocVien';
 
 interface Props {
   /** 'ho_tro' không render khối Xếp hạng (spec §4 khối 8). */
@@ -141,6 +142,7 @@ export default function DashboardThongKe({ che_do }: Props) {
             </Tabs.Panel>
             <Tabs.Panel value="ho_so">
               <Stack gap="md" pt="md">
+                <KhoiXuatDanhSachHocVien loc={loc} />
                 <KhoiChatLuongHoSo loc={loc} />
                 <KhoiCanDonDoc loc={loc} />
               </Stack>

@@ -136,6 +136,9 @@ export type XepHangResult =
 export interface CanDonDocDong {
   hoc_vien_id: string;
   ho_ten: string;
+  /** dd/mm/yyyy */
+  ngay_sinh: string;
+  doi_tuong: string | null;
   ten_don_vi: string;
   ten_khoa: string;
   so_dien_thoai: string | null;

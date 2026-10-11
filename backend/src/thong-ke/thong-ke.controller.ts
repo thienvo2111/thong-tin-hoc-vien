@@ -14,6 +14,7 @@ import {
 import { BieuMauService } from './bieu-mau.service';
 import { ChatLuongHoSoService } from './chat-luong-ho-so.service';
 import { CanDonDocService } from './can-don-doc.service';
+import { DanhSachHocVienService } from './danh-sach-hoc-vien.service';
 import { MucNlsService } from './muc-nls.service';
 import { NhuCauMucHocService } from './nhu-cau-muc-hoc.service';
 import { TienDoTruongService } from './tien-do-truong.service';
@@ -33,6 +34,7 @@ export class ThongKeController {
     private readonly chatLuongHoSoService: ChatLuongHoSoService,
     private readonly mucNlsService: MucNlsService,
     private readonly nhuCauMucHocService: NhuCauMucHocService,
+    private readonly danhSachHocVienService: DanhSachHocVienService,
   ) {}
 
   @Get('bo-loc')
@@ -136,6 +138,25 @@ export class ThongKeController {
         'Content-Type':
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': 'attachment; filename="can-don-doc.xlsx"',
+      })
+      .send(buffer);
+  }
+
+  // Mỗi học viên 1 dòng (có PII) + truy cập / KS kĩ năng số / đánh giá NLS.
+  // Chọn nhiều trường qua don_vi_ids; bỏ trống = toàn bộ phạm vi tài khoản.
+  @Get('danh-sach-hoc-vien/xuat-excel')
+  async danhSachHocVienXuatExcel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: ThongKeQueryDto,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.danhSachHocVienService.xuatExcel(user, q);
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="danh-sach-hoc-vien.xlsx"',
+        'Cache-Control': 'no-store',
       })
       .send(buffer);
   }
