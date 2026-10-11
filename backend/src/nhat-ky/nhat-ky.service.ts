@@ -24,6 +24,7 @@ export type HanhDongNhatKy =
   | 'dieu_chinh_muc_hoc'
   | 'sua_ma_dinh_danh_moet'
   | 'xuat_danh_sach_hoc_vien_truong'
+  | 'xuat_danh_sach_hoc_vien_tong_hop'
   | 'tao_hoc_vien_le'
   | 'ghi_danh_le';
 
@@ -47,6 +48,7 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   dieu_chinh_muc_hoc: 'Điều chỉnh mức lớp học',
   sua_ma_dinh_danh_moet: 'Quản trị sửa mã định danh MOET',
   xuat_danh_sach_hoc_vien_truong: 'Xuất danh sách học viên theo trường',
+  xuat_danh_sach_hoc_vien_tong_hop: 'Xuất danh sách học viên tổng hợp',
   tao_hoc_vien_le: 'Quản trị tạo tài khoản học viên',
   ghi_danh_le: 'Quản trị ghi danh vào khóa',
 };
@@ -71,6 +73,7 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   dieu_chinh_muc_hoc: 'hoc_tap',
   sua_ma_dinh_danh_moet: 'tai_khoan',
   xuat_danh_sach_hoc_vien_truong: 'tai_khoan',
+  xuat_danh_sach_hoc_vien_tong_hop: 'tai_khoan',
   tao_hoc_vien_le: 'tai_khoan',
   ghi_danh_le: 'hoc_tap',
 };

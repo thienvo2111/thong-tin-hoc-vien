@@ -575,6 +575,95 @@ describe('Thống kê dashboard (e2e)', () => {
       );
     });
   });
+  describe('xuất danh sách học viên (tổng hợp)', () => {
+    const URL_DS = '/thong-ke/danh-sach-hoc-vien/xuat-excel';
+    // Tên đơn vị của từng dòng dữ liệu (dưới hàng header "STT").
+    const taiDanhSach = async (path: string, t: string) => {
+      const res = await get(path, t)
+        .buffer(true)
+        .parse((r, cb) => {
+          const chunks: Buffer[] = [];
+          r.on('data', (c: Buffer) => chunks.push(c));
+          r.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+      expect(res.status).toBe(200);
+      expect(res.headers['content-disposition']).toContain(
+        'danh-sach-hoc-vien.xlsx',
+      );
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(res.body as ExcelJS.Buffer);
+      const sheet = wb.worksheets[0];
+      let hang = 0;
+      sheet.eachRow((r, so) => {
+        if (!hang && r.getCell(1).value === 'STT') hang = so;
+      });
+      const header = (sheet.getRow(hang).values as unknown[]).slice(1);
+      const cotDonVi = header.indexOf('Đơn vị công tác') + 1;
+      const donVi: string[] = [];
+      for (let r = hang + 1; r <= sheet.rowCount; r++) {
+        donVi.push(String(sheet.getRow(r).getCell(cotDonVi).value));
+      }
+      return { header, donVi };
+    };
+    const ten = (k: 't1' | 't2' | 't3') => `Đơn vị TK ${k} ${suf}`;
+
+    it('quan_tri chọn 2 trường (T1,T2) -> đúng 11 HV, chỉ 2 trường đó', async () => {
+      const { header, donVi } = await taiDanhSach(
+        `${URL_DS}?don_vi_ids=${dv.t1},${dv.t2}`,
+        tok.quanTri,
+      );
+      expect(header).toEqual(
+        expect.arrayContaining([
+          'Họ tên',
+          'Ngày sinh',
+          'Đơn vị công tác',
+          'Đối tượng',
+          'Số điện thoại',
+          'Email',
+          'Truy cập hệ thống',
+          'KS kĩ năng số (đầu vào)',
+          'Đánh giá NLS đầu vào',
+        ]),
+      );
+      expect(donVi).toHaveLength(11);
+      expect(new Set(donVi)).toEqual(new Set([ten('t1'), ten('t2')]));
+    });
+
+    it('quan_tri theo khóa A, tất cả trường -> 14 HV (mỗi HV 1 dòng)', async () => {
+      const { donVi } = await taiDanhSach(
+        `${URL_DS}?khoa_id=${khoaA}`,
+        tok.quanTri,
+      );
+      expect(donVi).toHaveLength(14);
+    });
+
+    it('truong T1 không lọc -> chỉ HV của T1, không lặp HV học 2 khóa', async () => {
+      const { donVi } = await taiDanhSach(URL_DS, tok.truong1);
+      expect(donVi).toHaveLength(6);
+      expect(new Set(donVi)).toEqual(new Set([ten('t1')]));
+    });
+
+    it('phong chọn trường ngoài phạm vi -> 403', async () => {
+      const res = await get(
+        `${URL_DS}?don_vi_ids=${dv.t1},${dv.khac}`,
+        tok.phong,
+      );
+      expect(res.status).toBe(403);
+    });
+
+    it('ho_tro gửi don_vi_ids -> 400', async () => {
+      const res = await get(`${URL_DS}?don_vi_ids=${dv.t1}`, tok.hoTro);
+      expect(res.status).toBe(400);
+    });
+
+    it('don_vi_ids không phải UUID -> 400; hoc_vien -> 403', async () => {
+      const sai = await get(`${URL_DS}?don_vi_ids=abc`, tok.quanTri);
+      expect(sai.status).toBe(400);
+      const hv = await get(URL_DS, tok.hocVien);
+      expect(hv.status).toBe(403);
+    });
+  });
+
   describe('biểu mẫu đăng ký và truy cập', () => {
     const URL_BM = '/thong-ke/bieu-mau/dang-ky-truy-cap/xuat-excel';
     const taiXlsx = async (path: string, t: string) => {

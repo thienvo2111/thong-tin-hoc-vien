@@ -273,6 +273,92 @@ describe('ThongKeScopeService', () => {
     });
   });
 
+  describe('don_vi_ids (chọn nhiều trường)', () => {
+    it('quan_tri 2 trường -> AND chứa hợp cây con của cả 2', async () => {
+      scope.getAccessibleDonViIds.mockImplementation(
+        async (c: { don_vi_id: string }) => [c.don_vi_id],
+      );
+      const r = await service.resolve(caller(), { don_vi_ids: [T1, CON] });
+      expect(r.where.AND).toContainEqual({
+        hoc_vien: { don_vi_cong_tac_id: { in: [T1, CON] } },
+      });
+    });
+
+    it('gộp don_vi_id với don_vi_ids, bỏ trùng', async () => {
+      scope.getAccessibleDonViIds.mockImplementation(
+        async (c: { don_vi_id: string }) => [c.don_vi_id],
+      );
+      const r = await service.resolve(caller(), {
+        don_vi_id: T1,
+        don_vi_ids: [T1, CON],
+      });
+      expect(r.where.AND).toContainEqual({
+        hoc_vien: { don_vi_cong_tac_id: { in: [T1, CON] } },
+      });
+    });
+
+    it('so: 1 trong các đơn vị ngoài phạm vi -> ForbiddenAppException', async () => {
+      scope.getAccessibleDonViIds.mockResolvedValue([T1, CON]);
+      await expect(
+        service.resolve(so(), { don_vi_ids: [CON, NGOAI] }),
+      ).rejects.toBeInstanceOf(ForbiddenAppException);
+    });
+
+    it('so: mọi đơn vị trong phạm vi -> giữ R1/R2 và thêm lọc đơn vị', async () => {
+      scope.getAccessibleDonViIds.mockImplementation(
+        async (c: { vai_tro: string; don_vi_id: string }) =>
+          c.vai_tro === 'so_gddt' && c.don_vi_id !== T1
+            ? [c.don_vi_id]
+            : [T1, CON],
+      );
+      const r = await service.resolve(so(), { don_vi_ids: [CON] });
+      expect(r.where.OR).toBeDefined();
+      expect(r.where.AND).toContainEqual({
+        hoc_vien: { don_vi_cong_tac_id: { in: [CON] } },
+      });
+    });
+
+    it('ho_tro gửi don_vi_ids -> ValidationException', async () => {
+      await expect(
+        service.resolve(hoTro(), { don_vi_ids: [T1] }),
+      ).rejects.toBeInstanceOf(ValidationException);
+    });
+
+    it('don_vi_ids + cum_id -> ValidationException', async () => {
+      await expect(
+        service.resolve(caller(), {
+          khoa_id: K1,
+          don_vi_ids: [T1],
+          cum_id: CUM1,
+        }),
+      ).rejects.toBeInstanceOf(ValidationException);
+    });
+
+    it('DTO: chuỗi "a,b" và mảng đều thành mảng UUID', async () => {
+      const a = plainToInstance(ThongKeQueryDto, {
+        don_vi_ids: `${T1},${CON}`,
+      });
+      expect(a.don_vi_ids).toEqual([T1, CON]);
+      expect(await validate(a)).toHaveLength(0);
+      const b = plainToInstance(ThongKeQueryDto, { don_vi_ids: [T1, CON] });
+      expect(b.don_vi_ids).toEqual([T1, CON]);
+      const rong = plainToInstance(ThongKeQueryDto, { don_vi_ids: '' });
+      expect(rong.don_vi_ids).toBeUndefined();
+      expect(await validate(rong)).toHaveLength(0);
+    });
+
+    it('DTO: từ chối id không phải UUID và quá 100 đơn vị', async () => {
+      const sai = plainToInstance(ThongKeQueryDto, { don_vi_ids: 'abc' });
+      expect(await validate(sai)).not.toHaveLength(0);
+      const nhieu = Array.from(
+        { length: 101 },
+        (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+      );
+      const qua = plainToInstance(ThongKeQueryDto, { don_vi_ids: nhieu });
+      expect(await validate(qua)).not.toHaveLength(0);
+    });
+  });
+
   describe('boLoc', () => {
     it('truong → don_vi null, cum null, don_vi_co_dinh = đơn vị của mình', async () => {
       prisma.khoa_boi_duong.findMany.mockResolvedValue([

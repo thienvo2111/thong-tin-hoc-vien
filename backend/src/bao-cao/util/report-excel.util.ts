@@ -441,13 +441,28 @@ export async function buildCanDonDocWorkbook(
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Cần đôn đốc');
-  sheet.addRow(['STT', 'Họ tên', 'Đơn vị', 'Khóa', 'SĐT', 'Email', 'Chi tiết']);
+  sheet.addRow([
+    'STT',
+    'Họ tên',
+    'Ngày sinh',
+    'Đơn vị',
+    'Đối tượng',
+    'Khóa',
+    'SĐT',
+    'Email',
+    'Chi tiết',
+  ]);
   sheet.getRow(1).font = { bold: true };
   rows.forEach((row, i) => {
     sheet.addRow([
       i + 1,
       row.ho_ten,
+      row.ngay_sinh,
       row.ten_don_vi,
+      row.doi_tuong
+        ? (DOI_TUONG_LABEL[row.doi_tuong as keyof typeof DOI_TUONG_LABEL] ??
+          row.doi_tuong)
+        : 'Chưa xác định',
       row.ten_khoa,
       row.so_dien_thoai ?? '',
       row.email ?? '',

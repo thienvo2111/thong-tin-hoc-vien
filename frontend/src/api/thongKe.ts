@@ -75,6 +75,15 @@ export async function xuatCanDonDoc(loc: LocThongKe & { loai: LoaiCanDonDoc }): 
   taiFileTuBlob(blob, `can-don-doc-${loc.loai}.xlsx`);
 }
 
+/** Danh sách học viên (có PII). `donViIds` rỗng = tất cả trường trong bộ lọc/phạm vi. */
+export async function xuatDanhSachHocVien(loc: LocThongKe, donViIds: string[]): Promise<void> {
+  const params = donViIds.length
+    ? { ...loc, don_vi_id: undefined, cum_id: undefined, don_vi_ids: donViIds.join(',') }
+    : loc;
+  const blob = await apiFetchBlob(`/thong-ke/danh-sach-hoc-vien/xuat-excel${xayQuery(params)}`);
+  taiFileTuBlob(blob, 'danh-sach-hoc-vien.xlsx');
+}
+
 export const useTienDoTruong = (loc: LocThongKe, enabled = true) =>
   useKhoi<TienDoTruongDong[]>('tien-do-truong', 'tien-do-truong', loc, enabled);
 

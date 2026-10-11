@@ -22,6 +22,13 @@ export function locDoiTuong(
   };
 }
 
+/** don_vi_id + don_vi_ids, bỏ trùng. */
+export function donViLoc(q: ThongKeQueryDto): string[] {
+  return [...new Set([q.don_vi_id, ...(q.don_vi_ids ?? [])])].filter(
+    (v): v is string => !!v,
+  );
+}
+
 // Fail-closed: nhánh rong=true vẫn mang where không khớp dòng nào, để endpoint
 // quên kiểm rong cũng không rò dữ liệu.
 const PHAM_VI_RONG: PhamViThongKe = {
@@ -70,12 +77,13 @@ export class ThongKeScopeService {
     if (q.cum_id && !q.khoa_id) {
       throw new ValidationException('Lọc theo cụm cần chọn khóa');
     }
-    if (q.don_vi_id && q.cum_id) {
+    const coDonVi = donViLoc(q).length > 0;
+    if (coDonVi && q.cum_id) {
       throw new ValidationException(
         'Không thể lọc đồng thời theo đơn vị và theo cụm',
       );
     }
-    if (vt === 'ho_tro_hoc_vien' && q.don_vi_id) {
+    if (vt === 'ho_tro_hoc_vien' && coDonVi) {
       throw new ValidationException(
         'Người hỗ trợ học viên không lọc theo đơn vị',
       );
@@ -89,7 +97,8 @@ export class ThongKeScopeService {
     const loc: Prisma.dang_ky_hocWhereInput[] = [];
     if (q.doi_tuong) loc.push(locDoiTuong(q.doi_tuong));
     if (q.khoa_id) loc.push({ khoa_id: q.khoa_id });
-    if (q.don_vi_id) loc.push(await this.locDonVi(q.don_vi_id));
+    const donViIds = donViLoc(q);
+    if (donViIds.length) loc.push(await this.locDonVi(donViIds));
     if (q.cum_id) {
       const cum = await this.prisma.cum_hoc_vien.findUnique({
         where: { id: q.cum_id },
@@ -123,12 +132,11 @@ export class ThongKeScopeService {
     const loc: Prisma.dang_ky_hocWhereInput[] = [];
     if (q.doi_tuong) loc.push(locDoiTuong(q.doi_tuong));
     if (q.khoa_id) loc.push({ khoa_id: q.khoa_id });
-    if (q.don_vi_id) {
-      if (!scope.includes(q.don_vi_id)) {
-        throw new ForbiddenAppException('Đơn vị nằm ngoài phạm vi của bạn');
-      }
-      loc.push(await this.locDonVi(q.don_vi_id));
+    const donViIds = donViLoc(q);
+    if (donViIds.some((id) => !scope.includes(id))) {
+      throw new ForbiddenAppException('Đơn vị nằm ngoài phạm vi của bạn');
     }
+    if (donViIds.length) loc.push(await this.locDonVi(donViIds));
     // R1: khóa do đơn vị trong phạm vi đặt hàng; R2: học viên thuộc phạm vi.
     const where: Prisma.dang_ky_hocWhereInput = {
       OR: [
@@ -176,15 +184,20 @@ export class ThongKeScopeService {
     };
   }
 
-  // Cây con của don_vi_id (tái dùng cách duyệt cây của ScopeService).
+  // Hợp cây con của các đơn vị (tái dùng cách duyệt cây của ScopeService).
   private async locDonVi(
-    donViId: string,
+    donViIds: string[],
   ): Promise<Prisma.dang_ky_hocWhereInput> {
-    const cay = await this.scopeService.getAccessibleDonViIds({
-      vai_tro: 'so_gddt',
-      don_vi_id: donViId,
-    });
-    return { hoc_vien: { don_vi_cong_tac_id: { in: cay as string[] } } };
+    const cay = await Promise.all(
+      donViIds.map((id) =>
+        this.scopeService.getAccessibleDonViIds({
+          vai_tro: 'so_gddt',
+          don_vi_id: id,
+        }),
+      ),
+    );
+    const hop = [...new Set(cay.flatMap((c) => c as string[]))];
+    return { hoc_vien: { don_vi_cong_tac_id: { in: hop } } };
   }
 
   private cumPhanCong(cumIds: string[]): Promise<CumRow[]> {
