@@ -119,6 +119,38 @@ export function suaMaDinhDanhMoet(id: string, dto: SuaMaMoetDto) {
   });
 }
 
+// Issue #30: Quản trị xóa cứng 1 học viên + mọi dữ liệu liên quan (không hoàn tác). xac_nhan = mã MOET
+// (nếu hồ sơ có) hoặc họ tên — backend kiểm lại, sai -> 400.
+export interface XoaHocVienDto {
+  ly_do: string;
+  xac_nhan: string;
+}
+
+export interface XoaHocVienResult {
+  id: string;
+  nhat_ky_id: string;
+  so_dang_ky_da_xoa: number;
+}
+
+export function xoaHocVien(id: string, dto: XoaHocVienDto) {
+  return apiFetch<XoaHocVienResult>(`/hoc-vien/${id}`, {
+    method: 'DELETE',
+    body: JSON.stringify(dto),
+  });
+}
+
+export function useXoaHocVien(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: XoaHocVienDto) => xoaHocVien(id, dto),
+    onSuccess: () => {
+      // refetchType 'none': chỉ đánh dấu cũ — không tải lại chi tiết hồ sơ vừa xóa (sẽ 404) trước khi rời trang.
+      queryClient.invalidateQueries({ queryKey: ['admin', 'hoc-vien'], refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: ['thong-ke'], refetchType: 'none' });
+    },
+  });
+}
+
 export function useSuaMaDinhDanhMoet(id: string) {
   const queryClient = useQueryClient();
   return useMutation({

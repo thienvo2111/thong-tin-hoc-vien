@@ -488,6 +488,9 @@ model nguoi_dung {
   // ADR 0005 Z7 (issue #23)
   diem_danh_da_sua diem_danh[] @relation("diem_danh_nguoi_sua")
 
+  // Issue #30: Quản trị xóa cứng học viên
+  nhat_ky_xoa_hoc_vien nhat_ky_xoa_hoc_vien[] @relation("nhat_ky_xoa_hv_nguoi_xoa")
+
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
 }
@@ -1522,4 +1525,26 @@ model nhat_ky_nhac_lich {
   @@index([lich_hoc_ids], map: "idx_nhac_lich_buoi", type: Gin)
   @@index([giang_vien_id], map: "idx_nhac_lich_giang_vien")
   @@index([cum_id], map: "idx_nhac_lich_cum")
+}
+
+// Issue #30 (PRD #29, 2026-10-12): Quản trị xóa cứng 1 học viên — mọi dữ liệu
+// liên quan bị xóa, chỉ còn dòng nhật ký này. Snapshot tối thiểu, KHÔNG FK tới
+// hoc_vien/don_vi (bản ghi gốc đã mất hoặc có thể đổi), KHÔNG lưu CCCD/SĐT/email.
+model nhat_ky_xoa_hoc_vien {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hoc_vien_id_cu     String   @db.Uuid
+  ho_ten             String   @db.VarChar(255)
+  ma_dinh_danh_moet  String?  @db.VarChar(20)
+  don_vi_cong_tac_id String?  @db.Uuid
+  ten_don_vi         String   @db.VarChar(255)
+  so_dang_ky_da_xoa  Int
+  ten_dang_nhap_vle  String?  @db.VarChar(100)
+  ly_do              String
+  nguoi_xoa_id       String   @db.Uuid
+  thoi_gian          DateTime @default(now()) @db.Timestamptz(6)
+
+  nguoi_xoa nguoi_dung @relation("nhat_ky_xoa_hv_nguoi_xoa", fields: [nguoi_xoa_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([thoi_gian], map: "idx_nhat_ky_xoa_hv_thoi_gian")
+  @@index([ma_dinh_danh_moet], map: "idx_nhat_ky_xoa_hv_ma_moet")
 }
