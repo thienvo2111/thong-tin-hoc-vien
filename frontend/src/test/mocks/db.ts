@@ -1,5 +1,6 @@
 import type { LopCuaToiGv, TrangLop } from '@/api/hoTroGv';
 import type { BoBangKiem, DanhGiaDot } from '@/api/bangKiem';
+import type { HocVienDaXoa } from '@/api/admin';
 import type { DiemDanhZoomBuoi, KetQuaVaoHoc, LichHocLopToi } from '@/api/types';
 import type {
   DiemHoc,
@@ -1183,6 +1184,37 @@ export function taoLopCuaToiGvMau(): LopCuaToiGv[] {
   ];
 }
 
+// Issue #32: nhật ký học viên đã xóa (GET /hoc-vien/da-xoa) — mới nhất trước.
+function taoHocVienDaXoaMau(): HocVienDaXoa[] {
+  const nguoiXoa = { id: 'nd-qt', ho_ten: 'Quản trị hệ thống', ten_dang_nhap: 'quantri' };
+  return [
+    {
+      id: 'nkx-2',
+      hoc_vien_id_cu: 'hv-cu-2',
+      ho_ten: 'Trần Văn Trùng',
+      ma_dinh_danh_moet: '9100000002',
+      ten_don_vi: 'THPT Long Xuyên',
+      so_dang_ky_da_xoa: 1,
+      ten_dang_nhap_vle: 'vle.trung',
+      ly_do: 'Hồ sơ trùng',
+      thoi_gian: '2026-10-12T03:30:00.000Z',
+      nguoi_xoa: nguoiXoa,
+    },
+    {
+      id: 'nkx-1',
+      hoc_vien_id_cu: 'hv-cu-1',
+      ho_ten: 'Lý Thị Nhầm',
+      ma_dinh_danh_moet: null,
+      ten_don_vi: 'THCS Mỹ Hòa',
+      so_dang_ky_da_xoa: 0,
+      ten_dang_nhap_vle: null,
+      ly_do: 'Nhập nhầm người',
+      thoi_gian: '2026-10-11T02:00:00.000Z',
+      nguoi_xoa: nguoiXoa,
+    },
+  ];
+}
+
 export const db = {
   hoSo: taoHoSoMoi(),
   dotXacNhan: taoDotXacNhanDangMoThieu(),
@@ -1224,6 +1256,7 @@ export const db = {
   bangKiemMacDinh: taoBangKiemMacDinhMau(),
   bangKiemKhoa: {} as Record<string, BoBangKiem>,
   danhGiaDot: taoDanhGiaDotMau(),
+  hocVienDaXoa: taoHocVienDaXoaMau(),
 };
 
 export function resetDb(): void {
@@ -1266,4 +1299,5 @@ export function resetDb(): void {
   db.bangKiemMacDinh = taoBangKiemMacDinhMau();
   db.bangKiemKhoa = {};
   db.danhGiaDot = taoDanhGiaDotMau();
+  db.hocVienDaXoa = taoHocVienDaXoaMau();
 }

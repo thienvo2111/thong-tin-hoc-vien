@@ -295,3 +295,92 @@ describe('Admin — Danh sách học viên — Thêm học viên lẻ', () => {
     expect(modal.getByText('Số định danh cá nhân đã tồn tại ở hồ sơ học viên khác')).toBeInTheDocument();
   });
 });
+
+// Issue #32: tab "Đã xóa" (GET /hoc-vien/da-xoa) — chỉ quan_tri, chỉ đọc.
+describe('Admin — Danh sách học viên — Tab Đã xóa (issue #32)', () => {
+  async function moTab() {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const user = userEvent.setup();
+    renderTrang();
+    await screen.findByText('Lê Văn Bình');
+    await user.click(screen.getByRole('tab', { name: 'Đã xóa' }));
+    const panel = await screen.findByRole('tabpanel', { name: 'Đã xóa' });
+    return { user, panel: within(panel) };
+  }
+
+  it('không phải quản trị -> không có tab Đã xóa', async () => {
+    db.nguoiDung.vai_tro = 'truong';
+    renderTrang();
+    await screen.findByText('Lê Văn Bình');
+    expect(screen.queryByRole('tab', { name: 'Đã xóa' })).not.toBeInTheDocument();
+  });
+
+  it('hiển thị đủ cột, mới nhất trước, chỉ đọc', async () => {
+    const { panel } = await moTab();
+    expect(await panel.findByText('Trần Văn Trùng')).toBeInTheDocument();
+    for (const cot of [
+      'Họ và tên',
+      'Mã MOET',
+      'Trường',
+      'Số ghi danh đã xóa',
+      'Tài khoản VLE',
+      'Lý do',
+      'Người xóa',
+      'Thời điểm',
+    ]) {
+      expect(panel.getByRole('columnheader', { name: cot })).toBeInTheDocument();
+    }
+    const dong = panel.getAllByRole('row').slice(1);
+    expect(dong).toHaveLength(2);
+    const dau = within(dong[0]);
+    expect(dau.getByText('Trần Văn Trùng')).toBeInTheDocument();
+    expect(dau.getByText('9100000002')).toBeInTheDocument();
+    expect(dau.getByText('THPT Long Xuyên')).toBeInTheDocument();
+    expect(dau.getByText('vle.trung')).toBeInTheDocument();
+    expect(dau.getByText('Hồ sơ trùng')).toBeInTheDocument();
+    expect(dau.getByText('Quản trị hệ thống')).toBeInTheDocument();
+    expect(dau.getByText('12/10/2026 10:30')).toBeInTheDocument();
+    expect(within(dong[1]).getByText('Lý Thị Nhầm')).toBeInTheDocument();
+    expect(panel.getByText('2 học viên đã xóa')).toBeInTheDocument();
+    expect(panel.queryByRole('button', { name: /Xóa|Sửa|Xuất/ })).not.toBeInTheDocument();
+  });
+
+  it('gõ ô tìm kiếm -> gọi API với q, lọc kết quả', async () => {
+    const cacQ: (string | null)[] = [];
+    const nghe = ({ request }: { request: Request }) => {
+      const url = new URL(request.url);
+      if (url.pathname === '/hoc-vien/da-xoa') cacQ.push(url.searchParams.get('q'));
+    };
+    server.events.on('request:start', nghe);
+    try {
+      const { user, panel } = await moTab();
+      await panel.findByText('Trần Văn Trùng');
+      await user.type(panel.getByPlaceholderText('Tìm theo họ tên, mã MOET...'), 'Nhầm');
+      await waitFor(() => expect(panel.queryByText('Trần Văn Trùng')).not.toBeInTheDocument());
+      expect(panel.getByText('Lý Thị Nhầm')).toBeInTheDocument();
+      expect(cacQ[0]).toBeNull();
+      expect(cacQ[cacQ.length - 1]).toBe('Nhầm');
+    } finally {
+      server.events.removeListener('request:start', nghe);
+    }
+  });
+
+  it('chưa có ai bị xóa -> trạng thái rỗng', async () => {
+    server.use(http.get('/hoc-vien/da-xoa', () => HttpResponse.json({ data: [], total: 0, page: 1, page_size: 20 })));
+    const { panel } = await moTab();
+    expect(await panel.findByText('Chưa có học viên nào bị xóa.')).toBeInTheDocument();
+  });
+
+  it('tìm không khớp -> thông báo không có kết quả', async () => {
+    const { user, panel } = await moTab();
+    await panel.findByText('Trần Văn Trùng');
+    await user.type(panel.getByPlaceholderText('Tìm theo họ tên, mã MOET...'), 'khongcoai');
+    expect(await panel.findByText('Không có học viên đã xóa nào khớp tìm kiếm.')).toBeInTheDocument();
+  });
+
+  it('lỗi API -> hiện thông báo lỗi', async () => {
+    server.use(http.get('/hoc-vien/da-xoa', () => HttpResponse.error()));
+    const { panel } = await moTab();
+    expect(await panel.findByText('Không kết nối được máy chủ. Kiểm tra mạng và thử lại.')).toBeInTheDocument();
+  });
+});

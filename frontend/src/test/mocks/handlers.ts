@@ -491,6 +491,34 @@ export const handlers = [
     return HttpResponse.json({ data, total, page, page_size: pageSize });
   }),
 
+  // Issue #32: nhật ký học viên đã xóa — khai báo TRƯỚC '/hoc-vien/:id'.
+  http.get('/hoc-vien/da-xoa', ({ request }) => {
+    const url = new URL(request.url);
+    const q = url.searchParams.get('q')?.toLowerCase();
+    const page = Number(url.searchParams.get('page') ?? '1');
+    const pageSize = Number(url.searchParams.get('page_size') ?? '20');
+    let items = db.hocVienDaXoa;
+    if (q) items = items.filter((r) => r.ho_ten.toLowerCase().includes(q) || (r.ma_dinh_danh_moet ?? '').includes(q));
+    const start = (page - 1) * pageSize;
+    return HttpResponse.json({ data: items.slice(start, start + pageSize), total: items.length, page, page_size: pageSize });
+  }),
+
+  // Issue #31: mức ảnh hưởng nếu xóa học viên.
+  http.get('/hoc-vien/:id/anh-huong-xoa', ({ params }) => {
+    const found = db.danhSachHocVien.find((h) => h.id === params.id);
+    if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy hồ sơ học viên');
+    return HttpResponse.json({
+      ho_ten: found.ho_ten,
+      ma_dinh_danh_moet: found.ma_dinh_danh_moet,
+      so_dang_ky: 2,
+      so_buoi_diem_danh: 7,
+      so_ket_qua_khao_sat: 3,
+      so_yeu_cau_ho_tro: 1,
+      co_tai_khoan: true,
+      ten_dang_nhap_vle: 'vle.khoi',
+    });
+  }),
+
   http.get('/hoc-vien/:id', ({ params }) => {
     const found = db.danhSachHocVien.find((h) => h.id === params.id);
     if (!found) return loi(404, 'NOT_FOUND', 'Không tìm thấy hồ sơ học viên');

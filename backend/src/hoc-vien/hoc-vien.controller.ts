@@ -27,6 +27,8 @@ import { KiemTraTrungQueryDto } from './dto/kiem-tra-trung-query.dto';
 import { SuaMaMoetDto } from './dto/sua-ma-moet.dto';
 import { XuatHocVienTheoTruongDto } from './dto/xuat-hoc-vien-theo-truong.dto';
 import { TaoHocVienLeDto } from './dto/tao-hoc-vien-le.dto';
+import { XoaHocVienDto } from './dto/xoa-hoc-vien.dto';
+import { QueryHocVienDaXoaDto } from './dto/query-hoc-vien-da-xoa.dto';
 
 // Dịch vụ Học viên — docs/api-contract.md mục 2.
 @Controller('hoc-vien')
@@ -138,6 +140,14 @@ export class HocVienController {
     return this.hocVienService.taoLeBoiQuanTri(dto, user.id);
   }
 
+  // Issue #32: nhật ký học viên đã xóa (chỉ đọc). Khai báo TRƯỚC ':id' để
+  // 'da-xoa' không bị route động (ParseUUIDPipe -> 400) chắn.
+  @Roles('quan_tri')
+  @Get('da-xoa')
+  danhSachDaXoa(@Query() query: QueryHocVienDaXoaDto) {
+    return this.hocVienService.danhSachDaXoa(query);
+  }
+
   // Khai báo TRƯỚC ':id' để 'xuat-excel' không bị route động chắn.
   @Roles('truong', 'phong_vhxh', 'so_gddt', 'quan_tri')
   @Get('xuat-excel')
@@ -193,6 +203,25 @@ export class HocVienController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.hocVienService.suaMaDinhDanhMoet(id, dto, user);
+  }
+
+  // Issue #31: mức ảnh hưởng nếu xóa — đếm tại thời điểm mở modal.
+  @Roles('quan_tri')
+  @Get(':id/anh-huong-xoa')
+  anhHuongXoa(@Param('id', ParseUUIDPipe) id: string) {
+    return this.hocVienService.anhHuongXoa(id);
+  }
+
+  // Issue #30: quan_tri xóa cứng 1 học viên + mọi dữ liệu liên quan (không
+  // hoàn tác) — chỉ còn 1 dòng nhat_ky_xoa_hoc_vien.
+  @Roles('quan_tri')
+  @Delete(':id')
+  xoaHocVien(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: XoaHocVienDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.hocVienService.xoaHocVien(id, dto, user);
   }
 
   // T14: quan_tri sửa hồ sơ import_moet NGOÀI thời gian đợt xác nhận (học

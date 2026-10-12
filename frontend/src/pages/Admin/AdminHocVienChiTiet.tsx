@@ -1,8 +1,16 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Alert, Box, Button, Container, Group, Modal, Paper, Select, Skeleton, Stack, Text, TextInput, Textarea } from '@mantine/core';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Alert, Box, Button, Container, Group, Modal, Paper, Select, Skeleton, Stack, Table, Text, TextInput, Textarea } from '@mantine/core';
+import { useQueryClient } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
-import { useHocVienTheoId, useSuaMaDinhDanhMoet } from '@/api/admin';
+import {
+  anhHuongXoaKey,
+  useAnhHuongXoaHocVien,
+  useHocVienTheoId,
+  useSuaMaDinhDanhMoet,
+  useXoaHocVien,
+  type AnhHuongXoaHocVien,
+} from '@/api/admin';
 import { useNhatKyHocVien } from '@/api/taiKhoanHocVien';
 import { useToi } from '@/auth/AuthContext';
 import { DongThoiGianNhatKy } from '@/components/DongThoiGianNhatKy';
@@ -116,6 +124,10 @@ export default function AdminHocVienChiTiet() {
             <NhatKyCuaHocVien hocVienId={id} />
           </Paper>
         )}
+
+        {data && nguoiDung?.vai_tro === 'quan_tri' && (
+          <XoaHocVien hocVienId={data.id} hoTen={data.ho_ten ?? ''} maMoet={data.ma_dinh_danh_moet} />
+        )}
       </Container>
     </>
   );
@@ -227,6 +239,142 @@ function SuaMaMoet({ hocVienId, maHienTai }: { hocVienId: string; maHienTai: str
         </Stack>
       </Modal>
     </>
+  );
+}
+
+// Issue #30: xóa cứng học viên — "xóa là văng hết". Gõ lại mã MOET (hoặc họ tên khi không có mã) để
+// xác nhận; so khớp giống backend (trim, họ tên không phân biệt hoa/thường).
+function khopXacNhanXoa(nhap: string, hoTen: string, maMoet: string | null) {
+  const sach = chuanHoaNfc(nhap.trim());
+  if (maMoet) return sach === maMoet.trim();
+  return sach !== '' && sach.toLocaleLowerCase('vi') === chuanHoaNfc(hoTen.trim()).toLocaleLowerCase('vi');
+}
+
+function XoaHocVien(props: { hocVienId: string; hoTen: string; maMoet: string | null }) {
+  const { hocVienId } = props;
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const xoa = useXoaHocVien(hocVienId);
+  const [mo, setMo] = useState(false);
+  const [lyDo, setLyDo] = useState('');
+  const [xacNhan, setXacNhan] = useState('');
+  // Issue #31: mức ảnh hưởng chỉ tải khi modal mở; họ tên/mã MOET server trả kèm được ưu tiên (mới nhất).
+  const anhHuong = useAnhHuongXoaHocVien(hocVienId, mo);
+  const hoTen = anhHuong.data?.ho_ten ?? props.hoTen;
+  const maMoet = anhHuong.data ? anhHuong.data.ma_dinh_danh_moet : props.maMoet;
+
+  const giaTriXacNhan = maMoet ?? hoTen;
+  const nhanXacNhan = maMoet
+    ? `Gõ lại mã MOET ${maMoet} để xác nhận`
+    : `Gõ lại họ tên "${hoTen}" để xác nhận`;
+  const lyDoSach = chuanHoaNfc(lyDo.trim());
+  const duocXoa = lyDoSach !== '' && khopXacNhanXoa(xacNhan, hoTen, maMoet);
+
+  function moModal() {
+    setLyDo('');
+    setXacNhan('');
+    xoa.reset();
+    // Bỏ số đếm cũ để mỗi lần mở modal đều thấy trạng thái đang tải + số mới đếm.
+    queryClient.removeQueries({ queryKey: anhHuongXoaKey(hocVienId) });
+    setMo(true);
+  }
+
+  function xacNhanXoa() {
+    if (!duocXoa) return;
+    xoa.mutate(
+      { ly_do: lyDoSach, xac_nhan: chuanHoaNfc(xacNhan.trim()) },
+      {
+        onSuccess: () => {
+          notifications.show({ color: 'green', message: `Đã xóa học viên ${hoTen || giaTriXacNhan}` });
+          setMo(false);
+          navigate('/admin/hoc-vien', { replace: true });
+        },
+      },
+    );
+  }
+
+  return (
+    <Paper withBorder radius={14} p="lg" mt="lg" style={{ borderColor: 'var(--mantine-color-red-6)' }}>
+      <Text component="h2" fz={16} fw={700} c="red.7" mb={4}>
+        Thao tác nguy hiểm
+      </Text>
+      <Text fz={13} c="dimmed" mb="md">
+        Xóa vĩnh viễn hồ sơ học viên cùng toàn bộ dữ liệu liên quan. Không thể hoàn tác.
+      </Text>
+      <Button color="red" variant="outline" onClick={moModal}>
+        Xóa học viên
+      </Button>
+
+      <Modal opened={mo} onClose={() => setMo(false)} title="Xóa học viên" centered>
+        <Stack gap="md">
+          <Alert color="red" title="Không thể hoàn tác">
+            Hồ sơ <b>{hoTen || giaTriXacNhan}</b> sẽ bị xóa vĩnh viễn cùng toàn bộ dữ liệu liên quan (tài khoản đăng
+            nhập, ghi danh, phân lớp, điểm danh, kết quả, khảo sát, yêu cầu hỗ trợ…). Học viên sẽ biến mất khỏi mọi
+            báo cáo, thống kê.
+          </Alert>
+          <MucAnhHuongXoa data={anhHuong.data} loi={anhHuong.isError ? thongDiepLoiChung(anhHuong.error) : null} />
+          {xoa.isError && <Alert color="red">{thongDiepLoiXungDot(xoa.error)}</Alert>}
+          <Textarea
+            label="Lý do xóa"
+            placeholder="Ví dụ: hồ sơ trùng, nhập nhầm người"
+            autosize
+            minRows={2}
+            maxLength={1000}
+            value={lyDo}
+            onChange={(e) => setLyDo(e.currentTarget.value)}
+            required
+          />
+          <TextInput
+            label={nhanXacNhan}
+            autoComplete="off"
+            value={xacNhan}
+            onChange={(e) => setXacNhan(e.currentTarget.value)}
+            required
+          />
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={() => setMo(false)}>
+              Hủy
+            </Button>
+            <Button color="red" disabled={!duocXoa} loading={xoa.isPending} onClick={xacNhanXoa}>
+              Xóa
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+    </Paper>
+  );
+}
+
+// Issue #31: dữ liệu sẽ mất nếu xóa (server đếm lúc mở modal). Nhật ký hoạt động được giữ nên không liệt kê.
+function MucAnhHuongXoa({ data, loi }: { data: AnhHuongXoaHocVien | undefined; loi: string | null }) {
+  if (loi) return <Alert color="orange">Không tải được mức ảnh hưởng: {loi}</Alert>;
+  if (!data) return <Skeleton height={150} data-testid="anh-huong-xoa-dang-tai" />;
+  const dong: [string, string][] = [
+    ['Khóa đã ghi danh', String(data.so_dang_ky)],
+    ['Buổi điểm danh', String(data.so_buoi_diem_danh)],
+    ['Kết quả khảo sát', String(data.so_ket_qua_khao_sat)],
+    ['Yêu cầu hỗ trợ', String(data.so_yeu_cau_ho_tro)],
+    ['Tài khoản đăng nhập', data.co_tai_khoan ? 'Có' : 'Không'],
+    ['Tài khoản VLE', data.ten_dang_nhap_vle ?? 'Không có'],
+  ];
+  return (
+    <Box>
+      <Text fz={13} fw={600} mb={4}>
+        Dữ liệu sẽ bị xóa
+      </Text>
+      <Table withTableBorder verticalSpacing={4} fz={13} aria-label="Mức ảnh hưởng khi xóa">
+        <Table.Tbody>
+          {dong.map(([nhan, giaTri]) => (
+            <Table.Tr key={nhan}>
+              <Table.Th fw={500} w="60%">
+                {nhan}
+              </Table.Th>
+              <Table.Td fw={700}>{giaTri}</Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </Box>
   );
 }
 
