@@ -5,6 +5,7 @@ import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { PhamViThongKe } from './thong-ke.types';
 import { ThangMucService } from '../sso/thang-muc.service';
 import { ValidationException } from '../common/exceptions/app.exceptions';
+import { HOC_VIEN_PHAI_KHAO_SAT } from '../common/utils/doi-tuong-khao-sat.util';
 
 function caller(vai_tro: AuthenticatedUser['vai_tro']): AuthenticatedUser {
   return {
@@ -93,16 +94,19 @@ describe('ThongKeService.pheu', () => {
     ).toBe(true);
   });
 
-  it('3 khảo sát: lọc ket_qua_khao_sat theo loai + hoan_thanh', async () => {
+  // Tử số 3 khảo sát phải trừ nhân viên như mẫu số tham_gia_khao_sat (lỗi 2026-10-12: nhân viên đã làm
+  // bài trước quy tắc vẫn bị đếm vào tử số -> "đã làm" lệch 6 so với khối Nhu cầu mức học).
+  it('3 khảo sát: lọc loai + hoan_thanh VÀ trừ nhân viên (khớp mẫu số)', async () => {
     await service.pheu(caller('quan_tri'), {});
     const ks = prisma.hoc_vien.count.mock.calls
-      .map(([a]) => a.where.ket_qua_khao_sat?.some)
+      .map(([a]) => a.where.AND)
       .filter(Boolean);
-    expect(ks).toEqual([
-      { loai: 'khao-sat', trang_thai: 'hoan_thanh' },
-      { loai: 'danh-gia', trang_thai: 'hoan_thanh' },
-      { loai: 'dau-ra', trang_thai: 'hoan_thanh' },
-    ]);
+    expect(ks).toEqual(
+      ['khao-sat', 'danh-gia', 'dau-ra'].map((loai) => [
+        HOC_VIEN_PHAI_KHAO_SAT,
+        { ket_qua_khao_sat: { some: { loai, trang_thai: 'hoan_thanh' } } },
+      ]),
+    );
   });
 
   it('ho_so_cho_duyet: hoc_vien.trang_thai = cho_duyet giao với phạm vi', async () => {
@@ -217,7 +221,9 @@ describe('ThongKeService khối khảo sát + chuyển mức', () => {
       const arg = prisma.ket_qua_khao_sat.groupBy.mock.calls[0][0];
       expect(arg.where).toEqual({
         trang_thai: 'hoan_thanh',
-        hoc_vien: { dang_ky_hoc: { some: WHERE_SCOPE } },
+        hoc_vien: {
+          AND: [{ dang_ky_hoc: { some: WHERE_SCOPE } }, HOC_VIEN_PHAI_KHAO_SAT],
+        },
       });
     });
 
@@ -281,7 +287,9 @@ describe('ThongKeService khối khảo sát + chuyển mức', () => {
       expect(arg.where).toEqual({
         loai: { in: ['danh-gia', 'dau-ra'] },
         trang_thai: 'hoan_thanh',
-        hoc_vien: { dang_ky_hoc: { some: WHERE_SCOPE } },
+        hoc_vien: {
+          AND: [{ dang_ky_hoc: { some: WHERE_SCOPE } }, HOC_VIEN_PHAI_KHAO_SAT],
+        },
       });
     });
 

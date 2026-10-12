@@ -181,7 +181,13 @@ export class XepHangService {
       if (r.hoc_vien.nguoi_dung_account?.dang_nhap_lan_cuoi) {
         d.truyCap.add(r.hoc_vien_id);
       }
-      if (r.hoc_vien.ket_qua_khao_sat.length > 0) d.khaoSat.add(r.hoc_vien_id);
+      // Tử số cũng trừ nhân viên (khớp mẫu số hvKhaoSat).
+      if (
+        phaiKhaoSat(r.hoc_vien.doi_tuong) &&
+        r.hoc_vien.ket_qua_khao_sat.length > 0
+      ) {
+        d.khaoSat.add(r.hoc_vien_id);
+      }
       d.luot += 1;
       if (r.ket_qua === 'dat') d.dat += 1;
     }

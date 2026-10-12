@@ -139,7 +139,9 @@ export class TienDoTruongService {
       if (h.nguoi_dung_account?.dang_nhap_lan_cuoi) {
         t.truyCap.add(d.hoc_vien_id);
       }
-      for (const ks of h.ket_qua_khao_sat) {
+      // Tử số khảo sát cũng trừ nhân viên (khớp mẫu số hvKhaoSat).
+      const ketQua = phaiKhaoSat(h.doi_tuong) ? h.ket_qua_khao_sat : [];
+      for (const ks of ketQua) {
         if (ks.loai === 'khao-sat') t.kyNangSo.add(d.hoc_vien_id);
         else if (ks.loai === 'danh-gia') t.dauVao.add(d.hoc_vien_id);
         else if (ks.loai === 'dau-ra') t.dauRa.add(d.hoc_vien_id);

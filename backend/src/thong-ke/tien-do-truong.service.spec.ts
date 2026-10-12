@@ -22,13 +22,14 @@ interface HvOpt {
   dangNhap?: boolean;
   ks?: string[];
   ketQua?: string | null;
+  doiTuong?: string | null;
 }
 let dem = 0;
 // Một dòng dang_ky_hoc; `hv` cố định để mô phỏng HV học 2 khóa.
 function dk(
   donVi: string,
   hv: string,
-  { dangNhap = false, ks = [], ketQua = null }: HvOpt = {},
+  { dangNhap = false, ks = [], ketQua = null, doiTuong = null }: HvOpt = {},
   cha: string | null = 'Sở A',
   ten = `Trường ${donVi}`,
 ) {
@@ -37,6 +38,7 @@ function dk(
     ket_qua: ketQua,
     hoc_vien_id: hv,
     hoc_vien: {
+      doi_tuong: doiTuong,
       don_vi_cong_tac_id: donVi,
       don_vi_cong_tac: {
         ten_don_vi: ten,
@@ -106,6 +108,23 @@ describe('TienDoTruongService', () => {
     expect(prisma.dang_ky_hoc.findMany).not.toHaveBeenCalled();
     expect(prisma.diem_danh.groupBy).not.toHaveBeenCalled();
     expect(prisma.ket_qua_giai_doan.findMany).not.toHaveBeenCalled();
+  });
+
+  // 2026-10-12: nhân viên đã làm bài (trước quy tắc) không vào tử số khảo sát, vẫn tính truy cập.
+  it('nhân viên đã làm khảo sát: không vào tử/mẫu khảo sát, vẫn tính số HV + truy cập', async () => {
+    setup([
+      dk('t1', 'gv', { dangNhap: true, ks: ['khao-sat', 'danh-gia'], doiTuong: 'giao_vien' }),
+      dk('t1', 'nv', { dangNhap: true, ks: ['khao-sat', 'danh-gia'], doiTuong: 'nhan_vien' }),
+      dk('t1', 'null', { ks: [] }),
+    ]);
+    const [t1] = await service.danhSach(caller('quan_tri'), {});
+    expect(t1.so_hv).toBe(3);
+    expect(t1.so_truy_cap).toBe(2);
+    expect(t1.ty_le_truy_cap).toBeCloseTo(2 / 3);
+    expect(t1.so_hv_khao_sat).toBe(2); // gv + null
+    expect(t1.so_ky_nang_so).toBe(1);
+    expect(t1.so_dau_vao).toBe(1);
+    expect(t1.ty_le_ky_nang_so).toBeCloseTo(1 / 2);
   });
 
   it('2 trường: so_hv phân biệt, tỷ lệ truy cập/khảo sát/đạt đúng', async () => {
@@ -290,8 +309,9 @@ describe('TienDoTruongService', () => {
     expect(row.getCell(4).value).toBe(3);
     expect(row.getCell(5).value).toBe(1); // Đã truy cập
     expect(row.getCell(6).value).toBe(33.3); // % Truy cập
-    expect(row.getCell(13).value).toBe(0); // Lượt điểm danh
-    expect(row.getCell(15).value).toBeNull(); // % Có mặt: không điểm danh
+    expect(row.getCell(7).value).toBeDefined(); // Số HV phải khảo sát (cột thêm 2026-10-12)
+    expect(row.getCell(14).value).toBe(0); // Lượt điểm danh
+    expect(row.getCell(16).value).toBeNull(); // % Có mặt: không điểm danh
   });
 
   it('xuatExcel rong -> chỉ header', async () => {

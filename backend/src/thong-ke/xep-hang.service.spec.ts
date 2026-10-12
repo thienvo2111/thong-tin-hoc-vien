@@ -37,12 +37,14 @@ const dv = (
 function hocVien(
   donVi: string,
   n: number,
-  { dangNhap = 0, daKs = 0, dat = 0 } = {},
+  { dangNhap = 0, daKs = 0, dat = 0, nhanVien = 0 } = {},
 ) {
   return Array.from({ length: n }, (_, i) => ({
     hoc_vien_id: `${donVi}-hv${i}`,
     ket_qua: i < dat ? 'dat' : null,
     hoc_vien: {
+      // nhanVien: n HV CUỐI danh sách là nhân viên.
+      doi_tuong: i >= n - nhanVien ? 'nhan_vien' : null,
       don_vi_cong_tac_id: donVi,
       nguoi_dung_account: {
         dang_nhap_lan_cuoi: i < dangNhap ? new Date() : null,
@@ -181,6 +183,22 @@ describe('XepHangService', () => {
     if (ks.kieu !== 'bang' || dat.kieu !== 'bang') throw new Error('kieu');
     expect(ks.top[0].gia_tri).toBeCloseTo(0.4);
     expect(dat.top[0].gia_tri).toBeCloseTo(0.6);
+  });
+
+  // 2026-10-12: nhân viên đã làm khảo sát không vào tử số (mẫu số đã trừ) — truy cập vẫn tính đủ.
+  it('chỉ số khao_sat trừ nhân viên ở cả tử lẫn mẫu; truy_cap vẫn tính nhân viên', async () => {
+    setup(
+      [dv('so', null, 'so_gddt'), dv('a', 'so', 'truong')],
+      // 5 HV, đều đã làm KS + đăng nhập; 2 HV cuối là nhân viên.
+      hocVien('a', 5, { daKs: 5, dangNhap: 5, nhanVien: 2 }),
+    );
+    const u = caller('so_gddt', 'so');
+    const ks = await service.xepHang(u, { chi_so: 'khao_sat' });
+    const tc = await service.xepHang(u, { chi_so: 'truy_cap' });
+    if (ks.kieu !== 'bang' || tc.kieu !== 'bang') throw new Error('kieu');
+    expect(ks.top[0].gia_tri).toBeCloseTo(1); // 3/3, không phải 5/3
+    expect(tc.top[0].gia_tri).toBeCloseTo(1); // 5/5
+    expect(tc.top[0].so_hv).toBe(5);
   });
 
   it('một HV đăng ký 2 khóa chỉ đếm 1 HV; dat tính theo lượt', async () => {

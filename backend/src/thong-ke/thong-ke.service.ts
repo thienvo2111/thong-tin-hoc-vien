@@ -92,9 +92,11 @@ export class ThongKeService {
       // Nhân viên chưa triển khai khảo sát -> mẫu số riêng cho 3 tỷ lệ dưới.
       dem(HOC_VIEN_PHAI_KHAO_SAT),
       dem({ nguoi_dung_account: { dang_nhap_lan_cuoi: { not: null } } }),
-      dem(hoanThanh(LOAI_KY_NANG_SO)),
-      dem(hoanThanh(LOAI_DAU_VAO)),
-      dem(hoanThanh(LOAI_DAU_RA)),
+      // Tử số cũng trừ nhân viên (có người đã làm trước khi áp quy tắc
+      // 2026-10-10) — nếu không tử/mẫu lệch nhau, tỷ lệ bị đội lên.
+      dem({ AND: [HOC_VIEN_PHAI_KHAO_SAT, hoanThanh(LOAI_KY_NANG_SO)] }),
+      dem({ AND: [HOC_VIEN_PHAI_KHAO_SAT, hoanThanh(LOAI_DAU_VAO)] }),
+      dem({ AND: [HOC_VIEN_PHAI_KHAO_SAT, hoanThanh(LOAI_DAU_RA)] }),
     ]);
     return {
       tham_gia,
@@ -122,7 +124,9 @@ export class ThongKeService {
         by: ['loai', 'muc_goc'],
         where: {
           trang_thai: 'hoan_thanh',
-          hoc_vien: { dang_ky_hoc: { some: where } },
+          hoc_vien: {
+            AND: [{ dang_ky_hoc: { some: where } }, HOC_VIEN_PHAI_KHAO_SAT],
+          },
         },
         _count: { _all: true },
       }),
@@ -167,7 +171,9 @@ export class ThongKeService {
           where: {
             loai: { in: [LOAI_DAU_VAO, LOAI_DAU_RA] },
             trang_thai: 'hoan_thanh',
-            hoc_vien: { dang_ky_hoc: { some: where } },
+            hoc_vien: {
+              AND: [{ dang_ky_hoc: { some: where } }, HOC_VIEN_PHAI_KHAO_SAT],
+            },
           },
           select: { hoc_vien_id: true, loai: true, muc_goc: true },
         });
