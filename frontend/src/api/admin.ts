@@ -119,6 +119,94 @@ export function suaMaDinhDanhMoet(id: string, dto: SuaMaMoetDto) {
   });
 }
 
+// Issue #30: Quản trị xóa cứng 1 học viên + mọi dữ liệu liên quan (không hoàn tác). xac_nhan = mã MOET
+// (nếu hồ sơ có) hoặc họ tên — backend kiểm lại, sai -> 400.
+export interface XoaHocVienDto {
+  ly_do: string;
+  xac_nhan: string;
+}
+
+export interface XoaHocVienResult {
+  id: string;
+  nhat_ky_id: string;
+  so_dang_ky_da_xoa: number;
+}
+
+export function xoaHocVien(id: string, dto: XoaHocVienDto) {
+  return apiFetch<XoaHocVienResult>(`/hoc-vien/${id}`, {
+    method: 'DELETE',
+    body: JSON.stringify(dto),
+  });
+}
+
+export function useXoaHocVien(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: XoaHocVienDto) => xoaHocVien(id, dto),
+    onSuccess: () => {
+      // refetchType 'none': chỉ đánh dấu cũ — không tải lại chi tiết hồ sơ vừa xóa (sẽ 404) trước khi rời trang.
+      queryClient.invalidateQueries({ queryKey: ['admin', 'hoc-vien'], refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: ['thong-ke'], refetchType: 'none' });
+    },
+  });
+}
+
+// Issue #31: mức ảnh hưởng nếu xóa — server đếm tại thời điểm gọi (không tính nhat_ky_hoat_dong, bảng đó được giữ).
+export interface AnhHuongXoaHocVien {
+  ho_ten: string;
+  ma_dinh_danh_moet: string | null;
+  so_dang_ky: number;
+  so_buoi_diem_danh: number;
+  so_ket_qua_khao_sat: number;
+  so_yeu_cau_ho_tro: number;
+  co_tai_khoan: boolean;
+  ten_dang_nhap_vle: string | null;
+}
+
+export function anhHuongXoaKey(id: string) {
+  return ['admin', 'hoc-vien', 'anh-huong-xoa', id] as const;
+}
+
+export function useAnhHuongXoaHocVien(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: anhHuongXoaKey(id),
+    queryFn: () => apiFetch<AnhHuongXoaHocVien>(`/hoc-vien/${id}/anh-huong-xoa`),
+    enabled,
+    // Luôn đếm lại mỗi lần mở modal, không dùng số cũ trong cache.
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+  });
+}
+
+// Issue #32: nhật ký học viên đã xóa (chỉ quan_tri, chỉ đọc).
+export interface HocVienDaXoa {
+  id: string;
+  hoc_vien_id_cu: string;
+  ho_ten: string;
+  ma_dinh_danh_moet: string | null;
+  ten_don_vi: string;
+  so_dang_ky_da_xoa: number;
+  ten_dang_nhap_vle: string | null;
+  ly_do: string;
+  thoi_gian: string;
+  nguoi_xoa: { id: string; ho_ten: string; ten_dang_nhap: string };
+}
+
+export interface DanhSachDaXoaParams {
+  q?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export function useDanhSachHocVienDaXoa(params: DanhSachDaXoaParams) {
+  return useQuery({
+    queryKey: ['admin', 'hoc-vien', 'da-xoa', params] as const,
+    queryFn: () => apiFetch<PaginatedResult<HocVienDaXoa>>(`/hoc-vien/da-xoa${xayQueryString(params)}`),
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function useSuaMaDinhDanhMoet(id: string) {
   const queryClient = useQueryClient();
   return useMutation({

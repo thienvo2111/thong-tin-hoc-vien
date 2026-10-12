@@ -11,6 +11,7 @@ import {
   Skeleton,
   Stack,
   Table,
+  Tabs,
   Text,
   TextInput,
   Tooltip,
@@ -27,6 +28,7 @@ import { SelectDonViTimKiem } from '@/components/SelectDonViTimKiem';
 import { TrangThaiBadge } from '@/components/TrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
 import { ModalTaoHocVienLe } from './ModalTaoHocVienLe';
+import { TabHocVienDaXoa } from './TabHocVienDaXoa';
 
 const KICH_THUOC_TRANG = 20;
 
@@ -65,6 +67,8 @@ export default function AdminDanhSach() {
   const [capGiangDay, setCapGiangDay] = useState('');
   const [page, setPage] = useState(1);
   const [dangXuat, setDangXuat] = useState(false);
+  const [tab, setTab] = useState<string | null>('danh-sach');
+  const laQuanTri = nguoiDung?.vai_tro === 'quan_tri';
 
   async function xuatTheoTruong() {
     setDangXuat(true);
@@ -105,6 +109,131 @@ export default function AdminDanhSach() {
 
   const tongSoTrang = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
 
+  const danhSach = (
+    <Stack gap="md">
+      <Group gap="sm" wrap="wrap">
+        <TextInput
+          placeholder="Tìm theo tên, CCCD, mã MOET..."
+          value={q}
+          onChange={(e) => datBoLoc(setQ)(e.currentTarget.value)}
+          w={280}
+        />
+        <Select
+          data={TUY_CHON_TRANG_THAI}
+          value={trangThai}
+          onChange={(v) => datBoLoc(setTrangThai)(v ?? '')}
+          allowDeselect={false}
+          w={180}
+        />
+        <SelectDonViTimKiem
+          placeholder="Tất cả đơn vị — gõ tên để tìm"
+          loaiDonVi="truong"
+          value={donViId || null}
+          onChange={(id, donVi) => {
+            datBoLoc(setDonViId)(id ?? '');
+            setDonViDaChon(donVi);
+          }}
+          w={260}
+        />
+        <Select
+          data={TUY_CHON_CAP_GIANG_DAY}
+          value={capGiangDay}
+          onChange={(v) => datBoLoc(setCapGiangDay)(v ?? '')}
+          allowDeselect={false}
+          w={160}
+        />
+        {/* data-disabled thay vì disabled: nút disabled không phát mouseleave nên Tooltip kẹt (Mantine). */}
+        <Tooltip label="Chọn một trường để xuất" disabled={coTheXuat}>
+          <Button
+            variant="light"
+            loading={dangXuat}
+            data-disabled={!coTheXuat || undefined}
+            aria-disabled={!coTheXuat}
+            onClick={() => {
+              if (coTheXuat) void xuatTheoTruong();
+            }}
+          >
+            Xuất Excel theo trường
+          </Button>
+        </Tooltip>
+        <Text fz={12.5} c="dimmed" ml="auto">
+          {data ? `${data.total.toLocaleString('vi-VN')} học viên` : ''}
+        </Text>
+      </Group>
+
+      <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
+        {isLoading && (
+          <Stack p="md" gap="sm">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} height={36} />
+            ))}
+          </Stack>
+        )}
+
+        {isError && (
+          <Alert color="red" m="md">
+            {thongDiepLoiChung(error)}
+          </Alert>
+        )}
+
+        {data && (
+          <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md" style={{ opacity: isFetching ? 0.6 : 1 }}>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Họ và tên</Table.Th>
+                <Table.Th>Số CCCD</Table.Th>
+                <Table.Th>Đơn vị công tác</Table.Th>
+                <Table.Th>Cấp giảng dạy</Table.Th>
+                <Table.Th>Trạng thái hồ sơ</Table.Th>
+                <Table.Th />
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {data.data.length === 0 && (
+                <Table.Tr>
+                  <Table.Td colSpan={6}>
+                    <Text c="dimmed" ta="center" py="lg">
+                      Không có học viên nào khớp bộ lọc.
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+              {data.data.map((hv) => (
+                <Table.Tr
+                  key={hv.id}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => navigate(`/admin/hoc-vien/${hv.id}`)}
+                >
+                  <Table.Td fw={600}>{hv.ho_ten ?? '(Chưa có tên)'}</Table.Td>
+                  <Table.Td>{hv.so_dinh_danh_ca_nhan ?? '—'}</Table.Td>
+                  <Table.Td>{hv.don_vi_cong_tac_id ? (donViMap.get(hv.don_vi_cong_tac_id) ?? '—') : '—'}</Table.Td>
+                  <Table.Td>{TUY_CHON_CAP_GIANG_DAY.find((c) => c.value === hv.cap_giang_day)?.label ?? '—'}</Table.Td>
+                  <Table.Td>
+                    <TrangThaiBadge trangThai={hv.trang_thai} />
+                  </Table.Td>
+                  <Table.Td ta="right">
+                    <Text fz={12.5} fw={700}>
+                      Xem →
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        )}
+      </Paper>
+
+      {data && data.total > 0 && (
+        <Group justify="space-between">
+          <Text fz={12.5} c="dimmed">
+            Trang {data.page} / {tongSoTrang} — {data.total.toLocaleString('vi-VN')} kết quả
+          </Text>
+          <Pagination value={page} onChange={setPage} total={tongSoTrang} size="sm" />
+        </Group>
+      )}
+    </Stack>
+  );
+
   return (
     <>
       <AdminPageHeader
@@ -119,128 +248,20 @@ export default function AdminDanhSach() {
       />
       <ModalTaoHocVienLe opened={moTaoLe} onClose={() => setMoTaoLe(false)} />
       <Container size="xl" py="lg" px={{ base: 'md', md: 28 }}>
-        <Stack gap="md">
-          <Group gap="sm" wrap="wrap">
-            <TextInput
-              placeholder="Tìm theo tên, CCCD, mã MOET..."
-              value={q}
-              onChange={(e) => datBoLoc(setQ)(e.currentTarget.value)}
-              w={280}
-            />
-            <Select
-              data={TUY_CHON_TRANG_THAI}
-              value={trangThai}
-              onChange={(v) => datBoLoc(setTrangThai)(v ?? '')}
-              allowDeselect={false}
-              w={180}
-            />
-            <SelectDonViTimKiem
-              placeholder="Tất cả đơn vị — gõ tên để tìm"
-              loaiDonVi="truong"
-              value={donViId || null}
-              onChange={(id, donVi) => {
-                datBoLoc(setDonViId)(id ?? '');
-                setDonViDaChon(donVi);
-              }}
-              w={260}
-            />
-            <Select
-              data={TUY_CHON_CAP_GIANG_DAY}
-              value={capGiangDay}
-              onChange={(v) => datBoLoc(setCapGiangDay)(v ?? '')}
-              allowDeselect={false}
-              w={160}
-            />
-            {/* data-disabled thay vì disabled: nút disabled không phát mouseleave nên Tooltip kẹt (Mantine). */}
-            <Tooltip label="Chọn một trường để xuất" disabled={coTheXuat}>
-              <Button
-                variant="light"
-                loading={dangXuat}
-                data-disabled={!coTheXuat || undefined}
-                aria-disabled={!coTheXuat}
-                onClick={() => {
-                  if (coTheXuat) void xuatTheoTruong();
-                }}
-              >
-                Xuất Excel theo trường
-              </Button>
-            </Tooltip>
-            <Text fz={12.5} c="dimmed" ml="auto">
-              {data ? `${data.total.toLocaleString('vi-VN')} học viên` : ''}
-            </Text>
-          </Group>
-
-          <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
-            {isLoading && (
-              <Stack p="md" gap="sm">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <Skeleton key={i} height={36} />
-                ))}
-              </Stack>
-            )}
-
-            {isError && (
-              <Alert color="red" m="md">
-                {thongDiepLoiChung(error)}
-              </Alert>
-            )}
-
-            {data && (
-              <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md" style={{ opacity: isFetching ? 0.6 : 1 }}>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Họ và tên</Table.Th>
-                    <Table.Th>Số CCCD</Table.Th>
-                    <Table.Th>Đơn vị công tác</Table.Th>
-                    <Table.Th>Cấp giảng dạy</Table.Th>
-                    <Table.Th>Trạng thái hồ sơ</Table.Th>
-                    <Table.Th />
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {data.data.length === 0 && (
-                    <Table.Tr>
-                      <Table.Td colSpan={6}>
-                        <Text c="dimmed" ta="center" py="lg">
-                          Không có học viên nào khớp bộ lọc.
-                        </Text>
-                      </Table.Td>
-                    </Table.Tr>
-                  )}
-                  {data.data.map((hv) => (
-                    <Table.Tr
-                      key={hv.id}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/admin/hoc-vien/${hv.id}`)}
-                    >
-                      <Table.Td fw={600}>{hv.ho_ten ?? '(Chưa có tên)'}</Table.Td>
-                      <Table.Td>{hv.so_dinh_danh_ca_nhan ?? '—'}</Table.Td>
-                      <Table.Td>{hv.don_vi_cong_tac_id ? (donViMap.get(hv.don_vi_cong_tac_id) ?? '—') : '—'}</Table.Td>
-                      <Table.Td>{TUY_CHON_CAP_GIANG_DAY.find((c) => c.value === hv.cap_giang_day)?.label ?? '—'}</Table.Td>
-                      <Table.Td>
-                        <TrangThaiBadge trangThai={hv.trang_thai} />
-                      </Table.Td>
-                      <Table.Td ta="right">
-                        <Text fz={12.5} fw={700}>
-                          Xem →
-                        </Text>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            )}
-          </Paper>
-
-          {data && data.total > 0 && (
-            <Group justify="space-between">
-              <Text fz={12.5} c="dimmed">
-                Trang {data.page} / {tongSoTrang} — {data.total.toLocaleString('vi-VN')} kết quả
-              </Text>
-              <Pagination value={page} onChange={setPage} total={tongSoTrang} size="sm" />
-            </Group>
-          )}
-        </Stack>
+        {/* Issue #32: chỉ quan_tri có tab "Đã xóa" (nhật ký xóa cứng) — vai trò khác giữ nguyên màn cũ. */}
+        {laQuanTri ? (
+          <Tabs value={tab} onChange={setTab}>
+            <Tabs.List mb="md">
+              <Tabs.Tab value="danh-sach">Danh sách</Tabs.Tab>
+              <Tabs.Tab value="da-xoa">Đã xóa</Tabs.Tab>
+            </Tabs.List>
+            <Tabs.Panel value="danh-sach">{danhSach}</Tabs.Panel>
+            {/* Danh sách giữ mounted (không mất bộ lọc); tab "Đã xóa" chỉ tải khi được chọn. */}
+            <Tabs.Panel value="da-xoa">{tab === 'da-xoa' && <TabHocVienDaXoa />}</Tabs.Panel>
+          </Tabs>
+        ) : (
+          danhSach
+        )}
       </Container>
     </>
   );

@@ -58,6 +58,8 @@ import { DuyetHocVienDto } from './dto/duyet-hoc-vien.dto';
 import { ChuyenMonDto } from './dto/chuyen-mon.dto';
 import { SuaMaMoetDto } from './dto/sua-ma-moet.dto';
 import { TaoHocVienLeDto } from './dto/tao-hoc-vien-le.dto';
+import { XoaHocVienDto } from './dto/xoa-hoc-vien.dto';
+import { QueryHocVienDaXoaDto } from './dto/query-hoc-vien-da-xoa.dto';
 import {
   DongHocVienTruong,
   buildDanhSachHocVienTruongWorkbook,
@@ -885,6 +887,241 @@ export class HocVienService {
       ten_dang_nhap: ketQua.ten_dang_nhap,
       da_doi_ten_dang_nhap: ketQua.da_doi_ten_dang_nhap,
     };
+  }
+
+  // GET /hoc-vien/{id}/anh-huong-xoa (quan_tri, issue #31): đếm tại thời điểm
+  // gọi những gì sẽ mất nếu xóa — hiển thị trong modal xác nhận xóa.
+  // nhat_ky_hoat_dong không tính: bảng chỉ thêm, được giữ lại khi xóa.
+  async anhHuongXoa(id: string) {
+    const hv = await this.prisma.hoc_vien.findUnique({
+      where: { id },
+      select: {
+        ho_ten: true,
+        ma_dinh_danh_moet: true,
+        nguoi_dung_account: { select: { id: true } },
+        tai_khoan_vle: { select: { ten_dang_nhap_vle: true } },
+        _count: {
+          select: {
+            dang_ky_hoc: true,
+            ket_qua_khao_sat: true,
+            yeu_cau_ho_tro: true,
+          },
+        },
+      },
+    });
+    if (!hv) throw new NotFoundAppException('Không tìm thấy hồ sơ học viên');
+    const soBuoiDiemDanh = await this.prisma.diem_danh.count({
+      where: { dang_ky_hoc: { hoc_vien_id: id } },
+    });
+    return {
+      ho_ten: hv.ho_ten,
+      ma_dinh_danh_moet: hv.ma_dinh_danh_moet,
+      so_dang_ky: hv._count.dang_ky_hoc,
+      so_buoi_diem_danh: soBuoiDiemDanh,
+      so_ket_qua_khao_sat: hv._count.ket_qua_khao_sat,
+      so_yeu_cau_ho_tro: hv._count.yeu_cau_ho_tro,
+      co_tai_khoan: !!hv.nguoi_dung_account,
+      ten_dang_nhap_vle: hv.tai_khoan_vle?.ten_dang_nhap_vle ?? null,
+    };
+  }
+
+  // GET /hoc-vien/da-xoa (quan_tri, issue #32): nhật ký xóa, mới nhất trước.
+  async danhSachDaXoa(query: QueryHocVienDaXoaDto) {
+    const where: Prisma.nhat_ky_xoa_hoc_vienWhereInput = {};
+    const q = query.q?.trim();
+    if (q) {
+      const dk = dieuKienKhongDau(Prisma.sql`ho_ten`, q);
+      const idsTheoTen = dk
+        ? (
+            await this.prisma.$queryRaw<{ id: string }[]>(
+              Prisma.sql`SELECT id FROM "nhat_ky_xoa_hoc_vien" WHERE ${dk}`,
+            )
+          ).map((r) => r.id)
+        : [];
+      where.OR = [
+        { id: { in: idsTheoTen } },
+        {
+          ma_dinh_danh_moet: {
+            contains: boSo0DauDeTimKiem(q),
+            mode: 'insensitive',
+          },
+        },
+      ];
+    }
+    const page = query.page ?? 1;
+    const pageSize = query.page_size ?? 20;
+    const [rows, total] = await Promise.all([
+      this.prisma.nhat_ky_xoa_hoc_vien.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: [{ thoi_gian: 'desc' }, { id: 'desc' }],
+        include: {
+          nguoi_xoa: {
+            select: { id: true, ho_ten: true, ten_dang_nhap: true },
+          },
+        },
+      }),
+      this.prisma.nhat_ky_xoa_hoc_vien.count({ where }),
+    ]);
+    const data = rows.map((r) => ({
+      id: r.id,
+      hoc_vien_id_cu: r.hoc_vien_id_cu,
+      ho_ten: r.ho_ten,
+      ma_dinh_danh_moet: r.ma_dinh_danh_moet,
+      ten_don_vi: r.ten_don_vi,
+      so_dang_ky_da_xoa: r.so_dang_ky_da_xoa,
+      ten_dang_nhap_vle: r.ten_dang_nhap_vle,
+      ly_do: r.ly_do,
+      thoi_gian: r.thoi_gian,
+      nguoi_xoa: r.nguoi_xoa,
+    }));
+    return paginate(data, total, page, pageSize);
+  }
+
+  // DELETE /hoc-vien/{id} (quan_tri, issue #30 — "xóa là văng hết"): xóa cứng
+  // học viên + MỌI dữ liệu tham chiếu (kể cả tài khoản đăng nhập) trong 1
+  // transaction, chỉ để lại 1 dòng nhat_ky_xoa_hoc_vien (snapshot tối thiểu,
+  // không CCCD/SĐT/email). Không gửi email, không gọi Moodle.
+  // xac_nhan phải khớp mã MOET (nếu có), không thì họ tên (không phân biệt hoa/thường).
+  async xoaHocVien(id: string, dto: XoaHocVienDto, caller: AuthenticatedUser) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const hv = await tx.hoc_vien.findUnique({
+          where: { id },
+          select: {
+            id: true,
+            ho_ten: true,
+            ma_dinh_danh_moet: true,
+            don_vi_cong_tac: { select: { id: true, ten_don_vi: true } },
+            nguoi_dung_account: { select: { id: true } },
+            tai_khoan_vle: { select: { ten_dang_nhap_vle: true } },
+            _count: { select: { dang_ky_hoc: true } },
+          },
+        });
+        if (!hv)
+          throw new NotFoundAppException('Không tìm thấy hồ sơ học viên');
+        this.kiemTraXacNhanXoa(hv, dto.xac_nhan);
+
+        const tkId = hv.nguoi_dung_account?.id ?? null;
+        if (tkId) await this.goThamChieuTaiKhoan(tx, tkId, id);
+
+        // Con của dang_ky_hoc (phan_lop_giai_doan, diem_danh, ket_qua_giai_doan,
+        // bao_vang, de_nghi_doi_lop) đều ON DELETE CASCADE.
+        await tx.dang_ky_hoc.deleteMany({ where: { hoc_vien_id: id } });
+        await tx.xac_nhan_ho_so.deleteMany({ where: { hoc_vien_id: id } });
+        await tx.lich_su_thay_doi_ho_so.deleteMany({
+          where: { hoc_vien_id: id },
+        });
+        await tx.tai_khoan_vle.deleteMany({ where: { hoc_vien_id: id } });
+        await tx.nhat_ky_thong_bao.deleteMany({ where: { hoc_vien_id: id } });
+        await tx.hang_doi_email.deleteMany({ where: { hoc_vien_id: id } });
+        await tx.yeu_cau_ho_tro.deleteMany({ where: { hoc_vien_id: id } });
+        // nhat_ky_hoat_dong KHÔNG xóa: bảng chỉ thêm (trigger DB chặn
+        // UPDATE/DELETE, migration 2026-10-04), không FK nên không chặn xóa —
+        // giữ log đối chiếu khiếu nại theo thiết kế.
+        if (tkId) await tx.nguoi_dung.delete({ where: { id: tkId } });
+        // hoc_vien_chuyen_mon, token_xac_thuc, ma_sso_mot_lan, ket_qua_khao_sat: CASCADE.
+        await tx.hoc_vien.delete({ where: { id } });
+
+        const nhatKy = await tx.nhat_ky_xoa_hoc_vien.create({
+          data: {
+            hoc_vien_id_cu: id,
+            ho_ten: hv.ho_ten,
+            ma_dinh_danh_moet: hv.ma_dinh_danh_moet,
+            don_vi_cong_tac_id: hv.don_vi_cong_tac.id,
+            ten_don_vi: hv.don_vi_cong_tac.ten_don_vi,
+            so_dang_ky_da_xoa: hv._count.dang_ky_hoc,
+            ten_dang_nhap_vle: hv.tai_khoan_vle?.ten_dang_nhap_vle ?? null,
+            ly_do: dto.ly_do,
+            nguoi_xoa_id: caller.id,
+          },
+        });
+        return {
+          id,
+          nhat_ky_id: nhatKy.id,
+          so_dang_ky_da_xoa: nhatKy.so_dang_ky_da_xoa,
+        };
+      },
+      { timeout: 30000 },
+    );
+  }
+
+  private kiemTraXacNhanXoa(
+    hv: { ho_ten: string; ma_dinh_danh_moet: string | null },
+    xacNhan: string,
+  ) {
+    const nhap = (xacNhan ?? '').trim().normalize('NFC');
+    const khop = hv.ma_dinh_danh_moet
+      ? nhap === hv.ma_dinh_danh_moet.trim()
+      : nhap.toLocaleLowerCase('vi') ===
+        hv.ho_ten.trim().normalize('NFC').toLocaleLowerCase('vi');
+    if (!khop) {
+      const can = hv.ma_dinh_danh_moet ? 'mã định danh MOET' : 'họ tên';
+      throw new ValidationException(
+        `Nội dung xác nhận không khớp ${can} của học viên`,
+        [{ field: 'xac_nhan', message: `Gõ lại đúng ${can} để xác nhận xóa` }],
+      );
+    }
+  }
+
+  // Tài khoản học viên có thể là "người thực hiện" trong dữ liệu khác: cột
+  // nullable NoAction -> set NULL (cột SetNull/Cascade DB tự xử lý). Cột NOT
+  // NULL trỏ tới dữ liệu của người khác (nhat_ky_import, lịch sử sửa hồ sơ học
+  // viên khác) — vai trò hoc_vien không tạo được nên thực tế không có; nếu có
+  // thì chặn 409 thay vì xóa dữ liệu của người khác.
+  private async goThamChieuTaiKhoan(
+    tx: Prisma.TransactionClient,
+    tkId: string,
+    hocVienId: string,
+  ) {
+    const [soImport, soLichSuKhac] = await Promise.all([
+      tx.nhat_ky_import.count({ where: { nguoi_import_id: tkId } }),
+      tx.lich_su_thay_doi_ho_so.count({
+        where: { nguoi_sua_id: tkId, hoc_vien_id: { not: hocVienId } },
+      }),
+    ]);
+    if (soImport > 0 || soLichSuKhac > 0) {
+      throw new ConflictAppException(
+        'Tài khoản của học viên đã ghi dữ liệu của người khác (import/sửa hồ sơ), không thể xóa tự động',
+      );
+    }
+    await tx.hoc_vien.updateMany({
+      where: { created_by: tkId },
+      data: { created_by: null },
+    });
+    await tx.hoc_vien.updateMany({
+      where: { nguoi_duyet_id: tkId },
+      data: { nguoi_duyet_id: null },
+    });
+    await tx.khoa_boi_duong.updateMany({
+      where: { created_by: tkId },
+      data: { created_by: null },
+    });
+    await tx.khoa_boi_duong.updateMany({
+      where: { nguoi_duyet_id: tkId },
+      data: { nguoi_duyet_id: null },
+    });
+    await tx.dot_xac_nhan.updateMany({
+      where: { created_by: tkId },
+      data: { created_by: null },
+    });
+    await tx.phan_cong_giang_day.updateMany({
+      where: { nguoi_xac_nhan_id: tkId },
+      data: { nguoi_xac_nhan_id: null },
+    });
+    await tx.yeu_cau_ho_tro.updateMany({
+      where: { tra_loi_boi: tkId },
+      data: { tra_loi_boi: null },
+    });
+    await tx.yeu_cau_ho_tro.updateMany({
+      where: { sua_tra_loi_boi: tkId },
+      data: { sua_tra_loi_boi: null },
+    });
+    await tx.token_thu_hoi.deleteMany({ where: { nguoi_dung_id: tkId } });
+    await tx.nhat_ky_dat_lai_mat_khau.deleteMany({
+      where: { OR: [{ nguoi_dung_id: tkId }, { thuc_hien_boi: tkId }] },
+    });
   }
 
   // Lõi dùng chung cho capNhatHoSoCuaToi (học viên) + suaHoSoByAdmin (quan_tri)

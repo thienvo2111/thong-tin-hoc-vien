@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { notifications } from '@mantine/notifications';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
 import { loi } from '@/test/mocks/handlers';
 import { db } from '@/test/mocks/db';
@@ -487,5 +487,233 @@ describe('Admin — Chi tiết hồ sơ học viên — Ghi danh vào khóa', ()
     renderTrang('hv-duyet-1');
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
     expect(screen.queryByTestId('ghi-danh-vao-khoa')).not.toBeInTheDocument();
+  });
+});
+
+// Issue #30: Quản trị xóa cứng học viên (DELETE /hoc-vien/{id}) — khối "Thao tác nguy hiểm" cuối trang.
+describe('Admin — Chi tiết hồ sơ học viên — Xóa học viên (issue #30)', () => {
+  beforeEach(() => notifications.clean());
+
+  function renderCoDanhSach() {
+    datToken('token-gia-lap');
+    return renderVoiRouter(
+      [
+        { path: '/admin/hoc-vien/:id', element: <AdminHocVienChiTiet /> },
+        { path: '/admin/hoc-vien', element: <div>Trang danh sách học viên</div> },
+      ],
+      { initialEntries: ['/admin/hoc-vien/hv-duyet-1'] },
+    );
+  }
+
+  async function moModal() {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const user = userEvent.setup();
+    const utils = renderCoDanhSach();
+    await user.click(await screen.findByRole('button', { name: 'Xóa học viên' }));
+    const modal = within(await screen.findByRole('dialog', { name: 'Xóa học viên' }));
+    const oLyDo = modal.getByRole('textbox', { name: /Lý do xóa/ });
+    const oXacNhan = modal.getByRole('textbox', { name: /Gõ lại mã MOET 9115131099 để xác nhận/ });
+    const nutXoa = modal.getByRole('button', { name: 'Xóa' });
+    return { user, modal, oLyDo, oXacNhan, nutXoa, ...utils };
+  }
+
+  function batBody() {
+    const bodies: unknown[] = [];
+    server.use(
+      http.delete('/hoc-vien/:id', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({ id: 'hv-duyet-1', nhat_ky_id: 'nk-1', so_dang_ky_da_xoa: 1 });
+      }),
+    );
+    return bodies;
+  }
+
+  it('tài khoản đơn vị (trường) -> không có khối xóa', async () => {
+    db.nguoiDung.vai_tro = 'truong';
+    renderCoDanhSach();
+    expect(await screen.findByText('Bồi dưỡng NLS – Mức cơ bản')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Xóa học viên' })).not.toBeInTheDocument();
+  });
+
+  it('modal cảnh báo không thể hoàn tác', async () => {
+    const { modal } = await moModal();
+    expect(modal.getByText('Không thể hoàn tác')).toBeInTheDocument();
+    expect(modal.getByText(/biến mất khỏi mọi\s+báo cáo/)).toBeInTheDocument();
+  });
+
+  it('nút Xóa bị khóa khi thiếu lý do hoặc xác nhận sai; mở khi cả hai hợp lệ', async () => {
+    const { user, oLyDo, oXacNhan, nutXoa } = await moModal();
+    expect(nutXoa).toBeDisabled();
+
+    await user.type(oXacNhan, '9115131099');
+    expect(nutXoa).toBeDisabled(); // thiếu lý do
+
+    await user.type(oLyDo, '   ');
+    expect(nutXoa).toBeDisabled(); // lý do toàn khoảng trắng
+
+    await user.type(oLyDo, 'Hồ sơ trùng');
+    expect(nutXoa).toBeEnabled();
+
+    await user.clear(oXacNhan);
+    await user.type(oXacNhan, '911513109'); // sai 1 chữ số
+    expect(nutXoa).toBeDisabled();
+
+    await user.clear(oXacNhan);
+    await user.type(oXacNhan, 'Võ Minh Khôi'); // có mã MOET thì phải gõ mã, không nhận họ tên
+    expect(nutXoa).toBeDisabled();
+  });
+
+  it('hồ sơ không có mã MOET -> xác nhận bằng họ tên, không phân biệt hoa/thường', async () => {
+    const hv = db.danhSachHocVien.find((h) => h.id === 'hv-duyet-1')!;
+    const maCu = hv.ma_dinh_danh_moet;
+    hv.ma_dinh_danh_moet = null;
+    try {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      const user = userEvent.setup();
+      renderCoDanhSach();
+      await user.click(await screen.findByRole('button', { name: 'Xóa học viên' }));
+      const modal = within(await screen.findByRole('dialog', { name: 'Xóa học viên' }));
+      const oXacNhan = modal.getByRole('textbox', { name: /Gõ lại họ tên "Võ Minh Khôi" để xác nhận/ });
+      await user.type(modal.getByRole('textbox', { name: /Lý do xóa/ }), 'Nhập nhầm');
+      await user.type(oXacNhan, '  võ minh KHÔI ');
+      expect(modal.getByRole('button', { name: 'Xóa' })).toBeEnabled();
+    } finally {
+      hv.ma_dinh_danh_moet = maCu;
+    }
+  });
+
+  it('thành công -> gửi đúng body (đã trim), báo thành công, chuyển về danh sách học viên', async () => {
+    const bodies = batBody();
+    const { user, oLyDo, oXacNhan, nutXoa, router } = await moModal();
+    await user.type(oLyDo, '  Hồ sơ trùng  ');
+    await user.type(oXacNhan, ' 9115131099 ');
+    await user.click(nutXoa);
+
+    expect(await screen.findByText('Đã xóa học viên Võ Minh Khôi')).toBeInTheDocument();
+    expect(bodies).toEqual([{ ly_do: 'Hồ sơ trùng', xac_nhan: '9115131099' }]);
+    expect(await screen.findByText('Trang danh sách học viên')).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/admin/hoc-vien');
+  });
+
+  it('lỗi từ API -> hiện thông điệp lỗi trong modal, không chuyển trang', async () => {
+    server.use(
+      http.delete('/hoc-vien/:id', () =>
+        loi(400, 'VALIDATION_ERROR', 'Nội dung xác nhận không khớp mã định danh MOET của học viên'),
+      ),
+    );
+    const { user, modal, oLyDo, oXacNhan, nutXoa, router } = await moModal();
+    await user.type(oLyDo, 'Hồ sơ trùng');
+    await user.type(oXacNhan, '9115131099');
+    await user.click(nutXoa);
+
+    expect(
+      await modal.findByText('Nội dung xác nhận không khớp mã định danh MOET của học viên'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/admin/hoc-vien/hv-duyet-1');
+  });
+
+  it('lỗi mạng -> hiện thông điệp lỗi chung', async () => {
+    server.use(http.delete('/hoc-vien/:id', () => HttpResponse.error()));
+    const { user, modal, oLyDo, oXacNhan, nutXoa } = await moModal();
+    await user.type(oLyDo, 'Hồ sơ trùng');
+    await user.type(oXacNhan, '9115131099');
+    await user.click(nutXoa);
+    expect(await modal.findByText('Không kết nối được máy chủ. Kiểm tra mạng và thử lại.')).toBeInTheDocument();
+  });
+});
+
+// Issue #31: modal xóa hiển thị mức ảnh hưởng do server đếm lúc mở (GET /hoc-vien/{id}/anh-huong-xoa).
+describe('Admin — Chi tiết hồ sơ học viên — Mức ảnh hưởng khi xóa (issue #31)', () => {
+  beforeEach(() => notifications.clean());
+
+  async function moModal() {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    datToken('token-gia-lap');
+    const user = userEvent.setup();
+    renderVoiRouter([{ path: '/admin/hoc-vien/:id', element: <AdminHocVienChiTiet /> }], {
+      initialEntries: ['/admin/hoc-vien/hv-duyet-1'],
+    });
+    await user.click(await screen.findByRole('button', { name: 'Xóa học viên' }));
+    const modal = within(await screen.findByRole('dialog', { name: 'Xóa học viên' }));
+    return { user, modal };
+  }
+
+  function giaTri(modal: ReturnType<typeof within>, nhan: string) {
+    return modal.getByText(nhan).closest('tr')?.querySelector('td')?.textContent;
+  }
+
+  function anhHuongMau(ghiDe: Record<string, unknown> = {}) {
+    return {
+      ho_ten: 'Võ Minh Khôi',
+      ma_dinh_danh_moet: '9115131099',
+      so_dang_ky: 0,
+      so_buoi_diem_danh: 0,
+      so_ket_qua_khao_sat: 0,
+      so_yeu_cau_ho_tro: 0,
+      co_tai_khoan: false,
+      ten_dang_nhap_vle: null,
+      ...ghiDe,
+    };
+  }
+
+  it('hiển thị đủ các số ảnh hưởng, trước ô nhập', async () => {
+    const { modal } = await moModal();
+    const bang = await modal.findByRole('table', { name: 'Mức ảnh hưởng khi xóa' });
+    expect(giaTri(modal, 'Khóa đã ghi danh')).toBe('2');
+    expect(giaTri(modal, 'Buổi điểm danh')).toBe('7');
+    expect(giaTri(modal, 'Kết quả khảo sát')).toBe('3');
+    expect(giaTri(modal, 'Yêu cầu hỗ trợ')).toBe('1');
+    expect(giaTri(modal, 'Tài khoản đăng nhập')).toBe('Có');
+    expect(giaTri(modal, 'Tài khoản VLE')).toBe('vle.khoi');
+    const oLyDo = modal.getByRole('textbox', { name: /Lý do xóa/ });
+    expect(bang.compareDocumentPosition(oLyDo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('hồ sơ sạch: số 0, không tài khoản, không VLE', async () => {
+    server.use(http.get('/hoc-vien/:id/anh-huong-xoa', () => HttpResponse.json(anhHuongMau())));
+    const { modal } = await moModal();
+    await modal.findByRole('table', { name: 'Mức ảnh hưởng khi xóa' });
+    expect(giaTri(modal, 'Khóa đã ghi danh')).toBe('0');
+    expect(giaTri(modal, 'Buổi điểm danh')).toBe('0');
+    expect(giaTri(modal, 'Tài khoản đăng nhập')).toBe('Không');
+    expect(giaTri(modal, 'Tài khoản VLE')).toBe('Không có');
+  });
+
+  it('đang tải: hiện skeleton, ô nhập vẫn hiển thị', async () => {
+    server.use(http.get('/hoc-vien/:id/anh-huong-xoa', () => delay('infinite')));
+    const { modal } = await moModal();
+    expect(modal.getByTestId('anh-huong-xoa-dang-tai')).toBeInTheDocument();
+    expect(modal.queryByRole('table', { name: 'Mức ảnh hưởng khi xóa' })).not.toBeInTheDocument();
+    expect(modal.getByRole('textbox', { name: /Gõ lại mã MOET 9115131099 để xác nhận/ })).toBeInTheDocument();
+  });
+
+  it('lỗi tải: hiện cảnh báo, vẫn xóa được khi nhập hợp lệ', async () => {
+    server.use(http.get('/hoc-vien/:id/anh-huong-xoa', () => loi(500, 'INTERNAL_ERROR', 'Lỗi máy chủ')));
+    const { user, modal } = await moModal();
+    expect(await modal.findByText(/Không tải được mức ảnh hưởng/)).toBeInTheDocument();
+    await user.type(modal.getByRole('textbox', { name: /Lý do xóa/ }), 'Hồ sơ trùng');
+    await user.type(modal.getByRole('textbox', { name: /Gõ lại mã MOET 9115131099 để xác nhận/ }), '9115131099');
+    expect(modal.getByRole('button', { name: 'Xóa' })).toBeEnabled();
+  });
+
+  it('mỗi lần mở modal đều gọi lại API (không dùng số cũ)', async () => {
+    let soLanGoi = 0;
+    server.use(
+      http.get('/hoc-vien/:id/anh-huong-xoa', () => {
+        soLanGoi += 1;
+        return HttpResponse.json(anhHuongMau({ so_dang_ky: soLanGoi }));
+      }),
+    );
+    const { user, modal } = await moModal();
+    await modal.findByRole('table', { name: 'Mức ảnh hưởng khi xóa' });
+    expect(giaTri(modal, 'Khóa đã ghi danh')).toBe('1');
+    await user.click(modal.getByRole('button', { name: 'Hủy' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Xóa học viên' }));
+    const modal2 = within(await screen.findByRole('dialog', { name: 'Xóa học viên' }));
+    await waitFor(() => expect(giaTri(modal2, 'Khóa đã ghi danh')).toBe('2'));
+    expect(soLanGoi).toBe(2);
   });
 });
