@@ -59,6 +59,7 @@ import { ChuyenMonDto } from './dto/chuyen-mon.dto';
 import { SuaMaMoetDto } from './dto/sua-ma-moet.dto';
 import { TaoHocVienLeDto } from './dto/tao-hoc-vien-le.dto';
 import { XoaHocVienDto } from './dto/xoa-hoc-vien.dto';
+import { QueryHocVienDaXoaDto } from './dto/query-hoc-vien-da-xoa.dto';
 import {
   DongHocVienTruong,
   buildDanhSachHocVienTruongWorkbook,
@@ -886,6 +887,96 @@ export class HocVienService {
       ten_dang_nhap: ketQua.ten_dang_nhap,
       da_doi_ten_dang_nhap: ketQua.da_doi_ten_dang_nhap,
     };
+  }
+
+  // GET /hoc-vien/{id}/anh-huong-xoa (quan_tri, issue #31): đếm tại thời điểm
+  // gọi những gì sẽ mất nếu xóa — hiển thị trong modal xác nhận xóa.
+  // nhat_ky_hoat_dong không tính: bảng chỉ thêm, được giữ lại khi xóa.
+  async anhHuongXoa(id: string) {
+    const hv = await this.prisma.hoc_vien.findUnique({
+      where: { id },
+      select: {
+        ho_ten: true,
+        ma_dinh_danh_moet: true,
+        nguoi_dung_account: { select: { id: true } },
+        tai_khoan_vle: { select: { ten_dang_nhap_vle: true } },
+        _count: {
+          select: {
+            dang_ky_hoc: true,
+            ket_qua_khao_sat: true,
+            yeu_cau_ho_tro: true,
+          },
+        },
+      },
+    });
+    if (!hv) throw new NotFoundAppException('Không tìm thấy hồ sơ học viên');
+    const soBuoiDiemDanh = await this.prisma.diem_danh.count({
+      where: { dang_ky_hoc: { hoc_vien_id: id } },
+    });
+    return {
+      ho_ten: hv.ho_ten,
+      ma_dinh_danh_moet: hv.ma_dinh_danh_moet,
+      so_dang_ky: hv._count.dang_ky_hoc,
+      so_buoi_diem_danh: soBuoiDiemDanh,
+      so_ket_qua_khao_sat: hv._count.ket_qua_khao_sat,
+      so_yeu_cau_ho_tro: hv._count.yeu_cau_ho_tro,
+      co_tai_khoan: !!hv.nguoi_dung_account,
+      ten_dang_nhap_vle: hv.tai_khoan_vle?.ten_dang_nhap_vle ?? null,
+    };
+  }
+
+  // GET /hoc-vien/da-xoa (quan_tri, issue #32): nhật ký xóa, mới nhất trước.
+  async danhSachDaXoa(query: QueryHocVienDaXoaDto) {
+    const where: Prisma.nhat_ky_xoa_hoc_vienWhereInput = {};
+    const q = query.q?.trim();
+    if (q) {
+      const dk = dieuKienKhongDau(Prisma.sql`ho_ten`, q);
+      const idsTheoTen = dk
+        ? (
+            await this.prisma.$queryRaw<{ id: string }[]>(
+              Prisma.sql`SELECT id FROM "nhat_ky_xoa_hoc_vien" WHERE ${dk}`,
+            )
+          ).map((r) => r.id)
+        : [];
+      where.OR = [
+        { id: { in: idsTheoTen } },
+        {
+          ma_dinh_danh_moet: {
+            contains: boSo0DauDeTimKiem(q),
+            mode: 'insensitive',
+          },
+        },
+      ];
+    }
+    const page = query.page ?? 1;
+    const pageSize = query.page_size ?? 20;
+    const [rows, total] = await Promise.all([
+      this.prisma.nhat_ky_xoa_hoc_vien.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: [{ thoi_gian: 'desc' }, { id: 'desc' }],
+        include: {
+          nguoi_xoa: {
+            select: { id: true, ho_ten: true, ten_dang_nhap: true },
+          },
+        },
+      }),
+      this.prisma.nhat_ky_xoa_hoc_vien.count({ where }),
+    ]);
+    const data = rows.map((r) => ({
+      id: r.id,
+      hoc_vien_id_cu: r.hoc_vien_id_cu,
+      ho_ten: r.ho_ten,
+      ma_dinh_danh_moet: r.ma_dinh_danh_moet,
+      ten_don_vi: r.ten_don_vi,
+      so_dang_ky_da_xoa: r.so_dang_ky_da_xoa,
+      ten_dang_nhap_vle: r.ten_dang_nhap_vle,
+      ly_do: r.ly_do,
+      thoi_gian: r.thoi_gian,
+      nguoi_xoa: r.nguoi_xoa,
+    }));
+    return paginate(data, total, page, pageSize);
   }
 
   // DELETE /hoc-vien/{id} (quan_tri, issue #30 — "xóa là văng hết"): xóa cứng

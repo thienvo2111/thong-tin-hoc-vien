@@ -1,8 +1,16 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Alert, Box, Button, Container, Group, Modal, Paper, Select, Skeleton, Stack, Text, TextInput, Textarea } from '@mantine/core';
+import { Alert, Box, Button, Container, Group, Modal, Paper, Select, Skeleton, Stack, Table, Text, TextInput, Textarea } from '@mantine/core';
+import { useQueryClient } from '@tanstack/react-query';
 import { notifications } from '@mantine/notifications';
-import { useHocVienTheoId, useSuaMaDinhDanhMoet, useXoaHocVien } from '@/api/admin';
+import {
+  anhHuongXoaKey,
+  useAnhHuongXoaHocVien,
+  useHocVienTheoId,
+  useSuaMaDinhDanhMoet,
+  useXoaHocVien,
+  type AnhHuongXoaHocVien,
+} from '@/api/admin';
 import { useNhatKyHocVien } from '@/api/taiKhoanHocVien';
 import { useToi } from '@/auth/AuthContext';
 import { DongThoiGianNhatKy } from '@/components/DongThoiGianNhatKy';
@@ -242,12 +250,18 @@ function khopXacNhanXoa(nhap: string, hoTen: string, maMoet: string | null) {
   return sach !== '' && sach.toLocaleLowerCase('vi') === chuanHoaNfc(hoTen.trim()).toLocaleLowerCase('vi');
 }
 
-function XoaHocVien({ hocVienId, hoTen, maMoet }: { hocVienId: string; hoTen: string; maMoet: string | null }) {
+function XoaHocVien(props: { hocVienId: string; hoTen: string; maMoet: string | null }) {
+  const { hocVienId } = props;
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const xoa = useXoaHocVien(hocVienId);
   const [mo, setMo] = useState(false);
   const [lyDo, setLyDo] = useState('');
   const [xacNhan, setXacNhan] = useState('');
+  // Issue #31: mức ảnh hưởng chỉ tải khi modal mở; họ tên/mã MOET server trả kèm được ưu tiên (mới nhất).
+  const anhHuong = useAnhHuongXoaHocVien(hocVienId, mo);
+  const hoTen = anhHuong.data?.ho_ten ?? props.hoTen;
+  const maMoet = anhHuong.data ? anhHuong.data.ma_dinh_danh_moet : props.maMoet;
 
   const giaTriXacNhan = maMoet ?? hoTen;
   const nhanXacNhan = maMoet
@@ -260,6 +274,8 @@ function XoaHocVien({ hocVienId, hoTen, maMoet }: { hocVienId: string; hoTen: st
     setLyDo('');
     setXacNhan('');
     xoa.reset();
+    // Bỏ số đếm cũ để mỗi lần mở modal đều thấy trạng thái đang tải + số mới đếm.
+    queryClient.removeQueries({ queryKey: anhHuongXoaKey(hocVienId) });
     setMo(true);
   }
 
@@ -296,6 +312,7 @@ function XoaHocVien({ hocVienId, hoTen, maMoet }: { hocVienId: string; hoTen: st
             nhập, ghi danh, phân lớp, điểm danh, kết quả, khảo sát, yêu cầu hỗ trợ…). Học viên sẽ biến mất khỏi mọi
             báo cáo, thống kê.
           </Alert>
+          <MucAnhHuongXoa data={anhHuong.data} loi={anhHuong.isError ? thongDiepLoiChung(anhHuong.error) : null} />
           {xoa.isError && <Alert color="red">{thongDiepLoiXungDot(xoa.error)}</Alert>}
           <Textarea
             label="Lý do xóa"
@@ -325,6 +342,39 @@ function XoaHocVien({ hocVienId, hoTen, maMoet }: { hocVienId: string; hoTen: st
         </Stack>
       </Modal>
     </Paper>
+  );
+}
+
+// Issue #31: dữ liệu sẽ mất nếu xóa (server đếm lúc mở modal). Nhật ký hoạt động được giữ nên không liệt kê.
+function MucAnhHuongXoa({ data, loi }: { data: AnhHuongXoaHocVien | undefined; loi: string | null }) {
+  if (loi) return <Alert color="orange">Không tải được mức ảnh hưởng: {loi}</Alert>;
+  if (!data) return <Skeleton height={150} data-testid="anh-huong-xoa-dang-tai" />;
+  const dong: [string, string][] = [
+    ['Khóa đã ghi danh', String(data.so_dang_ky)],
+    ['Buổi điểm danh', String(data.so_buoi_diem_danh)],
+    ['Kết quả khảo sát', String(data.so_ket_qua_khao_sat)],
+    ['Yêu cầu hỗ trợ', String(data.so_yeu_cau_ho_tro)],
+    ['Tài khoản đăng nhập', data.co_tai_khoan ? 'Có' : 'Không'],
+    ['Tài khoản VLE', data.ten_dang_nhap_vle ?? 'Không có'],
+  ];
+  return (
+    <Box>
+      <Text fz={13} fw={600} mb={4}>
+        Dữ liệu sẽ bị xóa
+      </Text>
+      <Table withTableBorder verticalSpacing={4} fz={13} aria-label="Mức ảnh hưởng khi xóa">
+        <Table.Tbody>
+          {dong.map(([nhan, giaTri]) => (
+            <Table.Tr key={nhan}>
+              <Table.Th fw={500} w="60%">
+                {nhan}
+              </Table.Th>
+              <Table.Td fw={700}>{giaTri}</Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </Box>
   );
 }
 

@@ -151,6 +151,62 @@ export function useXoaHocVien(id: string) {
   });
 }
 
+// Issue #31: mức ảnh hưởng nếu xóa — server đếm tại thời điểm gọi (không tính nhat_ky_hoat_dong, bảng đó được giữ).
+export interface AnhHuongXoaHocVien {
+  ho_ten: string;
+  ma_dinh_danh_moet: string | null;
+  so_dang_ky: number;
+  so_buoi_diem_danh: number;
+  so_ket_qua_khao_sat: number;
+  so_yeu_cau_ho_tro: number;
+  co_tai_khoan: boolean;
+  ten_dang_nhap_vle: string | null;
+}
+
+export function anhHuongXoaKey(id: string) {
+  return ['admin', 'hoc-vien', 'anh-huong-xoa', id] as const;
+}
+
+export function useAnhHuongXoaHocVien(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: anhHuongXoaKey(id),
+    queryFn: () => apiFetch<AnhHuongXoaHocVien>(`/hoc-vien/${id}/anh-huong-xoa`),
+    enabled,
+    // Luôn đếm lại mỗi lần mở modal, không dùng số cũ trong cache.
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+  });
+}
+
+// Issue #32: nhật ký học viên đã xóa (chỉ quan_tri, chỉ đọc).
+export interface HocVienDaXoa {
+  id: string;
+  hoc_vien_id_cu: string;
+  ho_ten: string;
+  ma_dinh_danh_moet: string | null;
+  ten_don_vi: string;
+  so_dang_ky_da_xoa: number;
+  ten_dang_nhap_vle: string | null;
+  ly_do: string;
+  thoi_gian: string;
+  nguoi_xoa: { id: string; ho_ten: string; ten_dang_nhap: string };
+}
+
+export interface DanhSachDaXoaParams {
+  q?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export function useDanhSachHocVienDaXoa(params: DanhSachDaXoaParams) {
+  return useQuery({
+    queryKey: ['admin', 'hoc-vien', 'da-xoa', params] as const,
+    queryFn: () => apiFetch<PaginatedResult<HocVienDaXoa>>(`/hoc-vien/da-xoa${xayQueryString(params)}`),
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function useSuaMaDinhDanhMoet(id: string) {
   const queryClient = useQueryClient();
   return useMutation({

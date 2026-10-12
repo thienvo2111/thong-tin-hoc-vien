@@ -42,6 +42,10 @@ describe('Xóa cứng học viên (e2e)', () => {
   const bearer = (t: string) => ({ Authorization: `Bearer ${t}` });
   const xoa = (id: string, body: Record<string, unknown>, t = tok.quanTri) =>
     http().delete(`/hoc-vien/${id}`).set(bearer(t)).send(body);
+  const anhHuong = (id: string, t = tok.quanTri) =>
+    http().get(`/hoc-vien/${id}/anh-huong-xoa`).set(bearer(t));
+  const daXoa = (qs = '', t = tok.quanTri) =>
+    http().get(`/hoc-vien/da-xoa${qs}`).set(bearer(t));
   const dangNhap = async (ten: string, mk: string) => {
     const res = await http()
       .post('/auth/dang-nhap')
@@ -466,6 +470,21 @@ describe('Xóa cứng học viên (e2e)', () => {
     for (const [bang, so] of Object.entries(truoc)) {
       expect({ bang, coDuLieu: so > 0 }).toEqual({ bang, coDuLieu: true });
     }
+    // Issue #31: mức ảnh hưởng đếm đúng dữ liệu của CHÍNH học viên này (không
+    // tính điểm danh/yêu cầu hỗ trợ của học viên khác; không tính nhat_ky_hoat_dong).
+    const ah = await anhHuong(hv.id);
+    expect(ah.status).toBe(200);
+    expect(ah.body).toEqual({
+      ho_ten: hv.ho_ten,
+      ma_dinh_danh_moet: hv.ma,
+      so_dang_ky: 1,
+      so_buoi_diem_danh: 1,
+      so_ket_qua_khao_sat: 1,
+      so_yeu_cau_ho_tro: 1,
+      co_tai_khoan: true,
+      ten_dang_nhap_vle: `vle-${suf}`,
+    });
+
     const pheuTruoc = await http()
       .get(`/thong-ke/pheu?khoa_id=${khoaId}`)
       .set(bearer(tok.quanTri))
@@ -565,6 +584,19 @@ describe('Xóa cứng học viên (e2e)', () => {
       },
     });
     hocVienIds.push(h.id);
+    // Issue #31: hồ sơ sạch -> mọi số đếm = 0, không tài khoản, không VLE.
+    const ah = await anhHuong(h.id);
+    expect(ah.status).toBe(200);
+    expect(ah.body).toEqual({
+      ho_ten: h.ho_ten,
+      ma_dinh_danh_moet: null,
+      so_dang_ky: 0,
+      so_buoi_diem_danh: 0,
+      so_ket_qua_khao_sat: 0,
+      so_yeu_cau_ho_tro: 0,
+      co_tai_khoan: false,
+      ten_dang_nhap_vle: null,
+    });
     const res = await xoa(h.id, {
       ly_do: 'Nhập nhầm',
       xac_nhan: `  trần thị sạch ${suf.toUpperCase()} `,
@@ -611,6 +643,24 @@ describe('Xóa cứng học viên (e2e)', () => {
       expect(res.status).toBe(403);
     });
 
+    it.each(['truong', 'phong_vhxh', 'so_gddt'])(
+      '%s -> 403 với GET anh-huong-xoa và GET da-xoa',
+      async (vt) => {
+        expect((await anhHuong(hv.id, tok[vt])).status).toBe(403);
+        expect((await daXoa('', tok[vt])).status).toBe(403);
+      },
+    );
+
+    it('hoc_vien -> 403 với GET anh-huong-xoa và GET da-xoa', async () => {
+      const t = await dangNhap(hv.ten, MK);
+      expect((await anhHuong(hv.id, t)).status).toBe(403);
+      expect((await daXoa('', t)).status).toBe(403);
+    });
+
+    it('GET anh-huong-xoa: id không tồn tại -> 404', async () => {
+      expect((await anhHuong(randomUUID())).status).toBe(404);
+    });
+
     it('thiếu lý do / lý do toàn khoảng trắng -> 400', async () => {
       expect((await xoa(hv.id, { xac_nhan: hv.ma })).status).toBe(400);
       expect((await xoa(hv.id, { ly_do: '   ', xac_nhan: hv.ma })).status).toBe(
@@ -640,6 +690,110 @@ describe('Xóa cứng học viên (e2e)', () => {
     it('id không tồn tại -> 404', async () => {
       const res = await xoa(randomUUID(), { ly_do: 'x', xac_nhan: 'x' });
       expect(res.status).toBe(404);
+    });
+  });
+
+  // Issue #32: tab "Đã xóa" — GET /hoc-vien/da-xoa (chỉ đọc nhật ký xóa).
+  describe('GET /hoc-vien/da-xoa', () => {
+    let thu1: Awaited<ReturnType<typeof taoHocVien>>;
+    let thu2: Awaited<ReturnType<typeof taoHocVien>>;
+    const ten1 = `Đặng Nhật Ký ${suf}`;
+    const ten2 = `Bùi Thứ Hai ${suf}`;
+
+    beforeAll(async () => {
+      thu1 = await taoHocVien({ ho_ten: ten1 });
+      await dangKy(thu1.id);
+      await prisma.tai_khoan_vle.create({
+        data: {
+          hoc_vien_id: thu1.id,
+          ten_dang_nhap_vle: `vle1-${suf}`,
+          duong_dan: 'https://vle.test',
+        },
+      });
+      thu2 = await taoHocVien({ ho_ten: ten2 });
+      expect(
+        (await xoa(thu1.id, { ly_do: 'Hồ sơ trùng', xac_nhan: thu1.ma }))
+          .status,
+      ).toBe(200);
+      expect(
+        (await xoa(thu2.id, { ly_do: 'Nhập nhầm', xac_nhan: thu2.ma })).status,
+      ).toBe(200);
+    });
+
+    it('route "da-xoa" không bị GET :id (ParseUUIDPipe) chắn -> 200 dạng phân trang', async () => {
+      const res = await daXoa();
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        data: expect.any(Array),
+        total: expect.any(Number),
+        page: 1,
+        page_size: 20,
+      });
+    });
+
+    it('sau khi xóa: dòng nhật ký có đủ cột', async () => {
+      const res = await daXoa(`?q=${encodeURIComponent(thu1.ma!)}`);
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.data[0]).toEqual({
+        id: expect.any(String),
+        hoc_vien_id_cu: thu1.id,
+        ho_ten: ten1,
+        ma_dinh_danh_moet: thu1.ma,
+        ten_don_vi: tenDonVi,
+        so_dang_ky_da_xoa: 1,
+        ten_dang_nhap_vle: `vle1-${suf}`,
+        ly_do: 'Hồ sơ trùng',
+        thoi_gian: expect.any(String),
+        nguoi_xoa: {
+          id: quanTriId,
+          ho_ten: expect.any(String),
+          ten_dang_nhap: expect.any(String),
+        },
+      });
+    });
+
+    it('q lọc theo họ tên (không dấu, không phân biệt hoa/thường)', async () => {
+      const res = await daXoa(`?q=${encodeURIComponent(`NHAT KY ${suf}`)}`);
+      expect(res.status).toBe(200);
+      expect(res.body.data.map((r: { ho_ten: string }) => r.ho_ten)).toEqual([
+        ten1,
+      ]);
+    });
+
+    it('q lọc theo mã MOET (chuỗi con)', async () => {
+      const res = await daXoa(`?q=${thu2.ma!.slice(2, 10)}`);
+      expect(res.status).toBe(200);
+      const ids = res.body.data.map(
+        (r: { hoc_vien_id_cu: string }) => r.hoc_vien_id_cu,
+      );
+      expect(ids).toContain(thu2.id);
+      expect(ids).not.toContain(thu1.id);
+    });
+
+    it('sắp xếp mới nhất trước + phân trang page/page_size', async () => {
+      const res = await daXoa(`?q=${suf}&page_size=200`);
+      expect(res.status).toBe(200);
+      const rows = res.body.data as {
+        hoc_vien_id_cu: string;
+        thoi_gian: string;
+      }[];
+      expect(rows.length).toBeGreaterThanOrEqual(2);
+      const tg = rows.map((r) => new Date(r.thoi_gian).getTime());
+      expect(tg).toEqual([...tg].sort((a, b) => b - a));
+      const i1 = rows.findIndex((r) => r.hoc_vien_id_cu === thu1.id);
+      const i2 = rows.findIndex((r) => r.hoc_vien_id_cu === thu2.id);
+      expect(i2).toBeGreaterThanOrEqual(0);
+      expect(i2).toBeLessThan(i1);
+
+      const trang2 = await daXoa(`?q=${suf}&page=2&page_size=1`);
+      expect(trang2.body).toMatchObject({
+        total: res.body.total,
+        page: 2,
+        page_size: 1,
+      });
+      expect(trang2.body.data).toHaveLength(1);
+      expect(trang2.body.data[0].id).toBe(res.body.data[1].id);
     });
   });
 

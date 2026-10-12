@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { notifications } from '@mantine/notifications';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
 import { loi } from '@/test/mocks/handlers';
 import { db } from '@/test/mocks/db';
@@ -620,5 +620,100 @@ describe('Admin — Chi tiết hồ sơ học viên — Xóa học viên (issue 
     await user.type(oXacNhan, '9115131099');
     await user.click(nutXoa);
     expect(await modal.findByText('Không kết nối được máy chủ. Kiểm tra mạng và thử lại.')).toBeInTheDocument();
+  });
+});
+
+// Issue #31: modal xóa hiển thị mức ảnh hưởng do server đếm lúc mở (GET /hoc-vien/{id}/anh-huong-xoa).
+describe('Admin — Chi tiết hồ sơ học viên — Mức ảnh hưởng khi xóa (issue #31)', () => {
+  beforeEach(() => notifications.clean());
+
+  async function moModal() {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    datToken('token-gia-lap');
+    const user = userEvent.setup();
+    renderVoiRouter([{ path: '/admin/hoc-vien/:id', element: <AdminHocVienChiTiet /> }], {
+      initialEntries: ['/admin/hoc-vien/hv-duyet-1'],
+    });
+    await user.click(await screen.findByRole('button', { name: 'Xóa học viên' }));
+    const modal = within(await screen.findByRole('dialog', { name: 'Xóa học viên' }));
+    return { user, modal };
+  }
+
+  function giaTri(modal: ReturnType<typeof within>, nhan: string) {
+    return modal.getByText(nhan).closest('tr')?.querySelector('td')?.textContent;
+  }
+
+  function anhHuongMau(ghiDe: Record<string, unknown> = {}) {
+    return {
+      ho_ten: 'Võ Minh Khôi',
+      ma_dinh_danh_moet: '9115131099',
+      so_dang_ky: 0,
+      so_buoi_diem_danh: 0,
+      so_ket_qua_khao_sat: 0,
+      so_yeu_cau_ho_tro: 0,
+      co_tai_khoan: false,
+      ten_dang_nhap_vle: null,
+      ...ghiDe,
+    };
+  }
+
+  it('hiển thị đủ các số ảnh hưởng, trước ô nhập', async () => {
+    const { modal } = await moModal();
+    const bang = await modal.findByRole('table', { name: 'Mức ảnh hưởng khi xóa' });
+    expect(giaTri(modal, 'Khóa đã ghi danh')).toBe('2');
+    expect(giaTri(modal, 'Buổi điểm danh')).toBe('7');
+    expect(giaTri(modal, 'Kết quả khảo sát')).toBe('3');
+    expect(giaTri(modal, 'Yêu cầu hỗ trợ')).toBe('1');
+    expect(giaTri(modal, 'Tài khoản đăng nhập')).toBe('Có');
+    expect(giaTri(modal, 'Tài khoản VLE')).toBe('vle.khoi');
+    const oLyDo = modal.getByRole('textbox', { name: /Lý do xóa/ });
+    expect(bang.compareDocumentPosition(oLyDo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('hồ sơ sạch: số 0, không tài khoản, không VLE', async () => {
+    server.use(http.get('/hoc-vien/:id/anh-huong-xoa', () => HttpResponse.json(anhHuongMau())));
+    const { modal } = await moModal();
+    await modal.findByRole('table', { name: 'Mức ảnh hưởng khi xóa' });
+    expect(giaTri(modal, 'Khóa đã ghi danh')).toBe('0');
+    expect(giaTri(modal, 'Buổi điểm danh')).toBe('0');
+    expect(giaTri(modal, 'Tài khoản đăng nhập')).toBe('Không');
+    expect(giaTri(modal, 'Tài khoản VLE')).toBe('Không có');
+  });
+
+  it('đang tải: hiện skeleton, ô nhập vẫn hiển thị', async () => {
+    server.use(http.get('/hoc-vien/:id/anh-huong-xoa', () => delay('infinite')));
+    const { modal } = await moModal();
+    expect(modal.getByTestId('anh-huong-xoa-dang-tai')).toBeInTheDocument();
+    expect(modal.queryByRole('table', { name: 'Mức ảnh hưởng khi xóa' })).not.toBeInTheDocument();
+    expect(modal.getByRole('textbox', { name: /Gõ lại mã MOET 9115131099 để xác nhận/ })).toBeInTheDocument();
+  });
+
+  it('lỗi tải: hiện cảnh báo, vẫn xóa được khi nhập hợp lệ', async () => {
+    server.use(http.get('/hoc-vien/:id/anh-huong-xoa', () => loi(500, 'INTERNAL_ERROR', 'Lỗi máy chủ')));
+    const { user, modal } = await moModal();
+    expect(await modal.findByText(/Không tải được mức ảnh hưởng/)).toBeInTheDocument();
+    await user.type(modal.getByRole('textbox', { name: /Lý do xóa/ }), 'Hồ sơ trùng');
+    await user.type(modal.getByRole('textbox', { name: /Gõ lại mã MOET 9115131099 để xác nhận/ }), '9115131099');
+    expect(modal.getByRole('button', { name: 'Xóa' })).toBeEnabled();
+  });
+
+  it('mỗi lần mở modal đều gọi lại API (không dùng số cũ)', async () => {
+    let soLanGoi = 0;
+    server.use(
+      http.get('/hoc-vien/:id/anh-huong-xoa', () => {
+        soLanGoi += 1;
+        return HttpResponse.json(anhHuongMau({ so_dang_ky: soLanGoi }));
+      }),
+    );
+    const { user, modal } = await moModal();
+    await modal.findByRole('table', { name: 'Mức ảnh hưởng khi xóa' });
+    expect(giaTri(modal, 'Khóa đã ghi danh')).toBe('1');
+    await user.click(modal.getByRole('button', { name: 'Hủy' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Xóa học viên' }));
+    const modal2 = within(await screen.findByRole('dialog', { name: 'Xóa học viên' }));
+    await waitFor(() => expect(giaTri(modal2, 'Khóa đã ghi danh')).toBe('2'));
+    expect(soLanGoi).toBe(2);
   });
 });
