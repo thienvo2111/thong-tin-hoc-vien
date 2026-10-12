@@ -26,9 +26,9 @@ describe('KhoiKpiPheu', () => {
     renderKhoi();
     await screen.findByTestId('kpi-da-truy-cap');
     expect(within(screen.getByTestId('kpi-da-truy-cap')).getByText('75,0% số tham gia')).toBeInTheDocument(); // 150/200
-    expect(within(screen.getByTestId('kpi-ky-nang-so')).getByText('52,6% số tham gia')).toBeInTheDocument(); // 100/190
-    expect(within(screen.getByTestId('kpi-dau-vao')).getByText('47,4% số tham gia')).toBeInTheDocument(); // 90/190
-    expect(within(screen.getByTestId('kpi-dau-ra')).getByText('23,7% số tham gia')).toBeInTheDocument(); // 45/190
+    expect(within(screen.getByTestId('kpi-ky-nang-so')).getByText('52,6% số phải khảo sát (190, trừ nhân viên)')).toBeInTheDocument(); // 100/190
+    expect(within(screen.getByTestId('kpi-dau-vao')).getByText('47,4% số phải khảo sát (190, trừ nhân viên)')).toBeInTheDocument(); // 90/190
+    expect(within(screen.getByTestId('kpi-dau-ra')).getByText('23,7% số phải khảo sát (190, trừ nhân viên)')).toBeInTheDocument(); // 45/190
     expect(within(screen.getByTestId('kpi-tham-gia')).queryByText(/số tham gia/)).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain('so với thẻ trước');
   });
@@ -94,7 +94,7 @@ describe('KhoiKpiPheu', () => {
     renderKhoi();
     const buoc = await screen.findByTestId('pheu-ks-ky-nang-so');
     expect(within(buoc).getByText('100')).toBeInTheDocument();
-    expect(within(buoc).getByText('52,6% số tham gia')).toBeInTheDocument(); // 100/190 (trừ nhân viên)
+    expect(within(buoc).getByText('52,6% số phải khảo sát (190, trừ nhân viên)')).toBeInTheDocument(); // 100/190 (trừ nhân viên)
     expect(within(screen.getByTestId('pheu-tham-gia')).queryByText(/số tham gia/)).not.toBeInTheDocument();
     expect(screen.getAllByTestId(/^pheu-/)).toHaveLength(5);
     expect(document.body.textContent).not.toMatch(/rơi/);

@@ -15,33 +15,42 @@ interface TheKpi {
   id: string;
   nhan: string;
   so: number;
-  /** so với số tham gia; undefined = không hiện */
+  /** so với mẫu số `mau_nhan`; undefined = không hiện */
   ty_le?: number | null;
+  /** Mô tả mẫu số hiển thị sau %, vd "số tham gia". */
+  mau_nhan?: string;
 }
+
+const MAU_THAM_GIA = 'số tham gia';
+// Mẫu số 3 chỉ số khảo sát: tham gia trừ nhân viên — ghi rõ số để không đọc nhầm thành "số tham gia".
+const mauKhaoSat = (d: PheuResult) => `số phải khảo sát (${d.tham_gia_khao_sat.toLocaleString('vi-VN')}, trừ nhân viên)`;
 
 // 3 chỉ số khảo sát (ky_nang_so/dau_vao/dau_ra) dùng tham_gia_khao_sat (trừ
 // nhân viên) làm mẫu số, khác với "Đã truy cập" (tham_gia, không phải khảo sát).
 function dungKpi(d: PheuResult): TheKpi[] {
   return [
     { id: 'kpi-tham-gia', nhan: 'Tham gia', so: d.tham_gia },
-    { id: 'kpi-da-truy-cap', nhan: 'Đã truy cập', so: d.da_truy_cap, ty_le: tyLe(d.da_truy_cap, d.tham_gia) },
+    { id: 'kpi-da-truy-cap', nhan: 'Đã truy cập', so: d.da_truy_cap, ty_le: tyLe(d.da_truy_cap, d.tham_gia), mau_nhan: MAU_THAM_GIA },
     {
       id: 'kpi-ky-nang-so',
       nhan: 'Đã làm KS kĩ năng số',
       so: d.khao_sat_ky_nang_so,
       ty_le: tyLe(d.khao_sat_ky_nang_so, d.tham_gia_khao_sat),
+      mau_nhan: mauKhaoSat(d),
     },
     {
       id: 'kpi-dau-vao',
       nhan: 'Đã làm đánh giá NLS đầu vào',
       so: d.danh_gia_dau_vao,
       ty_le: tyLe(d.danh_gia_dau_vao, d.tham_gia_khao_sat),
+      mau_nhan: mauKhaoSat(d),
     },
     {
       id: 'kpi-dau-ra',
       nhan: 'Đã làm đánh giá NLS đầu ra',
       so: d.danh_gia_dau_ra,
       ty_le: tyLe(d.danh_gia_dau_ra, d.tham_gia_khao_sat),
+      mau_nhan: mauKhaoSat(d),
     },
   ];
 }
@@ -63,7 +72,12 @@ function dungPheu(d: PheuResult) {
   ];
   return buoc.map((b, i) => {
     const mau = MAU_PHEU[b.id];
-    return { ...b, ty_le: i === 0 ? undefined : tyLe(b.so, mau ? (d[mau] as number) : d.tham_gia) };
+    const laKhaoSat = mau === 'tham_gia_khao_sat';
+    return {
+      ...b,
+      ty_le: i === 0 ? undefined : tyLe(b.so, mau ? (d[mau] as number) : d.tham_gia),
+      mau_nhan: laKhaoSat ? mauKhaoSat(d) : MAU_THAM_GIA,
+    };
   });
 }
 
@@ -86,7 +100,7 @@ export function KhoiKpiPheu({ loc }: { loc: LocThongKe }) {
                 </Text>
                 {t.ty_le !== undefined && (
                   <Text size="xs" c="dimmed">
-                    {dinhDangTyLe(t.ty_le)} số tham gia
+                    {dinhDangTyLe(t.ty_le)} {t.mau_nhan}
                   </Text>
                 )}
               </Paper>
@@ -153,7 +167,7 @@ function Pheu({ d }: { d: PheuResult }) {
               </Text>
               {b.ty_le !== undefined && (
                 <Text size="xs" c="dimmed">
-                  {dinhDangTyLe(b.ty_le)} số tham gia
+                  {dinhDangTyLe(b.ty_le)} {b.mau_nhan}
                 </Text>
               )}
             </Group>

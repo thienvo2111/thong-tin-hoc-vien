@@ -351,7 +351,7 @@ describe('report-excel.util', () => {
     ]);
   });
 
-  it('buildTienDoTruongWorkbook: đủ 21 tiêu đề đúng thứ tự, dòng có cả số lượng lẫn %', async () => {
+  it('buildTienDoTruongWorkbook: đủ 22 tiêu đề đúng thứ tự, dòng có cả số lượng lẫn %', async () => {
     const dong: TienDoTruongDong = {
       don_vi_id: 'x',
       ten_don_vi: 'Trường A',
@@ -359,7 +359,7 @@ describe('report-excel.util', () => {
       so_hv: 8,
       so_truy_cap: 6,
       ty_le_truy_cap: 0.75,
-      so_hv_khao_sat: 8,
+      so_hv_khao_sat: 7,
       so_ky_nang_so: 4,
       ty_le_ky_nang_so: 0.5,
       so_dau_vao: 2,
@@ -384,6 +384,7 @@ describe('report-excel.util', () => {
       'Số HV',
       'Đã truy cập',
       '% Truy cập',
+      'Số HV phải khảo sát (trừ nhân viên)',
       'Đã làm KS kĩ năng số',
       '% KS kĩ năng số',
       'Đã làm đánh giá NLS đầu vào',
@@ -402,7 +403,7 @@ describe('report-excel.util', () => {
     ]);
     expect(rows[1]).toEqual([
       1, 'Trường A', 'Sở B', 8,
-      6, 75, 4, 50, 2, 25, 1, 12.5,
+      6, 75, 7, 4, 50, 2, 25, 1, 12.5,
       10, 9, 90,
       0, 0, undefined, // ô trống đọc lại là undefined
       8, 3, 37.5,

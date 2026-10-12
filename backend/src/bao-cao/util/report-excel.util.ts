@@ -489,6 +489,8 @@ export async function buildTienDoTruongWorkbook(
     'Số HV',
     'Đã truy cập',
     '% Truy cập',
+    // Mẫu số 3 cột % khảo sát/đánh giá bên phải (2026-10-12): trừ nhân viên.
+    'Số HV phải khảo sát (trừ nhân viên)',
     'Đã làm KS kĩ năng số',
     '% KS kĩ năng số',
     'Đã làm đánh giá NLS đầu vào',
@@ -507,8 +509,8 @@ export async function buildTienDoTruongWorkbook(
   ]);
   sheet.getRow(1).font = { bold: true };
   const doRong = [
-    6, 45, 35, 12, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14,
-    12, 12,
+    6, 45, 35, 12, 14, 14, 18, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14,
+    14, 12, 12,
   ];
   doRong.forEach((width, i) => {
     sheet.getColumn(i + 1).width = width;
@@ -522,6 +524,7 @@ export async function buildTienDoTruongWorkbook(
       row.so_hv,
       row.so_truy_cap,
       phanTram(row.ty_le_truy_cap),
+      row.so_hv_khao_sat,
       row.so_ky_nang_so,
       phanTram(row.ty_le_ky_nang_so),
       row.so_dau_vao,
