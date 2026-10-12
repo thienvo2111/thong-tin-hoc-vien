@@ -152,4 +152,38 @@ describe('Admin — Đợt xác nhận', () => {
 
     expect(await screen.findByText('Đã gia hạn đợt xác nhận "Đợt cần gia hạn"')).toBeInTheDocument();
   });
+
+  it('đợt đã đóng vẫn gia hạn được (mở lại cho học viên làm trễ)', async () => {
+    db.danhSachDotXacNhan = [
+      {
+        id: 'dot-da-dong',
+        khoa_id: null,
+        ten: 'Đợt đã đóng cần mở lại',
+        loai: 'kiem_tra_bo_sung',
+        mo_luc: '2019-01-01T00:00:00.000Z',
+        dong_luc: isoLech(-1),
+        created_by: 'nd-1',
+        created_at: '2018-12-31T00:00:00.000Z',
+      },
+    ];
+
+    const user = userEvent.setup();
+    renderTrang();
+    await screen.findByText('Đợt đã đóng cần mở lại');
+
+    await user.click(screen.getByRole('button', { name: 'Gia hạn' }));
+    expect(
+      await screen.findByText('Đợt đã đóng — chọn thời điểm đóng mới sau hiện tại để mở lại cho học viên.'),
+    ).toBeInTheDocument();
+    const o = await screen.findByLabelText(/^Đóng lúc \(mới\)/);
+
+    // Giờ đóng mới vẫn ở quá khứ (dù sau mo_luc) -> không mở lại được, nút bị khóa.
+    await user.type(o, '2020-01-01T08:00');
+    expect(screen.getByRole('button', { name: 'Xác nhận gia hạn' })).toBeDisabled();
+
+    await user.clear(o);
+    await user.type(o, '2099-03-01T08:00');
+    await user.click(screen.getByRole('button', { name: 'Xác nhận gia hạn' }));
+    expect(await screen.findByText('Đã gia hạn đợt xác nhận "Đợt đã đóng cần mở lại"')).toBeInTheDocument();
+  });
 });

@@ -165,9 +165,14 @@ export default function AdminDotXacNhan() {
     form.mo_luc !== '' &&
     form.dong_luc !== '' &&
     new Date(form.dong_luc) > new Date(form.mo_luc);
-  const giaHanHopLe = dongLucMoi !== '' && dotGiaHan !== null && new Date(dongLucMoi) > new Date(dotGiaHan.mo_luc);
-
   const now = new Date();
+  // Đợt đã đóng vẫn gia hạn được (học viên làm trễ) — giờ đóng mới phải sau hiện tại mới thật sự mở lại.
+  const dotGiaHanDaDong = dotGiaHan !== null && tinhTrangThaiDot(dotGiaHan, now) === 'da_dong';
+  const giaHanHopLe =
+    dongLucMoi !== '' &&
+    dotGiaHan !== null &&
+    new Date(dongLucMoi) > new Date(dotGiaHan.mo_luc) &&
+    (!dotGiaHanDaDong || new Date(dongLucMoi) > now);
 
   return (
     <>
@@ -247,11 +252,9 @@ export default function AdminDotXacNhan() {
                           </Badge>
                         </Table.Td>
                         <Table.Td ta="right">
-                          {trangThai !== 'da_dong' && (
-                            <Button size="xs" variant="default" onClick={() => moModalGiaHan(dot)}>
-                              Gia hạn
-                            </Button>
-                          )}
+                          <Button size="xs" variant="default" onClick={() => moModalGiaHan(dot)}>
+                            Gia hạn
+                          </Button>
                         </Table.Td>
                       </Table.Tr>
                     );
@@ -325,6 +328,11 @@ export default function AdminDotXacNhan() {
           {dotGiaHan && (
             <Text fz={13.5} c="dimmed">
               Đợt "{dotGiaHan.ten}" — hiện đóng lúc {dinhDangNgayGio(dotGiaHan.dong_luc)}
+            </Text>
+          )}
+          {dotGiaHanDaDong && (
+            <Text fz={13.5} c="dimmed">
+              Đợt đã đóng — chọn thời điểm đóng mới sau hiện tại để mở lại cho học viên.
             </Text>
           )}
           <TextInput
