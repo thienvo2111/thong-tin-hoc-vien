@@ -157,16 +157,24 @@ describe('M7 — Thông tin lớp học', () => {
       'href',
       'https://zalo.me/g/cum-long-xuyen',
     );
-    expect(screen.getByText(/Đầu vào: Cơ bản/)).toBeInTheDocument();
+    expect(screen.getByText(/Mức chính thức/)).toHaveTextContent('Mức chính thức (xếp lớp): Cơ bản');
     // Khóa không có giai đoạn đánh giá đầu ra + chưa có kết quả đầu ra -> không hiện dòng thừa.
     expect(screen.queryByText(/Đầu ra:/)).not.toBeInTheDocument();
   });
 
-  it('chưa chốt mức đầu vào nhưng đã hoàn thành bài đánh giá trên hệ thống khảo sát -> hiện mức theo thang khảo sát + link chi tiết', async () => {
+  it('chưa chốt mức đầu vào nhưng đã hoàn thành bài đánh giá -> kết quả hệ thống + link chi tiết, mức chính thức "Chưa chốt"', async () => {
     server.use(
       http.get('/hoc-vien/toi/khoa-hoc', () =>
         HttpResponse.json([
-          { ...db.khoaHocToi[0], muc_dau_vao: null, muc_dau_ra: null, muc_danh_gia: 'co_ban', nguon_muc_danh_gia: 'khao_sat' },
+          {
+            ...db.khoaHocToi[0],
+            muc_dau_vao: null,
+            muc_dau_ra: null,
+            muc_danh_gia: 'co_ban',
+            nguon_muc_danh_gia: 'khao_sat',
+            muc_he_thong: 'co_ban',
+            nhan_muc_goc_danh_gia: 'M1 – Chưa đạt',
+          },
         ]),
       ),
     );
@@ -179,8 +187,10 @@ describe('M7 — Thông tin lớp học', () => {
       url_ket_qua: 'https://khaosat.test/ket-qua/abc',
     });
     renderDaDangNhap();
-    expect(await screen.findByText(/Đầu vào: M1 – Chưa đạt/)).toBeInTheDocument();
-    expect(screen.getByText(/hoàn thành lúc 05\/10\/2026 14:50/)).toBeInTheDocument();
+    expect(await screen.findByText(/Kết quả hệ thống/)).toHaveTextContent('M1 – Chưa đạt');
+    expect(screen.getByText(/Mức chính thức/)).toHaveTextContent('Mức chính thức (xếp lớp): Chưa chốt');
+    expect(screen.queryByText(/Đầu vào:/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Hoàn thành bài đánh giá lúc 05\/10\/2026 14:50/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Xem kết quả chi tiết' })).toHaveAttribute(
       'href',
       'https://khaosat.test/ket-qua/abc',
@@ -188,14 +198,21 @@ describe('M7 — Thông tin lớp học', () => {
     expect(screen.queryByText(/Đầu ra:/)).not.toBeInTheDocument();
   });
 
-  it('đã chốt mức đầu vào -> ưu tiên mức chốt, không lấy kết quả khảo sát', async () => {
-    datTinhTrangBai({ loai: 'danh-gia', trang_thai: 'hoan_thanh', muc_goc: 'M1', nhan_muc_goc: 'M1 – Chưa đạt' });
+  it('đã chốt mức đầu vào -> mức chính thức theo chốt, vẫn hiện link bài làm', async () => {
+    datTinhTrangBai({
+      loai: 'danh-gia',
+      trang_thai: 'hoan_thanh',
+      muc_goc: 'M1',
+      nhan_muc_goc: 'M1 – Chưa đạt',
+      url_ket_qua: 'https://khaosat.test/ket-qua/abc',
+    });
     renderDaDangNhap();
-    expect(await screen.findByText(/Đầu vào: Cơ bản/)).toBeInTheDocument();
-    expect(screen.queryByText(/M1 – Chưa đạt/)).not.toBeInTheDocument();
+    expect(await screen.findByText(/Mức chính thức/)).toHaveTextContent('Mức chính thức (xếp lớp): Cơ bản');
+    expect(screen.queryByText(/Đầu vào:/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Xem kết quả chi tiết' })).toHaveAttribute('href', 'https://khaosat.test/ket-qua/abc');
   });
 
-  it('đang làm (chưa hoàn thành) -> vẫn "Chưa có kết quả"', async () => {
+  it('đang làm (chưa hoàn thành) -> kết quả hệ thống "Chưa có kết quả", không có link', async () => {
     server.use(
       http.get('/hoc-vien/toi/khoa-hoc', () =>
         HttpResponse.json([{ ...db.khoaHocToi[0], muc_dau_vao: null, muc_danh_gia: null, nguon_muc_danh_gia: null }]),
@@ -203,7 +220,8 @@ describe('M7 — Thông tin lớp học', () => {
     );
     datTinhTrangBai({ loai: 'danh-gia', trang_thai: 'dang_lam' });
     renderDaDangNhap();
-    expect(await screen.findByText(/Đầu vào: Chưa có kết quả/)).toBeInTheDocument();
+    expect(await screen.findByText(/Kết quả hệ thống/)).toHaveTextContent('Kết quả hệ thống: Chưa có kết quả');
+    expect(screen.queryByRole('link', { name: 'Xem kết quả chi tiết' })).not.toBeInTheDocument();
   });
 
   it('chưa được phân lớp ở giai đoạn nào → vẫn hiện đủ thẻ giai đoạn + dòng nhắc sau cùng, không có buổi học, không cụm', async () => {
@@ -269,19 +287,19 @@ describe('M7 — Thông tin lớp học', () => {
       const the = await cacTheGiaiDoan();
       const gd1 = the[0];
       expect(within(gd1).getByText('Kết quả đánh giá đầu vào')).toBeInTheDocument();
-      expect(within(gd1).getByText(/Đầu vào: Cơ bản/)).toBeInTheDocument();
-      expect(within(gd1).getByText(/Mức lớp học:/)).toBeInTheDocument();
+      expect(within(gd1).getByText(/Mức chính thức/)).toHaveTextContent('Mức chính thức (xếp lớp): Cơ bản');
+      expect(within(gd1).getByText(/Mức chính thức/)).toBeInTheDocument();
       expect(within(gd1).queryByText(/Đầu ra:/)).not.toBeInTheDocument();
 
       const gd5 = the[4];
       expect(within(gd5).getByText('Kết quả đánh giá đầu ra')).toBeInTheDocument();
       expect(within(gd5).getByText(/Đầu ra: Thành thạo/)).toBeInTheDocument();
-      expect(within(gd5).queryByText(/Mức lớp học:/)).not.toBeInTheDocument();
+      expect(within(gd5).queryByText(/Mức chính thức/)).not.toBeInTheDocument();
 
       // Các thẻ học không có kết quả đánh giá.
       the.slice(1, 4).forEach((t) => expect(within(t).queryByTestId('ket-qua-giai-doan')).not.toBeInTheDocument());
       expect(screen.queryByTestId('ket-qua-cuoi-trang')).not.toBeInTheDocument();
-      expect(screen.getAllByText(/Đầu vào:/)).toHaveLength(1);
+      expect(screen.getAllByText(/Mức chính thức/)).toHaveLength(1);
       expect(screen.getAllByText(/Đầu ra:/)).toHaveLength(1);
     });
 
@@ -289,7 +307,7 @@ describe('M7 — Thông tin lớp học', () => {
     it('chỉ có giai đoạn đánh giá đầu vào, chưa có kết quả đầu ra: ẩn khối cuối trang', async () => {
       renderDaDangNhap();
       const gd1 = (await cacTheGiaiDoan())[0];
-      expect(within(gd1).getByText(/Đầu vào: Cơ bản/)).toBeInTheDocument();
+      expect(within(gd1).getByText(/Mức chính thức/)).toHaveTextContent('Mức chính thức (xếp lớp): Cơ bản');
       expect(screen.queryByTestId('ket-qua-cuoi-trang')).not.toBeInTheDocument();
       expect(screen.queryByText(/Đầu ra:/)).not.toBeInTheDocument();
     });
@@ -301,8 +319,8 @@ describe('M7 — Thông tin lớp học', () => {
       renderDaDangNhap();
       const cuoi = await screen.findByTestId('ket-qua-cuoi-trang');
       expect(within(cuoi).getByText(/Đầu ra: Nâng cao/)).toBeInTheDocument();
-      expect(within(cuoi).queryByText(/Đầu vào:/)).not.toBeInTheDocument();
-      expect(within(cuoi).queryByText(/Mức lớp học:/)).not.toBeInTheDocument();
+      expect(within(cuoi).queryByText(/Mức chính thức/)).not.toBeInTheDocument();
+      expect(within(cuoi).queryByText(/Mức chính thức/)).not.toBeInTheDocument();
     });
 
     it('chỉ có giai đoạn đánh giá đầu vào, bài đầu ra đã hoàn thành: đầu ra ở khối cuối trang', async () => {
@@ -343,28 +361,31 @@ describe('M7 — Thông tin lớp học', () => {
       const the = await cacTheGiaiDoan();
       the.forEach((t) => expect(within(t).queryByTestId('ket-qua-giai-doan')).not.toBeInTheDocument());
       const cuoi = screen.getByTestId('ket-qua-cuoi-trang');
-      expect(within(cuoi).getByText(/Đầu vào: Cơ bản/)).toBeInTheDocument();
+      expect(within(cuoi).getByText(/Mức chính thức/)).toHaveTextContent('Mức chính thức (xếp lớp): Cơ bản');
       expect(within(cuoi).queryByText(/Đầu ra:/)).not.toBeInTheDocument();
-      expect(within(cuoi).getByText(/Mức lớp học:/)).toBeInTheDocument();
+      expect(within(cuoi).getByText(/Mức chính thức/)).toBeInTheDocument();
     });
 
     it('khóa chưa có giai đoạn nào: kết quả vẫn hiện ở khối cuối trang', async () => {
       server.use(http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json([{ ...db.khoaHocToi[0], giai_doan: [] }])));
       renderDaDangNhap();
       const cuoi = await screen.findByTestId('ket-qua-cuoi-trang');
-      expect(within(cuoi).getByText(/Đầu vào: Cơ bản/)).toBeInTheDocument();
+      expect(within(cuoi).getByText(/Mức chính thức/)).toHaveTextContent('Mức chính thức (xếp lớp): Cơ bản');
     });
 
-    it('điều chỉnh mức ngay trong thẻ GĐ1, hiện thời điểm điều chỉnh', async () => {
+    it('điều chỉnh nhu cầu mức ngay trong thẻ GĐ1 (chưa chốt), hiện thời điểm điều chỉnh', async () => {
+      // ADR 0006: chưa chốt -> điều chỉnh nhu cầu theo mốc hệ thống.
       const dk = db.khoaHocToi[0];
-      dk.muc_dau_vao = 'nang_cao';
+      dk.muc_dau_vao = null;
+      dk.muc_he_thong = 'nang_cao';
       dk.muc_danh_gia = 'nang_cao';
-      dk.muc_hoc_chon = 'co_ban';
+      dk.nguon_muc_danh_gia = 'khao_sat';
+      dk.muc_hoc_chon = 'thanh_thao';
       dk.muc_hoc_chon_luc = '2026-10-08T03:05:00.000Z';
       dk.khoa.mo_dieu_chinh_muc = true;
       renderDaDangNhap();
       const gd1 = (await cacTheGiaiDoan())[0];
-      expect(within(gd1).getByText(/đã điều chỉnh từ Nâng cao/)).toBeInTheDocument();
+      expect(within(gd1).getByText(/Nhu cầu đã chọn:/)).toHaveTextContent('Nhu cầu đã chọn: Thành thạo');
       expect(within(gd1).getByText('Đã điều chỉnh lúc 08/10/2026 10:05')).toBeInTheDocument();
       expect(within(gd1).getByRole('button', { name: 'Điều chỉnh mức lớp' })).toBeInTheDocument();
     });

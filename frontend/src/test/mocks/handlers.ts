@@ -18,7 +18,12 @@ const THU_TU_MUC_MOCK: MucNangLuc[] = ['co_ban', 'thanh_thao', 'nang_cao'];
 
 async function luuMucHocMock(dk: KhoaHocDangKy, request: Request) {
   const { muc } = (await request.json()) as { muc: MucNangLuc | null };
-  const mucDanhGia = dk.muc_danh_gia;
+  // Như backend (ADR 0006): đã chốt -> khóa điều chỉnh; mốc = kết quả hệ thống.
+  if (dk.muc_dau_vao) {
+    const thongDiep = 'Đã có mức chính thức (chốt), không thể điều chỉnh mức';
+    throw loi(400, 'VALIDATION_ERROR', thongDiep, { fields: [{ field: 'muc', message: thongDiep }] });
+  }
+  const mucDanhGia = dk.muc_he_thong;
   if (!mucDanhGia) {
     throw loi(400, 'VALIDATION_ERROR', 'Chưa có kết quả đánh giá đầu vào', {
       fields: [{ field: 'muc', message: 'Chưa có kết quả đánh giá đầu vào' }],
@@ -37,7 +42,7 @@ async function luuMucHocMock(dk: KhoaHocDangKy, request: Request) {
   return {
     muc_dau_vao: dk.muc_dau_vao,
     muc_hoc_chon: dk.muc_hoc_chon,
-    muc_hoc: dk.muc_hoc_chon ?? mucDanhGia,
+    muc_hoc: dk.muc_dau_vao,
     muc_hoc_chon_luc: dk.muc_hoc_chon_luc,
   };
 }

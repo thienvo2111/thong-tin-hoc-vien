@@ -80,142 +80,131 @@ describe('Admin — Chi tiết hồ sơ học viên — Khóa & lớp (QĐ10)', 
   });
 });
 
-// 2026-10-08: mức lớp học hiệu lực + Quản trị sửa hộ (PATCH /dang-ky-hoc/{id}/muc-hoc).
+// ADR 0006: 3 nguồn mức (hệ thống / nhu cầu / chốt) + Quản trị sửa hộ nhu cầu (PATCH /dang-ky-hoc/{id}/muc-hoc)
+// chỉ khi chưa chốt.
 describe('Admin — Chi tiết hồ sơ học viên — Mức lớp học', () => {
-  function datMuc(muc_dau_vao: 'co_ban' | 'thanh_thao' | 'nang_cao' | null, muc_hoc_chon: 'co_ban' | 'thanh_thao' | null = null) {
+  type Muc = 'co_ban' | 'thanh_thao' | 'nang_cao';
+  const NHAN_GOC: Record<Muc, string> = { co_ban: 'M2 – Cơ bản', thanh_thao: 'M3 – Thành thạo', nang_cao: 'M4 – Nâng cao' };
+  function datMuc({ heThong = null, chot = null, chon = null }: { heThong?: Muc | null; chot?: Muc | null; chon?: Muc | null }) {
     const dk = db.khoaHocCuaHocVien['hv-duyet-1'][0];
-    dk.muc_dau_vao = muc_dau_vao;
-    dk.muc_danh_gia = muc_dau_vao;
-    dk.nguon_muc_danh_gia = muc_dau_vao ? 'chot' : null;
-    dk.muc_hoc_chon = muc_hoc_chon;
+    dk.muc_he_thong = heThong;
+    dk.muc_goc_danh_gia = heThong ? NHAN_GOC[heThong].slice(0, 2) : null;
+    dk.nhan_muc_goc_danh_gia = heThong ? NHAN_GOC[heThong] : null;
+    dk.muc_dau_vao = chot;
+    dk.muc_danh_gia = chot ?? heThong;
+    dk.nguon_muc_danh_gia = chot ? 'chot' : heThong ? 'khao_sat' : null;
+    dk.muc_hoc_chon = chon;
+    dk.muc_hoc_chon_luc = null;
   }
+  const dongNguon = (dong: ReturnType<typeof within>, nhan: string) =>
+    dong.getByText((noiDung: string) => noiDung.startsWith(nhan));
+  const oSua = () => screen.queryByRole('textbox', { name: 'Sửa nhu cầu mức lớp học' });
 
-  // 2026-10-09: chưa chốt muc_dau_vao, mốc lấy từ bài khảo sát đầu vào.
-  function datMucKhaoSat(muc_danh_gia: 'co_ban' | 'thanh_thao' | 'nang_cao') {
-    const dk = db.khoaHocCuaHocVien['hv-duyet-1'][0];
-    dk.muc_dau_vao = null;
-    dk.muc_danh_gia = muc_danh_gia;
-    dk.nguon_muc_danh_gia = 'khao_sat';
-    dk.muc_goc_danh_gia = 'M3';
-    dk.nhan_muc_goc_danh_gia = 'M3 – Thành thạo';
-    dk.muc_hoc_chon = null;
-  }
-
-  it('mốc theo khảo sát chưa chốt -> "Kết quả: M3 – Thành thạo (khảo sát, chưa chốt) → xếp lớp", Select theo mốc', async () => {
+  it('chưa chốt, hệ thống M3: hiện đủ 3 nguồn, Select theo mốc hệ thống', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
-    datMucKhaoSat('thanh_thao');
+    datMuc({ heThong: 'thanh_thao' });
     const user = userEvent.setup();
     renderTrang('hv-duyet-1');
     const dong = within(await screen.findByTestId('dong-muc-hoc'));
-    expect(dong.getByText('Thành thạo', { selector: 'b' })).toBeInTheDocument();
-    expect(dong.getByText(/Kết quả: M3 – Thành thạo \(khảo sát, chưa chốt\) → xếp lớp Thành thạo/)).toBeInTheDocument();
-    await user.click(dong.getByRole('textbox', { name: 'Sửa mức lớp học' }));
+    expect(dongNguon(dong, 'Kết quả hệ thống:')).toHaveTextContent('Kết quả hệ thống: M3 – Thành thạo');
+    expect(dongNguon(dong, 'Nhu cầu đã chọn:')).toHaveTextContent('Nhu cầu đã chọn: Học theo kết quả đánh giá');
+    expect(dongNguon(dong, 'Mức chính thức')).toHaveTextContent('Mức chính thức (xếp lớp): Chưa chốt');
+    await user.click(oSua()!);
     expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(
       expect.arrayContaining(['Cơ bản', 'Thành thạo (theo kết quả đánh giá)']),
     );
     expect(screen.queryByRole('option', { name: /Nâng cao/ })).not.toBeInTheDocument();
   });
 
-  it('mốc đã chốt -> không có ghi chú khảo sát', async () => {
+  it('hệ thống M1 -> giữ nhãn "M1 – Chưa đạt" kèm mức quy đổi Cơ bản', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
-    datMuc('thanh_thao');
+    datMuc({ heThong: 'co_ban' });
+    db.khoaHocCuaHocVien['hv-duyet-1'][0].nhan_muc_goc_danh_gia = 'M1 – Chưa đạt';
     renderTrang('hv-duyet-1');
     const dong = within(await screen.findByTestId('dong-muc-hoc'));
-    expect(dong.queryByText(/khảo sát, chưa chốt/)).not.toBeInTheDocument();
+    expect(dongNguon(dong, 'Kết quả hệ thống:')).toHaveTextContent('M1 – Chưa đạt (quy đổi: Cơ bản)');
   });
 
-  it('khảo sát M1 -> giữ nhãn kết quả "M1 – Chưa đạt", xếp lớp Cơ bản', async () => {
+  it('chưa có kết quả nào -> "Chưa có kết quả", không có ô sửa', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
-    datMucKhaoSat('co_ban');
-    const dk = db.khoaHocCuaHocVien['hv-duyet-1'][0];
-    dk.muc_goc_danh_gia = 'M1';
-    dk.nhan_muc_goc_danh_gia = 'M1 – Chưa đạt';
+    datMuc({});
     renderTrang('hv-duyet-1');
     const dong = within(await screen.findByTestId('dong-muc-hoc'));
-    expect(dong.getByText(/Kết quả: M1 – Chưa đạt \(khảo sát, chưa chốt\) → xếp lớp Cơ bản/)).toBeInTheDocument();
+    expect(dongNguon(dong, 'Kết quả hệ thống:')).toHaveTextContent('Chưa có kết quả');
+    expect(dongNguon(dong, 'Nhu cầu đã chọn:')).toHaveTextContent('Chưa chọn');
+    expect(oSua()).not.toBeInTheDocument();
   });
 
-  it('chưa có kết quả đánh giá -> chỉ hiện dòng thông báo, không có ô sửa', async () => {
+  it('đã chốt: mức chính thức = muc_dau_vao, nhu cầu giữ riêng, ghi "Mức đã được chốt", không có ô sửa', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
-    datMuc(null);
-    renderTrang('hv-duyet-1');
-    expect(await screen.findByText('Mức lớp học: chưa có kết quả đánh giá đầu vào')).toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'Sửa mức lớp học' })).not.toBeInTheDocument();
-  });
-
-  it('đã tự điều chỉnh -> hiện mức hiệu lực kèm mức đánh giá gốc', async () => {
-    db.nguoiDung.vai_tro = 'quan_tri';
-    datMuc('nang_cao', 'thanh_thao');
+    datMuc({ heThong: 'nang_cao', chot: 'co_ban', chon: 'thanh_thao' });
     renderTrang('hv-duyet-1');
     const dong = within(await screen.findByTestId('dong-muc-hoc'));
-    expect(dong.getByText('Thành thạo', { selector: 'b' })).toBeInTheDocument();
-    expect(dong.getByText(/học viên tự điều chỉnh từ Nâng cao/)).toBeInTheDocument();
-    expect(dong.queryByText(/Đã điều chỉnh lúc/)).not.toBeInTheDocument();
+    expect(dongNguon(dong, 'Kết quả hệ thống:')).toHaveTextContent('M4 – Nâng cao');
+    expect(dongNguon(dong, 'Nhu cầu đã chọn:')).toHaveTextContent('Nhu cầu đã chọn: Thành thạo');
+    expect(dongNguon(dong, 'Mức chính thức')).toHaveTextContent('Mức chính thức (xếp lớp): Cơ bản');
+    expect(dong.getByText('Mức đã được chốt')).toBeInTheDocument();
+    expect(oSua()).not.toBeInTheDocument();
   });
 
   it('có thời điểm điều chỉnh -> hiện "Đã điều chỉnh lúc" theo giờ Việt Nam', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
-    datMuc('nang_cao', 'thanh_thao');
+    datMuc({ heThong: 'nang_cao', chon: 'thanh_thao' });
     db.khoaHocCuaHocVien['hv-duyet-1'][0].muc_hoc_chon_luc = '2026-10-08T03:05:00.000Z';
     renderTrang('hv-duyet-1');
     const dong = within(await screen.findByTestId('dong-muc-hoc'));
     expect(dong.getByText('Đã điều chỉnh lúc 08/10/2026 10:05')).toBeInTheDocument();
   });
 
-  it('quản trị: Select chỉ có các mức ≤ đánh giá; chọn + Lưu mức -> PATCH đúng body, báo thành công', async () => {
+  it('quản trị, chưa chốt: chọn + Lưu mức -> PATCH đúng body, báo thành công', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
-    datMuc('thanh_thao');
+    datMuc({ heThong: 'thanh_thao' });
     let body: unknown;
     server.use(
       http.patch('/dang-ky-hoc/:id/muc-hoc', async ({ request }) => {
         body = await request.json();
-        return HttpResponse.json({ muc_dau_vao: 'thanh_thao', muc_hoc_chon: 'co_ban', muc_hoc: 'co_ban' });
+        return HttpResponse.json({ muc_dau_vao: null, muc_hoc_chon: 'co_ban', muc_hoc: null });
       }),
     );
     const user = userEvent.setup();
     renderTrang('hv-duyet-1');
     const dong = within(await screen.findByTestId('dong-muc-hoc'));
-    await user.click(dong.getByRole('textbox', { name: 'Sửa mức lớp học' }));
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(
-      expect.arrayContaining(['Cơ bản', 'Thành thạo (theo kết quả đánh giá)']),
-    );
-    expect(screen.queryByRole('option', { name: /Nâng cao/ })).not.toBeInTheDocument();
+    await user.click(dong.getByRole('textbox', { name: 'Sửa nhu cầu mức lớp học' }));
     await user.click(screen.getByRole('option', { name: 'Cơ bản' }));
     await user.click(dong.getByRole('button', { name: 'Lưu mức' }));
-    expect(await screen.findByText('Đã lưu mức lớp học')).toBeInTheDocument();
+    expect(await screen.findByText('Đã lưu nhu cầu mức lớp học')).toBeInTheDocument();
     expect(body).toEqual({ muc: 'co_ban' });
   });
 
   // 2026-10-09: quản trị cũng chỉ được thấp hơn 1 mức.
   it('quản trị, mốc nâng cao: Select chỉ có Thành thạo + Nâng cao', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
-    datMuc('nang_cao');
+    datMuc({ heThong: 'nang_cao' });
     const user = userEvent.setup();
     renderTrang('hv-duyet-1');
     const dong = within(await screen.findByTestId('dong-muc-hoc'));
-    await user.click(dong.getByRole('textbox', { name: 'Sửa mức lớp học' }));
+    await user.click(dong.getByRole('textbox', { name: 'Sửa nhu cầu mức lớp học' }));
     expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
       'Thành thạo',
       'Nâng cao (theo kết quả đánh giá)',
     ]);
   });
 
-  it('lựa chọn cũ Cơ bản dưới mốc Nâng cao: dòng mức vẫn hiện Cơ bản, Select chọn sẵn mốc', async () => {
+  it('lựa chọn cũ Cơ bản dưới mốc Nâng cao: nhu cầu vẫn hiện Cơ bản, Select chọn sẵn mốc', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
-    datMuc('nang_cao', 'co_ban');
+    datMuc({ heThong: 'nang_cao', chon: 'co_ban' });
     renderTrang('hv-duyet-1');
     const dong = within(await screen.findByTestId('dong-muc-hoc'));
-    expect(dong.getByText('Cơ bản', { selector: 'b' })).toBeInTheDocument();
-    expect(dong.getByText(/học viên tự điều chỉnh từ Nâng cao/)).toBeInTheDocument();
-    expect(dong.getByRole('textbox', { name: 'Sửa mức lớp học' })).toHaveValue('Nâng cao (theo kết quả đánh giá)');
+    expect(dongNguon(dong, 'Nhu cầu đã chọn:')).toHaveTextContent('Nhu cầu đã chọn: Cơ bản');
+    expect(dong.getByRole('textbox', { name: 'Sửa nhu cầu mức lớp học' })).toHaveValue('Nâng cao (theo kết quả đánh giá)');
   });
 
   it('tài khoản đơn vị (trường) -> chỉ xem mức, không có ô sửa', async () => {
     db.nguoiDung.vai_tro = 'truong';
-    datMuc('nang_cao');
+    datMuc({ heThong: 'nang_cao' });
     renderTrang('hv-duyet-1');
     expect(await screen.findByTestId('dong-muc-hoc')).toBeInTheDocument();
-    expect(screen.queryByRole('textbox', { name: 'Sửa mức lớp học' })).not.toBeInTheDocument();
+    expect(oSua()).not.toBeInTheDocument();
   });
 });
 

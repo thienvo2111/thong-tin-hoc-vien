@@ -1226,13 +1226,15 @@ export class KhoaBoiDuongService {
     // T12: trạng thái điểm danh từng buổi + tiến độ từng giai đoạn — truy
     // vấn RIÊNG rồi map thủ công (Prisma không lọc nested theo field anh em).
     const dangKyIds = dangKyList.map((dk) => dk.id);
-    // Mốc điều chỉnh mức khi quản trị chưa chốt muc_dau_vao (2026-10-09) —
-    // bài khảo sát gắn theo học viên nên chỉ tra 1 lần cho mọi đăng ký.
-    const baiDauVao = dangKyList.some((dk) => !dk.muc_dau_vao)
+    // Kết quả hệ thống (ADR 0006) — luôn tra, độc lập với mức chốt; bài khảo
+    // sát gắn theo học viên nên chỉ tra 1 lần cho mọi đăng ký.
+    const baiDauVao = dangKyList.length
       ? await this.baiDauVaoCuaHocVien(hocVienId)
       : null;
-    // Mức quy đổi chỉ để XẾP LỚP; học viên vẫn xem kết quả theo mã/nhãn thang khảo sát.
-    const mucGocDanhGia = baiDauVao?.muc_goc ?? null;
+    // Học viên xem kết quả theo mã/nhãn thang khảo sát; mức quy đổi = muc_he_thong.
+    const mucHeThong = mucDanhGiaLamMoc(null, baiDauVao).muc;
+    const mucGocDanhGia =
+      baiDauVao?.trang_thai === 'hoan_thanh' ? baiDauVao.muc_goc : null;
     const nhanMucGocDanhGia = mucGocDanhGia
       ? nhanMucGoc(mucGocDanhGia, await this.thangMuc.thang())
       : null;
@@ -1324,10 +1326,10 @@ export class KhoaBoiDuongService {
         ...rest,
         muc_danh_gia: mocDanhGia.muc,
         nguon_muc_danh_gia: mocDanhGia.nguon,
-        muc_goc_danh_gia:
-          mocDanhGia.nguon === 'khao_sat' ? mucGocDanhGia : null,
-        nhan_muc_goc_danh_gia:
-          mocDanhGia.nguon === 'khao_sat' ? nhanMucGocDanhGia : null,
+        muc_goc_danh_gia: mucGocDanhGia,
+        nhan_muc_goc_danh_gia: nhanMucGocDanhGia,
+        // Mức quy đổi từ kết quả hệ thống; mức chính thức vẫn là muc_dau_vao.
+        muc_he_thong: mucHeThong,
         khoa: khoaGon,
         giai_doan: dsGiaiDoan.map((gd) => {
           const lop = phan_lop_giai_doan.find(
@@ -1705,7 +1707,8 @@ export class KhoaBoiDuongService {
   // Điều chỉnh mức lớp học (2026-10-08): học viên tự chọn khi khóa mở công
   // tắc (PUT /hoc-vien/toi/khoa-hoc/{khoaId}/muc-hoc); Quản trị sửa hộ bỏ qua
   // công tắc (PATCH /dang-ky-hoc/{id}/muc-hoc). Cả 2 vẫn áp quy tắc ≤ mức
-  // đánh giá. Chọn bằng mức đánh giá -> lưu NULL.
+  // đánh giá. Chọn bằng mức đánh giá -> lưu NULL. ADR 0006: muc_hoc_chon chỉ
+  // là NHU CẦU; đã có mức chốt (muc_dau_vao) thì khóa điều chỉnh.
   // ---------------------------------------------------------------------
   async chonMucHoc(
     caller: AuthenticatedUser,
@@ -1741,7 +1744,11 @@ export class KhoaBoiDuongService {
     },
     muc: muc_nang_luc | null,
   ) {
-    // Mốc = mức quản trị chốt ?? mức quy đổi từ bài đánh giá đầu vào (2026-10-09).
+    if (dangKy.muc_dau_vao) {
+      const msg = 'Đã có mức chính thức (chốt), không thể điều chỉnh mức';
+      throw new ValidationException(msg, [{ field: 'muc', message: msg }]);
+    }
+    // Chưa chốt -> mốc = mức quy đổi từ bài đánh giá đầu vào (2026-10-09).
     const { muc: mucDanhGia } = await this.mucDanhGiaCuaDangKy(dangKy);
     if (!mucDanhGia) {
       throw new ValidationException('Chưa có kết quả đánh giá đầu vào', [
@@ -1768,7 +1775,8 @@ export class KhoaBoiDuongService {
         where: { id: dangKy.id },
         data: { muc_hoc_chon: mucMoi, muc_hoc_chon_luc: luc },
       });
-      const mucCu = mucHocHieuLuc(dangKy.muc_hoc_chon, mucDanhGia);
+      // Nhật ký ghi theo NHU CẦU (chọn ?? mốc) — mức xếp lớp chưa có vì chưa chốt.
+      const mucCu = dangKy.muc_hoc_chon ?? mucDanhGia;
       const mucHoc = mucMoi ?? mucDanhGia;
       await this.nhatKy.ghi({
         hanh_dong: 'dieu_chinh_muc_hoc',
@@ -1780,7 +1788,8 @@ export class KhoaBoiDuongService {
     return {
       muc_dau_vao: dangKy.muc_dau_vao,
       muc_hoc_chon: mucMoi,
-      muc_hoc: mucMoi ?? mucDanhGia,
+      // Mức chính thức (xếp lớp) — tới đây luôn null vì đã chốt thì bị chặn ở trên.
+      muc_hoc: mucHocHieuLuc(dangKy.muc_dau_vao),
       muc_hoc_chon_luc: luc,
     };
   }
@@ -2024,12 +2033,7 @@ export class KhoaBoiDuongService {
     const gan: { giai_doan_id: string; lop_id: string | null }[] = [];
     const canhBaoList: string[] = [];
     // Mức đầu vào của học viên: tra tối đa 1 lần/dòng, chỉ khi có lớp gắn mức.
-    let mucDauVao:
-      | Promise<{
-          muc_danh_gia: muc_nang_luc | null;
-          muc_hoc_chon: muc_nang_luc | null;
-        } | null>
-      | undefined;
+    let mucDauVao: Promise<{ muc_dau_vao: muc_nang_luc | null } | null> | undefined;
     for (const gd of giaiDoanList) {
       const o = raw[`gd:${gd.thu_tu}`]?.trim();
       if (!o) continue;
@@ -2075,30 +2079,17 @@ export class KhoaBoiDuongService {
                 khoa_id: khoa.id,
               },
             },
-            select: { muc_dau_vao: true, muc_hoc_chon: true },
-          })
-          .then(async (dk) =>
-            dk
-              ? {
-                  muc_hoc_chon: dk.muc_hoc_chon,
-                  muc_danh_gia: (
-                    await this.mucDanhGiaCuaDangKy({
-                      hoc_vien_id: hocVien.id,
-                      muc_dau_vao: dk.muc_dau_vao,
-                    })
-                  ).muc,
-                }
-              : null,
-          );
-        // So với mức học hiệu lực (muc_hoc_chon ?? mốc đánh giá, 2026-10-09).
+            select: { muc_dau_vao: true },
+          });
+        // So với mức học hiệu lực = mức chốt (ADR 0006) — chưa chốt thì cảnh báo 1 lần/dòng.
         const dk = await mucDauVao;
-        const muc = dk ? mucHocHieuLuc(dk.muc_hoc_chon, dk.muc_danh_gia) : null;
-        if (dk && muc && muc !== lop.muc_nang_luc) {
-          const dieuChinh = dk.muc_hoc_chon
-            ? ` (học viên tự điều chỉnh từ "${dk.muc_danh_gia}")`
-            : '';
+        const muc = dk ? mucHocHieuLuc(dk.muc_dau_vao) : null;
+        if (dk && !muc) {
+          const cb = `Học viên "${ma}" chưa có mức chốt đầu vào — kiểm tra lại phân lớp`;
+          if (!canhBaoList.includes(cb)) canhBaoList.push(cb);
+        } else if (muc && muc !== lop.muc_nang_luc) {
           canhBaoList.push(
-            `Học viên "${ma}" có mức học "${muc}"${dieuChinh} khác mức năng lực "${lop.muc_nang_luc}" của lớp "${lop.ten_lop}" — kiểm tra lại phân lớp`,
+            `Học viên "${ma}" có mức học "${muc}" khác mức năng lực "${lop.muc_nang_luc}" của lớp "${lop.ten_lop}" — kiểm tra lại phân lớp`,
           );
         }
       }
@@ -2371,16 +2362,10 @@ export class KhoaBoiDuongService {
       select: {
         muc_dau_vao: true,
         muc_dau_ra: true,
-        muc_hoc_chon: true,
         khoa: { select: { ten_khoa: true } },
       },
     });
-    // Mức tự chọn chỉ giữ khi vẫn THẤP HƠN ĐÚNG 1 mức so với mức đánh giá mới —
-    // bằng/cao hơn hoặc thấp hơn quá 1 mức thì reset về học theo mức đánh giá.
-    const resetMucChon =
-      dto.loai === 'dau_vao' &&
-      !!cu?.muc_hoc_chon &&
-      (cu.muc_hoc_chon === dto.muc || !duocChonMuc(dto.muc, cu.muc_hoc_chon));
+    // ADR 0006: nhập mức chốt KHÔNG đụng tới nhu cầu học viên (muc_hoc_chon/_luc).
     await this.prisma.dang_ky_hoc.update({
       where: {
         hoc_vien_id_khoa_id: {
@@ -2390,12 +2375,7 @@ export class KhoaBoiDuongService {
       },
       data:
         dto.loai === 'dau_vao'
-          ? {
-              muc_dau_vao: dto.muc,
-              ...(resetMucChon
-                ? { muc_hoc_chon: null, muc_hoc_chon_luc: null }
-                : {}),
-            }
+          ? { muc_dau_vao: dto.muc }
           : { muc_dau_ra: dto.muc },
     });
     const mucCu =

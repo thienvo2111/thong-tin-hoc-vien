@@ -120,9 +120,10 @@ export function useKhoaHocToi(enabled = true) {
 // 2026-10-08: học viên tự điều chỉnh mức lớp học (chỉ ≤ mức đánh giá, khi khóa mở điều chỉnh).
 // muc=null = quay về học theo mức đánh giá.
 export interface KetQuaChonMucHoc {
-  muc_dau_vao: MucNangLuc;
+  muc_dau_vao: MucNangLuc | null;
   muc_hoc_chon: MucNangLuc | null;
-  muc_hoc: MucNangLuc;
+  // Mức chính thức (chốt) — ADR 0006; null = chưa chốt.
+  muc_hoc: MucNangLuc | null;
   muc_hoc_chon_luc: string | null;
 }
 

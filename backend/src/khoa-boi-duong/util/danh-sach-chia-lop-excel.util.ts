@@ -15,12 +15,7 @@ import {
 import { NHAN_CAP_GIANG_DAY } from '../../bao-cao/util/report-excel.util';
 import { tieuDeCotGiaiDoan } from '../../import/util/phan-lop-excel.util';
 import { MucThang, nhanMucGoc } from '../../sso/thang-muc.service';
-import {
-  NguonMucDanhGia,
-  THU_TU_MUC,
-  mucDanhGiaLamMoc,
-  mucHocHieuLuc,
-} from './muc-hoc.util';
+import { THU_TU_MUC, mucDanhGiaLamMoc, mucHocHieuLuc } from './muc-hoc.util';
 
 // Export "Danh sách chia lớp" (2026-10-09) — Excel để Quản trị chia lớp
 // ngoài hệ thống rồi nhập lại thẳng qua POST /import/phan_lop_hoc_vien.
@@ -120,11 +115,6 @@ function nhanDiem(bai: BaiDauVaoChiaLop | null): string {
   return `${soVn(bai.diem)} / ${soVn(bai.diem_toi_da)}`;
 }
 
-const NHAN_NGUON_MUC: Record<NguonMucDanhGia, string> = {
-  chot: 'Đã chốt',
-  khao_sat: 'Từ bài khảo sát',
-};
-
 const NHAN_TRANG_THAI_HO_SO_CHUA_DUYET: Record<string, string> = {
   nhap: 'Nháp',
   cho_duyet: 'Chờ duyệt',
@@ -150,19 +140,16 @@ function lopHienTaiNhanVien(
     .join('; ');
 }
 
+// ADR 0006: 3 nguồn mức tách cột — chỉ "Mức chính thức (chốt)" dùng để xếp lớp.
 interface DongTinhToan extends DongChiaLop {
-  mocMuc: muc_nang_luc | null;
-  nguonMoc: NguonMucDanhGia | null;
+  mucHeThong: muc_nang_luc | null;
   mucHieuLuc: muc_nang_luc | null;
 }
 
 function tinhToanDong(r: DongChiaLop): DongTinhToan {
-  const { muc: mocMuc, nguon: nguonMoc } = mucDanhGiaLamMoc(
-    r.muc_dau_vao,
-    r.bai_dau_vao,
-  );
-  const mucHieuLuc = mucHocHieuLuc(r.muc_hoc_chon, mocMuc);
-  return { ...r, mocMuc, nguonMoc, mucHieuLuc };
+  const mucHeThong = mucDanhGiaLamMoc(null, r.bai_dau_vao).muc;
+  const mucHieuLuc = mucHocHieuLuc(r.muc_dau_vao);
+  return { ...r, mucHeThong, mucHieuLuc };
 }
 
 function hangDauSheet1(giaiDoan: GiaiDoanChiaLop[]): string[] {
@@ -176,11 +163,10 @@ function hangDauSheet1(giaiDoan: GiaiDoanChiaLop[]): string[] {
     '# Kết quả đánh giá',
     '# Điểm',
     '# Ngày hoàn thành',
-    '# Mức đánh giá (mốc)',
-    '# Nguồn mức',
-    '# Mức học viên chọn',
+    '# Mức hệ thống (quy đổi)',
+    '# Mức học viên chọn (nhu cầu)',
     '# Thời điểm chọn',
-    '# Mức học',
+    '# Mức chính thức (chốt)',
     ...giaiDoan.flatMap((gd) => [
       `# GĐ${gd.thu_tu} hiện tại`,
       tieuDeCotGiaiDoan(gd),
@@ -206,8 +192,7 @@ function dongSheet1(
     nhanKetQuaDauVao(r.bai_dau_vao, thang),
     nhanDiem(r.bai_dau_vao),
     r.bai_dau_vao?.hoan_thanh_luc ? ngayVn(r.bai_dau_vao.hoan_thanh_luc) : '',
-    r.mocMuc ? MUC_NANG_LUC_LABEL[r.mocMuc] : '',
-    r.nguonMoc ? NHAN_NGUON_MUC[r.nguonMoc] : '',
+    r.mucHeThong ? MUC_NANG_LUC_LABEL[r.mucHeThong] : '',
     r.muc_hoc_chon ? MUC_NANG_LUC_LABEL[r.muc_hoc_chon] : '',
     r.muc_hoc_chon_luc ? ngayGioVn(r.muc_hoc_chon_luc) : '',
     r.mucHieuLuc ? MUC_NANG_LUC_LABEL[r.mucHieuLuc] : '',
@@ -297,6 +282,7 @@ export async function buildDanhSachChiaLopWorkbook(
     '- Không đổi tên hoặc xóa tiêu đề các cột còn lại (ma_dinh_danh_moet, so_dinh_danh_ca_nhan, ten_cum, "GĐ<n> - <tên>").',
     '- Lưu file rồi nhập lại qua Nhập dữ liệu → Phân lớp học viên, chọn đúng khóa này.',
     '- Lưu ý: nhập lại 1 dòng đã có lớp TRỰC TIẾP sẽ gửi lại email thông báo lớp cho học viên đó, dù không đổi gì.',
+    '- Xếp lớp theo cột "# Mức chính thức (chốt)"; trống = chưa chốt mức (nhập Kết quả đánh giá đầu vào trước). Mức hệ thống và mức học viên chọn chỉ để tham khảo.',
   ];
   dongHuongDan.forEach((line) => sheet2.addRow([line]));
   sheet2.getRow(1).font = { bold: true };
@@ -342,7 +328,7 @@ export async function buildDanhSachChiaLopWorkbook(
   // ---- Sheet 3: Tổng hợp theo mức học (trên tập ĐÃ DUYỆT — tập có thể chia lớp) ----
   const sheet3 = workbook.addWorksheet('Tổng hợp theo mức học');
   const header3 = [
-    'Mức học',
+    'Mức chính thức (chốt)',
     'Số học viên',
     ...giaiDoan.map((gd) => `Đã xếp lớp GĐ${gd.thu_tu}`),
   ];
@@ -352,7 +338,7 @@ export async function buildDanhSachChiaLopWorkbook(
     { nhan: MUC_NANG_LUC_LABEL.nang_cao, muc: 'nang_cao' },
     { nhan: MUC_NANG_LUC_LABEL.thanh_thao, muc: 'thanh_thao' },
     { nhan: MUC_NANG_LUC_LABEL.co_ban, muc: 'co_ban' },
-    { nhan: 'Chưa có mức', muc: null },
+    { nhan: 'Chưa chốt mức', muc: null },
   ];
   for (const nhom of nhomMuc) {
     const trongNhom = daDuyet.filter((r) => r.mucHieuLuc === nhom.muc);

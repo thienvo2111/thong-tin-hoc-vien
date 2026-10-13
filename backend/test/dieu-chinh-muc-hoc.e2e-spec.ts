@@ -65,10 +65,15 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
     });
   }
 
+  // ADR 0006: mốc điều chỉnh = kết quả hệ thống (bài khảo sát), chốt thì khóa.
+  const MA_GOC_THEO_MUC = { co_ban: 'M2', thanh_thao: 'M3', nang_cao: 'M4' };
+
   // Học viên MOET + tài khoản + (tùy chọn) đăng ký học ở khóa chính.
+  // mocKhaoSat: tạo bài 'danh-gia' hoàn thành quy đổi ra mức đó; mucChot: muc_dau_vao.
   async function taoHocVien(
-    mucDauVao: 'co_ban' | 'thanh_thao' | 'nang_cao' | null,
+    mocKhaoSat: 'co_ban' | 'thanh_thao' | 'nang_cao' | null,
     ghiDanh = true,
+    mucChot: 'co_ban' | 'thanh_thao' | 'nang_cao' | null = null,
   ) {
     const suf = uniqueSuffix();
     const tenDangNhap = `MOET-DCM-${suf}`;
@@ -96,13 +101,25 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
     });
     hocVienIds.push(hocVien.id);
     nguoiDungHocVienIds.push(nguoiDung.id);
+    if (mocKhaoSat) {
+      await prisma.ket_qua_khao_sat.create({
+        data: {
+          hoc_vien_id: hocVien.id,
+          loai: 'danh-gia',
+          trang_thai: 'hoan_thanh',
+          muc_goc: MA_GOC_THEO_MUC[mocKhaoSat],
+          nguon: 'api',
+          hoan_thanh_luc: new Date(),
+        },
+      });
+    }
     const dangKy = ghiDanh
       ? await prisma.dang_ky_hoc.create({
           data: {
             hoc_vien_id: hocVien.id,
             khoa_id: khoaId,
             trang_thai: 'da_duyet',
-            muc_dau_vao: mucDauVao,
+            muc_dau_vao: mucChot,
           },
         })
       : null;
@@ -189,14 +206,15 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
     await app.close();
   });
 
-  it('happy path: nâng cao -> thành thạo, có hiệu lực ngay, ghi nhật ký, GET khóa học trả field mới', async () => {
+  it('happy path: nâng cao -> thành thạo, lưu nhu cầu, ghi nhật ký, GET khóa học trả field mới', async () => {
     const { hocVien, token, dangKy } = await taoHocVien('nang_cao');
     const truoc = Date.now();
     const res = await chon(token, 'thanh_thao').expect(200);
+    // muc_hoc = mức chính thức (chốt) — chưa chốt nên null.
     expect(res.body).toEqual({
-      muc_dau_vao: 'nang_cao',
+      muc_dau_vao: null,
       muc_hoc_chon: 'thanh_thao',
-      muc_hoc: 'thanh_thao',
+      muc_hoc: null,
       muc_hoc_chon_luc: expect.any(String),
     });
     const daLuu = await docDangKy(dangKy!.id);
@@ -251,9 +269,9 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
     const { token, dangKy } = await taoHocVien('thanh_thao');
     const res = await chon(token, 'thanh_thao').expect(200);
     expect(res.body).toEqual({
-      muc_dau_vao: 'thanh_thao',
+      muc_dau_vao: null,
       muc_hoc_chon: null,
-      muc_hoc: 'thanh_thao',
+      muc_hoc: null,
       muc_hoc_chon_luc: null,
     });
     const sau = await docDangKy(dangKy!.id);
@@ -267,9 +285,9 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
     await chon(token, 'thanh_thao').expect(200);
     const res = await chon(token, null).expect(200);
     expect(res.body).toEqual({
-      muc_dau_vao: 'nang_cao',
+      muc_dau_vao: null,
       muc_hoc_chon: null,
-      muc_hoc: 'nang_cao',
+      muc_hoc: null,
       muc_hoc_chon_luc: expect.any(String),
     });
     expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBeNull();
@@ -298,7 +316,7 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
   it('thành thạo -> cơ bản (thấp hơn 1 mức) -> 200', async () => {
     const { token, dangKy } = await taoHocVien('thanh_thao');
     const res = await chon(token, 'co_ban').expect(200);
-    expect(res.body.muc_hoc).toBe('co_ban');
+    expect(res.body.muc_hoc_chon).toBe('co_ban');
     expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBe('co_ban');
   });
 
@@ -341,13 +359,12 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
   });
 
   it('quản trị sửa hộ khi khóa đóng -> OK, vẫn chặn mức cao hơn; vai trò khác -> 403', async () => {
-    const { hocVien } = await taoHocVien(null, false);
+    const { hocVien } = await taoHocVien('thanh_thao', false);
     const dangKy = await prisma.dang_ky_hoc.create({
       data: {
         hoc_vien_id: hocVien.id,
         khoa_id: khoaKhacId,
         trang_thai: 'da_duyet',
-        muc_dau_vao: 'thanh_thao',
       },
     });
     const sua = (token: string, muc: string | null) =>
@@ -357,7 +374,7 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
         .send({ muc });
 
     const ok = await sua(tokenQuanTri, 'co_ban').expect(200);
-    expect(ok.body.muc_hoc).toBe('co_ban');
+    expect(ok.body.muc_hoc_chon).toBe('co_ban');
     expect((await docDangKy(dangKy.id)).muc_hoc_chon).toBe('co_ban');
 
     await sua(tokenQuanTri, 'nang_cao').expect(400);
@@ -383,22 +400,42 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
     expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBe('thanh_thao');
   });
 
-  it('import lại ket_qua_danh_gia hạ mức xuống ≤ lựa chọn -> muc_hoc_chon reset null; vẫn cao hơn thì giữ', async () => {
+  // ADR 0006: import mức chốt không xóa nhu cầu; đã chốt thì khóa điều chỉnh.
+  it('import ket_qua_danh_gia (cao hơn hay bằng lựa chọn) -> giữ nguyên muc_hoc_chon/_luc', async () => {
     const { tenDangNhap, token, dangKy } = await taoHocVien('nang_cao');
     await chon(token, 'thanh_thao').expect(200);
+    const daChon = await docDangKy(dangKy!.id);
 
     const importMuc = (muc: string) => importMucDauVao(tenDangNhap, muc);
 
-    // Mức mới vẫn cao hơn lựa chọn đúng 1 mức -> giữ lựa chọn.
     await importMuc('nang_cao');
     const giu = await docDangKy(dangKy!.id);
+    expect(giu.muc_dau_vao).toBe('nang_cao');
     expect(giu.muc_hoc_chon).toBe('thanh_thao');
-    expect(giu.muc_hoc_chon_luc).not.toBeNull();
+    expect(giu.muc_hoc_chon_luc!.getTime()).toBe(
+      daChon.muc_hoc_chon_luc!.getTime(),
+    );
 
-    // Hạ đánh giá xuống bằng lựa chọn -> reset.
+    // Hạ mức chốt xuống bằng lựa chọn -> vẫn giữ nhu cầu.
     await importMuc('thanh_thao');
     const sau = await docDangKy(dangKy!.id);
     expect(sau.muc_dau_vao).toBe('thanh_thao');
+    expect(sau.muc_hoc_chon).toBe('thanh_thao');
+    expect(sau.muc_hoc_chon_luc).not.toBeNull();
+  });
+
+  it('đã chốt muc_dau_vao -> HV và quản trị đều không điều chỉnh được (400), không đổi dữ liệu', async () => {
+    const { token, dangKy } = await taoHocVien('nang_cao', true, 'nang_cao');
+    const msg = 'Đã có mức chính thức (chốt), không thể điều chỉnh mức';
+    const hv = await chon(token, 'thanh_thao').expect(400);
+    expect(hv.body.error.fields[0]).toEqual({ field: 'muc', message: msg });
+    const qt = await http()
+      .patch(`/dang-ky-hoc/${dangKy!.id}/muc-hoc`)
+      .set('Authorization', `Bearer ${tokenQuanTri}`)
+      .send({ muc: 'thanh_thao' })
+      .expect(400);
+    expect(qt.body.error.fields[0].message).toBe(msg);
+    const sau = await docDangKy(dangKy!.id);
     expect(sau.muc_hoc_chon).toBeNull();
     expect(sau.muc_hoc_chon_luc).toBeNull();
   });
@@ -444,7 +481,7 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
       const res = await chon(token, 'thanh_thao').expect(200);
       expect(res.body).toMatchObject({
         muc_hoc_chon: 'thanh_thao',
-        muc_hoc: 'thanh_thao',
+        muc_hoc: null,
       });
       const sau = await docDangKy(dangKy!.id);
       expect(sau.muc_hoc_chon).toBe('thanh_thao');
@@ -461,7 +498,7 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
       // Chọn bằng mốc khảo sát -> lưu NULL.
       const ve = await chon(token, 'nang_cao').expect(200);
       expect(ve.body.muc_hoc_chon).toBeNull();
-      expect(ve.body.muc_hoc).toBe('nang_cao');
+      expect(ve.body.muc_hoc).toBeNull();
     });
 
     it('khảo sát M3 + chọn nang_cao -> 400', async () => {
@@ -483,7 +520,7 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
       expect((await docDangKy(dangKy!.id)).muc_hoc_chon).toBeNull();
     });
 
-    it('chọn co_ban theo khảo sát M3, quản trị chốt nang_cao (co_ban thấp hơn 2 mức) -> reset NULL', async () => {
+    it('chọn co_ban theo khảo sát M3, quản trị chốt nang_cao -> vẫn giữ nhu cầu co_ban', async () => {
       const { hocVien, tenDangNhap, token, dangKy } = await taoHocVien(null);
       await ghiKhaoSat(hocVien.id, 'hoan_thanh', 'M3');
       await chon(token, 'co_ban').expect(200);
@@ -492,8 +529,8 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
       await importMucDauVao(tenDangNhap, 'nang_cao');
       const sau = await docDangKy(dangKy!.id);
       expect(sau.muc_dau_vao).toBe('nang_cao');
-      expect(sau.muc_hoc_chon).toBeNull();
-      expect(sau.muc_hoc_chon_luc).toBeNull();
+      expect(sau.muc_hoc_chon).toBe('co_ban');
+      expect(sau.muc_hoc_chon_luc).not.toBeNull();
     });
 
     it('bài chưa hoàn thành -> 400 "Chưa có kết quả đánh giá đầu vào"', async () => {
@@ -514,7 +551,7 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
       expect(entry.nguon_muc_danh_gia).toBeNull();
     });
 
-    it('chọn thanh_thao theo khảo sát M4, quản trị chốt thanh_thao -> reset NULL, nguồn chot', async () => {
+    it('chọn thanh_thao theo khảo sát M4, quản trị chốt thanh_thao -> giữ nhu cầu, GET trả đủ 3 nguồn', async () => {
       const { hocVien, tenDangNhap, token, dangKy } = await taoHocVien(null);
       await ghiKhaoSat(hocVien.id, 'hoan_thanh', 'M4');
       await chon(token, 'thanh_thao').expect(200);
@@ -523,8 +560,8 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
 
       const sau = await docDangKy(dangKy!.id);
       expect(sau.muc_dau_vao).toBe('thanh_thao');
-      expect(sau.muc_hoc_chon).toBeNull();
-      expect(sau.muc_hoc_chon_luc).toBeNull();
+      expect(sau.muc_hoc_chon).toBe('thanh_thao');
+      expect(sau.muc_hoc_chon_luc).not.toBeNull();
 
       const khoaHoc = await http()
         .get('/hoc-vien/toi/khoa-hoc')
@@ -536,8 +573,11 @@ describe('Điều chỉnh mức lớp học (e2e)', () => {
       expect(entry).toMatchObject({
         muc_danh_gia: 'thanh_thao',
         nguon_muc_danh_gia: 'chot',
-        muc_goc_danh_gia: null,
-        nhan_muc_goc_danh_gia: null,
+        muc_dau_vao: 'thanh_thao',
+        muc_hoc_chon: 'thanh_thao',
+        muc_he_thong: 'nang_cao',
+        muc_goc_danh_gia: 'M4',
+        nhan_muc_goc_danh_gia: expect.stringContaining('M4'),
       });
     });
   });

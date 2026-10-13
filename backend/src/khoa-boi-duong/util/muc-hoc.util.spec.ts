@@ -13,17 +13,17 @@ describe('THU_TU_MUC', () => {
   });
 });
 
+// ADR 0006: mức xếp lớp = mức chốt duy nhất; nhu cầu/kết quả hệ thống không thay thế.
 describe('mucHocHieuLuc', () => {
-  it('chưa chọn -> theo mức đánh giá', () => {
-    expect(mucHocHieuLuc(null, 'nang_cao')).toBe('nang_cao');
-  });
+  it.each(['co_ban', 'thanh_thao', 'nang_cao'] as const)(
+    'đã chốt %s -> đúng mức chốt',
+    (muc) => {
+      expect(mucHocHieuLuc(muc)).toBe(muc);
+    },
+  );
 
-  it('đã chọn -> theo mức đã chọn', () => {
-    expect(mucHocHieuLuc('co_ban', 'nang_cao')).toBe('co_ban');
-  });
-
-  it('chưa có kết quả đánh giá -> null', () => {
-    expect(mucHocHieuLuc(null, null)).toBeNull();
+  it('chưa chốt -> null (chưa xếp lớp)', () => {
+    expect(mucHocHieuLuc(null)).toBeNull();
   });
 });
 

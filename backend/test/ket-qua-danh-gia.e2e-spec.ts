@@ -230,11 +230,15 @@ describe('Import ket_qua_danh_gia — phân mức đầu vào/đầu ra — T5 (
 
   it('học viên ĐÃ ghi danh: import mức đầu vào, sau đó chạy lại đổi mức -> ghi đè đúng cột; không đụng cột còn lại', async () => {
     const { hocVien, tenDangNhap, token } = await taoHocVienMoet();
+    // ADR 0006: nhu cầu học viên (muc_hoc_chon/_luc) phải còn nguyên sau mọi lượt import.
+    const lucChon = new Date('2026-10-01T03:00:00Z');
     await prisma.dang_ky_hoc.create({
       data: {
         hoc_vien_id: hocVien.id,
         khoa_id: khoaId,
         trang_thai: 'da_duyet',
+        muc_hoc_chon: 'co_ban',
+        muc_hoc_chon_luc: lucChon,
       },
     });
 
@@ -288,6 +292,8 @@ describe('Import ket_qua_danh_gia — phân mức đầu vào/đầu ra — T5 (
     });
     expect(dangKy?.muc_dau_vao).toBe('nang_cao');
     expect(dangKy?.muc_dau_ra).toBeNull();
+    expect(dangKy?.muc_hoc_chon).toBe('co_ban');
+    expect(dangKy?.muc_hoc_chon_luc?.getTime()).toBe(lucChon.getTime());
 
     // Lượt 3: loai="dau_ra" -> chỉ set muc_dau_ra, không đụng muc_dau_vao.
     const buffer3 = await buildXlsx([

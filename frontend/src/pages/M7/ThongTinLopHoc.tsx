@@ -131,10 +131,11 @@ function KhoiKhoaHoc({
   };
 
   // 2026-10-08: kết quả đánh giá hiện ngay trong thẻ giai đoạn tương ứng (đầu vào kèm điều chỉnh mức).
+  // ADR 0006: đầu vào hiện 3 nguồn (ChonMucLopHoc) thay cho badge — chỉ giữ link xem bài làm.
   const ketQuaDauVao = (
     <Stack gap="xs">
-      <DongKetQua nhan="Đầu vào" mucChot={muc_dau_vao} bai={baiDauVao} />
       <ChonMucLopHoc dangKy={dangKy} />
+      <ChiTietBaiLam bai={baiDauVao} />
     </Stack>
   );
   const ketQuaDauRa = <DongKetQua nhan="Đầu ra" mucChot={muc_dau_ra} bai={baiDauRa} />;
@@ -218,6 +219,26 @@ function KhuKetQua({ tieuDe, children }: { tieuDe: string; children: ReactNode }
       </Text>
       {children}
     </Box>
+  );
+}
+
+/** Thời điểm hoàn thành + link kết quả chi tiết của bài trên hệ thống khảo sát (không phụ thuộc mức chốt). */
+function ChiTietBaiLam({ bai }: { bai?: TinhTrangBaiKhaoSat }) {
+  if (bai?.trang_thai !== 'hoan_thanh') return null;
+  const hrefChiTiet = chuanHoaLienKet(bai.url_ket_qua);
+  if (!bai.hoan_thanh_luc && !hrefChiTiet) return null;
+  return (
+    <Text size="xs" c="dimmed">
+      {bai.hoan_thanh_luc && <>Hoàn thành bài đánh giá lúc {dinhDangNgayGio(bai.hoan_thanh_luc)}.</>}
+      {hrefChiTiet && (
+        <>
+          {' '}
+          <Anchor href={hrefChiTiet} size="xs">
+            Xem kết quả chi tiết
+          </Anchor>
+        </>
+      )}
+    </Text>
   );
 }
 

@@ -1,21 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { cacMucDuocChon, ghiChuXepLopTheoKhaoSat, mucHocHieuLuc, nhanMucNangLuc } from './mucNangLuc';
+import { cacMucDuocChon, mucHocHieuLuc, nhanKetQuaHeThong, nhanMucNangLuc, nhuCauMucHoc } from './mucNangLuc';
 
-describe('ghiChuXepLopTheoKhaoSat', () => {
-  const dk = (nguon: 'chot' | 'khao_sat' | null, nhan: string | null) => ({
-    muc_danh_gia: 'co_ban' as const,
-    nguon_muc_danh_gia: nguon,
-    nhan_muc_goc_danh_gia: nhan,
+describe('nhanKetQuaHeThong', () => {
+  it('M1 – Chưa đạt -> kèm mức quy đổi Cơ bản', () => {
+    expect(nhanKetQuaHeThong({ muc_he_thong: 'co_ban', nhan_muc_goc_danh_gia: 'M1 – Chưa đạt' })).toBe(
+      'M1 – Chưa đạt (quy đổi: Cơ bản)',
+    );
   });
 
-  it('khảo sát M1 – Chưa đạt -> ghi chú xếp lớp Cơ bản', () => {
-    expect(ghiChuXepLopTheoKhaoSat(dk('khao_sat', 'M1 – Chưa đạt'))).toBe('xếp lớp Cơ bản theo kết quả M1 – Chưa đạt');
+  it('nhãn trùng tên mức -> chỉ nhãn gốc', () => {
+    expect(nhanKetQuaHeThong({ muc_he_thong: 'nang_cao', nhan_muc_goc_danh_gia: 'M4 – Nâng cao' })).toBe('M4 – Nâng cao');
   });
 
-  it('nhãn trùng tên mức lớp, mức chốt hoặc thiếu nhãn -> null', () => {
-    expect(ghiChuXepLopTheoKhaoSat(dk('khao_sat', 'M2 – Cơ bản'))).toBeNull();
-    expect(ghiChuXepLopTheoKhaoSat(dk('chot', 'M1 – Chưa đạt'))).toBeNull();
-    expect(ghiChuXepLopTheoKhaoSat(dk('khao_sat', null))).toBeNull();
+  it('thiếu nhãn gốc -> tên mức quy đổi; chưa có kết quả -> null', () => {
+    expect(nhanKetQuaHeThong({ muc_he_thong: 'thanh_thao', nhan_muc_goc_danh_gia: null })).toBe('Thành thạo');
+    expect(nhanKetQuaHeThong({ muc_he_thong: null, nhan_muc_goc_danh_gia: null })).toBeNull();
   });
 });
 
@@ -37,13 +36,25 @@ describe('cacMucDuocChon', () => {
   });
 });
 
+// ADR 0006: chỉ mức chốt dùng để xếp lớp.
 describe('mucHocHieuLuc', () => {
-  it('chưa tự chọn -> theo mức đánh giá', () => {
-    expect(mucHocHieuLuc({ muc_danh_gia: 'nang_cao', muc_hoc_chon: null })).toBe('nang_cao');
+  it('đã chốt -> đúng mức chốt', () => {
+    expect(mucHocHieuLuc({ muc_dau_vao: 'thanh_thao' })).toBe('thanh_thao');
   });
 
-  it('đã tự chọn -> theo mức đã chọn', () => {
-    expect(mucHocHieuLuc({ muc_danh_gia: 'nang_cao', muc_hoc_chon: 'co_ban' })).toBe('co_ban');
+  it('chưa chốt -> null', () => {
+    expect(mucHocHieuLuc({ muc_dau_vao: null })).toBeNull();
+  });
+});
+
+describe('nhuCauMucHoc', () => {
+  it('đã tự chọn -> mức đã chọn', () => {
+    expect(nhuCauMucHoc({ muc_hoc_chon: 'co_ban', muc_he_thong: 'thanh_thao' })).toBe('co_ban');
+  });
+
+  it('chưa chọn -> theo kết quả hệ thống; không có gì -> null', () => {
+    expect(nhuCauMucHoc({ muc_hoc_chon: null, muc_he_thong: 'nang_cao' })).toBe('nang_cao');
+    expect(nhuCauMucHoc({ muc_hoc_chon: null, muc_he_thong: null })).toBeNull();
   });
 });
 
