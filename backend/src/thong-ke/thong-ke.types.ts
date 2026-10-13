@@ -325,7 +325,7 @@ export interface MucNlsTongHop extends Omit<MucNlsResult, 'loai'> {
  * "Nhu cầu mức học" (2026-10-09) — khác thang với khảo sát NLS (M1..M4): mức đánh giá làm
  * mốc = dang_ky_hoc.muc_dau_vao (admin chốt) ?? mức quy đổi từ bài khảo sát NLS đầu vào ĐÃ
  * hoàn thành (xem muc-hoc.util.ts#mucDanhGiaLamMoc), và muc_hoc_chon (học viên tự chọn mức
- * thấp hơn hoặc bằng mốc, xem muc-hoc.util.ts#mucHocHieuLuc). muc_hoc_chon gắn với TỪNG khóa
+ * thấp hơn hoặc bằng mốc — chỉ là NHU CẦU, xếp lớp theo muc_dau_vao, ADR 0006). muc_hoc_chon gắn với TỪNG khóa
  * (dang_ky_hoc), không phải học viên — đếm theo lượt đăng ký, không khử trùng HV.
  */
 export interface NhuCauMucHocTheoMuc {

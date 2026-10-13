@@ -681,7 +681,8 @@ export interface KhoaHocDangKy {
   ngay_hoan_thanh: string | null;
   muc_dau_vao: MucNangLuc | null;
   muc_dau_ra: MucNangLuc | null;
-  // 2026-10-08: mức lớp học tự chọn (≤ muc_danh_gia); null = học theo mức đánh giá.
+  // ADR 0006: muc_dau_vao = mức chính thức (chốt), chuẩn DUY NHẤT để xếp lớp; null = chưa chốt.
+  // 2026-10-08: nhu cầu học viên tự chọn (≤ mốc); null = học theo kết quả đánh giá. Import không xóa.
   muc_hoc_chon: MucNangLuc | null;
   // Thời điểm điều chỉnh mức gần nhất (UTC ISO); null = chưa điều chỉnh.
   muc_hoc_chon_luc: string | null;
@@ -689,10 +690,11 @@ export interface KhoaHocDangKy {
   // đầu vào đã hoàn thành (M1/M2 cơ bản, M3 thành thạo, M4 nâng cao).
   muc_danh_gia: MucNangLuc | null;
   nguon_muc_danh_gia: NguonMucDanhGia | null;
-  // Mã/nhãn kết quả gốc theo thang khảo sát (vd 'M1' / 'M1 – Chưa đạt') — chỉ có khi nguồn = khao_sat.
-  // Quy đổi M1 -> co_ban chỉ để xếp lớp; kết quả hiển thị luôn giữ nhãn khảo sát.
+  // Kết quả hệ thống: mã/nhãn gốc theo thang khảo sát (vd 'M1' / 'M1 – Chưa đạt') khi bài đánh giá
+  // đã hoàn thành — độc lập với mức chốt (ADR 0006). muc_he_thong = mức quy đổi (M1/M2 cơ bản...).
   muc_goc_danh_gia: string | null;
   nhan_muc_goc_danh_gia: string | null;
+  muc_he_thong: MucNangLuc | null;
   cum_id: string | null;
   khoa: {
     id: string;

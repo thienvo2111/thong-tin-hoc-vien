@@ -640,8 +640,8 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
       expect(lopGan).not.toBeNull();
     });
 
-    // 2026-10-08: so lớp với MỨC HỌC hiệu lực (muc_hoc_chon ?? muc_dau_vao).
-    it('học viên tự điều chỉnh mức -> so với mức đã chọn, câu cảnh báo ghi rõ mức đánh giá gốc', async () => {
+    // ADR 0006: so lớp với MỨC CHỐT (muc_dau_vao) — nhu cầu muc_hoc_chon không dùng để xếp lớp.
+    it('học viên có nhu cầu khác mức chốt -> so với mức chốt', async () => {
       const suf = uniqueSuffix();
       const khoa = await taoKhoa();
       const { hocVien, tenDangNhap } = await taoHocVienMoet(suf);
@@ -698,18 +698,16 @@ describe('Import lop_va_lich_hoc — thuộc tính lớp, lịch nhiều buổi 
         return ketQua.body;
       };
 
-      // Lớp thành thạo (= mức đánh giá) nhưng học viên đã chọn cơ bản -> cảnh báo.
-      const lechMuc = await preview(tenLopThanhThao);
+      // Lớp cơ bản (= nhu cầu) nhưng mức chốt thành thạo -> cảnh báo theo mức chốt.
+      const lechMuc = await preview(tenLopCoBan);
       expect(lechMuc.danh_sach_canh_bao).toHaveLength(1);
       expect(lechMuc.danh_sach_canh_bao[0].ly_do).toEqual(
-        expect.stringContaining('mức học "co_ban"'),
+        expect.stringContaining('mức học "thanh_thao"'),
       );
-      expect(lechMuc.danh_sach_canh_bao[0].ly_do).toEqual(
-        expect.stringContaining('tự điều chỉnh từ "thanh_thao"'),
-      );
+      expect(lechMuc.danh_sach_canh_bao[0].ly_do).not.toContain('tự điều chỉnh');
 
-      // Lớp cơ bản khớp mức đã chọn -> không cảnh báo.
-      const khopMuc = await preview(tenLopCoBan);
+      // Lớp thành thạo khớp mức chốt -> không cảnh báo mức.
+      const khopMuc = await preview(tenLopThanhThao);
       expect(khopMuc.so_dong_loi).toBe(0);
       // (cảnh báo lớp không có buổi trong giai đoạn vẫn có — không liên quan mức)
       const lyDo = (khopMuc.danh_sach_canh_bao as { ly_do: string }[])

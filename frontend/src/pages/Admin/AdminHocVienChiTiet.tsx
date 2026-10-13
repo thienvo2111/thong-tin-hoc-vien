@@ -22,10 +22,10 @@ import {
   useKhoaHocCuaHocVien,
 } from '@/api/khoaBoiDuong';
 import type { KhoaHocDangKy, MucNangLuc } from '@/api/types';
-import { cacMucDuocChon, mucHocHieuLuc, nhanMucNangLuc } from '@/lib/mucNangLuc';
+import { cacMucDuocChon, nhanMucNangLuc, nhuCauMucHoc } from '@/lib/mucNangLuc';
+import { CacNguonMucHoc } from '@/components/CacNguonMucHoc';
 import { loiFieldsThanhMap, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { chuanHoaNfc } from '@/lib/nfc';
-import { dinhDangNgayGio } from '@/lib/ngay';
 import { nhanCuaTruong } from '@/lib/nhanTruong';
 import { TrangThaiBadge } from '@/components/TrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
@@ -518,32 +518,22 @@ function KhoiDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHocD
   );
 }
 
-// 2026-10-08: mức lớp học hiệu lực (tự chọn ?? đánh giá). Quản trị sửa hộ — bỏ qua công tắc khóa nhưng
-// chỉ chọn được mức đánh giá làm mốc hoặc thấp hơn 1 mức (chốt ?? khảo sát, 2026-10-09; backend kiểm lại).
+// ADR 0006: hiện 3 nguồn mức (hệ thống / nhu cầu / chốt); xếp lớp chỉ theo mức chốt. Quản trị sửa hộ NHU CẦU
+// (bỏ qua công tắc khóa) chỉ khi chưa chốt, trong phạm vi mốc hệ thống hoặc thấp hơn 1 mức (backend kiểm lại).
 function MucHocDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHocDangKy }) {
   const { nguoiDung } = useToi();
   const capNhatMuc = useCapNhatMucHoc(hocVienId);
-  const mucHoc = mucHocHieuLuc(dangKy);
-  const cacMuc = cacMucDuocChon(dangKy.muc_danh_gia);
+  const moc = dangKy.muc_he_thong;
+  const nhuCau = nhuCauMucHoc(dangKy);
+  const cacMuc = cacMucDuocChon(moc);
   // Lựa chọn cũ thấp hơn 2 mức không còn trong danh sách -> chọn sẵn mốc.
-  const [chonMuc, setChonMuc] = useState<string>(
-    mucHoc && cacMuc.includes(mucHoc) ? mucHoc : (dangKy.muc_danh_gia ?? ''),
-  );
-
-  const mucDanhGia = dangKy.muc_danh_gia;
-  if (!mucDanhGia) {
-    return (
-      <Text fz="sm" c="dimmed">
-        Mức lớp học: chưa có kết quả đánh giá đầu vào
-      </Text>
-    );
-  }
+  const [chonMuc, setChonMuc] = useState<string>(nhuCau && cacMuc.includes(nhuCau) ? nhuCau : (moc ?? ''));
 
   function luuMuc() {
     capNhatMuc.mutate(
       { dangKyHocId: dangKy.id, muc: chonMuc as MucNangLuc },
       {
-        onSuccess: () => notifications.show({ color: 'green', message: 'Đã lưu mức lớp học' }),
+        onSuccess: () => notifications.show({ color: 'green', message: 'Đã lưu nhu cầu mức lớp học' }),
         onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
       },
     );
@@ -551,28 +541,19 @@ function MucHocDangKy({ hocVienId, dangKy }: { hocVienId: string; dangKy: KhoaHo
 
   return (
     <Stack gap={4} data-testid="dong-muc-hoc">
-      <Text fz="sm">
-        Mức lớp học: <b>{nhanMucNangLuc(mucHoc)}</b>
-        {dangKy.muc_hoc_chon && <> (học viên tự điều chỉnh từ {nhanMucNangLuc(mucDanhGia)})</>}
-      </Text>
-      {dangKy.nguon_muc_danh_gia === 'khao_sat' && (
+      <CacNguonMucHoc dangKy={dangKy} />
+      {dangKy.muc_dau_vao && (
         <Text fz="xs" c="dimmed">
-          Kết quả: {dangKy.nhan_muc_goc_danh_gia ?? nhanMucNangLuc(mucDanhGia)} (khảo sát, chưa chốt) → xếp lớp{' '}
-          {nhanMucNangLuc(mucDanhGia)}
+          Mức đã được chốt
         </Text>
       )}
-      {dangKy.muc_hoc_chon_luc && (
-        <Text fz="xs" c="dimmed">
-          Đã điều chỉnh lúc {dinhDangNgayGio(dangKy.muc_hoc_chon_luc)}
-        </Text>
-      )}
-      {nguoiDung?.vai_tro === 'quan_tri' && (
+      {nguoiDung?.vai_tro === 'quan_tri' && !dangKy.muc_dau_vao && moc && (
         <Group gap="sm" wrap="wrap" align="flex-end">
           <Select
-            label="Sửa mức lớp học"
+            label="Sửa nhu cầu mức lớp học"
             data={cacMuc.map((m) => ({
               value: m,
-              label: m === mucDanhGia ? `${nhanMucNangLuc(m)} (theo kết quả đánh giá)` : nhanMucNangLuc(m),
+              label: m === moc ? `${nhanMucNangLuc(m)} (theo kết quả đánh giá)` : nhanMucNangLuc(m),
             }))}
             value={chonMuc}
             onChange={(v) => setChonMuc(v ?? '')}

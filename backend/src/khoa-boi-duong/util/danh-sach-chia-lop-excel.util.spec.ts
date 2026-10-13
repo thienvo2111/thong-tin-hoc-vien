@@ -48,8 +48,7 @@ const coBan = hocVien({
   ho_ten: 'Lê Thị A',
   ma_dinh_danh_moet: '1000000002',
   ten_truong: 'Trường A',
-  muc_hoc_chon: 'co_ban',
-  muc_dau_vao: 'nang_cao',
+  muc_dau_vao: 'co_ban',
 });
 const chuaDuyet = hocVien({
   ho_ten: 'Chưa Duyệt C',
@@ -179,6 +178,115 @@ describe('buildDanhSachChiaLopWorkbook', () => {
       expect(r.values.ten_cum).toBe('');
       expect(Object.keys(r.values).some((k) => k.startsWith('#'))).toBe(false);
     }
+  });
+
+  // ADR 0006: tách 3 nguồn mức; chỉ "Mức chính thức (chốt)" = muc_dau_vao dùng để xếp lớp.
+  describe('3 nguồn mức', () => {
+    const baiM4 = {
+      trang_thai: 'hoan_thanh' as const,
+      muc: null,
+      muc_goc: 'M4',
+      diem: 9,
+      diem_toi_da: 10,
+      hoan_thanh_luc: new Date('2026-10-01T03:00:00Z'),
+    };
+    const chuaChot = hocVien({
+      ho_ten: 'Chưa Chốt',
+      ma_dinh_danh_moet: '3000000001',
+      bai_dau_vao: baiM4,
+      muc_hoc_chon: 'thanh_thao',
+      muc_hoc_chon_luc: new Date('2026-10-02T03:00:00Z'),
+    });
+    const daChot = hocVien({
+      ho_ten: 'Đã Chốt',
+      ma_dinh_danh_moet: '3000000002',
+      bai_dau_vao: baiM4,
+      muc_hoc_chon: 'thanh_thao',
+      muc_dau_vao: 'co_ban',
+    });
+
+    async function dongTheoTen(buf: Buffer) {
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+      const sheet = wb.getWorksheet('Phân lớp')!;
+      const header = await layHeader(buf, 'Phân lớp');
+      const cot = (ten: string) => header.indexOf(ten) + 1;
+      const theoTen = new Map<string, (ten: string) => unknown>();
+      sheet.eachRow((row, i) => {
+        if (i === 1) return;
+        theoTen.set(String(row.getCell(cot('# Họ tên')).value), (ten) =>
+          row.getCell(cot(ten)).value ?? '',
+        );
+      });
+      return { header, theoTen, wb };
+    }
+
+    it('header có 3 cột mức rõ nguồn, bỏ "# Nguồn mức"/"# Mức học" cũ', async () => {
+      const buf = await buildDanhSachChiaLopWorkbook('K1', giaiDoan, lopHoc, [daChot], THANG_MUC_MAC_DINH);
+      const header = await layHeader(buf, 'Phân lớp');
+      expect(header).toEqual(
+        expect.arrayContaining([
+          '# Mức hệ thống (quy đổi)',
+          '# Mức học viên chọn (nhu cầu)',
+          '# Mức chính thức (chốt)',
+        ]),
+      );
+      expect(header).not.toContain('# Nguồn mức');
+      expect(header).not.toContain('# Mức học');
+      expect(header).not.toContain('# Mức đánh giá (mốc)');
+    });
+
+    it('mức chính thức = muc_dau_vao; chưa chốt thì để trống dù học viên đã chọn', async () => {
+      const buf = await buildDanhSachChiaLopWorkbook(
+        'K1',
+        giaiDoan,
+        lopHoc,
+        [chuaChot, daChot],
+        THANG_MUC_MAC_DINH,
+      );
+      const { theoTen } = await dongTheoTen(buf);
+      const a = theoTen.get('Chưa Chốt')!;
+      expect(a('# Mức hệ thống (quy đổi)')).toBe('Nâng cao');
+      expect(a('# Mức học viên chọn (nhu cầu)')).toBe('Thành thạo');
+      expect(a('# Mức chính thức (chốt)')).toBe('');
+      const b = theoTen.get('Đã Chốt')!;
+      expect(b('# Mức hệ thống (quy đổi)')).toBe('Nâng cao');
+      expect(b('# Mức học viên chọn (nhu cầu)')).toBe('Thành thạo');
+      expect(b('# Mức chính thức (chốt)')).toBe('Cơ bản');
+    });
+
+    it('sheet tổng hợp đếm theo mức chốt; chưa chốt vào nhóm "Chưa chốt mức"', async () => {
+      const buf = await buildDanhSachChiaLopWorkbook(
+        'K1',
+        giaiDoan,
+        lopHoc,
+        [chuaChot, daChot],
+        THANG_MUC_MAC_DINH,
+      );
+      const { wb } = await dongTheoTen(buf);
+      const sheet3 = wb.getWorksheet('Tổng hợp theo mức học')!;
+      const dem = new Map<string, unknown>();
+      sheet3.eachRow((row) => dem.set(String(row.getCell(1).value), row.getCell(2).value));
+      expect(dem.get('Cơ bản')).toBe(1);
+      expect(dem.get('Thành thạo')).toBe(0);
+      expect(dem.get('Nâng cao')).toBe(0);
+      expect(dem.get('Chưa chốt mức')).toBe(1);
+    });
+
+    it('round-trip vẫn đọc được với cột mức mới', async () => {
+      const buf = await buildDanhSachChiaLopWorkbook(
+        'K1',
+        giaiDoan,
+        lopHoc,
+        [chuaChot, daChot],
+        THANG_MUC_MAC_DINH,
+      );
+      const { rows } = await readPhanLopWorkbook(buf, new Set([1, 2]));
+      expect(rows.map((r) => r.values.ma_dinh_danh_moet).sort()).toEqual([
+        '3000000001',
+        '3000000002',
+      ]);
+    });
   });
 
   describe('2026-10-10: nhân viên không xếp lớp', () => {

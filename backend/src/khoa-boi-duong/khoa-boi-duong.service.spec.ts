@@ -868,19 +868,19 @@ describe('KhoaBoiDuongService', () => {
       expect(canhBao).toBeUndefined();
     });
 
-    it('chưa chốt mức, có bài đánh giá M4 + tự chọn thanh_thao -> cảnh báo theo mức hiệu lực', async () => {
-      prisma.lop_hoc.findMany.mockResolvedValue([
-        {
-          id: 'lop-zoom',
-          ten_lop: 'Lớp Zoom',
-          loai_lop: 'zoom',
-          muc_nang_luc: 'nang_cao',
-        },
-      ]);
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
-        muc_dau_vao: null,
-        muc_hoc_chon: 'thanh_thao',
-      });
+    // ADR 0006: so lớp với mức CHỐT — nhu cầu/kết quả hệ thống không dùng để xếp lớp.
+    const lopZoomNangCao = [
+      {
+        id: 'lop-zoom',
+        ten_lop: 'Lớp Zoom',
+        loai_lop: 'zoom',
+        muc_nang_luc: 'nang_cao',
+      },
+    ];
+
+    it('chưa chốt mức (dù có bài M4) -> cảnh báo "chưa có mức chốt đầu vào"', async () => {
+      prisma.lop_hoc.findMany.mockResolvedValue(lopZoomNangCao);
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({ muc_dau_vao: null });
       prisma.ket_qua_khao_sat.findUnique.mockResolvedValue({
         trang_thai: 'hoan_thanh',
         muc: null,
@@ -890,9 +890,34 @@ describe('KhoaBoiDuongService', () => {
         { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': 'Lớp Zoom' },
         khoa,
       );
-      expect(canhBao).toContain(
-        '"thanh_thao" (học viên tự điều chỉnh từ "nang_cao")',
+      expect(canhBao).toContain('chưa có mức chốt đầu vào');
+    });
+
+    it('đã chốt thanh_thao, lớp nang_cao -> cảnh báo lệch theo mức chốt', async () => {
+      prisma.lop_hoc.findMany.mockResolvedValue(lopZoomNangCao);
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        muc_dau_vao: 'thanh_thao',
+      });
+      const { canhBao } = await service.resolvePhanLopRow(
+        { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': 'Lớp Zoom' },
+        khoa,
       );
+      expect(canhBao).toContain(
+        'có mức học "thanh_thao" khác mức năng lực "nang_cao"',
+      );
+      expect(canhBao).not.toContain('tự điều chỉnh');
+    });
+
+    it('đã chốt đúng mức lớp -> không cảnh báo mức', async () => {
+      prisma.lop_hoc.findMany.mockResolvedValue(lopZoomNangCao);
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        muc_dau_vao: 'nang_cao',
+      });
+      const { canhBao } = await service.resolvePhanLopRow(
+        { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': 'Lớp Zoom' },
+        khoa,
+      );
+      expect(canhBao ?? '').not.toContain('mức');
     });
 
     it('commitPhanLop: gán lớp trực tiếp -> upsert phan_lop_giai_doan, da_phan_lop, gửi email', async () => {
@@ -1737,16 +1762,15 @@ describe('KhoaBoiDuongService', () => {
       expect(nhatKy.ghi).not.toHaveBeenCalled();
     });
 
-    // 2026-10-09: chỉ giữ muc_hoc_chon khi vẫn thấp hơn ĐÚNG 1 mức so với mốc mới.
+    // ADR 0006: nhập mức chốt KHÔNG xóa nhu cầu học viên, bất kể chênh lệch.
     it.each([
-      ['co_ban', 'nang_cao', true], // thấp hơn 2 mức -> reset
-      ['thanh_thao', 'thanh_thao', true], // bằng -> reset
-      ['thanh_thao', 'co_ban', true], // cao hơn -> reset
-      ['thanh_thao', 'nang_cao', false], // thấp hơn 1 mức -> giữ
-      ['co_ban', 'thanh_thao', false], // thấp hơn 1 mức -> giữ
+      ['co_ban', 'nang_cao'], // thấp hơn 2 mức
+      ['thanh_thao', 'thanh_thao'], // bằng
+      ['thanh_thao', 'co_ban'], // cao hơn
+      ['thanh_thao', 'nang_cao'], // thấp hơn 1 mức
     ] as const)(
-      'import đầu vào: muc_hoc_chon %s, mốc mới %s -> reset=%s',
-      async (mucChon, mucMoi, reset) => {
+      'import đầu vào: muc_hoc_chon %s, mức chốt mới %s -> chỉ ghi muc_dau_vao',
+      async (mucChon, mucMoi) => {
         prisma.dang_ky_hoc.findUnique.mockResolvedValue({
           muc_dau_vao: null,
           muc_dau_ra: null,
@@ -1760,17 +1784,25 @@ describe('KhoaBoiDuongService', () => {
           muc: mucMoi,
         });
         const data = prisma.dang_ky_hoc.update.mock.calls[0][0].data;
-        expect(data.muc_dau_vao).toBe(mucMoi);
-        if (reset) {
-          expect(data).toMatchObject({
-            muc_hoc_chon: null,
-            muc_hoc_chon_luc: null,
-          });
-        } else {
-          expect(data).not.toHaveProperty('muc_hoc_chon');
-        }
+        expect(data).toEqual({ muc_dau_vao: mucMoi });
       },
     );
+
+    it('import đầu ra chỉ ghi muc_dau_ra', async () => {
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        muc_dau_vao: 'co_ban',
+        muc_dau_ra: null,
+        khoa: { ten_khoa: 'Khóa A' },
+      });
+      await service.commitKetQuaDanhGia({
+        hoc_vien_id: 'hv-1',
+        khoa_id: 'khoa-1',
+        loai: 'dau_ra',
+        muc: 'thanh_thao',
+      });
+      const data = prisma.dang_ky_hoc.update.mock.calls[0][0].data;
+      expect(data).toEqual({ muc_dau_ra: 'thanh_thao' });
+    });
 
     it('nhập file phân lớp đổi lớp -> ghi lớp cũ → lớp mới', async () => {
       prisma.dang_ky_hoc.findUnique.mockResolvedValue({
@@ -1922,9 +1954,10 @@ describe('KhoaBoiDuongService', () => {
         bai('hoan_thanh', 'M4'),
       );
       const res = await service.capNhatMucHocDangKy('dk-1', 'thanh_thao');
+      // muc_hoc = mức chính thức (chốt) — chưa chốt nên null.
       expect(res).toMatchObject({
         muc_hoc_chon: 'thanh_thao',
-        muc_hoc: 'thanh_thao',
+        muc_hoc: null,
       });
       expect(nhatKy.ghi).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1950,6 +1983,42 @@ describe('KhoaBoiDuongService', () => {
           data: expect.objectContaining({ muc_hoc_chon: null }),
         }),
       );
+    });
+
+    // ADR 0006: đã có mức chốt -> khóa điều chỉnh (cả HV lẫn Quản trị), không ghi gì.
+    it.each(['co_ban', 'thanh_thao', 'nang_cao', null] as const)(
+      'đã chốt muc_dau_vao -> chọn %s bị chặn "Đã có mức chính thức (chốt)"',
+      async (muc) => {
+        prisma.dang_ky_hoc.findUnique.mockResolvedValue(
+          dangKy('nang_cao', 'thanh_thao'),
+        );
+        await expect(
+          service.capNhatMucHocDangKy('dk-1', muc),
+        ).rejects.toMatchObject({
+          response: {
+            error: {
+              message: 'Đã có mức chính thức (chốt), không thể điều chỉnh mức',
+            },
+          },
+        });
+        expect(prisma.dang_ky_hoc.update).not.toHaveBeenCalled();
+        expect(nhatKy.ghi).not.toHaveBeenCalled();
+      },
+    );
+
+    it('chonMucHoc (học viên, khóa mở điều chỉnh): đã chốt -> ValidationException', async () => {
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
+        ...dangKy('thanh_thao'),
+        khoa: { ten_khoa: 'Khóa A', mo_dieu_chinh_muc: true },
+      });
+      await expect(
+        service.chonMucHoc(
+          { ...truong, vai_tro: 'hoc_vien', hoc_vien_id: 'hv-1' },
+          'khoa-1',
+          'co_ban',
+        ),
+      ).rejects.toBeInstanceOf(ValidationException);
+      expect(prisma.dang_ky_hoc.update).not.toHaveBeenCalled();
     });
 
     it('khảo sát M3 + chọn nang_cao -> ValidationException', async () => {
@@ -2008,14 +2077,43 @@ describe('KhoaBoiDuongService', () => {
         ['co_ban', 'chot'],
       ]);
       expect(prisma.ket_qua_khao_sat.findUnique).toHaveBeenCalledTimes(1);
-      // Mã/nhãn gốc chỉ trả khi mốc lấy từ khảo sát.
-      expect(res[0]).toMatchObject({
-        muc_goc_danh_gia: 'M4',
-        nhan_muc_goc_danh_gia: 'M4 – Nâng cao',
+      // ADR 0006: kết quả hệ thống trả độc lập với mức chốt.
+      for (const r of res) {
+        expect(r).toMatchObject({
+          muc_goc_danh_gia: 'M4',
+          nhan_muc_goc_danh_gia: 'M4 – Nâng cao',
+          muc_he_thong: 'nang_cao',
+        });
+      }
+      expect(res[1].muc_dau_vao).toBe('co_ban');
+    });
+
+    it('mọi đăng ký đã chốt -> vẫn tra bài hệ thống; bài chưa hoàn thành -> không có kết quả hệ thống', async () => {
+      prisma.dang_ky_hoc.findMany.mockResolvedValue([
+        {
+          id: 'dk-1',
+          hoc_vien_id: 'hv-1',
+          muc_dau_vao: 'thanh_thao',
+          khoa: { id: 'khoa-1', giai_doan: [] },
+          cum: null,
+          phan_lop_giai_doan: [],
+        },
+      ]);
+      prisma.ket_qua_khao_sat.findUnique.mockResolvedValue(
+        bai('dang_lam', 'M4'),
+      );
+      const res = await service.khoaHocCuaToi({
+        ...truong,
+        vai_tro: 'hoc_vien',
+        hoc_vien_id: 'hv-1',
       });
-      expect(res[1]).toMatchObject({
+      expect(prisma.ket_qua_khao_sat.findUnique).toHaveBeenCalledTimes(1);
+      expect(res[0]).toMatchObject({
         muc_goc_danh_gia: null,
         nhan_muc_goc_danh_gia: null,
+        muc_he_thong: null,
+        muc_danh_gia: 'thanh_thao',
+        nguon_muc_danh_gia: 'chot',
       });
     });
 

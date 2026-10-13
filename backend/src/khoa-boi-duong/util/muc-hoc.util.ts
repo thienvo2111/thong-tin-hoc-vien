@@ -1,8 +1,11 @@
 import type { muc_nang_luc } from '@prisma/client';
 
-// Điều chỉnh mức lớp học (2026-10-08): học viên chỉ được chọn mức BẰNG hoặc
-// THẤP HƠN mức đánh giá làm mốc — sửa 2026-10-09: thấp hơn ĐÚNG 1 mức.
-// Mức học hiệu lực = muc_hoc_chon ?? mốc.
+// 3 nguồn mức đầu vào của 1 đăng ký học (ADR 0006, 2026-10-13):
+//  1. Kết quả hệ thống — bài khảo sát loai 'danh-gia' (M1..M4, quy đổi bên dưới).
+//  2. Nhu cầu học viên — muc_hoc_chon: chọn BẰNG hoặc THẤP HƠN ĐÚNG 1 mức so
+//     với mốc (2026-10-08/09); chỉ là nguyện vọng, import không xóa.
+//  3. Mức chính thức (chốt) — muc_dau_vao do Quản trị nhập ket_qua_danh_gia:
+//     chuẩn DUY NHẤT để xếp lớp. Đã chốt thì khóa tự điều chỉnh.
 export const THU_TU_MUC: Record<muc_nang_luc, number> = {
   co_ban: 1,
   thanh_thao: 2,
@@ -35,7 +38,10 @@ export function mucTuKetQuaKhaoSat(kq: {
 
 export type NguonMucDanhGia = 'chot' | 'khao_sat';
 
-/** Mức đánh giá làm mốc = muc_dau_vao (quản trị chốt) ?? mức quy đổi từ bài đầu vào ĐÃ hoàn thành. */
+/**
+ * Mức đánh giá làm mốc = muc_dau_vao (quản trị chốt) ?? mức quy đổi từ bài đầu vào ĐÃ hoàn thành.
+ * Chỉ để hiển thị/làm mốc chọn nhu cầu — KHÔNG dùng để xếp lớp (xem mucHocHieuLuc).
+ */
 export function mucDanhGiaLamMoc(
   mucDauVao: muc_nang_luc | null,
   baiDauVao: {
@@ -50,11 +56,11 @@ export function mucDanhGiaLamMoc(
   return muc ? { muc, nguon: 'khao_sat' } : { muc: null, nguon: null };
 }
 
+/** Mức học hiệu lực (xếp lớp) = mức chốt muc_dau_vao; chưa chốt -> null (chưa xếp lớp). */
 export function mucHocHieuLuc(
-  mucHocChon: muc_nang_luc | null,
-  mucDanhGia: muc_nang_luc | null,
+  mucDauVao: muc_nang_luc | null,
 ): muc_nang_luc | null {
-  return mucHocChon ?? mucDanhGia;
+  return mucDauVao;
 }
 
 /** Được chọn mức bằng mốc hoặc thấp hơn đúng 1 mức (nang_cao→thanh_thao, thanh_thao→co_ban). */
