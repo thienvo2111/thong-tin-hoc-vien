@@ -12,10 +12,12 @@ import { DonViCongTacService } from '../danh-muc/don-vi-cong-tac/don-vi-cong-tac
 import { MonHocService } from '../danh-muc/mon-hoc/mon-hoc.service';
 import { HocVienService } from '../hoc-vien/hoc-vien.service';
 import {
+  BoNhoKetQuaDanhGia,
   BoNhoPhanLop,
   KhoaBoiDuongService,
   taoBoNhoPhanLop,
 } from '../khoa-boi-duong/khoa-boi-duong.service';
+import { chaySongSongGioiHan, chiaLo } from '../common/utils/theo-lo.util';
 import { DotXacNhanService } from '../dot-xac-nhan/dot-xac-nhan.service';
 import { CreateDiaDanhDto } from '../danh-muc/dto/dia-danh.dto';
 import { CreateDonViCongTacDto } from '../danh-muc/dto/don-vi-cong-tac.dto';
@@ -96,6 +98,13 @@ interface KetQuaKhaoSatRowDto {
 }
 import { encryptVleMatKhau } from '../common/utils/vle-crypto.util';
 import { LichSuImportQueryDto } from './dto/lich-su-import-query.dto';
+
+// ket_qua_danh_gia: dữ liệu nạp sẵn cả file + tập hoc_vien_id cần cảnh báo
+// lách cổng (undefined = không tính, bước xác nhận).
+interface BoNhoKqdgImport {
+  lo: BoNhoKetQuaDanhGia;
+  lachCong?: Set<string>;
+}
 
 // Dịch vụ Import — docs/api-contract.md mục 5. Cả 5 loại đã triển khai:
 // dia_danh / don_vi_cong_tac / mon_hoc / ho_so_nhan_su_moet (lượt trước) +
@@ -274,6 +283,16 @@ export class ImportService {
     const dupKeys = new Set<string>();
     // phan_lop_hoc_vien: tra lớp/cảnh báo 1 lần cho cả lượt (xem BoNhoPhanLop).
     const boNho = taoBoNhoPhanLop();
+    const boNhoKqdg =
+      loai === 'ket_qua_danh_gia'
+        ? await this.napLoKetQuaDanhGia(
+            this.valuesDeNapLo(
+              rows.map((r) => r.values),
+              maKhoa,
+            ),
+            true,
+          )
+        : undefined;
 
     for (const row of rows) {
       const apDung = this.apDungMaKhoaMacDinh(row.values, maKhoa);
@@ -287,6 +306,7 @@ export class ImportService {
         dupKeys,
         phanLop?.khoa,
         boNho,
+        boNhoKqdg,
       );
       if (error || !dto) {
         danhSachLoi.push({
@@ -439,6 +459,18 @@ export class ImportService {
     // phan_lop_hoc_vien: tra lớp/cảnh báo 1 lần cho cả lượt (xem BoNhoPhanLop).
     const boNho = taoBoNhoPhanLop();
     const taiKhoanDaTao: TaiKhoanDonViDaTao[] = [];
+    const boNhoKqdg =
+      loai === 'ket_qua_danh_gia'
+        ? await this.napLoKetQuaDanhGia(
+            this.valuesDeNapLo(
+              ketQuaCu.dong_hop_le.flatMap((d) => rowsByDong.get(d) ?? []),
+              ketQuaCu.ma_khoa_mac_dinh,
+            ),
+            false,
+          )
+        : undefined;
+    // ket_qua_danh_gia ghi gộp sau vòng lặp (commitKetQuaDanhGiaLo).
+    const choGhiKqdg: { dong: number; dto: KetQuaDanhGiaRowDto }[] = [];
 
     for (const dong of ketQuaCu.dong_hop_le) {
       const values = rowsByDong.get(dong);
@@ -463,12 +495,17 @@ export class ImportService {
         dupKeys,
         phanLop?.khoa,
         boNho,
+        boNhoKqdg,
       );
       if (error || !dto) {
         danhSachLoiMoi.push({
           dong,
           ly_do: error ?? 'Không dựng được dữ liệu dòng',
         });
+        continue;
+      }
+      if (loai === 'ket_qua_danh_gia') {
+        choGhiKqdg.push({ dong, dto: dto as KetQuaDanhGiaRowDto });
         continue;
       }
       try {
@@ -484,6 +521,20 @@ export class ImportService {
         soDongThanhCong++;
       } catch (e) {
         danhSachLoiMoi.push({ dong, ly_do: toRowErrorMessage(e) });
+      }
+    }
+    if (choGhiKqdg.length > 0) {
+      try {
+        await this.khoaBoiDuongService.commitKetQuaDanhGiaLo(
+          choGhiKqdg.map((c) => c.dto),
+          boNhoKqdg?.lo,
+        );
+        soDongThanhCong += choGhiKqdg.length;
+      } catch (e) {
+        const lyDo = toRowErrorMessage(e);
+        choGhiKqdg.forEach(({ dong }) =>
+          danhSachLoiMoi.push({ dong, ly_do: lyDo }),
+        );
       }
     }
 
@@ -772,6 +823,17 @@ export class ImportService {
     return maKhoa;
   }
 
+  // Giá trị các dòng (đã gán khóa mặc định) để nạp lô ket_qua_danh_gia.
+  private valuesDeNapLo(
+    values: Record<string, string>[],
+    maKhoa?: string,
+  ): Record<string, string>[] {
+    return values.flatMap((v) => {
+      const apDung = this.apDungMaKhoaMacDinh(v, maKhoa);
+      return 'error' in apDung ? [] : [apDung.values];
+    });
+  }
+
   // Dòng để trống ma_khoa -> gán khóa mặc định; dòng ghi khóa KHÁC -> lỗi
   // dòng (chặn import nhầm sang khóa khác từ trang chi tiết khóa). Không có
   // khóa mặc định -> giữ nguyên hành vi cũ.
@@ -978,6 +1040,7 @@ export class ImportService {
     dupKeys?: Set<string>,
     khoaPhanLop?: Parameters<KhoaBoiDuongService['resolvePhanLopRow']>[1],
     boNho?: BoNhoPhanLop,
+    boNhoKqdg?: BoNhoKqdgImport,
   ): Promise<
     RowBuildResult<
       | CreateDiaDanhDto
@@ -1030,15 +1093,18 @@ export class ImportService {
             loai: raw.loai,
             muc: raw.muc,
           },
+          boNhoKqdg?.lo,
         );
         if (resolved.error || !resolved.dto) return resolved;
+        if (!boNhoKqdg?.lachCong?.has(resolved.dto.hoc_vien_id)) {
+          return { dto: resolved.dto };
+        }
         const ma =
           raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
-        const canhBao = await this.canhBaoLachCongDanhGia(
-          resolved.dto.hoc_vien_id,
-          ma ?? '',
-        );
-        return { dto: resolved.dto, canhBao };
+        return {
+          dto: resolved.dto,
+          canhBao: `Học viên "${ma ?? ''}" có kết quả đánh giá nhưng CHƯA đủ điều kiện làm đánh giá đầu vào tại thời điểm import (chưa xác nhận đợt xác nhận trước đánh giá hoặc hồ sơ chưa đầy đủ) — kiểm tra khả năng lách cổng`,
+        };
       }
       case 'lop_va_lich_hoc':
         return this.khoaBoiDuongService.resolveLopVaLichHocRow(
@@ -1115,21 +1181,45 @@ export class ImportService {
   // xác nhận CÒN HIỆU LỰC ở đợt xac_nhan_truoc_danh_gia VÀ day_du=true, cả 2
   // TẠI THỜI ĐIỂM IMPORT) -> cảnh báo 🟡 không chặn dòng, giúp N1 phát hiện
   // trường hợp lách cổng (dùng VLE dù chưa được phép).
-  private async canhBaoLachCongDanhGia(
-    hocVienId: string,
-    ma: string,
-  ): Promise<string | undefined> {
-    const hocVien = await this.prisma.hoc_vien.findUnique({
-      where: { id: hocVienId },
-      include: { chuyen_mon: true },
+  //
+  // Tính theo lô cho cả file: chưa xác nhận -> cảnh báo luôn (không cần
+  // day_du); có xác nhận mới chạy danhGiaDayDu, song song có giới hạn.
+  // Chỉ bước kiểm tra cần (bước xác nhận bỏ qua cảnh báo) -> tinhCanhBao.
+  private async napLoKetQuaDanhGia(
+    values: Record<string, string>[],
+    tinhCanhBao: boolean,
+  ): Promise<BoNhoKqdgImport> {
+    const lo = await this.khoaBoiDuongService.napLoKetQuaDanhGia(values);
+    if (!tinhCanhBao) return { lo };
+
+    const ids = new Set<string>();
+    for (const v of values) {
+      const { hocVien } = await lo.traHocVien(v);
+      if (hocVien) ids.add(hocVien.id);
+    }
+    const daXacNhan =
+      await this.dotXacNhanService.hocVienCoXacNhanTruocDanhGiaConHieuLuc([
+        ...ids,
+      ]);
+    const hocViens: Prisma.hoc_vienGetPayload<{
+      include: { chuyen_mon: true };
+    }>[] = [];
+    for (const phan of chiaLo([...daXacNhan])) {
+      hocViens.push(
+        ...(await this.prisma.hoc_vien.findMany({
+          where: { id: { in: phan } },
+          include: { chuyen_mon: true },
+        })),
+      );
+    }
+    const dayDu = new Set<string>();
+    await chaySongSongGioiHan(hocViens, 8, async (hv) => {
+      if ((await this.hocVienService.danhGiaDayDu(hv)).day_du) dayDu.add(hv.id);
     });
-    if (!hocVien) return undefined;
-    const [{ day_du }, daXacNhan] = await Promise.all([
-      this.hocVienService.danhGiaDayDu(hocVien),
-      this.dotXacNhanService.coXacNhanTruocDanhGiaConHieuLuc(hocVienId),
-    ]);
-    if (day_du && daXacNhan) return undefined;
-    return `Học viên "${ma}" có kết quả đánh giá nhưng CHƯA đủ điều kiện làm đánh giá đầu vào tại thời điểm import (chưa xác nhận đợt xác nhận trước đánh giá hoặc hồ sơ chưa đầy đủ) — kiểm tra khả năng lách cổng`;
+    return {
+      lo,
+      lachCong: new Set([...ids].filter((id) => !dayDu.has(id))),
+    };
   }
 
   // Tài khoản đơn vị (ADR 0002): tra đơn vị theo ma_don_vi (trim, không phân

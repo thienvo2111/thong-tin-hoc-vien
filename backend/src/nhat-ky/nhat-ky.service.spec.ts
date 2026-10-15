@@ -97,6 +97,88 @@ describe('NhatKyService', () => {
     });
   });
 
+  describe('ghiNhieu (import file lớn)', () => {
+    beforeEach(() => {
+      prisma.nhat_ky_hoat_dong.createMany = jest
+        .fn()
+        .mockResolvedValue({ count: 0 });
+    });
+
+    it('cùng cách dựng dòng như ghi (ngữ cảnh request, mo_ta vào chi_tiet)', async () => {
+      await nguCanhNhatKy.run(
+        {
+          ip: '1.2.3.4',
+          thietBi: 'Chrome',
+          nguoiDung: { id: 'nd-qt', vai_tro: 'quan_tri' },
+        },
+        () =>
+          service.ghiNhieu([
+            {
+              hanh_dong: 'cap_nhat_muc_danh_gia',
+              hoc_vien_id: 'hv-1',
+              mo_ta: 'X',
+            },
+            { hanh_dong: 'cap_nhat_muc_danh_gia', hoc_vien_id: 'hv-2' },
+          ]),
+      );
+      expect(prisma.nhat_ky_hoat_dong.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            hanh_dong: 'cap_nhat_muc_danh_gia',
+            hoc_vien_id: 'hv-1',
+            nguoi_dung_id: 'nd-qt',
+            vai_tro: 'quan_tri',
+            chi_tiet: { mo_ta: 'X' },
+            ip: '1.2.3.4',
+            thiet_bi: 'Chrome',
+          },
+          {
+            hanh_dong: 'cap_nhat_muc_danh_gia',
+            hoc_vien_id: 'hv-2',
+            nguoi_dung_id: 'nd-qt',
+            vai_tro: 'quan_tri',
+            chi_tiet: undefined,
+            ip: '1.2.3.4',
+            thiet_bi: 'Chrome',
+          },
+        ],
+      });
+      expect(prisma.nhat_ky_hoat_dong.create).not.toHaveBeenCalled();
+    });
+
+    it('danh sách rỗng -> không truy vấn', async () => {
+      await service.ghiNhieu([]);
+      expect(prisma.nhat_ky_hoat_dong.createMany).not.toHaveBeenCalled();
+    });
+
+    it('2.500 sự kiện -> chia 3 lần createMany', async () => {
+      await service.ghiNhieu(
+        Array.from({ length: 2500 }, () => ({
+          hanh_dong: 'cap_nhat_muc_danh_gia' as const,
+        })),
+      );
+      expect(
+        prisma.nhat_ky_hoat_dong.createMany.mock.calls.map(
+          (c) => c[0].data.length,
+        ),
+      ).toEqual([1000, 1000, 500]);
+    });
+
+    it('DB lỗi 1 lô -> KHÔNG ném lỗi, vẫn ghi các lô còn lại', async () => {
+      prisma.nhat_ky_hoat_dong.createMany.mockRejectedValueOnce(
+        new Error('db down'),
+      );
+      await expect(
+        service.ghiNhieu(
+          Array.from({ length: 1500 }, () => ({
+            hanh_dong: 'cap_nhat_muc_danh_gia' as const,
+          })),
+        ),
+      ).resolves.toBeUndefined();
+      expect(prisma.nhat_ky_hoat_dong.createMany).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('dongThoiGian', () => {
     it('học viên không tồn tại -> NotFound', async () => {
       prisma.hoc_vien.findUnique.mockResolvedValue(null);

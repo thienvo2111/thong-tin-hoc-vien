@@ -20,9 +20,17 @@ export interface HocVienResolverResult {
   error?: string;
 }
 
-export async function resolveHocVienImportRow(
-  prisma: PrismaService,
+// Nguồn tra cứu: truy vấn từng dòng (bên dưới) hoặc dữ liệu nạp sẵn theo lô
+// (hoc-vien-resolver-lo.util.ts) — cùng đi qua quyetDinhHocVien.
+export interface TraCuuHocVien {
+  theoSdd(sdd: string): Promise<hoc_vien | null>;
+  idsTheoMaMoet(maMoet: string): Promise<string[]>;
+  theoId(id: string): Promise<hoc_vien | null>;
+}
+
+export async function quyetDinhHocVien(
   raw: HocVienResolverInput,
+  tra: TraCuuHocVien,
 ): Promise<HocVienResolverResult> {
   const sdd = raw.so_dinh_danh_ca_nhan?.trim() || undefined;
   const maMoet = raw.ma_dinh_danh_moet?.trim() || undefined;
@@ -37,9 +45,7 @@ export async function resolveHocVienImportRow(
   let byMoet: hoc_vien | null = null;
 
   if (sdd) {
-    bySdd = await prisma.hoc_vien.findUnique({
-      where: { so_dinh_danh_ca_nhan: sdd },
-    });
+    bySdd = await tra.theoSdd(sdd);
     if (!bySdd) {
       return {
         error: `Số định danh cá nhân "${sdd}" không tồn tại (chưa có hồ sơ học viên)`,
@@ -49,15 +55,13 @@ export async function resolveHocVienImportRow(
   if (maMoet) {
     // Spec 2026-10-09 Q-A: khớp chính xác trước, không có thì bỏ số 0 đầu
     // (file của trường thường mất số 0). >= 2 hồ sơ -> không đoán, lỗi dòng.
-    const ids = await timCacHocVienIdTheoMaMoet(prisma, maMoet);
+    const ids = await tra.idsTheoMaMoet(maMoet);
     if (ids.length > 1) {
       return {
         error: `Mã định danh MOET "${maMoet}" khớp nhiều hồ sơ học viên (khác số 0 đầu) — không xác định được`,
       };
     }
-    byMoet = ids.length
-      ? await prisma.hoc_vien.findUnique({ where: { id: ids[0] } })
-      : null;
+    byMoet = ids.length ? await tra.theoId(ids[0]) : null;
     if (!byMoet) {
       return {
         error: `Mã định danh MOET "${maMoet}" không tồn tại (chưa có hồ sơ học viên)`,
@@ -71,4 +75,16 @@ export async function resolveHocVienImportRow(
   }
 
   return { hocVien: (bySdd ?? byMoet) as hoc_vien };
+}
+
+export async function resolveHocVienImportRow(
+  prisma: PrismaService,
+  raw: HocVienResolverInput,
+): Promise<HocVienResolverResult> {
+  return quyetDinhHocVien(raw, {
+    theoSdd: (sdd) =>
+      prisma.hoc_vien.findUnique({ where: { so_dinh_danh_ca_nhan: sdd } }),
+    idsTheoMaMoet: (maMoet) => timCacHocVienIdTheoMaMoet(prisma, maMoet),
+    theoId: (id) => prisma.hoc_vien.findUnique({ where: { id } }),
+  });
 }
