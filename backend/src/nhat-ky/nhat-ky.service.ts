@@ -24,6 +24,7 @@ export type HanhDongNhatKy =
   | 'duyet_doi_lop'
   | 'de_nghi_doi_buoi'
   | 'duyet_doi_buoi'
+  | 'xuat_thong_ke_doi_buoi'
   | 'dieu_chinh_muc_hoc'
   | 'sua_ma_dinh_danh_moet'
   | 'xuat_danh_sach_hoc_vien_truong'
@@ -50,6 +51,7 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   duyet_doi_lop: 'Duyệt đổi lớp',
   de_nghi_doi_buoi: 'Đề nghị đổi buổi',
   duyet_doi_buoi: 'Duyệt đổi buổi',
+  xuat_thong_ke_doi_buoi: 'Xuất thống kê đổi buổi (có danh sách học viên)',
   dieu_chinh_muc_hoc: 'Điều chỉnh mức lớp học',
   sua_ma_dinh_danh_moet: 'Quản trị sửa mã định danh MOET',
   xuat_danh_sach_hoc_vien_truong: 'Xuất danh sách học viên theo trường',
@@ -77,6 +79,7 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   duyet_doi_lop: 'hoc_tap',
   de_nghi_doi_buoi: 'hoc_tap',
   duyet_doi_buoi: 'hoc_tap',
+  xuat_thong_ke_doi_buoi: 'tai_khoan',
   dieu_chinh_muc_hoc: 'hoc_tap',
   sua_ma_dinh_danh_moet: 'tai_khoan',
   xuat_danh_sach_hoc_vien_truong: 'tai_khoan',

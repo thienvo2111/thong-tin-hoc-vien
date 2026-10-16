@@ -21,7 +21,7 @@ export type DoiTuongLoc = (typeof DOI_TUONG_LOC)[number];
 export const TOI_DA_DON_VI_LOC = 100;
 
 /** "a,b" | ["a","b"] | ["a,b"] -> ["a","b"]; rỗng -> undefined. */
-function tachDanhSach({ value }: { value: unknown }): string[] | undefined {
+export function tachDanhSach({ value }: { value: unknown }): string[] | undefined {
   if (value == null || value === '') return undefined;
   const ds = (Array.isArray(value) ? value : [value])
     .flatMap((v) => String(v).split(','))

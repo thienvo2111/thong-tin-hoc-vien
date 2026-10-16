@@ -1,6 +1,20 @@
-import { trang_thai_de_nghi } from '@prisma/client';
+import { loai_lop_hoc, muc_nang_luc, trang_thai_de_nghi } from '@prisma/client';
 import { Transform } from 'class-transformer';
-import { IsEnum, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsDateString,
+  IsEnum,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+} from 'class-validator';
+import {
+  tachDanhSach,
+  TOI_DA_DON_VI_LOC,
+} from '../../thong-ke/dto/thong-ke-query.dto';
 
 // Độ dài ly_do được kiểm bằng chuanHoaLyDo (5–500 sau NFC + trim).
 export class GuiDoiBuoiDto {
@@ -55,4 +69,64 @@ export class DuyetDoiBuoiDto {
 export class GhiChuXuLyDto {
   @IsString()
   ghi_chu: string;
+}
+
+const NGAY = /^\d{4}-\d{2}-\d{2}$/;
+const toBool = ({ value }: { value: unknown }) =>
+  value === 'true' ? true : value === 'false' ? false : value;
+
+// Tab Thống kê: mảng nhận CSV hoặc lặp tham số (tachDanhSach). Lọc buổi
+// (khóa/giai đoạn/lớp/mức/loại/ngày) áp lên buổi của dòng; cum_id áp lên
+// học viên gửi đề nghị (ho_tro luôn giao với cụm của mình).
+export class LocThongKeDoiBuoiDto {
+  @IsOptional()
+  @IsUUID()
+  khoa_id?: string;
+
+  @IsOptional()
+  @IsUUID()
+  giai_doan_id?: string;
+
+  @IsOptional()
+  @Transform(tachDanhSach)
+  @IsArray()
+  @ArrayMaxSize(TOI_DA_DON_VI_LOC)
+  @IsUUID('all', { each: true })
+  lop_id?: string[];
+
+  @IsOptional()
+  @Transform(tachDanhSach)
+  @IsArray()
+  @IsEnum(muc_nang_luc, { each: true })
+  muc_nang_luc?: muc_nang_luc[];
+
+  @IsOptional()
+  @Transform(tachDanhSach)
+  @IsArray()
+  @IsEnum(loai_lop_hoc, { each: true })
+  loai_lop?: loai_lop_hoc[];
+
+  @IsOptional()
+  @Transform(tachDanhSach)
+  @IsArray()
+  @ArrayMaxSize(TOI_DA_DON_VI_LOC)
+  @IsUUID('all', { each: true })
+  cum_id?: string[];
+
+  /** YYYY-MM-DD theo giờ Việt Nam, so với thoi_gian_bat_dau của buổi. */
+  @IsOptional()
+  @Matches(NGAY)
+  @IsDateString()
+  tu_ngay?: string;
+
+  @IsOptional()
+  @Matches(NGAY)
+  @IsDateString()
+  den_ngay?: string;
+
+  // Chỉ buổi có đề nghị chờ duyệt còn hạn (ra hoặc vào).
+  @IsOptional()
+  @Transform(toBool)
+  @IsIn([true, false])
+  chi_co_cho?: boolean;
 }

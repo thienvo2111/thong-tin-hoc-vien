@@ -7,7 +7,7 @@ describe('DoiBuoiHocController', () => {
     const service = {
       demChoDuyet: jest.fn(async () => 4),
     } as unknown as DoiBuoiHocService;
-    const c = new DoiBuoiHocController(service);
+    const c = new DoiBuoiHocController(service, {} as never);
     await expect(
       c.demChoDuyet({ id: 'u' } as AuthenticatedUser),
     ).resolves.toEqual({

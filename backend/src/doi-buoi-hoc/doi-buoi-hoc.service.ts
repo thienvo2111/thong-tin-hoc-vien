@@ -59,7 +59,7 @@ export interface BuoiTomTat {
   lop: { ten_lop: string };
 }
 
-function tomTatBuoi(l: LichTomTat | undefined): BuoiTomTat | null {
+export function tomTatBuoi(l: LichTomTat | undefined): BuoiTomTat | null {
   if (!l) return null;
   return {
     id: l.id,
@@ -1010,7 +1010,7 @@ export const GHI_CHU_HOC_VIEN_HUY = 'Học viên tự hủy';
 
 export type LyDoHuy = 'hoc_vien_sua' | 'hoc_vien_huy' | 'huy_duyet';
 
-function lyDoHuy(r: {
+export function lyDoHuy(r: {
   trang_thai: trang_thai_de_nghi;
   nguoi_xu_ly: string | null;
   ghi_chu_xu_ly: string | null;
