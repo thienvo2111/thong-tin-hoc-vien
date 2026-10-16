@@ -214,7 +214,7 @@ export default function AdminNguoiHoTro() {
           <Text fz="sm" c="dimmed">
             {laHoTroGv
               ? 'Phân công nhóm hỗ trợ giảng viên ở Khóa bồi dưỡng → chi tiết khóa → mục "Nhóm hỗ trợ giảng viên".'
-              : 'Phân công người hỗ trợ cho từng cụm ở Khóa bồi dưỡng → chi tiết khóa → tab "Cụm hỗ trợ Zalo".'}
+              : 'Phân công người hỗ trợ cho từng cụm ở Khóa bồi dưỡng → chi tiết khóa → tab "Cụm hỗ trợ Zalo"; gắn người hỗ trợ lớp ở bảng Lớp học của khóa.'}
           </Text>
           <Group gap="sm" wrap="wrap">
             <TextInput
@@ -265,6 +265,7 @@ export default function AdminNguoiHoTro() {
                       <Table.Th>Tên đăng nhập</Table.Th>
                       <Table.Th>Email</Table.Th>
                       <Table.Th>{laHoTroGv ? 'Khóa phụ trách' : 'Cụm phụ trách'}</Table.Th>
+                      {!laHoTroGv && <Table.Th>Lớp phụ trách</Table.Th>}
                       <Table.Th>Lần đăng nhập cuối</Table.Th>
                       <Table.Th>Trạng thái</Table.Th>
                       <Table.Th aria-label="Thao tác" />
@@ -273,7 +274,7 @@ export default function AdminNguoiHoTro() {
                   <Table.Tbody>
                     {data.data.length === 0 && (
                       <Table.Tr>
-                        <Table.Td colSpan={7}>
+                        <Table.Td colSpan={laHoTroGv ? 7 : 8}>
                           <Text c="dimmed" ta="center" py="lg">
                             Chưa có người hỗ trợ nào khớp bộ lọc.
                           </Text>
@@ -318,6 +319,23 @@ export default function AdminNguoiHoTro() {
                             </Stack>
                           )}
                         </Table.Td>
+                        {!laHoTroGv && (
+                          <Table.Td>
+                            {(tk.lop_phu_trach ?? []).length === 0 ? (
+                              <Text fz="sm" c="dimmed">
+                                —
+                              </Text>
+                            ) : (
+                              <Stack gap={2}>
+                                {(tk.lop_phu_trach ?? []).map((l) => (
+                                  <Text key={l.lop_id} fz="sm">
+                                    {l.ten_lop} · {l.ma_khoa}
+                                  </Text>
+                                ))}
+                              </Stack>
+                            )}
+                          </Table.Td>
+                        )}
                         <Table.Td>
                           {tk.dang_nhap_lan_cuoi ? (
                             dinhDangNgayGio(tk.dang_nhap_lan_cuoi)

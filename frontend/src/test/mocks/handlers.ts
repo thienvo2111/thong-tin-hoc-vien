@@ -1310,8 +1310,33 @@ export const handlers = [
     return HttpResponse.json({ cum_id: cum.id, nguoi_ho_tro: cum.nguoi_ho_tro });
   }),
 
+  // ADR 0008: Quản trị gắn người hỗ trợ học viên vào lớp.
+  http.put('/khoa-boi-duong/:id/lop/:lopId/nguoi-ho-tro', async ({ params, request }) => {
+    const khoa = db.chiTietKhoa[params.id as string];
+    const lop = khoa?.lop_hoc.find((l) => l.id === params.lopId);
+    if (!lop) return loi(404, 'NOT_FOUND', 'Không tìm thấy lớp học trong khóa này');
+    const { nguoi_dung_ids } = (await request.json()) as { nguoi_dung_ids: string[] };
+    lop.nguoi_ho_tro = db.taiKhoanHoTro
+      .filter((t) => nguoi_dung_ids.includes(t.id))
+      .map((t) => ({ id: t.id, ho_ten: t.ho_ten }));
+    return HttpResponse.json({ lop_id: lop.id, nguoi_ho_tro: lop.nguoi_ho_tro });
+  }),
+
   // Khu người hỗ trợ học viên (ADR 0003) — API /ho-tro-hoc-vien/* (trang frontend là /ho-tro/*).
   http.get('/ho-tro-hoc-vien/cum-cua-toi', () => HttpResponse.json(db.hoTroCum)),
+  // ADR 0008: hỗ trợ theo lớp. lop/xuat khai báo trước lop/:lopId/hoc-vien.
+  http.get('/ho-tro-hoc-vien/lop-cua-toi', () => HttpResponse.json(db.hoTroLop)),
+  http.get('/ho-tro-hoc-vien/lop/xuat', ({ request }) => {
+    const lopId = new URL(request.url).searchParams.get('lop_id');
+    if (lopId && !db.hoTroDanhSachLop[lopId]) return loi(404, 'NOT_FOUND', 'Không tìm thấy lớp');
+    return new HttpResponse(new Blob(['xlsx']), {
+      headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    });
+  }),
+  http.get('/ho-tro-hoc-vien/lop/:lopId/hoc-vien', ({ params }) => {
+    const ds = db.hoTroDanhSachLop[params.lopId as string];
+    return ds ? HttpResponse.json(ds) : loi(404, 'NOT_FOUND', 'Không tìm thấy lớp');
+  }),
   // ADR 0004 G11 (issue #21): số buổi cần nhắc (menu Lịch học).
   http.get('/ho-tro-hoc-vien/nhac-lich/dem', () => HttpResponse.json({ can_nhac: 0 })),
   // Đổi buổi: số đề nghị chờ duyệt (menu hỗ trợ/admin + khối Vận hành).

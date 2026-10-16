@@ -3,8 +3,10 @@ import { apiFetch, apiFetchBlob } from './client';
 import type {
   BuoiHocHoTro,
   CumCuaToi,
+  DanhSachLopHoTro,
   HocVienHoTroChiTiet,
   HocVienHoTroDong,
+  LopCuaToi,
   MatKhauTamResponse,
   PaginatedResult,
   TrangThaiYeuCauHoTro,
@@ -76,6 +78,29 @@ export function useLichHocHoTro(params: LocLichHocHoTro) {
 export function xuatDanhSachHoTro(params: LocHocVienHoTro): Promise<Blob> {
   const { page: _p, page_size: _ps, ...loc } = params;
   return apiFetchBlob(`/ho-tro-hoc-vien/hoc-vien/xuat${xayQueryString(loc)}`);
+}
+
+// --- Hỗ trợ theo lớp (ADR 0008) ---
+
+export function useLopCuaToi() {
+  return useQuery({
+    queryKey: [...KHOA, 'lop-cua-toi'],
+    queryFn: () => apiFetch<LopCuaToi[]>('/ho-tro-hoc-vien/lop-cua-toi'),
+  });
+}
+
+export function useHocVienCuaLop(lopId: string | undefined) {
+  return useQuery({
+    queryKey: [...KHOA, 'lop', lopId],
+    queryFn: () => apiFetch<DanhSachLopHoTro>(`/ho-tro-hoc-vien/lop/${lopId}/hoc-vien`),
+    enabled: !!lopId,
+    retry: false,
+  });
+}
+
+/** Xuất .xlsx 1 lớp (lopId) hoặc mọi lớp của tôi — file có ngày sinh (ADR 0008 L5). */
+export function xuatDanhSachLopHoTro(lopId?: string): Promise<Blob> {
+  return apiFetchBlob(`/ho-tro-hoc-vien/lop/xuat${xayQueryString({ lop_id: lopId })}`);
 }
 
 // --- Yêu cầu hỗ trợ theo cụm (ADR 0003 Lát 4) ---

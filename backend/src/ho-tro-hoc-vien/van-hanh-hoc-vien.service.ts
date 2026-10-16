@@ -24,16 +24,19 @@ export class VanHanhHocVienService {
     private readonly doiBuoi: DoiBuoiHocQueryService,
   ) {}
 
-  /** Đăng ký học của học viên thuộc cụm của tôi, khớp điều kiện thêm. */
+  /**
+   * Đăng ký học của học viên thuộc phạm vi của tôi (cụm ∪ lớp gốc được gắn —
+   * ADR 0008 L3), khớp điều kiện thêm.
+   */
   private async dangKyTrongCum(
     nguoiDungId: string,
     hocVienId: string,
     them: Prisma.dang_ky_hocWhereInput,
   ) {
-    const cumIds = await this.scope.cumIdsCuaToi(nguoiDungId);
-    const dk = cumIds.length
+    const phamVi = await this.scope.whereDangKyTrongPhamVi(nguoiDungId);
+    const dk = phamVi
       ? await this.prisma.dang_ky_hoc.findFirst({
-          where: { hoc_vien_id: hocVienId, cum_id: { in: cumIds }, ...them },
+          where: { AND: [{ hoc_vien_id: hocVienId }, phamVi, them] },
           select: { id: true, khoa_id: true },
         })
       : null;

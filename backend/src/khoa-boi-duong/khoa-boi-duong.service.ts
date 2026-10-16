@@ -554,6 +554,11 @@ export class KhoaBoiDuongService {
         lop_hoc: {
           include: {
             nhan_su: true,
+            // ADR 0008: người hỗ trợ học viên theo lớp — chỉ Quản trị thấy.
+            phan_cong_ho_tro_lop: {
+              select: { nguoi_dung: { select: { id: true, ho_ten: true } } },
+              orderBy: { created_at: 'asc' },
+            },
             lich_hoc: {
               include: {
                 giai_doan: true,
@@ -647,7 +652,10 @@ export class KhoaBoiDuongService {
       ),
       // ADR 0005 Z4: học viên không nhận link buổi/giai đoạn Zoom khi khóa bật.
       ...(caller.vai_tro === 'hoc_vien' ? giauLinkZoomCuaKhoa(khoa) : {}),
-      lop_hoc: khoa.lop_hoc.map((l) => ({
+      lop_hoc: khoa.lop_hoc.map(({ phan_cong_ho_tro_lop, ...l }) => ({
+        ...(caller.vai_tro === 'quan_tri'
+          ? { nguoi_ho_tro: phan_cong_ho_tro_lop.map((p) => p.nguoi_dung) }
+          : {}),
         ...(caller.vai_tro === 'hoc_vien' && apDungDiemDanhZoom(l, khoa)
           ? {
               ...l,
@@ -962,6 +970,49 @@ export class KhoaBoiDuongService {
       orderBy: { created_at: 'asc' },
     });
     return { cum_id: cumId, nguoi_ho_tro: rows.map((r) => r.nguoi_dung) };
+  }
+
+  // ---------------------------------------------------------------------
+  // PUT /khoa-boi-duong/{id}/lop/{lopId}/nguoi-ho-tro — ADR 0008 L1/L6: thay
+  // TOÀN BỘ người hỗ trợ học viên của lớp (rỗng = gỡ hết). Chỉ nhận
+  // ho_tro_hoc_vien (cùng vai trò người hỗ trợ cụm).
+  // ---------------------------------------------------------------------
+  async ganNguoiHoTroLop(
+    khoaId: string,
+    lopId: string,
+    nguoiDungIds: string[],
+  ) {
+    await this.getLopTrongKhoaOrThrow(khoaId, lopId);
+    const ids = [...new Set(nguoiDungIds)];
+    const hopLe = await this.prisma.nguoi_dung.count({
+      where: { id: { in: ids }, vai_tro: 'ho_tro_hoc_vien' },
+    });
+    if (hopLe !== ids.length) {
+      throw new ValidationException(
+        'Chỉ phân công được tài khoản người hỗ trợ học viên',
+        [
+          {
+            field: 'nguoi_dung_ids',
+            message: 'Có tài khoản không phải người hỗ trợ học viên',
+          },
+        ],
+      );
+    }
+    await this.prisma.$transaction([
+      this.prisma.phan_cong_ho_tro_lop.deleteMany({
+        where: { lop_id: lopId, nguoi_dung_id: { notIn: ids } },
+      }),
+      this.prisma.phan_cong_ho_tro_lop.createMany({
+        data: ids.map((nguoi_dung_id) => ({ nguoi_dung_id, lop_id: lopId })),
+        skipDuplicates: true,
+      }),
+    ]);
+    const rows = await this.prisma.phan_cong_ho_tro_lop.findMany({
+      where: { lop_id: lopId },
+      select: { nguoi_dung: { select: { id: true, ho_ten: true } } },
+      orderBy: { created_at: 'asc' },
+    });
+    return { lop_id: lopId, nguoi_ho_tro: rows.map((r) => r.nguoi_dung) };
   }
 
   // ---------------------------------------------------------------------
@@ -2115,7 +2166,8 @@ export class KhoaBoiDuongService {
     const gan: { giai_doan_id: string; lop_id: string | null }[] = [];
     const canhBaoList: string[] = [];
     // Mức đầu vào của học viên: tra tối đa 1 lần/dòng, chỉ khi có lớp gắn mức.
-    let mucDauVao: Promise<{ muc_dau_vao: muc_nang_luc | null } | null> | undefined;
+    let mucDauVao:
+      Promise<{ muc_dau_vao: muc_nang_luc | null } | null> | undefined;
     for (const gd of giaiDoanList) {
       const o = raw[`gd:${gd.thu_tu}`]?.trim();
       if (!o) continue;
@@ -2153,16 +2205,15 @@ export class KhoaBoiDuongService {
       const cb = await cbPromise;
       if (cb) canhBaoList.push(cb);
       if (lop.muc_nang_luc) {
-        mucDauVao ??= this.prisma.dang_ky_hoc
-          .findUnique({
-            where: {
-              hoc_vien_id_khoa_id: {
-                hoc_vien_id: hocVien.id,
-                khoa_id: khoa.id,
-              },
+        mucDauVao ??= this.prisma.dang_ky_hoc.findUnique({
+          where: {
+            hoc_vien_id_khoa_id: {
+              hoc_vien_id: hocVien.id,
+              khoa_id: khoa.id,
             },
-            select: { muc_dau_vao: true },
-          });
+          },
+          select: { muc_dau_vao: true },
+        });
         // So với mức học hiệu lực = mức chốt (ADR 0006) — chưa chốt thì cảnh báo 1 lần/dòng.
         const dk = await mucDauVao;
         const muc = dk ? mucHocHieuLuc(dk.muc_dau_vao) : null;

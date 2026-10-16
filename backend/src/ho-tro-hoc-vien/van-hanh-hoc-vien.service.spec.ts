@@ -36,7 +36,9 @@ describe('VanHanhHocVienService.baoVang — đổi buổi', () => {
     service = new VanHanhHocVienService(
       prisma as unknown as PrismaService,
       {
-        cumIdsCuaToi: jest.fn().mockResolvedValue(['cum-1']),
+        whereDangKyTrongPhamVi: jest
+          .fn()
+          .mockResolvedValue({ OR: [{ cum_id: { in: ['cum-1'] } }] }),
       } as unknown as HoTroHocVienScopeService,
       { ghi: jest.fn() } as unknown as NhatKyService,
       doiBuoi as unknown as DoiBuoiHocQueryService,
@@ -66,12 +68,19 @@ describe('VanHanhHocVienService.baoVang — đổi buổi', () => {
       },
     ]);
     await service.baoVang(user, 'hv-1', dto);
-    expect(prisma.dang_ky_hoc.findFirst.mock.calls[1][0].where).toMatchObject({
-      hoc_vien_id: 'hv-1',
-      cum_id: { in: ['cum-1'] },
-      doi_buoi_hoc: {
-        some: { trang_thai: 'da_duyet', lich_chot_id: 'lich-b' },
-      },
+    expect(prisma.dang_ky_hoc.findFirst.mock.calls[1][0].where).toEqual({
+      AND: [
+        { hoc_vien_id: 'hv-1' },
+        { OR: [{ cum_id: { in: ['cum-1'] } }] },
+        {
+          doi_buoi_hoc: {
+            some: expect.objectContaining({
+              trang_thai: 'da_duyet',
+              lich_chot_id: 'lich-b',
+            }),
+          },
+        },
+      ],
     });
     expect(prisma.bao_vang.upsert.mock.calls[0][0].create).toMatchObject({
       dang_ky_hoc_id: 'dk-1',

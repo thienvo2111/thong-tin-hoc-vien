@@ -21,10 +21,16 @@ import {
   SuaHoSoHoTroDto,
 } from './dto/ho-tro-hoc-vien.dto';
 import { buildDanhSachCumWorkbook } from './xuat-danh-sach-cum.util';
+import {
+  buildDanhSachLopWorkbook,
+  dinhDangNgaySinh,
+} from './xuat-danh-sach-lop.util';
 
 const SO_NGAY_LICH_MAC_DINH = 14;
 
-const includeDong = (cumIds: string[]) =>
+// whereDangKy: đăng ký học dùng để lấy cụm/lớp của dòng (theo cụm của tôi,
+// hoặc theo lớp được gắn — ADR 0008).
+const includeDong = (whereDangKy: Prisma.dang_ky_hocWhereInput) =>
   ({
     chuyen_mon: true,
     don_vi_cong_tac: { select: { ten_don_vi: true } },
@@ -36,12 +42,17 @@ const includeDong = (cumIds: string[]) =>
       orderBy: { loai: 'asc' },
     },
     dang_ky_hoc: {
-      where: { cum_id: { in: cumIds } },
+      where: whereDangKy,
       select: {
         khoa_id: true,
         cum: { select: { id: true, ten_cum: true } },
         phan_lop_giai_doan: {
-          select: { giai_doan_id: true, lop: { select: { ten_lop: true } } },
+          select: {
+            giai_doan_id: true,
+            lop_id: true,
+            lop: { select: { ten_lop: true } },
+            giai_doan: { select: { thu_tu: true, ten_giai_doan: true } },
+          },
         },
       },
     },
@@ -362,6 +373,124 @@ export class HoTroHocVienService {
   }
 
   // ---------------------------------------------------------------------
+  // ADR 0008 — người hỗ trợ theo LỚP (lớp gốc qua phan_lop_giai_doan; đổi
+  // buổi không tính). Lớp không được gắn → 404.
+  // ---------------------------------------------------------------------
+
+  async lopCuaToi(nguoiDungId: string) {
+    const lopIds = await this.scope.lopIdsCuaToi(nguoiDungId);
+    return lopIds.length === 0 ? [] : this.dauLop(lopIds);
+  }
+
+  async hocVienCuaLop(nguoiDungId: string, lopId: string) {
+    await this.scope.damBaoLopCuaToi(nguoiDungId, lopId);
+    const [[lop], dong] = await Promise.all([
+      this.dauLop([lopId]),
+      this.layDongLop(lopId),
+    ]);
+    return { lop, hoc_vien: dong };
+  }
+
+  async xuatDanhSachLop(
+    nguoiDungId: string,
+    vaiTro: 'ho_tro_hoc_vien',
+    lopId?: string,
+  ): Promise<Buffer> {
+    let lopIds: string[];
+    if (lopId) {
+      await this.scope.damBaoLopCuaToi(nguoiDungId, lopId);
+      lopIds = [lopId];
+    } else {
+      lopIds = await this.scope.lopIdsCuaToi(nguoiDungId);
+    }
+    const lops = lopIds.length > 0 ? await this.dauLop(lopIds) : [];
+    const sheets = [];
+    let soDong = 0;
+    for (const l of lops) {
+      const hocVien = await this.layDongLop(l.lop_id);
+      soDong += hocVien.length;
+      sheets.push({ ...l, hoc_vien: hocVien });
+    }
+    const buffer = await buildDanhSachLopWorkbook(sheets);
+    await this.nhatKy.ghi({
+      hanh_dong: 'ho_tro_xuat_danh_sach_lop',
+      nguoi_dung: { id: nguoiDungId, vai_tro: vaiTro },
+      chi_tiet: { lop_ids: lopIds, so_dong: soDong },
+    });
+    return buffer;
+  }
+
+  /** Thông tin đầu lớp + sĩ số (số đăng ký khác nhau phân vào lớp). */
+  private async dauLop(lopIds: string[]) {
+    const [lops, cap] = await Promise.all([
+      this.prisma.lop_hoc.findMany({
+        where: { id: { in: lopIds } },
+        select: {
+          id: true,
+          ten_lop: true,
+          loai_lop: true,
+          muc_nang_luc: true,
+          nhom_hoc_vien: true,
+          khoa: { select: { id: true, ma_khoa: true, ten_khoa: true } },
+        },
+        orderBy: [
+          { khoa: { ma_khoa: 'asc' } },
+          { loai_lop: 'asc' },
+          { ten_lop: 'asc' },
+        ],
+      }),
+      this.prisma.phan_lop_giai_doan.groupBy({
+        by: ['lop_id', 'dang_ky_hoc_id'],
+        where: { lop_id: { in: lopIds } },
+      }),
+    ]);
+    const siSo = new Map<string, number>();
+    for (const c of cap) siSo.set(c.lop_id, (siSo.get(c.lop_id) ?? 0) + 1);
+    return lops.map(({ id, ...l }) => ({
+      lop_id: id,
+      ...l,
+      so_hoc_vien: siSo.get(id) ?? 0,
+    }));
+  }
+
+  /** Học viên có phân lớp gốc vào lớp (mọi giai đoạn), xếp theo họ tên. */
+  private async layDongLop(lopId: string) {
+    const coLop = { phan_lop_giai_doan: { some: { lop_id: lopId } } };
+    const rows = await this.prisma.hoc_vien.findMany({
+      where: { dang_ky_hoc: { some: coLop } },
+      include: includeDong(coLop),
+    });
+    const dong = await Promise.all(
+      rows.map(async (r) => {
+        const d = await this.toDong(r);
+        return {
+          hoc_vien_id: r.id,
+          ho_ten: r.ho_ten,
+          ngay_sinh: dinhDangNgaySinh(r.ngay_sinh, r.thang_sinh, r.nam_sinh),
+          don_vi_cong_tac_ten: d.don_vi_cong_tac_ten,
+          doi_tuong: d.doi_tuong,
+          so_dien_thoai_lien_he: d.so_dien_thoai_lien_he,
+          email_lien_he: d.email_lien_he,
+          cum: d.cum[0]?.ten_cum ?? null,
+          giai_doan: r.dang_ky_hoc
+            .flatMap((dk) => dk.phan_lop_giai_doan)
+            .filter((p) => p.lop_id === lopId)
+            .sort((a, b) => a.giai_doan.thu_tu - b.giai_doan.thu_tu)
+            .map((p) => p.giai_doan.ten_giai_doan),
+          day_du: d.day_du,
+          dang_nhap_lan_cuoi: d.dang_nhap_lan_cuoi,
+          khao_sat: d.khao_sat,
+        };
+      }),
+    );
+    return dong.sort(
+      (a, b) =>
+        a.ho_ten.localeCompare(b.ho_ten, 'vi') ||
+        a.hoc_vien_id.localeCompare(b.hoc_vien_id),
+    );
+  }
+
+  // ---------------------------------------------------------------------
   // Lát 3 — can thiệp hồ sơ & tài khoản (ADR 0003 H7–H9). Mọi thao tác kiểm
   // tra phạm vi cụm TRƯỚC (ngoài phạm vi -> 404).
   // ---------------------------------------------------------------------
@@ -497,7 +626,7 @@ export class HoTroHocVienService {
   ) {
     const rows = await this.prisma.hoc_vien.findMany({
       where,
-      include: includeDong(cumIds),
+      include: includeDong({ cum_id: { in: cumIds } }),
       orderBy: [{ ho_ten: 'asc' }, { id: 'asc' }],
       ...trang,
     });

@@ -979,6 +979,17 @@ CREATE TABLE phan_cong_ho_tro_gv (
 );
 CREATE INDEX idx_phan_cong_ho_tro_gv_khoa ON phan_cong_ho_tro_gv(khoa_id);
 
+-- ADR 0008 (2026-10-16): người hỗ trợ học viên gắn vào LỚP (song song cụm).
+-- Chỉ nhận tài khoản vai_tro='ho_tro_hoc_vien' (kiểm ở service).
+CREATE TABLE phan_cong_ho_tro_lop (
+    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    nguoi_dung_id uuid NOT NULL REFERENCES nguoi_dung(id) ON DELETE CASCADE,
+    lop_id        uuid NOT NULL REFERENCES lop_hoc(id) ON DELETE CASCADE,
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_phan_cong_ho_tro_lop UNIQUE (nguoi_dung_id, lop_id)
+);
+CREATE INDEX idx_phan_cong_ho_tro_lop_lop ON phan_cong_ho_tro_lop(lop_id);
+
 CREATE TABLE hau_can_giang_vien (
     id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     lop_id                uuid NOT NULL REFERENCES lop_hoc(id) ON DELETE CASCADE,

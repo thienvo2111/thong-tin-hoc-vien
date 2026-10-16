@@ -145,6 +145,14 @@ export const router = createBrowserRouter([
                     lazy: () => import('@/pages/HoTro/HoTroTrangChu').then((m) => ({ Component: m.default })),
                   },
                   {
+                    path: '/ho-tro/lop',
+                    lazy: () => import('@/pages/HoTro/HoTroLop').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/ho-tro/lop/:lopId',
+                    lazy: () => import('@/pages/HoTro/HoTroLopChiTiet').then((m) => ({ Component: m.default })),
+                  },
+                  {
                     path: '/ho-tro/hoc-vien',
                     lazy: () => import('@/pages/HoTro/HoTroDanhSachHocVien').then((m) => ({ Component: m.default })),
                   },

@@ -14,6 +14,13 @@ import { UpdateHocVienDto } from '../../hoc-vien/dto/update-hoc-vien.dto';
 const chuoiThanhBoolean = ({ value }: { value: unknown }) =>
   value === 'true' ? true : value === 'false' ? false : value;
 
+// ADR 0008: GET /ho-tro-hoc-vien/lop/xuat — 1 lớp (phải được gắn) hoặc mọi lớp của tôi.
+export class XuatLopHoTroDto {
+  @IsOptional()
+  @IsUUID()
+  lop_id?: string;
+}
+
 // Bộ lọc dùng chung cho GET /ho-tro/hoc-vien và /ho-tro/hoc-vien/xuat.
 export class LocHocVienHoTroDto extends PaginationQueryDto {
   @IsOptional()

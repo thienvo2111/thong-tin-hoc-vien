@@ -35,8 +35,25 @@ const NHAN_KHAO_SAT: Record<string, string> = {
   hoan_thanh: 'hoàn thành',
 };
 
+/** Nhãn đối tượng cho file xuất (rỗng khi chưa xác định). */
+export function nhanDoiTuong(doiTuong: string | null): string {
+  return doiTuong ? (NHAN_DOI_TUONG[doiTuong] ?? doiTuong) : '';
+}
+
+/** Ô "Khảo sát": nhân viên → "Không áp dụng" (phaiKhaoSat). */
+export function oKhaoSat(
+  doiTuong: string | null,
+  khaoSat: { loai: string; trang_thai: string }[],
+): string {
+  return phaiKhaoSat(doiTuong)
+    ? khaoSat
+        .map((k) => `${k.loai}: ${NHAN_KHAO_SAT[k.trang_thai] ?? k.trang_thai}`)
+        .join('; ')
+    : 'Không áp dụng';
+}
+
 // Tên sheet Excel: tối đa 31 ký tự, không chứa : \ / ? * [ ] và không trùng.
-function tenSheet(ten: string, daDung: Set<string>): string {
+export function tenSheet(ten: string, daDung: Set<string>): string {
   const goc =
     ten
       .replace(/[:\\/?*[\]]/g, ' ')
@@ -76,20 +93,13 @@ export async function buildDanhSachCumWorkbook(
         i + 1,
         h.ho_ten,
         h.don_vi_cong_tac_ten,
-        h.doi_tuong ? (NHAN_DOI_TUONG[h.doi_tuong] ?? h.doi_tuong) : '',
+        nhanDoiTuong(h.doi_tuong),
         h.so_dien_thoai_lien_he ?? '',
         h.email_lien_he ?? '',
         ...s.giai_doan.map((g) => h.lop_theo_giai_doan[g.id] ?? ''),
         h.day_du ? 'Đủ' : 'Chưa đủ',
         h.dang_nhap_lan_cuoi ? 'Rồi' : 'Chưa',
-        phaiKhaoSat(h.doi_tuong)
-          ? h.khao_sat
-              .map(
-                (k) =>
-                  `${k.loai}: ${NHAN_KHAO_SAT[k.trang_thai] ?? k.trang_thai}`,
-              )
-              .join('; ')
-          : 'Không áp dụng',
+        oKhaoSat(h.doi_tuong, h.khao_sat),
       ]);
     });
     ws.columns.forEach((c) => (c.width = 18));

@@ -54,6 +54,16 @@ describe('Admin — Người hỗ trợ học viên (ADR 0003)', () => {
     expect(within(dongB).getByText('Chưa phân công')).toBeInTheDocument();
   });
 
+  it('ADR 0008: cột "Lớp phụ trách" hiện lớp được gắn cạnh cụm', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    renderTrang();
+    const bang = await screen.findByRole('table');
+    expect(within(bang).getByRole('columnheader', { name: 'Lớp phụ trách' })).toBeInTheDocument();
+    const dongA = (await within(bang).findByText('Nguyễn Văn A')).closest('tr');
+    expect(dongA).not.toBeNull();
+    expect(within(dongA as HTMLElement).getByText('Zoom 01 · KBD-AG-01')).toBeInTheDocument();
+  });
+
   it('tạo mặc định gửi email kích hoạt: gửi đúng body, báo đã gửi, không hiện mật khẩu', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
     let body: Record<string, unknown> | null = null;

@@ -6,8 +6,8 @@ import { server } from '@/test/mocks/server';
 import { db } from '@/test/mocks/db';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
-import type { CumHocVien } from '@/api/types';
-import { ChonNguoiHoTroCum } from './ChonNguoiHoTroCum';
+import type { CumHocVien, LopHoc } from '@/api/types';
+import { ChonNguoiHoTroCum, ChonNguoiHoTroLop } from './ChonNguoiHoTroCum';
 
 const CUM: CumHocVien = {
   id: 'cum-1',
@@ -68,5 +68,49 @@ describe('Phân công người hỗ trợ cho cụm (ADR 0003 H4)', () => {
     await user.click(await screen.findByRole('textbox', { name: 'Người hỗ trợ Cụm Long Xuyên' }));
     await user.click(await screen.findByRole('option', { name: 'Nguyễn Văn A' }));
     expect(await screen.findByText(/Chỉ phân công được tài khoản người hỗ trợ học viên/)).toBeInTheDocument();
+  });
+});
+
+const LOP: LopHoc = {
+  id: 'lop-2',
+  khoa_id: 'khoa-1',
+  loai_lop: 'zoom',
+  ten_lop: 'Lớp Zoom 01',
+  si_so_toi_da: 500,
+  trang_thai: 'active',
+  nhom_hoc_vien: null,
+  muc_nang_luc: null,
+  nguoi_ho_tro: [],
+};
+
+function renderLop(lop: LopHoc) {
+  datToken('token-gia-lap');
+  db.nguoiDung.vai_tro = 'quan_tri';
+  return renderVoiRouter([{ path: '/', element: <ChonNguoiHoTroLop khoaId="khoa-1" lop={lop} /> }]);
+}
+
+describe('Phân công người hỗ trợ cho lớp (ADR 0008)', () => {
+  it('lớp chưa có người hỗ trợ -> không cảnh báo (bình thường)', async () => {
+    renderLop(LOP);
+    expect(await screen.findByRole('textbox', { name: 'Người hỗ trợ lớp Lớp Zoom 01' })).toBeInTheDocument();
+    expect(screen.queryByText('Chưa có người hỗ trợ')).not.toBeInTheDocument();
+  });
+
+  it('thêm người -> PUT /lop/:lopId/nguoi-ho-tro với toàn bộ danh sách id', async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      http.put('/khoa-boi-duong/:id/lop/:lopId/nguoi-ho-tro', async ({ request, params }) => {
+        bodies.push({ ...((await request.json()) as object), khoaId: params.id, lopId: params.lopId });
+        return HttpResponse.json({ lop_id: 'lop-2', nguoi_ho_tro: [] });
+      }),
+    );
+    renderLop({ ...LOP, nguoi_ho_tro: [{ id: 'ht-1', ho_ten: 'Nguyễn Văn A' }] });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('textbox', { name: 'Người hỗ trợ lớp Lớp Zoom 01' }));
+    await user.click(await screen.findByRole('option', { name: 'Trần Thị B' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([{ nguoi_dung_ids: ['ht-1', 'ht-2'], khoaId: 'khoa-1', lopId: 'lop-2' }]),
+    );
+    expect(await screen.findByText('Đã cập nhật người hỗ trợ "Lớp Zoom 01"')).toBeInTheDocument();
   });
 });

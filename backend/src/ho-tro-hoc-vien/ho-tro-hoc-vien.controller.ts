@@ -21,6 +21,7 @@ import {
   LocHocVienHoTroDto,
   LocLichHocHoTroDto,
   SuaHoSoHoTroDto,
+  XuatLopHoTroDto,
 } from './dto/ho-tro-hoc-vien.dto';
 import { VanHanhHocVienService } from './van-hanh-hoc-vien.service';
 import { NhacLichService } from '../nhac-lich/nhac-lich.service';
@@ -31,6 +32,13 @@ import {
   LopCoTheDoiQueryDto,
   TaoDeNghiDoiLopDto,
 } from './dto/van-hanh-hoc-vien.dto';
+
+/** yyyymmdd theo giờ Việt Nam — đặt tên file xuất. */
+const ngayVn = () =>
+  new Date(Date.now() + 7 * 3600 * 1000)
+    .toISOString()
+    .slice(0, 10)
+    .replace(/-/g, '');
 
 // Khu làm việc người hỗ trợ học viên (ADR 0003). Chỉ ho_tro_hoc_vien — Quản
 // trị dùng các API /admin của mình, không đi qua đây.
@@ -78,6 +86,42 @@ export class HoTroHocVienController {
     return this.service.cumCuaToi(user.id);
   }
 
+  // ---------------- ADR 0008: hỗ trợ theo lớp ----------------
+  @Get('lop-cua-toi')
+  lopCuaToi(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.lopCuaToi(user.id);
+  }
+
+  // Khai báo TRƯỚC lop/:lopId/... để 'xuat' không bị route động chắn.
+  @Get('lop/xuat')
+  async xuatLop(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: XuatLopHoTroDto,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.service.xuatDanhSachLop(
+      user.id,
+      'ho_tro_hoc_vien',
+      query.lop_id,
+    );
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="ds-lop-ho-tro-${ngayVn()}.xlsx"`,
+        'Cache-Control': 'no-store',
+      })
+      .send(buffer);
+  }
+
+  @Get('lop/:lopId/hoc-vien')
+  hocVienCuaLop(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('lopId', ParseUUIDPipe) lopId: string,
+  ) {
+    return this.service.hocVienCuaLop(user.id, lopId);
+  }
+
   @Get('hoc-vien')
   danhSach(
     @CurrentUser() user: AuthenticatedUser,
@@ -98,15 +142,11 @@ export class HoTroHocVienController {
       'ho_tro_hoc_vien',
       query,
     );
-    const ngay = new Date(Date.now() + 7 * 3600 * 1000)
-      .toISOString()
-      .slice(0, 10)
-      .replace(/-/g, '');
     res
       .set({
         'Content-Type':
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="ds-cum-ho-tro-${ngay}.xlsx"`,
+        'Content-Disposition': `attachment; filename="ds-cum-ho-tro-${ngayVn()}.xlsx"`,
         'Cache-Control': 'no-store',
       })
       .send(buffer);

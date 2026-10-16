@@ -10,6 +10,7 @@ import { tokenKhac } from '@/theme';
 
 const MENU = [
   { to: '/ho-tro', nhan: 'Cụm của tôi', end: true },
+  { to: '/ho-tro/lop', nhan: 'Lớp hỗ trợ', end: false },
   { to: '/ho-tro/hoc-vien', nhan: 'Học viên', end: false },
   { to: '/ho-tro/lich-hoc', nhan: 'Lịch học', end: false },
   { to: '/ho-tro/doi-buoi', nhan: 'Đổi buổi', end: false },

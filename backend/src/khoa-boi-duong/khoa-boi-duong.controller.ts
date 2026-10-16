@@ -172,6 +172,21 @@ export class KhoaBoiDuongController {
     );
   }
 
+  // ADR 0008: phân công người hỗ trợ học viên cho lớp.
+  @Roles('quan_tri')
+  @Put(':id/lop/:lopId/nguoi-ho-tro')
+  ganNguoiHoTroLop(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('lopId', ParseUUIDPipe) lopId: string,
+    @Body() dto: GanNguoiHoTroCumDto,
+  ) {
+    return this.khoaBoiDuongService.ganNguoiHoTroLop(
+      id,
+      lopId,
+      dto.nguoi_dung_ids,
+    );
+  }
+
   // ADR 0004 G3 (issue #14): nhóm người hỗ trợ giảng viên của khóa.
   @Roles('quan_tri')
   @Put(':id/nhom-ho-tro-gv')

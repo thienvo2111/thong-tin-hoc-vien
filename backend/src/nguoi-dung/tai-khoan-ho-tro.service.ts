@@ -47,6 +47,20 @@ const SELECT_VIEW = {
     },
     orderBy: { created_at: 'asc' },
   },
+  // ADR 0008: lớp mà người hỗ trợ học viên được gắn (song song cụm).
+  phan_cong_ho_tro_lop: {
+    select: {
+      lop: {
+        select: {
+          id: true,
+          ten_lop: true,
+          loai_lop: true,
+          khoa: { select: { ma_khoa: true } },
+        },
+      },
+    },
+    orderBy: { created_at: 'asc' },
+  },
   // ADR 0004 L1: khóa mà người hỗ trợ giảng viên thuộc nhóm.
   phan_cong_ho_tro_gv: {
     select: { khoa: { select: { id: true, ma_khoa: true, ten_khoa: true } } },
@@ -57,7 +71,12 @@ const SELECT_VIEW = {
 type Row = Prisma.nguoi_dungGetPayload<{ select: typeof SELECT_VIEW }>;
 
 export function toTaiKhoanHoTroView(row: Row) {
-  const { phan_cong_ho_tro, phan_cong_ho_tro_gv, ...rest } = row;
+  const {
+    phan_cong_ho_tro,
+    phan_cong_ho_tro_gv,
+    phan_cong_ho_tro_lop,
+    ...rest
+  } = row;
   return {
     ...rest,
     khoa: phan_cong_ho_tro_gv.map(({ khoa }) => ({
@@ -71,6 +90,12 @@ export function toTaiKhoanHoTroView(row: Row) {
       khoa_id: cum.khoa.id,
       ma_khoa: cum.khoa.ma_khoa,
       ten_khoa: cum.khoa.ten_khoa,
+    })),
+    lop_phu_trach: phan_cong_ho_tro_lop.map(({ lop }) => ({
+      lop_id: lop.id,
+      ten_lop: lop.ten_lop,
+      loai_lop: lop.loai_lop,
+      ma_khoa: lop.khoa.ma_khoa,
     })),
   };
 }

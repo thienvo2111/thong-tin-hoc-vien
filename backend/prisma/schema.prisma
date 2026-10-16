@@ -470,6 +470,7 @@ model nguoi_dung {
   yeu_cau_ho_tro_sua_tra_loi_boi     yeu_cau_ho_tro[]           @relation("yeu_cau_ho_tro_sua_tra_loi_boi")
   token_xac_thuc                     token_xac_thuc[]
   phan_cong_ho_tro                   phan_cong_ho_tro[]
+  phan_cong_ho_tro_lop               phan_cong_ho_tro_lop[]
   phan_cong_ho_tro_gv                phan_cong_ho_tro_gv[]
   diem_hoc_tao                       diem_hoc[]                 @relation("diem_hoc_tao_boi")
   giang_vien_tao                     giang_vien[]               @relation("giang_vien_tao_boi")
@@ -872,6 +873,8 @@ model lop_hoc {
   trang_thai_muc_kiem_tra trang_thai_muc_kiem_tra[]
   de_nghi_tu_lop          de_nghi_doi_lop[]         @relation("de_nghi_lop_hien_tai")
   de_nghi_den_lop         de_nghi_doi_lop[]         @relation("de_nghi_lop_de_nghi")
+  // ADR 0008: người hỗ trợ học viên được gắn vào lớp.
+  phan_cong_ho_tro_lop    phan_cong_ho_tro_lop[]
 
   @@unique([khoa_id, loai_lop, ten_lop], map: "uq_lop_ten_trong_khoa")
   @@index([khoa_id], map: "idx_lop_khoa")
@@ -913,6 +916,22 @@ model phan_cong_ho_tro {
 
   @@unique([nguoi_dung_id, cum_id], map: "uq_phan_cong_ho_tro")
   @@index([cum_id], map: "idx_phan_cong_ho_tro_cum")
+}
+
+/// ADR 0008 (2026-10-16): phân công người hỗ trợ học viên (cùng vai trò
+/// ho_tro_hoc_vien) vào LỚP — 1 người có thể vừa giữ cụm vừa giữ nhiều lớp.
+/// Phạm vi = cụm ∪ lớp gốc (phan_lop_giai_doan), kiểm động mỗi request.
+model phan_cong_ho_tro_lop {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nguoi_dung_id String   @db.Uuid
+  lop_id        String   @db.Uuid
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  nguoi_dung nguoi_dung @relation(fields: [nguoi_dung_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lop        lop_hoc    @relation(fields: [lop_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([nguoi_dung_id, lop_id], map: "uq_phan_cong_ho_tro_lop")
+  @@index([lop_id], map: "idx_phan_cong_ho_tro_lop_lop")
 }
 
 model lich_hoc_lop {

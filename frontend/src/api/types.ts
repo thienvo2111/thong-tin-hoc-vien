@@ -459,6 +459,8 @@ export interface LopHoc {
   lich_hoc?: LichHocLop[];
   // Chỉ có trong GET /khoa-boi-duong/{id}: số đăng ký khác nhau đang được phân vào lớp.
   si_so_hien_tai?: number;
+  /** ADR 0008 — người hỗ trợ học viên theo lớp; chỉ có khi người gọi là quan_tri. */
+  nguoi_ho_tro?: NguoiHoTroRutGon[];
 }
 
 // cum_hoc_vien (QĐ10) — nhóm Zalo hỗ trợ theo địa lý, độc lập với cây đơn vị công tác VÀ với 3 loại
@@ -850,6 +852,8 @@ export interface TaiKhoanHoTro {
   trang_thai: TrangThaiActive;
   dang_nhap_lan_cuoi: string | null;
   cum: CumPhanCong[];
+  // ADR 0008: lớp mà người hỗ trợ học viên được gắn (song song cụm).
+  lop_phu_trach?: { lop_id: string; ten_lop: string; loai_lop: LoaiLop; ma_khoa: string }[];
   // ADR 0004 L1: khóa mà người hỗ trợ giảng viên thuộc nhóm.
   khoa?: { khoa_id: string; ma_khoa: string; ten_khoa: string }[];
 }
@@ -937,6 +941,38 @@ export interface CumCuaToi {
   ma_khoa: string;
   ten_khoa: string;
   so_hoc_vien: number;
+}
+
+// ADR 0008: GET /ho-tro-hoc-vien/lop-cua-toi — lớp người hỗ trợ được gắn.
+export interface LopCuaToi {
+  lop_id: string;
+  ten_lop: string;
+  loai_lop: LoaiLop;
+  muc_nang_luc: MucNangLuc | null;
+  nhom_hoc_vien: number | null;
+  khoa: { id: string; ma_khoa: string; ten_khoa: string };
+  so_hoc_vien: number;
+}
+
+// GET /ho-tro-hoc-vien/lop/:lopId/hoc-vien — học viên có phân lớp gốc vào lớp (đổi buổi không tính).
+export interface HocVienCuaLop {
+  hoc_vien_id: string;
+  ho_ten: string;
+  /** dd/mm/yyyy */
+  ngay_sinh: string;
+  don_vi_cong_tac_ten: string;
+  doi_tuong: string | null;
+  so_dien_thoai_lien_he: string | null;
+  email_lien_he: string | null;
+  cum: string | null;
+  giai_doan: string[];
+  day_du: boolean;
+  dang_nhap_lan_cuoi: string | null;
+}
+
+export interface DanhSachLopHoTro {
+  lop: LopCuaToi;
+  hoc_vien: HocVienCuaLop[];
 }
 
 export interface KhaoSatTomTat {

@@ -8,6 +8,9 @@ import { NotFoundAppException } from '../common/exceptions/app.exceptions';
 // phạm vi DUY NHẤT cho mọi /ho-tro/* — truy vấn động mỗi request (gỡ phân
 // công có hiệu lực ngay), không nằm trong JWT, không dùng ScopeService của
 // cây đơn vị.
+// ADR 0008 L2: phạm vi mở rộng = cụm ∪ LỚP GỐC được gắn (phan_cong_ho_tro_lop):
+// học viên có phan_lop_giai_doan vào lớp của tôi. Đổi buổi KHÔNG tính (ADR
+// 0007 — đọc theo lớp giữ lớp gốc).
 @Injectable()
 export class HoTroHocVienScopeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -18,6 +21,40 @@ export class HoTroHocVienScopeService {
       select: { cum_id: true },
     });
     return rows.map((r) => r.cum_id);
+  }
+
+  async lopIdsCuaToi(nguoiDungId: string): Promise<string[]> {
+    const rows = await this.prisma.phan_cong_ho_tro_lop.findMany({
+      where: { nguoi_dung_id: nguoiDungId },
+      select: { lop_id: true },
+    });
+    return rows.map((r) => r.lop_id);
+  }
+
+  /**
+   * Điều kiện dang_ky_hoc thuộc phạm vi (cụm ∪ lớp gốc) — null khi tôi chưa
+   * được gắn cụm/lớp nào.
+   */
+  async whereDangKyTrongPhamVi(
+    nguoiDungId: string,
+  ): Promise<Prisma.dang_ky_hocWhereInput | null> {
+    const [cumIds, lopIds] = await Promise.all([
+      this.cumIdsCuaToi(nguoiDungId),
+      this.lopIdsCuaToi(nguoiDungId),
+    ]);
+    const or: Prisma.dang_ky_hocWhereInput[] = [];
+    if (cumIds.length > 0) or.push({ cum_id: { in: cumIds } });
+    if (lopIds.length > 0)
+      or.push({ phan_lop_giai_doan: { some: { lop_id: { in: lopIds } } } });
+    return or.length > 0 ? { OR: or } : null;
+  }
+
+  /** Lớp được gắn cho tôi — ngoài phạm vi → 404. */
+  async damBaoLopCuaToi(nguoiDungId: string, lopId: string): Promise<void> {
+    const co = await this.prisma.phan_cong_ho_tro_lop.count({
+      where: { nguoi_dung_id: nguoiDungId, lop_id: lopId },
+    });
+    if (co === 0) throw new NotFoundAppException('Không tìm thấy lớp');
   }
 
   /** Cụm dùng để lọc: 1 cụm cụ thể (phải thuộc phạm vi, ngoài phạm vi → 404) hoặc mọi cụm của tôi. */
@@ -39,11 +76,11 @@ export class HoTroHocVienScopeService {
     nguoiDungId: string,
     hocVienId: string,
   ): Promise<void> {
-    const cumIds = await this.cumIdsCuaToi(nguoiDungId);
+    const phamVi = await this.whereDangKyTrongPhamVi(nguoiDungId);
     const co =
-      cumIds.length > 0 &&
+      phamVi !== null &&
       (await this.prisma.dang_ky_hoc.count({
-        where: { hoc_vien_id: hocVienId, cum_id: { in: cumIds } },
+        where: { AND: [{ hoc_vien_id: hocVienId }, phamVi] },
       })) > 0;
     if (!co) throw new NotFoundAppException('Không tìm thấy hồ sơ học viên');
   }

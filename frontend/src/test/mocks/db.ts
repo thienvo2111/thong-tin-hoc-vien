@@ -1,7 +1,7 @@
 import type { LopCuaToiGv, TrangLop } from '@/api/hoTroGv';
 import type { BoBangKiem, DanhGiaDot } from '@/api/bangKiem';
 import type { HocVienDaXoa } from '@/api/admin';
-import type { DiemDanhZoomBuoi, KetQuaVaoHoc, LichHocLopToi } from '@/api/types';
+import type { DanhSachLopHoTro, DiemDanhZoomBuoi, KetQuaVaoHoc, LichHocLopToi, LopCuaToi } from '@/api/types';
 import type {
   DiemHoc,
   GiangVien,
@@ -801,6 +801,7 @@ export function taoDanhSachTaiKhoanHoTroMau(): TaiKhoanHoTro[] {
       trang_thai: 'active',
       dang_nhap_lan_cuoi: '2026-10-05T02:00:00.000Z',
       cum: [{ cum_id: 'cum-1', ten_cum: 'Cụm Long Xuyên', khoa_id: 'khoa-1', ma_khoa: 'KBD-AG-01', ten_khoa: 'Khóa An Giang' }],
+      lop_phu_trach: [{ lop_id: 'lop-zoom-1', ten_lop: 'Zoom 01', loai_lop: 'zoom', ma_khoa: 'KBD-AG-01' }],
     },
     {
       id: 'htgv-1',
@@ -824,6 +825,45 @@ export function taoDanhSachTaiKhoanHoTroMau(): TaiKhoanHoTro[] {
       cum: [],
     },
   ];
+}
+
+// ADR 0008: người hỗ trợ được gắn 1 lớp Zoom.
+export function taoHoTroLopMau(): LopCuaToi[] {
+  return [
+    {
+      lop_id: 'lop-zoom-1',
+      ten_lop: 'Zoom 01',
+      loai_lop: 'zoom',
+      muc_nang_luc: 'co_ban',
+      nhom_hoc_vien: 1,
+      khoa: { id: 'khoa-1', ma_khoa: 'KBD-AG-01', ten_khoa: 'Khóa An Giang' },
+      so_hoc_vien: 1,
+    },
+  ];
+}
+
+export function taoHoTroDanhSachLopMau(): Record<string, DanhSachLopHoTro> {
+  const [lop] = taoHoTroLopMau();
+  return {
+    [lop.lop_id]: {
+      lop,
+      hoc_vien: [
+        {
+          hoc_vien_id: 'hv-lop-1',
+          ho_ten: 'Lê Thị Zoom',
+          ngay_sinh: '02/03/1988',
+          don_vi_cong_tac_ten: 'Trường THCS Mỹ Hòa',
+          doi_tuong: 'giao_vien',
+          so_dien_thoai_lien_he: '0912345678',
+          email_lien_he: 'zoom@gmail.com',
+          cum: 'Cụm Long Xuyên',
+          giai_doan: ['Học Zoom'],
+          day_du: true,
+          dang_nhap_lan_cuoi: null,
+        },
+      ],
+    },
+  };
 }
 
 // Khu người hỗ trợ học viên (ADR 0003): 1 cụm, 1 học viên, 1 buổi học.
@@ -1246,6 +1286,8 @@ export const db = {
   taiKhoanDonVi: taoDanhSachTaiKhoanDonViMau(),
   taiKhoanHoTro: taoDanhSachTaiKhoanHoTroMau(),
   hoTroCum: taoHoTroCumMau(),
+  hoTroLop: taoHoTroLopMau(),
+  hoTroDanhSachLop: taoHoTroDanhSachLopMau(),
   hoTroHocVien: taoHoTroHocVienMau(),
   hoTroChiTiet: taoHoTroChiTietMau(),
   hoTroLichHoc: taoHoTroLichHocMau(),
@@ -1289,6 +1331,8 @@ export function resetDb(): void {
   db.taiKhoanDonVi = taoDanhSachTaiKhoanDonViMau();
   db.taiKhoanHoTro = taoDanhSachTaiKhoanHoTroMau();
   db.hoTroCum = taoHoTroCumMau();
+  db.hoTroLop = taoHoTroLopMau();
+  db.hoTroDanhSachLop = taoHoTroDanhSachLopMau();
   db.hoTroHocVien = taoHoTroHocVienMau();
   db.hoTroChiTiet = taoHoTroChiTietMau();
   db.hoTroLichHoc = taoHoTroLichHocMau();

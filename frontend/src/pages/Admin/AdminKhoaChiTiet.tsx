@@ -63,7 +63,7 @@ import { KhoaTrangThaiBadge } from '@/components/KhoaTrangThaiBadge';
 import { SelectDonViTimKiem } from '@/components/SelectDonViTimKiem';
 import { AdminPageHeader } from './AdminPageHeader';
 import { ModalImportLopHoc } from './ModalImportLopHoc';
-import { ChonNguoiHoTroCum } from './ChonNguoiHoTroCum';
+import { ChonNguoiHoTroCum, ChonNguoiHoTroLop } from './ChonNguoiHoTroCum';
 import { SelectDiemHoc } from '@/components/SelectDiemHoc';
 import { ModalPhanCongBuoi } from './ModalPhanCongBuoi';
 import { ChonNhomHoTroGv } from './ChonNhomHoTroGv';
@@ -940,6 +940,7 @@ export default function AdminKhoaChiTiet() {
                           <Table.Th>Sĩ số tối đa</Table.Th>
                           <Table.Th>Sĩ số hiện tại</Table.Th>
                           <Table.Th>Giảng viên / nhân sự</Table.Th>
+                          {laQuanTri && <Table.Th>Người hỗ trợ lớp</Table.Th>}
                           <Table.Th>Trạng thái</Table.Th>
                           <Table.Th>Số buổi đã lên lịch</Table.Th>
                           <Table.Th />
@@ -948,7 +949,7 @@ export default function AdminKhoaChiTiet() {
                       <Table.Tbody>
                         {khoa.lop_hoc.length === 0 && (
                           <Table.Tr>
-                            <Table.Td colSpan={7}>
+                            <Table.Td colSpan={laQuanTri ? 9 : 8}>
                               <Text c="dimmed" ta="center" py="lg">
                                 Khóa chưa có lớp học nào.
                               </Text>
@@ -973,6 +974,11 @@ export default function AdminKhoaChiTiet() {
                                     ? lop.nhan_su.map((n) => n.ho_ten).join(', ')
                                     : '—'}
                                 </Table.Td>
+                                {laQuanTri && (
+                                  <Table.Td>
+                                    <ChonNguoiHoTroLop khoaId={khoa.id} lop={lop} />
+                                  </Table.Td>
+                                )}
                                 <Table.Td>
                                   <BadgeHoatDong trangThai={lop.trang_thai} />
                                 </Table.Td>
@@ -1012,7 +1018,7 @@ export default function AdminKhoaChiTiet() {
                               </Table.Tr>
                               {moRong && (
                                 <Table.Tr key={`${lop.id}-mo-rong`}>
-                                  <Table.Td colSpan={7} style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                                  <Table.Td colSpan={laQuanTri ? 9 : 8} style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
                                     <Stack gap="md" py="xs">
                                       <Box>
                                         <Group justify="space-between" mb={6}>
