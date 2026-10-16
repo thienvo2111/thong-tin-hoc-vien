@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Alert,
   Badge,
   Button,
   Container,
@@ -9,6 +8,7 @@ import {
   Modal,
   Paper,
   Radio,
+  ScrollArea,
   SimpleGrid,
   Stack,
   Tabs,
@@ -45,38 +45,32 @@ const NHAN_TRANG_THAI: Record<TrangThaiDeNghi, string> = {
   da_huy: 'Đã hủy',
 };
 
-/** Khối 1 buổi: nhãn vai trò, tên lớp, buổi số, thứ-ngày, giờ (+ dòng phụ tùy chọn). */
+/** Khối 1 buổi, gọn 2 dòng: [nhãn] tên lớp / Buổi n · thứ-ngày · giờ (+ dòng phụ nhỏ). */
 function KhoiBuoi({ nhan, b, mau, phu }: { nhan: string; b: BuoiTomTat | null; mau: string; phu?: string }) {
   return (
     <Paper
       role="group"
       aria-label={nhan}
       radius="sm"
-      p="sm"
+      px="xs"
+      py={6}
       bg={`${mau}.0`}
-      style={{ borderLeft: `4px solid var(--mantine-color-${mau}-6)` }}
+      style={{ borderLeft: `3px solid var(--mantine-color-${mau}-6)` }}
     >
-      <Text fz="xs" fw={700} c={`${mau}.8`} tt="uppercase">
-        {nhan}
+      <Text fz="sm" lh={1.35}>
+        <Text span fz={11} fw={700} c={`${mau}.8`} tt="uppercase" mr={6}>
+          {nhan}
+        </Text>
+        {b ? <b>{b.lop.ten_lop}</b> : '—'}
       </Text>
-      {b ? (
-        <>
-          <Text fw={700} fz="sm" mt={4}>
-            {b.lop.ten_lop}
-          </Text>
-          <Text fz="sm">
-            <b>Buổi {b.buoi_so}</b> · {dinhDangThuNgay(b.thoi_gian_bat_dau)}
-          </Text>
-          <Text fz="sm">
-            {dinhDangGio(b.thoi_gian_bat_dau)}
-            {b.thoi_gian_ket_thuc ? `–${dinhDangGio(b.thoi_gian_ket_thuc)}` : ''}
-          </Text>
-        </>
-      ) : (
-        <Text fz="sm">—</Text>
+      {b && (
+        <Text fz="xs" lh={1.35}>
+          <b>Buổi {b.buoi_so}</b> · {dinhDangThuNgay(b.thoi_gian_bat_dau)} · {dinhDangGio(b.thoi_gian_bat_dau)}
+          {b.thoi_gian_ket_thuc ? `–${dinhDangGio(b.thoi_gian_ket_thuc)}` : ''}
+        </Text>
       )}
       {phu && (
-        <Text fz="xs" c="dimmed" mt={4}>
+        <Text fz="xs" c="dimmed" lh={1.35}>
           {phu}
         </Text>
       )}
@@ -87,7 +81,7 @@ function KhoiBuoi({ nhan, b, mau, phu }: { nhan: string; b: BuoiTomTat | null; m
 /** Buổi gốc → buổi đích, 2 cột trên màn rộng, xếp dọc trên điện thoại. */
 function HaiBuoi({ goc, dich, nhanDich, phuDich }: { goc: BuoiTomTat | null; dich: BuoiTomTat | null; nhanDich: string; phuDich?: string }) {
   return (
-    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs" verticalSpacing={6}>
       <KhoiBuoi nhan="Buổi gốc" b={goc} mau="gray" />
       <KhoiBuoi nhan={nhanDich} b={dich} mau="blue" phu={phuDich} />
     </SimpleGrid>
@@ -361,7 +355,7 @@ function ModalDuyet({ deNghi, onDong }: { deNghi: DeNghiDuyet; onDong: () => voi
 
   return (
     <Modal opened onClose={onDong} size="lg" title={`Duyệt đề nghị của ${deNghi.hoc_vien.ho_ten}`}>
-      <Stack gap="md">
+      <Stack gap="sm">
         <KhoiBuoi nhan="Buổi gốc" b={deNghi.buoi_nguon} mau="gray" />
         {isLoading && <Loader size="sm" />}
         {isError && <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>}
@@ -372,11 +366,14 @@ function ModalDuyet({ deNghi, onDong }: { deNghi: DeNghiDuyet; onDong: () => voi
             onChange={setChon}
             description={deNghiKhongDuyetDuoc ? 'Buổi đề nghị không duyệt được — chọn buổi khác' : undefined}
           >
-            <Stack gap="xs" mt="xs">
-              {data.map((c) => (
-                <LuaChonDong key={c.lich.id} c={c} laQuanTri={laQuanTri} />
-              ))}
-            </Stack>
+            {/* Nhiều buổi lựa chọn: cuộn trong khung, không đẩy cả cửa sổ vượt màn hình. */}
+            <ScrollArea.Autosize mah="calc(100dvh - 380px)" mt={6} type="auto" offsetScrollbars>
+              <Stack gap={6}>
+                {data.map((c) => (
+                  <LuaChonDong key={c.lich.id} c={c} laQuanTri={laQuanTri} />
+                ))}
+              </Stack>
+            </ScrollArea.Autosize>
           </Radio.Group>
         )}
         <Textarea
@@ -384,7 +381,8 @@ function ModalDuyet({ deNghi, onDong }: { deNghi: DeNghiDuyet; onDong: () => voi
           value={ghiChu}
           onChange={(e) => setGhiChu(e.currentTarget.value)}
           autosize
-          minRows={2}
+          minRows={1}
+          maxRows={3}
           maxLength={GHI_CHU_TOI_DA}
           error={ghiChuSai ? `Ghi chú từ ${GHI_CHU_TOI_THIEU} đến ${GHI_CHU_TOI_DA} ký tự` : undefined}
         />
@@ -406,35 +404,39 @@ function LuaChonDong({ c, laQuanTri }: { c: LuaChonDuyet; laQuanTri: boolean }) 
   const vuot = !c.duyet_duoc && laQuanTri;
   const diaDiem = c.diem_hoc ? `${c.diem_hoc.ten}${c.phong ? ` · ${c.phong}` : ''}` : (c.dia_diem_hoac_link ?? c.phong);
   return (
-    <Paper withBorder radius="md" p="xs">
+    <Paper withBorder radius="sm" px="xs" py={6}>
       <Radio
+        size="xs"
         value={c.lich.id}
         disabled={khoa}
         aria-disabled={khoa}
         label={
-          <Stack gap={2}>
-            <Text fz="sm" fw={600}>
-              {c.lich.lop.ten_lop} · Buổi {c.lich.buoi_so}
+          <Stack gap={0}>
+            <Text fz="sm" lh={1.35}>
+              <b>{c.lich.lop.ten_lop}</b> · Buổi {c.lich.buoi_so} · {dinhDangThuNgay(c.lich.thoi_gian_bat_dau)}{' '}
+              {dinhDangGio(c.lich.thoi_gian_bat_dau)}–{dinhDangGio(c.thoi_gian_ket_thuc)}
             </Text>
-            <Text fz="xs">
-              {dinhDangNgayGio(c.lich.thoi_gian_bat_dau)}–{dinhDangGio(c.thoi_gian_ket_thuc)}
-              {diaDiem ? ` · ${diaDiem}` : ''}
-            </Text>
-            <Text fz="xs" c="dimmed">
-              Sĩ số {c.si_so}/{c.si_so_toi_da ?? '—'}
+            <Text fz="xs" c="dimmed" lh={1.35}>
+              {diaDiem ? `${diaDiem} · ` : ''}Sĩ số {c.si_so}/{c.si_so_toi_da ?? '—'}
               {c.so_cho_duyet > 0 ? ` +${c.so_cho_duyet} đang chờ` : ''}
               {c.so_truoc > 0 ? ` · ${c.so_truoc} gửi trước` : ''}
+              {khoa && (
+                <>
+                  {' · '}
+                  <Text span fz="xs" c="red" fw={600}>
+                    {c.da_du ? 'Đã đủ' : 'Giữ chỗ cho đề nghị gửi trước'}
+                  </Text>
+                </>
+              )}
+              {vuot && (
+                <>
+                  {' · '}
+                  <Text span fz="xs" c="yellow.8" fw={600}>
+                    Vượt sĩ số / thứ tự — chỉ Quản trị
+                  </Text>
+                </>
+              )}
             </Text>
-            {khoa && (
-              <Text fz="xs" c="red">
-                {c.da_du ? 'Đã đủ' : 'Giữ chỗ cho đề nghị gửi trước'}
-              </Text>
-            )}
-            {vuot && (
-              <Alert color="yellow" p={4} fz="xs">
-                Vượt sĩ số / thứ tự — chỉ Quản trị
-              </Alert>
-            )}
           </Stack>
         }
       />
@@ -493,7 +495,8 @@ function ModalGhiChu({
           value={ghiChu}
           onChange={(e) => setGhiChu(e.currentTarget.value)}
           autosize
-          minRows={3}
+          minRows={2}
+          maxRows={5}
           maxLength={GHI_CHU_TOI_DA}
         />
         <Group justify="flex-end">
