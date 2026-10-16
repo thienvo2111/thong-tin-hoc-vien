@@ -1,5 +1,6 @@
 import { trang_thai_de_nghi } from '@prisma/client';
-import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsEnum, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 
 // Độ dài ly_do được kiểm bằng chuanHoaLyDo (5–500 sau NFC + trim).
 export class GuiDoiBuoiDto {
@@ -21,6 +22,14 @@ export class LocDoiBuoiDto {
   @IsOptional()
   @IsUUID()
   khoa_id?: string;
+
+  // true = mọi đề nghị đã xử lý (da_duyet/tu_choi/da_huy), mới xử lý nhất trước; ưu tiên hơn trang_thai.
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsIn([true, false])
+  da_xu_ly?: boolean;
 }
 
 // ghi_chu kiểm bằng chuanHoaLyDo trong service (5–500 sau NFC + trim).

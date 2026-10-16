@@ -873,6 +873,18 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     expect(arg.orderBy).toEqual({ xu_ly_luc: 'desc' });
   });
 
+  it('danhSach: da_xu_ly -> 3 trang thai da xu ly, xu_ly_luc giam, van gioi han cum + 500', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.danhSach(hoTro, { da_xu_ly: true });
+    const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
+    expect(arg.where).toEqual({
+      trang_thai: { in: ['da_duyet', 'tu_choi', 'da_huy'] },
+      dang_ky_hoc: { cum_id: { in: ['c1'] } },
+    });
+    expect(arg.orderBy).toEqual({ xu_ly_luc: 'desc' });
+    expect(arg.take).toBe(500);
+  });
+
   it('danhSach: ho tro khong co cum -> []', async () => {
     const { svc, scope, prisma } = setupDuyet();
     scope.cumIdsCuaToi.mockResolvedValueOnce([]);

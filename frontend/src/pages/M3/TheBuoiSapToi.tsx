@@ -14,7 +14,7 @@ function buoiSapToi(khoaHoc: KhoaHocDangKy[] | undefined, bayGio = Date.now()) {
         lop: gd.lop!.ten_lop,
         thucDia: gd.thuc_dia ?? [],
         khoaId: dk.khoa_id,
-        coDoiBuoi: (dk.khoa.so_buoi_doi_toi_da ?? 0) > 0,
+        coDoiBuoi: (dk.khoa?.so_buoi_doi_toi_da ?? 0) > 0,
       })),
     ),
   );

@@ -293,17 +293,23 @@ export class DoiBuoiHocService {
     if (cumIds?.length === 0) return [];
     const rows = await this.prisma.doi_buoi_hoc.findMany({
       where: {
-        ...(q.trang_thai ? { trang_thai: q.trang_thai } : {}),
+        ...(q.da_xu_ly
+          ? { trang_thai: { in: ['da_duyet', 'tu_choi', 'da_huy'] as trang_thai_de_nghi[] } }
+          : q.trang_thai
+            ? { trang_thai: q.trang_thai }
+            : {}),
         dang_ky_hoc: {
           ...(cumIds ? { cum_id: { in: cumIds } } : {}),
           ...(q.khoa_id ? { khoa_id: q.khoa_id } : {}),
         },
       },
-      orderBy: !q.trang_thai
-        ? { tao_luc: 'desc' }
-        : q.trang_thai === 'cho_duyet'
-          ? { tao_luc: 'asc' }
-          : { xu_ly_luc: 'desc' },
+      orderBy: q.da_xu_ly
+        ? { xu_ly_luc: 'desc' }
+        : !q.trang_thai
+          ? { tao_luc: 'desc' }
+          : q.trang_thai === 'cho_duyet'
+            ? { tao_luc: 'asc' }
+            : { xu_ly_luc: 'desc' },
       take: 500,
       select: {
         ...DE_NGHI_SELECT,

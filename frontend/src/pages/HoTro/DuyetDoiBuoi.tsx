@@ -34,6 +34,7 @@ import { thongDiepLoiXungDot } from "@/lib/loiApi";
 
 const GHI_CHU_TOI_THIEU = 5;
 const GHI_CHU_TOI_DA = 500;
+const GIOI_HAN_DANH_SACH = 500; // khớp take: 500 của server
 
 const NHAN_TRANG_THAI: Record<TrangThaiDeNghi, string> = {
   cho_duyet: "Chờ duyệt",
@@ -131,16 +132,14 @@ function DanhSach({
   hanhDong: HanhDong;
 }) {
   const { data, isLoading, isError, error } = useDsDoiBuoi(
-    chiChoDuyet ? { trang_thai: "cho_duyet" } : {},
+    chiChoDuyet ? { trang_thai: "cho_duyet" } : { da_xu_ly: true },
   );
   if (isLoading) return <Loader size="sm" />;
   if (isError)
     return (
       <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>
     );
-  const ds = (data ?? []).filter((d) =>
-    chiChoDuyet ? d.trang_thai === "cho_duyet" : d.trang_thai !== "cho_duyet",
-  );
+  const ds = data ?? [];
   if (ds.length === 0)
     return (
       <Text fz="sm" c="dimmed">
@@ -151,6 +150,11 @@ function DanhSach({
     );
   return (
     <Stack gap="sm">
+      {!chiChoDuyet && ds.length >= GIOI_HAN_DANH_SACH && (
+        <StatusBanner loai="info">
+          Chỉ hiển thị {GIOI_HAN_DANH_SACH} đề nghị xử lý gần nhất
+        </StatusBanner>
+      )}
       {ds.map((d) =>
         chiChoDuyet ? (
           <DongChoDuyet key={d.id} d={d} hanhDong={hanhDong} />
@@ -298,10 +302,14 @@ function ModalDuyet({
   const laQuanTri = nguoiDung?.vai_tro === "quan_tri";
   const { data, isLoading, isError, error } = useLuaChonDuyet(deNghi.id);
   const [chon, setChon] = useState<string>(deNghi.lich_de_nghi_id);
+  const deNghiKhongDuyetDuoc =
+    !laQuanTri &&
+    data?.find((c) => c.lich.id === deNghi.lich_de_nghi_id)?.duyet_duoc === false;
+  const chonHieuLuc = deNghiKhongDuyetDuoc && chon === deNghi.lich_de_nghi_id ? "" : chon;
   const [ghiChu, setGhiChu] = useState("");
   const duyet = useDuyetDoiBuoi();
 
-  const chonMuc = data?.find((c) => c.lich.id === chon);
+  const chonMuc = data?.find((c) => c.lich.id === chonHieuLuc);
   const chonDuoc = !!chonMuc && (chonMuc.duyet_duoc || laQuanTri);
   const ghiChuCat = chuanHoa(ghiChu);
   const ghiChuSai = ghiChuCat.length > 0 && !ghiChuHopLe(ghiChu);
@@ -310,7 +318,7 @@ function ModalDuyet({
     duyet.mutate(
       {
         id: deNghi.id,
-        lich_chot_id: chon,
+        lich_chot_id: chonHieuLuc,
         ...(ghiChuCat ? { ghi_chu: ghiChuCat } : {}),
       },
       {
@@ -345,7 +353,16 @@ function ModalDuyet({
           <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>
         )}
         {data && (
-          <Radio.Group label="Chọn buổi chốt" value={chon} onChange={setChon}>
+          <Radio.Group
+            label="Chọn buổi chốt"
+            value={chonHieuLuc}
+            onChange={setChon}
+            description={
+              deNghiKhongDuyetDuoc
+                ? "Buổi đề nghị không duyệt được — chọn buổi khác"
+                : undefined
+            }
+          >
             <Stack gap="xs" mt="xs">
               {data.map((c) => (
                 <LuaChonDong key={c.lich.id} c={c} laQuanTri={laQuanTri} />

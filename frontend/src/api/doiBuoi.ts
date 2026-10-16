@@ -88,6 +88,8 @@ export interface LuaChonDuyet extends LuaChonBuoi {
 export interface LocDoiBuoi {
   trang_thai?: TrangThaiDeNghi;
   khoa_id?: string;
+  /** true = mọi đề nghị đã xử lý (server sắp xu_ly_luc giảm, tối đa 500). */
+  da_xu_ly?: boolean;
 }
 
 const KEY = "doi-buoi";
@@ -168,7 +170,9 @@ export function useHuyDoiBuoi() {
 export function useDsDoiBuoi(q: LocDoiBuoi = {}) {
   return useQuery({
     queryKey: [KEY, "ds", q],
-    queryFn: () => apiFetch<DeNghiDuyet[]>(`/doi-buoi-hoc${qs({ ...q })}`),
+    queryFn: () => apiFetch<DeNghiDuyet[]>(
+        `/doi-buoi-hoc${qs({ ...q, da_xu_ly: q.da_xu_ly ? "true" : undefined })}`,
+      ),
   });
 }
 

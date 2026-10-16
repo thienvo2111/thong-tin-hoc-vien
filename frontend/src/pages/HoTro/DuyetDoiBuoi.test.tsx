@@ -12,6 +12,7 @@ import type {
   LichTomTat,
   LuaChonDuyet,
 } from "@/api/doiBuoi";
+import { RequireQuanTri } from "@/auth/RequireQuanTri";
 import HoTroLayout from "./HoTroLayout";
 import DuyetDoiBuoi from "./DuyetDoiBuoi";
 
@@ -274,5 +275,54 @@ describe("Màn duyệt đổi buổi", () => {
       ).toBeInTheDocument(),
     );
     expect(within(nav).getByText("Đổi buổi")).toBeInTheDocument();
+  });
+  it("tab Đã xử lý gọi server với da_xu_ly=true và báo khi chạm giới hạn 500", async () => {
+    let url = "";
+    const dong = Array.from({ length: 500 }, (_, i) =>
+      deNghi({ id: `dn-${i}`, trang_thai: "tu_choi" }),
+    );
+    datApi([]);
+    server.use(
+      http.get("/doi-buoi-hoc", ({ request }) => {
+        url = request.url;
+        return HttpResponse.json(dong);
+      }),
+    );
+    renderTrang("ho_tro_hoc_vien");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "Đã xử lý" }));
+    expect(
+      await screen.findByText("Chỉ hiển thị 500 đề nghị xử lý gần nhất"),
+    ).toBeInTheDocument();
+    expect(url).toContain("da_xu_ly=true");
+  });
+
+  it("hỗ trợ cụm: buổi đề nghị không duyệt được -> không chọn sẵn, có gợi ý, nút xác nhận disabled", async () => {
+    datApi([deNghi({ lich_de_nghi_id: "ld-2" })]);
+    renderTrang("ho_tro_hoc_vien");
+    await moModalDuyet();
+    expect(
+      await screen.findByText("Buổi đề nghị không duyệt được — chọn buổi khác"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Lớp 02/ })).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Xác nhận duyệt" })).toBeDisabled();
+  });
+
+  it("/admin/doi-buoi: truong không xem được trang, quan_tri xem được", async () => {
+    datApi([deNghi()]);
+    datToken("token-gia-lap");
+    db.nguoiDung.vai_tro = "truong";
+    renderVoiRouter(
+      [
+        {
+          element: <RequireQuanTri />,
+          children: [{ path: "/admin/doi-buoi", element: <DuyetDoiBuoi /> }],
+        },
+        { path: "/admin/tong-quan", element: <div>Tổng quan</div> },
+      ],
+      { initialEntries: ["/admin/doi-buoi"] },
+    );
+    expect(await screen.findByText("Tổng quan")).toBeInTheDocument();
+    expect(screen.queryByText("Đổi buổi học")).toBeNull();
   });
 });

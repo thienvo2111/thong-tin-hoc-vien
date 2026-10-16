@@ -230,10 +230,6 @@ export const router = createBrowserRouter([
                     lazy: () => import('@/pages/Admin/AdminGiangVien').then((m) => ({ Component: m.default })),
                   },
                   {
-                    path: '/admin/doi-buoi',
-                    lazy: () => import('@/pages/HoTro/DuyetDoiBuoi').then((m) => ({ Component: m.default })),
-                  },
-                  {
                     path: '/admin/van-hanh',
                     lazy: () => import('@/pages/Admin/AdminVanHanh').then((m) => ({ Component: m.default })),
                   },
@@ -263,6 +259,10 @@ export const router = createBrowserRouter([
                       {
                         path: '/admin/tai-khoan-hoc-vien',
                         lazy: () => import('@/pages/Admin/AdminTaiKhoanHocVien').then((m) => ({ Component: m.default })),
+                      },
+                      {
+                        path: '/admin/doi-buoi',
+                        lazy: () => import('@/pages/HoTro/DuyetDoiBuoi').then((m) => ({ Component: m.default })),
                       },
                       {
                         path: '/admin/nguoi-ho-tro',
