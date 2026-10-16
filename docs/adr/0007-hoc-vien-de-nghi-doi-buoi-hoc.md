@@ -1,7 +1,7 @@
 # ADR 0007 — Học viên tự đề nghị đổi từng buổi học, người hỗ trợ cụm duyệt theo hàng đợi
 
 - Ngày: 2026-10-16
-- Trạng thái: Đề xuất
+- Trạng thái: Đã chấp nhận
 - Bổ sung (không thay thế): ADR 0004 G14 — đề nghị đổi lớp **cả giai đoạn** (`de_nghi_doi_lop`) giữ nguyên
 - Đặc tả: [2026-10-16-doi-buoi-hoc-design.md](../superpowers/specs/2026-10-16-doi-buoi-hoc-design.md)
 
@@ -39,3 +39,4 @@ Học viên thường bận đúng một buổi chứ không phải cả giai đ
 - Nạp điểm danh: học viên đã được duyệt đổi vào buổi không còn bị coi là học bù.
 - Đổi buổi được duyệt sau lần nhắc lịch cuối của cụm → bật cờ "Cần nhắc lại" (như G11).
 - Sĩ số "theo buổi" có thể khác sĩ số "theo lớp" — giao diện phải ghi rõ đang hiện loại nào.
+- Các đường đọc phát sinh thêm khi triển khai (đều đi qua `DoiBuoiHocQueryService`): vào học Zoom (học viên đổi vào buổi chốt được vào phòng), chuyên cần/tiến độ (tính điểm danh ở buổi chốt thay buổi nguồn), báo vắng (nhận buổi chốt), chốt vắng Zoom tự động (bỏ qua người đổi ra, tính người đổi vào). Trang lớp và bảng điểm danh trả người đổi vào ở danh sách riêng `hoc_vien_doi_vao`.

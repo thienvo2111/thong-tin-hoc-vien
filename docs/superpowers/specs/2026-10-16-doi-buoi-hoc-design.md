@@ -93,8 +93,8 @@ Phạm vi: `ho_tro_hoc_vien` chỉ thấy/xử lý đề nghị có `dang_ky_hoc
 
 | Endpoint | Hành vi |
 |---|---|
-| `GET /doi-buoi-hoc?trang_thai=&khoa_id=` | Danh sách: học viên (họ tên, đơn vị, cụm), buổi nguồn, buổi đề nghị, buổi chốt, lý do, `tao_luc`, `qua_han` (buổi nguồn hoặc buổi đề nghị đã bắt đầu, chỉ với `cho_duyet`), `thu_tu_hang` (`k/n` trong hàng chờ của buổi đề nghị), `si_so`/`si_so_toi_da`/`so_cho_duyet` của buổi đề nghị. `cho_duyet` sắp `tao_luc` tăng dần; trạng thái khác sắp `xu_ly_luc` giảm dần. `take: 500`. |
-| `GET /doi-buoi-hoc/dem-cho-duyet` | Số `cho_duyet` chưa quá hạn trong phạm vi — cho badge menu. |
+| `GET /doi-buoi-hoc?trang_thai=&khoa_id=&da_xu_ly=` | `da_xu_ly=true` = mọi đề nghị đã xử lý (`da_duyet`/`tu_choi`/`da_huy`), lọc ở server, mới xử lý nhất trước, ưu tiên hơn `trang_thai`. Danh sách: học viên (họ tên, đơn vị, cụm), buổi nguồn, buổi đề nghị, buổi chốt, lý do, `tao_luc`, `qua_han` (buổi nguồn hoặc buổi đề nghị đã bắt đầu, chỉ với `cho_duyet`), `thu_tu_hang` (`k/n` trong hàng chờ của buổi đề nghị), `si_so`/`si_so_toi_da`/`so_cho_duyet` của buổi đề nghị. `cho_duyet` sắp `tao_luc` tăng dần; trạng thái khác sắp `xu_ly_luc` giảm dần. `take: 500`. |
+| `GET /doi-buoi-hoc/dem-cho-duyet` | Trả `{ cho_duyet: n }` — số `cho_duyet` chưa quá hạn trong phạm vi, cho badge menu (bọc object vì số trần không đọc được bằng client JSON). |
 | `GET /doi-buoi-hoc/{id}/lua-chon` | Các buổi tương đương với buổi nguồn, chưa bắt đầu, kèm `si_so`, `si_so_toi_da`, `so_cho_duyet`, `so_truoc` (số `cho_duyet` vào buổi đó có `tao_luc` < đề nghị này), `duyet_duoc` (theo D5). |
 | `POST /doi-buoi-hoc/{id}/duyet` | `{ lich_chot_id?, ghi_chu? }` — mặc định `lich_chot_id = lich_de_nghi_id`. Xem §4. |
 | `POST /doi-buoi-hoc/{id}/tu-choi` | `{ ghi_chu }` bắt buộc (5–500). UPDATE có điều kiện `cho_duyet`; 0 dòng → 409. |
@@ -132,6 +132,11 @@ Chốt sang buổi khác buổi đề nghị: hàng đợi và sĩ số tính th
 | Lịch học hỗ trợ cụm (`ho-tro-hoc-vien.service.ts` `lichHoc`) | Buổi chốt của học viên trong cụm được tính là buổi của cụm. |
 | Nhắc lịch cụm (`nhac-lich.service.ts` `capDotCuaCum` + nội dung tin) | Buổi chốt thêm vào lịch nhắc của cụm; nội dung ghi "{họ tên} học buổi {n} tại {lớp}". Đổi buổi được duyệt **sau** lần nhắc cuối → cờ "Cần nhắc lại" như G11 (so `xu_ly_luc` với lần gửi cuối). |
 | Trang học viên (`M7/ThongTinLopHoc.tsx`, `M3/TheBuoiSapToi.tsx`) | Buổi đã đổi hiện giờ/địa điểm/link của buổi chốt, nhãn "Đã đổi buổi". |
+| Vào học Zoom (`vao-hoc-zoom.service.ts`) | Học viên có đề nghị `da_duyet` **vào** buổi đó (buổi chốt) được vào phòng, không bị 403. |
+| Chuyên cần / tiến độ (`chuyen-can.util`, `theo_lop_hien_tai`) | Đề nghị `da_duyet` hiệu lực: điểm danh ở buổi chốt được tính thay buổi nguồn. |
+| Báo vắng (`van-hanh-hoc-vien` `buoiCuaHocVien`) | Nhận buổi chốt của đề nghị `da_duyet` hiệu lực. |
+| Chốt vắng Zoom tự động (`ChotVangZoomProcessor`) | Bỏ qua người đổi **ra** ở buổi nguồn; tính người đổi **vào** ở buổi chốt. |
+| Trang lớp, bảng điểm danh (cách trả dữ liệu) | Người đổi vào **không** lẫn vào danh sách lớp: trả riêng `hoc_vien_doi_vao`, để các số đếm theo lớp giữ lớp gốc; nhãn đổi ra/vào ở `doi_buoi: Record<lich_hoc_id, { loai, lop }>`. |
 | **Giữ nguyên** | Sĩ số lớp ở trang khóa, báo cáo theo lớp, email thông báo xếp lớp, SSO, Excel chia lớp — vẫn theo lớp gốc. |
 
 ## 6. Giao diện
