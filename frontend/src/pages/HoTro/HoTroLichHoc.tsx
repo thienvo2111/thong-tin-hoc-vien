@@ -102,6 +102,11 @@ export default function HoTroLichHoc() {
                         {b.so_hoc_vien_cum} học viên của cụm · {b.khoa.ma_khoa} · GĐ{b.giai_doan.thu_tu}
                       </Text>
                     </Group>
+                    {(b.hoc_vien_doi_buoi ?? []).length > 0 && (
+                      <Text fz="xs" mt={4}>
+                        Đổi buổi vào: {(b.hoc_vien_doi_buoi ?? []).join(', ')}
+                      </Text>
+                    )}
                     {b.dia_diem_hoac_link && (
                       <Text fz="sm" mt={4} style={{ wordBreak: 'break-all' }}>
                         {href ? (

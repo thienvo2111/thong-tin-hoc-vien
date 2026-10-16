@@ -97,6 +97,12 @@ Tính năng **TẮT cho mọi khóa** sau deploy. Chỉ khi Quản trị đặt 
 thì học viên của khóa đó mới thấy lối vào và gửi được đề nghị. Báo người hỗ trợ cụm trước khi bật (họ duyệt ở
 menu **Đổi buổi**, có badge số chờ).
 
+> **Không bật `so_buoi_doi_toi_da > 0` cho khóa nào cho tới khi kiểm tra trang lớp/bảng điểm danh hiển thị đổi
+> buổi trên môi trường thật.** Cách kiểm: trên một khóa thử (hoặc dữ liệu thử), duyệt 1 đề nghị rồi mở trang lớp
+> (hỗ trợ GV — tab Lịch có cột "Sĩ số buổi", tab Học viên có nhãn "Từ {lớp}" / "Đổi sang {lớp}"), bảng điểm danh
+> (dòng "Học viên đổi buổi vào lớp", ô buổi chốt sửa được, buổi khác "—"), trang lớp cổng giảng viên và Lịch học
+> của hỗ trợ cụm ("Đổi buổi vào: …"). Chỉ khi cả 4 chỗ hiển thị đúng mới bật cho khóa thật.
+
 ## 7. Quay lui (nếu cần)
 
 Ưu tiên **tắt tính năng**: đặt `so_buoi_doi_toi_da = 0` ở các khóa (dừng đề nghị mới, giữ dữ liệu).

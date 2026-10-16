@@ -753,7 +753,7 @@ Thông điệp lỗi dưới đây là nguyên văn trong `message`. Mã nghiệ
 
 ### 12.1 Học viên (`hoc_vien`, prefix `/hoc-vien/toi/doi-buoi`)
 
-Mọi endpoint: đăng ký phải của caller (không phải → `404`); khóa `so_buoi_doi_toi_da = 0` → `403` "Khóa học chưa mở đề nghị đổi buổi".
+Mọi endpoint: đăng ký phải của caller (không phải → `404`); đăng ký `tu_choi` → `400` "Đăng ký không còn hiệu lực"; khóa `so_buoi_doi_toi_da = 0` → `403` "Khóa học chưa mở đề nghị đổi buổi".
 
 | Method | Endpoint | Mô tả |
 |---|---|---|
@@ -771,12 +771,12 @@ Mọi endpoint: đăng ký phải của caller (không phải → `404`); khóa 
 
 | Method | Endpoint | Mô tả |
 |---|---|---|
-| GET | `/doi-buoi-hoc?trang_thai=&khoa_id=&da_xu_ly=` | Query đều tùy chọn. `trang_thai` ∈ enum (sai → `400`); `da_xu_ly=true` = mọi đề nghị đã xử lý (`da_duyet`/`tu_choi`/`da_huy`), lọc ở server, mới xử lý nhất trước, ưu tiên hơn `trang_thai`. Sắp: `cho_duyet` theo `tao_luc` tăng dần; trạng thái khác `xu_ly_luc` giảm dần; không lọc → `tao_luc` giảm dần. Tối đa 500. Mỗi dòng = **Đối tượng đề nghị** (12.1) thêm `hoc_vien: { id, ho_ten, don_vi, cum }`, `si_so` / `si_so_toi_da` / `so_cho_duyet` (của buổi đề nghị), `nguoi_xu_ly` (họ tên hoặc `null`) |
+| GET | `/doi-buoi-hoc?trang_thai=&khoa_id=&da_xu_ly=&qua_han=` | Query đều tùy chọn. `trang_thai` ∈ enum (sai → `400`); `da_xu_ly=true` = mọi đề nghị đã xử lý (`da_duyet`/`tu_choi`/`da_huy`), lọc ở server, mới xử lý nhất trước, ưu tiên hơn `trang_thai`. `trang_thai=cho_duyet`: mặc định **chỉ đề nghị còn hạn** (buổi nguồn và buổi đề nghị chưa bắt đầu); `qua_han=true` → chỉ đề nghị quá hạn, `tao_luc` giảm dần, tối đa 100 (`qua_han` bị bỏ qua với trạng thái khác). Sắp: `cho_duyet` theo `tao_luc` tăng dần; trạng thái khác `xu_ly_luc` giảm dần; không lọc → `tao_luc` giảm dần. Tối đa 500. Mỗi dòng = **Đối tượng đề nghị** (12.1) thêm `hoc_vien: { id, ho_ten, don_vi, cum }`, `si_so` / `si_so_toi_da` / `so_cho_duyet` (của buổi đề nghị), `nguoi_xu_ly` (họ tên hoặc `null`) |
 | GET | `/doi-buoi-hoc/dem-cho-duyet` | `{ cho_duyet }` — số `cho_duyet` chưa quá hạn trong phạm vi (badge menu). Bọc object vì số trần Nest trả `text/html` |
 | GET | `/doi-buoi-hoc/{id}/lua-chon` | Buổi tương đương với buổi nguồn của đề nghị, chưa bắt đầu: các trường như `lua-chon` của học viên (kể cả `thoi_gian_ket_thuc`, `diem_hoc`, `phong`, `dia_diem_hoac_link`; link Zoom `null`) thêm `so_truoc` (số `cho_duyet` gửi trước vào buổi đó) và `duyet_duoc` (còn chỗ cho đề nghị này theo hàng chờ) |
 | POST | `/doi-buoi-hoc/{id}/duyet` | `{ lich_chot_id?, ghi_chu? }` — mặc định `lich_chot_id = lich_de_nghi_id`; `ghi_chu` nếu gửi: 5–500 ký tự. → `200 { trang_thai: 'da_duyet', canh_bao: string[] }`. Một transaction, khóa `pg_advisory_xact_lock` theo buổi chốt. Lỗi: `409` "Đề nghị đã được xử lý"; `400` "Buổi đã bắt đầu, không thể đổi" / "Buổi chọn không tương đương với buổi của bạn" (kể cả lớp đích đã `inactive`); `409` "Phân lớp của học viên đã thay đổi — hãy từ chối". `ho_tro_hoc_vien` thêm `409` "Buổi đã đủ sĩ số {si_so}/{toi_da} — chọn buổi khác" hoặc "Còn {k} chỗ, có {n} đề nghị gửi trước đang chờ — cần xử lý trước". `quan_tri` vẫn duyệt được khi đầy/vượt thứ tự, `canh_bao` ghi "Vượt sĩ số …" / "Vượt thứ tự: …". Ghi nhật ký `duyet_doi_buoi` |
 | POST | `/doi-buoi-hoc/{id}/tu-choi` | `{ ghi_chu }` bắt buộc 5–500 (sai → `400` "Ghi chú phải từ 5 đến 500 ký tự"). → `{ trang_thai: 'tu_choi' }`. Không còn `cho_duyet` → `409` "Đề nghị đã được xử lý" |
-| POST | `/doi-buoi-hoc/{id}/huy-duyet` | `{ ghi_chu }` bắt buộc 5–500. Chỉ khi `da_duyet` và cả buổi nguồn lẫn buổi chốt chưa bắt đầu → `{ trang_thai: 'da_huy' }`, trả lại lượt. Không phải `da_duyet` → `409` "Đề nghị đã được xử lý"; đã bắt đầu → `400` "Buổi đã bắt đầu, không thể đổi" |
+| POST | `/doi-buoi-hoc/{id}/huy-duyet` | `{ ghi_chu }` bắt buộc 5–500. Chỉ khi `da_duyet` và cả buổi nguồn lẫn buổi chốt chưa bắt đầu → `{ trang_thai: 'da_huy', canh_bao: string[] }`, trả lại lượt. Một transaction, khóa `pg_advisory_xact_lock(hashtext('doi_buoi:'||lich_nguon_id))` rồi đọc sĩ số buổi nguồn: buổi gốc đã đủ (`si_so >= si_so_toi_da`) → `ho_tro_hoc_vien` nhận `409` "Buổi gốc đã đủ sĩ số {si_so}/{toi_da} — không thể hủy duyệt", `quan_tri` vẫn hủy + `canh_bao` (nhật ký `vuot_si_so: true`). Không phải `da_duyet` → `409` "Đề nghị đã được xử lý"; đã bắt đầu → `400` "Buổi đã bắt đầu, không thể đổi" |
 
 Mọi chuyển trạng thái là `updateMany` có điều kiện trạng thái cũ; 0 dòng → `409` "Đề nghị đã được xử lý". Nhật ký nhóm `hoc_tap`: `de_nghi_doi_buoi`, `duyet_doi_buoi`.
 

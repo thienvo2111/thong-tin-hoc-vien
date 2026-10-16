@@ -90,6 +90,21 @@ export interface LocDoiBuoi {
   khoa_id?: string;
   /** true = mọi đề nghị đã xử lý (server sắp xu_ly_luc giảm, tối đa 500). */
   da_xu_ly?: boolean;
+  /** Chỉ với trang_thai=cho_duyet: true = đề nghị quá hạn (100 mới nhất); mặc định chỉ còn hạn. */
+  qua_han?: boolean;
+}
+
+/** Spec đổi buổi §5: lich_hoc_id → đổi ra (sang lớp chốt) / đổi vào (từ lớp nguồn). */
+export type NhanDoiBuoi = Record<string, { loai: 'ra' | 'vao'; lop: string }>;
+
+export function nhanDoiBuoi(n: { loai: 'ra' | 'vao'; lop: string }): string {
+  return n.loai === 'vao' ? `Từ ${n.lop}` : `Đổi sang ${n.lop}`;
+}
+
+/** Sĩ số buổi dạng "12/40" (hoặc "12" khi lớp không giới hạn) — null khi backend không trả sĩ số buổi. */
+export function siSoBuoi(siSo: number | null | undefined, toiDa: number | null | undefined): string | null {
+  if (siSo === null || siSo === undefined) return null;
+  return toiDa ? `${siSo}/${toiDa}` : `${siSo}`;
 }
 
 const KEY = 'doi-buoi';
@@ -166,7 +181,14 @@ export function useHuyDoiBuoi() {
 export function useDsDoiBuoi(q: LocDoiBuoi = {}) {
   return useQuery({
     queryKey: [KEY, 'ds', q],
-    queryFn: () => apiFetch<DeNghiDuyet[]>(`/doi-buoi-hoc${qs({ ...q, da_xu_ly: q.da_xu_ly ? 'true' : undefined })}`),
+    queryFn: () =>
+      apiFetch<DeNghiDuyet[]>(
+        `/doi-buoi-hoc${qs({
+          ...q,
+          da_xu_ly: q.da_xu_ly ? 'true' : undefined,
+          qua_han: q.qua_han ? 'true' : undefined,
+        })}`,
+      ),
   });
 }
 
@@ -213,7 +235,7 @@ export function useHuyDuyetDoiBuoi() {
   const lamMoi = useLamMoiHocVien();
   return useMutation({
     mutationFn: ({ id, ghi_chu }: { id: string; ghi_chu: string }) =>
-      apiFetch<{ trang_thai: 'da_huy' }>(`/doi-buoi-hoc/${id}/huy-duyet`, {
+      apiFetch<{ trang_thai: 'da_huy'; canh_bao: string[] }>(`/doi-buoi-hoc/${id}/huy-duyet`, {
         method: 'POST',
         body: JSON.stringify({ ghi_chu }),
       }),

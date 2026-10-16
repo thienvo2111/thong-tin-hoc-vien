@@ -74,6 +74,48 @@ describe('Hỗ trợ GV — bảng điểm danh lớp', () => {
     expect(screen.getByRole('button', { name: 'Lưu' })).toBeInTheDocument();
   });
 
+  // Spec đổi buổi §5: người đổi vào ở danh sách riêng (chỉ ô buổi chốt), nhãn đổi ra/vào, sĩ số buổi.
+  it('đổi buổi: dòng đổi vào chỉ có ô buổi chốt kèm "Từ {lớp}", người đổi ra có "Đổi sang {lớp}", tiêu đề có sĩ số buổi', async () => {
+    const bang = structuredClone(bangDiemDanhMock);
+    bang.buoi[0] = { ...bang.buoi[0], si_so: 3, si_so_toi_da: 40 };
+    bang.hoc_vien[0] = { ...bang.hoc_vien[0], doi_buoi: { 'b-1': { loai: 'ra', lop: 'Lớp 05' } } };
+    bang.hoc_vien_doi_vao = [
+      {
+        dang_ky_hoc_id: 'dk-9',
+        ho_ten: 'Phan Văn Đến',
+        don_vi: 'THPT Châu Đốc',
+        diem_danh: {},
+        bao_vang: {},
+        doi_buoi: { 'b-1': { loai: 'vao', lop: 'Lớp 07' } },
+      },
+    ];
+    server.use(http.get('/lop/:lopId/diem-danh', () => HttpResponse.json(bang)));
+    render();
+    const dongVao = await screen.findByTestId('dong-doi-vao');
+    expect(within(dongVao).getByText('Phan Văn Đến')).toBeInTheDocument();
+    expect(within(dongVao).getByText('Từ Lớp 07')).toBeInTheDocument();
+    expect(within(dongVao).getByRole('button', { name: 'Sửa điểm danh Phan Văn Đến buổi 1' })).toBeInTheDocument();
+    expect(within(dongVao).getByLabelText('Phan Văn Đến không học buổi 2 ở lớp này')).toHaveTextContent('—');
+    expect(within(dongVao).getByLabelText('Phan Văn Đến không học buổi 3 ở lớp này')).toBeInTheDocument();
+    expect(screen.getByText(/Học viên đổi buổi vào lớp \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText('Đổi sang Lớp 05')).toBeInTheDocument();
+    expect(screen.getByText('Sĩ số buổi 3/40')).toBeInTheDocument();
+    // Buổi không có sĩ số từ backend → không hiện nhãn.
+    expect(screen.getAllByText(/Sĩ số buổi/)).toHaveLength(1);
+  });
+
+  it('lớp không còn ai phân nhưng có người đổi vào → vẫn hiện bảng', async () => {
+    const bang = structuredClone(bangDiemDanhMock);
+    bang.hoc_vien = [];
+    bang.hoc_vien_doi_vao = [
+      { dang_ky_hoc_id: 'dk-9', ho_ten: 'Phan Văn Đến', don_vi: 'X', diem_danh: {}, bao_vang: {}, doi_buoi: { 'b-1': { loai: 'vao', lop: 'Lớp 07' } } },
+    ];
+    server.use(http.get('/lop/:lopId/diem-danh', () => HttpResponse.json(bang)));
+    render();
+    expect(await screen.findByTestId('dong-doi-vao')).toBeInTheDocument();
+    expect(screen.queryByText(/Chưa có học viên được phân/)).toBeNull();
+  });
+
   it('chọn giai đoạn khác → tải lại bảng theo giai đoạn đó', async () => {
     const user = userEvent.setup();
     render();

@@ -24,6 +24,7 @@ import {
   type ODiemDanh,
   type TrangThaiDiemDanh,
 } from '@/api/diemDanh';
+import { nhanDoiBuoi, siSoBuoi } from '@/api/doiBuoi';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangGio, dinhDangNgay } from '@/lib/ngay';
 
@@ -57,6 +58,8 @@ export function BangDiemDanhLop({ lopId }: { lopId: string }) {
   if (isLoading) return <Skeleton height={160} />;
   if (isError) return <Alert color="red">{thongDiepLoiChung(error)}</Alert>;
   if (!data) return null;
+  const doiVao = data.hoc_vien_doi_vao ?? [];
+  const soCot = data.buoi.length + 1;
 
   return (
     <Stack gap="sm">
@@ -70,7 +73,7 @@ export function BangDiemDanhLop({ lopId }: { lopId: string }) {
           data={data.giai_doan.map((g) => ({ value: g.id, label: `GĐ ${g.thu_tu} — ${g.ten_giai_doan}` }))}
         />
       )}
-      {data.buoi.length === 0 || data.hoc_vien.length === 0 ? (
+      {data.buoi.length === 0 || (data.hoc_vien.length === 0 && doiVao.length === 0) ? (
         <Alert color="gray" variant="light">
           {data.buoi.length === 0 ? 'Lớp chưa có buổi học.' : 'Chưa có học viên được phân vào lớp ở giai đoạn này.'}
         </Alert>
@@ -87,6 +90,11 @@ export function BangDiemDanhLop({ lopId }: { lopId: string }) {
                       <Text fz={11} c="dimmed" fw={400}>
                         {dinhDangNgay(b.thoi_gian_bat_dau).slice(0, 5)} {dinhDangGio(b.thoi_gian_bat_dau)}
                       </Text>
+                      {siSoBuoi(b.si_so, b.si_so_toi_da) && (
+                        <Text fz={10} c="dimmed" fw={400}>
+                          Sĩ số buổi {siSoBuoi(b.si_so, b.si_so_toi_da)}
+                        </Text>
+                      )}
                     </Table.Th>
                   ))}
                 </Table.Tr>
@@ -105,6 +113,42 @@ export function BangDiemDanhLop({ lopId }: { lopId: string }) {
                     {data.buoi.map((b) => (
                       <Table.Td key={b.id} p={2}>
                         <OSua sua={sua} hv={h} buoi={b} />
+                        <NhanDoi hv={h} buoi={b} />
+                      </Table.Td>
+                    ))}
+                  </Table.Tr>
+                ))}
+                {doiVao.length > 0 && (
+                  <Table.Tr>
+                    <Table.Td colSpan={soCot} bg="var(--mantine-color-gray-0)">
+                      <Text fz="xs" fw={600} c="dimmed">
+                        Học viên đổi buổi vào lớp ({doiVao.length}) — không tính vào sĩ số lớp
+                      </Text>
+                    </Table.Td>
+                  </Table.Tr>
+                )}
+                {doiVao.map((h) => (
+                  <Table.Tr key={h.dang_ky_hoc_id} data-testid="dong-doi-vao">
+                    <Table.Td>
+                      <Text fz="sm" fw={600}>
+                        {h.ho_ten}
+                      </Text>
+                      <Text fz={11} c="dimmed">
+                        {h.don_vi}
+                      </Text>
+                    </Table.Td>
+                    {data.buoi.map((b) => (
+                      <Table.Td key={b.id} p={2}>
+                        {h.doi_buoi?.[b.id]?.loai === 'vao' ? (
+                          <>
+                            <OSua sua={sua} hv={h} buoi={b} />
+                            <NhanDoi hv={h} buoi={b} />
+                          </>
+                        ) : (
+                          <Text fz="xs" c="dimmed" ta="center" aria-label={`${h.ho_ten} không học buổi ${b.buoi_so} ở lớp này`}>
+                            —
+                          </Text>
+                        )}
                       </Table.Td>
                     ))}
                   </Table.Tr>
@@ -115,6 +159,17 @@ export function BangDiemDanhLop({ lopId }: { lopId: string }) {
         </Paper>
       )}
     </Stack>
+  );
+}
+
+/** Nhãn đổi buổi của học viên ở 1 buổi: "Từ {lớp}" (đổi vào) hoặc "Đổi sang {lớp}" (đổi ra). */
+function NhanDoi({ hv, buoi }: { hv: HocVien; buoi: Buoi }) {
+  const n = hv.doi_buoi?.[buoi.id];
+  if (!n) return null;
+  return (
+    <Text fz={10} c={n.loai === 'vao' ? 'blue' : 'orange'} ta="center" lineClamp={2}>
+      {nhanDoiBuoi(n)}
+    </Text>
   );
 }
 

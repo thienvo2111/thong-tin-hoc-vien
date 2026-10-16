@@ -132,6 +132,23 @@ describe('Cổng giảng viên', () => {
     expect(screen.queryByText('0909123456')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Sửa|Lưu|Phân công/ })).not.toBeInTheDocument();
   });
+
+  // Spec đổi buổi §5: sĩ số buổi; người đổi vào hiện thêm với "Từ {lớp}", không cộng số học viên của lớp.
+  it('trang lớp: đổi buổi vào/ra có nhãn, sĩ số buổi, số học viên lớp giữ lớp gốc', async () => {
+    const hv0 = db.trangLopGv.hoc_vien[0];
+    db.trangLopGv.buoi[0] = { ...db.trangLopGv.buoi[0], si_so: 1 };
+    db.trangLopGv.hoc_vien = [{ ...hv0, doi_buoi: { 'lh-1': { loai: 'ra', lop: 'Lớp 05' } } }];
+    db.trangLopGv.hoc_vien_doi_vao = [
+      { ...hv0, dang_ky_hoc_id: 'dk-9', hoc_vien_id: 'hv-9', ho_ten: 'Phan Văn Đến', diem_danh: {}, doi_buoi: { 'lh-1': { loai: 'vao', lop: 'Lớp 07' } } },
+    ];
+    renderCong(['/giang-day/lop/lop-1/giai-doan/gd-2']);
+    expect(await screen.findByText('Phan Văn Đến')).toBeInTheDocument();
+    expect(screen.getByText(/· 1 học viên$/)).toBeInTheDocument();
+    expect(screen.getByText(/Sĩ số buổi 1\/30/)).toBeInTheDocument();
+    expect(screen.getByText('B1: Từ Lớp 07')).toBeInTheDocument();
+    expect(screen.getByText('B1: Đổi sang Lớp 05')).toBeInTheDocument();
+    expect(screen.getByText(/Thêm 1 học viên đổi buổi vào lớp/)).toBeInTheDocument();
+  });
 });
 
 describe('Cấp tài khoản giảng viên', () => {

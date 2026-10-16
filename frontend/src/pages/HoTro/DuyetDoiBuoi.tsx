@@ -35,6 +35,7 @@ import { thongDiepLoiXungDot } from '@/lib/loiApi';
 const GHI_CHU_TOI_THIEU = 5;
 const GHI_CHU_TOI_DA = 500;
 const GIOI_HAN_DANH_SACH = 500; // khớp take: 500 của server
+const GIOI_HAN_QUA_HAN = 100; // khớp take: 100 của server khi qua_han=true
 
 const NHAN_TRANG_THAI: Record<TrangThaiDeNghi, string> = {
   cho_duyet: 'Chờ duyệt',
@@ -90,7 +91,10 @@ export default function DuyetDoiBuoi() {
             <Tabs.Tab value="da_xu_ly">Đã xử lý</Tabs.Tab>
           </Tabs.List>
           <Tabs.Panel value="cho_duyet" pt="md">
-            <DanhSach chiChoDuyet hanhDong={hanhDong} />
+            <Stack gap="lg">
+              <DanhSach chiChoDuyet hanhDong={hanhDong} />
+              <DanhSachQuaHan hanhDong={hanhDong} />
+            </Stack>
           </Tabs.Panel>
           <Tabs.Panel value="da_xu_ly" pt="md">
             <DanhSach chiChoDuyet={false} hanhDong={hanhDong} />
@@ -121,8 +125,12 @@ function DanhSach({ chiChoDuyet, hanhDong }: { chiChoDuyet: boolean; hanhDong: H
     );
   return (
     <Stack gap="sm">
-      {!chiChoDuyet && ds.length >= GIOI_HAN_DANH_SACH && (
-        <StatusBanner loai="info">Chỉ hiển thị {GIOI_HAN_DANH_SACH} đề nghị xử lý gần nhất</StatusBanner>
+      {ds.length >= GIOI_HAN_DANH_SACH && (
+        <StatusBanner loai="info">
+          {chiChoDuyet
+            ? `Chỉ hiển thị ${GIOI_HAN_DANH_SACH} đề nghị chờ duyệt gửi sớm nhất — xử lý bớt để thấy các đề nghị sau`
+            : `Chỉ hiển thị ${GIOI_HAN_DANH_SACH} đề nghị xử lý gần nhất`}
+        </StatusBanner>
       )}
       {ds.map((d) =>
         chiChoDuyet ? (
@@ -131,6 +139,27 @@ function DanhSach({ chiChoDuyet, hanhDong }: { chiChoDuyet: boolean; hanhDong: H
           <DongDaXuLy key={d.id} d={d} hanhDong={hanhDong} />
         ),
       )}
+    </Stack>
+  );
+}
+
+/** Đề nghị chờ duyệt đã quá hạn (buổi nguồn hoặc buổi đề nghị đã bắt đầu) — tách riêng, chỉ còn Từ chối. */
+function DanhSachQuaHan({ hanhDong }: { hanhDong: HanhDong }) {
+  const { data } = useDsDoiBuoi({ trang_thai: 'cho_duyet', qua_han: true });
+  const ds = data ?? [];
+  if (ds.length === 0) return null;
+  return (
+    <Stack gap="sm" data-testid="khoi-qua-han">
+      <Text fw={700} fz="sm">
+        Quá hạn ({ds.length}
+        {ds.length >= GIOI_HAN_QUA_HAN ? '+' : ''}) — buổi đã bắt đầu, chỉ còn từ chối
+      </Text>
+      {ds.length >= GIOI_HAN_QUA_HAN && (
+        <StatusBanner loai="info">Chỉ hiển thị {GIOI_HAN_QUA_HAN} đề nghị quá hạn gửi gần nhất</StatusBanner>
+      )}
+      {ds.map((d) => (
+        <DongChoDuyet key={d.id} d={d} hanhDong={hanhDong} />
+      ))}
     </Stack>
   );
 }
@@ -373,11 +402,18 @@ function ModalGhiChu({
     mut.mutate(
       { id: deNghi.id, ghi_chu: chuanHoa(ghiChu) },
       {
-        onSuccess: () => {
+        onSuccess: (res) => {
           notifications.show({
             color: 'green',
             message: laTuChoi ? 'Đã từ chối đề nghị' : 'Đã hủy duyệt đề nghị',
           });
+          if ('canh_bao' in res && res.canh_bao.length > 0)
+            notifications.show({
+              color: 'yellow',
+              autoClose: false,
+              title: 'Lưu ý',
+              message: res.canh_bao.join('; '),
+            });
           onDong();
         },
         onError: (e) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(e) }),

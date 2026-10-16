@@ -273,7 +273,57 @@ describe("Trang đề nghị đổi buổi (học viên)", () => {
     await user.click(
       await screen.findByRole("button", { name: "Hủy đề nghị" }),
     );
+    // Phải xác nhận; bấm "Không" thì không gọi API.
+    await user.click(await screen.findByRole("button", { name: "Không" }));
+    expect(goi).toEqual([]);
+    await user.click(screen.getByRole("button", { name: "Hủy đề nghị" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Xác nhận hủy" }),
+    );
     await waitFor(() => expect(goi).toEqual(["dn-1"]));
+  });
+
+  it("đếm ký tự lý do theo chuỗi đã bỏ khoảng trắng đầu/cuối", async () => {
+    datApi(tongQuanMau());
+    const user = userEvent.setup();
+    renderTrang();
+    const oLyDo = await screen.findByLabelText(/Lý do/);
+    await user.type(oLyDo, "   abc   ");
+    expect(screen.getByText("3/500 ký tự (tối thiểu 5)")).toBeInTheDocument();
+  });
+
+  it("?lich= trỏ tới buổi đã có đề nghị đang chờ → hiện đề nghị đó, không hiện form gửi", async () => {
+    datApi(
+      tongQuanMau({
+        buoi_sap_toi: [
+          { lich_nguon: lich("ln-1", "Lớp 01"), de_nghi: deNghiMau() },
+        ],
+        de_nghi: [deNghiMau({ thu_tu_hang: { k: 1, n: 2 } })],
+      }),
+    );
+    const user = userEvent.setup();
+    renderTrang("?khoa=khoa-1&lich=ln-1");
+    expect(
+      await screen.findByText(/Buổi này Thầy\/Cô đã có đề nghị đổi buổi/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Bạn đang xếp thứ 1")).toBeInTheDocument();
+    expect(screen.queryByText("Gửi đề nghị mới")).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Xem tất cả đề nghị" }),
+    );
+    expect(await screen.findByText("Gửi đề nghị mới")).toBeInTheDocument();
+  });
+
+  it("?lich= trỏ tới buổi đã được duyệt đổi → hiện đề nghị đã duyệt, không hiện form", async () => {
+    const xong = deNghiMau({
+      trang_thai: "da_duyet",
+      lich_chot_id: "ld-1",
+      buoi_chot: tomTat(lich("ld-1", "Lớp 02", 1, 50)),
+    });
+    datApi(tongQuanMau({ de_nghi: [xong] }));
+    renderTrang("?khoa=khoa-1&lich=ln-1");
+    expect(await screen.findByText("Đã duyệt")).toBeInTheDocument();
+    expect(screen.queryByText("Gửi đề nghị mới")).not.toBeInTheDocument();
   });
 
   it("khóa tắt (API 403) → thông báo nhẹ, không lỗi, không trắng trang", async () => {

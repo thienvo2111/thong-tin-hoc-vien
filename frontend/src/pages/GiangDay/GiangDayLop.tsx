@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Alert, Anchor, Badge, Container, Paper, Skeleton, Stack, Table, Text, Title } from '@mantine/core';
 import { useTrangLopGiangVien } from '@/api/congGiangVien';
 import type { TrangLop } from '@/api/hoTroGv';
+import { nhanDoiBuoi, siSoBuoi } from '@/api/doiBuoi';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangGio, dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 import { lienKetBanDo } from '@/lib/banDo';
@@ -30,6 +31,8 @@ export default function GiangDayLop() {
 
 function NoiDung({ d }: { d: TrangLop }) {
   const hauCan = d.hau_can[0];
+  // Người đổi buổi vào: liệt kê thêm, không cộng vào số học viên của lớp (spec đổi buổi §5).
+  const doiVao = d.hoc_vien_doi_vao ?? [];
   return (
     <>
       <div>
@@ -65,6 +68,7 @@ function NoiDung({ d }: { d: TrangLop }) {
               </Text>
               <Text fz="xs" c="dimmed">
                 Giảng viên: {b.giang_vien.map((g) => g.ho_ten).join(', ') || '—'}
+                {siSoBuoi(b.si_so, d.lop.si_so_toi_da) && ` · Sĩ số buổi ${siSoBuoi(b.si_so, d.lop.si_so_toi_da)}`}
               </Text>
             </div>
           ))}
@@ -110,6 +114,11 @@ function NoiDung({ d }: { d: TrangLop }) {
         </Paper>
       )}
 
+      {doiVao.length > 0 && (
+        <Text fz="sm" c="dimmed">
+          Thêm {doiVao.length} học viên đổi buổi vào lớp (không tính vào số học viên của lớp).
+        </Text>
+      )}
       <Paper withBorder radius={12} style={{ overflow: 'hidden' }}>
         <Table.ScrollContainer minWidth={560}>
           <Table verticalSpacing="xs" fz="sm">
@@ -122,7 +131,7 @@ function NoiDung({ d }: { d: TrangLop }) {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {d.hoc_vien.map((h) => (
+              {[...d.hoc_vien, ...doiVao].map((h) => (
                 <Table.Tr key={h.dang_ky_hoc_id}>
                   <Table.Td fw={600}>{h.ho_ten}</Table.Td>
                   <Table.Td>{h.don_vi}</Table.Td>
@@ -131,6 +140,11 @@ function NoiDung({ d }: { d: TrangLop }) {
                     {h.muc_hoc_chon && <> (tự chọn: {NHAN_MUC[h.muc_hoc_chon] ?? h.muc_hoc_chon})</>}
                   </Table.Td>
                   <Table.Td>
+                    {Object.entries(h.doi_buoi ?? {}).map(([lichId, n]) => (
+                      <Badge key={`doi-${lichId}`} mr={4} variant="light" color={n.loai === 'vao' ? 'blue' : 'gray'}>
+                        B{d.buoi.find((b) => b.id === lichId)?.buoi_so ?? '?'}: {nhanDoiBuoi(n)}
+                      </Badge>
+                    ))}
                     {d.buoi.map((b) => {
                       const dd = h.diem_danh[b.id];
                       const bv = h.bao_vang?.[b.id];

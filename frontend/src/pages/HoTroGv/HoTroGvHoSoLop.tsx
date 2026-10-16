@@ -6,6 +6,7 @@ import { KhungThucDia, ModalSuaBuoiGv, TheHauCan } from './VanHanhLop';
 import { KhungBangKiem } from './KhungBangKiem';
 import { TaiKhoanGiangVienDot } from './TaiKhoanGiangVien';
 import { useTrangLopGv, type TrangLop } from '@/api/hoTroGv';
+import { nhanDoiBuoi, siSoBuoi } from '@/api/doiBuoi';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangGio, dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
 
@@ -34,7 +35,9 @@ export default function HoTroGvHoSoLop() {
 }
 
 function NoiDung({ d }: { d: TrangLop }) {
+  // Sĩ số lớp theo lớp gốc; người đổi buổi vào chỉ liệt kê thêm, không cộng (spec đổi buổi §5).
   const siSo = d.hoc_vien.length;
+  const doiVao = d.hoc_vien_doi_vao ?? [];
   const [buoiSua, setBuoiSua] = useState<TrangLop['buoi'][number] | null>(null);
   const [buoiPhanCong, setBuoiPhanCong] = useState<TrangLop['buoi'][number] | null>(null);
   // Giảng viên của đợt (gộp mọi buổi) — mỗi người 1 thẻ hậu cần.
@@ -108,6 +111,7 @@ function NoiDung({ d }: { d: TrangLop }) {
                     <Table.Th>Thời gian</Table.Th>
                     <Table.Th>Điểm học</Table.Th>
                     <Table.Th>Phòng</Table.Th>
+                    <Table.Th>Sĩ số buổi</Table.Th>
                     <Table.Th />
                   </Table.Tr>
                 </Table.Thead>
@@ -137,6 +141,9 @@ function NoiDung({ d }: { d: TrangLop }) {
                         )}
                       </Table.Td>
                       <Table.Td>{b.phong ?? '—'}</Table.Td>
+                      <Table.Td style={{ whiteSpace: 'nowrap' }}>
+                        {siSoBuoi(b.si_so, d.lop.si_so_toi_da) ?? '—'}
+                      </Table.Td>
                       <Table.Td ta="right" style={{ whiteSpace: 'nowrap' }}>
                         <Button size="xs" variant="subtle" onClick={() => setBuoiPhanCong(b)}>
                           Giảng viên
@@ -228,6 +235,11 @@ function NoiDung({ d }: { d: TrangLop }) {
               </Anchor>
             </Alert>
           )}
+          {doiVao.length > 0 && (
+            <Text fz="sm" c="dimmed" mb="xs">
+              Thêm {doiVao.length} học viên đổi buổi vào lớp (không tính vào sĩ số lớp) — xem cột Đổi buổi.
+            </Text>
+          )}
           <Paper withBorder radius={12} style={{ overflow: 'hidden' }}>
             <Table.ScrollContainer minWidth={760}>
               <Table verticalSpacing="xs" fz="sm">
@@ -240,10 +252,11 @@ function NoiDung({ d }: { d: TrangLop }) {
                     <Table.Th>SĐT</Table.Th>
                     <Table.Th>Cụm · người hỗ trợ</Table.Th>
                     <Table.Th>Báo vắng</Table.Th>
+                    <Table.Th>Đổi buổi</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {d.hoc_vien.map((h) => (
+                  {[...d.hoc_vien, ...doiVao].map((h) => (
                     <Table.Tr key={h.dang_ky_hoc_id}>
                       <Table.Td fw={600}>{h.ho_ten}</Table.Td>
                       <Table.Td>{h.don_vi}</Table.Td>
@@ -275,6 +288,13 @@ function NoiDung({ d }: { d: TrangLop }) {
                         {Object.entries(h.bao_vang ?? {}).map(([lichId, lyDo]) => (
                           <Badge key={lichId} color="orange" variant="light" title={lyDo} mr={4}>
                             Buổi {d.buoi.find((b) => b.id === lichId)?.buoi_so ?? '?'}: {lyDo}
+                          </Badge>
+                        ))}
+                      </Table.Td>
+                      <Table.Td>
+                        {Object.entries(h.doi_buoi ?? {}).map(([lichId, n]) => (
+                          <Badge key={lichId} color={n.loai === 'vao' ? 'blue' : 'gray'} variant="light" mr={4}>
+                            Buổi {d.buoi.find((b) => b.id === lichId)?.buoi_so ?? '?'}: {nhanDoiBuoi(n)}
                           </Badge>
                         ))}
                       </Table.Td>

@@ -8,6 +8,7 @@ import {
   Container,
   Group,
   Loader,
+  Modal,
   Paper,
   Radio,
   Select,
@@ -120,11 +121,38 @@ function KhoiDoiBuoi({ khoaId, lichBanDau }: { khoaId: string; lichBanDau: strin
   return <NoiDung tongQuan={data} lichBanDau={lichBanDau} />;
 }
 
+function laHoatDong(d: DeNghiHocVien): boolean {
+  return d.trang_thai === 'cho_duyet' || d.trang_thai === 'da_duyet';
+}
+
 function NoiDung({ tongQuan, lichBanDau }: { tongQuan: TongQuanDoiBuoi; lichBanDau: string | null }) {
   const [dangSua, setDangSua] = useState<DeNghiHocVien | null>(null);
+  const [boQuaLink, setBoQuaLink] = useState(false);
   const conLai = Math.max(0, tongQuan.so_buoi_doi_toi_da - tongQuan.so_luot_da_dung);
   const choDuyet = tongQuan.de_nghi.filter((d) => d.trang_thai === 'cho_duyet');
   const daXuLy = tongQuan.de_nghi.filter((d) => d.trang_thai !== 'cho_duyet');
+  // Link ?lich= trỏ tới buổi đã có đề nghị hoạt động → hiện đề nghị đó thay vì form gửi.
+  const deNghiCuaLink =
+    !boQuaLink && lichBanDau ? tongQuan.de_nghi.find((d) => laHoatDong(d) && d.lich_nguon_id === lichBanDau) : undefined;
+
+  if (deNghiCuaLink && !dangSua)
+    return (
+      <Stack gap="lg">
+        <StatusBanner loai="info">
+          Buổi này Thầy/Cô đã có đề nghị đổi buổi ({NHAN_TRANG_THAI[deNghiCuaLink.trang_thai].toLowerCase()}).
+        </StatusBanner>
+        {deNghiCuaLink.trang_thai === 'cho_duyet' ? (
+          <DongDeNghi deNghi={deNghiCuaLink} onSua={() => setDangSua(deNghiCuaLink)} />
+        ) : (
+          <DongDaXuLy d={deNghiCuaLink} />
+        )}
+        <Group>
+          <Button variant="default" onClick={() => setBoQuaLink(true)}>
+            Xem tất cả đề nghị
+          </Button>
+        </Group>
+      </Stack>
+    );
 
   return (
     <Stack gap="lg">
@@ -154,20 +182,7 @@ function NoiDung({ tongQuan, lichBanDau }: { tongQuan: TongQuanDoiBuoi; lichBanD
             Đề nghị đã xử lý
           </Text>
           {daXuLy.map((d) => (
-            <Paper key={d.id} withBorder radius="md" p="sm">
-              <Group gap="xs">
-                <Badge variant="light">{NHAN_TRANG_THAI[d.trang_thai]}</Badge>
-                <Text size="sm">
-                  {nhanBuoi(d.buoi_nguon)}
-                  {d.buoi_chot ? ` → ${nhanBuoi(d.buoi_chot)}` : ''}
-                </Text>
-              </Group>
-              {d.ghi_chu_xu_ly && (
-                <Text size="sm" c="dimmed" mt={4}>
-                  {d.ghi_chu_xu_ly}
-                </Text>
-              )}
-            </Paper>
+            <DongDaXuLy key={d.id} d={d} />
           ))}
         </Stack>
       )}
@@ -175,8 +190,28 @@ function NoiDung({ tongQuan, lichBanDau }: { tongQuan: TongQuanDoiBuoi; lichBanD
   );
 }
 
+function DongDaXuLy({ d }: { d: DeNghiHocVien }) {
+  return (
+    <Paper withBorder radius="md" p="sm">
+      <Group gap="xs">
+        <Badge variant="light">{NHAN_TRANG_THAI[d.trang_thai]}</Badge>
+        <Text size="sm">
+          {nhanBuoi(d.buoi_nguon)}
+          {d.buoi_chot ? ` → ${nhanBuoi(d.buoi_chot)}` : ''}
+        </Text>
+      </Group>
+      {d.ghi_chu_xu_ly && (
+        <Text size="sm" c="dimmed" mt={4}>
+          {d.ghi_chu_xu_ly}
+        </Text>
+      )}
+    </Paper>
+  );
+}
+
 function DongDeNghi({ deNghi, onSua }: { deNghi: DeNghiHocVien; onSua: () => void }) {
   const huy = useHuyDoiBuoi();
+  const [xacNhan, setXacNhan] = useState(false);
   return (
     <Paper withBorder radius="md" p="md" data-testid="de-nghi-cho-duyet">
       <Stack gap="xs">
@@ -206,25 +241,39 @@ function DongDeNghi({ deNghi, onSua }: { deNghi: DeNghiHocVien; onSua: () => voi
               Sửa
             </Button>
           )}
-          <Button
-            size="xs"
-            variant="subtle"
-            color="red"
-            loading={huy.isPending}
-            onClick={() =>
-              huy.mutate(deNghi.id, {
-                onSuccess: () =>
-                  notifications.show({
-                    color: 'green',
-                    message: 'Đã hủy đề nghị',
-                  }),
-              })
-            }
-          >
+          <Button size="xs" variant="subtle" color="red" loading={huy.isPending} onClick={() => setXacNhan(true)}>
             Hủy đề nghị
           </Button>
         </Group>
       </Stack>
+      <Modal opened={xacNhan} onClose={() => setXacNhan(false)} title="Hủy đề nghị đổi buổi?" centered>
+        <Stack gap="md">
+          <Text size="sm">
+            Hủy đề nghị cho {nhanBuoi(deNghi.buoi_nguon)}. Nếu gửi lại, Thầy/Cô sẽ xếp ở cuối hàng chờ.
+          </Text>
+          <Group justify="flex-end" gap="xs">
+            <Button variant="default" onClick={() => setXacNhan(false)}>
+              Không
+            </Button>
+            <Button
+              color="red"
+              loading={huy.isPending}
+              onClick={() =>
+                huy.mutate(deNghi.id, {
+                  onSuccess: () =>
+                    notifications.show({
+                      color: 'green',
+                      message: 'Đã hủy đề nghị',
+                    }),
+                  onSettled: () => setXacNhan(false),
+                })
+              }
+            >
+              Xác nhận hủy
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Paper>
   );
 }
@@ -256,7 +305,7 @@ function FormDoiBuoi({
   );
   const buoiNguon = tongQuan.buoi_sap_toi.map((b) => b.lich_nguon);
   const nguonHopLe = buoiNguon.some((b) => b.id === nguonId) ? nguonId : null;
-  const lyDoCat = lyDo.trim();
+  const lyDoCat = lyDo.normalize('NFC').trim();
   const lyDoHopLe = lyDoCat.length >= LY_DO_TOI_THIEU && lyDoCat.length <= LY_DO_TOI_DA;
 
   const { data: luaChon, isLoading, isError, error } = useLuaChonDoiBuoi(nguonHopLe ?? undefined);
@@ -319,7 +368,7 @@ function FormDoiBuoi({
           maxLength={LY_DO_TOI_DA}
           value={lyDo}
           onChange={(e) => setLyDo(e.currentTarget.value)}
-          description={`${lyDo.length}/${LY_DO_TOI_DA} ký tự (tối thiểu ${LY_DO_TOI_THIEU})`}
+          description={`${lyDoCat.length}/${LY_DO_TOI_DA} ký tự (tối thiểu ${LY_DO_TOI_THIEU})`}
         />
 
         {loi && <StatusBanner loai="error">{thongDiepLoiXungDot(loi)}</StatusBanner>}

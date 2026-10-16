@@ -109,9 +109,15 @@ const LUA_CHON: LuaChonDuyet[] = [
   }),
 ];
 
-function datApi(ds: DeNghiDuyet[], dem = 0) {
+function datApi(ds: DeNghiDuyet[], dem = 0, quaHan: DeNghiDuyet[] = []) {
   server.use(
-    http.get("/doi-buoi-hoc", () => HttpResponse.json(ds)),
+    http.get("/doi-buoi-hoc", ({ request }) =>
+      HttpResponse.json(
+        new URL(request.url).searchParams.get("qua_han") === "true"
+          ? quaHan
+          : ds,
+      ),
+    ),
     http.get("/doi-buoi-hoc/dem-cho-duyet", () =>
       HttpResponse.json({ cho_duyet: dem }),
     ),
@@ -146,13 +152,47 @@ describe("Màn duyệt đổi buổi", () => {
     expect(screen.getByText(/Bận công tác đột xuất/)).toBeInTheDocument();
   });
 
-  it("đề nghị quá hạn: có nhãn Quá hạn, không có nút Duyệt, vẫn có Từ chối", async () => {
-    datApi([deNghi({ qua_han: true })]);
+  it("đề nghị quá hạn: khối Quá hạn riêng, có nhãn, không có nút Duyệt, vẫn có Từ chối", async () => {
+    datApi([], 0, [deNghi({ qua_han: true })]);
     renderTrang("ho_tro_hoc_vien");
-    expect(await screen.findByText("Quá hạn")).toBeInTheDocument();
+    const khoi = await screen.findByTestId("khoi-qua-han");
+    expect(within(khoi).getByText(/Quá hạn \(1\)/)).toBeInTheDocument();
+    expect(within(khoi).getByText("Quá hạn")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Duyệt" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Từ chối" })).toBeInTheDocument();
+    expect(within(khoi).getByRole("button", { name: "Từ chối" })).toBeInTheDocument();
+    expect(screen.getByText("Không có đề nghị nào đang chờ duyệt.")).toBeInTheDocument();
   });
+
+  it("tab Chờ duyệt: danh sách chính không gửi qua_han, khối Quá hạn gửi qua_han=true", async () => {
+    const urls: string[] = [];
+    datApi([]);
+    server.use(
+      http.get("/doi-buoi-hoc", ({ request }) => {
+        urls.push(request.url);
+        const quaHan = new URL(request.url).searchParams.get("qua_han") === "true";
+        return HttpResponse.json(quaHan ? [deNghi({ id: "dn-qh", qua_han: true })] : [deNghi()]);
+      }),
+    );
+    renderTrang("ho_tro_hoc_vien");
+    await screen.findByTestId("khoi-qua-han");
+    expect(screen.getAllByTestId("de-nghi-cho-duyet")).toHaveLength(2);
+    const chinh = urls.find((u) => !u.includes("qua_han"));
+    expect(chinh).toContain("trang_thai=cho_duyet");
+    expect(urls.some((u) => u.includes("trang_thai=cho_duyet") && u.includes("qua_han=true"))).toBe(true);
+  });
+
+  it("tab Chờ duyệt: chạm giới hạn 500 thì báo", async () => {
+    datApi(Array.from({ length: 500 }, (_, i) => deNghi({ id: `dn-${i}` })));
+    renderTrang("ho_tro_hoc_vien");
+    // 500 thẻ render chậm khi chạy song song nhiều file → nới thời gian chờ.
+    expect(
+      await screen.findByText(
+        /Chỉ hiển thị 500 đề nghị chờ duyệt gửi sớm nhất/,
+        undefined,
+        { timeout: 15_000 },
+      ),
+    ).toBeInTheDocument();
+  }, 30_000);
 
   it("hỗ trợ cụm: lựa chọn không duyệt được bị disabled kèm lý do; buổi đề nghị chọn sẵn", async () => {
     datApi([deNghi()]);
@@ -252,6 +292,42 @@ describe("Màn duyệt đổi buổi", () => {
     expect(screen.getByText(/Không hợp lệ/)).toBeInTheDocument();
   });
 
+  it("Hủy duyệt thành công có canh_bao: hiện Lưu ý; 409 thì hiện thông điệp server", async () => {
+    const chot = tomTat(lich("ld-1", "Lớp 02", 50));
+    datApi([deNghi({ id: "dn-a", trang_thai: "da_duyet", buoi_chot: chot })]);
+    let lan = 0;
+    server.use(
+      http.post("/doi-buoi-hoc/:id/huy-duyet", () => {
+        lan += 1;
+        if (lan === 1)
+          return HttpResponse.json(
+            { error: { code: "CONFLICT", message: "Buổi gốc đã đủ sĩ số 30/30 — không thể hủy duyệt" } },
+            { status: 409 },
+          );
+        return HttpResponse.json({
+          trang_thai: "da_huy",
+          canh_bao: ["Buổi gốc đã đủ sĩ số 30/30 — hủy duyệt sẽ vượt sĩ số"],
+        });
+      }),
+    );
+    renderTrang("quan_tri");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "Đã xử lý" }));
+    await user.click(await screen.findByRole("button", { name: "Hủy duyệt" }));
+    await user.type(screen.getByLabelText(/Ghi chú/), "Học viên xin ở lại");
+    const xacNhan = screen.getByRole("button", { name: "Xác nhận hủy duyệt" });
+    await user.click(xacNhan);
+    expect(
+      await screen.findByText("Buổi gốc đã đủ sĩ số 30/30 — không thể hủy duyệt"),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(xacNhan).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "Xác nhận hủy duyệt" }));
+    await waitFor(() => expect(lan).toBe(2));
+    expect(
+      await screen.findByText("Buổi gốc đã đủ sĩ số 30/30 — hủy duyệt sẽ vượt sĩ số"),
+    ).toBeInTheDocument();
+  });
+
   it("menu hỗ trợ có Đổi buổi + badge số chờ duyệt từ dem-cho-duyet", async () => {
     datApi([], 4);
     server.use(
@@ -284,6 +360,7 @@ describe("Màn duyệt đổi buổi", () => {
     datApi([]);
     server.use(
       http.get("/doi-buoi-hoc", ({ request }) => {
+        if (!request.url.includes("da_xu_ly")) return HttpResponse.json([]);
         url = request.url;
         return HttpResponse.json(dong);
       }),
