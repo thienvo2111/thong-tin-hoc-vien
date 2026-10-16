@@ -422,6 +422,44 @@ export const huongDanQuanTri: {
         },
       ],
     },
+    {
+      id: 'doi-buoi',
+      tieuDe: 'Đổi buổi học',
+      moTa: 'Bật cho khóa, duyệt đề nghị học viên học 1 buổi ở lớp khác (ADR 0007). Người hỗ trợ cụm duyệt học viên cụm mình ở menu Đổi buổi.',
+      vaiTro: 'quan_tri',
+      manHinh: { nhan: 'Đổi buổi', duongDan: '/admin/doi-buoi' },
+      buoc: [
+        'Bật cho khóa: [[Khóa bồi dưỡng]] → chi tiết khóa → ô **Số buổi tối đa học viên được đề nghị đổi (0 = tắt)** → nhập số lượt → [[Lưu số buổi đổi]]. Mặc định 0 (tắt).',
+        'Học viên chỉ thấy dòng chữ nhỏ *Không tham gia được buổi này?* dưới từng buổi, hoặc mở link **/de-nghi-doi-buoi** do người hỗ trợ gửi — không có nút nổi bật.',
+        'Duyệt: tab [[Chờ duyệt]] (sắp theo thời điểm gửi) → [[Duyệt]] → chọn buổi ở **Chọn buổi chốt** (mặc định là buổi học viên đề nghị; có thể chốt buổi tương đương khác) → [[Xác nhận duyệt]].',
+        '[[Từ chối]] cần ghi chú (học viên đọc được). Đề nghị **Quá hạn** (buổi đã bắt đầu) chỉ từ chối được.',
+        'Tab [[Đã xử lý]]: [[Hủy duyệt]] khi cả buổi gốc và buổi chốt chưa bắt đầu.',
+      ],
+      bang: [
+        {
+          cot: ['Nhãn trên lựa chọn', 'Ý nghĩa'],
+          hang: [
+            ['Đã đủ', 'Buổi đã đủ sĩ số (phân lớp − đổi ra + đổi vào ≥ sĩ số tối đa).'],
+            ['Giữ chỗ cho đề nghị gửi trước', 'Chỗ còn lại đang giữ cho đề nghị gửi trước vào buổi này — xử lý đề nghị đó trước.'],
+            ['Vượt sĩ số / thứ tự — chỉ Quản trị', 'Quản trị vẫn duyệt được, có cảnh báo và ghi nhật ký; người hỗ trợ cụm bị chặn.'],
+          ],
+        },
+      ],
+      ghiChu: [
+        {
+          loai: 'info',
+          tieuDe: 'Học viên vẫn thuộc lớp gốc',
+          noiDung:
+            'Đổi buổi chỉ đổi **một buổi**: trang lớp, bảng điểm danh, Zoom, chuyên cần, nhắc lịch cụm tính theo buổi chốt; sĩ số **theo lớp**, báo cáo, Excel chia lớp giữ lớp gốc. Học viên **sửa** đề nghị thì về cuối hàng chờ.',
+        },
+        {
+          loai: 'warning',
+          tieuDe: 'Đổi hàng loạt theo danh sách',
+          noiDung:
+            'Chưa có nút tạo đổi buổi thay học viên. Cần đổi theo danh sách thì chuyển cho kỹ thuật xử lý bằng SQL (tài liệu docs/huong-dan-doi-buoi-ho-tro.md).',
+        },
+      ],
+    },
   ],
 
   hoiDap: [
