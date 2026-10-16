@@ -64,6 +64,12 @@ Mọi nơi cần "ai học buổi nào" hoặc "sĩ số buổi" đi qua module 
 - `daBatDau(lich, now)` — `thoi_gian_bat_dau <= now`.
 - `conChoChoDeNghi({ si_so, si_so_toi_da, so_truoc })` — `si_so_toi_da == null || si_so_toi_da - si_so > so_truoc` (D5).
 - `soLuotDaDung(ds)` — đếm `cho_duyet` + `da_duyet`.
+- `tinhSiSoBuoi({ so_phan_lop, so_doi_ra, so_doi_vao })` — công thức §2.1, service chỉ đếm rồi gọi hàm này.
+- `kiemTraGui(input, now)` → `{ ok: true } | { ok: false, ma, thong_diep }` — toàn bộ điều kiện của `POST/PUT /hoc-vien/toi/doi-buoi` (khóa tắt, hết lượt, không tương đương, đã bắt đầu, buổi đích đầy, lý do sai độ dài).
+- `quyetDinhDuyet({ vai_tro, de_nghi, buoi_nguon, buoi_chot, phan_lop_hien_tai, si_so, so_truoc, now })` → `{ ket_qua: 'duyet' | 'chan', ma_loi?, thong_diep?, canh_bao: string[] }` — bước 2–7 của §4.
+- `thuTuHang(deNghi, dsChoCungBuoi, now)` → `{ k, n }`.
+
+Service chỉ **đọc dữ liệu → gọi hàm thuần → ghi**; mọi nhánh nghiệp vụ nằm trong `doi-buoi-hoc.rules.ts` để test không cần Nest, Prisma hay DB (§8).
 
 ## 3. API
 
@@ -145,31 +151,52 @@ Chốt sang buổi khác buổi đề nghị: hàng đợi và sĩ số tính th
 
 Thêm `hanh_dong` vào `NhatKyService`: `de_nghi_doi_buoi` (tạo/sửa/hủy, nhóm `hoc_tap`), `duyet_doi_buoi` (duyệt/từ chối/hủy duyệt, nhóm `hoc_tap`). `hanh_dong` là `VarChar(50)` — không migration.
 
-## 8. Kiểm thử
+## 8. Kiểm thử — ưu tiên chạy nhanh
 
-### Unit (rules + service, mock Prisma)
-- Buổi tương đương: khác `buoi_so` / `giai_doan` / `loai_lop` / `muc_nang_luc` / cùng lớp → loại; `muc_nang_luc` NULL chỉ khớp NULL.
-- Đã bắt đầu: đúng mốc `thoi_gian_bat_dau` (bằng = đã bắt đầu).
-- Sĩ số: phân lớp − ra + vào; `si_so_toi_da` NULL = không giới hạn.
-- Giữ chỗ (D5): còn 2 chỗ, 1 người trước → duyệt được; còn 1 chỗ, 1 người trước → chặn; người trước quá hạn không tính.
-- Lượt: `cho_duyet` + `da_duyet` tính; `tu_choi`/`da_huy` không; sửa không tốn thêm lượt; hết lượt → 400.
-- Khóa tắt (`0`) → 403 cả 5 endpoint học viên.
-- Phạm vi: hỗ trợ cụm khác → 404; quan_tri thấy tất cả.
-- Quản trị duyệt vượt sĩ số / vượt thứ tự → thành công kèm `canh_bao`.
-- Chốt sang buổi khác → `lich_chot_id` ≠ `lich_de_nghi_id`, sĩ số tính theo buổi chốt.
-- Phân lớp đổi sau khi gửi → 409.
-- Hủy duyệt khi buổi đã bắt đầu → 400; trước đó → `da_huy`, sĩ số giảm.
+Nguyên tắc: **dồn kịch bản xuống tầng rẻ nhất**. Mọi nhánh nghiệp vụ test ở tầng 1 (hàm thuần, mili-giây); tầng 2 chỉ test phần nối dây; e2e giữ tối thiểu cho những gì chỉ DB thật mới chứng minh được (unique index, advisory lock).
 
-### E2E (`backend/test/doi-buoi-hoc.e2e-spec.ts`, DB dev)
-1. Học viên gửi → hỗ trợ cụm duyệt → trang lớp buổi đích có học viên, buổi nguồn có nhãn đổi ra → nạp điểm danh buổi đích không báo học bù.
-2. Hai người duyệt song song cùng buổi còn 1 chỗ → đúng 1 thành công, 1 nhận 409.
-3. Sửa đề nghị → `tao_luc` mới, thứ tự hàng về cuối, số lượt không đổi.
-4. Unique hoạt động: gửi 2 đề nghị cùng buổi nguồn → 409.
+| Tầng | File | Chạy | Mục tiêu thời gian |
+|---|---|---|---|
+| 1. Hàm thuần | `src/doi-buoi-hoc/doi-buoi-hoc.rules.spec.ts` | jest, không Nest/Prisma/DB | < 3 giây |
+| 2. Service (mock Prisma) | `src/doi-buoi-hoc/doi-buoi-hoc.service.spec.ts` | jest, `Test.createTestingModule` với Prisma giả | < 5 giây |
+| 3. E2E (DB dev) | `test/doi-buoi-hoc.e2e-spec.ts` | jest e2e, chỉ file này | < 60 giây |
+| FE | 2 file `*.test.tsx` mới | `vitest run` đúng file | < 10 giây |
 
-### Frontend (vitest)
-- Link nhỏ chỉ hiện khi khóa bật và buổi chưa bắt đầu.
-- Buổi đầy không chọn được; hiện sĩ số và "+n đang chờ".
-- Modal duyệt: lựa chọn `duyet_duoc = false` bị vô hiệu với hỗ trợ cụm, bật với quản trị kèm cảnh báo.
+### Tầng 1 — hàm thuần (dùng `it.each` dạng bảng, mỗi dòng 1 kịch bản)
+- `laBuoiTuongDuong`: khác `buoi_so` / `giai_doan` / `loai_lop` / `muc_nang_luc` / cùng lớp / lớp ngưng → loại; mức NULL chỉ khớp NULL.
+- `daBatDau`: trước / bằng / sau mốc `thoi_gian_bat_dau`.
+- `tinhSiSoBuoi`: phân lớp − ra + vào.
+- `conChoChoDeNghi`: tối đa NULL; còn 2 chỗ + 1 người trước → được; còn 1 chỗ + 1 người trước → chặn; đầy → chặn.
+- `kiemTraGui`: khóa tắt (0); hết lượt; `tu_choi`/`da_huy` không tính lượt; không tương đương; buổi nguồn/đích đã bắt đầu; buổi đích đầy; lý do < 5 hoặc > 500 ký tự.
+- `quyetDinhDuyet`: đề nghị đã xử lý; buổi đã bắt đầu; phân lớp đã đổi; hỗ trợ cụm gặp đầy/giữ chỗ → chặn đúng mã + thông điệp; quản trị gặp đầy/giữ chỗ → duyệt kèm `canh_bao`; chốt buổi khác buổi đề nghị → tính theo buổi chốt.
+- `thuTuHang`: thứ tự theo `tao_luc`; người quá hạn không tính.
+
+### Tầng 2 — service, mock Prisma (≤ 8 test, chỉ nối dây)
+- Duyệt gọi `pg_advisory_xact_lock` **trước** khi đọc sĩ số, trong cùng `$transaction`.
+- UPDATE có điều kiện trả 0 dòng → 409 (duyệt, từ chối, hủy, hủy duyệt).
+- Sửa = UPDATE `da_huy` + INSERT mới trong 1 transaction; UPDATE 0 dòng → không INSERT.
+- Phạm vi: hỗ trợ cụm khác → 404; quản trị không bị lọc cụm.
+- Ghi nhật ký đúng `hanh_dong` sau khi transaction thành công (không ghi khi lỗi).
+
+### Tầng 3 — e2e (1 file, 3 test, seed 1 lần)
+- Seed **một lần** trong `beforeAll` (1 khóa bật `so_buoi_doi_toi_da`, 2 lớp cùng mức, mỗi lớp 1 buổi tương lai, lớp đích `si_so_toi_da` = sĩ số + 1, 3 học viên cùng cụm, 1 tài khoản hỗ trợ cụm); dọn trong `afterAll`. Không reset DB giữa các test.
+- (a) Luồng chính: gửi → duyệt → trang lớp buổi đích có học viên → nạp 1 dòng điểm danh buổi đích không báo học bù.
+- (b) Song song: 2 đề nghị vào buổi còn 1 chỗ, `Promise.all` 2 lần duyệt → đúng 1 thành công, 1 nhận 409.
+- (c) Unique: gửi đề nghị thứ 2 cho cùng buổi nguồn → 409.
+- Các kịch bản khác **không** viết e2e — đã phủ ở tầng 1–2.
+
+### Frontend (vitest, mock API)
+- `TheBuoiSapToi.test.tsx`: link nhỏ chỉ hiện khi khóa bật và buổi chưa bắt đầu.
+- `DeNghiDoiBuoi.test.tsx`: buổi đầy không chọn được; hiện sĩ số và "+n đang chờ"; cảnh báo khi Sửa.
+- Modal duyệt: lựa chọn `duyet_duoc = false` bị vô hiệu với hỗ trợ cụm, bật kèm cảnh báo với quản trị.
+
+### Lệnh chạy (luôn chạy đúng file, có timeout, không watch)
+```bash
+cd backend && npx jest src/doi-buoi-hoc --forceExit
+cd backend && npx jest --config ./test/jest-e2e.json --runInBand --forceExit test/doi-buoi-hoc.e2e-spec.ts
+cd frontend && npx vitest run src/pages/M3/TheBuoiSapToi.test.tsx src/pages/HoTro src/pages/HocVien/DeNghiDoiBuoi.test.tsx
+```
+Khi sửa các chỗ ở §5, chỉ chạy lại spec của đúng file đó (vd `npx jest src/trang-lop --forceExit`), không chạy toàn bộ e2e.
 
 ## 9. Lát cắt triển khai
 
