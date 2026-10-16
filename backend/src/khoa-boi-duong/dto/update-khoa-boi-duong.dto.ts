@@ -52,6 +52,13 @@ export class UpdateKhoaBoiDuongDto {
   @IsBoolean()
   mo_dieu_chinh_muc?: boolean;
 
+  // ADR 0007: số buổi tối đa học viên được đề nghị đổi (0 = tắt). Khớp CHECK 0–50.
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(50)
+  so_buoi_doi_toi_da?: number;
+
   // ADR 0005 (issue #23): bật = ghi mốc bat_diem_danh_zoom_luc (giữ mốc cũ
   // nếu đã bật), tắt = NULL. Khoảng phút khớp CHECK trong migration.
   @IsOptional()

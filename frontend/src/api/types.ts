@@ -314,6 +314,8 @@ export interface KhoaBoiDuong {
   created_by: string | null;
   // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học (chỉ xuống mức thấp hơn).
   mo_dieu_chinh_muc: boolean;
+  // ADR 0007: số buổi tối đa học viên được đề nghị đổi (0 = tắt).
+  so_buoi_doi_toi_da: number;
   // ADR 0005 (issue #23): tự điểm danh lớp Zoom — mốc bật (null = tắt) + cửa sổ (phút).
   bat_diem_danh_zoom_luc: string | null;
   diem_danh_mo_truoc_phut: number;

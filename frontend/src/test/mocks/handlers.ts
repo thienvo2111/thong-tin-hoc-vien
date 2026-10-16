@@ -720,6 +720,7 @@ export const handlers = [
       updated_at: new Date().toISOString(),
       created_by: 'nd-1',
       mo_dieu_chinh_muc: false,
+      so_buoi_doi_toi_da: 0,
       bat_diem_danh_zoom_luc: null,
       diem_danh_mo_truoc_phut: 30,
       diem_danh_dong_sau_phut: 120,
