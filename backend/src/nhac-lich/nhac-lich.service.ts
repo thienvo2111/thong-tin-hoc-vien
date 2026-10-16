@@ -168,7 +168,9 @@ export class NhacLichService {
 
   /**
    * Spec đổi buổi §5: buổi chốt của học viên cụm cũng là buổi của cụm. Chỉ
-   * buổi chốt bắt đầu từ `tu` (mặc định đầu hôm nay giờ VN − 30 ngày).
+   * đổi buổi có buổi chốt HOẶC buổi nguồn bắt đầu từ `tu` (mặc định đầu hôm
+   * nay giờ VN − 30 ngày) — buổi chốt có thể sớm hơn buổi nguồn, vẫn cần để
+   * trừ người đổi ra ở buổi nguồn.
    */
   async doiBuoiCuaCum(
     cumIds: string[],
@@ -178,7 +180,10 @@ export class NhacLichService {
     const rows = await this.prisma.doi_buoi_hoc.findMany({
       where: {
         trang_thai: 'da_duyet',
-        lich_chot: { thoi_gian_bat_dau: { gte: tu } },
+        OR: [
+          { lich_chot: { thoi_gian_bat_dau: { gte: tu } } },
+          { lich_nguon: { thoi_gian_bat_dau: { gte: tu } } },
+        ],
         dang_ky_hoc: { cum_id: { in: cumIds } },
       },
       select: {

@@ -94,7 +94,11 @@ describe('NhacLichService — đổi buổi của cụm', () => {
     const kq = await service.doiBuoiCuaCum(['c1'], tu);
     expect(prisma.doi_buoi_hoc.findMany.mock.calls[0][0].where).toEqual({
       trang_thai: 'da_duyet',
-      lich_chot: { thoi_gian_bat_dau: { gte: tu } },
+      // Buổi chốt có thể sớm hơn buổi nguồn: giữ nếu 1 trong 2 còn trong cửa sổ.
+      OR: [
+        { lich_chot: { thoi_gian_bat_dau: { gte: tu } } },
+        { lich_nguon: { thoi_gian_bat_dau: { gte: tu } } },
+      ],
       dang_ky_hoc: { cum_id: { in: ['c1'] } },
     });
     expect(query.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledWith(['dk1', 'dk2']);

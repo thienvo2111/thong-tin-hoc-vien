@@ -81,4 +81,54 @@ describe('HoTroHocVienService.lichHoc — đổi buổi', () => {
       doi,
     );
   });
+
+  // Buổi chốt hôm qua (ngoài cửa sổ), buổi nguồn ngày mai: vẫn trừ người đổi ra.
+  it('buổi chốt sớm hơn cửa sổ, buổi nguồn trong cửa sổ → vẫn trừ đổi ra ở buổi nguồn', async () => {
+    const prisma = {
+      phan_lop_giai_doan: {
+        groupBy: jest
+          .fn()
+          .mockResolvedValue([
+            { lop_id: 'lop-a', giai_doan_id: 'gd', _count: { _all: 5 } },
+          ]),
+      },
+      lich_hoc_lop: {
+        findMany: jest.fn().mockResolvedValue([buoi('a1', 'lop-a')]),
+      },
+      nhan_su_thuc_dia: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const nhacLich = {
+      doiBuoiCuaCum: jest.fn().mockResolvedValue([
+        {
+          cum_id: 'c1',
+          ho_ten: 'An',
+          lich_nguon_id: 'a1',
+          lich_chot_id: 'b-hom-qua',
+          xu_ly_luc: new Date(),
+        },
+      ]),
+      trangThaiCumTheoBuoi: jest.fn().mockResolvedValue(new Map()),
+    };
+    const service = new HoTroHocVienService(
+      prisma as unknown as PrismaService,
+      {
+        cumLoc: jest.fn().mockResolvedValue(['c1']),
+      } as unknown as HoTroHocVienScopeService,
+      {} as HocVienService,
+      {} as KhoaBoiDuongService,
+      {} as NhatKyService,
+      {} as AuthService,
+      nhacLich as unknown as NhacLichService,
+    );
+
+    const kq = await service.lichHoc('nd-1', { tu_ngay: '2026-11-10' });
+
+    // Cửa sổ của lịch được truyền cho doiBuoiCuaCum (lọc theo chốt HOẶC nguồn).
+    expect(nhacLich.doiBuoiCuaCum).toHaveBeenCalledWith(
+      ['c1'],
+      new Date('2026-11-10T00:00:00+07:00'),
+    );
+    expect(kq).toHaveLength(1);
+    expect(kq[0]).toMatchObject({ id: 'a1', so_hoc_vien_cum: 4 });
+  });
 });
