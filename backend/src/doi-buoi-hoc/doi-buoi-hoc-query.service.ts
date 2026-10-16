@@ -66,7 +66,7 @@ export class DoiBuoiHocQueryService {
       where: { id: { in: unique } },
       select: LICH_TOM_TAT_SELECT,
     });
-    return new Map(rows.map((r) => [r.id, r as LichTomTat]));
+    return new Map(rows.map((r) => [r.id, r]));
   }
 
   async siSoBuoi(

@@ -231,4 +231,71 @@ describe('DoiBuoiHocQueryService', () => {
       expect(await svc.doiBuoiDaDuyetCuaDangKy([])).toEqual([]);
     });
   });
+
+  describe('where của truy vấn', () => {
+    it('siSoBuoi lọc đúng da_duyet, cho_duyet, cặp lớp/giai đoạn, tập lịch', async () => {
+      const { svc, prisma } = setup({
+        lich: [lichRow('LA', 'A', TUONG_LAI)],
+        soPhanLop: 1,
+        daDuyet: [dd('d1', 'LA', 'LB')],
+        phanLopHienTai: [{ dang_ky_hoc_id: 'd1', lop_id: 'A' }],
+      });
+      await svc.siSoBuoi(['LA'], NOW);
+      expect(prisma.phan_lop_giai_doan.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { OR: [{ lop_id: 'A', giai_doan_id: 'gd1' }] },
+        }),
+      );
+      expect(prisma.doi_buoi_hoc.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            OR: [
+              { lich_nguon_id: { in: ['LA'] } },
+              { lich_chot_id: { in: ['LA'] } },
+            ],
+            trang_thai: 'da_duyet',
+          },
+        }),
+      );
+      expect(prisma.phan_lop_giai_doan.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { OR: [{ dang_ky_hoc_id: 'd1', giai_doan_id: 'gd1' }] },
+        }),
+      );
+      expect(prisma.doi_buoi_hoc.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { lich_de_nghi_id: { in: ['LA'] }, trang_thai: 'cho_duyet' },
+        }),
+      );
+    });
+
+    it('dieuChinhTheoBuoi lọc da_duyet theo tập lịch', async () => {
+      const { svc, prisma } = setup(RONG);
+      await svc.dieuChinhTheoBuoi(['LA', 'LB']);
+      expect(prisma.doi_buoi_hoc.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            trang_thai: 'da_duyet',
+            OR: [
+              { lich_nguon_id: { in: ['LA', 'LB'] } },
+              { lich_chot_id: { in: ['LA', 'LB'] } },
+            ],
+          },
+        }),
+      );
+    });
+
+    it('doiBuoiDaDuyetCuaDangKy lọc da_duyet theo tập đăng ký', async () => {
+      const { svc, prisma } = setup(RONG);
+      await svc.doiBuoiDaDuyetCuaDangKy(['d1', 'd2']);
+      expect(prisma.doi_buoi_hoc.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            dang_ky_hoc_id: { in: ['d1', 'd2'] },
+            trang_thai: 'da_duyet',
+          },
+        }),
+      );
+    });
+  });
 });
