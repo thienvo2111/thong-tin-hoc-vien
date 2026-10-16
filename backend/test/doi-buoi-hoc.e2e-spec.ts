@@ -2,6 +2,8 @@ import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import * as bcrypt from 'bcryptjs';
 import { createTestApp } from './utils/test-app';
+import { TrangLopService } from '../src/trang-lop/trang-lop.service';
+import { KhoaBoiDuongService } from '../src/khoa-boi-duong/khoa-boi-duong.service';
 import {
   prisma,
   taoDonViTest,
@@ -23,8 +25,11 @@ describe('Đổi buổi học (e2e)', () => {
   const nguoiDungIds: string[] = [];
   const hocVienIds: string[] = [];
   let khoaId: string;
+  let maKhoa: string;
+  let gdId: string;
   const buoi: Record<'a' | 'b', string> = { a: '', b: '' };
-  const hv: Record<string, { id: string; dk: string }> = {};
+  const lop: Record<'a' | 'b', string> = { a: '', b: '' };
+  const hv: Record<string, { id: string; dk: string; moet: string }> = {};
   const tk: Record<string, string> = {};
   const deNghi: Record<string, string> = {};
 
@@ -62,10 +67,11 @@ describe('Đổi buổi học (e2e)', () => {
     lopId: string,
     coTaiKhoan: boolean,
   ) {
+    const moet = `DB${ma}${suf}`.slice(0, 20);
     const h = await prisma.hoc_vien.create({
       data: {
         nguon_tao: 'import_moet',
-        ma_dinh_danh_moet: `DB${ma}${suf}`.slice(0, 20),
+        ma_dinh_danh_moet: moet,
         ho_ten: `HV ${ma}`,
         ngay_sinh: 1,
         thang_sinh: 1,
@@ -86,7 +92,7 @@ describe('Đổi buổi học (e2e)', () => {
     await prisma.phan_lop_giai_doan.create({
       data: { dang_ky_hoc_id: dk.id, giai_doan_id: gdId, lop_id: lopId },
     });
-    hv[ma] = { id: h.id, dk: dk.id };
+    hv[ma] = { id: h.id, dk: dk.id, moet };
     if (!coTaiKhoan) return;
     const nd = await prisma.nguoi_dung.create({
       data: {
@@ -114,10 +120,11 @@ describe('Đổi buổi học (e2e)', () => {
   beforeAll(async () => {
     app = await createTestApp({ raiseThrottlerLimit: true });
     dv = await taoDonViTest('dbh');
+    maKhoa = `DBH-${suf}`.slice(0, 30);
     khoaId = (
       await prisma.khoa_boi_duong.create({
         data: {
-          ma_khoa: `DBH-${suf}`.slice(0, 30),
+          ma_khoa: maKhoa,
           ten_khoa: 'Khóa đổi buổi',
           don_vi_dat_hang_id: dv.donVi.id,
           thoi_gian_bat_dau: new Date('2026-01-01'),
@@ -127,7 +134,7 @@ describe('Đổi buổi học (e2e)', () => {
         },
       })
     ).id;
-    const gdId = (
+    gdId = (
       await prisma.giai_doan_khoa.create({
         data: {
           khoa_id: khoaId,
@@ -166,6 +173,8 @@ describe('Đổi buổi học (e2e)', () => {
     const b = await taoLop('Lớp B', 3);
     buoi.a = a.lichId;
     buoi.b = b.lichId;
+    lop.a = a.lopId;
+    lop.b = b.lopId;
 
     const cum = await prisma.cum_hoc_vien.create({
       data: { khoa_id: khoaId, ten_cum: 'Cụm DBH' },
@@ -221,10 +230,36 @@ describe('Đổi buổi học (e2e)', () => {
     expect(dong.trang_thai).toBe('da_duyet');
   });
 
-  it.todo('(a, Task 7) trang lớp B buổi 1 có HV1 với nhãn "Từ lớp A"');
-  it.todo(
-    '(a, Task 7) nạp điểm danh HV1 ở buổi B không ghi_chu → không lỗi, không cảnh báo học bù',
-  );
+  it('(a) trang lớp B buổi 1 có HV1 với nhãn "Từ lớp A"; lớp A ghi đổi ra', async () => {
+    const trangLop = app.get(TrangLopService);
+    const b = await trangLop.layTrangLop(lop.b, gdId, { vai_tro: 'quan_tri' });
+    const hv1 = b.hoc_vien.find((h) => h.dang_ky_hoc_id === hv.hv1.dk);
+    expect(hv1?.doi_buoi).toEqual({ [buoi.b]: { loai: 'vao', lop: 'Lớp A' } });
+    expect(b.buoi[0]).toMatchObject({ id: buoi.b, si_so: 2 });
+
+    const a = await trangLop.layTrangLop(lop.a, gdId, { vai_tro: 'quan_tri' });
+    const hv1A = a.hoc_vien.find((h) => h.dang_ky_hoc_id === hv.hv1.dk);
+    expect(hv1A?.doi_buoi).toEqual({ [buoi.a]: { loai: 'ra', lop: 'Lớp B' } });
+  });
+
+  it('(a) nạp điểm danh HV1 ở buổi B không ghi_chu → không lỗi, không cảnh báo học bù', async () => {
+    const kq = await app.get(KhoaBoiDuongService).resolveDiemDanhRow({
+      ma_dinh_danh_moet: hv.hv1.moet,
+      ma_khoa: maKhoa,
+      ten_lop: 'Lớp B',
+      loai_lop: 'truc_tiep',
+      giai_doan_thu_tu: '1',
+      buoi_so: '1',
+      trang_thai: 'co_mat',
+      nguon: 'ky_ten',
+    });
+    expect(kq.error).toBeUndefined();
+    expect(kq.canhBao).toBeUndefined();
+    expect(kq.dto).toMatchObject({
+      dang_ky_hoc_id: hv.hv1.dk,
+      lich_hoc_id: buoi.b,
+    });
+  });
 
   it('(b) duyệt theo thứ tự gửi: HV3 bị giữ chỗ cho HV2; duyệt song song → đúng 1 thành công, 1 xung đột', async () => {
     deNghi.hv2 = (await gui('hv2').expect(201)).body.id;
