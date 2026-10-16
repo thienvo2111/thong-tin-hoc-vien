@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Badge, Box, Button, Group, Image, ScrollArea, Text } from '@mantine/core';
 import { useDemYeuCauHoTroCuaCum } from '@/api/hoTro';
 import { useDemNhacLichCum } from '@/api/nhacLich';
+import { useDemDoiBuoi } from '@/api/doiBuoi';
 import { useToi } from '@/auth/AuthContext';
 import logoHcmue from '@/assets/logo-hcmue.png';
 import { tokenKhac } from '@/theme';
@@ -11,6 +12,7 @@ const MENU = [
   { to: '/ho-tro', nhan: 'Cụm của tôi', end: true },
   { to: '/ho-tro/hoc-vien', nhan: 'Học viên', end: false },
   { to: '/ho-tro/lich-hoc', nhan: 'Lịch học', end: false },
+  { to: '/ho-tro/doi-buoi', nhan: 'Đổi buổi', end: false },
   { to: '/ho-tro/yeu-cau-ho-tro', nhan: 'Yêu cầu hỗ trợ', end: false },
   { to: '/ho-tro/thong-ke', nhan: 'Thống kê', end: false },
 ];
@@ -35,6 +37,13 @@ export default function HoTroLayout() {
     void refetchNhac();
   }, [pathname, refetchNhac]);
   const soCanNhac = demNhac.data?.can_nhac ?? 0;
+  // Đề nghị đổi buổi chờ duyệt: tải lại mỗi lần chuyển trang như các số đếm khác.
+  const demDoiBuoi = useDemDoiBuoi();
+  const refetchDoiBuoi = demDoiBuoi.refetch;
+  useEffect(() => {
+    void refetchDoiBuoi();
+  }, [pathname, refetchDoiBuoi]);
+  const soDoiBuoi = demDoiBuoi.data ?? 0;
 
   async function xuLyDangXuat() {
     await dangXuat();
@@ -84,6 +93,11 @@ export default function HoTroLayout() {
                     {m.to === '/ho-tro/lich-hoc' && soCanNhac > 0 && (
                       <Badge component="span" ml={6} size="sm" color="orange" circle={soCanNhac < 10} aria-label={`${soCanNhac} buổi cần nhắc`}>
                         {soCanNhac}
+                      </Badge>
+                    )}
+                    {m.to === '/ho-tro/doi-buoi' && soDoiBuoi > 0 && (
+                      <Badge component="span" ml={6} size="sm" color="red" circle={soDoiBuoi < 10} aria-label={`${soDoiBuoi} đề nghị đổi buổi chờ duyệt`}>
+                        {soDoiBuoi}
                       </Badge>
                     )}
                     {m.to === '/ho-tro/yeu-cau-ho-tro' && soChoXuLy > 0 && (

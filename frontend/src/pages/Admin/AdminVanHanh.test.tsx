@@ -27,6 +27,17 @@ function render(data: VanHanh) {
 }
 
 describe('Admin — Vận hành', () => {
+  it('khối "Đề nghị đổi buổi chờ duyệt" hiện số chờ và link sang /admin/doi-buoi', async () => {
+    server.use(http.get('/doi-buoi-hoc/dem-cho-duyet', () => HttpResponse.json({ cho_duyet: 7 })));
+    render(RONG);
+    expect(await screen.findByLabelText('Đề nghị đổi buổi chờ duyệt: 7')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Mở màn duyệt đổi buổi' })).toHaveAttribute('href', '/admin/doi-buoi');
+  });
+
+  it('menu admin có mục "Đổi buổi" chỉ cho Quản trị', () => {
+    expect(MENU_ADMIN.find((m) => m.to === '/admin/doi-buoi')).toMatchObject({ nhan: 'Đổi buổi', chiQuanTri: true });
+  });
+
   it('menu có mục "Vận hành" chỉ cho Quản trị', () => {
     expect(MENU_ADMIN.find((m) => m.to === '/admin/van-hanh')).toMatchObject({ nhan: 'Vận hành', chiQuanTri: true });
   });

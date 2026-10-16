@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert, Anchor, Badge, Container, Group, Paper, SimpleGrid, Skeleton, Stack, Text, Title } from '@mantine/core';
+import { useDemDoiBuoi } from '@/api/doiBuoi';
 import { useVanHanh, type VanHanh } from '@/api/vanHanh';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
@@ -70,8 +71,25 @@ function Khoi({ tieuDe, so, mau, children }: { tieuDe: string; so: number; mau: 
 }
 
 function NoiDung({ d }: { d: VanHanh }) {
+  const soDoiBuoi = useDemDoiBuoi().data ?? 0;
   return (
     <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
+      <Paper withBorder radius={12} p="md">
+        <Group justify="space-between" mb="xs">
+          <Title order={5}>Đề nghị đổi buổi chờ duyệt</Title>
+          <Badge
+            color={soDoiBuoi > 0 ? 'orange' : 'green'}
+            variant="light"
+            aria-label={`Đề nghị đổi buổi chờ duyệt: ${soDoiBuoi}`}
+          >
+            {soDoiBuoi}
+          </Badge>
+        </Group>
+        <Anchor component={Link} to="/admin/doi-buoi" fz="sm">
+          Mở màn duyệt đổi buổi
+        </Anchor>
+      </Paper>
+
       <Khoi tieuDe="Đợt trực tiếp có mục quá hạn" so={d.dot_do.length} mau="red">
         {d.dot_do.map((x) => (
           <div key={`${x.lop.id}|${x.giai_doan.id}`}>
