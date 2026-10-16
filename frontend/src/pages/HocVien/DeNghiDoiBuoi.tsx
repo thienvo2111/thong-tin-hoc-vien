@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Badge,
   Box,
@@ -15,9 +15,9 @@ import {
   Text,
   Textarea,
   Title,
-} from "@mantine/core";
-import { notifications } from "@mantine/notifications";
-import { useKhoaHocToi } from "@/api/hocVien";
+} from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { useKhoaHocToi } from '@/api/hocVien';
 import {
   useGuiDoiBuoi,
   useHuyDoiBuoi,
@@ -29,25 +29,25 @@ import {
   type LichTomTat,
   type LuaChonBuoi,
   type TongQuanDoiBuoi,
-} from "@/api/doiBuoi";
-import { ApiError } from "@/api/client";
-import { StatusBanner } from "@/components/StatusBanner";
-import { dinhDangGio, dinhDangNgayGio } from "@/lib/ngay";
-import { thongDiepLoiXungDot } from "@/lib/loiApi";
+} from '@/api/doiBuoi';
+import { ApiError } from '@/api/client';
+import { StatusBanner } from '@/components/StatusBanner';
+import { dinhDangGio, dinhDangNgayGio } from '@/lib/ngay';
+import { thongDiepLoiXungDot } from '@/lib/loiApi';
 
 const LY_DO_TOI_THIEU = 5;
 const LY_DO_TOI_DA = 500;
-const KHOA_TAT = "Khóa học chưa mở đề nghị đổi buổi";
+const KHOA_TAT = 'Khóa học chưa mở đề nghị đổi buổi';
 
-const NHAN_TRANG_THAI: Record<DeNghiHocVien["trang_thai"], string> = {
-  cho_duyet: "Đang chờ duyệt",
-  da_duyet: "Đã duyệt",
-  tu_choi: "Bị từ chối",
-  da_huy: "Đã hủy",
+const NHAN_TRANG_THAI: Record<DeNghiHocVien['trang_thai'], string> = {
+  cho_duyet: 'Đang chờ duyệt',
+  da_duyet: 'Đã duyệt',
+  tu_choi: 'Bị từ chối',
+  da_huy: 'Đã hủy',
 };
 
 function nhanBuoi(l: LichTomTat | BuoiTomTat | null | undefined): string {
-  if (!l) return "Buổi học";
+  if (!l) return 'Buổi học';
   return `${l.lop.ten_lop} · Buổi ${l.buoi_so} · ${dinhDangNgayGio(l.thoi_gian_bat_dau)}`;
 }
 
@@ -55,7 +55,7 @@ function nhanBuoi(l: LichTomTat | BuoiTomTat | null | undefined): string {
 export default function DeNghiDoiBuoi() {
   const [params] = useSearchParams();
   const { data: dsKhoa, isLoading, isError, error } = useKhoaHocToi();
-  const [khoaChon, setKhoaChon] = useState<string | null>(params.get("khoa"));
+  const [khoaChon, setKhoaChon] = useState<string | null>(params.get('khoa'));
 
   const khoaId = timKhoaId(dsKhoa, khoaChon);
 
@@ -71,13 +71,9 @@ export default function DeNghiDoiBuoi() {
             <Loader />
           </Center>
         )}
-        {isError && (
-          <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>
-        )}
+        {isError && <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>}
         {dsKhoa && dsKhoa.length === 0 && (
-          <StatusBanner loai="info">
-            Thầy/Cô chưa được ghi danh vào khóa bồi dưỡng nào.
-          </StatusBanner>
+          <StatusBanner loai="info">Thầy/Cô chưa được ghi danh vào khóa bồi dưỡng nào.</StatusBanner>
         )}
         {dsKhoa && dsKhoa.length > 1 && (
           <Select
@@ -91,23 +87,14 @@ export default function DeNghiDoiBuoi() {
             onChange={setKhoaChon}
           />
         )}
-        {khoaId && (
-          <KhoiDoiBuoi
-            key={khoaId}
-            khoaId={khoaId}
-            lichBanDau={params.get("lich")}
-          />
-        )}
+        {khoaId && <KhoiDoiBuoi key={khoaId} khoaId={khoaId} lichBanDau={params.get('lich')} />}
       </Stack>
     </Container>
   );
 }
 
 /** `?khoa=` hợp lệ > khóa duy nhất > khóa duy nhất đã bật đổi buổi. Nhiều khóa không rõ → phải chọn. */
-function timKhoaId(
-  ds: ReturnType<typeof useKhoaHocToi>["data"],
-  chon: string | null,
-): string | undefined {
+function timKhoaId(ds: ReturnType<typeof useKhoaHocToi>['data'], chon: string | null): string | undefined {
   if (!ds || ds.length === 0) return undefined;
   if (chon && ds.some((d) => d.khoa_id === chon)) return chon;
   if (ds.length === 1) return ds[0].khoa_id;
@@ -115,13 +102,7 @@ function timKhoaId(
   return bat.length === 1 ? bat[0].khoa_id : undefined;
 }
 
-function KhoiDoiBuoi({
-  khoaId,
-  lichBanDau,
-}: {
-  khoaId: string;
-  lichBanDau: string | null;
-}) {
+function KhoiDoiBuoi({ khoaId, lichBanDau }: { khoaId: string; lichBanDau: string | null }) {
   const { data, isLoading, isError, error } = useTongQuanDoiBuoi(khoaId);
 
   if (isLoading)
@@ -132,30 +113,18 @@ function KhoiDoiBuoi({
     );
   if (isError) {
     // Khóa tắt (403) không phải sự cố: thông báo nhẹ, không lỗi đỏ.
-    if (error instanceof ApiError && error.status === 403)
-      return <StatusBanner loai="info">{KHOA_TAT}</StatusBanner>;
-    return (
-      <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>
-    );
+    if (error instanceof ApiError && error.status === 403) return <StatusBanner loai="info">{KHOA_TAT}</StatusBanner>;
+    return <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>;
   }
   if (!data) return null;
   return <NoiDung tongQuan={data} lichBanDau={lichBanDau} />;
 }
 
-function NoiDung({
-  tongQuan,
-  lichBanDau,
-}: {
-  tongQuan: TongQuanDoiBuoi;
-  lichBanDau: string | null;
-}) {
+function NoiDung({ tongQuan, lichBanDau }: { tongQuan: TongQuanDoiBuoi; lichBanDau: string | null }) {
   const [dangSua, setDangSua] = useState<DeNghiHocVien | null>(null);
-  const conLai = Math.max(
-    0,
-    tongQuan.so_buoi_doi_toi_da - tongQuan.so_luot_da_dung,
-  );
-  const choDuyet = tongQuan.de_nghi.filter((d) => d.trang_thai === "cho_duyet");
-  const daXuLy = tongQuan.de_nghi.filter((d) => d.trang_thai !== "cho_duyet");
+  const conLai = Math.max(0, tongQuan.so_buoi_doi_toi_da - tongQuan.so_luot_da_dung);
+  const choDuyet = tongQuan.de_nghi.filter((d) => d.trang_thai === 'cho_duyet');
+  const daXuLy = tongQuan.de_nghi.filter((d) => d.trang_thai !== 'cho_duyet');
 
   return (
     <Stack gap="lg">
@@ -169,16 +138,14 @@ function NoiDung({
 
       {dangSua || conLai > 0 ? (
         <FormDoiBuoi
-          key={dangSua?.id ?? "moi"}
+          key={dangSua?.id ?? 'moi'}
           tongQuan={tongQuan}
           dangSua={dangSua}
           lichBanDau={lichBanDau}
           onXong={() => setDangSua(null)}
         />
       ) : (
-        <StatusBanner loai="info">
-          Thầy/Cô đã dùng hết lượt đổi buổi của khóa này.
-        </StatusBanner>
+        <StatusBanner loai="info">Thầy/Cô đã dùng hết lượt đổi buổi của khóa này.</StatusBanner>
       )}
 
       {daXuLy.length > 0 && (
@@ -192,7 +159,7 @@ function NoiDung({
                 <Badge variant="light">{NHAN_TRANG_THAI[d.trang_thai]}</Badge>
                 <Text size="sm">
                   {nhanBuoi(d.buoi_nguon)}
-                  {d.buoi_chot ? ` → ${nhanBuoi(d.buoi_chot)}` : ""}
+                  {d.buoi_chot ? ` → ${nhanBuoi(d.buoi_chot)}` : ''}
                 </Text>
               </Group>
               {d.ghi_chu_xu_ly && (
@@ -208,13 +175,7 @@ function NoiDung({
   );
 }
 
-function DongDeNghi({
-  deNghi,
-  onSua,
-}: {
-  deNghi: DeNghiHocVien;
-  onSua: () => void;
-}) {
+function DongDeNghi({ deNghi, onSua }: { deNghi: DeNghiHocVien; onSua: () => void }) {
   const huy = useHuyDoiBuoi();
   return (
     <Paper withBorder radius="md" p="md" data-testid="de-nghi-cho-duyet">
@@ -238,11 +199,7 @@ function DongDeNghi({
             Bạn đang xếp thứ {deNghi.thu_tu_hang.k}
           </Text>
         )}
-        {huy.isError && (
-          <StatusBanner loai="error">
-            {thongDiepLoiXungDot(huy.error)}
-          </StatusBanner>
-        )}
+        {huy.isError && <StatusBanner loai="error">{thongDiepLoiXungDot(huy.error)}</StatusBanner>}
         <Group gap="xs">
           {!deNghi.qua_han && (
             <Button size="xs" variant="default" onClick={onSua}>
@@ -258,8 +215,8 @@ function DongDeNghi({
               huy.mutate(deNghi.id, {
                 onSuccess: () =>
                   notifications.show({
-                    color: "green",
-                    message: "Đã hủy đề nghị",
+                    color: 'green',
+                    message: 'Đã hủy đề nghị',
                   }),
               })
             }
@@ -283,13 +240,9 @@ function FormDoiBuoi({
   lichBanDau: string | null;
   onXong: () => void;
 }) {
-  const [nguonId, setNguonId] = useState<string | null>(
-    dangSua?.lich_nguon_id ?? lichBanDau,
-  );
-  const [dichId, setDichId] = useState<string | null>(
-    dangSua?.lich_de_nghi_id ?? null,
-  );
-  const [lyDo, setLyDo] = useState(dangSua?.ly_do ?? "");
+  const [nguonId, setNguonId] = useState<string | null>(dangSua?.lich_nguon_id ?? lichBanDau);
+  const [dichId, setDichId] = useState<string | null>(dangSua?.lich_de_nghi_id ?? null);
+  const [lyDo, setLyDo] = useState(dangSua?.ly_do ?? '');
   const gui = useGuiDoiBuoi();
   const sua = useSuaDoiBuoi();
   const dangGui = gui.isPending || sua.isPending;
@@ -298,23 +251,15 @@ function FormDoiBuoi({
   // Buổi đã có đề nghị hoạt động chỉ đổi qua "Sửa"; giữ lại buổi đang sửa.
   const hoatDong = new Set(
     tongQuan.de_nghi
-      .filter(
-        (d) => d.trang_thai === "cho_duyet" || d.trang_thai === "da_duyet",
-      )
+      .filter((d) => d.trang_thai === 'cho_duyet' || d.trang_thai === 'da_duyet')
       .map((d) => d.lich_nguon_id),
   );
   const buoiNguon = tongQuan.buoi_sap_toi.map((b) => b.lich_nguon);
   const nguonHopLe = buoiNguon.some((b) => b.id === nguonId) ? nguonId : null;
   const lyDoCat = lyDo.trim();
-  const lyDoHopLe =
-    lyDoCat.length >= LY_DO_TOI_THIEU && lyDoCat.length <= LY_DO_TOI_DA;
+  const lyDoHopLe = lyDoCat.length >= LY_DO_TOI_THIEU && lyDoCat.length <= LY_DO_TOI_DA;
 
-  const {
-    data: luaChon,
-    isLoading,
-    isError,
-    error,
-  } = useLuaChonDoiBuoi(nguonHopLe ?? undefined);
+  const { data: luaChon, isLoading, isError, error } = useLuaChonDoiBuoi(nguonHopLe ?? undefined);
   const dichHopLe = luaChon?.some((c) => c.lich.id === dichId && !c.da_du);
 
   function guiDeNghi() {
@@ -327,11 +272,11 @@ function FormDoiBuoi({
     const opts = {
       onSuccess: () => {
         notifications.show({
-          color: "green",
-          message: "Đã gửi đề nghị đổi buổi",
+          color: 'green',
+          message: 'Đã gửi đề nghị đổi buổi',
         });
         setDichId(null);
-        setLyDo("");
+        setLyDo('');
         onXong();
       },
     };
@@ -342,12 +287,8 @@ function FormDoiBuoi({
   return (
     <Paper withBorder radius="md" p="md">
       <Stack gap="md">
-        <Text fw={700}>{dangSua ? "Sửa đề nghị" : "Gửi đề nghị mới"}</Text>
-        {dangSua && (
-          <StatusBanner loai="warning">
-            Sửa sẽ đưa bạn về cuối hàng chờ
-          </StatusBanner>
-        )}
+        <Text fw={700}>{dangSua ? 'Sửa đề nghị' : 'Gửi đề nghị mới'}</Text>
+        {dangSua && <StatusBanner loai="warning">Sửa sẽ đưa bạn về cuối hàng chờ</StatusBanner>}
 
         <Select
           label="Buổi không tham gia được"
@@ -367,16 +308,8 @@ function FormDoiBuoi({
         />
 
         {nguonHopLe && isLoading && <Loader size="sm" />}
-        {nguonHopLe && isError && (
-          <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>
-        )}
-        {luaChon && (
-          <DanhSachLuaChon
-            luaChon={luaChon}
-            dichId={dichId}
-            onChon={setDichId}
-          />
-        )}
+        {nguonHopLe && isError && <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>}
+        {luaChon && <DanhSachLuaChon luaChon={luaChon} dichId={dichId} onChon={setDichId} />}
 
         <Textarea
           label="Lý do"
@@ -389,17 +322,11 @@ function FormDoiBuoi({
           description={`${lyDo.length}/${LY_DO_TOI_DA} ký tự (tối thiểu ${LY_DO_TOI_THIEU})`}
         />
 
-        {loi && (
-          <StatusBanner loai="error">{thongDiepLoiXungDot(loi)}</StatusBanner>
-        )}
+        {loi && <StatusBanner loai="error">{thongDiepLoiXungDot(loi)}</StatusBanner>}
 
         <Group gap="xs">
-          <Button
-            loading={dangGui}
-            disabled={!nguonHopLe || !dichHopLe || !lyDoHopLe}
-            onClick={guiDeNghi}
-          >
-            {dangSua ? "Lưu đề nghị" : "Gửi đề nghị"}
+          <Button loading={dangGui} disabled={!nguonHopLe || !dichHopLe || !lyDoHopLe} onClick={guiDeNghi}>
+            {dangSua ? 'Lưu đề nghị' : 'Gửi đề nghị'}
           </Button>
           {dangSua && (
             <Button variant="default" onClick={onXong}>
@@ -422,17 +349,9 @@ function DanhSachLuaChon({
   onChon: (id: string) => void;
 }) {
   if (luaChon.length === 0)
-    return (
-      <StatusBanner loai="info">
-        Hiện chưa có buổi tương đương nào để đổi sang.
-      </StatusBanner>
-    );
+    return <StatusBanner loai="info">Hiện chưa có buổi tương đương nào để đổi sang.</StatusBanner>;
   return (
-    <Radio.Group
-      label="Buổi muốn đổi sang"
-      value={dichId ?? ""}
-      onChange={onChon}
-    >
+    <Radio.Group label="Buổi muốn đổi sang" value={dichId ?? ''} onChange={onChon}>
       <Stack gap="xs" mt="xs">
         {luaChon.map((c) => (
           <Radio
@@ -456,12 +375,9 @@ function NhanLuaChon({ c }: { c: LuaChonBuoi }) {
       </Text>
       <Group gap="xs">
         <Text size="sm" c="dimmed">
-          {dinhDangNgayGio(c.lich.thoi_gian_bat_dau)}–
-          {dinhDangGio(c.thoi_gian_ket_thuc)}
+          {dinhDangNgayGio(c.lich.thoi_gian_bat_dau)}–{dinhDangGio(c.thoi_gian_ket_thuc)}
         </Text>
-        <Text size="sm">
-          {c.si_so_toi_da == null ? c.si_so : `${c.si_so}/${c.si_so_toi_da}`}
-        </Text>
+        <Text size="sm">{c.si_so_toi_da == null ? c.si_so : `${c.si_so}/${c.si_so_toi_da}`}</Text>
         {c.so_cho_duyet > 0 && (
           <Text size="sm" c="dimmed">
             +{c.so_cho_duyet} đang chờ
@@ -487,8 +403,8 @@ function DiaDiem({ c }: { c: LuaChonBuoi }) {
   ].filter(Boolean);
   if (ds.length === 0) return null;
   return (
-    <Text size="sm" c="dimmed" style={{ wordBreak: "break-all" }}>
-      {ds.join(" · ")}
+    <Text size="sm" c="dimmed" style={{ wordBreak: 'break-all' }}>
+      {ds.join(' · ')}
     </Text>
   );
 }

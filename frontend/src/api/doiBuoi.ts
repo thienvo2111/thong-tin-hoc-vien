@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "./client";
-import type { LoaiLop, MucNangLuc } from "./types";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from './client';
+import type { LoaiLop, MucNangLuc } from './types';
 
-export type TrangThaiDeNghi = "cho_duyet" | "da_duyet" | "tu_choi" | "da_huy";
+export type TrangThaiDeNghi = 'cho_duyet' | 'da_duyet' | 'tu_choi' | 'da_huy';
 
 /** Tóm tắt 1 buổi học (khớp LichTomTat ở backend). */
 export interface LichTomTat {
@@ -92,24 +92,21 @@ export interface LocDoiBuoi {
   da_xu_ly?: boolean;
 }
 
-const KEY = "doi-buoi";
+const KEY = 'doi-buoi';
 
 function qs(q: Record<string, string | undefined>): string {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(q)) if (v) p.set(k, v);
   const s = p.toString();
-  return s ? `?${s}` : "";
+  return s ? `?${s}` : '';
 }
 
 // ---- Học viên (/hoc-vien/toi/doi-buoi) ----
 
 export function useTongQuanDoiBuoi(khoaId: string | undefined) {
   return useQuery({
-    queryKey: [KEY, "tong-quan", khoaId],
-    queryFn: () =>
-      apiFetch<TongQuanDoiBuoi>(
-        `/hoc-vien/toi/doi-buoi${qs({ khoa_id: khoaId })}`,
-      ),
+    queryKey: [KEY, 'tong-quan', khoaId],
+    queryFn: () => apiFetch<TongQuanDoiBuoi>(`/hoc-vien/toi/doi-buoi${qs({ khoa_id: khoaId })}`),
     enabled: !!khoaId,
     retry: false,
   });
@@ -117,9 +114,8 @@ export function useTongQuanDoiBuoi(khoaId: string | undefined) {
 
 export function useLuaChonDoiBuoi(lichNguonId: string | undefined) {
   return useQuery({
-    queryKey: [KEY, "lua-chon", lichNguonId],
-    queryFn: () =>
-      apiFetch<LuaChonBuoi[]>(`/hoc-vien/toi/doi-buoi/lua-chon/${lichNguonId}`),
+    queryKey: [KEY, 'lua-chon', lichNguonId],
+    queryFn: () => apiFetch<LuaChonBuoi[]>(`/hoc-vien/toi/doi-buoi/lua-chon/${lichNguonId}`),
     enabled: !!lichNguonId,
     retry: false,
   });
@@ -134,8 +130,8 @@ export function useGuiDoiBuoi() {
   const lamMoi = useLamMoiHocVien();
   return useMutation({
     mutationFn: (body: GuiDoiBuoiBody) =>
-      apiFetch<{ id: string }>("/hoc-vien/toi/doi-buoi", {
-        method: "POST",
+      apiFetch<{ id: string }>('/hoc-vien/toi/doi-buoi', {
+        method: 'POST',
         body: JSON.stringify(body),
       }),
     onSuccess: lamMoi,
@@ -147,7 +143,7 @@ export function useSuaDoiBuoi() {
   return useMutation({
     mutationFn: ({ id, ...body }: GuiDoiBuoiBody & { id: string }) =>
       apiFetch<{ id: string }>(`/hoc-vien/toi/doi-buoi/${id}`, {
-        method: "PUT",
+        method: 'PUT',
         body: JSON.stringify(body),
       }),
     onSuccess: lamMoi,
@@ -158,8 +154,8 @@ export function useHuyDoiBuoi() {
   const lamMoi = useLamMoiHocVien();
   return useMutation({
     mutationFn: (id: string) =>
-      apiFetch<{ trang_thai: "da_huy" }>(`/hoc-vien/toi/doi-buoi/${id}/huy`, {
-        method: "POST",
+      apiFetch<{ trang_thai: 'da_huy' }>(`/hoc-vien/toi/doi-buoi/${id}/huy`, {
+        method: 'POST',
       }),
     onSuccess: lamMoi,
   });
@@ -169,25 +165,21 @@ export function useHuyDoiBuoi() {
 
 export function useDsDoiBuoi(q: LocDoiBuoi = {}) {
   return useQuery({
-    queryKey: [KEY, "ds", q],
-    queryFn: () => apiFetch<DeNghiDuyet[]>(
-        `/doi-buoi-hoc${qs({ ...q, da_xu_ly: q.da_xu_ly ? "true" : undefined })}`,
-      ),
+    queryKey: [KEY, 'ds', q],
+    queryFn: () => apiFetch<DeNghiDuyet[]>(`/doi-buoi-hoc${qs({ ...q, da_xu_ly: q.da_xu_ly ? 'true' : undefined })}`),
   });
 }
 
 export function useDemDoiBuoi() {
   return useQuery({
-    queryKey: [KEY, "dem"],
-    queryFn: async () =>
-      (await apiFetch<{ cho_duyet: number }>("/doi-buoi-hoc/dem-cho-duyet"))
-        .cho_duyet,
+    queryKey: [KEY, 'dem'],
+    queryFn: async () => (await apiFetch<{ cho_duyet: number }>('/doi-buoi-hoc/dem-cho-duyet')).cho_duyet,
   });
 }
 
 export function useLuaChonDuyet(id: string | undefined) {
   return useQuery({
-    queryKey: [KEY, "lua-chon-duyet", id],
+    queryKey: [KEY, 'lua-chon-duyet', id],
     queryFn: () => apiFetch<LuaChonDuyet[]>(`/doi-buoi-hoc/${id}/lua-chon`),
     enabled: !!id,
   });
@@ -196,21 +188,11 @@ export function useLuaChonDuyet(id: string | undefined) {
 export function useDuyetDoiBuoi() {
   const lamMoi = useLamMoiHocVien();
   return useMutation({
-    mutationFn: ({
-      id,
-      ...body
-    }: {
-      id: string;
-      lich_chot_id?: string;
-      ghi_chu?: string;
-    }) =>
-      apiFetch<{ trang_thai: "da_duyet"; canh_bao: string[] }>(
-        `/doi-buoi-hoc/${id}/duyet`,
-        {
-          method: "POST",
-          body: JSON.stringify(body),
-        },
-      ),
+    mutationFn: ({ id, ...body }: { id: string; lich_chot_id?: string; ghi_chu?: string }) =>
+      apiFetch<{ trang_thai: 'da_duyet'; canh_bao: string[] }>(`/doi-buoi-hoc/${id}/duyet`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
     onSuccess: lamMoi,
   });
 }
@@ -219,8 +201,8 @@ export function useTuChoiDoiBuoi() {
   const lamMoi = useLamMoiHocVien();
   return useMutation({
     mutationFn: ({ id, ghi_chu }: { id: string; ghi_chu: string }) =>
-      apiFetch<{ trang_thai: "tu_choi" }>(`/doi-buoi-hoc/${id}/tu-choi`, {
-        method: "POST",
+      apiFetch<{ trang_thai: 'tu_choi' }>(`/doi-buoi-hoc/${id}/tu-choi`, {
+        method: 'POST',
         body: JSON.stringify({ ghi_chu }),
       }),
     onSuccess: lamMoi,
@@ -231,8 +213,8 @@ export function useHuyDuyetDoiBuoi() {
   const lamMoi = useLamMoiHocVien();
   return useMutation({
     mutationFn: ({ id, ghi_chu }: { id: string; ghi_chu: string }) =>
-      apiFetch<{ trang_thai: "da_huy" }>(`/doi-buoi-hoc/${id}/huy-duyet`, {
-        method: "POST",
+      apiFetch<{ trang_thai: 'da_huy' }>(`/doi-buoi-hoc/${id}/huy-duyet`, {
+        method: 'POST',
         body: JSON.stringify({ ghi_chu }),
       }),
     onSuccess: lamMoi,
