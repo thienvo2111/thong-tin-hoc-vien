@@ -646,4 +646,47 @@ describe('M7 — Điểm danh & vào Zoom', () => {
     expect(within(gd3).queryByRole('button', { name: 'Điểm danh & vào Zoom' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('canh-bao-diem-danh-zoom')).not.toBeInTheDocument();
   });
+
+  describe('đổi buổi học', () => {
+    // Lớp học trực tiếp có 1 buổi tương lai (lh-1) + 1 buổi đã đổi sang lớp khác (lh-2).
+    function datKhoaDoiBuoi(soBuoi: number) {
+      const [dk] = taoKhoaHocToiMau();
+      const lop = dk.giai_doan[1].lop!;
+      const batDau = (gio: number) => new Date(Date.now() + gio * 3600_000).toISOString();
+      lop.lich_hoc = [
+        { ...lop.lich_hoc[0], id: 'lh-tl', buoi_so: 1, thoi_gian_bat_dau: batDau(24), thoi_gian_ket_thuc: batDau(27), trang_thai: 'chua_dien_ra' },
+        {
+          ...lop.lich_hoc[0],
+          id: 'lh-doi',
+          buoi_so: 2,
+          thoi_gian_bat_dau: batDau(48),
+          thoi_gian_ket_thuc: batDau(51),
+          trang_thai: 'chua_dien_ra',
+          da_doi_buoi: true,
+          lop_goc_ten: 'Lớp 01',
+          lop_chot_ten: 'Lớp 05',
+        },
+      ];
+      dk.khoa = { ...dk.khoa, so_buoi_doi_toi_da: soBuoi };
+      db.khoaHocToi = [dk];
+    }
+
+    it('khóa bật: buổi tương lai có link, buổi đã đổi có nhãn + lớp chốt và không có link', async () => {
+      datKhoaDoiBuoi(2);
+      renderDaDangNhap();
+      const gd2 = (await cacTheGiaiDoan())[1];
+      const links = within(gd2).getAllByRole('link', { name: 'Không tham gia được buổi này?' });
+      expect(links).toHaveLength(1);
+      expect(links[0]).toHaveAttribute('href', '/de-nghi-doi-buoi?khoa=khoa-1&lich=lh-tl');
+      expect(within(gd2).getByText('Đã đổi buổi')).toBeInTheDocument();
+      expect(within(gd2).getByTestId('lop-chot')).toHaveTextContent('Lớp 05');
+    });
+
+    it('khóa tắt (0 lượt): không có link', async () => {
+      datKhoaDoiBuoi(0);
+      renderDaDangNhap();
+      const gd2 = (await cacTheGiaiDoan())[1];
+      expect(within(gd2).queryByRole('link', { name: 'Không tham gia được buổi này?' })).not.toBeInTheDocument();
+    });
+  });
 });

@@ -615,6 +615,10 @@ export interface LichHocLopToi {
   // ADR 0005 Z8 (issue #27): buổi chưa có dòng ở lớp hiện tại nhưng đã có ở lớp cũ cùng giai
   // đoạn, cùng buoi_so (học viên chuyển lớp) — chỉ để hiển thị.
   diem_danh_lop_cu?: { trang_thai: TrangThaiDiemDanh; ten_lop: string };
+  // Đổi buổi học: buổi này là buổi chốt (thay cho buổi gốc của lớp được phân).
+  da_doi_buoi?: boolean;
+  lop_goc_ten?: string;
+  lop_chot_ten?: string;
 }
 
 export type PhaDiemDanh = 'chua_mo' | 'dang_mo' | 'da_dong';
@@ -707,6 +711,8 @@ export interface KhoaHocDangKy {
     thoi_gian_ket_thuc: string;
     trang_thai: TrangThaiKhoa;
     mo_dieu_chinh_muc: boolean;
+    // Đổi buổi học: 0/thiếu = khóa chưa mở đề nghị đổi buổi.
+    so_buoi_doi_toi_da?: number;
   };
   cum: CumHocVien | null;
   // Phân lớp theo giai đoạn (spec 2026-10-02) — thay lop_truc_tiep/lop_zoom/lop_vle/tien_do_giai_doan.

@@ -68,6 +68,11 @@ export const router = createBrowserRouter([
                 path: '/toi/yeu-cau-ho-tro',
                 lazy: () => import('@/pages/M8/YeuCauHoTro').then((m) => ({ Component: m.default })),
               },
+              {
+                // Trang ẩn (không có menu): người hỗ trợ gửi link qua Zalo. ?khoa=&lich= chọn sẵn.
+                path: '/de-nghi-doi-buoi',
+                lazy: () => import('@/pages/HocVien/DeNghiDoiBuoi').then((m) => ({ Component: m.default })),
+              },
             ],
           },
           {
