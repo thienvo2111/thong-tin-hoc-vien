@@ -271,14 +271,29 @@ function huyDuyetDuoc(d: DeNghiDuyet): boolean {
   return Date.parse(d.buoi_chot.thoi_gian_bat_dau) > now && Date.parse(d.buoi_nguon.thoi_gian_bat_dau) > now;
 }
 
+/** Nhãn trạng thái tab Đã xử lý — "Đã hủy" tách theo ai hủy để không bị hiểu nhầm là người duyệt hủy. */
+function nhanDaXuLy(d: DeNghiDuyet): string {
+  if (d.trang_thai !== 'da_huy') return NHAN_TRANG_THAI[d.trang_thai];
+  if (d.ly_do_huy === 'hoc_vien_sua') return 'Học viên đã sửa (thay bằng đề nghị mới)';
+  if (d.ly_do_huy === 'hoc_vien_huy') return 'Học viên tự hủy';
+  return d.nguoi_xu_ly ? `Hủy duyệt bởi ${d.nguoi_xu_ly}` : 'Hủy duyệt';
+}
+
 function DongDaXuLy({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
+  // Hủy do học viên: ghi chú là chữ hệ thống tự đặt, đã thể hiện ở nhãn — không lặp lại.
+  const hocVienHuy = d.ly_do_huy === 'hoc_vien_sua' || d.ly_do_huy === 'hoc_vien_huy';
   return (
     <Paper withBorder radius="md" p="md" data-testid="de-nghi-da-xu-ly">
       <Stack gap="xs">
         <Group justify="space-between" align="flex-start" wrap="nowrap">
           <ThongTinHocVien d={d} />
-          <Badge variant="light" color={d.trang_thai === 'da_duyet' ? 'green' : 'gray'}>
-            {NHAN_TRANG_THAI[d.trang_thai]}
+          <Badge
+            variant="light"
+            color={d.trang_thai === 'da_duyet' ? 'green' : 'gray'}
+            tt="none"
+            styles={{ root: { height: 'auto', whiteSpace: 'normal', textAlign: 'right' } }}
+          >
+            {nhanDaXuLy(d)}
           </Badge>
         </Group>
         <HaiBuoi
@@ -287,8 +302,10 @@ function DongDaXuLy({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
           nhanDich={d.buoi_chot ? 'Buổi đã chốt' : 'Đã xin đổi sang'}
         />
         <Text fz="xs" c="dimmed">
-          {d.nguoi_xu_ly ? `Xử lý bởi ${d.nguoi_xu_ly}` : ''}
-          {d.ghi_chu_xu_ly ? ` · Ghi chú: ${d.ghi_chu_xu_ly}` : ''}
+          {d.nguoi_xu_ly && d.ly_do_huy !== 'huy_duyet' ? `Xử lý bởi ${d.nguoi_xu_ly}` : ''}
+          {d.ghi_chu_xu_ly && !hocVienHuy
+            ? `${d.nguoi_xu_ly && d.ly_do_huy !== 'huy_duyet' ? ' · ' : ''}Ghi chú: ${d.ghi_chu_xu_ly}`
+            : ''}
         </Text>
         {huyDuyetDuoc(d) && (
           <Group>

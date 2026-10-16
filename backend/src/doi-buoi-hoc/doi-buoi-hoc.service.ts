@@ -43,6 +43,7 @@ export interface DeNghiHocVien {
   ly_do: string;
   tao_luc: Date;
   ghi_chu_xu_ly: string | null;
+  ly_do_huy: LyDoHuy | null;
   qua_han: boolean;
   thu_tu_hang: { k: number; n: number } | null;
   buoi_nguon: BuoiTomTat | null;
@@ -105,6 +106,7 @@ interface DeNghiRow {
   ly_do: string;
   tao_luc: Date;
   ghi_chu_xu_ly: string | null;
+  nguoi_xu_ly: string | null;
 }
 
 const TRANG_THAI_HOAT_DONG: trang_thai_de_nghi[] = ['cho_duyet', 'da_duyet'];
@@ -271,7 +273,11 @@ export class DoiBuoiHocService {
     await this.soBuoiDoiToiDa(cu.dang_ky_hoc.khoa_id);
     const { count } = await this.prisma.doi_buoi_hoc.updateMany({
       where: { id, trang_thai: 'cho_duyet', dang_ky_hoc_id: cu.dang_ky_hoc_id },
-      data: { trang_thai: 'da_huy' },
+      data: {
+        trang_thai: 'da_huy',
+        xu_ly_luc: new Date(),
+        ghi_chu_xu_ly: GHI_CHU_HOC_VIEN_HUY,
+      },
     });
     if (!count) throw new ConflictAppException('Đề nghị đã được xử lý');
     await this.ghiNhatKyGui(hocVienId, 'Hủy đề nghị đổi buổi', {
@@ -323,14 +329,14 @@ export class DoiBuoiHocService {
         },
       },
       orderBy: q.da_xu_ly
-        ? { xu_ly_luc: 'desc' }
+        ? { xu_ly_luc: { sort: 'desc', nulls: 'last' } }
         : !q.trang_thai
           ? { tao_luc: 'desc' }
           : quaHan
             ? { tao_luc: 'desc' }
             : q.trang_thai === 'cho_duyet'
               ? { tao_luc: 'asc' }
-              : { xu_ly_luc: 'desc' },
+              : { xu_ly_luc: { sort: 'desc', nulls: 'last' } },
       take: quaHan ? 100 : 500,
       select: {
         ...DE_NGHI_SELECT,
@@ -798,7 +804,11 @@ export class DoiBuoiHocService {
               trang_thai: 'cho_duyet',
               dang_ky_hoc_id: x.dangKyId,
             },
-            data: { trang_thai: 'da_huy' },
+            data: {
+              trang_thai: 'da_huy',
+              xu_ly_luc: now,
+              ghi_chu_xu_ly: GHI_CHU_HOC_VIEN_SUA,
+            },
           });
           if (!count) throw new ConflictAppException('Đề nghị đã được xử lý');
         }
@@ -955,6 +965,7 @@ export class DoiBuoiHocService {
       ly_do: r.ly_do,
       tao_luc: r.tao_luc,
       ghi_chu_xu_ly: r.ghi_chu_xu_ly,
+      ly_do_huy: lyDoHuy(r),
       qua_han: quaHan,
       thu_tu_hang: quaHan ? null : (hang.get(r.id) ?? null),
       buoi_nguon: tomTatBuoi(nguon),
@@ -988,4 +999,23 @@ const DE_NGHI_SELECT = {
   ly_do: true,
   tao_luc: true,
   ghi_chu_xu_ly: true,
+  nguoi_xu_ly: true,
 } satisfies Prisma.doi_buoi_hocSelect;
+
+// Đề nghị bị hủy không do người duyệt: server tự ghi ghi_chu_xu_ly để phân biệt
+// học viên sửa (bản cũ bị thay) với học viên tự hủy. Bản ghi cũ (trước khi có
+// ghi chú này) được coi là tự hủy.
+export const GHI_CHU_HOC_VIEN_SUA = 'Học viên đã sửa (thay bằng đề nghị mới)';
+export const GHI_CHU_HOC_VIEN_HUY = 'Học viên tự hủy';
+
+export type LyDoHuy = 'hoc_vien_sua' | 'hoc_vien_huy' | 'huy_duyet';
+
+function lyDoHuy(r: {
+  trang_thai: trang_thai_de_nghi;
+  nguoi_xu_ly: string | null;
+  ghi_chu_xu_ly: string | null;
+}): LyDoHuy | null {
+  if (r.trang_thai !== 'da_huy') return null;
+  if (r.nguoi_xu_ly) return 'huy_duyet';
+  return r.ghi_chu_xu_ly === GHI_CHU_HOC_VIEN_SUA ? 'hoc_vien_sua' : 'hoc_vien_huy';
+}

@@ -30,6 +30,8 @@ export interface BuoiTomTat {
   lop: { ten_lop: string };
 }
 
+export type LyDoHuy = 'hoc_vien_sua' | 'hoc_vien_huy' | 'huy_duyet';
+
 export interface DeNghiHocVien {
   id: string;
   trang_thai: TrangThaiDeNghi;
@@ -39,6 +41,8 @@ export interface DeNghiHocVien {
   ly_do: string;
   tao_luc: string;
   ghi_chu_xu_ly: string | null;
+  /** Chỉ khi trang_thai = da_huy: học viên sửa (bản cũ bị thay), học viên tự hủy, hoặc người duyệt hủy duyệt. */
+  ly_do_huy: LyDoHuy | null;
   qua_han: boolean;
   thu_tu_hang: { k: number; n: number } | null;
   buoi_nguon: BuoiTomTat | null;

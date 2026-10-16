@@ -57,6 +57,7 @@ function deNghiMau(over: Partial<DeNghiHocVien> = {}): DeNghiHocVien {
     ly_do: "Bận công tác đột xuất",
     tao_luc: new Date().toISOString(),
     ghi_chu_xu_ly: null,
+    ly_do_huy: null,
     qua_han: false,
     thu_tu_hang: null,
     buoi_nguon: tomTat(lich("ln-1", "Lớp 01")),

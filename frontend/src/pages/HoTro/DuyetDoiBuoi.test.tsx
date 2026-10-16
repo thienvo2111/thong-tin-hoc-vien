@@ -58,6 +58,7 @@ function deNghi(over: Partial<DeNghiDuyet> = {}): DeNghiDuyet {
     ly_do: "Bận công tác đột xuất",
     tao_luc: "2026-10-10T01:00:00.000Z",
     ghi_chu_xu_ly: null,
+    ly_do_huy: null,
     qua_han: false,
     thu_tu_hang: { k: 2, n: 3 },
     buoi_nguon: tomTat(lich("ln-1", "Lớp 01")),
@@ -366,6 +367,26 @@ describe("Màn duyệt đổi buổi", () => {
     );
     expect(within(nav).getByText("Đổi buổi")).toBeInTheDocument();
   });
+  it("tab Đã xử lý ghi rõ lý do hủy: học viên sửa / học viên tự hủy / hủy duyệt bởi ai", async () => {
+    datApi([
+      deNghi({ id: "s", trang_thai: "da_huy", ly_do_huy: "hoc_vien_sua", ghi_chu_xu_ly: "Học viên đã sửa (thay bằng đề nghị mới)" }),
+      deNghi({ id: "h", trang_thai: "da_huy", ly_do_huy: "hoc_vien_huy", ghi_chu_xu_ly: "Học viên tự hủy" }),
+      deNghi({ id: "d", trang_thai: "da_huy", ly_do_huy: "huy_duyet", nguoi_xu_ly: "Cán bộ B", ghi_chu_xu_ly: "Học viên xin ở lại" }),
+    ]);
+    renderTrang("quan_tri");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "Đã xử lý" }));
+    const dong = await screen.findAllByTestId("de-nghi-da-xu-ly");
+    expect(dong[0]).toHaveTextContent("Học viên đã sửa (thay bằng đề nghị mới)");
+    expect(dong[1]).toHaveTextContent("Học viên tự hủy");
+    expect(dong[2]).toHaveTextContent("Hủy duyệt bởi Cán bộ B");
+    expect(dong[2]).toHaveTextContent("Ghi chú: Học viên xin ở lại");
+    // Ghi chú hệ thống tự đặt không lặp lại thành dòng "Ghi chú: …"
+    expect(dong[0]).not.toHaveTextContent("Ghi chú:");
+    expect(dong[1]).not.toHaveTextContent("Ghi chú:");
+    for (const d of dong) expect(within(d).queryByText("Đã hủy")).toBeNull();
+  });
+
   it("tab Đã xử lý gọi server với da_xu_ly=true và báo khi chạm giới hạn 500", async () => {
     let url = "";
     const dong = Array.from({ length: 500 }, (_, i) =>

@@ -226,7 +226,11 @@ describe('DoiBuoiHocService (hoc vien)', () => {
     expect(tx.doi_buoi_hoc.create).not.toHaveBeenCalled();
     expect(tx.doi_buoi_hoc.updateMany).toHaveBeenCalledWith({
       where: { id: 'x1', trang_thai: 'cho_duyet', dang_ky_hoc_id: 'dk1' },
-      data: { trang_thai: 'da_huy' },
+      data: {
+        trang_thai: 'da_huy',
+        xu_ly_luc: expect.any(Date),
+        ghi_chu_xu_ly: 'Học viên đã sửa (thay bằng đề nghị mới)',
+      },
     });
   });
 
@@ -275,7 +279,11 @@ describe('DoiBuoiHocService (hoc vien)', () => {
     });
     expect(prisma.doi_buoi_hoc.updateMany).toHaveBeenCalledWith({
       where: { id: 'x1', trang_thai: 'cho_duyet', dang_ky_hoc_id: 'dk1' },
-      data: { trang_thai: 'da_huy' },
+      data: {
+        trang_thai: 'da_huy',
+        xu_ly_luc: expect.any(Date),
+        ghi_chu_xu_ly: 'Học viên tự hủy',
+      },
     });
   });
 
@@ -969,7 +977,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
       trang_thai: 'da_duyet',
       dang_ky_hoc: { cum_id: { in: ['c1'] } },
     });
-    expect(arg.orderBy).toEqual({ xu_ly_luc: 'desc' });
+    expect(arg.orderBy).toEqual({ xu_ly_luc: { sort: 'desc', nulls: 'last' } });
   });
 
   it('danhSach: da_xu_ly -> 3 trang thai da xu ly, xu_ly_luc giam, van gioi han cum + 500', async () => {
@@ -980,8 +988,43 @@ describe('DoiBuoiHocService nguoi duyet', () => {
       trang_thai: { in: ['da_duyet', 'tu_choi', 'da_huy'] },
       dang_ky_hoc: { cum_id: { in: ['c1'] } },
     });
-    expect(arg.orderBy).toEqual({ xu_ly_luc: 'desc' });
+    expect(arg.orderBy).toEqual({ xu_ly_luc: { sort: 'desc', nulls: 'last' } });
     expect(arg.take).toBe(500);
+  });
+
+  it('danhSach: ly_do_huy phan biet hoc vien sua / tu huy / huy duyet', async () => {
+    const { svc, prisma } = setupDuyet();
+    const dong = (id: string, ghiChu: string | null, nguoi: string | null, trangThai = 'da_huy') => ({
+      id,
+      trang_thai: trangThai,
+      lich_nguon_id: 'ln',
+      lich_de_nghi_id: 'ld',
+      lich_chot_id: null,
+      ly_do: 'abcde',
+      tao_luc: taoLuc,
+      ghi_chu_xu_ly: ghiChu,
+      nguoi_xu_ly: nguoi ? 'nd1' : null,
+      dang_ky_hoc: {
+        hoc_vien: { id: 'hv1', ho_ten: 'A', don_vi_cong_tac: { ten_don_vi: 'X' } },
+        cum: null,
+      },
+      xu_ly_boi: nguoi ? { ho_ten: nguoi } : null,
+    });
+    prisma.doi_buoi_hoc.findMany.mockResolvedValueOnce([
+      dong('s', 'Học viên đã sửa (thay bằng đề nghị mới)', null),
+      dong('h', 'Học viên tự hủy', null),
+      dong('cu', null, null),
+      dong('d', 'Học viên xin ở lại', 'Cán bộ B'),
+      dong('t', 'Không phù hợp', 'Cán bộ B', 'tu_choi'),
+    ]);
+    const r = await svc.danhSach(quanTri, { da_xu_ly: true });
+    expect(r.map((x) => [x.id, x.ly_do_huy])).toEqual([
+      ['s', 'hoc_vien_sua'],
+      ['h', 'hoc_vien_huy'],
+      ['cu', 'hoc_vien_huy'],
+      ['d', 'huy_duyet'],
+      ['t', null],
+    ]);
   });
 
   it('danhSach: cho_duyet qua_han=true -> chi qua han, moi nhat truoc, 100', async () => {
