@@ -1449,6 +1449,8 @@ export class KhoaBoiDuongService {
                       ...(lopChot
                         ? {
                             da_doi_buoi: true,
+                            // Buổi gốc của lớp được phân — để học viên "Đổi lại" (ADR 0007 D11).
+                            lich_goc_id: goc.id,
                             lop_goc_ten: lop.ten_lop,
                             lop_chot_ten: lopChot.ten_lop,
                           }

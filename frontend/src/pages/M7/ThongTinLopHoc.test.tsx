@@ -663,6 +663,7 @@ describe('M7 — Điểm danh & vào Zoom', () => {
           thoi_gian_ket_thuc: batDau(51),
           trang_thai: 'chua_dien_ra',
           da_doi_buoi: true,
+          lich_goc_id: 'lh-goc',
           lop_goc_ten: 'Lớp 01',
           lop_chot_ten: 'Lớp 05',
         },
@@ -680,6 +681,11 @@ describe('M7 — Điểm danh & vào Zoom', () => {
       expect(links[0]).toHaveAttribute('href', '/de-nghi-doi-buoi?khoa=khoa-1&lich=lh-tl');
       expect(within(gd2).getByText('Đã đổi buổi')).toBeInTheDocument();
       expect(within(gd2).getByTestId('lop-chot')).toHaveTextContent('Lớp 05');
+      // Buổi đã đổi: link "Đổi lại" trỏ về buổi gốc để mở đề nghị đã duyệt.
+      expect(within(gd2).getByRole('link', { name: 'Muốn đổi lại buổi này?' })).toHaveAttribute(
+        'href',
+        '/de-nghi-doi-buoi?khoa=khoa-1&lich=lh-goc',
+      );
     });
 
     it('khóa tắt (0 lượt): không có link', async () => {
@@ -687,6 +693,7 @@ describe('M7 — Điểm danh & vào Zoom', () => {
       renderDaDangNhap();
       const gd2 = (await cacTheGiaiDoan())[1];
       expect(within(gd2).queryByRole('link', { name: 'Không tham gia được buổi này?' })).not.toBeInTheDocument();
+      expect(within(gd2).queryByRole('link', { name: 'Muốn đổi lại buổi này?' })).not.toBeInTheDocument();
     });
   });
 });

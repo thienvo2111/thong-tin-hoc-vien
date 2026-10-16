@@ -64,10 +64,11 @@ describe("TheBuoiSapToi — link đổi buổi", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("buổi đã đổi → nhãn Đã đổi buổi + tên lớp chốt, không link", () => {
+  it("buổi đã đổi → nhãn Đã đổi buổi + tên lớp chốt, link Đổi lại về buổi gốc", () => {
     renderThe(
       khoaVoiBuoi(2, 24 * GIO, {
         da_doi_buoi: true,
+        lich_goc_id: "lh-goc",
         lop_goc_ten: "Lớp 01",
         lop_chot_ten: "Lớp 05",
       }),
@@ -77,5 +78,8 @@ describe("TheBuoiSapToi — link đổi buổi", () => {
     expect(
       screen.queryByRole("link", { name: "Không tham gia được buổi này?" }),
     ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Muốn đổi lại buổi này?" }).getAttribute("href")).toMatch(
+      /^\/de-nghi-doi-buoi\?khoa=.+&lich=lh-goc$/,
+    );
   });
 });

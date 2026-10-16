@@ -692,6 +692,7 @@ describe('KhoaBoiDuongService', () => {
         id: 'b-1',
         dia_diem_hoac_link: 'Phòng B',
         da_doi_buoi: true,
+        lich_goc_id: 'a-1',
         lop_goc_ten: 'Lớp A',
         lop_chot_ten: 'Lớp B',
         giang_vien: [{ ho_ten: 'GV B', vai_tro: 'giang_vien' }],

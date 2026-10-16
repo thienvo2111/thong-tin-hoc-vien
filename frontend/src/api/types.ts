@@ -617,6 +617,8 @@ export interface LichHocLopToi {
   diem_danh_lop_cu?: { trang_thai: TrangThaiDiemDanh; ten_lop: string };
   // Đổi buổi học: buổi này là buổi chốt (thay cho buổi gốc của lớp được phân).
   da_doi_buoi?: boolean;
+  /** Buổi gốc (lớp được phân) bị thay — để mở trang đề nghị và "Đổi lại". */
+  lich_goc_id?: string;
   lop_goc_ten?: string;
   lop_chot_ten?: string;
 }

@@ -98,6 +98,20 @@ export function TheBuoiSapToi({
                   Không tham gia được buổi này?
                 </Text>
               )}
+            {coDoiBuoi &&
+              b.da_doi_buoi &&
+              b.lich_goc_id &&
+              Date.parse(b.thoi_gian_bat_dau) > bayGio && (
+                <Text
+                  component={Link}
+                  to={`/de-nghi-doi-buoi?khoa=${khoaId}&lich=${b.lich_goc_id}`}
+                  size="xs"
+                  c="dimmed"
+                  td="underline"
+                >
+                  Muốn đổi lại buổi này?
+                </Text>
+              )}
           </Stack>
         ))}
       </Stack>

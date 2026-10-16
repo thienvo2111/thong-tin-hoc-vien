@@ -513,6 +513,11 @@ function DanhSachBuoi({ lichHoc, khoaDoiBuoi }: { lichHoc: LichHocLopToi[]; khoa
               Không tham gia được buổi này?
             </Text>
           )}
+          {khoaDoiBuoi && buoi.da_doi_buoi && buoi.lich_goc_id && Date.parse(buoi.thoi_gian_bat_dau) > Date.now() && (
+            <Text component={Link} to={`/de-nghi-doi-buoi?khoa=${khoaDoiBuoi}&lich=${buoi.lich_goc_id}`} size="xs" c="dimmed" td="underline" mt={4} display="block">
+              Muốn đổi lại buổi này?
+            </Text>
+          )}
           {canNhacCungNgay(buoi, lichHoc) && (
             <Text size="sm" c="orange.8" mt={4}>
               Buổi này cũng cần bấm điểm danh, kể cả khi bạn vẫn đang ở trong phòng Zoom.
