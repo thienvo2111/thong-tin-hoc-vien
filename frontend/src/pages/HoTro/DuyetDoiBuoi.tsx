@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Badge,
+  Box,
   Button,
   Container,
   Group,
@@ -30,6 +31,7 @@ import {
 } from '@/api/doiBuoi';
 import { useToi } from '@/auth/AuthContext';
 import { StatusBanner } from '@/components/StatusBanner';
+import { ThanhSiSo } from '@/components/ThanhSiSo';
 import { dinhDangGio, dinhDangNgayGio, dinhDangThuNgay } from '@/lib/ngay';
 import { thongDiepLoiXungDot } from '@/lib/loiApi';
 import ThongKeDoiBuoi from './ThongKeDoiBuoi';
@@ -40,7 +42,17 @@ const GIOI_HAN_DANH_SACH = 500; // khớp take: 500 của server
 const GIOI_HAN_QUA_HAN = 100; // khớp take: 100 của server khi qua_han=true
 
 /** Khối 1 buổi, gọn 2 dòng: [nhãn] tên lớp / Buổi n · thứ-ngày · giờ (+ dòng phụ nhỏ). */
-function KhoiBuoi({ nhan, b, mau, phu }: { nhan: string; b: BuoiTomTat | null; mau: string; phu?: string }) {
+function KhoiBuoi({
+  nhan,
+  b,
+  mau,
+  phu,
+}: {
+  nhan: string;
+  b: BuoiTomTat | null;
+  mau: string;
+  phu?: ReactNode;
+}) {
   return (
     <Paper
       role="group"
@@ -64,16 +76,26 @@ function KhoiBuoi({ nhan, b, mau, phu }: { nhan: string; b: BuoiTomTat | null; m
         </Text>
       )}
       {phu && (
-        <Text fz="xs" c="dimmed" lh={1.35}>
+        <Box mt={2} fz="xs" c="dimmed" lh={1.35}>
           {phu}
-        </Text>
+        </Box>
       )}
     </Paper>
   );
 }
 
 /** Buổi gốc → buổi đích, 2 cột trên màn rộng, xếp dọc trên điện thoại. */
-function HaiBuoi({ goc, dich, nhanDich, phuDich }: { goc: BuoiTomTat | null; dich: BuoiTomTat | null; nhanDich: string; phuDich?: string }) {
+function HaiBuoi({
+  goc,
+  dich,
+  nhanDich,
+  phuDich,
+}: {
+  goc: BuoiTomTat | null;
+  dich: BuoiTomTat | null;
+  nhanDich: string;
+  phuDich?: ReactNode;
+}) {
   return (
     <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs" verticalSpacing={6}>
       <KhoiBuoi nhan="Buổi gốc" b={goc} mau="gray" />
@@ -235,7 +257,12 @@ function DongChoDuyet({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
           goc={d.buoi_nguon}
           dich={d.buoi_de_nghi}
           nhanDich="Xin đổi sang"
-          phuDich={`Sĩ số buổi đề nghị: ${d.si_so}/${d.si_so_toi_da ?? '—'}${d.so_cho_duyet > 0 ? ` +${d.so_cho_duyet} đang chờ` : ''}`}
+          phuDich={
+            <Group gap={6} wrap="nowrap">
+              <span>Sĩ số buổi:</span>
+              <ThanhSiSo siSo={d.si_so} toiDa={d.si_so_toi_da} cho={d.so_cho_duyet} w={110} />
+            </Group>
+          }
         />
         <Text fz="sm">Lý do: {d.ly_do}</Text>
         <Text fz="xs" c="dimmed">
@@ -406,10 +433,12 @@ function LuaChonDong({ c, laQuanTri }: { c: LuaChonDuyet; laQuanTri: boolean }) 
               <b>{c.lich.lop.ten_lop}</b> · Buổi {c.lich.buoi_so} · {dinhDangThuNgay(c.lich.thoi_gian_bat_dau)}{' '}
               {dinhDangGio(c.lich.thoi_gian_bat_dau)}–{dinhDangGio(c.thoi_gian_ket_thuc)}
             </Text>
+            <Group gap={6} wrap="wrap" mt={2}>
+              <ThanhSiSo siSo={c.si_so} toiDa={c.si_so_toi_da} cho={c.so_cho_duyet} w={90} />
+            </Group>
             <Text fz="xs" c="dimmed" lh={1.35}>
-              {diaDiem ? `${diaDiem} · ` : ''}Sĩ số {c.si_so}/{c.si_so_toi_da ?? '—'}
-              {c.so_cho_duyet > 0 ? ` +${c.so_cho_duyet} đang chờ` : ''}
-              {c.so_truoc > 0 ? ` · ${c.so_truoc} gửi trước` : ''}
+              {diaDiem ?? ''}
+              {c.so_truoc > 0 ? `${diaDiem ? ' · ' : ''}${c.so_truoc} gửi trước` : ''}
               {khoa && (
                 <>
                   {' · '}

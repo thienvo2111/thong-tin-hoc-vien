@@ -149,7 +149,8 @@ describe("Màn duyệt đổi buổi", () => {
     expect(await screen.findByText("Nguyễn Thị Lan")).toBeInTheDocument();
     expect(screen.getByText(/THPT Long Xuyên · Cụm An Giang/)).toBeInTheDocument();
     expect(screen.getByLabelText("Thứ tự gửi")).toHaveTextContent("2/3");
-    expect(screen.getByText(/Sĩ số buổi đề nghị: 28\/30 \+2 đang chờ/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Sĩ số 28/30, 2 đang chờ")).toBeInTheDocument();
+    expect(screen.getByText("28/30")).toHaveTextContent("28/30 · +2 chờ");
     expect(screen.getByText(/Bận công tác đột xuất/)).toBeInTheDocument();
   });
 
@@ -163,7 +164,7 @@ describe("Màn duyệt đổi buổi", () => {
       expect(khoi).toHaveTextContent(/(Thứ [A-ZĐa-zăâêôơưàáạảãèéẹẻẽìíịỉĩòóọỏõùúụủũỳýỵỷỹđ]+|Chủ nhật), \d{2}\/\d{2}\/\d{4}/);
       expect(khoi).toHaveTextContent(/\d{2}:\d{2}–\d{2}:\d{2}/);
     }
-    expect(sang).toHaveTextContent(/Sĩ số buổi đề nghị: 28\/30 \+2 đang chờ/);
+    expect(within(sang).getByLabelText("Sĩ số 28/30, 2 đang chờ")).toBeInTheDocument();
   });
 
   it("đề nghị quá hạn: khối Quá hạn riêng, có nhãn, không có nút Duyệt, vẫn có Từ chối", async () => {

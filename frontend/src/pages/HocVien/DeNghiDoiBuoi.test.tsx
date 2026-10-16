@@ -136,8 +136,8 @@ describe("Trang đề nghị đổi buổi (học viên)", () => {
     datApi(tongQuanMau());
     renderTrang();
     expect(await screen.findByText("Còn 1/2 lượt đổi")).toBeInTheDocument();
-    expect(await screen.findByText("28/30")).toBeInTheDocument();
-    expect(screen.getByText("+2 đang chờ")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Sĩ số 28/30, 2 đang chờ")).toBeInTheDocument();
+    expect(screen.getByText("28/30")).toHaveTextContent("28/30 · +2 chờ");
     expect(screen.getByText("Đã đủ")).toBeInTheDocument();
     const dau = screen.getByRole("radio", { name: /Lớp 03/ });
     expect(dau).toBeDisabled();

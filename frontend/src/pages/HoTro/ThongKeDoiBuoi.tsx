@@ -31,6 +31,7 @@ import {
 } from '@/api/doiBuoi';
 import type { LoaiLop, MucNangLuc } from '@/api/types';
 import { StatusBanner } from '@/components/StatusBanner';
+import { ThanhSiSo } from '@/components/ThanhSiSo';
 import { dayjs, dinhDangGio, dinhDangNgayGio, dinhDangThuNgay } from '@/lib/ngay';
 import { NHAN_MUC_NANG_LUC } from '@/lib/mucNangLuc';
 import { thongDiepLoiXungDot } from '@/lib/loiApi';
@@ -323,6 +324,7 @@ function BangBuoi({ dong, onChon }: { dong: DongThongKeDoiBuoi[]; onChon: (d: Do
                   >
                     {d.si_so_phan_lop} → {d.si_so} / {d.si_so_toi_da ?? '—'}
                   </Text>
+                  <ThanhSiSo siSo={d.si_so} toiDa={d.si_so_toi_da} cho={d.vao_cho} w={110} anSo />
                 </Table.Td>
                 <Table.Td>
                   <NamSo nhan="Đổi ra" so={[d.ra_da_duyet, d.ra_cho, d.ra_qua_han, d.ra_tu_choi, d.ra_huy]} />

@@ -33,6 +33,7 @@ import {
 } from '@/api/doiBuoi';
 import { ApiError } from '@/api/client';
 import { StatusBanner } from '@/components/StatusBanner';
+import { ThanhSiSo } from '@/components/ThanhSiSo';
 import { dinhDangGio, dinhDangNgayGio } from '@/lib/ngay';
 import { thongDiepLoiXungDot } from '@/lib/loiApi';
 
@@ -426,12 +427,7 @@ function NhanLuaChon({ c }: { c: LuaChonBuoi }) {
         <Text size="sm" c="dimmed">
           {dinhDangNgayGio(c.lich.thoi_gian_bat_dau)}–{dinhDangGio(c.thoi_gian_ket_thuc)}
         </Text>
-        <Text size="sm">{c.si_so_toi_da == null ? c.si_so : `${c.si_so}/${c.si_so_toi_da}`}</Text>
-        {c.so_cho_duyet > 0 && (
-          <Text size="sm" c="dimmed">
-            +{c.so_cho_duyet} đang chờ
-          </Text>
-        )}
+        <ThanhSiSo siSo={c.si_so} toiDa={c.si_so_toi_da} cho={c.so_cho_duyet} w={90} />
         {c.da_du && (
           <Badge size="sm" color="gray">
             Đã đủ
