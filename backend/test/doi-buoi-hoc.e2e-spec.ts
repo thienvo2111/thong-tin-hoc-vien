@@ -179,14 +179,35 @@ describe('Đổi buổi học (e2e)', () => {
     });
   });
 
+  // Mỗi bước độc lập và chỉ chạy khi id đã có: deleteMany với id undefined
+  // trong Prisma KHÔNG có bộ lọc và sẽ xóa sạch bảng dev.
   afterAll(async () => {
-    await prisma.dang_ky_hoc.deleteMany({ where: { khoa_id: khoaId } });
-    await prisma.khoa_boi_duong.deleteMany({ where: { id: khoaId } });
-    for (const id of nguoiDungIds) await xoaNguoiDungTest(id);
-    await prisma.hoc_vien.deleteMany({ where: { id: { in: hocVienIds } } });
-    await xoaDonViTest([dv.donVi.id], [dv.diaDanhXa.id, dv.diaDanhTinh.id]);
-    await prisma.$disconnect();
-    await app.close();
+    const buoc = async (fn: () => Promise<unknown>) => {
+      try {
+        await fn();
+      } catch (e) {
+        console.error('Dọn dữ liệu e2e đổi buổi lỗi:', e);
+      }
+    };
+    if (khoaId) {
+      await buoc(() =>
+        prisma.dang_ky_hoc.deleteMany({ where: { khoa_id: khoaId } }),
+      );
+      await buoc(() =>
+        prisma.khoa_boi_duong.deleteMany({ where: { id: khoaId } }),
+      );
+    }
+    for (const id of nguoiDungIds) await buoc(() => xoaNguoiDungTest(id));
+    if (hocVienIds.length)
+      await buoc(() =>
+        prisma.hoc_vien.deleteMany({ where: { id: { in: hocVienIds } } }),
+      );
+    if (dv)
+      await buoc(() =>
+        xoaDonViTest([dv.donVi.id], [dv.diaDanhXa.id, dv.diaDanhTinh.id]),
+      );
+    await buoc(() => prisma.$disconnect());
+    if (app) await buoc(() => app.close());
   });
 
   it('(a) HV1 gửi đề nghị → hỗ trợ cụm duyệt khi buổi B còn chỗ', async () => {
@@ -213,9 +234,15 @@ describe('Đổi buổi học (e2e)', () => {
     const [r2, r3] = await Promise.all([duyet(deNghi.hv2), duyet(deNghi.hv3)]);
     const maLoi = [r2.status, r3.status].sort();
     expect(maLoi).toEqual([200, 409]);
+    const daDuyet = await prisma.doi_buoi_hoc.count({
+      where: { trang_thai: 'da_duyet', lich_chot_id: buoi.b },
+    });
+    expect(daDuyet).toBe(2);
   });
 
   it('(c) HV2 gửi lần 2 cho cùng buổi nguồn → 409', async () => {
-    await gui('hv2').expect(409);
+    // Sau (b) buổi B đã đủ 3/3 nên BUOI_DAY được kiểm trước unique P2002.
+    const res = await gui('hv2').expect(409);
+    expect(res.body.error.message).toBe('Buổi đã đủ sĩ số, hãy chọn buổi khác');
   });
 });
