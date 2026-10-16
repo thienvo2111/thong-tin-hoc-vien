@@ -115,6 +115,7 @@ function renderTab() {
 }
 
 const tham = (url: string) => new URL(url).searchParams;
+const hang = (nut: HTMLElement) => nut.closest('tr') as HTMLElement;
 const cuoi = (urls: string[]) => urls[urls.length - 1];
 const choBang = () => screen.findByRole('button', { name: /Xem chi tiết Lớp 01/ });
 
@@ -132,7 +133,7 @@ describe('Tab Thống kê đổi buổi', () => {
     expect(screen.getByLabelText('Chờ duyệt')).toHaveTextContent('4');
     expect(screen.getByLabelText('Quá hạn')).toHaveTextContent('1');
     expect(screen.getByLabelText('Buổi đã đầy')).toHaveTextContent('1');
-    const hangA = screen.getByRole('button', { name: /Xem chi tiết Lớp 01/ });
+    const hangA = hang(screen.getByRole('button', { name: /Xem chi tiết Lớp 01/ }));
     expect(hangA).toHaveTextContent(/Buổi 2 · Thứ sáu, 20\/11 · 08:00–11:00/i);
     expect(within(hangA).getByLabelText('Sĩ số')).toHaveTextContent('25 → 27 / 30');
     expect(within(hangA).getByLabelText('Đổi ra')).toHaveTextContent('1 · 2 · 0 · 0 · 0');
@@ -142,9 +143,9 @@ describe('Tab Thống kê đổi buổi', () => {
   it('buổi đầy: sĩ số có nhãn đã đầy', async () => {
     datApi();
     renderTab();
-    const hangB = await screen.findByRole('button', { name: /Xem chi tiết Lớp 02/ });
+    const hangB = hang(await screen.findByRole('button', { name: /Xem chi tiết Lớp 02/ }));
     expect(within(hangB).getByLabelText('Sĩ số (đã đầy)')).toHaveTextContent('25 → 30 / 30');
-    const hangA = screen.getByRole('button', { name: /Xem chi tiết Lớp 01/ });
+    const hangA = hang(screen.getByRole('button', { name: /Xem chi tiết Lớp 01/ }));
     expect(within(hangA).queryByLabelText('Sĩ số (đã đầy)')).toBeNull();
   });
 
@@ -227,6 +228,28 @@ describe('Tab Thống kê đổi buổi', () => {
     renderTab();
     expect(await screen.findByText('Không có buổi nào có đề nghị đổi theo bộ lọc.')).toBeInTheDocument();
     expect(screen.getByText(/vượt giới hạn/)).toBeInTheDocument();
+  });
+
+  it('chưa chọn khóa: nhãn giai đoạn có mã khóa', async () => {
+    datApi();
+    const user = userEvent.setup();
+    renderTab();
+    await choBang();
+    await user.click(screen.getByRole('textbox', { name: 'Giai đoạn' }));
+    expect(await screen.findByRole('option', { name: 'K1 · GĐ1 – GĐ 1' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'K2 · GĐ1 – GĐ khóa 2' })).toBeInTheDocument();
+  });
+
+  it('dòng có nút thật mở chi tiết; tiêu đề cửa sổ 1 dòng ngắn, ngày nằm trong thân', async () => {
+    datApi();
+    const user = userEvent.setup();
+    renderTab();
+    const nut = await choBang();
+    expect(nut.tagName).toBe('BUTTON');
+    expect(hang(nut)).not.toHaveAttribute('role');
+    await user.click(nut);
+    const modal = await screen.findByRole('dialog', { name: 'Buổi 2 · Lớp 01' });
+    expect(modal).toHaveTextContent(/Thứ sáu, 20\/11\/2026 · 08:00–11:00/i);
   });
 
   it('ẩn bộ lọc Cụm khi chỉ có 1 cụm', async () => {

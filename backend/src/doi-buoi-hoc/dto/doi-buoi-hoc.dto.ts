@@ -116,12 +116,12 @@ export class LocThongKeDoiBuoiDto {
   /** YYYY-MM-DD theo giờ Việt Nam, so với thoi_gian_bat_dau của buổi. */
   @IsOptional()
   @Matches(NGAY)
-  @IsDateString()
+  @IsDateString({ strict: true })
   tu_ngay?: string;
 
   @IsOptional()
   @Matches(NGAY)
-  @IsDateString()
+  @IsDateString({ strict: true })
   den_ngay?: string;
 
   // Chỉ buổi có đề nghị chờ duyệt còn hạn (ra hoặc vào).

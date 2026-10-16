@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { HoTroHocVienScopeService } from '../ho-tro-hoc-vien/ho-tro-hoc-vien-scope.service';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
+import { ValidationException } from '../common/exceptions/app.exceptions';
 import { LocThongKeDoiBuoiDto } from './dto/doi-buoi-hoc.dto';
 import { DoiBuoiHocQueryService } from './doi-buoi-hoc-query.service';
 import { daBatDau } from './doi-buoi-hoc.rules';
@@ -272,16 +273,24 @@ function boLoc(ds: DeNghiThongKe[], lich: LichThongKe[]): BoLocThongKe {
       loai_lop: l.lop.loai_lop,
     });
   }
+  const maKhoa = (id: string) => khoa.get(id)?.ma_khoa ?? id;
   for (const d of ds)
     if (d.dang_ky_hoc.cum) cum.set(d.dang_ky_hoc.cum.id, d.dang_ky_hoc.cum);
   return {
     khoa: [...khoa.values()].sort((a, b) => theoTen(a.ma_khoa, b.ma_khoa)),
     giai_doan: [...giaiDoan.values()].sort(
-      (a, b) => theoTen(a.khoa_id, b.khoa_id) || a.thu_tu - b.thu_tu,
+      (a, b) =>
+        theoTen(maKhoa(a.khoa_id), maKhoa(b.khoa_id)) || a.thu_tu - b.thu_tu,
     ),
     lop: [...lop.values()].sort((a, b) => theoTen(a.ten_lop, b.ten_lop)),
     cum: [...cum.values()].sort((a, b) => theoTen(a.ten_cum, b.ten_cum)),
   };
+}
+
+/** Ngày ở dạng YYYY-MM-DD nên so chuỗi = so ngày. */
+function kiemTraKhoangNgay(loc: LocThongKeDoiBuoiDto): void {
+  if (loc.tu_ngay && loc.den_ngay && loc.tu_ngay > loc.den_ngay)
+    throw new ValidationException('Từ ngày phải trước hoặc bằng đến ngày');
 }
 
 function demRong(): Dem {
@@ -334,6 +343,7 @@ export class ThongKeDoiBuoiService {
     user: AuthenticatedUser,
     loc: LocThongKeDoiBuoiDto,
   ): Promise<KetQuaThongKe> {
+    kiemTraKhoangNgay(loc);
     const phamVi = await this.cumPhamVi(user);
     if (phamVi?.length === 0) return ketQuaRong();
     const rows = await this.prisma.doi_buoi_hoc.findMany({
@@ -399,6 +409,7 @@ export class ThongKeDoiBuoiService {
     user: AuthenticatedUser,
     loc: LocThongKeDoiBuoiDto,
   ): Promise<Buffer> {
+    kiemTraKhoangNgay(loc);
     const phamVi = await this.cumPhamVi(user);
     const rows =
       phamVi?.length === 0
@@ -543,9 +554,10 @@ export class ThongKeDoiBuoiService {
     const tongNhom = demRong();
     for (const d of deNghi) tongNhom[nhomCua.get(d.id)!]++;
 
-    const gioiHanDong = ids.length > TOI_DA_DONG;
-    const conLai = ids.slice(0, TOI_DA_DONG);
-    const dong = await this.dongThongKe(conLai, lichMap, dem, now);
+    // Sĩ số tính cho mọi dòng (để so_buoi_day khớp các số tong khác), rồi mới cắt 1000 dòng.
+    const tatCa = await this.dongThongKe(ids, lichMap, dem, now);
+    const gioiHanDong = tatCa.length > TOI_DA_DONG;
+    const dong = tatCa.slice(0, TOI_DA_DONG);
     return {
       ketQua: {
         tong: {
@@ -555,7 +567,7 @@ export class ThongKeDoiBuoiService {
           da_duyet: tongNhom.da_duyet,
           tu_choi: tongNhom.tu_choi,
           da_huy: tongNhom.huy,
-          so_buoi_day: dong.filter((x) => x.day).length,
+          so_buoi_day: tatCa.filter((x) => x.day).length,
         },
         dong,
         bo_loc,

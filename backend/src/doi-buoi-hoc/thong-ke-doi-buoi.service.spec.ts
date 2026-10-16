@@ -1,4 +1,7 @@
 import * as ExcelJS from 'exceljs';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { ValidationException } from '../common/exceptions/app.exceptions';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { ThongKeDoiBuoiService } from './thong-ke-doi-buoi.service';
 import { LocThongKeDoiBuoiDto } from './dto/doi-buoi-hoc.dto';
@@ -442,6 +445,72 @@ describe('ThongKeDoiBuoiService.thongKe', () => {
       khoa: KHOA_1,
     });
     expect(kq.gioi_han).toBe(false);
+  });
+
+  it('tu_ngay > den_ngay → 400, không truy vấn', async () => {
+    const { service, prisma } = setup({ lich: [], deNghi: [] });
+    const loc = { tu_ngay: '2026-11-21', den_ngay: '2026-11-20' };
+    await expect(service.thongKe(quanTri, loc)).rejects.toThrow(
+      ValidationException,
+    );
+    await expect(service.thongKe(quanTri, loc)).rejects.toMatchObject({
+      response: {
+        error: { message: 'Từ ngày phải trước hoặc bằng đến ngày' },
+      },
+    });
+    await expect(service.xuatExcel(quanTri, loc)).rejects.toThrow(
+      ValidationException,
+    );
+    expect(prisma.doi_buoi_hoc.findMany).not.toHaveBeenCalled();
+    // bằng nhau thì hợp lệ
+    await expect(
+      service.thongKe(quanTri, {
+        tu_ngay: '2026-11-20',
+        den_ngay: '2026-11-20',
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it('DTO: ngày không tồn tại (2026-02-31) hoặc sai dạng bị từ chối', async () => {
+    const loi = async (q: Record<string, string>) =>
+      (await validate(plainToInstance(LocThongKeDoiBuoiDto, q))).map(
+        (e) => e.property,
+      );
+    expect(await loi({ tu_ngay: '2026-02-31' })).toEqual(['tu_ngay']);
+    expect(await loi({ den_ngay: '2026-2-3' })).toEqual(['den_ngay']);
+    expect(
+      await loi({ tu_ngay: '2026-02-28', den_ngay: '2024-02-29' }),
+    ).toEqual([]);
+  });
+
+  it('bo_loc.giai_doan sắp theo ma_khoa (không theo UUID) rồi thu_tu', async () => {
+    const khoaA = { id: 'zz-uuid', ma_khoa: 'A01', ten_khoa: 'Khóa A' };
+    const khoaB = { id: 'aa-uuid', ma_khoa: 'B01', ten_khoa: 'Khóa B' };
+    const { service } = setup({
+      lich: [
+        lich('B', { khoa: khoaB, gd: 'gdB' }),
+        lich('A', { khoa: khoaA, gd: 'gdA' }),
+      ],
+      deNghi: [deNghi('1', 'cho_duyet', 'B', 'A')],
+    });
+    const kq = await service.thongKe(quanTri, {});
+    expect(kq.bo_loc.giai_doan.map((g) => g.id)).toEqual(['gdA', 'gdB']);
+  });
+
+  it('so_buoi_day đếm trước khi cắt 1.000 dòng', async () => {
+    const ds = Array.from({ length: 1000 }, (_, i) =>
+      lich(`L${i}`, { batDau: sau(10 + i) }),
+    );
+    ds.push(lich('day', { batDau: sau(5000) })); // dòng thứ 1001 — bị cắt, nhưng đầy
+    const { service } = setup({
+      lich: ds,
+      deNghi: ds.map((l, i) => deNghi(`${i}`, 'cho_duyet', l.id, l.id)),
+    });
+    const kq = await service.thongKe(quanTri, {});
+    expect(kq.gioi_han).toBe(true);
+    expect(kq.dong).toHaveLength(1000);
+    expect(kq.dong.some((d) => d.lich.id === 'day')).toBe(false);
+    expect(kq.tong.so_buoi_day).toBe(1);
   });
 
   it('vượt 20.000 đề nghị → gioi_han và cắt', async () => {

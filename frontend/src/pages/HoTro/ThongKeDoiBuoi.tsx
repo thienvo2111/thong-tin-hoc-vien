@@ -1,5 +1,6 @@
-import { useState, type KeyboardEvent } from 'react';
+import { useState, type MouseEvent } from 'react';
 import {
+  Anchor,
   Badge,
   Box,
   Button,
@@ -99,6 +100,7 @@ function BoLoc({
   const cuaKhoa = <T extends { khoa_id: string }>(ds: T[]) =>
     loc.khoa_id ? ds.filter((x) => x.khoa_id === loc.khoa_id) : ds;
   const w = { base: '100%', xs: 180 };
+  const maKhoa = new Map(bo.khoa.map((k) => [k.id, k.ma_khoa]));
   const mang = (v: string[]) => (v.length ? v : undefined);
 
   async function xuat() {
@@ -128,7 +130,11 @@ function BoLoc({
         size="xs"
         w={w}
         clearable
-        data={cuaKhoa(bo.giai_doan).map((g) => ({ value: g.id, label: `GĐ${g.thu_tu} – ${g.ten_giai_doan}` }))}
+        data={cuaKhoa(bo.giai_doan).map((g) => ({
+          value: g.id,
+          // Chưa chọn khóa: nhiều khóa cùng "GĐ1" → thêm mã khóa để phân biệt.
+          label: `${loc.khoa_id ? '' : `${maKhoa.get(g.khoa_id) ?? ''} · `}GĐ${g.thu_tu} – ${g.ten_giai_doan}`,
+        }))}
         value={loc.giai_doan_id ?? null}
         onChange={(v) => doi({ giai_doan_id: v ?? undefined })}
       />
@@ -245,12 +251,6 @@ function NamSo({ nhan, so }: { nhan: string; so: number[] }) {
 }
 
 function BangBuoi({ dong, onChon }: { dong: DongThongKeDoiBuoi[]; onChon: (d: DongThongKeDoiBuoi) => void }) {
-  const phim = (e: KeyboardEvent, d: DongThongKeDoiBuoi) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onChon(d);
-    }
-  };
   return (
     <ScrollArea.Autosize mah="calc(100dvh - 260px)" type="auto" offsetScrollbars>
       <Table miw={560} stickyHeader highlightOnHover verticalSpacing={4} horizontalSpacing="xs" fz="sm">
@@ -281,19 +281,24 @@ function BangBuoi({ dong, onChon }: { dong: DongThongKeDoiBuoi[]; onChon: (d: Do
           {dong.map((d) => {
             const l = d.lich;
             return (
-              <Table.Tr
-                key={l.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`Xem chi tiết ${l.lop.ten_lop} buổi ${l.buoi_so}`}
-                onClick={() => onChon(d)}
-                onKeyDown={(e) => phim(e, d)}
-                style={{ cursor: 'pointer' }}
-              >
+              // Bấm cả dòng cho tiện; nút ở ô đầu là đường bàn phím / trình đọc màn hình.
+              <Table.Tr key={l.id} onClick={() => onChon(d)} style={{ cursor: 'pointer' }}>
                 <Table.Td>
-                  <Text fz="sm" fw={700} lh={1.3}>
+                  <Anchor
+                    component="button"
+                    type="button"
+                    fz="sm"
+                    fw={700}
+                    lh={1.3}
+                    ta="left"
+                    aria-label={`Xem chi tiết ${l.lop.ten_lop} buổi ${l.buoi_so}`}
+                    onClick={(e: MouseEvent) => {
+                      e.stopPropagation();
+                      onChon(d);
+                    }}
+                  >
                     {l.lop.ten_lop}
-                  </Text>
+                  </Anchor>
                   <Text fz="xs" c="dimmed" lh={1.3}>
                     Buổi {l.buoi_so} · {thuNgayGon(l.thoi_gian_bat_dau)} · {gioBuoi(l.thoi_gian_bat_dau, l.thoi_gian_ket_thuc)}
                   </Text>
@@ -342,9 +347,13 @@ function ModalChiTiet({ dong, loc, onDong }: { dong: DongThongKeDoiBuoi; loc: Lo
       opened
       onClose={onDong}
       size="lg"
-      title={`${l.lop.ten_lop} · Buổi ${l.buoi_so} · ${dinhDangThuNgay(l.thoi_gian_bat_dau)} ${gioBuoi(l.thoi_gian_bat_dau, l.thoi_gian_ket_thuc)}`}
+      title={`Buổi ${l.buoi_so} · ${l.lop.ten_lop}`}
     >
-      <ScrollArea.Autosize mah="calc(100dvh - 180px)" type="auto" offsetScrollbars>
+      <Text fz="xs" c="dimmed" mb="xs">
+        {dinhDangThuNgay(l.thoi_gian_bat_dau)} · {gioBuoi(l.thoi_gian_bat_dau, l.thoi_gian_ket_thuc)}
+      </Text>
+      {/* Tiêu đề 1 dòng + dòng ngày: chừa 220px để cả cửa sổ không vượt màn hình điện thoại (không 2 thanh cuộn). */}
+      <ScrollArea.Autosize mah="calc(100dvh - 220px)" type="auto" offsetScrollbars>
         {isLoading && <Loader size="sm" />}
         {isError && <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>}
         {data && (
