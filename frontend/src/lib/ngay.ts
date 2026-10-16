@@ -23,6 +23,12 @@ export function dinhDangNgay(isoUtc: string): string {
   return dayjs.utc(isoUtc).tz(MUI_GIO).format('DD/MM/YYYY');
 }
 
+/** "Thứ Bảy, 15/11/2026" / "Chủ nhật, 16/11/2026" theo giờ Việt Nam. */
+export function dinhDangThuNgay(isoUtc: string): string {
+  const s = dayjs.utc(isoUtc).tz(MUI_GIO).format('dddd, DD/MM/YYYY');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export function conLaiDuoi24h(isoUtc: string): boolean {
   const gio = dayjs.utc(isoUtc).diff(dayjs(), 'hour');
   return gio < 24 && gio >= 0;

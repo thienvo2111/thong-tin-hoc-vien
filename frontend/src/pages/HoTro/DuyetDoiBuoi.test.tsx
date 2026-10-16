@@ -152,6 +152,19 @@ describe("Màn duyệt đổi buổi", () => {
     expect(screen.getByText(/Bận công tác đột xuất/)).toBeInTheDocument();
   });
 
+  it("thẻ chờ duyệt tách 2 khối Buổi gốc / Xin đổi sang, mỗi khối có lớp, buổi, thứ-ngày, giờ", async () => {
+    datApi([deNghi()]);
+    renderTrang("ho_tro_hoc_vien");
+    const goc = await screen.findByRole("group", { name: "Buổi gốc" });
+    const sang = screen.getByRole("group", { name: "Xin đổi sang" });
+    for (const khoi of [goc, sang]) {
+      expect(khoi).toHaveTextContent(/Buổi \d+/);
+      expect(khoi).toHaveTextContent(/(Thứ [A-ZĐa-zăâêôơưàáạảãèéẹẻẽìíịỉĩòóọỏõùúụủũỳýỵỷỹđ]+|Chủ nhật), \d{2}\/\d{2}\/\d{4}/);
+      expect(khoi).toHaveTextContent(/\d{2}:\d{2}–\d{2}:\d{2}/);
+    }
+    expect(sang).toHaveTextContent(/Sĩ số buổi đề nghị: 28\/30 \+2 đang chờ/);
+  });
+
   it("đề nghị quá hạn: khối Quá hạn riêng, có nhãn, không có nút Duyệt, vẫn có Từ chối", async () => {
     datApi([], 0, [deNghi({ qua_han: true })]);
     renderTrang("ho_tro_hoc_vien");
@@ -323,8 +336,9 @@ describe("Màn duyệt đổi buổi", () => {
     await waitFor(() => expect(xacNhan).toBeEnabled());
     await user.click(screen.getByRole("button", { name: "Xác nhận hủy duyệt" }));
     await waitFor(() => expect(lan).toBe(2));
+    // Thông báo canh_bao hiện sau khi danh sách refetch — nới chờ khi chạy song song nhiều file.
     expect(
-      await screen.findByText("Buổi gốc đã đủ sĩ số 30/30 — hủy duyệt sẽ vượt sĩ số"),
+      await screen.findByText("Buổi gốc đã đủ sĩ số 30/30 — hủy duyệt sẽ vượt sĩ số", {}, { timeout: 5000 }),
     ).toBeInTheDocument();
   });
 

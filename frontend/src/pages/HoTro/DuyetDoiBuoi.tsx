@@ -9,6 +9,7 @@ import {
   Modal,
   Paper,
   Radio,
+  SimpleGrid,
   Stack,
   Tabs,
   Text,
@@ -29,7 +30,7 @@ import {
 } from '@/api/doiBuoi';
 import { useToi } from '@/auth/AuthContext';
 import { StatusBanner } from '@/components/StatusBanner';
-import { dinhDangGio, dinhDangNgayGio } from '@/lib/ngay';
+import { dinhDangGio, dinhDangNgayGio, dinhDangThuNgay } from '@/lib/ngay';
 import { thongDiepLoiXungDot } from '@/lib/loiApi';
 
 const GHI_CHU_TOI_THIEU = 5;
@@ -44,12 +45,53 @@ const NHAN_TRANG_THAI: Record<TrangThaiDeNghi, string> = {
   da_huy: 'Đã hủy',
 };
 
-function nhanBuoi(b: BuoiTomTat | null): string {
-  if (!b) return '—';
-  const gio = b.thoi_gian_ket_thuc
-    ? `${dinhDangNgayGio(b.thoi_gian_bat_dau)}–${dinhDangGio(b.thoi_gian_ket_thuc)}`
-    : dinhDangNgayGio(b.thoi_gian_bat_dau);
-  return `${b.lop.ten_lop} · Buổi ${b.buoi_so} · ${gio}`;
+/** Khối 1 buổi: nhãn vai trò, tên lớp, buổi số, thứ-ngày, giờ (+ dòng phụ tùy chọn). */
+function KhoiBuoi({ nhan, b, mau, phu }: { nhan: string; b: BuoiTomTat | null; mau: string; phu?: string }) {
+  return (
+    <Paper
+      role="group"
+      aria-label={nhan}
+      radius="sm"
+      p="sm"
+      bg={`${mau}.0`}
+      style={{ borderLeft: `4px solid var(--mantine-color-${mau}-6)` }}
+    >
+      <Text fz="xs" fw={700} c={`${mau}.8`} tt="uppercase">
+        {nhan}
+      </Text>
+      {b ? (
+        <>
+          <Text fw={700} fz="sm" mt={4}>
+            {b.lop.ten_lop}
+          </Text>
+          <Text fz="sm">
+            <b>Buổi {b.buoi_so}</b> · {dinhDangThuNgay(b.thoi_gian_bat_dau)}
+          </Text>
+          <Text fz="sm">
+            {dinhDangGio(b.thoi_gian_bat_dau)}
+            {b.thoi_gian_ket_thuc ? `–${dinhDangGio(b.thoi_gian_ket_thuc)}` : ''}
+          </Text>
+        </>
+      ) : (
+        <Text fz="sm">—</Text>
+      )}
+      {phu && (
+        <Text fz="xs" c="dimmed" mt={4}>
+          {phu}
+        </Text>
+      )}
+    </Paper>
+  );
+}
+
+/** Buổi gốc → buổi đích, 2 cột trên màn rộng, xếp dọc trên điện thoại. */
+function HaiBuoi({ goc, dich, nhanDich, phuDich }: { goc: BuoiTomTat | null; dich: BuoiTomTat | null; nhanDich: string; phuDich?: string }) {
+  return (
+    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+      <KhoiBuoi nhan="Buổi gốc" b={goc} mau="gray" />
+      <KhoiBuoi nhan={nhanDich} b={dich} mau="blue" phu={phuDich} />
+    </SimpleGrid>
+  );
 }
 
 function chuanHoa(s: string): string {
@@ -197,13 +239,12 @@ function DongChoDuyet({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
             )}
           </Group>
         </Group>
-        <Text fz="sm">
-          {nhanBuoi(d.buoi_nguon)} → {nhanBuoi(d.buoi_de_nghi)}
-        </Text>
-        <Text fz="sm" c="dimmed">
-          Sĩ số buổi đề nghị: {d.si_so}/{d.si_so_toi_da ?? '—'}
-          {d.so_cho_duyet > 0 ? ` +${d.so_cho_duyet} đang chờ` : ''}
-        </Text>
+        <HaiBuoi
+          goc={d.buoi_nguon}
+          dich={d.buoi_de_nghi}
+          nhanDich="Xin đổi sang"
+          phuDich={`Sĩ số buổi đề nghị: ${d.si_so}/${d.si_so_toi_da ?? '—'}${d.so_cho_duyet > 0 ? ` +${d.so_cho_duyet} đang chờ` : ''}`}
+        />
         <Text fz="sm">Lý do: {d.ly_do}</Text>
         <Text fz="xs" c="dimmed">
           Gửi lúc {dinhDangNgayGio(d.tao_luc)}
@@ -240,10 +281,11 @@ function DongDaXuLy({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
             {NHAN_TRANG_THAI[d.trang_thai]}
           </Badge>
         </Group>
-        <Text fz="sm">
-          {nhanBuoi(d.buoi_nguon)}
-          {d.buoi_chot ? ` → ${nhanBuoi(d.buoi_chot)}` : ''}
-        </Text>
+        <HaiBuoi
+          goc={d.buoi_nguon}
+          dich={d.buoi_chot ?? d.buoi_de_nghi}
+          nhanDich={d.buoi_chot ? 'Buổi đã chốt' : 'Đã xin đổi sang'}
+        />
         <Text fz="xs" c="dimmed">
           {d.nguoi_xu_ly ? `Xử lý bởi ${d.nguoi_xu_ly}` : ''}
           {d.ghi_chu_xu_ly ? ` · Ghi chú: ${d.ghi_chu_xu_ly}` : ''}
@@ -303,7 +345,7 @@ function ModalDuyet({ deNghi, onDong }: { deNghi: DeNghiDuyet; onDong: () => voi
   return (
     <Modal opened onClose={onDong} size="lg" title={`Duyệt đề nghị của ${deNghi.hoc_vien.ho_ten}`}>
       <Stack gap="md">
-        <Text fz="sm">Buổi cần đổi: {nhanBuoi(deNghi.buoi_nguon)}</Text>
+        <KhoiBuoi nhan="Buổi gốc" b={deNghi.buoi_nguon} mau="gray" />
         {isLoading && <Loader size="sm" />}
         {isError && <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>}
         {data && (
