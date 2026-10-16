@@ -156,7 +156,11 @@ export class DoiBuoiHocService {
       : [];
 
     const lichMap = await this.query.lichTomTat(
-      deNghiRows.flatMap((d) => [d.lich_nguon_id, d.lich_de_nghi_id]),
+      deNghiRows.flatMap((d) =>
+        [d.lich_nguon_id, d.lich_de_nghi_id, d.lich_chot_id].filter(
+          (x): x is string => x !== null,
+        ),
+      ),
     );
     const hang = await this.hangChoTheoDeNghi(deNghiRows, now);
     const deNghi = deNghiRows.map((d) =>

@@ -455,6 +455,42 @@ describe('DoiBuoiHocService luaChon / tongQuan', () => {
   });
 });
 
+describe('DoiBuoiHocService tongQuan buoi chot', () => {
+  it('da_duyet chot buoi khac buoi de nghi: nap lich_chot_id, tra buoi_chot', async () => {
+    const s = setup({ soBuoi: 2 });
+    const p = s.prisma as Record<string, any>;
+    p.phan_lop_giai_doan = { findMany: jest.fn(async () => []) };
+    p.lich_hoc_lop = { findMany: jest.fn(async () => []) };
+    p.doi_buoi_hoc.findMany = jest.fn().mockResolvedValueOnce([
+      {
+        id: 'd1',
+        trang_thai: 'da_duyet',
+        lich_nguon_id: 'ln',
+        lich_de_nghi_id: 'ld',
+        lich_chot_id: 'lc',
+        ly_do: 'abcde',
+        tao_luc: new Date(Date.now() - 5000),
+        ghi_chu_xu_ly: null,
+      },
+    ]);
+    s.query.lichTomTat.mockResolvedValue(
+      new Map([
+        ['ln', lich('ln', 'lopA')],
+        ['ld', lich('ld', 'lopB')],
+        ['lc', lich('lc', 'lopChot')],
+      ]),
+    );
+    const r = await s.svc.tongQuanHocVien(user, 'k1');
+    expect((s.query.lichTomTat.mock.calls as unknown[][])[0][0]).toEqual(
+      expect.arrayContaining(['ln', 'ld', 'lc']),
+    );
+    expect(r.de_nghi[0].buoi_chot).toMatchObject({
+      id: 'lc',
+      lop: { ten_lop: 'lopChot' },
+    });
+  });
+});
+
 describe('DoiBuoiHocService nguoi duyet', () => {
   const quanTri = { id: 'qt', vai_tro: 'quan_tri' } as AuthenticatedUser;
   const hoTro = { id: 'ht', vai_tro: 'ho_tro_hoc_vien' } as AuthenticatedUser;
