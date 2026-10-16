@@ -141,7 +141,7 @@ Chốt sang buổi khác buổi đề nghị: hàng đợi và sĩ số tính th
 - Trang `/de-nghi-doi-buoi` (route có, **không** có mục menu; người hỗ trợ gửi link qua Zalo): chọn khóa → danh sách buổi sắp tới; với mỗi buổi chọn buổi tương đương (bảng: lớp, thời gian, địa điểm/link, `si_so/si_so_toi_da`, "+n đang chờ"; buổi đầy mờ, nhãn "Đã đủ", không chọn được), nhập lý do, gửi. Hiện "Còn {x}/{N} lượt đổi". Đề nghị đang chờ: "Bạn đang xếp thứ k", nút Sửa (cảnh báo "Sửa sẽ đưa bạn về cuối hàng chờ") và Hủy.
 
 ### Người hỗ trợ cụm
-- Màn `BaoVangDoiLop.tsx` thêm tab **"Đổi buổi"** (badge = `dem-cho-duyet`): bảng chờ duyệt sắp theo thời điểm gửi, cột thứ tự hàng `k/n`, sĩ số buổi đề nghị, nhãn "Quá hạn". Nút Duyệt mở modal: buổi đề nghị chọn sẵn + danh sách buổi tương đương (sĩ số, đang chờ, số gửi trước, `duyet_duoc`), ghi chú tùy chọn. Nút Từ chối (ghi chú bắt buộc). Tab "Đã xử lý" có nút Hủy duyệt.
+- Trang mới **`/ho-tro/doi-buoi`** (menu "Đổi buổi", badge = `dem-cho-duyet`; `BaoVangDoiLop.tsx` là component trong chi tiết học viên nên không gắn tab vào đó), tab "Chờ duyệt": bảng chờ duyệt sắp theo thời điểm gửi, cột thứ tự hàng `k/n`, sĩ số buổi đề nghị, nhãn "Quá hạn". Nút Duyệt mở modal: buổi đề nghị chọn sẵn + danh sách buổi tương đương (sĩ số, đang chờ, số gửi trước, `duyet_duoc`), ghi chú tùy chọn. Nút Từ chối (ghi chú bắt buộc). Tab "Đã xử lý" có nút Hủy duyệt.
 
 ### Quản trị
 - Chi tiết khóa: ô số "Số buổi tối đa học viên được đề nghị đổi (0 = tắt)".
