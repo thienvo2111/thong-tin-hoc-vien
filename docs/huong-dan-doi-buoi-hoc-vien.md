@@ -48,6 +48,7 @@ Lỡ chọn sai hoặc lịch thay đổi sau khi đề nghị đã được duy
    - Được duyệt → học buổi mới; đề nghị cũ chuyển sang *Đã hủy* với ghi chú *Đã thay bằng đề nghị đổi lại*.
    - Bị từ chối hoặc Thầy/Cô tự hủy → vẫn học buổi đã duyệt trước đó.
 4. Đề nghị đổi lại đang chờ ghi *Đổi lại — đang học: …*; vẫn **Sửa** / **Hủy đề nghị** như đề nghị thường.
+5. Muốn quay về học buổi của lớp gốc: nhắn người hỗ trợ cụm hủy duyệt (trước khi buổi bắt đầu).
 
 ## Thông báo thường gặp
 

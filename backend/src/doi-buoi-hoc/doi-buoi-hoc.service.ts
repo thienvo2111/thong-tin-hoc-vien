@@ -17,6 +17,7 @@ import {
   LocDoiBuoiDto,
 } from './dto/doi-buoi-hoc.dto';
 import {
+  Db,
   DoiBuoiHocQueryService,
   LICH_TOM_TAT_SELECT,
 } from './doi-buoi-hoc-query.service';
@@ -322,6 +323,8 @@ export class DoiBuoiHocService {
     // để không chiếm 500 chỗ đầu của danh sách sắp tao_luc tăng dần.
     const choDuyet = !q.da_xu_ly && q.trang_thai === 'cho_duyet';
     const quaHan = choDuyet && q.qua_han === true;
+    // Đổi lại có buổi đang học đã bắt đầu cũng quá hạn (không duyệt được nữa).
+    const doiLaiQuaHan = choDuyet ? await this.idDoiLaiQuaHan(now) : [];
     const locHan: Prisma.doi_buoi_hocWhereInput = !choDuyet
       ? {}
       : quaHan
@@ -329,11 +332,13 @@ export class DoiBuoiHocService {
             OR: [
               { lich_nguon: { thoi_gian_bat_dau: { lte: now } } },
               { lich_de_nghi: { thoi_gian_bat_dau: { lte: now } } },
+              ...(doiLaiQuaHan.length ? [{ id: { in: doiLaiQuaHan } }] : []),
             ],
           }
         : {
             lich_nguon: { thoi_gian_bat_dau: { gt: now } },
             lich_de_nghi: { thoi_gian_bat_dau: { gt: now } },
+            ...(doiLaiQuaHan.length ? { id: { notIn: doiLaiQuaHan } } : {}),
           };
     const rows = await this.prisma.doi_buoi_hoc.findMany({
       where: {
@@ -414,9 +419,11 @@ export class DoiBuoiHocService {
     const cumIds = await this.cumPhamVi(user);
     if (cumIds?.length === 0) return 0;
     const now = new Date();
+    const doiLaiQuaHan = await this.idDoiLaiQuaHan(now);
     return this.prisma.doi_buoi_hoc.count({
       where: {
         trang_thai: 'cho_duyet',
+        ...(doiLaiQuaHan.length ? { id: { notIn: doiLaiQuaHan } } : {}),
         ...(cumIds ? { dang_ky_hoc: { cum_id: { in: cumIds } } } : {}),
         lich_nguon: { thoi_gian_bat_dau: { gt: now } },
         lich_de_nghi: { thoi_gian_bat_dau: { gt: now } },
@@ -445,7 +452,7 @@ export class DoiBuoiHocService {
     const truoc = await this.prisma.doi_buoi_hoc.groupBy({
       by: ['lich_de_nghi_id'],
       where: {
-        ...this.whereChoTruoc(dn, now),
+        ...this.whereChoTruoc(dn, now, await this.idDoiLaiQuaHan(now)),
         lich_de_nghi_id: { in: ds.map((x) => x.lich.id) },
       },
       _count: { _all: true },
@@ -517,7 +524,11 @@ export class DoiBuoiHocService {
       const siSo = await this.query.siSoBuoi([lichChotId], now, tx);
       const soTruoc = await tx.doi_buoi_hoc.count({
         where: {
-          ...this.whereChoTruoc({ id, tao_luc: hienTai.tao_luc }, now),
+          ...this.whereChoTruoc(
+            { id, tao_luc: hienTai.tao_luc },
+            now,
+            await this.idDoiLaiQuaHan(now, tx),
+          ),
           lich_de_nghi_id: lichChotId,
         },
       });
@@ -594,7 +605,7 @@ export class DoiBuoiHocService {
           !conChoChoDeNghi({ si_so, si_so_toi_da: toiDa, so_truoc: soTruoc }),
         thay_the_id: banCu?.id ?? null,
       };
-    });
+    }).catch(trungLaDaXuLy);
     await this.ghiNhatKyDuyet(dn.dang_ky_hoc.hoc_vien_id, 'Duyệt đổi buổi', {
       de_nghi_id: id,
       lich_nguon_id: dn.lich_nguon_id,
@@ -784,14 +795,32 @@ export class DoiBuoiHocService {
   private whereChoTruoc(
     dn: { id: string; tao_luc: Date },
     now: Date,
+    doiLaiQuaHan: string[],
   ): Prisma.doi_buoi_hocWhereInput {
     return {
       trang_thai: 'cho_duyet',
       tao_luc: { lt: dn.tao_luc },
-      id: { not: dn.id },
+      id: doiLaiQuaHan.length
+        ? { not: dn.id, notIn: doiLaiQuaHan }
+        : { not: dn.id },
       lich_nguon: { thoi_gian_bat_dau: { gt: now } },
       lich_de_nghi: { thoi_gian_bat_dau: { gt: now } },
     };
+  }
+
+  // Id đề nghị đổi lại đang chờ mà buổi đang học (chốt của bản đã duyệt) đã bắt
+  // đầu → quá hạn như buổi nguồn/đề nghị đã bắt đầu. Tập nhỏ: 1 truy vấn gộp.
+  private async idDoiLaiQuaHan(
+    now: Date,
+    db: Db = this.prisma,
+  ): Promise<string[]> {
+    const rows = await db.$queryRaw<{ id: string }[]>`
+      SELECT c.id FROM doi_buoi_hoc c
+      JOIN doi_buoi_hoc d ON d.dang_ky_hoc_id = c.dang_ky_hoc_id
+        AND d.lich_nguon_id = c.lich_nguon_id AND d.trang_thai = 'da_duyet'
+      JOIN lich_hoc_lop l ON l.id = d.lich_chot_id
+      WHERE c.trang_thai = 'cho_duyet' AND l.thoi_gian_bat_dau <= ${now}`;
+    return rows.map((r) => r.id);
   }
 
   private ghiChuBatBuoc(s: string | undefined): string {
@@ -1076,10 +1105,12 @@ export class DoiBuoiHocService {
   ): DeNghiHocVien {
     const nguon = lichMap.get(r.lich_nguon_id);
     const dich = lichMap.get(r.lich_de_nghi_id);
+    const doiLai = doiLaiTu(r, chotCu, lichMap);
     const quaHan =
       r.trang_thai === 'cho_duyet' &&
       ((nguon !== undefined && daBatDau(nguon, now)) ||
-        (dich !== undefined && daBatDau(dich, now)));
+        (dich !== undefined && daBatDau(dich, now)) ||
+        (doiLai !== null && daBatDau(doiLai, now)));
     return {
       id: r.id,
       trang_thai: r.trang_thai,
@@ -1097,7 +1128,7 @@ export class DoiBuoiHocService {
       buoi_chot: r.lich_chot_id
         ? tomTatBuoi(lichMap.get(r.lich_chot_id))
         : null,
-      doi_lai_tu: doiLaiTu(r, chotCu, lichMap),
+      doi_lai_tu: doiLai,
     };
   }
 
@@ -1144,7 +1175,7 @@ export function lyDoHuy(r: {
   ghi_chu_xu_ly: string | null;
 }): LyDoHuy | null {
   if (r.trang_thai !== 'da_huy') return null;
-  if (r.ghi_chu_xu_ly === GHI_CHU_THAY_THE) return 'thay_the';
+  if (r.ghi_chu_xu_ly === GHI_CHU_THAY_THE && !r.nguoi_xu_ly) return 'thay_the';
   if (r.nguoi_xu_ly) return 'huy_duyet';
   return r.ghi_chu_xu_ly === GHI_CHU_HOC_VIEN_SUA ? 'hoc_vien_sua' : 'hoc_vien_huy';
 }
@@ -1175,4 +1206,11 @@ function doiLaiTu(
   if (r.trang_thai !== 'cho_duyet') return null;
   const id = chotCu.get(capKey(r.dang_ky_hoc_id, r.lich_nguon_id));
   return id ? tomTatBuoi(lichMap.get(id)) : null;
+}
+
+// Va chạm unique trong giao dịch duyệt (đua hiếm) → 409 thay vì 500.
+function trungLaDaXuLy(e: unknown): never {
+  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')
+    throw new ConflictAppException('Đề nghị đã được xử lý');
+  throw e;
 }

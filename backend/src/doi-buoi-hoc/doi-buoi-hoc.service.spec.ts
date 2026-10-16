@@ -1,5 +1,9 @@
 import { Prisma } from '@prisma/client';
-import { DoiBuoiHocService } from './doi-buoi-hoc.service';
+import {
+  DoiBuoiHocService,
+  GHI_CHU_THAY_THE,
+  lyDoHuy,
+} from './doi-buoi-hoc.service';
 import { LichTomTat } from './doi-buoi-hoc.rules';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 
@@ -580,6 +584,42 @@ describe('DoiBuoiHocService luaChon / tongQuan', () => {
     ).toBe('a');
   });
 
+  it('tong quan doi lai: buoi dang hoc da bat dau -> de nghi cho la qua han', async () => {
+    const s = setupDoc();
+    const row = (id: string, trang_thai: string, over: object = {}) => ({
+      id,
+      trang_thai,
+      dang_ky_hoc_id: 'dk1',
+      lich_nguon_id: 'ln',
+      lich_de_nghi_id: 'ld',
+      lich_chot_id: null,
+      ly_do: 'abcde',
+      tao_luc: new Date(Date.now() - 5000),
+      ghi_chu_xu_ly: null,
+      nguoi_xu_ly: null,
+      ...over,
+    });
+    (s.prisma.doi_buoi_hoc as Record<string, unknown>).findMany = jest
+      .fn()
+      .mockResolvedValueOnce([
+        row('moi', 'cho_duyet'),
+        row('cu', 'da_duyet', { lich_chot_id: 'lq' }),
+      ])
+      .mockResolvedValueOnce([]);
+    s.query.lichTomTat.mockResolvedValue(
+      new Map([
+        ['ln', lich('ln', 'lopA')],
+        ['ld', lich('ld', 'lopB')],
+        ['lq', lich('lq', 'lopC', { thoi_gian_bat_dau: hqua })],
+      ]),
+    );
+    const r = await s.svc.tongQuanHocVien(user, 'k1');
+    expect(r.de_nghi.find((d) => d.id === 'moi')).toMatchObject({
+      qua_han: true,
+      thu_tu_hang: null,
+    });
+  });
+
   it('tong quan doi lai: 1 luot, de_nghi = ban da duyet, de_nghi_doi_lai + doi_lai_tu', async () => {
     const s = setupDoc();
     const t0 = new Date(Date.now() - 5000);
@@ -690,6 +730,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
         order.push('lock');
         return 0;
       }),
+      $queryRaw: jest.fn(async (..._a: unknown[]) => [] as { id: string }[]),
       doi_buoi_hoc: {
         findUnique: jest.fn(async () => deNghi),
         findFirst: jest.fn(
@@ -710,6 +751,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     };
     const prisma = {
       $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
+      $queryRaw: jest.fn(async (..._a: unknown[]) => [] as { id: string }[]),
       doi_buoi_hoc: {
         findFirst: jest.fn(async (_a?: unknown) => deNghi as unknown),
         findMany: jest.fn(async (_a?: unknown) => [] as unknown[]),
@@ -950,6 +992,32 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     });
   });
 
+  it('duyet: P2002 trong giao dich -> 409 Đề nghị đã được xử lý (khong 500)', async () => {
+    const { svc, tx, nhatKy } = setupDuyet();
+    tx.doi_buoi_hoc.updateMany.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('dup', {
+        code: 'P2002',
+        clientVersion: 'x',
+      }),
+    );
+    await expect(svc.duyet(quanTri, 'x1', {})).rejects.toMatchObject({
+      status: 409,
+      response: {
+        error: expect.objectContaining({ message: 'Đề nghị đã được xử lý' }),
+      },
+    });
+    expect(nhatKy.ghi).not.toHaveBeenCalled();
+  });
+
+  it('duyet: so_truoc khong tinh doi lai qua han (buoi dang hoc da bat dau)', async () => {
+    const { svc, tx } = setupDuyet();
+    tx.$queryRaw.mockResolvedValueOnce([{ id: 'q1' }]);
+    await svc.duyet(quanTri, 'x1', {});
+    const where = (tx.doi_buoi_hoc.count.mock.calls[0][0] as { where: any })
+      .where;
+    expect(where.id).toEqual({ not: 'x1', notIn: ['q1'] });
+  });
+
   it('tuChoi doi lai: chi cap nhat de nghi moi, ban cu giu nguyen', async () => {
     const { svc, prisma, tx } = setupDuyet();
     await svc.tuChoi(quanTri, 'x1', ghiChu);
@@ -1167,6 +1235,34 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     });
     expect(where.lich_nguon.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
     expect(where.lich_de_nghi.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
+  });
+
+  it('demChoDuyet: loai doi lai qua han (buoi dang hoc da bat dau)', async () => {
+    const { svc, prisma } = setupDuyet();
+    prisma.$queryRaw.mockResolvedValueOnce([{ id: 'q1' }]);
+    await svc.demChoDuyet(quanTri);
+    const where = (prisma.doi_buoi_hoc.count.mock.calls[0][0] as { where: any })
+      .where;
+    expect(where.id).toEqual({ notIn: ['q1'] });
+  });
+
+  it('danhSach cho_duyet: doi lai qua han bi loai khoi danh sach chinh, vao danh sach qua han', async () => {
+    const { svc, prisma } = setupDuyet();
+    prisma.$queryRaw.mockResolvedValue([{ id: 'q1' }]);
+    await svc.danhSach(hoTro, { trang_thai: 'cho_duyet' });
+    await svc.danhSach(hoTro, { trang_thai: 'cho_duyet', qua_han: true });
+    const [chinh, quaHan] = prisma.doi_buoi_hoc.findMany.mock.calls.map(
+      (c) => (c[0] as any).where,
+    );
+    expect(chinh.id).toEqual({ notIn: ['q1'] });
+    expect(quaHan.OR).toHaveLength(3);
+    expect(quaHan.OR[2]).toEqual({ id: { in: ['q1'] } });
+  });
+
+  it('danhSach da_xu_ly: khong truy van doi lai qua han', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.danhSach(hoTro, { da_xu_ly: true });
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
   });
 
   it('demChoDuyet: ho tro khong co cum -> 0', async () => {
@@ -1418,5 +1514,16 @@ describe('DoiBuoiHocService nguoi duyet', () => {
       .mockResolvedValueOnce({ lich_chot_id: 'lk' });
     const r = await svc.luaChonDuyet(quanTri, 'x1');
     expect(r.map((x) => x.lich.id)).toEqual(['ld']);
+  });
+});
+
+describe('lyDoHuy', () => {
+  it('thay_the chi khi ghi chu he thong va khong co nguoi xu ly', () => {
+    expect(
+      lyDoHuy({ trang_thai: 'da_huy', nguoi_xu_ly: null, ghi_chu_xu_ly: GHI_CHU_THAY_THE }),
+    ).toBe('thay_the');
+    expect(
+      lyDoHuy({ trang_thai: 'da_huy', nguoi_xu_ly: 'nd1', ghi_chu_xu_ly: GHI_CHU_THAY_THE }),
+    ).toBe('huy_duyet');
   });
 });
