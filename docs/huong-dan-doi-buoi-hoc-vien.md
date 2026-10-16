@@ -36,6 +36,19 @@ Thầy/Cô **không tham gia được một buổi** của lớp mình (ví dụ
 - **Hủy đề nghị**: khi còn *Đang chờ duyệt*. Lượt được trả lại.
 - Đề nghị **đã duyệt** muốn hủy thì nhắn người hỗ trợ cụm (chỉ hủy được khi cả hai buổi chưa bắt đầu).
 
+## Đổi lại buổi đã duyệt
+
+Lỡ chọn sai hoặc lịch thay đổi sau khi đề nghị đã được duyệt:
+
+1. Ở mục **Đề nghị đã xử lý**, đề nghị **Đã duyệt** có nút **Đổi lại** (chỉ hiện khi buổi gốc và buổi đang học đều
+   chưa bắt đầu, và chưa có đề nghị đổi lại nào đang chờ).
+2. Bấm **Đổi lại** → form **Đổi lại buổi đã duyệt** đã chọn sẵn buổi gốc. Chọn buổi mới (buổi đang học không có
+   trong danh sách), ghi lý do, bấm **Gửi đề nghị**.
+3. **Buổi đã duyệt vẫn giữ** cho tới khi đề nghị đổi lại được duyệt. **Không tốn thêm lượt.**
+   - Được duyệt → học buổi mới; đề nghị cũ chuyển sang *Đã hủy* với ghi chú *Đã thay bằng đề nghị đổi lại*.
+   - Bị từ chối hoặc Thầy/Cô tự hủy → vẫn học buổi đã duyệt trước đó.
+4. Đề nghị đổi lại đang chờ ghi *Đổi lại — đang học: …*; vẫn **Sửa** / **Hủy đề nghị** như đề nghị thường.
+
 ## Thông báo thường gặp
 
 | Thông báo | Ý nghĩa |
@@ -44,6 +57,7 @@ Thầy/Cô **không tham gia được một buổi** của lớp mình (ví dụ
 | Thầy/Cô đã dùng hết lượt đổi buổi của khóa này | Đã dùng đủ số lượt; hủy một đề nghị đang chờ để lấy lại lượt, hoặc liên hệ người hỗ trợ. |
 | Hiện chưa có buổi tương đương nào để đổi sang | Không còn buổi phù hợp chưa bắt đầu ở lớp khác. |
 | Buổi đã đủ sĩ số, hãy chọn buổi khác | Buổi vừa đủ chỗ trong lúc Thầy/Cô thao tác — chọn buổi khác. |
+| Thầy/Cô đang học buổi này rồi | Đổi lại sang đúng buổi đang học theo đề nghị đã duyệt — chọn buổi khác. |
 
 ---
 

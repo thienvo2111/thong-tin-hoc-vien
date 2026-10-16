@@ -41,9 +41,15 @@ Sắp theo thời điểm gửi (cũ nhất trước). Mỗi dòng: học viên 
 
 **Quá hạn**: đề nghị mà buổi đã bắt đầu nằm ở mục **Quá hạn** — không duyệt được nữa, chỉ **Từ chối** để đóng.
 
+**Đổi lại**: thẻ có nhãn **Đổi lại** và khối **Đang học** là học viên xin đổi tiếp một đề nghị *đã duyệt*.
+Cửa sổ duyệt ghi *Duyệt sẽ thay buổi đang học*: duyệt thì buổi mới thay buổi đang học (đề nghị cũ chuyển *Đã thay
+bằng đề nghị đổi lại*, không tốn thêm lượt của học viên); **từ chối** thì học viên vẫn học buổi đã duyệt trước đó.
+Buổi đang học không có trong danh sách chọn buổi chốt.
+
 ### Tab **Đã xử lý**
 
-Xem đề nghị đã duyệt / từ chối / hủy, buổi chốt, người xử lý, ghi chú.
+Xem đề nghị đã duyệt / từ chối / hủy, buổi chốt, người xử lý, ghi chú. Nhãn *Đã thay bằng đề nghị đổi lại* = bản
+đã duyệt được thay khi duyệt đề nghị đổi lại (hệ thống tự ghi, không phải ai hủy).
 **Hủy duyệt**: chỉ khi cả buổi gốc và buổi chốt chưa bắt đầu; ghi chú bắt buộc. Nếu buổi gốc đã đủ sĩ số
 thì người hỗ trợ cụm **không hủy được** (Quản trị vẫn làm được, kèm cảnh báo).
 

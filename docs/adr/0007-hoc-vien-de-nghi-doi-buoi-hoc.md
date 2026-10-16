@@ -20,9 +20,10 @@ Học viên thường bận đúng một buổi chứ không phải cả giai đ
 | D5 | **Hàng đợi theo thời điểm gửi** (`tao_luc`): duyệt đề nghị R vào buổi X chỉ khi số chỗ trống của X **lớn hơn** số đề nghị đang chờ vào X gửi trước R (giữ chỗ cho người gửi trước). Buổi dư chỗ → người sau vẫn duyệt ngay, không bị kẹt bởi cụm khác. Quản trị được vượt thứ tự, kèm cảnh báo. Kiểm tra + duyệt trong 1 transaction có `pg_advisory_xact_lock` theo buổi chốt. |
 | D6 | **Sửa đề nghị = hủy + tạo mới** trong 1 transaction → `tao_luc` mới, học viên về **cuối hàng**. Đề nghị cũ `da_huy` không tính lượt. |
 | D7 | **Quá hạn** (buổi đã bắt đầu khi còn `cho_duyet`) tính lúc đọc, không lưu trạng thái, không cron; không duyệt được, không tính vào hàng đợi. |
-| D8 | **Giới hạn và công tắc chung một cột**: `khoa_boi_duong.so_buoi_doi_toi_da` (mặc định 0 = tắt). Lượt = số đề nghị `cho_duyet` + `da_duyet` của đăng ký trong khóa; từ chối/hủy trả lượt. |
+| D8 | **Giới hạn và công tắc chung một cột**: `khoa_boi_duong.so_buoi_doi_toi_da` (mặc định 0 = tắt). Lượt = số **buổi nguồn khác nhau** có đề nghị `cho_duyet` hoặc `da_duyet` của đăng ký trong khóa (sửa 2026-10-16 theo D11: đề nghị đổi lại không tốn thêm lượt); từ chối/hủy trả lượt. |
 | D9 | **Lối vào kín đáo**: dòng chữ nhỏ "Không tham gia được buổi này?" trong chi tiết buổi + trang `/de-nghi-doi-buoi` không có trong menu (người hỗ trợ gửi link). Không nút nổi bật, không thông báo chủ động. |
 | D10 | **Hiển thị minh bạch** cho cả học viên và người duyệt: mỗi buổi đích kèm sĩ số hiện tại/tối đa và số đề nghị đang chờ vào buổi đó; đề nghị đang chờ kèm thứ tự trong hàng. |
+| D11 | **Đổi lại đề nghị đã duyệt** (bổ sung 2026-10-16): học viên gửi đề nghị `cho_duyet` mới cho buổi nguồn đã có bản `da_duyet` (không thêm cột — suy ra từ cặp đăng ký + buổi nguồn). Điều kiện thêm: buổi đang học (buổi chốt của bản đã duyệt) chưa bắt đầu; buổi đích khác buổi đang học (`400` "Thầy/Cô đang học buổi này rồi"). Tối đa 1 bản chờ + 1 bản đã duyệt / cặp (2 partial unique `uq_doi_buoi_cho`, `uq_doi_buoi_da_duyet` thay `uq_doi_buoi_hoat_dong`). **Duyệt** trong cùng transaction (sau khóa theo buổi chốt mới): hạ bản cũ → `da_huy` (ghi chú hệ thống "Đã thay bằng đề nghị đổi lại", `nguoi_xu_ly` null) **trước**, rồi nâng bản mới; bản mới không nâng được → rollback cả hai. **Từ chối / hủy / sửa** đổi lại chỉ đụng bản chờ — bản đã duyệt giữ nguyên. Hủy duyệt bản cũ khi đang có đổi lại chờ: bản chờ thành đề nghị thường. |
 
 ## Phương án đã loại
 
@@ -35,6 +36,7 @@ Học viên thường bận đúng một buổi chứ không phải cả giai đ
 ## Hệ quả
 
 - 1 migration chỉ thêm (bảng `doi_buoi_hoc`, cột `so_buoi_doi_toi_da` default 0); không đổi dữ liệu cũ; sau deploy mọi khóa đều tắt.
+- D11: migration `20261016170000_doi_buoi_tach_rang_buoc` chỉ đổi index (không đổi dữ liệu). Thống kê đếm bản bị thay vào cột "hủy".
 - Các nơi đọc danh sách học viên theo **buổi** (trang lớp, mẫu/nạp điểm danh, lịch và nhắc lịch cụm, trang học viên) phải đi qua module `doi-buoi-hoc`. Nơi đọc theo **lớp** (sĩ số lớp, báo cáo, email xếp lớp, SSO, Excel chia lớp) không đổi.
 - Nạp điểm danh: học viên đã được duyệt đổi vào buổi không còn bị coi là học bù.
 - Đổi buổi được duyệt sau lần nhắc lịch cuối của cụm → bật cờ "Cần nhắc lại" (như G11).

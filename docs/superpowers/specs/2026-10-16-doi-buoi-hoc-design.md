@@ -33,9 +33,12 @@ CREATE TABLE doi_buoi_hoc (
   -- Hủy duyệt giữ lại lich_chot_id để tra lịch sử, nên chỉ ràng buộc một chiều.
   CHECK (trang_thai <> 'da_duyet' OR lich_chot_id IS NOT NULL)
 );
--- Mỗi buổi nguồn của 1 đăng ký: tối đa 1 đề nghị đang chờ hoặc đã duyệt.
-CREATE UNIQUE INDEX uq_doi_buoi_hoat_dong ON doi_buoi_hoc (dang_ky_hoc_id, lich_nguon_id)
-  WHERE trang_thai IN ('cho_duyet', 'da_duyet');
+-- Mỗi buổi nguồn của 1 đăng ký: tối đa 1 đề nghị đang chờ + 1 đề nghị đã duyệt
+-- (D11 — migration 20261016170000_doi_buoi_tach_rang_buoc thay uq_doi_buoi_hoat_dong cũ).
+CREATE UNIQUE INDEX uq_doi_buoi_cho ON doi_buoi_hoc (dang_ky_hoc_id, lich_nguon_id)
+  WHERE trang_thai = 'cho_duyet';
+CREATE UNIQUE INDEX uq_doi_buoi_da_duyet ON doi_buoi_hoc (dang_ky_hoc_id, lich_nguon_id)
+  WHERE trang_thai = 'da_duyet';
 CREATE INDEX idx_doi_buoi_de_nghi ON doi_buoi_hoc (lich_de_nghi_id, trang_thai, tao_luc);
 CREATE INDEX idx_doi_buoi_chot   ON doi_buoi_hoc (lich_chot_id) WHERE trang_thai = 'da_duyet';
 CREATE INDEX idx_doi_buoi_nguon  ON doi_buoi_hoc (lich_nguon_id) WHERE trang_thai = 'da_duyet';
@@ -81,11 +84,11 @@ Mọi endpoint: `dang_ky_hoc` phải của caller; khóa có `so_buoi_doi_toi_da
 |---|---|
 | `GET /hoc-vien/toi/doi-buoi?khoa_id=` | `{ so_buoi_doi_toi_da, so_luot_da_dung, buoi_sap_toi: [{ lich_nguon, de_nghi? }], de_nghi: [...] }` — `buoi_sap_toi` là buổi chưa bắt đầu của lớp được phân; mỗi đề nghị `cho_duyet` kèm `thu_tu_hang` ("Bạn đang xếp thứ k"). |
 | `GET /hoc-vien/toi/doi-buoi/lua-chon/{lichNguonId}` | Các buổi tương đương chưa bắt đầu: `{ lich, lop: {ten_lop}, si_so, si_so_toi_da, so_cho_duyet, da_du }`. Buổi nguồn đã bắt đầu → 400. |
-| `POST /hoc-vien/toi/doi-buoi` | `{ lich_nguon_id, lich_de_nghi_id, ly_do }`. Kiểm: buổi nguồn thuộc lớp được phân của caller ở đúng giai đoạn; buổi đích tương đương; cả hai chưa bắt đầu; buổi đích **chưa đầy** (`si_so < si_so_toi_da`, không tính hàng chờ); `ly_do` 5–500 ký tự sau trim; còn lượt (`so_luot_da_dung < so_buoi_doi_toi_da`); không có đề nghị hoạt động cho buổi nguồn (409). Ghi nhật ký `de_nghi_doi_buoi`. |
+| `POST /hoc-vien/toi/doi-buoi` | `{ lich_nguon_id, lich_de_nghi_id, ly_do }`. Kiểm: buổi nguồn thuộc lớp được phân của caller ở đúng giai đoạn; buổi đích tương đương; cả hai chưa bắt đầu; buổi đích **chưa đầy** (`si_so < si_so_toi_da`, không tính hàng chờ); `ly_do` 5–500 ký tự sau trim; còn lượt (`so_luot_da_dung < so_buoi_doi_toi_da`, không tính buổi nguồn đang gửi); không có đề nghị **chờ** cho buổi nguồn (409). **Đổi lại (D11)**: buổi nguồn đã có bản `da_duyet` vẫn gửi được nếu buổi đang học (buổi chốt) chưa bắt đầu và buổi đích khác buổi đang học (400 "Thầy/Cô đang học buổi này rồi"); không tốn thêm lượt. Ghi nhật ký `de_nghi_doi_buoi`. |
 | `PUT /hoc-vien/toi/doi-buoi/{id}` | **Sửa** (D6) — chỉ khi `cho_duyet`, body như POST với cùng `lich_nguon_id`. 1 transaction: UPDATE có điều kiện `cho_duyet` → `da_huy` (0 dòng → 409), rồi INSERT mới (`tao_luc = now()`, về cuối hàng). Lượt: đề nghị cũ đã hủy nên không tính hai lần. |
 | `POST /hoc-vien/toi/doi-buoi/{id}/huy` | UPDATE có điều kiện `cho_duyet` → `da_huy`; 0 dòng → 409. |
 
-Học viên **không** hủy được đề nghị đã duyệt (liên hệ người hỗ trợ cụm).
+Học viên **không** hủy được đề nghị đã duyệt (liên hệ người hỗ trợ cụm) — nhưng gửi được **đề nghị đổi lại** (D11). Lượt = số buổi nguồn khác nhau có đề nghị chờ/đã duyệt. Mỗi đề nghị trả thêm `doi_lai_tu` (buổi đang học của bản đã duyệt khi đề nghị là đổi lại đang chờ, ngược lại `null`); `buoi_sap_toi[].de_nghi` = bản đã duyệt nếu có, `de_nghi_doi_lai` = bản chờ đổi lại. `lua-chon` bỏ buổi đang học khỏi danh sách.
 
 ### 3.2 Người duyệt (`@Controller('doi-buoi-hoc')`, vai trò `quan_tri`, `ho_tro_hoc_vien`)
 
@@ -96,7 +99,7 @@ Phạm vi: `ho_tro_hoc_vien` chỉ thấy/xử lý đề nghị có `dang_ky_hoc
 | `GET /doi-buoi-hoc?trang_thai=&khoa_id=&da_xu_ly=` | `da_xu_ly=true` = mọi đề nghị đã xử lý (`da_duyet`/`tu_choi`/`da_huy`), lọc ở server, mới xử lý nhất trước, ưu tiên hơn `trang_thai`. Danh sách: học viên (họ tên, đơn vị, cụm), buổi nguồn, buổi đề nghị, buổi chốt, lý do, `tao_luc`, `qua_han` (buổi nguồn hoặc buổi đề nghị đã bắt đầu, chỉ với `cho_duyet`), `thu_tu_hang` (`k/n` trong hàng chờ của buổi đề nghị), `si_so`/`si_so_toi_da`/`so_cho_duyet` của buổi đề nghị. `cho_duyet` sắp `tao_luc` tăng dần; trạng thái khác sắp `xu_ly_luc` giảm dần. `take: 500`. |
 | `GET /doi-buoi-hoc/dem-cho-duyet` | Trả `{ cho_duyet: n }` — số `cho_duyet` chưa quá hạn trong phạm vi, cho badge menu (bọc object vì số trần không đọc được bằng client JSON). |
 | `GET /doi-buoi-hoc/{id}/lua-chon` | Các buổi tương đương với buổi nguồn, chưa bắt đầu, kèm `si_so`, `si_so_toi_da`, `so_cho_duyet`, `so_truoc` (số `cho_duyet` vào buổi đó có `tao_luc` < đề nghị này), `duyet_duoc` (theo D5). |
-| `POST /doi-buoi-hoc/{id}/duyet` | `{ lich_chot_id?, ghi_chu? }` — mặc định `lich_chot_id = lich_de_nghi_id`. Xem §4. |
+| `POST /doi-buoi-hoc/{id}/duyet` | `{ lich_chot_id?, ghi_chu? }` — mặc định `lich_chot_id = lich_de_nghi_id`. Xem §4. **Đổi lại (D11)**: trong cùng transaction, sau khóa, hạ bản `da_duyet` cùng (đăng ký, buổi nguồn) → `da_huy` (`ghi_chu_xu_ly` = "Đã thay bằng đề nghị đổi lại", `nguoi_xu_ly` null) **trước** rồi mới nâng bản mới (unique `uq_doi_buoi_da_duyet`); bản mới 0 dòng → 409, rollback cả bản cũ. Chốt đúng buổi đang học → 400; buổi đang học đã bắt đầu → 400. Nhật ký thêm `thay_the_id`. `lua-chon` của người duyệt cũng bỏ buổi đang học; danh sách trả `doi_lai_tu` (1 truy vấn gộp). Từ chối đổi lại chỉ đụng bản chờ. |
 | `POST /doi-buoi-hoc/{id}/tu-choi` | `{ ghi_chu }` bắt buộc (5–500). UPDATE có điều kiện `cho_duyet`; 0 dòng → 409. |
 | `POST /doi-buoi-hoc/{id}/huy-duyet` | `{ ghi_chu }` bắt buộc. Chỉ khi `da_duyet` và cả buổi nguồn lẫn buổi chốt chưa bắt đầu (400 nếu đã bắt đầu). UPDATE có điều kiện `da_duyet` → `da_huy`. Lượt được trả lại. |
 
