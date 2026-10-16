@@ -246,6 +246,11 @@ function DongChoDuyet({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
                 Quá hạn
               </Badge>
             )}
+            {d.doi_lai_tu && (
+              <Badge color="violet" variant="light">
+                Đổi lại
+              </Badge>
+            )}
             {d.thu_tu_hang && (
               <Badge variant="light" aria-label="Thứ tự gửi">
                 {d.thu_tu_hang.k}/{d.thu_tu_hang.n}
@@ -253,6 +258,7 @@ function DongChoDuyet({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
             )}
           </Group>
         </Group>
+        {d.doi_lai_tu && <KhoiBuoi nhan="Đang học" b={d.doi_lai_tu} mau="green" />}
         <HaiBuoi
           goc={d.buoi_nguon}
           dich={d.buoi_de_nghi}
@@ -291,8 +297,8 @@ function huyDuyetDuoc(d: DeNghiDuyet): boolean {
 }
 
 function DongDaXuLy({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
-  // Hủy do học viên: ghi chú là chữ hệ thống tự đặt, đã thể hiện ở nhãn — không lặp lại.
-  const hocVienHuy = d.ly_do_huy === 'hoc_vien_sua' || d.ly_do_huy === 'hoc_vien_huy';
+  // Hủy do học viên / bị thay bởi đổi lại: ghi chú là chữ hệ thống tự đặt, đã thể hiện ở nhãn — không lặp lại.
+  const hocVienHuy = d.ly_do_huy === 'hoc_vien_sua' || d.ly_do_huy === 'hoc_vien_huy' || d.ly_do_huy === 'thay_the';
   return (
     <Paper withBorder radius="md" p="md" data-testid="de-nghi-da-xu-ly">
       <Stack gap="xs">
@@ -374,6 +380,11 @@ function ModalDuyet({ deNghi, onDong }: { deNghi: DeNghiDuyet; onDong: () => voi
     <Modal opened onClose={onDong} size="lg" title={`Duyệt đề nghị của ${deNghi.hoc_vien.ho_ten}`}>
       <Stack gap="sm">
         <KhoiBuoi nhan="Buổi gốc" b={deNghi.buoi_nguon} mau="gray" />
+        {deNghi.doi_lai_tu && (
+          <Text fz="xs" c="dimmed">
+            Duyệt sẽ thay buổi đang học
+          </Text>
+        )}
         {isLoading && <Loader size="sm" />}
         {isError && <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>}
         {data && (

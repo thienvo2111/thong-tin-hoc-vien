@@ -63,6 +63,7 @@ function deNghiMau(over: Partial<DeNghiHocVien> = {}): DeNghiHocVien {
     buoi_nguon: tomTat(lich("ln-1", "Lớp 01")),
     buoi_de_nghi: tomTat(lich("ld-1", "Lớp 02", 1, 50)),
     buoi_chot: null,
+    doi_lai_tu: null,
     ...over,
   };
 }
@@ -325,6 +326,88 @@ describe("Trang đề nghị đổi buổi (học viên)", () => {
     renderTrang("?khoa=khoa-1&lich=ln-1");
     expect(await screen.findByText("Đã duyệt")).toBeInTheDocument();
     expect(screen.queryByText("Gửi đề nghị mới")).not.toBeInTheDocument();
+  });
+
+  it("đã duyệt (chưa bắt đầu, chưa có đổi lại chờ) → nút Đổi lại mở form khóa buổi nguồn, kể cả hết lượt", async () => {
+    const daDuyet = deNghiMau({
+      id: "dn-duyet",
+      trang_thai: "da_duyet",
+      lich_chot_id: "ld-9",
+      buoi_chot: tomTat(lich("ld-9", "Lớp 09", 1, 60)),
+    });
+    datApi(
+      tongQuanMau({
+        so_buoi_doi_toi_da: 1,
+        so_luot_da_dung: 1,
+        buoi_sap_toi: [
+          { lich_nguon: lich("ln-1", "Lớp 01"), de_nghi: daDuyet, de_nghi_doi_lai: null },
+        ],
+        de_nghi: [daDuyet],
+      }),
+    );
+    const bodies: unknown[] = [];
+    server.use(
+      http.post("/hoc-vien/toi/doi-buoi", async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({ id: "dn-moi" }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderTrang("?khoa=khoa-1");
+    expect(
+      await screen.findByText("Thầy/Cô đã dùng hết lượt đổi buổi của khóa này."),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Đổi lại" }));
+    expect(await screen.findByText("Đổi lại buổi đã duyệt")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Buổi đã duyệt vẫn giữ cho tới khi đề nghị đổi lại được duyệt. Không tốn thêm lượt.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Buổi không tham gia được" }),
+    ).toBeDisabled();
+    await user.click(await screen.findByRole("radio", { name: /Lớp 02/ }));
+    await user.type(screen.getByLabelText(/Lý do/), "Đổi ý vì lịch mới");
+    await user.click(screen.getByRole("button", { name: "Gửi đề nghị" }));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        {
+          lich_nguon_id: "ln-1",
+          lich_de_nghi_id: "ld-1",
+          ly_do: "Đổi ý vì lịch mới",
+        },
+      ]),
+    );
+  });
+
+  it("không hiện Đổi lại khi buổi đang học đã bắt đầu hoặc đã có đổi lại đang chờ", async () => {
+    const daBatDau = deNghiMau({
+      id: "dn-a",
+      trang_thai: "da_duyet",
+      lich_chot_id: "ld-9",
+      buoi_chot: tomTat(lich("ld-9", "Lớp 09", 1, -1)),
+    });
+    const daDuyet = deNghiMau({
+      id: "dn-b",
+      trang_thai: "da_duyet",
+      lich_nguon_id: "ln-2",
+      lich_chot_id: "ld-8",
+      buoi_nguon: tomTat(lich("ln-2", "Lớp 01", 2)),
+      buoi_chot: tomTat(lich("ld-8", "Lớp 08", 2, 60)),
+    });
+    const choDoiLai = deNghiMau({
+      id: "dn-c",
+      lich_nguon_id: "ln-2",
+      buoi_nguon: tomTat(lich("ln-2", "Lớp 01", 2)),
+      doi_lai_tu: tomTat(lich("ld-8", "Lớp 08", 2, 60)),
+    });
+    datApi(tongQuanMau({ de_nghi: [choDoiLai, daBatDau, daDuyet] }));
+    renderTrang("?khoa=khoa-1");
+    expect(await screen.findByText(/Đổi lại — đang học: Lớp 08 · Buổi 2/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sửa" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hủy đề nghị" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Đổi lại" })).not.toBeInTheDocument();
   });
 
   it("khóa tắt (API 403) → thông báo nhẹ, không lỗi, không trắng trang", async () => {

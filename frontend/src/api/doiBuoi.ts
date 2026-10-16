@@ -17,6 +17,7 @@ export function nhanDaXuLy(d: { trang_thai: TrangThaiDeNghi; ly_do_huy: LyDoHuy 
   if (d.trang_thai !== 'da_huy') return NHAN_TRANG_THAI_DE_NGHI[d.trang_thai];
   if (d.ly_do_huy === 'hoc_vien_sua') return 'Học viên đã sửa (thay bằng đề nghị mới)';
   if (d.ly_do_huy === 'hoc_vien_huy') return 'Học viên tự hủy';
+  if (d.ly_do_huy === 'thay_the') return 'Đã thay bằng đề nghị đổi lại';
   return d.nguoi_xu_ly ? `Hủy duyệt bởi ${d.nguoi_xu_ly}` : 'Hủy duyệt';
 }
 
@@ -46,7 +47,7 @@ export interface BuoiTomTat {
   lop: { ten_lop: string };
 }
 
-export type LyDoHuy = 'hoc_vien_sua' | 'hoc_vien_huy' | 'huy_duyet';
+export type LyDoHuy = 'hoc_vien_sua' | 'hoc_vien_huy' | 'huy_duyet' | 'thay_the';
 
 export interface DeNghiHocVien {
   id: string;
@@ -57,19 +58,27 @@ export interface DeNghiHocVien {
   ly_do: string;
   tao_luc: string;
   ghi_chu_xu_ly: string | null;
-  /** Chỉ khi trang_thai = da_huy: học viên sửa (bản cũ bị thay), học viên tự hủy, hoặc người duyệt hủy duyệt. */
+  /** Chỉ khi trang_thai = da_huy: học viên sửa (bản cũ bị thay), học viên tự hủy, người duyệt hủy duyệt, hoặc bị thay bởi đề nghị đổi lại. */
   ly_do_huy: LyDoHuy | null;
   qua_han: boolean;
   thu_tu_hang: { k: number; n: number } | null;
   buoi_nguon: BuoiTomTat | null;
   buoi_de_nghi: BuoiTomTat | null;
   buoi_chot: BuoiTomTat | null;
+  /** Đề nghị đổi lại (đang chờ): buổi đang học theo bản đã duyệt; còn lại null. */
+  doi_lai_tu: BuoiTomTat | null;
 }
 
 export interface TongQuanDoiBuoi {
   so_buoi_doi_toi_da: number;
+  /** Số buổi nguồn khác nhau có đề nghị chờ/đã duyệt — đổi lại không tốn thêm lượt. */
   so_luot_da_dung: number;
-  buoi_sap_toi: { lich_nguon: LichTomTat; de_nghi: DeNghiHocVien | null }[];
+  /** de_nghi: bản đã duyệt nếu có, ngược lại bản chờ; de_nghi_doi_lai: bản chờ đè lên bản đã duyệt. */
+  buoi_sap_toi: {
+    lich_nguon: LichTomTat;
+    de_nghi: DeNghiHocVien | null;
+    de_nghi_doi_lai?: DeNghiHocVien | null;
+  }[];
   de_nghi: DeNghiHocVien[];
 }
 

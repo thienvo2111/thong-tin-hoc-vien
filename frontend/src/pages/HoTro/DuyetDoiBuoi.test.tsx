@@ -64,6 +64,7 @@ function deNghi(over: Partial<DeNghiDuyet> = {}): DeNghiDuyet {
     buoi_nguon: tomTat(lich("ln-1", "Lớp 01")),
     buoi_de_nghi: tomTat(lich("ld-1", "Lớp 02", 50)),
     buoi_chot: null,
+    doi_lai_tu: null,
     hoc_vien: {
       id: "hv-1",
       ho_ten: "Nguyễn Thị Lan",
@@ -386,6 +387,40 @@ describe("Màn duyệt đổi buổi", () => {
     expect(dong[0]).not.toHaveTextContent("Ghi chú:");
     expect(dong[1]).not.toHaveTextContent("Ghi chú:");
     for (const d of dong) expect(within(d).queryByText("Đã hủy")).toBeNull();
+  });
+
+  it("đề nghị đổi lại: thẻ chờ có badge Đổi lại + khối Đang học; modal ghi Duyệt sẽ thay buổi đang học", async () => {
+    datApi([
+      deNghi({ doi_lai_tu: tomTat(lich("lc-1", "Lớp Cũ", 40)) }),
+      deNghi({ id: "dn-2", hoc_vien: { id: "hv-2", ho_ten: "Trần Văn B", don_vi: "X", cum: null } }),
+    ]);
+    renderTrang("ho_tro_hoc_vien");
+    const the = await screen.findAllByTestId("de-nghi-cho-duyet");
+    expect(within(the[0]).getByText("Đổi lại")).toBeInTheDocument();
+    expect(within(the[0]).getByRole("group", { name: "Đang học" })).toHaveTextContent("Lớp Cũ");
+    expect(within(the[1]).queryByText("Đổi lại")).toBeNull();
+    expect(within(the[1]).queryByRole("group", { name: "Đang học" })).toBeNull();
+    const user = userEvent.setup();
+    await user.click(within(the[0]).getByRole("button", { name: "Duyệt" }));
+    expect(await screen.findByText("Duyệt sẽ thay buổi đang học")).toBeInTheDocument();
+  });
+
+  it("tab Đã xử lý: bản bị thay bởi đổi lại có nhãn riêng, không lặp ghi chú hệ thống", async () => {
+    datApi([
+      deNghi({
+        id: "th",
+        trang_thai: "da_huy",
+        ly_do_huy: "thay_the",
+        ghi_chu_xu_ly: "Đã thay bằng đề nghị đổi lại",
+      }),
+    ]);
+    renderTrang("quan_tri");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "Đã xử lý" }));
+    const [dong] = await screen.findAllByTestId("de-nghi-da-xu-ly");
+    expect(dong).toHaveTextContent("Đã thay bằng đề nghị đổi lại");
+    expect(dong).not.toHaveTextContent("Ghi chú:");
+    expect(dong).not.toHaveTextContent("Hủy duyệt");
   });
 
   it("tab Đã xử lý gọi server với da_xu_ly=true và báo khi chạm giới hạn 500", async () => {

@@ -126,26 +126,55 @@ function laHoatDong(d: DeNghiHocVien): boolean {
   return d.trang_thai === 'cho_duyet' || d.trang_thai === 'da_duyet';
 }
 
+function chuaBatDau(b: BuoiTomTat | null): boolean {
+  return !!b && Date.parse(b.thoi_gian_bat_dau) > Date.now();
+}
+
 function NoiDung({ tongQuan, lichBanDau }: { tongQuan: TongQuanDoiBuoi; lichBanDau: string | null }) {
   const [dangSua, setDangSua] = useState<DeNghiHocVien | null>(null);
+  // Bản đã duyệt đang được "Đổi lại" (D11) — form gửi khóa sẵn buổi nguồn của nó.
+  const [doiLai, setDoiLai] = useState<DeNghiHocVien | null>(null);
   const [boQuaLink, setBoQuaLink] = useState(false);
   const conLai = Math.max(0, tongQuan.so_buoi_doi_toi_da - tongQuan.so_luot_da_dung);
   const choDuyet = tongQuan.de_nghi.filter((d) => d.trang_thai === 'cho_duyet');
   const daXuLy = tongQuan.de_nghi.filter((d) => d.trang_thai !== 'cho_duyet');
-  // Link ?lich= trỏ tới buổi đã có đề nghị hoạt động → hiện đề nghị đó thay vì form gửi.
-  const deNghiCuaLink =
-    !boQuaLink && lichBanDau ? tongQuan.de_nghi.find((d) => laHoatDong(d) && d.lich_nguon_id === lichBanDau) : undefined;
+  const nguonCoCho = new Set(choDuyet.map((d) => d.lich_nguon_id));
+  const duocDoiLai = (d: DeNghiHocVien) =>
+    d.trang_thai === 'da_duyet' &&
+    !nguonCoCho.has(d.lich_nguon_id) &&
+    chuaBatDau(d.buoi_nguon) &&
+    chuaBatDau(d.buoi_chot);
+  const moSua = (d: DeNghiHocVien) => {
+    setDoiLai(null);
+    setDangSua(d);
+  };
+  const moDoiLai = (d: DeNghiHocVien) => {
+    setDangSua(null);
+    setDoiLai(d);
+  };
+  const dongForm = () => {
+    setDangSua(null);
+    setDoiLai(null);
+  };
+  // Link ?lich= trỏ tới buổi đã có đề nghị hoạt động → hiện đề nghị đó thay vì form gửi
+  // (ưu tiên bản chờ — có thể là đổi lại của bản đã duyệt).
+  const cungLink =
+    !boQuaLink && lichBanDau ? tongQuan.de_nghi.filter((d) => laHoatDong(d) && d.lich_nguon_id === lichBanDau) : [];
+  const deNghiCuaLink = cungLink.find((d) => d.trang_thai === 'cho_duyet') ?? cungLink[0];
 
-  if (deNghiCuaLink && !dangSua)
+  if (deNghiCuaLink && !dangSua && !doiLai)
     return (
       <Stack gap="lg">
         <StatusBanner loai="info">
           Buổi này Thầy/Cô đã có đề nghị đổi buổi ({NHAN_TRANG_THAI[deNghiCuaLink.trang_thai].toLowerCase()}).
         </StatusBanner>
         {deNghiCuaLink.trang_thai === 'cho_duyet' ? (
-          <DongDeNghi deNghi={deNghiCuaLink} onSua={() => setDangSua(deNghiCuaLink)} />
+          <DongDeNghi deNghi={deNghiCuaLink} onSua={() => moSua(deNghiCuaLink)} />
         ) : (
-          <DongDaXuLy d={deNghiCuaLink} />
+          <DongDaXuLy
+            d={deNghiCuaLink}
+            onDoiLai={duocDoiLai(deNghiCuaLink) ? () => moDoiLai(deNghiCuaLink) : undefined}
+          />
         )}
         <Group>
           <Button variant="default" onClick={() => setBoQuaLink(true)}>
@@ -162,16 +191,17 @@ function NoiDung({ tongQuan, lichBanDau }: { tongQuan: TongQuanDoiBuoi; lichBanD
       </Text>
 
       {choDuyet.map((d) => (
-        <DongDeNghi key={d.id} deNghi={d} onSua={() => setDangSua(d)} />
+        <DongDeNghi key={d.id} deNghi={d} onSua={() => moSua(d)} />
       ))}
 
-      {dangSua || conLai > 0 ? (
+      {dangSua || doiLai || conLai > 0 ? (
         <FormDoiBuoi
-          key={dangSua?.id ?? 'moi'}
+          key={dangSua?.id ?? (doiLai ? 'doi-lai-' + doiLai.id : 'moi')}
           tongQuan={tongQuan}
           dangSua={dangSua}
+          nguonKhoa={doiLai?.lich_nguon_id ?? null}
           lichBanDau={lichBanDau}
-          onXong={() => setDangSua(null)}
+          onXong={dongForm}
         />
       ) : (
         <StatusBanner loai="info">Thầy/Cô đã dùng hết lượt đổi buổi của khóa này.</StatusBanner>
@@ -183,7 +213,7 @@ function NoiDung({ tongQuan, lichBanDau }: { tongQuan: TongQuanDoiBuoi; lichBanD
             Đề nghị đã xử lý
           </Text>
           {daXuLy.map((d) => (
-            <DongDaXuLy key={d.id} d={d} />
+            <DongDaXuLy key={d.id} d={d} onDoiLai={duocDoiLai(d) ? () => moDoiLai(d) : undefined} />
           ))}
         </Stack>
       )}
@@ -191,7 +221,7 @@ function NoiDung({ tongQuan, lichBanDau }: { tongQuan: TongQuanDoiBuoi; lichBanD
   );
 }
 
-function DongDaXuLy({ d }: { d: DeNghiHocVien }) {
+function DongDaXuLy({ d, onDoiLai }: { d: DeNghiHocVien; onDoiLai?: () => void }) {
   return (
     <Paper withBorder radius="md" p="sm">
       <Group gap="xs">
@@ -200,6 +230,11 @@ function DongDaXuLy({ d }: { d: DeNghiHocVien }) {
           {nhanBuoi(d.buoi_nguon)}
           {d.buoi_chot ? ` → ${nhanBuoi(d.buoi_chot)}` : ''}
         </Text>
+        {onDoiLai && (
+          <Button size="xs" variant="default" onClick={onDoiLai}>
+            Đổi lại
+          </Button>
+        )}
       </Group>
       {d.ghi_chu_xu_ly && (
         <Text size="sm" c="dimmed" mt={4}>
@@ -227,6 +262,11 @@ function DongDeNghi({ deNghi, onSua }: { deNghi: DeNghiHocVien; onSua: () => voi
           )}
         </Group>
         <Text size="sm">Buổi cần đổi: {nhanBuoi(deNghi.buoi_nguon)}</Text>
+        {deNghi.doi_lai_tu && (
+          <Text size="sm" fw={600}>
+            Đổi lại — đang học: {nhanBuoi(deNghi.doi_lai_tu)}
+          </Text>
+        )}
         <Text size="sm" c="dimmed">
           Lý do: {deNghi.ly_do}
         </Text>
@@ -282,15 +322,18 @@ function DongDeNghi({ deNghi, onSua }: { deNghi: DeNghiHocVien; onSua: () => voi
 function FormDoiBuoi({
   tongQuan,
   dangSua,
+  nguonKhoa,
   lichBanDau,
   onXong,
 }: {
   tongQuan: TongQuanDoiBuoi;
   dangSua: DeNghiHocVien | null;
+  /** Đổi lại: buổi nguồn của bản đã duyệt, không cho chọn buổi khác. */
+  nguonKhoa: string | null;
   lichBanDau: string | null;
   onXong: () => void;
 }) {
-  const [nguonId, setNguonId] = useState<string | null>(dangSua?.lich_nguon_id ?? lichBanDau);
+  const [nguonId, setNguonId] = useState<string | null>(dangSua?.lich_nguon_id ?? nguonKhoa ?? lichBanDau);
   const [dichId, setDichId] = useState<string | null>(dangSua?.lich_de_nghi_id ?? null);
   const [lyDo, setLyDo] = useState(dangSua?.ly_do ?? '');
   const gui = useGuiDoiBuoi();
@@ -298,12 +341,8 @@ function FormDoiBuoi({
   const dangGui = gui.isPending || sua.isPending;
   const loi = gui.error ?? sua.error;
 
-  // Buổi đã có đề nghị hoạt động chỉ đổi qua "Sửa"; giữ lại buổi đang sửa.
-  const hoatDong = new Set(
-    tongQuan.de_nghi
-      .filter((d) => d.trang_thai === 'cho_duyet' || d.trang_thai === 'da_duyet')
-      .map((d) => d.lich_nguon_id),
-  );
+  // Buổi đã có đề nghị đang chờ chỉ đổi qua "Sửa"; buổi đã duyệt vẫn chọn được (= đổi lại).
+  const coCho = new Set(tongQuan.de_nghi.filter((d) => d.trang_thai === 'cho_duyet').map((d) => d.lich_nguon_id));
   const buoiNguon = tongQuan.buoi_sap_toi.map((b) => b.lich_nguon);
   const nguonHopLe = buoiNguon.some((b) => b.id === nguonId) ? nguonId : null;
   const lyDoCat = lyDo.normalize('NFC').trim();
@@ -311,6 +350,8 @@ function FormDoiBuoi({
 
   const { data: luaChon, isLoading, isError, error } = useLuaChonDoiBuoi(nguonHopLe ?? undefined);
   const dichHopLe = luaChon?.some((c) => c.lich.id === dichId && !c.da_du);
+  const laDoiLai =
+    !dangSua && tongQuan.de_nghi.some((d) => d.trang_thai === 'da_duyet' && d.lich_nguon_id === nguonHopLe);
 
   function guiDeNghi() {
     if (!nguonHopLe || !dichId) return;
@@ -337,18 +378,23 @@ function FormDoiBuoi({
   return (
     <Paper withBorder radius="md" p="md">
       <Stack gap="md">
-        <Text fw={700}>{dangSua ? 'Sửa đề nghị' : 'Gửi đề nghị mới'}</Text>
+        <Text fw={700}>{dangSua ? 'Sửa đề nghị' : nguonKhoa ? 'Đổi lại buổi đã duyệt' : 'Gửi đề nghị mới'}</Text>
         {dangSua && <StatusBanner loai="warning">Sửa sẽ đưa bạn về cuối hàng chờ</StatusBanner>}
+        {laDoiLai && (
+          <StatusBanner loai="info">
+            Buổi đã duyệt vẫn giữ cho tới khi đề nghị đổi lại được duyệt. Không tốn thêm lượt.
+          </StatusBanner>
+        )}
 
         <Select
           label="Buổi không tham gia được"
           placeholder="Chọn buổi"
           allowDeselect={false}
-          disabled={!!dangSua}
+          disabled={!!dangSua || !!nguonKhoa}
           data={buoiNguon.map((b) => ({
             value: b.id,
             label: nhanBuoi(b),
-            disabled: !dangSua && hoatDong.has(b.id),
+            disabled: !dangSua && coCho.has(b.id),
           }))}
           value={nguonHopLe}
           onChange={(v) => {
@@ -378,7 +424,7 @@ function FormDoiBuoi({
           <Button loading={dangGui} disabled={!nguonHopLe || !dichHopLe || !lyDoHopLe} onClick={guiDeNghi}>
             {dangSua ? 'Lưu đề nghị' : 'Gửi đề nghị'}
           </Button>
-          {dangSua && (
+          {(dangSua || nguonKhoa) && (
             <Button variant="default" onClick={onXong}>
               Bỏ qua
             </Button>
