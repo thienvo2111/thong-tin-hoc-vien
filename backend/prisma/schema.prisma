@@ -1512,8 +1512,9 @@ model de_nghi_doi_lop {
 }
 
 // ADR 0007 (2026-10-16): học viên đề nghị đổi 1 buổi học sang buổi tương đương
-// của lớp khác. Partial unique uq_doi_buoi_hoat_dong, 2 CHECK và 2 index một
-// phần (idx_doi_buoi_chot/nguon) chỉ có trong SQL migration.
+// của lớp khác. Partial unique uq_doi_buoi_cho + uq_doi_buoi_da_duyet (D11, đổi
+// lại), 2 CHECK và 2 index một phần (idx_doi_buoi_chot/nguon) chỉ có trong SQL
+// migration.
 model doi_buoi_hoc {
   id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   dang_ky_hoc_id  String             @db.Uuid

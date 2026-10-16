@@ -3,7 +3,10 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { ValidationException } from '../common/exceptions/app.exceptions';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
-import { ThongKeDoiBuoiService } from './thong-ke-doi-buoi.service';
+import {
+  nhanTrangThai,
+  ThongKeDoiBuoiService,
+} from './thong-ke-doi-buoi.service';
 import { LocThongKeDoiBuoiDto } from './dto/doi-buoi-hoc.dto';
 import { buildThongKeDoiBuoiWorkbook } from './thong-ke-doi-buoi.excel';
 
@@ -716,5 +719,18 @@ describe('buildThongKeDoiBuoiWorkbook', () => {
     ]);
     expect(s2.rowCount).toBe(4 + 3);
     expect(s2.getCell(5, 8).value).toBe('20/11/2026 08:00');
+  });
+});
+
+describe('nhanTrangThai', () => {
+  it('bản bị thay bởi đề nghị đổi lại (D11) → nhãn riêng, không phải "Hủy duyệt"', () => {
+    expect(
+      nhanTrangThai({
+        trang_thai: 'da_huy',
+        ly_do_huy: 'thay_the',
+        qua_han: false,
+        nguoi_xu_ly: null,
+      }),
+    ).toBe('Đã thay bằng đề nghị đổi lại');
   });
 });

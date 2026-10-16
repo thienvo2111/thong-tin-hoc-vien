@@ -17,6 +17,7 @@ import {
   BuoiTomTat,
   GHI_CHU_HOC_VIEN_HUY,
   GHI_CHU_HOC_VIEN_SUA,
+  GHI_CHU_THAY_THE,
   LyDoHuy,
   lyDoHuy,
   tomTatBuoi,
@@ -207,6 +208,7 @@ export function nhanTrangThai(d: {
   if (d.trang_thai === 'tu_choi') return 'Từ chối';
   if (d.ly_do_huy === 'hoc_vien_sua') return GHI_CHU_HOC_VIEN_SUA;
   if (d.ly_do_huy === 'hoc_vien_huy') return GHI_CHU_HOC_VIEN_HUY;
+  if (d.ly_do_huy === 'thay_the') return GHI_CHU_THAY_THE;
   return d.nguoi_xu_ly ? `Hủy duyệt bởi ${d.nguoi_xu_ly}` : 'Hủy duyệt';
 }
 

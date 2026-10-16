@@ -131,12 +131,26 @@ describe('soLuotDaDung', () => {
   it('chỉ đếm chờ duyệt + đã duyệt', () => {
     expect(
       soLuotDaDung([
-        { trang_thai: 'cho_duyet' },
-        { trang_thai: 'da_duyet' },
-        { trang_thai: 'tu_choi' },
-        { trang_thai: 'da_huy' },
+        { trang_thai: 'cho_duyet', lich_nguon_id: 'n1' },
+        { trang_thai: 'da_duyet', lich_nguon_id: 'n2' },
+        { trang_thai: 'tu_choi', lich_nguon_id: 'n3' },
+        { trang_thai: 'da_huy', lich_nguon_id: 'n4' },
       ]),
     ).toBe(2);
+  });
+
+  it('đổi lại (đã duyệt + chờ cùng buổi nguồn) = 1 lượt', () => {
+    expect(
+      soLuotDaDung([
+        { trang_thai: 'da_duyet', lich_nguon_id: 'n1' },
+        { trang_thai: 'cho_duyet', lich_nguon_id: 'n1' },
+        { trang_thai: 'da_huy', lich_nguon_id: 'n1' },
+      ]),
+    ).toBe(1);
+  });
+
+  it('rỗng → 0', () => {
+    expect(soLuotDaDung([])).toBe(0);
   });
 });
 
@@ -232,6 +246,47 @@ describe('kiemTraGui', () => {
 
   it('hợp lệ', () => {
     expect(kiemTraGui(base, NOW)).toEqual({ ok: true });
+  });
+
+  describe('đổi lại (đã có bản đã duyệt)', () => {
+    const chotCu = lich({ id: 'bc', lop_id: 'l3' });
+
+    it('buổi đích trùng buổi chốt hiện tại → TRUNG_BUOI_CHOT (400)', () => {
+      expect(
+        kiemTraGui(
+          { ...base, buoi_dich: chotCu, buoi_chot_hien_tai: chotCu },
+          NOW,
+        ),
+      ).toEqual({
+        ok: false,
+        ma: 'TRUNG_BUOI_CHOT',
+        thong_diep: 'Thầy/Cô đang học buổi này rồi',
+      });
+      expect(HTTP_THEO_MA.TRUNG_BUOI_CHOT).toBe(400);
+    });
+
+    it('buổi chốt hiện tại đã bắt đầu → DA_BAT_DAU', () => {
+      const daQua = lich({
+        id: 'bc',
+        lop_id: 'l3',
+        thoi_gian_bat_dau: new Date(NOW.getTime() - 1),
+      });
+      expect(
+        kiemTraGui({ ...base, buoi_chot_hien_tai: daQua }, NOW),
+      ).toMatchObject({ ok: false, ma: 'DA_BAT_DAU' });
+    });
+
+    it('buổi đích khác buổi chốt, chưa bắt đầu → hợp lệ', () => {
+      expect(kiemTraGui({ ...base, buoi_chot_hien_tai: chotCu }, NOW)).toEqual({
+        ok: true,
+      });
+    });
+
+    it('null → như đề nghị thường', () => {
+      expect(kiemTraGui({ ...base, buoi_chot_hien_tai: null }, NOW)).toEqual({
+        ok: true,
+      });
+    });
   });
 });
 

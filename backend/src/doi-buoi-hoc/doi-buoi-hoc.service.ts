@@ -49,6 +49,8 @@ export interface DeNghiHocVien {
   buoi_nguon: BuoiTomTat | null;
   buoi_de_nghi: BuoiTomTat | null;
   buoi_chot: BuoiTomTat | null;
+  /** D11: đề nghị đổi lại (chờ) → buổi chốt của bản đã duyệt cùng buổi nguồn. */
+  doi_lai_tu: BuoiTomTat | null;
 }
 
 export interface BuoiTomTat {
@@ -100,6 +102,7 @@ export interface DeNghiDuyet extends DeNghiHocVien {
 interface DeNghiRow {
   id: string;
   trang_thai: trang_thai_de_nghi;
+  dang_ky_hoc_id: string;
   lich_nguon_id: string;
   lich_de_nghi_id: string;
   lich_chot_id: string | null;
@@ -165,21 +168,36 @@ export class DoiBuoiHocService {
       ),
     );
     const hang = await this.hangChoTheoDeNghi(deNghiRows, now);
-    const deNghi = deNghiRows.map((d) =>
-      this.anhXaDeNghi(d, lichMap, now, hang),
+    // Mọi đề nghị của đăng ký đã có sẵn → bản đã duyệt lấy luôn, không truy vấn thêm.
+    const chotCu = chotDaDuyetTheoCap(
+      deNghiRows.filter((d) => d.trang_thai === 'da_duyet'),
     );
-    const hoatDong = new Map(
+    const deNghi = deNghiRows.map((d) =>
+      this.anhXaDeNghi(d, lichMap, now, hang, chotCu),
+    );
+    const daDuyet = new Map(
       deNghi
-        .filter((d) => TRANG_THAI_HOAT_DONG.includes(d.trang_thai))
+        .filter((d) => d.trang_thai === 'da_duyet')
+        .map((d) => [d.lich_nguon_id, d]),
+    );
+    const choDuyet = new Map(
+      deNghi
+        .filter((d) => d.trang_thai === 'cho_duyet')
         .map((d) => [d.lich_nguon_id, d]),
     );
     return {
       so_buoi_doi_toi_da: soBuoiToiDa,
       so_luot_da_dung: soLuotDaDung(deNghiRows),
-      buoi_sap_toi: lichSapToi.map((l) => ({
-        lich_nguon: l,
-        de_nghi: hoatDong.get(l.id) ?? null,
-      })),
+      buoi_sap_toi: lichSapToi.map((l) => {
+        const duyet = daDuyet.get(l.id) ?? null;
+        const cho = choDuyet.get(l.id) ?? null;
+        return {
+          lich_nguon: l,
+          // Bản đã duyệt (nếu có) ưu tiên; chờ đi kèm bản đã duyệt = đổi lại.
+          de_nghi: duyet ?? cho,
+          de_nghi_doi_lai: duyet ? cho : null,
+        };
+      }),
       de_nghi: deNghi,
     };
   }
@@ -211,7 +229,9 @@ export class DoiBuoiHocService {
         thong_diep: 'Buổi đã bắt đầu, không thể đổi',
       });
 
-    return this.luaChonTuongDuong(nguon, now);
+    const ds = await this.luaChonTuongDuong(nguon, now);
+    const chot = await this.chotDaDuyet(dangKy.id, nguon.id);
+    return chot ? ds.filter((x) => x.lich.id !== chot) : ds;
   }
 
   async gui(user: AuthenticatedUser, dto: GuiDoiBuoiDto) {
@@ -356,14 +376,16 @@ export class DoiBuoiHocService {
       },
     });
     if (rows.length === 0) return [];
+    const chotCu = await this.chotCuChoDoiLai(rows);
     const [lichMap, hang, siSo] = await Promise.all([
-      this.query.lichTomTat(
-        rows.flatMap((r) =>
+      this.query.lichTomTat([
+        ...rows.flatMap((r) =>
           [r.lich_nguon_id, r.lich_de_nghi_id, r.lich_chot_id].filter(
             (x): x is string => x !== null,
           ),
         ),
-      ),
+        ...chotCu.values(),
+      ]),
       this.hangChoTheoDeNghi(rows, now),
       this.query.siSoBuoi(
         [...new Set(rows.map((r) => r.lich_de_nghi_id))],
@@ -373,7 +395,7 @@ export class DoiBuoiHocService {
     return rows.map(({ dang_ky_hoc, xu_ly_boi, ...r }) => {
       const s = siSo.get(r.lich_de_nghi_id);
       return {
-        ...this.anhXaDeNghi(r, lichMap, now, hang),
+        ...this.anhXaDeNghi(r, lichMap, now, hang, chotCu),
         hoc_vien: {
           id: dang_ky_hoc.hoc_vien.id,
           ho_ten: dang_ky_hoc.hoc_vien.ho_ten,
@@ -412,7 +434,13 @@ export class DoiBuoiHocService {
     );
     if (!nguon) throw new NotFoundAppException('Không tìm thấy buổi học');
     const now = new Date();
-    const ds = await this.luaChonTuongDuong(nguon, now);
+    const tatCa = await this.luaChonTuongDuong(nguon, now);
+    // Đổi lại: không đề xuất chốt vào buổi học viên đang học (bản đã duyệt).
+    const chotCu =
+      dn.trang_thai === 'cho_duyet' && tatCa.length > 0
+        ? await this.chotDaDuyet(dn.dang_ky_hoc_id, dn.lich_nguon_id)
+        : null;
+    const ds = chotCu ? tatCa.filter((x) => x.lich.id !== chotCu) : tatCa;
     if (ds.length === 0) return [];
     const truoc = await this.prisma.doi_buoi_hoc.groupBy({
       by: ['lich_de_nghi_id'],
@@ -457,8 +485,22 @@ export class DoiBuoiHocService {
         select: { trang_thai: true, tao_luc: true },
       });
       if (!hienTai) throw new NotFoundAppException('Không tìm thấy đề nghị');
+      // D11: bản đã duyệt cùng (đăng ký, buổi nguồn) → đề nghị này là đổi lại.
+      const banCu = await tx.doi_buoi_hoc.findFirst({
+        where: {
+          dang_ky_hoc_id: dn.dang_ky_hoc_id,
+          lich_nguon_id: dn.lich_nguon_id,
+          trang_thai: 'da_duyet',
+          id: { not: id },
+        },
+        select: { id: true, lich_chot_id: true },
+      });
       const lichMap = await this.query.lichTomTat(
-        [dn.lich_nguon_id, lichChotId],
+        [
+          dn.lich_nguon_id,
+          lichChotId,
+          ...(banCu?.lich_chot_id ? [banCu.lich_chot_id] : []),
+        ],
         tx,
       );
       const nguon = lichMap.get(dn.lich_nguon_id);
@@ -498,6 +540,39 @@ export class DoiBuoiHocService {
           ma: quyetDinh.ma!,
           thong_diep: quyetDinh.thong_diep!,
         });
+      if (banCu) {
+        const chotCu = banCu.lich_chot_id
+          ? lichMap.get(banCu.lich_chot_id)
+          : undefined;
+        if (chotCu && daBatDau(chotCu, now))
+          this.nem({
+            ok: false,
+            ma: 'DA_BAT_DAU',
+            thong_diep: 'Buổi đã bắt đầu, không thể đổi',
+          });
+        if (banCu.lich_chot_id === lichChotId)
+          this.nem({
+            ok: false,
+            ma: 'TRUNG_BUOI_CHOT',
+            thong_diep: 'Học viên đang học buổi này rồi',
+          });
+        // Hạ bản cũ TRƯỚC khi nâng bản mới (unique uq_doi_buoi_da_duyet).
+        // Bản mới không nâng được → throw bên dưới → rollback cả bước này.
+        await tx.doi_buoi_hoc.updateMany({
+          where: {
+            dang_ky_hoc_id: dn.dang_ky_hoc_id,
+            lich_nguon_id: dn.lich_nguon_id,
+            trang_thai: 'da_duyet',
+            id: { not: id },
+          },
+          data: {
+            trang_thai: 'da_huy',
+            xu_ly_luc: now,
+            ghi_chu_xu_ly: GHI_CHU_THAY_THE,
+            nguoi_xu_ly: null,
+          },
+        });
+      }
       const { count } = await tx.doi_buoi_hoc.updateMany({
         where: { id, trang_thai: 'cho_duyet' },
         data: {
@@ -517,6 +592,7 @@ export class DoiBuoiHocService {
         vuot_thu_tu:
           !vuotSiSo &&
           !conChoChoDeNghi({ si_so, si_so_toi_da: toiDa, so_truoc: soTruoc }),
+        thay_the_id: banCu?.id ?? null,
       };
     });
     await this.ghiNhatKyDuyet(dn.dang_ky_hoc.hoc_vien_id, 'Duyệt đổi buổi', {
@@ -526,6 +602,7 @@ export class DoiBuoiHocService {
       lich_chot_id: lichChotId,
       vuot_si_so: kq.vuot_si_so,
       vuot_thu_tu: kq.vuot_thu_tu,
+      ...(kq.thay_the_id ? { thay_the_id: kq.thay_the_id } : {}),
     });
     return { trang_thai: 'da_duyet', canh_bao: kq.canh_bao };
   }
@@ -635,6 +712,41 @@ export class DoiBuoiHocService {
       },
     );
     return { trang_thai: 'da_huy', canh_bao: kq.canh_bao };
+  }
+
+  // Buổi chốt của bản đã duyệt cùng (đăng ký, buổi nguồn); null nếu không có.
+  private async chotDaDuyet(
+    dangKyId: string,
+    lichNguonId: string,
+  ): Promise<string | null> {
+    const ban = await this.prisma.doi_buoi_hoc.findFirst({
+      where: {
+        dang_ky_hoc_id: dangKyId,
+        lich_nguon_id: lichNguonId,
+        trang_thai: 'da_duyet',
+      },
+      select: { lich_chot_id: true },
+    });
+    return ban?.lich_chot_id ?? null;
+  }
+
+  // Một truy vấn gộp cho mọi đề nghị chờ của danh sách (không N+1).
+  private async chotCuChoDoiLai(
+    rows: DeNghiRow[],
+  ): Promise<Map<string, string>> {
+    const cho = rows.filter((r) => r.trang_thai === 'cho_duyet');
+    if (cho.length === 0) return new Map();
+    const daDuyet = await this.prisma.doi_buoi_hoc.findMany({
+      where: {
+        trang_thai: 'da_duyet',
+        OR: cho.map((r) => ({
+          dang_ky_hoc_id: r.dang_ky_hoc_id,
+          lich_nguon_id: r.lich_nguon_id,
+        })),
+      },
+      select: { dang_ky_hoc_id: true, lich_nguon_id: true, lich_chot_id: true },
+    });
+    return chotDaDuyetTheoCap(daDuyet);
   }
 
   // null = mọi cụm (quan_tri); [] = không có cụm nào → không thấy gì.
@@ -812,12 +924,24 @@ export class DoiBuoiHocService {
           });
           if (!count) throw new ConflictAppException('Đề nghị đã được xử lý');
         }
-        const soLuot = await tx.doi_buoi_hoc.count({
+        const hoatDong = await tx.doi_buoi_hoc.findMany({
           where: {
             dang_ky_hoc_id: x.dangKyId,
             trang_thai: { in: TRANG_THAI_HOAT_DONG },
           },
+          select: { lich_nguon_id: true, trang_thai: true, lich_chot_id: true },
         });
+        // Buổi nguồn đang gửi không tính vào lượt đã dùng: đổi lại (D11) không
+        // tốn thêm lượt; đề nghị chờ thứ 2 cùng buổi nguồn bị unique chặn (409).
+        const soLuot = soLuotDaDung(
+          hoatDong.filter((d) => d.lich_nguon_id !== x.nguon.id),
+        );
+        const chotCuId = hoatDong.find(
+          (d) => d.lich_nguon_id === x.nguon.id && d.trang_thai === 'da_duyet',
+        )?.lich_chot_id;
+        const chotCu = chotCuId
+          ? ((await this.query.lichTomTat([chotCuId], tx)).get(chotCuId) ?? null)
+          : null;
         const phanLop = await tx.phan_lop_giai_doan.findFirst({
           where: {
             dang_ky_hoc_id: x.dangKyId,
@@ -836,6 +960,7 @@ export class DoiBuoiHocService {
               lop_phan_hien_tai: phanLop?.lop_id ?? null,
               si_so_dich: siSo.get(x.dich.id)?.si_so ?? 0,
               ly_do: x.dto.ly_do,
+              buoi_chot_hien_tai: chotCu,
             },
             now,
           ),
@@ -856,9 +981,7 @@ export class DoiBuoiHocService {
         e instanceof Prisma.PrismaClientKnownRequestError &&
         e.code === 'P2002'
       )
-        throw new ConflictAppException(
-          'Buổi này đã có đề nghị đang chờ hoặc đã duyệt',
-        );
+        throw new ConflictAppException('Buổi này đã có đề nghị đang chờ duyệt');
       throw e;
     }
   }
@@ -949,6 +1072,7 @@ export class DoiBuoiHocService {
     lichMap: Map<string, LichTomTat>,
     now: Date,
     hang: Map<string, { k: number; n: number }>,
+    chotCu: Map<string, string>,
   ): DeNghiHocVien {
     const nguon = lichMap.get(r.lich_nguon_id);
     const dich = lichMap.get(r.lich_de_nghi_id);
@@ -973,6 +1097,7 @@ export class DoiBuoiHocService {
       buoi_chot: r.lich_chot_id
         ? tomTatBuoi(lichMap.get(r.lich_chot_id))
         : null,
+      doi_lai_tu: doiLaiTu(r, chotCu, lichMap),
     };
   }
 
@@ -993,6 +1118,7 @@ export class DoiBuoiHocService {
 const DE_NGHI_SELECT = {
   id: true,
   trang_thai: true,
+  dang_ky_hoc_id: true,
   lich_nguon_id: true,
   lich_de_nghi_id: true,
   lich_chot_id: true,
@@ -1007,8 +1133,10 @@ const DE_NGHI_SELECT = {
 // ghi chú này) được coi là tự hủy.
 export const GHI_CHU_HOC_VIEN_SUA = 'Học viên đã sửa (thay bằng đề nghị mới)';
 export const GHI_CHU_HOC_VIEN_HUY = 'Học viên tự hủy';
+// D11: bản đã duyệt bị thay khi duyệt đề nghị đổi lại (server ghi, nguoi_xu_ly null).
+export const GHI_CHU_THAY_THE = 'Đã thay bằng đề nghị đổi lại';
 
-export type LyDoHuy = 'hoc_vien_sua' | 'hoc_vien_huy' | 'huy_duyet';
+export type LyDoHuy = 'hoc_vien_sua' | 'hoc_vien_huy' | 'huy_duyet' | 'thay_the';
 
 export function lyDoHuy(r: {
   trang_thai: trang_thai_de_nghi;
@@ -1016,6 +1144,35 @@ export function lyDoHuy(r: {
   ghi_chu_xu_ly: string | null;
 }): LyDoHuy | null {
   if (r.trang_thai !== 'da_huy') return null;
+  if (r.ghi_chu_xu_ly === GHI_CHU_THAY_THE) return 'thay_the';
   if (r.nguoi_xu_ly) return 'huy_duyet';
   return r.ghi_chu_xu_ly === GHI_CHU_HOC_VIEN_SUA ? 'hoc_vien_sua' : 'hoc_vien_huy';
+}
+
+const capKey = (dangKyId: string, lichNguonId: string) =>
+  `${dangKyId}|${lichNguonId}`;
+
+// (đăng ký|buổi nguồn) → buổi chốt của bản đã duyệt.
+function chotDaDuyetTheoCap(
+  rows: {
+    dang_ky_hoc_id: string;
+    lich_nguon_id: string;
+    lich_chot_id: string | null;
+  }[],
+): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const r of rows)
+    if (r.lich_chot_id)
+      m.set(capKey(r.dang_ky_hoc_id, r.lich_nguon_id), r.lich_chot_id);
+  return m;
+}
+
+function doiLaiTu(
+  r: { trang_thai: trang_thai_de_nghi; dang_ky_hoc_id: string; lich_nguon_id: string },
+  chotCu: Map<string, string>,
+  lichMap: Map<string, LichTomTat>,
+): BuoiTomTat | null {
+  if (r.trang_thai !== 'cho_duyet') return null;
+  const id = chotCu.get(capKey(r.dang_ky_hoc_id, r.lich_nguon_id));
+  return id ? tomTatBuoi(lichMap.get(id)) : null;
 }

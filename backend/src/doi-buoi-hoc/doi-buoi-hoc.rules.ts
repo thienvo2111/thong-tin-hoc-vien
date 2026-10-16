@@ -33,7 +33,8 @@ export type MaLoiDoiBuoi =
   | 'LY_DO'
   | 'DA_XU_LY'
   | 'PHAN_LOP_DOI'
-  | 'GIU_CHO';
+  | 'GIU_CHO'
+  | 'TRUNG_BUOI_CHOT';
 
 export type KetQuaKiemTra =
   { ok: true } | { ok: false; ma: MaLoiDoiBuoi; thong_diep: string };
@@ -49,6 +50,7 @@ export const HTTP_THEO_MA: Record<MaLoiDoiBuoi, 400 | 403 | 409> = {
   PHAN_LOP_DOI: 409,
   BUOI_DAY: 409,
   GIU_CHO: 409,
+  TRUNG_BUOI_CHOT: 400,
 };
 
 const LY_DO_TOI_THIEU = 5;
@@ -91,10 +93,16 @@ export function conChoChoDeNghi(x: {
   return x.si_so + x.so_truoc < x.si_so_toi_da;
 }
 
-export function soLuotDaDung(ds: { trang_thai: trang_thai_de_nghi }[]): number {
-  return ds.filter(
-    (d) => d.trang_thai === 'cho_duyet' || d.trang_thai === 'da_duyet',
-  ).length;
+// D8 + D11: lượt = số buổi nguồn KHÁC NHAU có đề nghị chờ hoặc đã duyệt —
+// đề nghị đổi lại (chờ, cùng buổi nguồn với bản đã duyệt) không tốn thêm lượt.
+export function soLuotDaDung(
+  ds: { trang_thai: trang_thai_de_nghi; lich_nguon_id: string }[],
+): number {
+  return new Set(
+    ds
+      .filter((d) => d.trang_thai === 'cho_duyet' || d.trang_thai === 'da_duyet')
+      .map((d) => d.lich_nguon_id),
+  ).size;
 }
 
 export function chuanHoaLyDo(s: string | undefined): string | null {
@@ -117,6 +125,8 @@ export function kiemTraGui(
     lop_phan_hien_tai: string | null;
     si_so_dich: number;
     ly_do: string | undefined;
+    /** Đổi lại (D11): buổi chốt của bản đã duyệt cùng buổi nguồn. */
+    buoi_chot_hien_tai?: LichTomTat | null;
   },
   now: Date,
 ): KetQuaKiemTra {
@@ -136,6 +146,11 @@ export function kiemTraGui(
     );
   if (daBatDau(x.buoi_nguon, now) || daBatDau(x.buoi_dich, now))
     return loi('DA_BAT_DAU', 'Buổi đã bắt đầu, không thể đổi');
+  const chot = x.buoi_chot_hien_tai;
+  if (chot && daBatDau(chot, now))
+    return loi('DA_BAT_DAU', 'Buổi đã bắt đầu, không thể đổi');
+  if (chot && chot.id === x.buoi_dich.id)
+    return loi('TRUNG_BUOI_CHOT', 'Thầy/Cô đang học buổi này rồi');
   const toiDa = x.buoi_dich.lop.si_so_toi_da;
   if (toiDa !== null && x.si_so_dich >= toiDa)
     return loi('BUOI_DAY', 'Buổi đã đủ sĩ số, hãy chọn buổi khác');

@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import { createTestApp } from './utils/test-app';
 import { TrangLopService } from '../src/trang-lop/trang-lop.service';
 import { KhoaBoiDuongService } from '../src/khoa-boi-duong/khoa-boi-duong.service';
+import { DoiBuoiHocQueryService } from '../src/doi-buoi-hoc/doi-buoi-hoc-query.service';
 import {
   prisma,
   taoDonViTest,
@@ -27,12 +28,15 @@ describe('Đổi buổi học (e2e)', () => {
   let khoaId: string;
   let maKhoa: string;
   let gdId: string;
-  const buoi: Record<'a' | 'b' | 'd' | 'e' | 'x', string> = {
+  const buoi: Record<'a' | 'b' | 'd' | 'e' | 'x' | 'f' | 'g' | 'h', string> = {
     a: '',
     b: '',
     d: '',
     e: '',
     x: '',
+    f: '',
+    g: '',
+    h: '',
   };
   const lop: Record<'a' | 'b', string> = { a: '', b: '' };
   const hv: Record<string, { id: string; dk: string; moet: string }> = {};
@@ -200,6 +204,15 @@ describe('Đổi buổi học (e2e)', () => {
     await taoHocVien('p2', cum.id, gdId, d.lopId, false);
     for (const ma of ['hv4', 'hv5'])
       await taoHocVien(ma, cum.id, gdId, e.lopId, true);
+
+    // (e) đổi lại (D11): HV6 ở lớp F; G, H là 2 buổi tương đương riêng.
+    const f = await taoLop('Lớp F');
+    const g = await taoLop('Lớp G', 10);
+    const h = await taoLop('Lớp H', 10);
+    buoi.f = f.lichId;
+    buoi.g = g.lichId;
+    buoi.h = h.lichId;
+    await taoHocVien('hv6', cum.id, gdId, f.lopId, true);
     const ht = await taoHoTro();
     await prisma.phan_cong_ho_tro.create({
       data: { nguoi_dung_id: ht.id, cum_id: cum.id },
@@ -327,9 +340,52 @@ describe('Đổi buổi học (e2e)', () => {
     expect(phanLopD + vaoD).toBeLessThanOrEqual(2);
   });
 
-  it('(c) HV2 gửi lần 2 cho cùng buổi nguồn → 409', async () => {
-    // Sau (b) buổi B đã đủ 3/3 nên BUOI_DAY được kiểm trước unique P2002.
-    const res = await gui('hv2').expect(409);
-    expect(res.body.error.message).toBe('Buổi đã đủ sĩ số, hãy chọn buổi khác');
+  it('(c) HV2 (đã duyệt sang B) gửi lại đúng buổi B → 400 đang học buổi này', async () => {
+    // D11: đã có bản đã duyệt → đây là đổi lại; đích trùng buổi chốt hiện tại.
+    const res = await gui('hv2').expect(400);
+    expect(res.body.error.message).toBe('Thầy/Cô đang học buổi này rồi');
+  });
+
+  it('(e) đổi lại: HV6 đã duyệt F→G, gửi đổi lại sang H, duyệt → bản cũ bị thay, sĩ số G giảm H tăng', async () => {
+    const guiHv6 = (dich: string) =>
+      http().post('/hoc-vien/toi/doi-buoi').set(auth('hv6')).send({
+        lich_nguon_id: buoi.f,
+        lich_de_nghi_id: dich,
+        ly_do: 'Trùng lịch công tác',
+      });
+    const siSo = async () => {
+      const m = await app
+        .get(DoiBuoiHocQueryService)
+        .siSoBuoi([buoi.g, buoi.h], new Date());
+      return [m.get(buoi.g)?.si_so, m.get(buoi.h)?.si_so];
+    };
+    const cu = (await guiHv6(buoi.g).expect(201)).body.id as string;
+    await duyet(cu).expect(200);
+    expect(await siSo()).toEqual([1, 0]);
+
+    const moi = (await guiHv6(buoi.h).expect(201)).body.id as string;
+    // Đã có 1 đề nghị chờ cho buổi nguồn → gửi thêm bị unique chặn.
+    await guiHv6(buoi.h).expect(409);
+    const tongQuan = await http()
+      .get('/hoc-vien/toi/doi-buoi')
+      .query({ khoa_id: khoaId })
+      .set(auth('hv6'))
+      .expect(200);
+    expect(tongQuan.body.so_luot_da_dung).toBe(1);
+    const dnMoi = tongQuan.body.de_nghi.find((d: { id: string }) => d.id === moi);
+    expect(dnMoi.doi_lai_tu.id).toBe(buoi.g);
+
+    await duyet(moi).expect(200);
+    const [dongCu, dongMoi] = await Promise.all([
+      prisma.doi_buoi_hoc.findUniqueOrThrow({ where: { id: cu } }),
+      prisma.doi_buoi_hoc.findUniqueOrThrow({ where: { id: moi } }),
+    ]);
+    expect(dongCu).toMatchObject({
+      trang_thai: 'da_huy',
+      ghi_chu_xu_ly: 'Đã thay bằng đề nghị đổi lại',
+      nguoi_xu_ly: null,
+    });
+    expect(dongMoi).toMatchObject({ trang_thai: 'da_duyet', lich_chot_id: buoi.h });
+    expect(await siSo()).toEqual([0, 1]);
   });
 });
