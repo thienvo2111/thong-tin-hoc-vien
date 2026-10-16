@@ -1,8 +1,24 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from './client';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiFetch, apiFetchBlob } from './client';
 import type { LoaiLop, MucNangLuc } from './types';
+import { taiFileTuBlob } from '@/lib/taiFile';
 
 export type TrangThaiDeNghi = 'cho_duyet' | 'da_duyet' | 'tu_choi' | 'da_huy';
+
+export const NHAN_TRANG_THAI_DE_NGHI: Record<TrangThaiDeNghi, string> = {
+  cho_duyet: 'Chờ duyệt',
+  da_duyet: 'Đã duyệt',
+  tu_choi: 'Từ chối',
+  da_huy: 'Đã hủy',
+};
+
+/** Nhãn trạng thái tab Đã xử lý / Thống kê — "Đã hủy" tách theo ai hủy để không bị hiểu nhầm là người duyệt hủy. */
+export function nhanDaXuLy(d: { trang_thai: TrangThaiDeNghi; ly_do_huy: LyDoHuy | null; nguoi_xu_ly: string | null }): string {
+  if (d.trang_thai !== 'da_huy') return NHAN_TRANG_THAI_DE_NGHI[d.trang_thai];
+  if (d.ly_do_huy === 'hoc_vien_sua') return 'Học viên đã sửa (thay bằng đề nghị mới)';
+  if (d.ly_do_huy === 'hoc_vien_huy') return 'Học viên tự hủy';
+  return d.nguoi_xu_ly ? `Hủy duyệt bởi ${d.nguoi_xu_ly}` : 'Hủy duyệt';
+}
 
 /** Tóm tắt 1 buổi học (khớp LichTomTat ở backend). */
 export interface LichTomTat {
@@ -245,4 +261,124 @@ export function useHuyDuyetDoiBuoi() {
       }),
     onSuccess: lamMoi,
   });
+}
+
+// ---- Thống kê theo buổi (/doi-buoi-hoc/thong-ke) ----
+
+export interface LocThongKeDoiBuoi {
+  khoa_id?: string;
+  giai_doan_id?: string;
+  lop_id?: string[];
+  muc_nang_luc?: MucNangLuc[];
+  loai_lop?: LoaiLop[];
+  cum_id?: string[];
+  /** YYYY-MM-DD giờ Việt Nam. */
+  tu_ngay?: string;
+  den_ngay?: string;
+  chi_co_cho?: boolean;
+}
+
+export interface DongThongKeDoiBuoi {
+  lich: {
+    id: string;
+    buoi_so: number;
+    thoi_gian_bat_dau: string;
+    thoi_gian_ket_thuc: string | null;
+    lop: { id: string; ten_lop: string; muc_nang_luc: MucNangLuc | null; loai_lop: LoaiLop };
+    giai_doan: { id: string; thu_tu: number; ten_giai_doan: string };
+    khoa: { id: string; ma_khoa: string; ten_khoa: string };
+  };
+  si_so_phan_lop: number;
+  /** Sĩ số sau đổi (chỉ tính đổi buổi còn hiệu lực). */
+  si_so: number;
+  si_so_toi_da: number | null;
+  day: boolean;
+  /** *_da_duyet là số bản ghi đã duyệt thô — có thể lệch si_so nếu phân lớp đổi sau khi duyệt. */
+  ra_da_duyet: number;
+  ra_cho: number;
+  ra_qua_han: number;
+  ra_tu_choi: number;
+  ra_huy: number;
+  vao_da_duyet: number;
+  vao_cho: number;
+  vao_qua_han: number;
+  vao_tu_choi: number;
+  vao_huy: number;
+}
+
+export interface ThongKeDoiBuoi {
+  tong: {
+    de_nghi: number;
+    cho_duyet: number;
+    qua_han: number;
+    da_duyet: number;
+    tu_choi: number;
+    da_huy: number;
+    so_buoi_day: number;
+  };
+  dong: DongThongKeDoiBuoi[];
+  bo_loc: {
+    khoa: { id: string; ma_khoa: string; ten_khoa: string }[];
+    giai_doan: { id: string; khoa_id: string; thu_tu: number; ten_giai_doan: string }[];
+    lop: { id: string; khoa_id: string; ten_lop: string; muc_nang_luc: MucNangLuc | null; loai_lop: LoaiLop }[];
+    cum: { id: string; ten_cum: string }[];
+  };
+  gioi_han: boolean;
+}
+
+export interface HocVienDongThongKe {
+  de_nghi_id: string;
+  ho_ten: string;
+  don_vi: string;
+  cum: string | null;
+  trang_thai: TrangThaiDeNghi;
+  ly_do_huy: LyDoHuy | null;
+  qua_han: boolean;
+  /** Đổi ra: buổi đích (chốt ?? đề nghị); đổi vào: buổi gốc. */
+  buoi_kia: BuoiTomTat | null;
+  tao_luc: string;
+  xu_ly_luc: string | null;
+  nguoi_xu_ly: string | null;
+}
+
+/** Query string bộ lọc thống kê — mảng gửi dạng CSV. */
+export function qsThongKe(loc: LocThongKeDoiBuoi): string {
+  const csv = (a?: string[]) => (a?.length ? a.join(',') : undefined);
+  return qs({
+    khoa_id: loc.khoa_id,
+    giai_doan_id: loc.giai_doan_id,
+    lop_id: csv(loc.lop_id),
+    muc_nang_luc: csv(loc.muc_nang_luc),
+    loai_lop: csv(loc.loai_lop),
+    cum_id: csv(loc.cum_id),
+    tu_ngay: loc.tu_ngay,
+    den_ngay: loc.den_ngay,
+    chi_co_cho: loc.chi_co_cho ? 'true' : undefined,
+  });
+}
+
+export function useThongKeDoiBuoi(loc: LocThongKeDoiBuoi) {
+  return useQuery({
+    queryKey: [KEY, 'thong-ke', loc],
+    queryFn: () => apiFetch<ThongKeDoiBuoi>(`/doi-buoi-hoc/thong-ke${qsThongKe(loc)}`),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useChiTietBuoiThongKe(lichId: string | undefined, loc: LocThongKeDoiBuoi) {
+  return useQuery({
+    queryKey: [KEY, 'thong-ke-buoi', lichId, loc.cum_id],
+    queryFn: () =>
+      apiFetch<{ ra: HocVienDongThongKe[]; vao: HocVienDongThongKe[] }>(
+        `/doi-buoi-hoc/thong-ke/buoi/${lichId}${qsThongKe({ cum_id: loc.cum_id })}`,
+      ),
+    enabled: !!lichId,
+  });
+}
+
+/** GET /doi-buoi-hoc/thong-ke/xuat-excel — cùng bộ lọc; tên file theo giờ Việt Nam. */
+export async function xuatThongKeDoiBuoi(loc: LocThongKeDoiBuoi): Promise<void> {
+  const blob = await apiFetchBlob(`/doi-buoi-hoc/thong-ke/xuat-excel${qsThongKe(loc)}`);
+  const p = new Date(Date.now() + 7 * 3600 * 1000).toISOString();
+  taiFileTuBlob(blob, `thong-ke-doi-buoi-${p.slice(0, 10).replace(/-/g, '')}-${p.slice(11, 16).replace(':', '')}.xlsx`);
 }

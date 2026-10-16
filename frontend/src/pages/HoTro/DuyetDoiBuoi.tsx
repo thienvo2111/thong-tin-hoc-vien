@@ -18,6 +18,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
+  nhanDaXuLy,
   useDsDoiBuoi,
   useDuyetDoiBuoi,
   useHuyDuyetDoiBuoi,
@@ -26,24 +27,17 @@ import {
   type BuoiTomTat,
   type DeNghiDuyet,
   type LuaChonDuyet,
-  type TrangThaiDeNghi,
 } from '@/api/doiBuoi';
 import { useToi } from '@/auth/AuthContext';
 import { StatusBanner } from '@/components/StatusBanner';
 import { dinhDangGio, dinhDangNgayGio, dinhDangThuNgay } from '@/lib/ngay';
 import { thongDiepLoiXungDot } from '@/lib/loiApi';
+import ThongKeDoiBuoi from './ThongKeDoiBuoi';
 
 const GHI_CHU_TOI_THIEU = 5;
 const GHI_CHU_TOI_DA = 500;
 const GIOI_HAN_DANH_SACH = 500; // khớp take: 500 của server
 const GIOI_HAN_QUA_HAN = 100; // khớp take: 100 của server khi qua_han=true
-
-const NHAN_TRANG_THAI: Record<TrangThaiDeNghi, string> = {
-  cho_duyet: 'Chờ duyệt',
-  da_duyet: 'Đã duyệt',
-  tu_choi: 'Từ chối',
-  da_huy: 'Đã hủy',
-};
 
 /** Khối 1 buổi, gọn 2 dòng: [nhãn] tên lớp / Buổi n · thứ-ngày · giờ (+ dòng phụ nhỏ). */
 function KhoiBuoi({ nhan, b, mau, phu }: { nhan: string; b: BuoiTomTat | null; mau: string; phu?: string }) {
@@ -125,6 +119,7 @@ export default function DuyetDoiBuoi() {
           <Tabs.List>
             <Tabs.Tab value="cho_duyet">Chờ duyệt</Tabs.Tab>
             <Tabs.Tab value="da_xu_ly">Đã xử lý</Tabs.Tab>
+            <Tabs.Tab value="thong_ke">Thống kê</Tabs.Tab>
           </Tabs.List>
           <Tabs.Panel value="cho_duyet" pt="md">
             <Stack gap="lg">
@@ -134,6 +129,9 @@ export default function DuyetDoiBuoi() {
           </Tabs.Panel>
           <Tabs.Panel value="da_xu_ly" pt="md">
             <DanhSach chiChoDuyet={false} hanhDong={hanhDong} />
+          </Tabs.Panel>
+          <Tabs.Panel value="thong_ke" pt="md">
+            <ThongKeDoiBuoi />
           </Tabs.Panel>
         </Tabs>
       </Stack>
@@ -263,14 +261,6 @@ function huyDuyetDuoc(d: DeNghiDuyet): boolean {
   if (d.trang_thai !== 'da_duyet' || !d.buoi_chot || !d.buoi_nguon) return false;
   const now = Date.now();
   return Date.parse(d.buoi_chot.thoi_gian_bat_dau) > now && Date.parse(d.buoi_nguon.thoi_gian_bat_dau) > now;
-}
-
-/** Nhãn trạng thái tab Đã xử lý — "Đã hủy" tách theo ai hủy để không bị hiểu nhầm là người duyệt hủy. */
-function nhanDaXuLy(d: DeNghiDuyet): string {
-  if (d.trang_thai !== 'da_huy') return NHAN_TRANG_THAI[d.trang_thai];
-  if (d.ly_do_huy === 'hoc_vien_sua') return 'Học viên đã sửa (thay bằng đề nghị mới)';
-  if (d.ly_do_huy === 'hoc_vien_huy') return 'Học viên tự hủy';
-  return d.nguoi_xu_ly ? `Hủy duyệt bởi ${d.nguoi_xu_ly}` : 'Hủy duyệt';
 }
 
 function DongDaXuLy({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
