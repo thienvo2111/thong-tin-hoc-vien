@@ -10,7 +10,7 @@ import {
   nguon_diem_danh,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { NhatKyService } from '../nhat-ky/nhat-ky.service';
+import { NhatKyService, SuKienNhatKy } from '../nhat-ky/nhat-ky.service';
 import { DiemHocService, DIEM_HOC_TOM_TAT } from '../diem-hoc/diem-hoc.service';
 import { LichHocThayDoiService } from './lich-hoc-thay-doi.service';
 import { PhanCongGiangDayService } from '../giang-vien/phan-cong-giang-day.service';
@@ -54,7 +54,13 @@ import {
 import { DiemDanhRowDto } from './dto/diem-danh-row.dto';
 import { KetQuaGiaiDoanRowDto } from './dto/ket-qua-giai-doan-row.dto';
 import { RowBuildResult } from '../import/import.types';
-import { resolveHocVienImportRow } from '../import/util/hoc-vien-resolver.util';
+import {
+  HocVienResolverInput,
+  HocVienResolverResult,
+  resolveHocVienImportRow,
+} from '../import/util/hoc-vien-resolver.util';
+import { napHocVienTheoLo } from '../import/util/hoc-vien-resolver-lo.util';
+import { chiaLo } from '../common/utils/theo-lo.util';
 import { parseVnDateTime } from '../common/utils/vn-datetime.util';
 import {
   LOAI_BAI_DAU_VAO,
@@ -88,6 +94,25 @@ export interface BoNhoPhanLop {
 export function taoBoNhoPhanLop(): BoNhoPhanLop {
   return { lopTheoTen: new Map(), canhBaoGan: new Map() };
 }
+
+type DangKyKetQuaDanhGia = {
+  muc_dau_vao: muc_nang_luc | null;
+  muc_dau_ra: muc_nang_luc | null;
+  khoa: { ten_khoa: string };
+};
+
+// Dữ liệu nạp sẵn cho 1 lượt import ket_qua_danh_gia (napLoKetQuaDanhGia):
+// file ~8.000 dòng tra từng dòng vượt timeout proxy (504). dangKy là mức
+// hiện tại, commitKetQuaDanhGia cập nhật lại sau mỗi dòng để dòng sau cùng
+// học viên so với giá trị vừa ghi (nhật ký giống hệt chạy tuần tự).
+export interface BoNhoKetQuaDanhGia {
+  traHocVien: (raw: HocVienResolverInput) => Promise<HocVienResolverResult>;
+  khoaTheoMa: Map<string, khoa_boi_duong>;
+  dangKy: Map<string, DangKyKetQuaDanhGia>;
+}
+
+const khoaDangKy = (hocVienId: string, khoaId: string) =>
+  `${hocVienId}:${khoaId}`;
 
 // Dịch vụ Khóa bồi dưỡng & Lớp học — docs/api-contract.md mục 3 +
 // docs/validation-checklist.md rule #47-52. D1/D6 (2026-10-03-don-vi-dat-
@@ -2227,14 +2252,74 @@ export class KhoaBoiDuongService {
   // chấm mức là 2 bước tách biệt theo đúng trình tự vận hành trong spec:
   // import MOET -> ghi danh (T3) -> import ket_qua_danh_gia -> tạo lớp (T6)
   // -> phân lớp).
-  async resolveKetQuaDanhGiaRow(raw: {
-    so_dinh_danh_ca_nhan?: string;
-    ma_dinh_danh_moet?: string;
-    ma_khoa?: string;
-    loai?: string;
-    muc?: string;
-  }): Promise<RowBuildResult<KetQuaDanhGiaRowDto>> {
-    const resolved = await resolveHocVienImportRow(this.prisma, {
+  //
+  // Nạp theo lô cả file (học viên, khóa, đăng ký) — số truy vấn không tăng
+  // theo số dòng; resolve/commit bên dưới chỉ đọc bộ nhớ này.
+  async napLoKetQuaDanhGia(
+    raws: (HocVienResolverInput & { ma_khoa?: string })[],
+  ): Promise<BoNhoKetQuaDanhGia> {
+    const traHocVien = await napHocVienTheoLo(this.prisma, raws);
+    const hocVienIds = new Set<string>();
+    for (const raw of raws) {
+      const { hocVien } = await traHocVien(raw);
+      if (hocVien) hocVienIds.add(hocVien.id);
+    }
+
+    const maKhoas = [
+      ...new Set(raws.map((r) => r.ma_khoa?.trim()).filter((m) => !!m)),
+    ] as string[];
+    const khoaTheoMa = new Map<string, khoa_boi_duong>();
+    if (maKhoas.length > 0) {
+      const ds = await this.prisma.khoa_boi_duong.findMany({
+        where: { ma_khoa: { in: maKhoas } },
+      });
+      ds.forEach((k) => khoaTheoMa.set(k.ma_khoa, k));
+    }
+
+    const dangKy = await this.napDangKyKetQuaDanhGia(
+      [...hocVienIds],
+      [...khoaTheoMa.values()].map((k) => k.id),
+    );
+    return { traHocVien, khoaTheoMa, dangKy };
+  }
+
+  private async napDangKyKetQuaDanhGia(
+    hocVienIds: string[],
+    khoaIds: string[],
+  ): Promise<Map<string, DangKyKetQuaDanhGia>> {
+    const dangKy = new Map<string, DangKyKetQuaDanhGia>();
+    const khoas = [...new Set(khoaIds)];
+    if (khoas.length === 0) return dangKy;
+    for (const lo of chiaLo([...new Set(hocVienIds)])) {
+      const ds = await this.prisma.dang_ky_hoc.findMany({
+        where: { hoc_vien_id: { in: lo }, khoa_id: { in: khoas } },
+        select: {
+          hoc_vien_id: true,
+          khoa_id: true,
+          muc_dau_vao: true,
+          muc_dau_ra: true,
+          khoa: { select: { ten_khoa: true } },
+        },
+      });
+      for (const { hoc_vien_id, khoa_id, ...dk } of ds) {
+        dangKy.set(khoaDangKy(hoc_vien_id, khoa_id), dk);
+      }
+    }
+    return dangKy;
+  }
+
+  async resolveKetQuaDanhGiaRow(
+    raw: {
+      so_dinh_danh_ca_nhan?: string;
+      ma_dinh_danh_moet?: string;
+      ma_khoa?: string;
+      loai?: string;
+      muc?: string;
+    },
+    boNho?: BoNhoKetQuaDanhGia,
+  ): Promise<RowBuildResult<KetQuaDanhGiaRowDto>> {
+    const bo = boNho ?? (await this.napLoKetQuaDanhGia([raw]));
+    const resolved = await bo.traHocVien({
       so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
       ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
     });
@@ -2247,9 +2332,7 @@ export class KhoaBoiDuongService {
     if (!maKhoa) {
       return { error: 'Thiếu cột "ma_khoa"' };
     }
-    const khoa = await this.prisma.khoa_boi_duong.findUnique({
-      where: { ma_khoa: maKhoa },
-    });
+    const khoa = bo.khoaTheoMa.get(maKhoa);
     if (!khoa) {
       return { error: `Khóa "${maKhoa}" không tồn tại` };
     }
@@ -2266,12 +2349,7 @@ export class KhoaBoiDuongService {
       };
     }
 
-    const dangKy = await this.prisma.dang_ky_hoc.findUnique({
-      where: {
-        hoc_vien_id_khoa_id: { hoc_vien_id: hocVien.id, khoa_id: khoa.id },
-      },
-    });
-    if (!dangKy) {
+    if (!bo.dangKy.has(khoaDangKy(hocVien.id, khoa.id))) {
       const ma =
         raw.so_dinh_danh_ca_nhan?.trim() || raw.ma_dinh_danh_moet?.trim();
       return {
@@ -2352,36 +2430,59 @@ export class KhoaBoiDuongService {
   }
 
   async commitKetQuaDanhGia(dto: KetQuaDanhGiaRowDto): Promise<void> {
-    const cu = await this.prisma.dang_ky_hoc.findUnique({
-      where: {
-        hoc_vien_id_khoa_id: {
-          hoc_vien_id: dto.hoc_vien_id,
+    await this.commitKetQuaDanhGiaLo([dto]);
+  }
+
+  // Ghi cả file trong vài câu lệnh: duyệt các dòng theo thứ tự file trên bộ
+  // nhớ (dòng sau so với giá trị dòng trước vừa đặt -> nhật ký giống hệt chạy
+  // từng dòng), chỉ ghi dòng ĐỔI mức (dang_ky_hoc không có cột updated_at nên
+  // bỏ qua dòng không đổi là tương đương), gom updateMany theo (khóa, cột,
+  // mức) trong 1 transaction. ADR 0006: chỉ ghi muc_dau_vao/muc_dau_ra, KHÔNG
+  // đụng nhu cầu học viên (muc_hoc_chon/_luc).
+  async commitKetQuaDanhGiaLo(
+    dtos: KetQuaDanhGiaRowDto[],
+    boNho?: BoNhoKetQuaDanhGia,
+  ): Promise<void> {
+    const dangKy =
+      boNho?.dangKy ??
+      (await this.napDangKyKetQuaDanhGia(
+        dtos.map((d) => d.hoc_vien_id),
+        dtos.map((d) => d.khoa_id),
+      ));
+    const nhatKys: SuKienNhatKy[] = [];
+    const nhom = new Map<
+      string,
+      {
+        khoa_id: string;
+        cot: 'muc_dau_vao' | 'muc_dau_ra';
+        muc: muc_nang_luc;
+        ids: Set<string>;
+      }
+    >();
+    for (const dto of dtos) {
+      const khoa = khoaDangKy(dto.hoc_vien_id, dto.khoa_id);
+      const cu = dangKy.get(khoa);
+      const cot = dto.loai === 'dau_vao' ? 'muc_dau_vao' : 'muc_dau_ra';
+      const mucCu = cu?.[cot] ?? null;
+      if (mucCu === dto.muc) continue;
+      if (cu) dangKy.set(khoa, { ...cu, [cot]: dto.muc });
+      // Đổi lại lần nữa trong cùng file -> bỏ khỏi nhóm cũ, giá trị cuối thắng.
+      for (const n of nhom.values()) {
+        if (n.khoa_id === dto.khoa_id && n.cot === cot) {
+          n.ids.delete(dto.hoc_vien_id);
+        }
+      }
+      const k = `${dto.khoa_id}|${cot}|${dto.muc}`;
+      if (!nhom.has(k)) {
+        nhom.set(k, {
           khoa_id: dto.khoa_id,
-        },
-      },
-      select: {
-        muc_dau_vao: true,
-        muc_dau_ra: true,
-        khoa: { select: { ten_khoa: true } },
-      },
-    });
-    // ADR 0006: nhập mức chốt KHÔNG đụng tới nhu cầu học viên (muc_hoc_chon/_luc).
-    await this.prisma.dang_ky_hoc.update({
-      where: {
-        hoc_vien_id_khoa_id: {
-          hoc_vien_id: dto.hoc_vien_id,
-          khoa_id: dto.khoa_id,
-        },
-      },
-      data:
-        dto.loai === 'dau_vao'
-          ? { muc_dau_vao: dto.muc }
-          : { muc_dau_ra: dto.muc },
-    });
-    const mucCu =
-      (dto.loai === 'dau_vao' ? cu?.muc_dau_vao : cu?.muc_dau_ra) ?? null;
-    if (mucCu !== dto.muc) {
-      await this.nhatKy.ghi({
+          cot,
+          muc: dto.muc,
+          ids: new Set(),
+        });
+      }
+      nhom.get(k)!.ids.add(dto.hoc_vien_id);
+      nhatKys.push({
         hanh_dong: 'cap_nhat_muc_danh_gia',
         hoc_vien_id: dto.hoc_vien_id,
         mo_ta:
@@ -2389,6 +2490,16 @@ export class KhoaBoiDuongService {
           `${nhanMuc(mucCu)} → ${nhanMuc(dto.muc)} (nhập file)`,
       });
     }
+    const lenh = [...nhom.values()].flatMap((n) =>
+      chiaLo([...n.ids]).map((lo) =>
+        this.prisma.dang_ky_hoc.updateMany({
+          where: { khoa_id: n.khoa_id, hoc_vien_id: { in: lo } },
+          data: { [n.cot]: n.muc },
+        }),
+      ),
+    );
+    if (lenh.length > 0) await this.prisma.$transaction(lenh);
+    await this.nhatKy.ghiNhieu(nhatKys);
   }
 
   // ---------------------------------------------------------------------

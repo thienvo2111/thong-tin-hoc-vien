@@ -3,6 +3,7 @@ import type { Prisma, vai_tro_nguoi_dung } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundAppException } from '../common/exceptions/app.exceptions';
 import { nguCanhNhatKy } from './nhat-ky.context';
+import { chiaLo } from '../common/utils/theo-lo.util';
 
 export type HanhDongNhatKy =
   | 'dang_nhap_thanh_cong'
@@ -125,26 +126,43 @@ export class NhatKyService {
 
   /** Ghi 1 sự kiện. KHÔNG BAO GIỜ ném lỗi — lỗi ghi log không được làm hỏng thao tác chính. */
   async ghi(su: SuKienNhatKy): Promise<void> {
+    try {
+      await this.prisma.nhat_ky_hoat_dong.create({ data: this.dongNhatKy(su) });
+    } catch (e) {
+      this.logger.error(`Không ghi được nhật ký ${su.hanh_dong}: ${String(e)}`);
+    }
+  }
+
+  /** Ghi nhiều sự kiện bằng createMany (import file lớn). Cũng KHÔNG ném lỗi. */
+  async ghiNhieu(ds: SuKienNhatKy[]): Promise<void> {
+    for (const lo of chiaLo(ds)) {
+      try {
+        await this.prisma.nhat_ky_hoat_dong.createMany({
+          data: lo.map((su) => this.dongNhatKy(su)),
+        });
+      } catch (e) {
+        this.logger.error(
+          `Không ghi được ${lo.length} nhật ký ${lo[0].hanh_dong}: ${String(e)}`,
+        );
+      }
+    }
+  }
+
+  private dongNhatKy(su: SuKienNhatKy) {
     const ctx = nguCanhNhatKy.getStore();
     const nd = su.nguoi_dung ?? ctx?.nguoiDung ?? null;
     const chiTiet = su.mo_ta
       ? { mo_ta: su.mo_ta, ...su.chi_tiet }
       : su.chi_tiet;
-    try {
-      await this.prisma.nhat_ky_hoat_dong.create({
-        data: {
-          hanh_dong: su.hanh_dong,
-          hoc_vien_id: su.hoc_vien_id ?? null,
-          nguoi_dung_id: nd?.id ?? null,
-          vai_tro: nd?.vai_tro ?? null,
-          chi_tiet: chiTiet as Prisma.InputJsonValue | undefined,
-          ip: ctx?.ip ?? null,
-          thiet_bi: ctx?.thietBi ?? null,
-        },
-      });
-    } catch (e) {
-      this.logger.error(`Không ghi được nhật ký ${su.hanh_dong}: ${String(e)}`);
-    }
+    return {
+      hanh_dong: su.hanh_dong,
+      hoc_vien_id: su.hoc_vien_id ?? null,
+      nguoi_dung_id: nd?.id ?? null,
+      vai_tro: nd?.vai_tro ?? null,
+      chi_tiet: chiTiet as Prisma.InputJsonValue | undefined,
+      ip: ctx?.ip ?? null,
+      thiet_bi: ctx?.thietBi ?? null,
+    };
   }
 
   /** GET /hoc-vien/{id}/nhat-ky — gộp mọi nguồn lịch sử của 1 học viên, mới nhất trước. */

@@ -15,7 +15,7 @@ import { LichHocThayDoiService } from './lich-hoc-thay-doi.service';
 import { PhanCongGiangDayService } from '../giang-vien/phan-cong-giang-day.service';
 import { ThangMucService } from '../sso/thang-muc.service';
 
-let nhatKy: { ghi: jest.Mock };
+let nhatKy: { ghi: jest.Mock; ghiNhieu: jest.Mock };
 let phanCongGiangDay: { xungDotKhiDoiGio: jest.Mock };
 let diemHocService: {
   layDiemHocDangHoatDong: jest.Mock;
@@ -56,6 +56,7 @@ describe('KhoaBoiDuongService', () => {
       findMany: jest.Mock;
       upsert: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
       create: jest.Mock;
     };
     phan_lop_giai_doan: {
@@ -82,6 +83,7 @@ describe('KhoaBoiDuongService', () => {
     nhan_su_thuc_dia: { findMany: jest.Mock };
     ket_qua_khao_sat: { findUnique: jest.Mock };
     cau_hinh_he_thong: { findUnique: jest.Mock };
+    $transaction: jest.Mock;
   };
   let scopeService: { canAccessDonVi: jest.Mock };
   let thongBaoService: { guiDangKyHocPhanLop: jest.Mock };
@@ -125,6 +127,7 @@ describe('KhoaBoiDuongService', () => {
         findMany: jest.fn(),
         upsert: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         create: jest.fn(),
       },
       phan_lop_giai_doan: {
@@ -159,12 +162,18 @@ describe('KhoaBoiDuongService', () => {
       nhan_su_thuc_dia: { findMany: jest.fn().mockResolvedValue([]) },
       ket_qua_khao_sat: { findUnique: jest.fn().mockResolvedValue(null) },
       cau_hinh_he_thong: { findUnique: jest.fn().mockResolvedValue(null) },
+      $transaction: jest.fn(async (lenh: Promise<unknown>[]) =>
+        Promise.all(lenh),
+      ),
     };
     scopeService = { canAccessDonVi: jest.fn() };
     thongBaoService = {
       guiDangKyHocPhanLop: jest.fn().mockResolvedValue({ chuaCoEmail: false }),
     };
-    nhatKy = { ghi: jest.fn().mockResolvedValue(undefined) };
+    nhatKy = {
+      ghi: jest.fn().mockResolvedValue(undefined),
+      ghiNhieu: jest.fn().mockResolvedValue(undefined),
+    };
     phanCongGiangDay = {
       xungDotKhiDoiGio: jest.fn().mockResolvedValue(null),
     };
@@ -1720,6 +1729,227 @@ describe('KhoaBoiDuongService', () => {
     });
   });
 
+  // File ~8.000 dòng tra từng dòng bị 504 (2026-10-15) -> nạp theo lô.
+  describe('import ket_qua_danh_gia nạp theo lô', () => {
+    const hv1 = {
+      id: 'hv-1',
+      so_dinh_danh_ca_nhan: null,
+      ma_dinh_danh_moet: '08901678964',
+    };
+    const hv2 = {
+      id: 'hv-2',
+      so_dinh_danh_ca_nhan: '079000000002',
+      ma_dinh_danh_moet: null,
+    };
+    const khoaAG = { id: 'khoa-1', ma_khoa: 'AG-2026' };
+    const dong = (o: Record<string, string>) => ({
+      ma_khoa: 'AG-2026',
+      loai: 'dau_vao',
+      muc: 'thanh_thao',
+      ...o,
+    });
+    let p: typeof prisma & {
+      hoc_vien: { findMany: jest.Mock };
+      khoa_boi_duong: { findMany: jest.Mock };
+      $queryRaw: jest.Mock;
+    };
+
+    beforeEach(() => {
+      p = prisma as typeof p;
+      p.hoc_vien.findMany = jest.fn(async ({ where }) =>
+        [hv1, hv2].filter((h) =>
+          where.id
+            ? where.id.in.includes(h.id)
+            : where.so_dinh_danh_ca_nhan.in.includes(h.so_dinh_danh_ca_nhan),
+        ),
+      );
+      p.$queryRaw = jest.fn(async () => [
+        { id: 'hv-1', ma_dinh_danh_moet: '08901678964' },
+      ]);
+      p.khoa_boi_duong.findMany = jest.fn().mockResolvedValue([khoaAG]);
+      prisma.dang_ky_hoc.findMany.mockResolvedValue([
+        {
+          hoc_vien_id: 'hv-1',
+          khoa_id: 'khoa-1',
+          muc_dau_vao: null,
+          muc_dau_ra: null,
+          khoa: { ten_khoa: 'Khóa AG' },
+        },
+      ]);
+    });
+
+    it('nạp 1 lần cho cả file, resolve từng dòng không truy vấn thêm', async () => {
+      const raws = Array.from({ length: 50 }, () =>
+        dong({ ma_dinh_danh_moet: '8901678964' }),
+      );
+      const bo = await service.napLoKetQuaDanhGia(raws);
+      const soTruyVan = () =>
+        p.$queryRaw.mock.calls.length +
+        p.hoc_vien.findMany.mock.calls.length +
+        p.khoa_boi_duong.findMany.mock.calls.length +
+        prisma.dang_ky_hoc.findMany.mock.calls.length;
+      const truoc = soTruyVan();
+      for (const r of raws) {
+        const { dto, error } = await service.resolveKetQuaDanhGiaRow(r, bo);
+        expect(error).toBeUndefined();
+        expect(dto).toEqual({
+          hoc_vien_id: 'hv-1',
+          khoa_id: 'khoa-1',
+          loai: 'dau_vao',
+          muc: 'thanh_thao',
+        });
+      }
+      expect(soTruyVan()).toBe(truoc);
+      expect(prisma.hoc_vien.findUnique).not.toHaveBeenCalled();
+      expect(prisma.khoa_boi_duong.findUnique).not.toHaveBeenCalled();
+      expect(prisma.dang_ky_hoc.findUnique).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        'khóa không tồn tại',
+        dong({ ma_dinh_danh_moet: '08901678964', ma_khoa: 'XX' }),
+        'Khóa "XX" không tồn tại',
+      ],
+      [
+        'thiếu ma_khoa',
+        dong({ ma_dinh_danh_moet: '08901678964', ma_khoa: ' ' }),
+        'Thiếu cột "ma_khoa"',
+      ],
+      [
+        'chưa ghi danh',
+        dong({ so_dinh_danh_ca_nhan: '079000000002' }),
+        'Học viên "079000000002" chưa được ghi danh vào khóa "AG-2026" — phải chạy ghi danh (import phan_lop_hoc_vien, T3) trước',
+      ],
+      [
+        'loai sai',
+        dong({ ma_dinh_danh_moet: '08901678964', loai: 'giua_ky' }),
+        'Cột "loai" phải là "dau_vao" hoặc "dau_ra"',
+      ],
+      [
+        'muc sai',
+        dong({ ma_dinh_danh_moet: '08901678964', muc: 'M3' }),
+        'Cột "muc" phải là "co_ban", "thanh_thao" hoặc "nang_cao"',
+      ],
+    ])('%s -> giữ nguyên câu báo lỗi', async (_ten, raw, loi) => {
+      const bo = await service.napLoKetQuaDanhGia([raw]);
+      expect((await service.resolveKetQuaDanhGiaRow(raw, bo)).error).toBe(loi);
+    });
+
+    it('không truyền bộ nhớ -> tự nạp cho 1 dòng, cùng kết quả', async () => {
+      const raw = dong({ ma_dinh_danh_moet: '8901678964' });
+      const { dto } = await service.resolveKetQuaDanhGiaRow(raw);
+      expect(dto?.hoc_vien_id).toBe('hv-1');
+    });
+
+    const dtoHv1 = {
+      hoc_vien_id: 'hv-1',
+      khoa_id: 'khoa-1',
+      loai: 'dau_vao' as const,
+      muc: 'co_ban' as const,
+    };
+    const moTaNhatKy = () =>
+      nhatKy.ghiNhieu.mock.calls.flatMap((c) =>
+        c[0].map((x: { mo_ta: string }) => x.mo_ta),
+      );
+
+    it('commit lô có bộ nhớ: không đọc lại dang_ky_hoc, ghi đúng cột + nhật ký', async () => {
+      const bo = await service.napLoKetQuaDanhGia([
+        dong({ ma_dinh_danh_moet: '08901678964' }),
+      ]);
+      prisma.dang_ky_hoc.findMany.mockClear();
+      await service.commitKetQuaDanhGiaLo([dtoHv1], bo);
+      expect(prisma.dang_ky_hoc.findMany).not.toHaveBeenCalled();
+      expect(prisma.dang_ky_hoc.findUnique).not.toHaveBeenCalled();
+      expect(prisma.dang_ky_hoc.updateMany).toHaveBeenCalledWith({
+        where: { khoa_id: 'khoa-1', hoc_vien_id: { in: ['hv-1'] } },
+        data: { muc_dau_vao: 'co_ban' },
+      });
+      expect(nhatKy.ghiNhieu).toHaveBeenCalledWith([
+        {
+          hanh_dong: 'cap_nhat_muc_danh_gia',
+          hoc_vien_id: 'hv-1',
+          mo_ta: 'Khóa AG — Đầu vào: (chưa có) → Cơ bản (nhập file)',
+        },
+      ]);
+    });
+
+    it('nhiều dòng trong 1 file: dòng sau so với giá trị dòng trước, giá trị cuối thắng', async () => {
+      const bo = await service.napLoKetQuaDanhGia([
+        dong({ ma_dinh_danh_moet: '08901678964' }),
+      ]);
+      await service.commitKetQuaDanhGiaLo(
+        [
+          dtoHv1,
+          dtoHv1, // trùng -> không log
+          { ...dtoHv1, muc: 'nang_cao' },
+          { ...dtoHv1, loai: 'dau_ra', muc: 'thanh_thao' },
+        ],
+        bo,
+      );
+      expect(moTaNhatKy()).toEqual([
+        'Khóa AG — Đầu vào: (chưa có) → Cơ bản (nhập file)',
+        'Khóa AG — Đầu vào: Cơ bản → Nâng cao (nhập file)',
+        'Khóa AG — Đầu ra: (chưa có) → Thành thạo (nhập file)',
+      ]);
+      const ghi = prisma.dang_ky_hoc.updateMany.mock.calls.map((c) => c[0]);
+      expect(ghi).toEqual([
+        {
+          where: { khoa_id: 'khoa-1', hoc_vien_id: { in: ['hv-1'] } },
+          data: { muc_dau_vao: 'nang_cao' },
+        },
+        {
+          where: { khoa_id: 'khoa-1', hoc_vien_id: { in: ['hv-1'] } },
+          data: { muc_dau_ra: 'thanh_thao' },
+        },
+      ]);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('gom theo (khóa, cột, mức): 2.500 học viên cùng mức -> 3 lệnh, 1 transaction', async () => {
+      const ids = Array.from({ length: 2500 }, (_, i) => `hv-${i}`);
+      prisma.dang_ky_hoc.findMany.mockResolvedValue(
+        ids.map((id) => ({
+          hoc_vien_id: id,
+          khoa_id: 'khoa-1',
+          muc_dau_vao: null,
+          muc_dau_ra: null,
+          khoa: { ten_khoa: 'Khóa AG' },
+        })),
+      );
+      await service.commitKetQuaDanhGiaLo(
+        ids.map((id) => ({ ...dtoHv1, hoc_vien_id: id })),
+      );
+      expect(prisma.dang_ky_hoc.updateMany).toHaveBeenCalledTimes(3);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(nhatKy.ghiNhieu.mock.calls[0][0]).toHaveLength(2500);
+      expect(prisma.dang_ky_hoc.update).not.toHaveBeenCalled();
+    });
+
+    it('không có dòng nào đổi mức -> không ghi gì', async () => {
+      prisma.dang_ky_hoc.findMany.mockResolvedValue([
+        {
+          hoc_vien_id: 'hv-1',
+          khoa_id: 'khoa-1',
+          muc_dau_vao: 'co_ban',
+          muc_dau_ra: null,
+          khoa: { ten_khoa: 'Khóa AG' },
+        },
+      ]);
+      await service.commitKetQuaDanhGiaLo([dtoHv1]);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(nhatKy.ghiNhieu).toHaveBeenCalledWith([]);
+    });
+
+    it('ghi DB lỗi -> ném lỗi, không ghi nhật ký', async () => {
+      prisma.$transaction.mockRejectedValueOnce(new Error('mất kết nối'));
+      await expect(service.commitKetQuaDanhGiaLo([dtoHv1])).rejects.toThrow(
+        'mất kết nối',
+      );
+      expect(nhatKy.ghiNhieu).not.toHaveBeenCalled();
+    });
+  });
+
   describe('nhật ký kết quả / phân lớp (2026-10-04)', () => {
     const gd2 = {
       id: 'gd-2',
@@ -1727,38 +1957,44 @@ describe('KhoaBoiDuongService', () => {
       thu_tu: 2,
       ten_giai_doan: 'Zoom',
     };
+    const dangKyHv1 = (o: Record<string, unknown>) =>
+      prisma.dang_ky_hoc.findMany.mockResolvedValue([
+        {
+          hoc_vien_id: 'hv-1',
+          khoa_id: 'khoa-1',
+          muc_dau_vao: null,
+          muc_dau_ra: null,
+          khoa: { ten_khoa: 'Khóa A' },
+          ...o,
+        },
+      ]);
 
     it('nhập kết quả đánh giá đổi mức -> ghi cũ → mới', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
-        muc_dau_vao: null,
-        muc_dau_ra: null,
-        khoa: { ten_khoa: 'Khóa A' },
-      });
+      dangKyHv1({});
       await service.commitKetQuaDanhGia({
         hoc_vien_id: 'hv-1',
         khoa_id: 'khoa-1',
         loai: 'dau_vao',
         muc: 'co_ban',
       });
-      expect(nhatKy.ghi).toHaveBeenCalledWith({
-        hanh_dong: 'cap_nhat_muc_danh_gia',
-        hoc_vien_id: 'hv-1',
-        mo_ta: 'Khóa A — Đầu vào: (chưa có) → Cơ bản (nhập file)',
-      });
+      expect(nhatKy.ghiNhieu).toHaveBeenCalledWith([
+        {
+          hanh_dong: 'cap_nhat_muc_danh_gia',
+          hoc_vien_id: 'hv-1',
+          mo_ta: 'Khóa A — Đầu vào: (chưa có) → Cơ bản (nhập file)',
+        },
+      ]);
     });
 
     it('nhập lại cùng mức -> không ghi (tránh log rác khi chạy lại file)', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
-        muc_dau_vao: 'co_ban',
-        muc_dau_ra: null,
-        khoa: { ten_khoa: 'Khóa A' },
-      });
+      dangKyHv1({ muc_dau_vao: 'co_ban' });
       await service.commitKetQuaDanhGia({
         hoc_vien_id: 'hv-1',
         khoa_id: 'khoa-1',
         loai: 'dau_vao',
         muc: 'co_ban',
       });
+      expect(nhatKy.ghiNhieu).toHaveBeenCalledWith([]);
       expect(nhatKy.ghi).not.toHaveBeenCalled();
     });
 
@@ -1771,36 +2007,27 @@ describe('KhoaBoiDuongService', () => {
     ] as const)(
       'import đầu vào: muc_hoc_chon %s, mức chốt mới %s -> chỉ ghi muc_dau_vao',
       async (mucChon, mucMoi) => {
-        prisma.dang_ky_hoc.findUnique.mockResolvedValue({
-          muc_dau_vao: null,
-          muc_dau_ra: null,
-          muc_hoc_chon: mucChon,
-          khoa: { ten_khoa: 'Khóa A' },
-        });
+        dangKyHv1({ muc_hoc_chon: mucChon });
         await service.commitKetQuaDanhGia({
           hoc_vien_id: 'hv-1',
           khoa_id: 'khoa-1',
           loai: 'dau_vao',
           muc: mucMoi,
         });
-        const data = prisma.dang_ky_hoc.update.mock.calls[0][0].data;
+        const data = prisma.dang_ky_hoc.updateMany.mock.calls[0][0].data;
         expect(data).toEqual({ muc_dau_vao: mucMoi });
       },
     );
 
     it('import đầu ra chỉ ghi muc_dau_ra', async () => {
-      prisma.dang_ky_hoc.findUnique.mockResolvedValue({
-        muc_dau_vao: 'co_ban',
-        muc_dau_ra: null,
-        khoa: { ten_khoa: 'Khóa A' },
-      });
+      dangKyHv1({ muc_dau_vao: 'co_ban' });
       await service.commitKetQuaDanhGia({
         hoc_vien_id: 'hv-1',
         khoa_id: 'khoa-1',
         loai: 'dau_ra',
         muc: 'thanh_thao',
       });
-      const data = prisma.dang_ky_hoc.update.mock.calls[0][0].data;
+      const data = prisma.dang_ky_hoc.updateMany.mock.calls[0][0].data;
       expect(data).toEqual({ muc_dau_ra: 'thanh_thao' });
     });
 

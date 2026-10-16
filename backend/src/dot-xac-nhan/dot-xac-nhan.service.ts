@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, dot_xac_nhan } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { chiaLo } from '../common/utils/theo-lo.util';
 import {
   ConflictAppException,
   NotFoundAppException,
@@ -252,6 +253,26 @@ export class DotXacNhanService {
       },
     });
     return found !== null;
+  }
+
+  // Bản theo lô của hàm trên (import file lớn): tập học viên thỏa điều kiện.
+  async hocVienCoXacNhanTruocDanhGiaConHieuLuc(
+    hocVienIds: string[],
+  ): Promise<Set<string>> {
+    const co = new Set<string>();
+    for (const lo of chiaLo([...new Set(hocVienIds)])) {
+      const ds = await this.prisma.xac_nhan_ho_so.findMany({
+        where: {
+          hoc_vien_id: { in: lo },
+          con_hieu_luc: true,
+          dot: { loai: 'xac_nhan_truoc_danh_gia' },
+        },
+        select: { hoc_vien_id: true },
+        distinct: ['hoc_vien_id'],
+      });
+      ds.forEach((x) => co.add(x.hoc_vien_id));
+    }
+    return co;
   }
 
   // Đợt loai=xac_nhan_truoc_danh_gia áp dụng cho học viên (khoa_id NULL hoặc
