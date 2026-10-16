@@ -9,19 +9,27 @@ import {
   ValidationException,
 } from '../common/exceptions/app.exceptions';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
-import { GuiDoiBuoiDto } from './dto/doi-buoi-hoc.dto';
+import { HoTroHocVienScopeService } from '../ho-tro-hoc-vien/ho-tro-hoc-vien-scope.service';
+import {
+  DuyetDoiBuoiDto,
+  GhiChuXuLyDto,
+  GuiDoiBuoiDto,
+  LocDoiBuoiDto,
+} from './dto/doi-buoi-hoc.dto';
 import {
   DoiBuoiHocQueryService,
   LICH_TOM_TAT_SELECT,
 } from './doi-buoi-hoc-query.service';
 import {
   chuanHoaLyDo,
+  conChoChoDeNghi,
   daBatDau,
   HTTP_THEO_MA,
   KetQuaKiemTra,
   kiemTraGui,
   laBuoiTuongDuong,
   LichTomTat,
+  quyetDinhDuyet,
   soLuotDaDung,
   thuTuHang,
 } from './doi-buoi-hoc.rules';
@@ -47,6 +55,22 @@ export interface LuaChonBuoi {
   da_du: boolean;
 }
 
+export interface DeNghiDuyet extends DeNghiHocVien {
+  hoc_vien: {
+    id: string;
+    ho_ten: string;
+    don_vi: string;
+    cum: string | null;
+  };
+  buoi_nguon: LichTomTat | null;
+  buoi_de_nghi: LichTomTat | null;
+  buoi_chot: LichTomTat | null;
+  si_so: number;
+  si_so_toi_da: number | null;
+  so_cho_duyet: number;
+  nguoi_xu_ly: string | null;
+}
+
 interface DeNghiRow {
   id: string;
   trang_thai: trang_thai_de_nghi;
@@ -60,6 +84,7 @@ interface DeNghiRow {
 
 const TRANG_THAI_HOAT_DONG: trang_thai_de_nghi[] = ['cho_duyet', 'da_duyet'];
 const TIN_KHOA_TAT = 'Khóa học chưa mở đề nghị đổi buổi';
+const TIN_GHI_CHU = 'Ghi chú phải từ 5 đến 500 ký tự';
 
 @Injectable()
 export class DoiBuoiHocService {
@@ -67,6 +92,7 @@ export class DoiBuoiHocService {
     private readonly prisma: PrismaService,
     private readonly query: DoiBuoiHocQueryService,
     private readonly nhatKy: NhatKyService,
+    private readonly scope: HoTroHocVienScopeService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -154,35 +180,7 @@ export class DoiBuoiHocService {
         thong_diep: 'Buổi đã bắt đầu, không thể đổi',
       });
 
-    const ungVien = await this.prisma.lich_hoc_lop.findMany({
-      where: {
-        giai_doan_id: nguon.giai_doan_id,
-        buoi_so: nguon.buoi_so,
-        thoi_gian_bat_dau: { gt: now },
-        lop: { khoa_id: nguon.lop.khoa_id, loai_lop: nguon.lop.loai_lop },
-      },
-      orderBy: { thoi_gian_bat_dau: 'asc' },
-      select: LICH_TOM_TAT_SELECT,
-    });
-    const tuongDuong = ungVien.filter((l) => laBuoiTuongDuong(nguon, l));
-    const siSo = await this.query.siSoBuoi(
-      tuongDuong.map((l) => l.id),
-      now,
-    );
-    return tuongDuong.map((lich) => {
-      const s = siSo.get(lich.id) ?? {
-        si_so: 0,
-        si_so_toi_da: lich.lop.si_so_toi_da,
-        so_cho_duyet: 0,
-      };
-      return {
-        lich,
-        si_so: s.si_so,
-        si_so_toi_da: s.si_so_toi_da,
-        so_cho_duyet: s.so_cho_duyet,
-        da_du: s.si_so_toi_da !== null && s.si_so >= s.si_so_toi_da,
-      };
-    });
+    return this.luaChonTuongDuong(nguon, now);
   }
 
   async gui(user: AuthenticatedUser, dto: GuiDoiBuoiDto) {
@@ -252,6 +250,367 @@ export class DoiBuoiHocService {
       huy: true,
     });
     return { trang_thai: 'da_huy' as const };
+  }
+
+  // ---------------------------------------------------------------------
+  // Người duyệt: quan_tri (mọi đề nghị) + ho_tro_hoc_vien (theo cụm, ADR 0003)
+  // ---------------------------------------------------------------------
+
+  async danhSach(
+    user: AuthenticatedUser,
+    q: LocDoiBuoiDto,
+  ): Promise<DeNghiDuyet[]> {
+    const cumIds = await this.cumPhamVi(user);
+    if (cumIds?.length === 0) return [];
+    const rows = await this.prisma.doi_buoi_hoc.findMany({
+      where: {
+        ...(q.trang_thai ? { trang_thai: q.trang_thai } : {}),
+        dang_ky_hoc: {
+          ...(cumIds ? { cum_id: { in: cumIds } } : {}),
+          ...(q.khoa_id ? { khoa_id: q.khoa_id } : {}),
+        },
+      },
+      orderBy: !q.trang_thai
+        ? { tao_luc: 'desc' }
+        : q.trang_thai === 'cho_duyet'
+          ? { tao_luc: 'asc' }
+          : { xu_ly_luc: 'desc' },
+      take: 500,
+      select: {
+        ...DE_NGHI_SELECT,
+        dang_ky_hoc: {
+          select: {
+            hoc_vien: {
+              select: {
+                id: true,
+                ho_ten: true,
+                don_vi_cong_tac: { select: { ten_don_vi: true } },
+              },
+            },
+            cum: { select: { ten_cum: true } },
+          },
+        },
+        xu_ly_boi: { select: { ho_ten: true } },
+      },
+    });
+    if (rows.length === 0) return [];
+    const now = new Date();
+    const [lichMap, hang, siSo] = await Promise.all([
+      this.query.lichTomTat(
+        rows.flatMap((r) =>
+          [r.lich_nguon_id, r.lich_de_nghi_id, r.lich_chot_id].filter(
+            (x): x is string => x !== null,
+          ),
+        ),
+      ),
+      this.hangChoTheoDeNghi(rows, now),
+      this.query.siSoBuoi(
+        [...new Set(rows.map((r) => r.lich_de_nghi_id))],
+        now,
+      ),
+    ]);
+    return rows.map(({ dang_ky_hoc, xu_ly_boi, ...r }) => {
+      const s = siSo.get(r.lich_de_nghi_id);
+      return {
+        ...this.anhXaDeNghi(r, lichMap, now, hang),
+        hoc_vien: {
+          id: dang_ky_hoc.hoc_vien.id,
+          ho_ten: dang_ky_hoc.hoc_vien.ho_ten,
+          don_vi: dang_ky_hoc.hoc_vien.don_vi_cong_tac.ten_don_vi,
+          cum: dang_ky_hoc.cum?.ten_cum ?? null,
+        },
+        buoi_nguon: lichMap.get(r.lich_nguon_id) ?? null,
+        buoi_de_nghi: lichMap.get(r.lich_de_nghi_id) ?? null,
+        buoi_chot: r.lich_chot_id
+          ? (lichMap.get(r.lich_chot_id) ?? null)
+          : null,
+        si_so: s?.si_so ?? 0,
+        si_so_toi_da: s?.si_so_toi_da ?? null,
+        so_cho_duyet: s?.so_cho_duyet ?? 0,
+        nguoi_xu_ly: xu_ly_boi?.ho_ten ?? null,
+      };
+    });
+  }
+
+  async demChoDuyet(user: AuthenticatedUser): Promise<number> {
+    const cumIds = await this.cumPhamVi(user);
+    if (cumIds?.length === 0) return 0;
+    const now = new Date();
+    return this.prisma.doi_buoi_hoc.count({
+      where: {
+        trang_thai: 'cho_duyet',
+        ...(cumIds ? { dang_ky_hoc: { cum_id: { in: cumIds } } } : {}),
+        lich_nguon: { thoi_gian_bat_dau: { gt: now } },
+        lich_de_nghi: { thoi_gian_bat_dau: { gt: now } },
+      },
+    });
+  }
+
+  async luaChonDuyet(
+    user: AuthenticatedUser,
+    id: string,
+  ): Promise<(LuaChonBuoi & { so_truoc: number; duyet_duoc: boolean })[]> {
+    const dn = await this.taiDeNghiTrongPhamVi(user, id);
+    const nguon = (await this.query.lichTomTat([dn.lich_nguon_id])).get(
+      dn.lich_nguon_id,
+    );
+    if (!nguon) throw new NotFoundAppException('Không tìm thấy buổi học');
+    const now = new Date();
+    const ds = await this.luaChonTuongDuong(nguon, now);
+    if (ds.length === 0) return [];
+    const truoc = await this.prisma.doi_buoi_hoc.groupBy({
+      by: ['lich_de_nghi_id'],
+      where: {
+        ...this.whereChoTruoc(dn, now),
+        lich_de_nghi_id: { in: ds.map((x) => x.lich.id) },
+      },
+      _count: { _all: true },
+    });
+    const dem = new Map(truoc.map((g) => [g.lich_de_nghi_id, g._count._all]));
+    const nguonDaBatDau = daBatDau(nguon, now);
+    return ds.map((x) => {
+      const so_truoc = dem.get(x.lich.id) ?? 0;
+      return {
+        ...x,
+        so_truoc,
+        duyet_duoc:
+          !nguonDaBatDau &&
+          conChoChoDeNghi({
+            si_so: x.si_so,
+            si_so_toi_da: x.si_so_toi_da,
+            so_truoc,
+          }),
+      };
+    });
+  }
+
+  // Spec §4: khóa theo buổi chốt TRƯỚC khi đọc sĩ số / đếm hàng chờ.
+  async duyet(
+    user: AuthenticatedUser,
+    id: string,
+    dto: DuyetDoiBuoiDto,
+  ): Promise<{ trang_thai: 'da_duyet'; canh_bao: string[] }> {
+    const ghiChu = this.ghiChuTuyChon(dto.ghi_chu);
+    const dn = await this.taiDeNghiTrongPhamVi(user, id);
+    const lichChotId = dto.lich_chot_id ?? dn.lich_de_nghi_id;
+    const now = new Date();
+    const kq = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'doi_buoi:' + lichChotId}))`;
+      const hienTai = await tx.doi_buoi_hoc.findUnique({
+        where: { id },
+        select: { trang_thai: true, tao_luc: true },
+      });
+      if (!hienTai) throw new NotFoundAppException('Không tìm thấy đề nghị');
+      const lichMap = await this.query.lichTomTat(
+        [dn.lich_nguon_id, lichChotId],
+        tx,
+      );
+      const nguon = lichMap.get(dn.lich_nguon_id);
+      const chot = lichMap.get(lichChotId);
+      if (!nguon || !chot)
+        throw new NotFoundAppException('Không tìm thấy buổi học');
+      const phanLop = await tx.phan_lop_giai_doan.findFirst({
+        where: {
+          dang_ky_hoc_id: dn.dang_ky_hoc_id,
+          giai_doan_id: nguon.giai_doan_id,
+        },
+        select: { lop_id: true },
+      });
+      const siSo = await this.query.siSoBuoi([lichChotId], now, tx);
+      const soTruoc = await tx.doi_buoi_hoc.count({
+        where: {
+          ...this.whereChoTruoc({ id, tao_luc: hienTai.tao_luc }, now),
+          lich_de_nghi_id: lichChotId,
+        },
+      });
+      const si_so = siSo.get(lichChotId)?.si_so ?? 0;
+      const quyetDinh = quyetDinhDuyet(
+        {
+          vai_tro: user.vai_tro === 'quan_tri' ? 'quan_tri' : 'ho_tro_hoc_vien',
+          trang_thai: hienTai.trang_thai,
+          buoi_nguon: nguon,
+          buoi_chot: chot,
+          lop_phan_hien_tai: phanLop?.lop_id ?? null,
+          si_so,
+          so_truoc: soTruoc,
+        },
+        now,
+      );
+      if (quyetDinh.ket_qua === 'chan')
+        this.nem({
+          ok: false,
+          ma: quyetDinh.ma!,
+          thong_diep: quyetDinh.thong_diep!,
+        });
+      const { count } = await tx.doi_buoi_hoc.updateMany({
+        where: { id, trang_thai: 'cho_duyet' },
+        data: {
+          trang_thai: 'da_duyet',
+          lich_chot_id: lichChotId,
+          nguoi_xu_ly: user.id,
+          xu_ly_luc: now,
+          ghi_chu_xu_ly: ghiChu,
+        },
+      });
+      if (!count) throw new ConflictAppException('Đề nghị đã được xử lý');
+      const toiDa = chot.lop.si_so_toi_da;
+      const vuotSiSo = toiDa !== null && si_so >= toiDa;
+      return {
+        canh_bao: quyetDinh.canh_bao,
+        vuot_si_so: vuotSiSo,
+        vuot_thu_tu:
+          !vuotSiSo &&
+          !conChoChoDeNghi({ si_so, si_so_toi_da: toiDa, so_truoc: soTruoc }),
+      };
+    });
+    await this.ghiNhatKyDuyet(dn.dang_ky_hoc.hoc_vien_id, 'Duyệt đổi buổi', {
+      de_nghi_id: id,
+      lich_nguon_id: dn.lich_nguon_id,
+      lich_de_nghi_id: dn.lich_de_nghi_id,
+      lich_chot_id: lichChotId,
+      vuot_si_so: kq.vuot_si_so,
+      vuot_thu_tu: kq.vuot_thu_tu,
+    });
+    return { trang_thai: 'da_duyet', canh_bao: kq.canh_bao };
+  }
+
+  async tuChoi(
+    user: AuthenticatedUser,
+    id: string,
+    dto: GhiChuXuLyDto,
+  ): Promise<{ trang_thai: 'tu_choi' }> {
+    const ghiChu = this.ghiChuBatBuoc(dto.ghi_chu);
+    const dn = await this.taiDeNghiTrongPhamVi(user, id);
+    const { count } = await this.prisma.doi_buoi_hoc.updateMany({
+      where: { id, trang_thai: 'cho_duyet' },
+      data: {
+        trang_thai: 'tu_choi',
+        nguoi_xu_ly: user.id,
+        xu_ly_luc: new Date(),
+        ghi_chu_xu_ly: ghiChu,
+      },
+    });
+    if (!count) throw new ConflictAppException('Đề nghị đã được xử lý');
+    await this.ghiNhatKyDuyet(
+      dn.dang_ky_hoc.hoc_vien_id,
+      'Từ chối đề nghị đổi buổi',
+      { de_nghi_id: id, tu_choi: true },
+    );
+    return { trang_thai: 'tu_choi' };
+  }
+
+  async huyDuyet(
+    user: AuthenticatedUser,
+    id: string,
+    dto: GhiChuXuLyDto,
+  ): Promise<{ trang_thai: 'da_huy' }> {
+    const ghiChu = this.ghiChuBatBuoc(dto.ghi_chu);
+    const dn = await this.taiDeNghiTrongPhamVi(user, id);
+    if (dn.trang_thai !== 'da_duyet' || !dn.lich_chot_id)
+      throw new ConflictAppException('Đề nghị đã được xử lý');
+    const now = new Date();
+    const lichMap = await this.query.lichTomTat([
+      dn.lich_nguon_id,
+      dn.lich_chot_id,
+    ]);
+    const daBatDauMot = [dn.lich_nguon_id, dn.lich_chot_id].some((lid) => {
+      const l = lichMap.get(lid);
+      return l !== undefined && daBatDau(l, now);
+    });
+    if (daBatDauMot)
+      this.nem({
+        ok: false,
+        ma: 'DA_BAT_DAU',
+        thong_diep: 'Buổi đã bắt đầu, không thể đổi',
+      });
+    const { count } = await this.prisma.doi_buoi_hoc.updateMany({
+      where: { id, trang_thai: 'da_duyet' },
+      data: {
+        trang_thai: 'da_huy',
+        nguoi_xu_ly: user.id,
+        xu_ly_luc: now,
+        ghi_chu_xu_ly: ghiChu,
+      },
+    });
+    if (!count) throw new ConflictAppException('Đề nghị đã được xử lý');
+    await this.ghiNhatKyDuyet(
+      dn.dang_ky_hoc.hoc_vien_id,
+      'Hủy duyệt đổi buổi',
+      {
+        de_nghi_id: id,
+        huy_duyet: true,
+      },
+    );
+    return { trang_thai: 'da_huy' };
+  }
+
+  // null = mọi cụm (quan_tri); [] = không có cụm nào → không thấy gì.
+  private async cumPhamVi(user: AuthenticatedUser): Promise<string[] | null> {
+    if (user.vai_tro === 'quan_tri') return null;
+    return this.scope.cumIdsCuaToi(user.id);
+  }
+
+  // Ngoài phạm vi cụm hoặc không tồn tại → 404 (không lộ đề nghị cụm khác).
+  private async taiDeNghiTrongPhamVi(user: AuthenticatedUser, id: string) {
+    const cumIds = await this.cumPhamVi(user);
+    if (cumIds?.length === 0)
+      throw new NotFoundAppException('Không tìm thấy đề nghị');
+    const dn = await this.prisma.doi_buoi_hoc.findFirst({
+      where: {
+        id,
+        ...(cumIds ? { dang_ky_hoc: { cum_id: { in: cumIds } } } : {}),
+      },
+      select: {
+        id: true,
+        trang_thai: true,
+        dang_ky_hoc_id: true,
+        lich_nguon_id: true,
+        lich_de_nghi_id: true,
+        lich_chot_id: true,
+        tao_luc: true,
+        dang_ky_hoc: { select: { hoc_vien_id: true } },
+      },
+    });
+    if (!dn) throw new NotFoundAppException('Không tìm thấy đề nghị');
+    return dn;
+  }
+
+  // Đề nghị cho_duyet gửi trước đề nghị này, buổi nguồn & buổi đề nghị chưa bắt đầu.
+  private whereChoTruoc(
+    dn: { id: string; tao_luc: Date },
+    now: Date,
+  ): Prisma.doi_buoi_hocWhereInput {
+    return {
+      trang_thai: 'cho_duyet',
+      tao_luc: { lt: dn.tao_luc },
+      id: { not: dn.id },
+      lich_nguon: { thoi_gian_bat_dau: { gt: now } },
+      lich_de_nghi: { thoi_gian_bat_dau: { gt: now } },
+    };
+  }
+
+  private ghiChuBatBuoc(s: string | undefined): string {
+    const v = chuanHoaLyDo(s);
+    if (v === null) throw new ValidationException(TIN_GHI_CHU);
+    return v;
+  }
+
+  private ghiChuTuyChon(s: string | undefined): string | null {
+    if (s === undefined || s.trim() === '') return null;
+    return this.ghiChuBatBuoc(s);
+  }
+
+  private ghiNhatKyDuyet(
+    hocVienId: string,
+    moTa: string,
+    chiTiet: Record<string, unknown>,
+  ) {
+    return this.nhatKy.ghi({
+      hanh_dong: 'duyet_doi_buoi',
+      hoc_vien_id: hocVienId,
+      mo_ta: moTa,
+      chi_tiet: chiTiet,
+    });
   }
 
   // ---------------------------------------------------------------------
@@ -402,6 +761,42 @@ export class DoiBuoiHocService {
         );
       throw e;
     }
+  }
+
+  // Buổi tương đương buổi nguồn, chưa bắt đầu, kèm sĩ số (dùng cho học viên và người duyệt).
+  private async luaChonTuongDuong(
+    nguon: LichTomTat,
+    now: Date,
+  ): Promise<LuaChonBuoi[]> {
+    const ungVien = await this.prisma.lich_hoc_lop.findMany({
+      where: {
+        giai_doan_id: nguon.giai_doan_id,
+        buoi_so: nguon.buoi_so,
+        thoi_gian_bat_dau: { gt: now },
+        lop: { khoa_id: nguon.lop.khoa_id, loai_lop: nguon.lop.loai_lop },
+      },
+      orderBy: { thoi_gian_bat_dau: 'asc' },
+      select: LICH_TOM_TAT_SELECT,
+    });
+    const tuongDuong = ungVien.filter((l) => laBuoiTuongDuong(nguon, l));
+    const siSo = await this.query.siSoBuoi(
+      tuongDuong.map((l) => l.id),
+      now,
+    );
+    return tuongDuong.map((lich) => {
+      const s = siSo.get(lich.id) ?? {
+        si_so: 0,
+        si_so_toi_da: lich.lop.si_so_toi_da,
+        so_cho_duyet: 0,
+      };
+      return {
+        lich,
+        si_so: s.si_so,
+        si_so_toi_da: s.si_so_toi_da,
+        so_cho_duyet: s.so_cho_duyet,
+        da_du: s.si_so_toi_da !== null && s.si_so >= s.si_so_toi_da,
+      };
+    });
   }
 
   // Thứ hạng trong hàng chờ của cùng buổi đề nghị: chỉ tính cho_duyet chưa quá hạn.
