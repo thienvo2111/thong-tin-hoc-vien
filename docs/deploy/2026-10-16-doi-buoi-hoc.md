@@ -35,6 +35,7 @@ git rev-parse --short HEAD | tee ~/truoc-deploy-$(date +%F).txt
 git status --short
 export DB_URL="$(grep '^DATABASE_URL=' backend/.env | cut -d= -f2- | tr -d '"' | sed 's/?.*//')"
 (umask 077; pg_dump "$DB_URL" -Fc -f ~/backups/postgres/truoc-doi-buoi-hoc-$(date +%F-%H%M).dump) && ls -lh ~/backups/postgres/ | tail -3
+unset DB_URL
 ```
 
 Mật khẩu lấy từ `DATABASE_URL` trong `backend/.env` (bỏ đuôi `?schema=public` vì `pg_dump`/`psql` không nhận) —
@@ -82,6 +83,7 @@ psql "$DB_URL" -c "SELECT count(*) FROM doi_buoi_hoc;"                          
 psql "$DB_URL" -c "SELECT count(*) FROM khoa_boi_duong WHERE so_buoi_doi_toi_da <> 0;"   # kỳ vọng 0
 curl -s -o /dev/null -w "%{http_code} %{content_type}\n" https://boiduongnls.hcmue.edu.vn/doi-buoi-hoc/dem-cho-duyet
 pm2 logs boiduongnls-backend --lines 100 --nostream
+unset DB_URL
 ```
 
 - Hai truy vấn đều phải ra `0` (không đổi dữ liệu cũ, mọi khóa đang tắt).
@@ -97,7 +99,10 @@ menu **Đổi buổi**, có badge số chờ).
 
 ## 7. Quay lui (nếu cần)
 
-Code cũ chạy được trên schema mới → quay lui code **không cần** khôi phục DB:
+Ưu tiên **tắt tính năng**: đặt `so_buoi_doi_toi_da = 0` ở các khóa (dừng đề nghị mới, giữ dữ liệu).
+
+**Cách A — chỉ quay lui code (khuyến nghị).** Code cũ bỏ qua bảng/cột mới → không lỗi, không cần khôi phục DB.
+**Không** đụng `_prisma_migrations`.
 
 ```bash
 # Máy dev: revert merge commit trên main rồi push
@@ -107,15 +112,33 @@ cd ~/apps/boi-duong-nls && git pull origin main
 cd scripts/vps && bash 06-deploy.sh
 ```
 
-Nếu muốn gỡ hẳn schema (chỉ khi chắc chắn không còn dữ liệu đổi buổi cần giữ — mất toàn bộ đề nghị):
+`prisma migrate status` sau quay lui có thể báo migration "applied but missing" — bình thường.
 
-```sql
+**Cách B — gỡ hẳn schema** (chỉ sau khi code cũ đã chạy, và chắc chắn không cần giữ đề nghị nào — mất toàn bộ).
+Chạy trong MỘT transaction để `_prisma_migrations` khớp schema, nếu không `migrate deploy` lần sau sẽ không tạo lại bảng:
+
+```bash
+export DB_URL="$(grep '^DATABASE_URL=' ~/apps/boi-duong-nls/backend/.env | cut -d= -f2- | tr -d '"' | sed 's/?.*//')"
+psql "$DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
 DROP TABLE doi_buoi_hoc;
 ALTER TABLE khoa_boi_duong DROP COLUMN so_buoi_doi_toi_da;
+DELETE FROM _prisma_migrations WHERE migration_name = '20261016120000_doi_buoi_hoc';
+COMMIT;
+SQL
+unset DB_URL
 ```
 
-Rồi đánh dấu migration đã gỡ để `migrate deploy` không lệch: `npx prisma migrate resolve --rolled-back 20261016120000_doi_buoi_hoc`.
-Chỉ khôi phục DB từ bản dump ở mục 1 khi **dữ liệu bị sai** (không phải khi chỉ lỗi giao diện).
+**Khôi phục từ backup** (chỉ khi dữ liệu bị sai — mất mọi thay đổi từ lúc dump). Bản dump ở mục 1 là định dạng `-Fc`,
+`psql` không đọc được, phải dùng `pg_restore`:
+
+```bash
+export DB_URL="$(grep '^DATABASE_URL=' ~/apps/boi-duong-nls/backend/.env | cut -d= -f2- | tr -d '"' | sed 's/?.*//')"
+pm2 stop boiduongnls-backend
+pg_restore -d "$DB_URL" --clean --if-exists ~/backups/postgres/truoc-doi-buoi-hoc-<ngay-gio>.dump
+pm2 start boiduongnls-backend
+unset DB_URL
+```
 
 ## 8. Sau deploy
 
