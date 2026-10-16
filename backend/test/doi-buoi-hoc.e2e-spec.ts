@@ -27,7 +27,13 @@ describe('Đổi buổi học (e2e)', () => {
   let khoaId: string;
   let maKhoa: string;
   let gdId: string;
-  const buoi: Record<'a' | 'b', string> = { a: '', b: '' };
+  const buoi: Record<'a' | 'b' | 'd' | 'e' | 'x', string> = {
+    a: '',
+    b: '',
+    d: '',
+    e: '',
+    x: '',
+  };
   const lop: Record<'a' | 'b', string> = { a: '', b: '' };
   const hv: Record<string, { id: string; dk: string; moet: string }> = {};
   const tk: Record<string, string> = {};
@@ -182,6 +188,18 @@ describe('Đổi buổi học (e2e)', () => {
     for (const ma of ['hv1', 'hv2', 'hv3'])
       await taoHocVien(ma, cum.id, gdId, a.lopId, true);
     await taoHocVien('p1', cum.id, gdId, b.lopId, false);
+
+    // (d) chứng minh advisory lock: lớp D còn đúng 1 chỗ (1/2), lớp X không
+    // giới hạn; HV4, HV5 ở lớp E (tách khỏi lớp A để không đổi số đếm (a)).
+    const d = await taoLop('Lớp D', 2);
+    const e = await taoLop('Lớp E');
+    const x = await taoLop('Lớp X');
+    buoi.d = d.lichId;
+    buoi.e = e.lichId;
+    buoi.x = x.lichId;
+    await taoHocVien('p2', cum.id, gdId, d.lopId, false);
+    for (const ma of ['hv4', 'hv5'])
+      await taoHocVien(ma, cum.id, gdId, e.lopId, true);
     const ht = await taoHoTro();
     await prisma.phan_cong_ho_tro.create({
       data: { nguoi_dung_id: ht.id, cum_id: cum.id },
@@ -277,6 +295,36 @@ describe('Đổi buổi học (e2e)', () => {
       where: { trang_thai: 'da_duyet', lich_chot_id: buoi.b },
     });
     expect(daDuyet).toBe(2);
+  });
+
+  it('(d) lock theo buổi chốt: R1 (đề nghị X, chốt D) và R2 (đề nghị D) duyệt song song khi D còn 1 chỗ → đúng 1 thành công', async () => {
+    const guiTu = (ai: string, dich: string) =>
+      http().post('/hoc-vien/toi/doi-buoi').set(auth(ai)).send({
+        lich_nguon_id: buoi.e,
+        lich_de_nghi_id: dich,
+        ly_do: 'Trùng lịch công tác',
+      });
+    // R1 gửi trước R2: không đề nghị nào chờ vào D trước R1 hay R2, nên cả hai
+    // qua được kiểm giữ chỗ; chỉ khóa doi_buoi:<D> ngăn cả hai cùng đọc 1/2.
+    const r1 = (await guiTu('hv4', buoi.x).expect(201)).body.id as string;
+    const r2 = (await guiTu('hv5', buoi.d).expect(201)).body.id as string;
+
+    const [k1, k2] = await Promise.all([
+      http()
+        .post(`/doi-buoi-hoc/${r1}/duyet`)
+        .set(auth('ht'))
+        .send({ lich_chot_id: buoi.d }),
+      duyet(r2),
+    ]);
+    expect([k1.status, k2.status].sort()).toEqual([200, 409]);
+    const vaoD = await prisma.doi_buoi_hoc.count({
+      where: { trang_thai: 'da_duyet', lich_chot_id: buoi.d },
+    });
+    expect(vaoD).toBe(1);
+    const phanLopD = await prisma.phan_lop_giai_doan.count({
+      where: { lop: { lich_hoc: { some: { id: buoi.d } } } },
+    });
+    expect(phanLopD + vaoD).toBeLessThanOrEqual(2);
   });
 
   it('(c) HV2 gửi lần 2 cho cùng buổi nguồn → 409', async () => {

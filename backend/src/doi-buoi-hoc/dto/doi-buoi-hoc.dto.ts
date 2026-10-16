@@ -30,6 +30,15 @@ export class LocDoiBuoiDto {
   )
   @IsIn([true, false])
   da_xu_ly?: boolean;
+
+  // Chỉ với trang_thai=cho_duyet: mặc định chỉ đề nghị còn hạn (cả buổi nguồn
+  // lẫn buổi đề nghị chưa bắt đầu); true = đề nghị quá hạn, 100 bản mới nhất.
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
+  @IsIn([true, false])
+  qua_han?: boolean;
 }
 
 // ghi_chu kiểm bằng chuanHoaLyDo trong service (5–500 sau NFC + trim).

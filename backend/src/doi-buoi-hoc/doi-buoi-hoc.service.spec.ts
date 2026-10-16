@@ -187,6 +187,31 @@ describe('DoiBuoiHocService (hoc vien)', () => {
     );
   });
 
+  it('gui: dang ky bi tu choi -> 400 khong con hieu luc, khong tao', async () => {
+    const { svc, prisma, tx } = setup();
+    prisma.dang_ky_hoc.findFirst.mockResolvedValueOnce({
+      id: 'dk1',
+      trang_thai: 'tu_choi',
+    } as never);
+    await expect(svc.gui(user, dto)).rejects.toMatchObject({
+      status: 400,
+      response: { error: expect.objectContaining({ message: 'Đăng ký không còn hiệu lực' }) },
+    });
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it.each(['cho_duyet', 'da_duyet', 'da_phan_lop'])(
+    'gui: dang ky %s van gui duoc',
+    async (tt) => {
+      const { svc, prisma } = setup();
+      prisma.dang_ky_hoc.findFirst.mockResolvedValueOnce({
+        id: 'dk1',
+        trang_thai: tt,
+      } as never);
+      await expect(svc.gui(user, dto)).resolves.toEqual({ id: 'moi' });
+    },
+  );
+
   it('gui: buoi nguon khong thuoc lop hien tai -> 400', async () => {
     const { svc, tx } = setup();
     tx.phan_lop_giai_doan.findFirst.mockResolvedValueOnce({ lop_id: 'lopZ' });
@@ -754,8 +779,8 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     );
   });
 
-  it('huyDuyet: buoi da bat dau -> 400', async () => {
-    const { svc, lichMap, prisma } = setupDuyet({
+  it('huyDuyet: buoi da bat dau (doc lai trong tx) -> 400', async () => {
+    const { svc, lichMap, prisma, tx, query } = setupDuyet({
       trangThai: 'da_duyet',
       lichChot: 'lk',
     });
@@ -763,18 +788,24 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     await expect(svc.huyDuyet(quanTri, 'x1', ghiChu)).rejects.toMatchObject({
       status: 400,
     });
+    expect(query.lichTomTat).toHaveBeenCalledWith(['ln', 'lk'], tx);
     expect(prisma.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+    expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
   });
 
-  it('huyDuyet: thanh cong -> updateMany co dieu kien da_duyet', async () => {
-    const { svc, prisma, nhatKy } = setupDuyet({
+  it('huyDuyet: thanh cong -> lock buoi nguon truoc si so, updateMany da_duyet trong tx', async () => {
+    const { svc, tx, query, nhatKy, order } = setupDuyet({
       trangThai: 'da_duyet',
       lichChot: 'lk',
     });
     await expect(svc.huyDuyet(quanTri, 'x1', ghiChu)).resolves.toEqual({
       trang_thai: 'da_huy',
+      canh_bao: [],
     });
-    expect(prisma.doi_buoi_hoc.updateMany).toHaveBeenCalledWith({
+    expect(tx.$executeRaw.mock.calls[0][1]).toBe('doi_buoi:ln');
+    expect(order.slice(0, 2)).toEqual(['lock', 'siSo']);
+    expect(query.siSoBuoi).toHaveBeenCalledWith(['ln'], expect.any(Date), tx);
+    expect(tx.doi_buoi_hoc.updateMany).toHaveBeenCalledWith({
       where: { id: 'x1', trang_thai: 'da_duyet' },
       data: expect.objectContaining({
         trang_thai: 'da_huy',
@@ -783,9 +814,73 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     });
     expect(nhatKy.ghi).toHaveBeenCalledWith(
       expect.objectContaining({
-        chi_tiet: { de_nghi_id: 'x1', huy_duyet: true },
+        chi_tiet: { de_nghi_id: 'x1', huy_duyet: true, vuot_si_so: false },
       }),
     );
+    expect(tx.doi_buoi_hoc.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+      nhatKy.ghi.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('huyDuyet: ho tro cum + buoi goc da du -> 409, khong cap nhat', async () => {
+    const { svc, tx, nhatKy } = setupDuyet({
+      trangThai: 'da_duyet',
+      lichChot: 'lk',
+      siSo: 40,
+    });
+    await expect(svc.huyDuyet(hoTro, 'x1', ghiChu)).rejects.toMatchObject({
+      status: 409,
+      response: {
+        error: expect.objectContaining({
+          message: 'Buổi gốc đã đủ sĩ số 40/40 — không thể hủy duyệt',
+        }),
+      },
+    });
+    expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+    expect(nhatKy.ghi).not.toHaveBeenCalled();
+  });
+
+  it('huyDuyet: quan tri + buoi goc da du -> van huy, canh_bao + vuot_si_so', async () => {
+    const { svc, tx, nhatKy } = setupDuyet({
+      trangThai: 'da_duyet',
+      lichChot: 'lk',
+      siSo: 40,
+    });
+    const r = await svc.huyDuyet(quanTri, 'x1', ghiChu);
+    expect(r.trang_thai).toBe('da_huy');
+    expect(r.canh_bao).toHaveLength(1);
+    expect(tx.doi_buoi_hoc.updateMany).toHaveBeenCalled();
+    expect(nhatKy.ghi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chi_tiet: { de_nghi_id: 'x1', huy_duyet: true, vuot_si_so: true },
+      }),
+    );
+  });
+
+  it('huyDuyet: phan lop da doi -> khong ve buoi nguon, khong chan theo si so', async () => {
+    const { svc, query } = setupDuyet({
+      trangThai: 'da_duyet',
+      lichChot: 'lk',
+      siSo: 40,
+      lopPhan: 'lopZ',
+    });
+    await expect(svc.huyDuyet(hoTro, 'x1', ghiChu)).resolves.toEqual({
+      trang_thai: 'da_huy',
+      canh_bao: [],
+    });
+    expect(query.siSoBuoi).not.toHaveBeenCalled();
+  });
+
+  it('huyDuyet: updateMany 0 dong -> 409', async () => {
+    const { svc, nhatKy } = setupDuyet({
+      trangThai: 'da_duyet',
+      lichChot: 'lk',
+      capNhat: 0,
+    });
+    await expect(svc.huyDuyet(quanTri, 'x1', ghiChu)).rejects.toMatchObject({
+      status: 409,
+    });
+    expect(nhatKy.ghi).not.toHaveBeenCalled();
   });
 
   it('huyDuyet: chua duyet -> 409', async () => {
@@ -843,10 +938,14 @@ describe('DoiBuoiHocService nguoi duyet', () => {
       khoa_id: 'k1',
     });
     const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
-    expect(arg.where).toEqual({
+    expect(arg.where).toMatchObject({
       trang_thai: 'cho_duyet',
       dang_ky_hoc: { khoa_id: 'k1' },
     });
+    // Mac dinh chi de nghi con han: ca buoi nguon lan buoi de nghi chua bat dau.
+    expect(arg.where.lich_nguon.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
+    expect(arg.where.lich_de_nghi.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
+    expect(arg.where.OR).toBeUndefined();
     expect(arg.orderBy).toEqual({ tao_luc: 'asc' });
     expect(arg.take).toBe(500);
     expect(query.siSoBuoi).toHaveBeenCalledTimes(1);
@@ -882,6 +981,34 @@ describe('DoiBuoiHocService nguoi duyet', () => {
       dang_ky_hoc: { cum_id: { in: ['c1'] } },
     });
     expect(arg.orderBy).toEqual({ xu_ly_luc: 'desc' });
+    expect(arg.take).toBe(500);
+  });
+
+  it('danhSach: cho_duyet qua_han=true -> chi qua han, moi nhat truoc, 100', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.danhSach(hoTro, { trang_thai: 'cho_duyet', qua_han: true });
+    const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
+    expect(arg.where).toMatchObject({
+      trang_thai: 'cho_duyet',
+      dang_ky_hoc: { cum_id: { in: ['c1'] } },
+    });
+    expect(arg.where.OR).toHaveLength(2);
+    expect(arg.where.OR[0].lich_nguon.thoi_gian_bat_dau.lte).toBeInstanceOf(
+      Date,
+    );
+    expect(arg.where.OR[1].lich_de_nghi.thoi_gian_bat_dau.lte).toBeInstanceOf(
+      Date,
+    );
+    expect(arg.where.lich_nguon).toBeUndefined();
+    expect(arg.orderBy).toEqual({ tao_luc: 'desc' });
+    expect(arg.take).toBe(100);
+  });
+
+  it('danhSach: qua_han bi bo qua khi khong phai cho_duyet', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.danhSach(hoTro, { da_xu_ly: true, qua_han: true });
+    const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
+    expect(arg.where.OR).toBeUndefined();
     expect(arg.take).toBe(500);
   });
 

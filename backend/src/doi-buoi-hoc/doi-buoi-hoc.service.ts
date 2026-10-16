@@ -291,6 +291,24 @@ export class DoiBuoiHocService {
   ): Promise<DeNghiDuyet[]> {
     const cumIds = await this.cumPhamVi(user);
     if (cumIds?.length === 0) return [];
+    const now = new Date();
+    // Tab Chờ duyệt: đề nghị quá hạn không bao giờ tự đóng (D7) → tách riêng
+    // để không chiếm 500 chỗ đầu của danh sách sắp tao_luc tăng dần.
+    const choDuyet = !q.da_xu_ly && q.trang_thai === 'cho_duyet';
+    const quaHan = choDuyet && q.qua_han === true;
+    const locHan: Prisma.doi_buoi_hocWhereInput = !choDuyet
+      ? {}
+      : quaHan
+        ? {
+            OR: [
+              { lich_nguon: { thoi_gian_bat_dau: { lte: now } } },
+              { lich_de_nghi: { thoi_gian_bat_dau: { lte: now } } },
+            ],
+          }
+        : {
+            lich_nguon: { thoi_gian_bat_dau: { gt: now } },
+            lich_de_nghi: { thoi_gian_bat_dau: { gt: now } },
+          };
     const rows = await this.prisma.doi_buoi_hoc.findMany({
       where: {
         ...(q.da_xu_ly
@@ -298,6 +316,7 @@ export class DoiBuoiHocService {
           : q.trang_thai
             ? { trang_thai: q.trang_thai }
             : {}),
+        ...locHan,
         dang_ky_hoc: {
           ...(cumIds ? { cum_id: { in: cumIds } } : {}),
           ...(q.khoa_id ? { khoa_id: q.khoa_id } : {}),
@@ -307,10 +326,12 @@ export class DoiBuoiHocService {
         ? { xu_ly_luc: 'desc' }
         : !q.trang_thai
           ? { tao_luc: 'desc' }
-          : q.trang_thai === 'cho_duyet'
-            ? { tao_luc: 'asc' }
-            : { xu_ly_luc: 'desc' },
-      take: 500,
+          : quaHan
+            ? { tao_luc: 'desc' }
+            : q.trang_thai === 'cho_duyet'
+              ? { tao_luc: 'asc' }
+              : { xu_ly_luc: 'desc' },
+      take: quaHan ? 100 : 500,
       select: {
         ...DE_NGHI_SELECT,
         dang_ky_hoc: {
@@ -329,7 +350,6 @@ export class DoiBuoiHocService {
       },
     });
     if (rows.length === 0) return [];
-    const now = new Date();
     const [lichMap, hang, siSo] = await Promise.all([
       this.query.lichTomTat(
         rows.flatMap((r) =>
@@ -533,45 +553,82 @@ export class DoiBuoiHocService {
     user: AuthenticatedUser,
     id: string,
     dto: GhiChuXuLyDto,
-  ): Promise<{ trang_thai: 'da_huy' }> {
+  ): Promise<{ trang_thai: 'da_huy'; canh_bao: string[] }> {
     const ghiChu = this.ghiChuBatBuoc(dto.ghi_chu);
     const dn = await this.taiDeNghiTrongPhamVi(user, id);
     if (dn.trang_thai !== 'da_duyet' || !dn.lich_chot_id)
       throw new ConflictAppException('Đề nghị đã được xử lý');
+    const lichChotId = dn.lich_chot_id;
     const now = new Date();
-    const lichMap = await this.query.lichTomTat([
-      dn.lich_nguon_id,
-      dn.lich_chot_id,
-    ]);
-    const daBatDauMot = [dn.lich_nguon_id, dn.lich_chot_id].some((lid) => {
-      const l = lichMap.get(lid);
-      return l !== undefined && daBatDau(l, now);
-    });
-    if (daBatDauMot)
-      this.nem({
-        ok: false,
-        ma: 'DA_BAT_DAU',
-        thong_diep: 'Buổi đã bắt đầu, không thể đổi',
+    // Hủy duyệt đưa học viên về buổi nguồn → khóa CÙNG namespace với duyệt
+    // (doi_buoi:<lich>) theo buổi nguồn, rồi mới đọc sĩ số buổi nguồn.
+    const kq = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'doi_buoi:' + dn.lich_nguon_id}))`;
+      const lichMap = await this.query.lichTomTat(
+        [dn.lich_nguon_id, lichChotId],
+        tx,
+      );
+      const daBatDauMot = [dn.lich_nguon_id, lichChotId].some((lid) => {
+        const l = lichMap.get(lid);
+        return l !== undefined && daBatDau(l, now);
       });
-    const { count } = await this.prisma.doi_buoi_hoc.updateMany({
-      where: { id, trang_thai: 'da_duyet' },
-      data: {
-        trang_thai: 'da_huy',
-        nguoi_xu_ly: user.id,
-        xu_ly_luc: now,
-        ghi_chu_xu_ly: ghiChu,
-      },
+      if (daBatDauMot)
+        this.nem({
+          ok: false,
+          ma: 'DA_BAT_DAU',
+          thong_diep: 'Buổi đã bắt đầu, không thể đổi',
+        });
+      const nguon = lichMap.get(dn.lich_nguon_id);
+      const phanLop = nguon
+        ? await tx.phan_lop_giai_doan.findFirst({
+            where: {
+              dang_ky_hoc_id: dn.dang_ky_hoc_id,
+              giai_doan_id: nguon.giai_doan_id,
+            },
+            select: { lop_id: true },
+          })
+        : null;
+      // Phân lớp đã đổi → bản ghi không còn hiệu lực, học viên không quay về buổi nguồn.
+      const veBuoiNguon = !!nguon && phanLop?.lop_id === nguon.lop_id;
+      const canh_bao: string[] = [];
+      let vuotSiSo = false;
+      if (veBuoiNguon) {
+        const s = (await this.query.siSoBuoi([dn.lich_nguon_id], now, tx)).get(
+          dn.lich_nguon_id,
+        );
+        const toiDa = s?.si_so_toi_da ?? null;
+        const siSo = s?.si_so ?? 0;
+        if (toiDa !== null && siSo >= toiDa) {
+          const tin = `Buổi gốc đã đủ sĩ số ${siSo}/${toiDa} — không thể hủy duyệt`;
+          if (user.vai_tro !== 'quan_tri') throw new ConflictAppException(tin);
+          vuotSiSo = true;
+          canh_bao.push(
+            `Buổi gốc đã đủ sĩ số ${siSo}/${toiDa} — hủy duyệt sẽ vượt sĩ số`,
+          );
+        }
+      }
+      const { count } = await tx.doi_buoi_hoc.updateMany({
+        where: { id, trang_thai: 'da_duyet' },
+        data: {
+          trang_thai: 'da_huy',
+          nguoi_xu_ly: user.id,
+          xu_ly_luc: now,
+          ghi_chu_xu_ly: ghiChu,
+        },
+      });
+      if (!count) throw new ConflictAppException('Đề nghị đã được xử lý');
+      return { canh_bao, vuot_si_so: vuotSiSo };
     });
-    if (!count) throw new ConflictAppException('Đề nghị đã được xử lý');
     await this.ghiNhatKyDuyet(
       dn.dang_ky_hoc.hoc_vien_id,
       'Hủy duyệt đổi buổi',
       {
         de_nghi_id: id,
         huy_duyet: true,
+        vuot_si_so: kq.vuot_si_so,
       },
     );
-    return { trang_thai: 'da_huy' };
+    return { trang_thai: 'da_huy', canh_bao: kq.canh_bao };
   }
 
   // null = mọi cụm (quan_tri); [] = không có cụm nào → không thấy gì.
@@ -683,10 +740,13 @@ export class DoiBuoiHocService {
   ) {
     const dangKy = await this.prisma.dang_ky_hoc.findFirst({
       where: { hoc_vien_id: hocVienId, khoa_id: khoaId },
-      select: { id: true },
+      select: { id: true, trang_thai: true },
     });
     if (!dangKy) throw new NotFoundAppException(thongDiep);
-    return dangKy;
+    // trang_thai_dang_ky: cho_duyet | da_duyet | da_phan_lop còn hiệu lực; tu_choi thì không.
+    if (dangKy.trang_thai === 'tu_choi')
+      throw new ValidationException('Đăng ký không còn hiệu lực');
+    return { id: dangKy.id };
   }
 
   private async taiDeNghiCuaCaller(hocVienId: string, id: string) {
