@@ -47,6 +47,17 @@ Xem đề nghị đã duyệt / từ chối / hủy, buổi chốt, người x�
 **Hủy duyệt**: chỉ khi cả buổi gốc và buổi chốt chưa bắt đầu; ghi chú bắt buộc. Nếu buổi gốc đã đủ sĩ số
 thì người hỗ trợ cụm **không hủy được** (Quản trị vẫn làm được, kèm cảnh báo).
 
+### Tab **Thống kê**
+
+Mỗi dòng là **một buổi học** có học viên xin đổi ra hoặc đổi vào. Lọc theo khóa, giai đoạn, lớp, trình độ, hình thức,
+cụm (người hỗ trợ chỉ thấy cụm mình), khoảng ngày học; bật **Chỉ buổi có đề nghị chờ** để chỉ xem buổi còn việc cần duyệt.
+
+- Hàng ô trên cùng: tổng đề nghị, chờ duyệt, quá hạn, đã duyệt, từ chối, đã hủy, số buổi đã đầy.
+- Cột **Sĩ số**: *phân lớp → sau đổi / tối đa* (đỏ = buổi đã đầy).
+- Cột **Đổi ra / Đổi vào**: 5 số *duyệt · chờ · quá hạn · từ chối · hủy*.
+- Bấm một dòng để xem danh sách học viên đổi ra / đổi vào của buổi đó.
+- **Xuất Excel**: tải bảng đang lọc kèm sheet danh sách học viên (có họ tên, đơn vị — **không chuyển ra ngoài**).
+
 ### Quyền riêng của Quản trị
 
 Quản trị **được duyệt vượt** sĩ số hoặc vượt thứ tự hàng chờ — lựa chọn hiện cảnh báo vàng

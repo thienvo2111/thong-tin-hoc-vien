@@ -780,6 +780,14 @@ Mọi endpoint: đăng ký phải của caller (không phải → `404`); đăng
 
 Mọi chuyển trạng thái là `updateMany` có điều kiện trạng thái cũ; 0 dòng → `409` "Đề nghị đã được xử lý". Nhật ký nhóm `hoc_tap`: `de_nghi_doi_buoi`, `duyet_doi_buoi`.
 
+**Thống kê theo buổi (tab Thống kê, 2026-10-16).** Cùng phạm vi cụm như trên (`ho_tro_hoc_vien` không có cụm → kết quả rỗng). Bộ lọc chung (đều tùy chọn; mảng gửi CSV `a,b` hoặc lặp tham số, sai UUID/enum/ngày → `400`): `khoa_id`, `giai_doan_id`, `lop_id[]`, `muc_nang_luc[]`, `loai_lop[]` (áp lên **buổi của dòng**), `cum_id[]` (cụm của học viên gửi; `ho_tro_hoc_vien` luôn giao với cụm của mình), `tu_ngay`/`den_ngay` (`YYYY-MM-DD` giờ Việt Nam, so với `thoi_gian_bat_dau`), `chi_co_cho=true` (chỉ buổi có đề nghị chờ còn hạn ra hoặc vào). Đề nghị A→B góp vào dòng A (ra) và dòng của buổi vào (vào); dòng không qua lọc buổi bị bỏ.
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| GET | `/doi-buoi-hoc/thong-ke?…` | `{ tong, dong, bo_loc, gioi_han }`. `dong[]` (sắp `thoi_gian_bat_dau` tăng rồi `ten_lop`): `lich { id, buoi_so, thoi_gian_bat_dau, thoi_gian_ket_thuc, lop { id, ten_lop, muc_nang_luc, loai_lop }, giai_doan { id, thu_tu, ten_giai_doan }, khoa { id, ma_khoa, ten_khoa } }`, `si_so_phan_lop`, `si_so` (sau đổi, chỉ đổi buổi còn hiệu lực), `si_so_toi_da`, `day`, `ra_da_duyet`/`ra_cho`/`ra_qua_han`/`ra_tu_choi`/`ra_huy` (theo `lich_nguon_id`), `vao_da_duyet` (theo `lich_chot_id`), `vao_cho`/`vao_qua_han`/`vao_tu_choi` (theo `lich_de_nghi_id`), `vao_huy` (theo `lich_chot_id ?? lich_de_nghi_id`). "Quá hạn" = `cho_duyet` mà buổi nguồn hoặc buổi đề nghị đã bắt đầu — tách khỏi `*_cho`. `*_da_duyet` là số bản ghi thô (kể cả bản mất hiệu lực do phân lớp đổi) nên có thể lệch `si_so`. `tong { de_nghi, cho_duyet, qua_han, da_duyet, tu_choi, da_huy, so_buoi_day }` đếm **mỗi đề nghị 1 lần** (có ít nhất 1 đầu thuộc dòng sau lọc). `bo_loc { khoa[], giai_doan[], lop[], cum[] }` lấy từ đề nghị trong phạm vi, **trước** lọc buổi/cụm. `gioi_han: true` khi vượt 20.000 đề nghị hoặc 1.000 dòng (bị cắt) |
+| GET | `/doi-buoi-hoc/thong-ke/buoi/{lichId}?cum_id=` | `{ ra: HocVienDong[], vao: HocVienDong[] }` — `HocVienDong = { de_nghi_id, ho_ten, don_vi, cum, trang_thai, ly_do_huy, qua_han, buoi_kia, tao_luc, xu_ly_luc, nguoi_xu_ly }`; `buoi_kia` (dạng `buoi_nguon` của 12.1) = buổi vào (ra) hoặc buổi gốc (vào). `lichId` sai UUID → `400` |
+| GET | `/doi-buoi-hoc/thong-ke/xuat-excel?…` | File `thong-ke-doi-buoi-YYYYMMDD-HHmm.xlsx`, cùng bộ lọc: sheet **Thống kê theo buổi** (mỗi dòng 1 buổi, dòng 2 ghi bộ lọc) và sheet **Học viên** (có PII: họ tên, đơn vị, cụm — mỗi đề nghị 1 dòng, trạng thái ghi rõ lý do hủy). Ghi nhật ký `xuat_thong_ke_doi_buoi` (nhóm `tai_khoan`) |
+
 ### 12.3 Thay đổi response của endpoint đã có
 
 - **`PATCH /khoa-boi-duong/{id}`** nhận thêm `so_buoi_doi_toi_da` (số nguyên 0–50; Quản trị). `GET /khoa-boi-duong/{id}` trả trường này.
