@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
@@ -9,6 +10,8 @@ import {
 import { HoTroGiangVienScopeService } from '../ho-tro-giang-vien/ho-tro-giang-vien-scope.service';
 import { quyenSuaDiemDanh } from './quyen-sua-diem-danh.util';
 import { SuaDiemDanhDto } from './diem-danh.dto';
+import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
+import { nhanDoiBuoiTheoDangKy } from '../trang-lop/trang-lop.service';
 
 const CHON_O = {
   lich_hoc_id: true,
@@ -46,6 +49,7 @@ export class DiemDanhService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scope: HoTroGiangVienScopeService,
+    private readonly doiBuoi: DoiBuoiHocQueryService,
   ) {}
 
   async bangDiemDanh(
@@ -106,6 +110,20 @@ export class DiemDanhService {
     }
     const gdId = chon.id;
     const trongDot = { lich_hoc: { lop_id: lopId, giai_doan_id: gdId } };
+    const chonDangKy = {
+      id: true,
+      hoc_vien: {
+        select: {
+          ho_ten: true,
+          don_vi_cong_tac: { select: { ten_don_vi: true } },
+        },
+      },
+      diem_danh: { where: trongDot, select: CHON_O },
+      bao_vang: {
+        where: trongDot,
+        select: { lich_hoc_id: true, ly_do: true },
+      },
+    } satisfies Prisma.dang_ky_hocSelect;
 
     const [dsBuoi, dsPhanLop] = await Promise.all([
       this.prisma.lich_hoc_lop.findMany({
@@ -120,26 +138,23 @@ export class DiemDanhService {
       }),
       this.prisma.phan_lop_giai_doan.findMany({
         where: { lop_id: lopId, giai_doan_id: gdId },
-        select: {
-          dang_ky_hoc: {
-            select: {
-              id: true,
-              hoc_vien: {
-                select: {
-                  ho_ten: true,
-                  don_vi_cong_tac: { select: { ten_don_vi: true } },
-                },
-              },
-              diem_danh: { where: trongDot, select: CHON_O },
-              bao_vang: {
-                where: trongDot,
-                select: { lich_hoc_id: true, ly_do: true },
-              },
-            },
-          },
-        },
+        select: { dang_ky_hoc: { select: chonDangKy } },
       }),
     ]);
+
+    // Spec đổi buổi §5: buổi chốt có thêm dòng người đổi vào; buổi nguồn ghi
+    // nhãn "đã đổi sang" cho người đổi ra (doi_buoi theo lich_hoc_id).
+    const doiBuoi = nhanDoiBuoiTheoDangKy(
+      await this.doiBuoi.dieuChinhTheoBuoi(dsBuoi.map((b) => b.id)),
+    );
+    const coSan = new Set(dsPhanLop.map((p) => p.dang_ky_hoc.id));
+    const vaoIds = [...doiBuoi.keys()].filter((id) => !coSan.has(id));
+    const dsVao = vaoIds.length
+      ? await this.prisma.dang_ky_hoc.findMany({
+          where: { id: { in: vaoIds } },
+          select: chonDangKy,
+        })
+      : [];
 
     return {
       lop,
@@ -149,8 +164,8 @@ export class DiemDanhService {
         ...b,
         ...quyenSuaDiemDanh(user.vai_tro, b.thoi_gian_bat_dau, now),
       })),
-      hoc_vien: dsPhanLop
-        .map(({ dang_ky_hoc: dk }) => ({
+      hoc_vien: [...dsPhanLop.map((p) => p.dang_ky_hoc), ...dsVao]
+        .map((dk) => ({
           dang_ky_hoc_id: dk.id,
           ho_ten: dk.hoc_vien.ho_ten,
           don_vi: dk.hoc_vien.don_vi_cong_tac.ten_don_vi,
@@ -160,6 +175,7 @@ export class DiemDanhService {
           bao_vang: Object.fromEntries(
             dk.bao_vang.map((b) => [b.lich_hoc_id, b.ly_do]),
           ),
+          ...(doiBuoi.has(dk.id) ? { doi_buoi: doiBuoi.get(dk.id) } : {}),
         }))
         .sort((a, b) => a.ho_ten.localeCompare(b.ho_ten, 'vi')),
     };
@@ -209,7 +225,13 @@ export class DiemDanhService {
         lop_id: lopId,
       },
     });
-    if (!thuocLop) {
+    // Spec đổi buổi §5: đổi buổi đã duyệt (còn hiệu lực) VÀO buổi này cũng thuộc lớp.
+    const doiVao =
+      !thuocLop &&
+      (await this.doiBuoi.doiBuoiDaDuyetCuaDangKy([dto.dang_ky_hoc_id])).some(
+        (d) => d.lich_chot_id === dto.lich_hoc_id,
+      );
+    if (!thuocLop && !doiVao) {
       throw new ValidationException(
         'Học viên không thuộc lớp của buổi học này ở giai đoạn đó',
       );

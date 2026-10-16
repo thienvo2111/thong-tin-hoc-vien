@@ -15,6 +15,7 @@ import { ThangMucService } from '../sso/thang-muc.service';
 import { ChotVangZoomProcessor } from './chot-vang-zoom.processor';
 import { VaoHocZoomController } from './vao-hoc-zoom.controller';
 import { VaoHocZoomService } from './vao-hoc-zoom.service';
+import { DoiBuoiHocQueryModule } from '../doi-buoi-hoc/doi-buoi-hoc-query.module';
 
 // Dịch vụ Khóa bồi dưỡng & Lớp học — xem docs/api-contract.md mục 3. Export
 // service ra để ImportModule tái dùng (import phan_lop_hoc_vien — nguồn duy
@@ -25,7 +26,13 @@ import { VaoHocZoomService } from './vao-hoc-zoom.service';
 // khoa-boi-duong.service.ts) — không vòng lặp vì ThongBaoModule không phụ
 // thuộc ngược lại module này.
 @Module({
-  imports: [AuthModule, ThongBaoModule, DiemHocModule, GiangVienModule],
+  imports: [
+    AuthModule,
+    ThongBaoModule,
+    DiemHocModule,
+    GiangVienModule,
+    DoiBuoiHocQueryModule,
+  ],
   controllers: [
     KhoaBoiDuongController,
     LopHocController,

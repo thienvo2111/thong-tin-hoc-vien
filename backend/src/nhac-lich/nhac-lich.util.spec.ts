@@ -154,4 +154,23 @@ describe('soạn tin nhắn (G10)', () => {
       'Nhớ bấm *Điểm danh & vào Zoom* trên Cổng thông tin cho từng buổi.',
     ]);
   });
+
+  // Spec đổi buổi §5: buổi chốt của học viên cụm → dòng "{họ tên} học buổi {n} tại {lớp}".
+  it('tin cụm: buổi chốt có dòng học viên đổi buổi', () => {
+    const s = soanTinNhanCum({
+      ten_cum: 'Cụm Long Xuyên',
+      ngay: new Date('2026-11-10T01:00:00Z'),
+      buoi: [
+        {
+          ...buoi,
+          buoi_so: 3,
+          ten_lop: 'Lớp 02',
+          thuc_dia: [],
+          hoc_vien_doi_buoi: ['Nguyễn An', 'Trần Bình'],
+        },
+      ],
+    });
+    expect(s).toContain('  Nguyễn An học buổi 3 tại Lớp 02');
+    expect(s).toContain('  Trần Bình học buổi 3 tại Lớp 02');
+  });
 });

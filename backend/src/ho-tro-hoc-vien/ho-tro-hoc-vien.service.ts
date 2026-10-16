@@ -200,22 +200,29 @@ export class HoTroHocVienService {
 
     // Các cặp (lớp, giai đoạn) có học viên của cụm được gán — buổi chỉ "của
     // cụm" khi học viên cụm được phân vào đúng lớp ở đúng giai đoạn của buổi.
-    const capLop = await this.prisma.phan_lop_giai_doan.groupBy({
-      by: ['lop_id', 'giai_doan_id'],
-      where: { dang_ky_hoc: { cum_id: { in: cumIds } } },
-      _count: { _all: true },
-    });
-    if (capLop.length === 0) return [];
+    // Spec đổi buổi §5: buổi chốt của học viên cụm cũng là buổi của cụm.
+    const [capLop, doi] = await Promise.all([
+      this.prisma.phan_lop_giai_doan.groupBy({
+        by: ['lop_id', 'giai_doan_id'],
+        where: { dang_ky_hoc: { cum_id: { in: cumIds } } },
+        _count: { _all: true },
+      }),
+      this.nhacLich.doiBuoiCuaCum(cumIds),
+    ]);
+    if (capLop.length === 0 && doi.length === 0) return [];
     const soHocVien = new Map(
       capLop.map((c) => [`${c.lop_id}|${c.giai_doan_id}`, c._count._all]),
     );
 
     const buoi = await this.prisma.lich_hoc_lop.findMany({
       where: {
-        OR: capLop.map(({ lop_id, giai_doan_id }) => ({
-          lop_id,
-          giai_doan_id,
-        })),
+        OR: [
+          ...capLop.map(({ lop_id, giai_doan_id }) => ({
+            lop_id,
+            giai_doan_id,
+          })),
+          { id: { in: doi.map((d) => d.lich_chot_id) } },
+        ],
         thoi_gian_bat_dau: { gte: tu, lte: den },
       },
       include: {
@@ -260,7 +267,7 @@ export class HoTroHocVienService {
     // ADR 0004 G4 (issue #16): người hỗ trợ thực địa của đợt (lớp × giai đoạn).
     const thucDia = await this.prisma.nhan_su_thuc_dia.findMany({
       where: {
-        OR: capLop.map(({ lop_id, giai_doan_id }) => ({
+        OR: buoi.map(({ lop_id, giai_doan_id }) => ({
           lop_id,
           giai_doan_id,
         })),
@@ -293,7 +300,14 @@ export class HoTroHocVienService {
             so_dien_thoai,
             nhiem_vu,
           })),
-        so_hoc_vien_cum: soHocVien.get(`${b.lop_id}|${b.giai_doan_id}`) ?? 0,
+        // Theo buổi: học viên cụm phân vào lớp − đổi ra + đổi vào buổi này.
+        so_hoc_vien_cum:
+          (soHocVien.get(`${b.lop_id}|${b.giai_doan_id}`) ?? 0) -
+          doi.filter((d) => d.lich_nguon_id === b.id).length +
+          doi.filter((d) => d.lich_chot_id === b.id).length,
+        hoc_vien_doi_buoi: doi
+          .filter((d) => d.lich_chot_id === b.id)
+          .map((d) => d.ho_ten),
         // ADR 0004 G11 (issue #21): trạng thái nhắc từng cụm có học viên trong lớp.
         nhac_cum: nhacCum.get(b.id) ?? [],
       };

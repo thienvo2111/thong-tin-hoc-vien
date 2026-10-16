@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundAppException } from '../common/exceptions/app.exceptions';
 import { TrangThaiNhac, trangThaiNhac } from '../nhac-lich/nhac-lich.util';
+import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 
 // ADR 0004 G9 (issue #15): "Trang lớp" dùng chung — 1 hàm lấy đủ dữ liệu 1
 // đợt (lớp × giai đoạn) + 1 hàm thuần lọc trường theo vai trò (ma trận đặc tả
@@ -57,7 +59,104 @@ export interface HocVienDot {
   /** ADR 0004 G13 (issue #18): lich_hoc_id → lý do báo vắng. */
   bao_vang: Record<string, string>;
   ket_qua: { ty_le_hoan_thanh: number | null; diem: number | null } | null;
+  /** Spec đổi buổi §5: lich_hoc_id → đổi ra (sang lớp chốt) / đổi vào (từ lớp nguồn). */
+  doi_buoi?: NhanDoiBuoi;
 }
+
+// Học viên của 1 đợt (lớp × giai đoạn) — dùng cho cả phân lớp và người đổi buổi vào.
+const chonDangKyDot = (lopId: string, giaiDoanId: string) =>
+  ({
+    id: true,
+    muc_dau_vao: true,
+    muc_hoc_chon: true,
+    hoc_vien: {
+      select: {
+        id: true,
+        ho_ten: true,
+        gioi_tinh: true,
+        doi_tuong: true,
+        chuc_vu: true,
+        so_dien_thoai_lien_he: true,
+        email_lien_he: true,
+        don_vi_cong_tac: { select: { ten_don_vi: true } },
+      },
+    },
+    cum: {
+      select: {
+        id: true,
+        ten_cum: true,
+        phan_cong_ho_tro: {
+          select: {
+            nguoi_dung: { select: { ho_ten: true, email: true } },
+          },
+        },
+      },
+    },
+    diem_danh: {
+      where: {
+        lich_hoc: { lop_id: lopId, giai_doan_id: giaiDoanId },
+      },
+      select: { lich_hoc_id: true, trang_thai: true },
+    },
+    bao_vang: {
+      where: {
+        lich_hoc: { lop_id: lopId, giai_doan_id: giaiDoanId },
+      },
+      select: { lich_hoc_id: true, ly_do: true },
+    },
+    ket_qua_giai_doan: {
+      where: { giai_doan_id: giaiDoanId },
+      select: { ty_le_hoan_thanh: true, diem: true },
+    },
+  }) satisfies Prisma.dang_ky_hocSelect;
+
+type DangKyDot = Prisma.dang_ky_hocGetPayload<{
+  select: ReturnType<typeof chonDangKyDot>;
+}>;
+
+function anhXaHocVienDot(dk: DangKyDot): HocVienDot {
+  return {
+    dang_ky_hoc_id: dk.id,
+    hoc_vien_id: dk.hoc_vien.id,
+    ho_ten: dk.hoc_vien.ho_ten,
+    gioi_tinh: dk.hoc_vien.gioi_tinh,
+    don_vi: dk.hoc_vien.don_vi_cong_tac.ten_don_vi,
+    doi_tuong: dk.hoc_vien.doi_tuong,
+    chuc_vu: dk.hoc_vien.chuc_vu,
+    muc_dau_vao: dk.muc_dau_vao,
+    muc_hoc_chon: dk.muc_hoc_chon,
+    so_dien_thoai: dk.hoc_vien.so_dien_thoai_lien_he,
+    email: dk.hoc_vien.email_lien_he,
+    cum: dk.cum
+      ? {
+          id: dk.cum.id,
+          ten_cum: dk.cum.ten_cum,
+          nguoi_ho_tro: dk.cum.phan_cong_ho_tro.map((p) => p.nguoi_dung),
+        }
+      : null,
+    diem_danh: Object.fromEntries(
+      dk.diem_danh.map((d) => [d.lich_hoc_id, d.trang_thai]),
+    ),
+    bao_vang: Object.fromEntries(
+      dk.bao_vang.map((b) => [b.lich_hoc_id, b.ly_do]),
+    ),
+    ket_qua: dk.ket_qua_giai_doan[0]
+      ? {
+          ty_le_hoan_thanh:
+            dk.ket_qua_giai_doan[0].ty_le_hoan_thanh == null
+              ? null
+              : Number(dk.ket_qua_giai_doan[0].ty_le_hoan_thanh),
+          diem:
+            dk.ket_qua_giai_doan[0].diem == null
+              ? null
+              : Number(dk.ket_qua_giai_doan[0].diem),
+        }
+      : null,
+  };
+}
+
+const theoTen = (a: HocVienDot, b: HocVienDot) =>
+  a.ho_ten.localeCompare(b.ho_ten, 'vi');
 
 export async function layDotLop(
   prisma: PrismaService,
@@ -124,54 +223,7 @@ export async function layDotLop(
       }),
       prisma.phan_lop_giai_doan.findMany({
         where: { lop_id: lopId, giai_doan_id: giaiDoanId },
-        select: {
-          dang_ky_hoc: {
-            select: {
-              id: true,
-              muc_dau_vao: true,
-              muc_hoc_chon: true,
-              hoc_vien: {
-                select: {
-                  id: true,
-                  ho_ten: true,
-                  gioi_tinh: true,
-                  doi_tuong: true,
-                  chuc_vu: true,
-                  so_dien_thoai_lien_he: true,
-                  email_lien_he: true,
-                  don_vi_cong_tac: { select: { ten_don_vi: true } },
-                },
-              },
-              cum: {
-                select: {
-                  id: true,
-                  ten_cum: true,
-                  phan_cong_ho_tro: {
-                    select: {
-                      nguoi_dung: { select: { ho_ten: true, email: true } },
-                    },
-                  },
-                },
-              },
-              diem_danh: {
-                where: {
-                  lich_hoc: { lop_id: lopId, giai_doan_id: giaiDoanId },
-                },
-                select: { lich_hoc_id: true, trang_thai: true },
-              },
-              bao_vang: {
-                where: {
-                  lich_hoc: { lop_id: lopId, giai_doan_id: giaiDoanId },
-                },
-                select: { lich_hoc_id: true, ly_do: true },
-              },
-              ket_qua_giai_doan: {
-                where: { giai_doan_id: giaiDoanId },
-                select: { ty_le_hoan_thanh: true, diem: true },
-              },
-            },
-          },
-        },
+        select: { dang_ky_hoc: { select: chonDangKyDot(lopId, giaiDoanId) } },
       }),
       prisma.phan_cong_ho_tro_gv.findMany({
         where: { khoa_id: lop.khoa.id },
@@ -255,45 +307,8 @@ export async function layDotLop(
       })),
     })),
     hoc_vien: dsPhanLop
-      .map(({ dang_ky_hoc: dk }): HocVienDot => ({
-        dang_ky_hoc_id: dk.id,
-        hoc_vien_id: dk.hoc_vien.id,
-        ho_ten: dk.hoc_vien.ho_ten,
-        gioi_tinh: dk.hoc_vien.gioi_tinh,
-        don_vi: dk.hoc_vien.don_vi_cong_tac.ten_don_vi,
-        doi_tuong: dk.hoc_vien.doi_tuong,
-        chuc_vu: dk.hoc_vien.chuc_vu,
-        muc_dau_vao: dk.muc_dau_vao,
-        muc_hoc_chon: dk.muc_hoc_chon,
-        so_dien_thoai: dk.hoc_vien.so_dien_thoai_lien_he,
-        email: dk.hoc_vien.email_lien_he,
-        cum: dk.cum
-          ? {
-              id: dk.cum.id,
-              ten_cum: dk.cum.ten_cum,
-              nguoi_ho_tro: dk.cum.phan_cong_ho_tro.map((p) => p.nguoi_dung),
-            }
-          : null,
-        diem_danh: Object.fromEntries(
-          dk.diem_danh.map((d) => [d.lich_hoc_id, d.trang_thai]),
-        ),
-        bao_vang: Object.fromEntries(
-          dk.bao_vang.map((b) => [b.lich_hoc_id, b.ly_do]),
-        ),
-        ket_qua: dk.ket_qua_giai_doan[0]
-          ? {
-              ty_le_hoan_thanh:
-                dk.ket_qua_giai_doan[0].ty_le_hoan_thanh == null
-                  ? null
-                  : Number(dk.ket_qua_giai_doan[0].ty_le_hoan_thanh),
-              diem:
-                dk.ket_qua_giai_doan[0].diem == null
-                  ? null
-                  : Number(dk.ket_qua_giai_doan[0].diem),
-            }
-          : null,
-      }))
-      .sort((a, b) => a.ho_ten.localeCompare(b.ho_ten, 'vi')),
+      .map(({ dang_ky_hoc: dk }) => anhXaHocVienDot(dk))
+      .sort(theoTen),
     nhom_ho_tro_gv: nhom.map((n) => n.nguoi_dung),
     hau_can: hauCan.map(({ nguoi_sua, ...h }) => ({
       ...h,
@@ -319,6 +334,63 @@ export async function layDotLop(
 }
 
 export type DotLop = Awaited<ReturnType<typeof layDotLop>>;
+
+type SiSoBuoi = Awaited<ReturnType<DoiBuoiHocQueryService['siSoBuoi']>>;
+type DieuChinhBuoi = Awaited<
+  ReturnType<DoiBuoiHocQueryService['dieuChinhTheoBuoi']>
+>;
+
+/** Trang lớp = đợt lớp + sĩ số theo buổi (đổi buổi) — layDotLop giữ lớp gốc. */
+export type TrangLop = Omit<DotLop, 'buoi'> & {
+  buoi: (DotLop['buoi'][number] & { si_so: number | null })[];
+};
+
+export type NhanDoiBuoi = Record<string, { loai: 'ra' | 'vao'; lop: string }>;
+
+/** Hàm thuần — dang_ky_hoc_id → (lich_hoc_id → nhãn đổi ra/đổi vào). */
+export function nhanDoiBuoiTheoDangKy(
+  dieuChinh: DieuChinhBuoi,
+): Map<string, NhanDoiBuoi> {
+  const nhan = new Map<string, NhanDoiBuoi>();
+  const gan = (dkId: string, lichId: string, loai: 'ra' | 'vao', lop: string) =>
+    nhan.set(dkId, { ...nhan.get(dkId), [lichId]: { loai, lop } });
+  for (const [lichId, dc] of dieuChinh) {
+    for (const r of dc.ra) {
+      gan(r.dang_ky_hoc_id, lichId, 'ra', r.lop_chot.ten_lop);
+    }
+    for (const v of dc.vao) {
+      gan(v.dang_ky_hoc_id, lichId, 'vao', v.lop_nguon.ten_lop);
+    }
+  }
+  return nhan;
+}
+
+/**
+ * Hàm thuần — spec đổi buổi §5: gắn sĩ số từng buổi, nhãn đổi ra cho học viên
+ * của lớp, thêm học viên đổi vào (hocVienVao, đã nạp sẵn) kèm nhãn đổi vào.
+ */
+export function apDungDoiBuoi(
+  dot: DotLop,
+  siSo: SiSoBuoi,
+  dieuChinh: DieuChinhBuoi,
+  hocVienVao: HocVienDot[],
+): TrangLop {
+  const nhan = nhanDoiBuoiTheoDangKy(dieuChinh);
+  const coSan = new Set(dot.hoc_vien.map((h) => h.dang_ky_hoc_id));
+  return {
+    ...dot,
+    buoi: dot.buoi.map((b) => ({ ...b, si_so: siSo.get(b.id)?.si_so ?? null })),
+    hoc_vien: [
+      ...dot.hoc_vien,
+      ...hocVienVao.filter((h) => !coSan.has(h.dang_ky_hoc_id)),
+    ]
+      .map((h) => {
+        const doiBuoi = nhan.get(h.dang_ky_hoc_id);
+        return doiBuoi ? { ...h, doi_buoi: doiBuoi } : h;
+      })
+      .sort(theoTen),
+  };
+}
 
 /**
  * Hàm thuần — lọc trường theo vai trò người xem (ma trận đặc tả §3, test K6).
@@ -358,15 +430,42 @@ export function locTheoVaiTro(
 
 @Injectable()
 export class TrangLopService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly doiBuoi: DoiBuoiHocQueryService,
+  ) {}
 
   async layTrangLop(
     lopId: string,
     giaiDoanId: string,
     nguoiXem: { vai_tro: VaiTroXemLop; giang_vien_id?: string },
+    now: Date = new Date(),
   ) {
+    const dot = await layDotLop(this.prisma, lopId, giaiDoanId);
+    const lichIds = dot.buoi.map((b) => b.id);
+    const [siSo, dieuChinh] = await Promise.all([
+      this.doiBuoi.siSoBuoi(lichIds, now),
+      this.doiBuoi.dieuChinhTheoBuoi(lichIds),
+    ]);
+    const coSan = new Set(dot.hoc_vien.map((h) => h.dang_ky_hoc_id));
+    const vaoIds = [
+      ...new Set(
+        [...dieuChinh.values()].flatMap((d) =>
+          d.vao.map((v) => v.dang_ky_hoc_id),
+        ),
+      ),
+    ].filter((id) => !coSan.has(id));
+    // Người đổi vào: 1 truy vấn, cùng tập trường như học viên của lớp.
+    const hocVienVao = vaoIds.length
+      ? (
+          await this.prisma.dang_ky_hoc.findMany({
+            where: { id: { in: vaoIds } },
+            select: chonDangKyDot(lopId, giaiDoanId),
+          })
+        ).map(anhXaHocVienDot)
+      : [];
     return locTheoVaiTro(
-      await layDotLop(this.prisma, lopId, giaiDoanId),
+      apDungDoiBuoi(dot, siSo, dieuChinh, hocVienVao),
       nguoiXem.vai_tro,
       nguoiXem.giang_vien_id,
     );
