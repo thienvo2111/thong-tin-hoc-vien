@@ -11,7 +11,10 @@ import { HoTroGiangVienScopeService } from '../ho-tro-giang-vien/ho-tro-giang-vi
 import { quyenSuaDiemDanh } from './quyen-sua-diem-danh.util';
 import { SuaDiemDanhDto } from './diem-danh.dto';
 import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
-import { nhanDoiBuoiTheoDangKy } from '../trang-lop/trang-lop.service';
+import {
+  chiOCuaBuoi,
+  nhanDoiBuoiTheoDangKy,
+} from '../doi-buoi-hoc/doi-buoi-hoc.view.util';
 
 const CHON_O = {
   lich_hoc_id: true,
@@ -106,6 +109,7 @@ export class DiemDanhService {
         giai_doan_id: null,
         buoi: [],
         hoc_vien: [],
+        hoc_vien_doi_vao: [],
       };
     }
     const gdId = chon.id;
@@ -155,6 +159,20 @@ export class DiemDanhService {
           select: chonDangKy,
         })
       : [];
+    const dong = (dk: (typeof dsVao)[number]) => ({
+      dang_ky_hoc_id: dk.id,
+      ho_ten: dk.hoc_vien.ho_ten,
+      don_vi: dk.hoc_vien.don_vi_cong_tac.ten_don_vi,
+      diem_danh: Object.fromEntries(
+        dk.diem_danh.map((d) => [d.lich_hoc_id, oDiemDanh(d)]),
+      ),
+      bao_vang: Object.fromEntries(
+        dk.bao_vang.map((b) => [b.lich_hoc_id, b.ly_do]),
+      ),
+      ...(doiBuoi.has(dk.id) ? { doi_buoi: doiBuoi.get(dk.id) } : {}),
+    });
+    const theoTen = (a: { ho_ten: string }, b: { ho_ten: string }) =>
+      a.ho_ten.localeCompare(b.ho_ten, 'vi');
 
     return {
       lop,
@@ -164,20 +182,20 @@ export class DiemDanhService {
         ...b,
         ...quyenSuaDiemDanh(user.vai_tro, b.thoi_gian_bat_dau, now),
       })),
-      hoc_vien: [...dsPhanLop.map((p) => p.dang_ky_hoc), ...dsVao]
-        .map((dk) => ({
-          dang_ky_hoc_id: dk.id,
-          ho_ten: dk.hoc_vien.ho_ten,
-          don_vi: dk.hoc_vien.don_vi_cong_tac.ten_don_vi,
-          diem_danh: Object.fromEntries(
-            dk.diem_danh.map((d) => [d.lich_hoc_id, oDiemDanh(d)]),
-          ),
-          bao_vang: Object.fromEntries(
-            dk.bao_vang.map((b) => [b.lich_hoc_id, b.ly_do]),
-          ),
-          ...(doiBuoi.has(dk.id) ? { doi_buoi: doiBuoi.get(dk.id) } : {}),
-        }))
-        .sort((a, b) => a.ho_ten.localeCompare(b.ho_ten, 'vi')),
+      // Học viên phân vào lớp gốc — số liệu cấp lớp không đổi (spec §5).
+      hoc_vien: dsPhanLop.map((p) => dong(p.dang_ky_hoc)).sort(theoTen),
+      // Người đổi vào: danh sách riêng, chỉ mang ô của buổi chốt.
+      hoc_vien_doi_vao: dsVao
+        .map((dk) => {
+          const h = dong(dk);
+          const nhan = doiBuoi.get(dk.id)!;
+          return {
+            ...h,
+            diem_danh: chiOCuaBuoi(h.diem_danh, nhan),
+            bao_vang: chiOCuaBuoi(h.bao_vang, nhan),
+          };
+        })
+        .sort(theoTen),
     };
   }
 

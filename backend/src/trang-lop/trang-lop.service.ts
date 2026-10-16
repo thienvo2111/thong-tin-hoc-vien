@@ -4,6 +4,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundAppException } from '../common/exceptions/app.exceptions';
 import { TrangThaiNhac, trangThaiNhac } from '../nhac-lich/nhac-lich.util';
 import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
+import {
+  chiOCuaBuoi,
+  DieuChinhTheoBuoi,
+  NhanDoiBuoi,
+  nhanDoiBuoiTheoDangKy,
+} from '../doi-buoi-hoc/doi-buoi-hoc.view.util';
 
 // ADR 0004 G9 (issue #15): "Trang lớp" dùng chung — 1 hàm lấy đủ dữ liệu 1
 // đợt (lớp × giai đoạn) + 1 hàm thuần lọc trường theo vai trò (ma trận đặc tả
@@ -336,43 +342,25 @@ export async function layDotLop(
 export type DotLop = Awaited<ReturnType<typeof layDotLop>>;
 
 type SiSoBuoi = Awaited<ReturnType<DoiBuoiHocQueryService['siSoBuoi']>>;
-type DieuChinhBuoi = Awaited<
-  ReturnType<DoiBuoiHocQueryService['dieuChinhTheoBuoi']>
->;
 
-/** Trang lớp = đợt lớp + sĩ số theo buổi (đổi buổi) — layDotLop giữ lớp gốc. */
+/**
+ * Trang lớp = đợt lớp + sĩ số theo buổi (đổi buổi). hoc_vien giữ đúng học viên
+ * phân vào lớp gốc (số liệu cấp lớp không đổi — spec §5); người đổi vào nằm
+ * riêng ở hoc_vien_doi_vao, chỉ mang ô của buổi chốt.
+ */
 export type TrangLop = Omit<DotLop, 'buoi'> & {
   buoi: (DotLop['buoi'][number] & { si_so: number | null })[];
+  hoc_vien_doi_vao: HocVienDot[];
 };
-
-export type NhanDoiBuoi = Record<string, { loai: 'ra' | 'vao'; lop: string }>;
-
-/** Hàm thuần — dang_ky_hoc_id → (lich_hoc_id → nhãn đổi ra/đổi vào). */
-export function nhanDoiBuoiTheoDangKy(
-  dieuChinh: DieuChinhBuoi,
-): Map<string, NhanDoiBuoi> {
-  const nhan = new Map<string, NhanDoiBuoi>();
-  const gan = (dkId: string, lichId: string, loai: 'ra' | 'vao', lop: string) =>
-    nhan.set(dkId, { ...nhan.get(dkId), [lichId]: { loai, lop } });
-  for (const [lichId, dc] of dieuChinh) {
-    for (const r of dc.ra) {
-      gan(r.dang_ky_hoc_id, lichId, 'ra', r.lop_chot.ten_lop);
-    }
-    for (const v of dc.vao) {
-      gan(v.dang_ky_hoc_id, lichId, 'vao', v.lop_nguon.ten_lop);
-    }
-  }
-  return nhan;
-}
 
 /**
  * Hàm thuần — spec đổi buổi §5: gắn sĩ số từng buổi, nhãn đổi ra cho học viên
- * của lớp, thêm học viên đổi vào (hocVienVao, đã nạp sẵn) kèm nhãn đổi vào.
+ * của lớp; người đổi vào (hocVienVao, đã nạp sẵn) vào danh sách riêng kèm nhãn.
  */
 export function apDungDoiBuoi(
   dot: DotLop,
   siSo: SiSoBuoi,
-  dieuChinh: DieuChinhBuoi,
+  dieuChinh: DieuChinhTheoBuoi,
   hocVienVao: HocVienDot[],
 ): TrangLop {
   const nhan = nhanDoiBuoiTheoDangKy(dieuChinh);
@@ -380,17 +368,32 @@ export function apDungDoiBuoi(
   return {
     ...dot,
     buoi: dot.buoi.map((b) => ({ ...b, si_so: siSo.get(b.id)?.si_so ?? null })),
-    hoc_vien: [
-      ...dot.hoc_vien,
-      ...hocVienVao.filter((h) => !coSan.has(h.dang_ky_hoc_id)),
-    ]
+    hoc_vien: dot.hoc_vien.map((h) => {
+      const doiBuoi = nhan.get(h.dang_ky_hoc_id);
+      return doiBuoi ? { ...h, doi_buoi: doiBuoi } : h;
+    }),
+    hoc_vien_doi_vao: hocVienVao
+      .filter((h) => !coSan.has(h.dang_ky_hoc_id) && nhan.has(h.dang_ky_hoc_id))
       .map((h) => {
-        const doiBuoi = nhan.get(h.dang_ky_hoc_id);
-        return doiBuoi ? { ...h, doi_buoi: doiBuoi } : h;
+        const doiBuoi = nhan.get(h.dang_ky_hoc_id)!;
+        return {
+          ...h,
+          diem_danh: chiOCuaBuoi(h.diem_danh, doiBuoi),
+          bao_vang: chiOCuaBuoi(h.bao_vang, doiBuoi),
+          doi_buoi: doiBuoi,
+        };
       })
       .sort(theoTen),
   };
 }
+
+const anTruongGv = (h: HocVienDot) => {
+  const { so_dien_thoai: _s, email: _e, cum: _c, ...con } = h;
+  void _s;
+  void _e;
+  void _c;
+  return con;
+};
 
 /**
  * Hàm thuần — lọc trường theo vai trò người xem (ma trận đặc tả §3, test K6).
@@ -398,11 +401,9 @@ export function apDungDoiBuoi(
  * lấy). Giảng viên: không thấy SĐT/email học viên, liên hệ/số giờ giảng viên
  * khác, cụm hỗ trợ của học viên.
  */
-export function locTheoVaiTro(
-  dot: DotLop,
-  vaiTro: VaiTroXemLop,
-  giangVienId?: string,
-): DotLop {
+export function locTheoVaiTro<
+  T extends DotLop & { hoc_vien_doi_vao?: HocVienDot[] },
+>(dot: T, vaiTro: VaiTroXemLop, giangVienId?: string): T {
   if (vaiTro !== 'giang_vien') return dot;
   return {
     ...dot,
@@ -418,13 +419,10 @@ export function locTheoVaiTro(
         vai_tro: g.vai_tro,
       })),
     })),
-    hoc_vien: dot.hoc_vien.map((h) => {
-      const { so_dien_thoai: _s, email: _e, cum: _c, ...con } = h;
-      void _s;
-      void _e;
-      void _c;
-      return con;
-    }),
+    hoc_vien: dot.hoc_vien.map(anTruongGv),
+    ...(dot.hoc_vien_doi_vao
+      ? { hoc_vien_doi_vao: dot.hoc_vien_doi_vao.map(anTruongGv) }
+      : {}),
   };
 }
 

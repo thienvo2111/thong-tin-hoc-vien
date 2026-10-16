@@ -9,13 +9,17 @@ import {
 } from '../common/exceptions/app.exceptions';
 import { tinhCuaSoDiemDanh } from './util/cua-so-diem-danh.util';
 import { apDungDiemDanhZoom } from './util/diem-danh-zoom.util';
+import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 
 // POST /lich-hoc/:id/vao-hoc — ADR 0005 Z2–Z5, spec 2026-10-09 §4. Học viên
 // bấm "Điểm danh & vào Zoom": trong cửa sổ thì tạo co_mat/zoom (1 lần, không
 // đè dòng đã có — kể cả dòng import/báo vắng); link chỉ trả khi đã mở cửa sổ.
 @Injectable()
 export class VaoHocZoomService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly doiBuoi: DoiBuoiHocQueryService,
+  ) {}
 
   async vaoHoc(
     lichHocId: string,
@@ -73,7 +77,10 @@ export class VaoHocZoomService {
       },
       select: { dang_ky_hoc_id: true },
     });
-    if (!phanLop) {
+    const dangKyHocId =
+      phanLop?.dang_ky_hoc_id ??
+      (await this.dangKyDoiVao(caller.hoc_vien_id, buoi.id, buoi.lop.khoa_id));
+    if (!dangKyHocId) {
       throw new ForbiddenAppException(
         'Thầy/Cô không thuộc lớp của buổi học này',
       );
@@ -86,7 +93,7 @@ export class VaoHocZoomService {
     }
 
     const khoaDiemDanh = {
-      dang_ky_hoc_id: phanLop.dang_ky_hoc_id,
+      dang_ky_hoc_id: dangKyHocId,
       lich_hoc_id: buoi.id,
     };
     const cuaSo = { link, mo, dong };
@@ -116,6 +123,23 @@ export class VaoHocZoomService {
       if (!vuaTao) throw e;
       return { ...vuaTao, ...cuaSo };
     }
+  }
+
+  // Spec đổi buổi (R6): đổi buổi đã duyệt, còn hiệu lực, VÀO buổi này → được vào học.
+  private async dangKyDoiVao(
+    hocVienId: string,
+    lichHocId: string,
+    khoaId: string,
+  ): Promise<string | null> {
+    const dk = await this.prisma.dang_ky_hoc.findUnique({
+      where: {
+        hoc_vien_id_khoa_id: { hoc_vien_id: hocVienId, khoa_id: khoaId },
+      },
+      select: { id: true },
+    });
+    if (!dk) return null;
+    const doi = await this.doiBuoi.doiBuoiDaDuyetCuaDangKy([dk.id]);
+    return doi.some((d) => d.lich_chot_id === lichHocId) ? dk.id : null;
   }
 
   private async diemDanhDaCo(khoa: {

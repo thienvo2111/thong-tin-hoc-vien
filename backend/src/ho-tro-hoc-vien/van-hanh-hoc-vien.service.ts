@@ -11,6 +11,7 @@ import {
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import { HoTroHocVienScopeService } from './ho-tro-hoc-vien-scope.service';
 import { BaoVangDto, TaoDeNghiDoiLopDto } from './dto/van-hanh-hoc-vien.dto';
+import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 
 // ADR 0004 G13/G14 (issue #18): người hỗ trợ học viên báo vắng và đề nghị
 // đổi lớp cho học viên CỤM MÌNH. Ngoài phạm vi → 404 (như ADR 0003).
@@ -20,6 +21,7 @@ export class VanHanhHocVienService {
     private readonly prisma: PrismaService,
     private readonly scope: HoTroHocVienScopeService,
     private readonly nhatKy: NhatKyService,
+    private readonly doiBuoi: DoiBuoiHocQueryService,
   ) {}
 
   /** Đăng ký học của học viên thuộc cụm của tôi, khớp điều kiện thêm. */
@@ -42,7 +44,8 @@ export class VanHanhHocVienService {
     return dk;
   }
 
-  // Buổi phải thuộc lớp học viên được phân ở giai đoạn đó, và chưa kết thúc.
+  // Buổi phải thuộc lớp học viên được phân ở giai đoạn đó (hoặc là buổi chốt
+  // của đổi buổi đã duyệt còn hiệu lực — spec đổi buổi R9), và chưa kết thúc.
   private async buoiCuaHocVien(
     user: AuthenticatedUser,
     hocVienId: string,
@@ -63,13 +66,31 @@ export class VanHanhHocVienService {
       phan_lop_giai_doan: {
         some: { lop_id: lich.lop_id, giai_doan_id: lich.giai_doan_id },
       },
-    });
+    }).catch((e: unknown) => this.dangKyDoiVao(user.id, hocVienId, lich.id, e));
     if (lich.thoi_gian_ket_thuc <= new Date()) {
       throw new ValidationException(
         'Buổi học đã kết thúc — không báo vắng được',
       );
     }
     return { lich, dk };
+  }
+
+  /** Không thuộc lớp của buổi: chỉ nhận khi buổi là buổi chốt của đổi buổi hiệu lực. */
+  private async dangKyDoiVao(
+    nguoiDungId: string,
+    hocVienId: string,
+    lichHocId: string,
+    loi: unknown,
+  ) {
+    if (!(loi instanceof NotFoundAppException)) throw loi;
+    const dk = await this.dangKyTrongCum(nguoiDungId, hocVienId, {
+      doi_buoi_hoc: {
+        some: { trang_thai: 'da_duyet', lich_chot_id: lichHocId },
+      },
+    });
+    const doi = await this.doiBuoi.doiBuoiDaDuyetCuaDangKy([dk.id]);
+    if (!doi.some((d) => d.lich_chot_id === lichHocId)) throw loi;
+    return dk;
   }
 
   async baoVang(user: AuthenticatedUser, hocVienId: string, dto: BaoVangDto) {

@@ -4,8 +4,15 @@ import { ThongKeScopeService } from './thong-ke-scope.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { PhamViThongKe } from './thong-ke.types';
 import { ThangMucService } from '../sso/thang-muc.service';
+import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 import { ValidationException } from '../common/exceptions/app.exceptions';
 import { HOC_VIEN_PHAI_KHAO_SAT } from '../common/utils/doi-tuong-khao-sat.util';
+
+// Mặc định không có đổi buổi nào (test đổi buổi tự ghi đè).
+const doiBuoiRong = () => ({
+  doiBuoiDaDuyetCuaDangKy: jest.fn().mockResolvedValue([]),
+  lichTomTat: jest.fn().mockResolvedValue(new Map()),
+});
 
 function caller(vai_tro: AuthenticatedUser['vai_tro']): AuthenticatedUser {
   return {
@@ -41,6 +48,7 @@ describe('ThongKeService.pheu', () => {
       prisma as unknown as PrismaService,
       scope as unknown as ThongKeScopeService,
       { thang: jest.fn() } as unknown as ThangMucService,
+      doiBuoiRong() as unknown as DoiBuoiHocQueryService,
     );
   });
 
@@ -170,6 +178,7 @@ describe('ThongKeService khối khảo sát + chuyển mức', () => {
       {
         thang: jest.fn().mockResolvedValue(THANG),
       } as unknown as ThangMucService,
+      doiBuoiRong() as unknown as DoiBuoiHocQueryService,
     );
   });
 
@@ -337,6 +346,7 @@ describe('ThongKeService khối kết quả học tập + so sánh khóa', () =>
       prisma as unknown as PrismaService,
       scope as unknown as ThongKeScopeService,
       { thang: jest.fn().mockResolvedValue([]) } as unknown as ThangMucService,
+      doiBuoiRong() as unknown as DoiBuoiHocQueryService,
     );
   });
 
@@ -558,6 +568,7 @@ describe('ThongKeService.chuyenCan', () => {
     dang_ky_hoc: { count: jest.Mock };
   };
   let scope: { resolve: jest.Mock };
+  let doiBuoi: ReturnType<typeof doiBuoiRong>;
 
   const dong = (
     dang_ky_hoc_id: string,
@@ -608,11 +619,41 @@ describe('ThongKeService.chuyenCan', () => {
         khoaIds: ['k1'],
       }),
     };
+    doiBuoi = doiBuoiRong();
     service = new ThongKeService(
       prisma as unknown as PrismaService,
       scope as unknown as ThongKeScopeService,
       { thang: jest.fn() } as unknown as ThangMucService,
+      doiBuoi as unknown as DoiBuoiHocQueryService,
     );
+  });
+
+  // Spec đổi buổi (R7): có mặt ở buổi chốt tính thay buổi nguồn (Zoom,
+  // theo_lop_hien_tai) — không vắng ở buổi nguồn, không thêm cột buổi chốt.
+  it('đổi buổi: có mặt ở buổi chốt → có mặt ở buổi nguồn, không đếm đôi', async () => {
+    prisma.diem_danh.findMany.mockResolvedValue([
+      { ...dong('dk1', 'lop-moi', 'gd1', 1, 1, 'vang'), lich_hoc_id: 'a-1' },
+      { ...dong('dk1', 'lop-khac', 'gd1', 1, 3, 'co_mat'), lich_hoc_id: 'b-3' },
+    ]);
+    prisma.phan_lop_giai_doan.findMany.mockResolvedValue([
+      phan('dk1', 'gd1', 'lop-moi'),
+    ]);
+    doiBuoi.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+      { dang_ky_hoc_id: 'dk1', lich_nguon_id: 'a-1', lich_chot_id: 'b-3' },
+    ]);
+    doiBuoi.lichTomTat.mockResolvedValue(
+      new Map([
+        [
+          'a-1',
+          { id: 'a-1', lop_id: 'lop-moi', giai_doan_id: 'gd1', buoi_so: 1 },
+        ],
+      ]),
+    );
+    const r = await service.chuyenCan(caller('quan_tri'), { khoa_id: 'k1' });
+    expect(doiBuoi.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledWith(['dk1']);
+    expect(r.truc_tiep).toEqual([
+      expect.objectContaining({ buoi_so: 1, co_mat: 1, vang: 0 }),
+    ]);
   });
 
   it('không khoa_id -> truc_tiep null, không truy vấn điểm danh', async () => {

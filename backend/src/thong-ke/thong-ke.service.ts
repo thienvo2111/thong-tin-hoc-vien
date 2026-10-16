@@ -6,6 +6,7 @@ import { ThongKeQueryDto } from './dto/thong-ke-query.dto';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { ThangMucService, MucThang } from '../sso/thang-muc.service';
 import { ValidationException } from '../common/exceptions/app.exceptions';
+import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 import { HOC_VIEN_PHAI_KHAO_SAT } from '../common/utils/doi-tuong-khao-sat.util';
 import {
   CheDoChuyenCan,
@@ -56,6 +57,7 @@ export class ThongKeService {
     private readonly prisma: PrismaService,
     private readonly scope: ThongKeScopeService,
     private readonly thangMuc: ThangMucService,
+    private readonly doiBuoi: DoiBuoiHocQueryService,
   ) {}
 
   async pheu(user: AuthenticatedUser, q: ThongKeQueryDto): Promise<PheuResult> {
@@ -359,6 +361,7 @@ export class ThongKeService {
       },
       select: {
         dang_ky_hoc_id: true,
+        lich_hoc_id: true,
         trang_thai: true,
         lich_hoc: {
           select: {
@@ -375,6 +378,9 @@ export class ThongKeService {
       },
     });
     if (dsDong.length === 0) return [];
+    const doiTu = await this.doiTuTheoBuoiChot([
+      ...new Set(dsDong.map((d) => d.dang_ky_hoc_id)),
+    ]);
 
     const phanLop = await this.prisma.phan_lop_giai_doan.findMany({
       where: { dang_ky_hoc: where },
@@ -404,6 +410,7 @@ export class ThongKeService {
         giai_doan_id: d.lich_hoc.giai_doan_id,
         buoi_so: d.lich_hoc.buoi_so,
         trang_thai: d.trang_thai,
+        doi_tu: doiTu.get(`${d.dang_ky_hoc_id}|${d.lich_hoc_id}`),
       });
       theoDangKy.set(d.dang_ky_hoc_id, nhom);
     }
@@ -442,6 +449,35 @@ export class ThongKeService {
         const tong = c.co_mat + c.vang_co_phep + c.vang;
         return { ...c, ty_le_co_mat: tong > 0 ? c.co_mat / tong : null };
       });
+  }
+
+  // Spec đổi buổi (R7): `${dang_ky_hoc_id}|${lich_chot_id}` → buổi nguồn, để
+  // dòng điểm danh ở buổi chốt tính thay buổi nguồn trong tinhChuyenCan.
+  private async doiTuTheoBuoiChot(
+    dangKyIds: string[],
+  ): Promise<Map<string, DongDiemDanhBuoi['doi_tu']>> {
+    const doi = await this.doiBuoi.doiBuoiDaDuyetCuaDangKy(dangKyIds);
+    if (doi.length === 0) return new Map();
+    const nguon = await this.doiBuoi.lichTomTat(
+      doi.map((d) => d.lich_nguon_id),
+    );
+    return new Map(
+      doi.flatMap((d) => {
+        const l = nguon.get(d.lich_nguon_id);
+        return l
+          ? [
+              [
+                `${d.dang_ky_hoc_id}|${d.lich_chot_id}`,
+                {
+                  lop_id: l.lop_id,
+                  giai_doan_id: l.giai_doan_id,
+                  buoi_so: l.buoi_so,
+                },
+              ] as const,
+            ]
+          : [];
+      }),
+    );
   }
 
   private async vleTheoKhoang(where: Prisma.dang_ky_hocWhereInput) {

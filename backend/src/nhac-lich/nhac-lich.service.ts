@@ -20,6 +20,8 @@ import {
 
 type CapDot = { lop_id: string; giai_doan_id: string };
 
+const MOT_NGAY_MS = 24 * 60 * 60 * 1000;
+
 /** Đổi buổi đã duyệt (còn hiệu lực) của 1 học viên cụm. */
 export interface DoiBuoiCum {
   cum_id: string;
@@ -30,7 +32,9 @@ export interface DoiBuoiCum {
 }
 
 // Spec đổi buổi §5: duyệt đổi buổi SAU lần gửi cuối cũng làm buổi chốt "cần nhắc lại".
-const capNhatTheoDoiBuoi = <T extends { id: string; cap_nhat_luc: Date }>(
+export const capNhatTheoDoiBuoi = <
+  T extends { id: string; cap_nhat_luc: Date },
+>(
   b: T,
   doi: DoiBuoiCum[],
 ): T => {
@@ -162,13 +166,19 @@ export class NhacLichService {
     return [...m.values()];
   }
 
-  /** Spec đổi buổi §5: buổi chốt của học viên cụm cũng là buổi của cụm. */
-  async doiBuoiCuaCum(cumIds: string[]): Promise<DoiBuoiCum[]> {
+  /**
+   * Spec đổi buổi §5: buổi chốt của học viên cụm cũng là buổi của cụm. Chỉ
+   * buổi chốt bắt đầu từ `tu` (mặc định đầu hôm nay giờ VN − 30 ngày).
+   */
+  async doiBuoiCuaCum(
+    cumIds: string[],
+    tu: Date = new Date(khoangNgayVn({}).tu.getTime() - 30 * MOT_NGAY_MS),
+  ): Promise<DoiBuoiCum[]> {
     if (cumIds.length === 0) return [];
     const rows = await this.prisma.doi_buoi_hoc.findMany({
       where: {
         trang_thai: 'da_duyet',
-        lich_chot_id: { not: null },
+        lich_chot: { thoi_gian_bat_dau: { gte: tu } },
         dang_ky_hoc: { cum_id: { in: cumIds } },
       },
       select: {
@@ -226,10 +236,12 @@ export class NhacLichService {
       giai_doan_id: string;
       cap_nhat_luc: Date;
     }[],
+    // Nơi gọi đã nạp đổi buổi của cụm thì truyền vào, tránh truy vấn lại.
+    doiDaNap?: DoiBuoiCum[],
   ): Promise<Map<string, { cum_id: string; trang_thai: TrangThaiNhac }[]>> {
     const [cap, doi] = await Promise.all([
       this.capDotCuaCum(cumIds),
-      this.doiBuoiCuaCum(cumIds),
+      doiDaNap ?? this.doiBuoiCuaCum(cumIds),
     ]);
     const nhatKy = await this.nhatKyCum(
       cumIds,
@@ -270,7 +282,7 @@ export class NhacLichService {
   private async buoiCuaCum(cumId: string, tu: Date, den: Date) {
     const [cap, doi] = await Promise.all([
       this.capDotCuaCum([cumId]),
-      this.doiBuoiCuaCum([cumId]),
+      this.doiBuoiCuaCum([cumId], tu),
     ]);
     if (cap.length === 0 && doi.length === 0) return { cap, doi, buoi: [] };
     const buoi = await this.prisma.lich_hoc_lop.findMany({
@@ -422,7 +434,7 @@ export class NhacLichService {
     const tu = new Date();
     const [cap, doi] = await Promise.all([
       this.capDotCuaCum(cumIds),
-      this.doiBuoiCuaCum(cumIds),
+      this.doiBuoiCuaCum(cumIds, tu),
     ]);
     if (cap.length === 0 && doi.length === 0) return 0;
     const buoi = await this.prisma.lich_hoc_lop.findMany({
@@ -440,7 +452,7 @@ export class NhacLichService {
         cap_nhat_luc: true,
       },
     });
-    const tt = await this.trangThaiCumTheoBuoi(cumIds, buoi);
+    const tt = await this.trangThaiCumTheoBuoi(cumIds, buoi, doi);
     return [...tt.values()].flat().filter((x) => x.trang_thai !== 'da_nhac')
       .length;
   }

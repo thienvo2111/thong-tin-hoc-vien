@@ -7,6 +7,7 @@ import {
   NotFoundAppException,
   ValidationException,
 } from '../common/exceptions/app.exceptions';
+import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 
 const PHUT = 60 * 1000;
 const BAT_DAU = new Date('2026-11-06T01:00:00Z'); // 08:00 giờ VN
@@ -55,8 +56,10 @@ describe('VaoHocZoomService.vaoHoc', () => {
   let prisma: {
     lich_hoc_lop: { findUnique: jest.Mock };
     phan_lop_giai_doan: { findFirst: jest.Mock };
+    dang_ky_hoc: { findUnique: jest.Mock };
     diem_danh: { findUnique: jest.Mock; create: jest.Mock };
   };
+  let doiBuoi: { doiBuoiDaDuyetCuaDangKy: jest.Mock };
   let service: VaoHocZoomService;
   const trongCuaSo = new Date(BAT_DAU.getTime() + 5 * PHUT);
 
@@ -66,12 +69,17 @@ describe('VaoHocZoomService.vaoHoc', () => {
       phan_lop_giai_doan: {
         findFirst: jest.fn().mockResolvedValue({ dang_ky_hoc_id: 'dk-1' }),
       },
+      dang_ky_hoc: { findUnique: jest.fn().mockResolvedValue({ id: 'dk-1' }) },
       diem_danh: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({}),
       },
     };
-    service = new VaoHocZoomService(prisma as unknown as PrismaService);
+    doiBuoi = { doiBuoiDaDuyetCuaDangKy: jest.fn().mockResolvedValue([]) };
+    service = new VaoHocZoomService(
+      prisma as unknown as PrismaService,
+      doiBuoi as unknown as DoiBuoiHocQueryService,
+    );
   });
 
   it('chưa mở: trả mo/dong, không link, không ghi', async () => {
@@ -227,6 +235,53 @@ describe('VaoHocZoomService.vaoHoc', () => {
       },
       select: { dang_ky_hoc_id: true },
     });
+  });
+
+  // Spec đổi buổi (R6): học viên đổi buổi VÀO buổi Zoom này (đã duyệt, còn hiệu lực).
+  it('không thuộc lớp nhưng có đổi buổi đã duyệt vào buổi → ghi co_mat cho đăng ký đó', async () => {
+    prisma.phan_lop_giai_doan.findFirst.mockResolvedValue(null);
+    doiBuoi.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+      {
+        dang_ky_hoc_id: 'dk-1',
+        lich_nguon_id: 'lich-a',
+        lich_chot_id: 'lich-1',
+      },
+    ]);
+    const kq = await service.vaoHoc('lich-1', hocVien, trongCuaSo);
+    expect(kq.ket_qua).toBe('da_ghi_nhan');
+    expect(prisma.dang_ky_hoc.findUnique).toHaveBeenCalledWith({
+      where: {
+        hoc_vien_id_khoa_id: { hoc_vien_id: 'hv-1', khoa_id: 'khoa-1' },
+      },
+      select: { id: true },
+    });
+    expect(doiBuoi.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledWith(['dk-1']);
+    expect(prisma.diem_danh.create.mock.calls[0][0].data).toMatchObject({
+      dang_ky_hoc_id: 'dk-1',
+      lich_hoc_id: 'lich-1',
+      trang_thai: 'co_mat',
+    });
+  });
+
+  it('đổi buổi hiệu lực sang buổi khác (không phải buổi này) → vẫn 403', async () => {
+    prisma.phan_lop_giai_doan.findFirst.mockResolvedValue(null);
+    doiBuoi.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+      {
+        dang_ky_hoc_id: 'dk-1',
+        lich_nguon_id: 'lich-a',
+        lich_chot_id: 'lich-9',
+      },
+    ]);
+    await expect(
+      service.vaoHoc('lich-1', hocVien, trongCuaSo),
+    ).rejects.toBeInstanceOf(ForbiddenAppException);
+    expect(prisma.diem_danh.create).not.toHaveBeenCalled();
+  });
+
+  it('thuộc lớp (kể cả đã đổi ra khỏi buổi này) → không tra đổi buổi, vẫn vào được', async () => {
+    const kq = await service.vaoHoc('lich-1', hocVien, trongCuaSo);
+    expect(kq.ket_qua).toBe('da_ghi_nhan');
+    expect(doiBuoi.doiBuoiDaDuyetCuaDangKy).not.toHaveBeenCalled();
   });
 
   it('tài khoản không gắn hồ sơ học viên -> 403', async () => {

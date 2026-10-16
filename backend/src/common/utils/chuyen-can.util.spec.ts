@@ -223,3 +223,45 @@ describe('tinhChuyenCan — cong_nhan_lop_cu', () => {
     expect(kq.get(khoaBuoi(GD1, 1))?.tu_lop_cu).toBe(false);
   });
 });
+
+// Spec đổi buổi (R7): dòng ở buổi chốt tính thay buổi nguồn.
+describe('tinhChuyenCan — đổi buổi', () => {
+  const doiTu = { lop_id: LOP_MOI, giai_doan_id: GD1, buoi_so: 1 };
+
+  it('có mặt ở buổi chốt (lớp khác, buổi số khác) → có mặt ở buổi nguồn, không tính buổi chốt', () => {
+    const kq = tinhChuyenCan(
+      hienTai,
+      [{ ...dong(LOP_KHAC, 3, 'co_mat'), doi_tu: doiTu }],
+      'theo_lop_hien_tai',
+    );
+    expect(kq.get(khoaBuoi(GD1, 1))).toEqual({
+      trang_thai: 'co_mat',
+      lop_id: LOP_MOI,
+      tu_lop_cu: false,
+    });
+    expect(kq.has(khoaBuoi(GD1, 3))).toBe(false);
+    expect(kq.size).toBe(1);
+  });
+
+  it('buổi nguồn bị ghi vắng + có mặt ở buổi chốt → 1 kết quả có mặt, không đếm đôi', () => {
+    const kq = tinhChuyenCan(
+      hienTai,
+      [
+        dong(LOP_MOI, 1, 'vang'),
+        { ...dong(LOP_KHAC, 1, 'co_mat'), doi_tu: doiTu },
+      ],
+      'theo_lop_hien_tai',
+    );
+    expect(kq.size).toBe(1);
+    expect(kq.get(khoaBuoi(GD1, 1))?.trang_thai).toBe('co_mat');
+  });
+
+  it('không có doi_tu → dòng Zoom lớp khác vẫn bị bỏ như cũ', () => {
+    const kq = tinhChuyenCan(
+      hienTai,
+      [dong(LOP_KHAC, 1, 'co_mat')],
+      'theo_lop_hien_tai',
+    );
+    expect(kq.size).toBe(0);
+  });
+});

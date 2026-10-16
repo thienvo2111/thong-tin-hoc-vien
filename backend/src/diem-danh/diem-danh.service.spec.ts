@@ -116,16 +116,42 @@ describe('DiemDanhService — đổi buổi', () => {
     );
   });
 
-  it('bảng điểm danh: thêm dòng người đổi vào kèm nhãn, nạp trong 1 truy vấn', async () => {
-    const bang = await service.bangDiemDanh(quanTri, 'lop-b', 'gd-1', now);
-    expect(bang.hoc_vien.map((h) => h.dang_ky_hoc_id)).toEqual([
-      'dk-a',
-      'dk-b',
+  it('bảng điểm danh: người đổi vào ở danh sách riêng kèm nhãn, chỉ ô buổi chốt, nạp trong 1 truy vấn', async () => {
+    prisma.dang_ky_hoc.findMany.mockResolvedValue([
+      {
+        ...dk('dk-a', 'An Lớp A'),
+        diem_danh: [
+          {
+            lich_hoc_id: 'b-1',
+            trang_thai: 'co_mat',
+            nguon: 'ky_ten',
+            ghi_chu: null,
+            tu_diem_danh_luc: null,
+            cap_nhat_luc: now,
+            sua_boi: null,
+          },
+          {
+            lich_hoc_id: 'b-9',
+            trang_thai: 'vang',
+            nguon: 'ky_ten',
+            ghi_chu: null,
+            tu_diem_danh_luc: null,
+            cap_nhat_luc: now,
+            sua_boi: null,
+          },
+        ],
+      },
     ]);
-    expect(bang.hoc_vien[0]).toMatchObject({
+    const bang = await service.bangDiemDanh(quanTri, 'lop-b', 'gd-1', now);
+    // Danh sách lớp gốc không đổi số lượng.
+    expect(bang.hoc_vien.map((h) => h.dang_ky_hoc_id)).toEqual(['dk-b']);
+    expect(bang.hoc_vien[0]).not.toHaveProperty('doi_buoi');
+    expect(bang.hoc_vien_doi_vao).toHaveLength(1);
+    expect(bang.hoc_vien_doi_vao[0]).toMatchObject({
+      dang_ky_hoc_id: 'dk-a',
       doi_buoi: { 'b-1': { loai: 'vao', lop: 'Lớp A' } },
     });
-    expect(bang.hoc_vien[1]).not.toHaveProperty('doi_buoi');
+    expect(Object.keys(bang.hoc_vien_doi_vao[0].diem_danh)).toEqual(['b-1']);
     expect(prisma.dang_ky_hoc.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.dang_ky_hoc.findMany.mock.calls[0][0].where).toEqual({
       id: { in: ['dk-a'] },

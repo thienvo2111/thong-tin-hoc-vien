@@ -207,7 +207,7 @@ export class HoTroHocVienService {
         where: { dang_ky_hoc: { cum_id: { in: cumIds } } },
         _count: { _all: true },
       }),
-      this.nhacLich.doiBuoiCuaCum(cumIds),
+      this.nhacLich.doiBuoiCuaCum(cumIds, tu),
     ]);
     if (capLop.length === 0 && doi.length === 0) return [];
     const soHocVien = new Map(
@@ -281,7 +281,7 @@ export class HoTroHocVienService {
       },
       orderBy: { created_at: 'asc' },
     });
-    const nhacCum = await this.nhacLich.trangThaiCumTheoBuoi(cumIds, buoi);
+    const nhacCum = await this.nhacLich.trangThaiCumTheoBuoi(cumIds, buoi, doi);
     return buoi.map(({ lop, ...b }) => {
       const { nhan_su, khoa, ...lopGon } = lop;
       const { phan_cong_ho_tro_gv, ...khoaGon } = khoa;

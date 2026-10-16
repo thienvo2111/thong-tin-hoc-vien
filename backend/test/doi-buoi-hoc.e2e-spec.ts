@@ -233,13 +233,17 @@ describe('Đổi buổi học (e2e)', () => {
   it('(a) trang lớp B buổi 1 có HV1 với nhãn "Từ lớp A"; lớp A ghi đổi ra', async () => {
     const trangLop = app.get(TrangLopService);
     const b = await trangLop.layTrangLop(lop.b, gdId, { vai_tro: 'quan_tri' });
-    const hv1 = b.hoc_vien.find((h) => h.dang_ky_hoc_id === hv.hv1.dk);
+    // Danh sách lớp gốc không đổi (P = 1); người đổi vào ở danh sách riêng.
+    expect(b.hoc_vien.map((h) => h.dang_ky_hoc_id)).toEqual([hv.p1.dk]);
+    const hv1 = b.hoc_vien_doi_vao.find((h) => h.dang_ky_hoc_id === hv.hv1.dk);
     expect(hv1?.doi_buoi).toEqual({ [buoi.b]: { loai: 'vao', lop: 'Lớp A' } });
     expect(b.buoi[0]).toMatchObject({ id: buoi.b, si_so: 2 });
 
     const a = await trangLop.layTrangLop(lop.a, gdId, { vai_tro: 'quan_tri' });
     const hv1A = a.hoc_vien.find((h) => h.dang_ky_hoc_id === hv.hv1.dk);
     expect(hv1A?.doi_buoi).toEqual({ [buoi.a]: { loai: 'ra', lop: 'Lớp B' } });
+    expect(a.hoc_vien).toHaveLength(3);
+    expect(a.hoc_vien_doi_vao).toEqual([]);
   });
 
   it('(a) nạp điểm danh HV1 ở buổi B không ghi_chu → không lỗi, không cảnh báo học bù', async () => {
