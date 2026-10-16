@@ -32,7 +32,7 @@ interface DieuChinh {
   }[];
 }
 
-const LICH_TOM_TAT_SELECT = {
+export const LICH_TOM_TAT_SELECT = {
   id: true,
   lop_id: true,
   giai_doan_id: true,
