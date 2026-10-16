@@ -21,6 +21,15 @@ export interface LichTomTat {
   };
 }
 
+/** Tóm tắt buổi nhúng sẵn trong đề nghị — có cả buổi đã bắt đầu (để hiện nhãn lịch sử). */
+export interface BuoiTomTat {
+  id: string;
+  buoi_so: number;
+  thoi_gian_bat_dau: string;
+  thoi_gian_ket_thuc: string | null;
+  lop: { ten_lop: string };
+}
+
 export interface DeNghiHocVien {
   id: string;
   trang_thai: TrangThaiDeNghi;
@@ -32,6 +41,9 @@ export interface DeNghiHocVien {
   ghi_chu_xu_ly: string | null;
   qua_han: boolean;
   thu_tu_hang: { k: number; n: number } | null;
+  buoi_nguon: BuoiTomTat | null;
+  buoi_de_nghi: BuoiTomTat | null;
+  buoi_chot: BuoiTomTat | null;
 }
 
 export interface TongQuanDoiBuoi {
@@ -43,6 +55,11 @@ export interface TongQuanDoiBuoi {
 
 export interface LuaChonBuoi {
   lich: LichTomTat;
+  thoi_gian_ket_thuc: string;
+  diem_hoc: { ten: string; dia_chi: string } | null;
+  phong: string | null;
+  /** Zoom luôn null (backend không lộ link). */
+  dia_diem_hoac_link: string | null;
   si_so: number;
   si_so_toi_da: number | null;
   so_cho_duyet: number;
@@ -57,9 +74,6 @@ export interface GuiDoiBuoiBody {
 
 export interface DeNghiDuyet extends DeNghiHocVien {
   hoc_vien: { id: string; ho_ten: string; don_vi: string; cum: string | null };
-  buoi_nguon: LichTomTat | null;
-  buoi_de_nghi: LichTomTat | null;
-  buoi_chot: LichTomTat | null;
   si_so: number;
   si_so_toi_da: number | null;
   so_cho_duyet: number;
@@ -161,9 +175,9 @@ export function useDsDoiBuoi(q: LocDoiBuoi = {}) {
 export function useDemDoiBuoi() {
   return useQuery({
     queryKey: [KEY, "dem"],
-    // Backend trả số trần; nếu thân không phải JSON thì apiFetch trả undefined -> coi như 0.
     queryFn: async () =>
-      (await apiFetch<number | undefined>("/doi-buoi-hoc/dem-cho-duyet")) ?? 0,
+      (await apiFetch<{ cho_duyet: number }>("/doi-buoi-hoc/dem-cho-duyet"))
+        .cho_duyet,
   });
 }
 

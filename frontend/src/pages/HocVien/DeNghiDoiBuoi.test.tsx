@@ -7,6 +7,7 @@ import { db } from "@/test/mocks/db";
 import { renderVoiRouter } from "@/test/testUtils";
 import { datToken } from "@/auth/tokenStore";
 import type {
+  BuoiTomTat,
   DeNghiHocVien,
   LichTomTat,
   LuaChonBuoi,
@@ -34,6 +35,18 @@ function lich(id: string, ten: string, buoi = 1, gio = 48): LichTomTat {
   };
 }
 
+function tomTat(l: LichTomTat, ketThucSauGio = 3): BuoiTomTat {
+  return {
+    id: l.id,
+    buoi_so: l.buoi_so,
+    thoi_gian_bat_dau: l.thoi_gian_bat_dau,
+    thoi_gian_ket_thuc: new Date(
+      Date.parse(l.thoi_gian_bat_dau) + ketThucSauGio * GIO,
+    ).toISOString(),
+    lop: { ten_lop: l.lop.ten_lop },
+  };
+}
+
 function deNghiMau(over: Partial<DeNghiHocVien> = {}): DeNghiHocVien {
   return {
     id: "dn-1",
@@ -46,6 +59,9 @@ function deNghiMau(over: Partial<DeNghiHocVien> = {}): DeNghiHocVien {
     ghi_chu_xu_ly: null,
     qua_han: false,
     thu_tu_hang: null,
+    buoi_nguon: tomTat(lich("ln-1", "Lớp 01")),
+    buoi_de_nghi: tomTat(lich("ld-1", "Lớp 02", 1, 50)),
+    buoi_chot: null,
     ...over,
   };
 }
@@ -63,6 +79,10 @@ function tongQuanMau(over: Partial<TongQuanDoiBuoi> = {}): TongQuanDoiBuoi {
 const LUA_CHON: LuaChonBuoi[] = [
   {
     lich: lich("ld-1", "Lớp 02", 1, 50),
+    thoi_gian_ket_thuc: new Date(Date.now() + 53 * GIO).toISOString(),
+    diem_hoc: { ten: "THPT Long Xuyên", dia_chi: "1 Trần Hưng Đạo" },
+    phong: "P201",
+    dia_diem_hoac_link: null,
     si_so: 28,
     si_so_toi_da: 30,
     so_cho_duyet: 2,
@@ -70,6 +90,10 @@ const LUA_CHON: LuaChonBuoi[] = [
   },
   {
     lich: lich("ld-2", "Lớp 03", 1, 52),
+    thoi_gian_ket_thuc: new Date(Date.now() + 55 * GIO).toISOString(),
+    diem_hoc: null,
+    phong: null,
+    dia_diem_hoac_link: null,
     si_so: 30,
     si_so_toi_da: 30,
     so_cho_duyet: 0,
@@ -190,6 +214,51 @@ describe("Trang đề nghị đổi buổi (học viên)", () => {
     ).toBeInTheDocument();
   });
 
+  it("lựa chọn hiện giờ kết thúc và địa điểm (điểm học + phòng)", async () => {
+    datApi(tongQuanMau());
+    renderTrang();
+    expect(
+      await screen.findByText("THPT Long Xuyên — 1 Trần Hưng Đạo · phòng P201"),
+    ).toBeInTheDocument();
+    const nhan = screen.getByRole("radio", { name: /Lớp 02/ });
+    expect(nhan.closest(".mantine-Radio-root")?.textContent).toMatch(
+      /\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}–\d{2}:\d{2}/,
+    );
+  });
+
+  it("đề nghị quá hạn: nhãn buổi thật (buổi đã bắt đầu), không có nút Sửa, vẫn Hủy", async () => {
+    const qua = deNghiMau({
+      qua_han: true,
+      buoi_nguon: tomTat(lich("ln-1", "Lớp Cũ", 4, -5)),
+    });
+    datApi(tongQuanMau({ buoi_sap_toi: [], de_nghi: [qua] }));
+    renderTrang("?khoa=khoa-1");
+    expect(await screen.findByText("Quá hạn")).toBeInTheDocument();
+    expect(screen.getByText(/Lớp Cũ · Buổi 4/)).toBeInTheDocument();
+    expect(screen.queryByText("Buổi học")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Sửa" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Hủy đề nghị" }),
+    ).toBeInTheDocument();
+  });
+
+  it("lịch sử đã duyệt: nhãn buổi nguồn thật và buổi chốt", async () => {
+    const xong = deNghiMau({
+      id: "dn-2",
+      trang_thai: "da_duyet",
+      lich_chot_id: "ld-9",
+      buoi_nguon: tomTat(lich("ln-1", "Lớp Gốc", 2, -30)),
+      buoi_chot: tomTat(lich("ld-9", "Lớp Chốt", 2, -20)),
+    });
+    datApi(tongQuanMau({ buoi_sap_toi: [], de_nghi: [xong] }));
+    renderTrang("?khoa=khoa-1");
+    expect(
+      await screen.findByText(/Lớp Gốc · Buổi 2 · .* → Lớp Chốt · Buổi 2/),
+    ).toBeInTheDocument();
+  });
+
   it("hủy đề nghị đang chờ gọi POST /huy", async () => {
     datApi(tongQuanMau({ de_nghi: [deNghiMau()] }));
     const goi: string[] = [];
@@ -241,7 +310,9 @@ describe("Trang đề nghị đổi buổi (học viên)", () => {
     ];
     datApi(tongQuanMau());
     renderTrang("");
-    expect(await screen.findByRole("textbox", { name: "Khóa học" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("textbox", { name: "Khóa học" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/lượt đổi/)).not.toBeInTheDocument();
   });
 });

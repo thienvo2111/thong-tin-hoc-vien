@@ -24,6 +24,7 @@ import {
   useLuaChonDoiBuoi,
   useSuaDoiBuoi,
   useTongQuanDoiBuoi,
+  type BuoiTomTat,
   type DeNghiHocVien,
   type LichTomTat,
   type LuaChonBuoi,
@@ -31,7 +32,7 @@ import {
 } from "@/api/doiBuoi";
 import { ApiError } from "@/api/client";
 import { StatusBanner } from "@/components/StatusBanner";
-import { dinhDangNgayGio } from "@/lib/ngay";
+import { dinhDangGio, dinhDangNgayGio } from "@/lib/ngay";
 import { thongDiepLoiXungDot } from "@/lib/loiApi";
 
 const LY_DO_TOI_THIEU = 5;
@@ -45,7 +46,7 @@ const NHAN_TRANG_THAI: Record<DeNghiHocVien["trang_thai"], string> = {
   da_huy: "Đã hủy",
 };
 
-function nhanBuoi(l: LichTomTat | undefined): string {
+function nhanBuoi(l: LichTomTat | BuoiTomTat | null | undefined): string {
   if (!l) return "Buổi học";
   return `${l.lop.ten_lop} · Buổi ${l.buoi_so} · ${dinhDangNgayGio(l.thoi_gian_bat_dau)}`;
 }
@@ -155,9 +156,6 @@ function NoiDung({
   );
   const choDuyet = tongQuan.de_nghi.filter((d) => d.trang_thai === "cho_duyet");
   const daXuLy = tongQuan.de_nghi.filter((d) => d.trang_thai !== "cho_duyet");
-  const lichMap = new Map(
-    tongQuan.buoi_sap_toi.map((b) => [b.lich_nguon.id, b.lich_nguon]),
-  );
 
   return (
     <Stack gap="lg">
@@ -166,12 +164,7 @@ function NoiDung({
       </Text>
 
       {choDuyet.map((d) => (
-        <DongDeNghi
-          key={d.id}
-          deNghi={d}
-          buoiNguon={lichMap.get(d.lich_nguon_id)}
-          onSua={() => setDangSua(d)}
-        />
+        <DongDeNghi key={d.id} deNghi={d} onSua={() => setDangSua(d)} />
       ))}
 
       {dangSua || conLai > 0 ? (
@@ -197,7 +190,10 @@ function NoiDung({
             <Paper key={d.id} withBorder radius="md" p="sm">
               <Group gap="xs">
                 <Badge variant="light">{NHAN_TRANG_THAI[d.trang_thai]}</Badge>
-                <Text size="sm">{nhanBuoi(lichMap.get(d.lich_nguon_id))}</Text>
+                <Text size="sm">
+                  {nhanBuoi(d.buoi_nguon)}
+                  {d.buoi_chot ? ` → ${nhanBuoi(d.buoi_chot)}` : ""}
+                </Text>
               </Group>
               {d.ghi_chu_xu_ly && (
                 <Text size="sm" c="dimmed" mt={4}>
@@ -214,11 +210,9 @@ function NoiDung({
 
 function DongDeNghi({
   deNghi,
-  buoiNguon,
   onSua,
 }: {
   deNghi: DeNghiHocVien;
-  buoiNguon: LichTomTat | undefined;
   onSua: () => void;
 }) {
   const huy = useHuyDoiBuoi();
@@ -235,7 +229,7 @@ function DongDeNghi({
             </Badge>
           )}
         </Group>
-        <Text size="sm">Buổi cần đổi: {nhanBuoi(buoiNguon)}</Text>
+        <Text size="sm">Buổi cần đổi: {nhanBuoi(deNghi.buoi_nguon)}</Text>
         <Text size="sm" c="dimmed">
           Lý do: {deNghi.ly_do}
         </Text>
@@ -250,9 +244,11 @@ function DongDeNghi({
           </StatusBanner>
         )}
         <Group gap="xs">
-          <Button size="xs" variant="default" onClick={onSua}>
-            Sửa
-          </Button>
+          {!deNghi.qua_han && (
+            <Button size="xs" variant="default" onClick={onSua}>
+              Sửa
+            </Button>
+          )}
           <Button
             size="xs"
             variant="subtle"
@@ -460,7 +456,8 @@ function NhanLuaChon({ c }: { c: LuaChonBuoi }) {
       </Text>
       <Group gap="xs">
         <Text size="sm" c="dimmed">
-          {dinhDangNgayGio(c.lich.thoi_gian_bat_dau)}
+          {dinhDangNgayGio(c.lich.thoi_gian_bat_dau)}–
+          {dinhDangGio(c.thoi_gian_ket_thuc)}
         </Text>
         <Text size="sm">
           {c.si_so_toi_da == null ? c.si_so : `${c.si_so}/${c.si_so_toi_da}`}
@@ -476,6 +473,22 @@ function NhanLuaChon({ c }: { c: LuaChonBuoi }) {
           </Badge>
         )}
       </Group>
+      <DiaDiem c={c} />
     </Box>
+  );
+}
+
+/** Điểm học + phòng (trực tiếp) hoặc link/địa điểm (VLE); zoom không có. */
+function DiaDiem({ c }: { c: LuaChonBuoi }) {
+  const ds = [
+    c.diem_hoc && `${c.diem_hoc.ten} — ${c.diem_hoc.dia_chi}`,
+    c.phong && `phòng ${c.phong}`,
+    c.dia_diem_hoac_link,
+  ].filter(Boolean);
+  if (ds.length === 0) return null;
+  return (
+    <Text size="sm" c="dimmed" style={{ wordBreak: "break-all" }}>
+      {ds.join(" · ")}
+    </Text>
   );
 }

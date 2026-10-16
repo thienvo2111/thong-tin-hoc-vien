@@ -318,6 +318,46 @@ describe('DoiBuoiHocService luaChon / tongQuan', () => {
     expect(arg.where.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
   });
 
+  it('lua-chon: dia diem theo loai lop, zoom khong bao gio lo link', async () => {
+    const mk = (id: string, lopId: string, loai: string, extra: object) => {
+      const l = lich(id, lopId, extra as Partial<LichTomTat>);
+      l.lop = { ...l.lop, loai_lop: loai as never };
+      return l;
+    };
+    const ketThuc = new Date(ngayMai.getTime() + 3_600_000);
+    const link = 'https://zoom.example/j/1';
+    const loai = (l: string) => {
+      const s = setupDoc();
+      s.query.lichTomTat.mockResolvedValueOnce(
+        new Map([['ln', mk('ln', 'lopA', l, {})]]),
+      );
+      (s.prisma as any).lich_hoc_lop.findMany.mockResolvedValueOnce([
+        mk('ld', 'lopB', l, {
+          thoi_gian_ket_thuc: ketThuc,
+          phong: 'P1',
+          dia_diem_hoac_link: link,
+          diem_hoc: { ten: 'THPT A', dia_chi: '1 Duong B' },
+        }),
+      ]);
+      return s.svc.luaChonHocVien(user, 'ln');
+    };
+    const zoom = (await loai('zoom'))[0];
+    expect(zoom.dia_diem_hoac_link).toBeNull();
+    expect(zoom.diem_hoc).toBeNull();
+    expect(zoom.thoi_gian_ket_thuc).toBe(ketThuc);
+    const tt = (await loai('truc_tiep'))[0];
+    expect(tt).toMatchObject({
+      diem_hoc: { ten: 'THPT A', dia_chi: '1 Duong B' },
+      phong: 'P1',
+      dia_diem_hoac_link: null,
+    });
+    expect((await loai('vle'))[0]).toMatchObject({
+      dia_diem_hoac_link: link,
+      diem_hoc: null,
+      phong: null,
+    });
+  });
+
   it('lua-chon: buoi nguon da bat dau -> 400', async () => {
     const { svc, query } = setupDoc();
     query.lichTomTat.mockResolvedValueOnce(
@@ -777,8 +817,8 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     expect(r[0]).toMatchObject({
       id: 'x1',
       hoc_vien: { id: 'hv1', ho_ten: 'A', don_vi: 'Truong X', cum: 'Cum 1' },
-      buoi_nguon: { id: 'ln' },
-      buoi_de_nghi: { id: 'ld' },
+      buoi_nguon: { id: 'ln', buoi_so: 3, lop: { ten_lop: 'lopA' } },
+      buoi_de_nghi: { id: 'ld', lop: { ten_lop: 'lopB' } },
       buoi_chot: null,
       si_so: 5,
       si_so_toi_da: 40,

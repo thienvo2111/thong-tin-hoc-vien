@@ -38,6 +38,7 @@ export const LICH_TOM_TAT_SELECT = {
   giai_doan_id: true,
   buoi_so: true,
   thoi_gian_bat_dau: true,
+  thoi_gian_ket_thuc: true,
   lop: {
     select: {
       khoa_id: true,

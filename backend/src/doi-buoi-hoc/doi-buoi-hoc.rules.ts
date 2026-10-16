@@ -12,6 +12,7 @@ export interface LichTomTat {
   giai_doan_id: string;
   buoi_so: number;
   thoi_gian_bat_dau: Date;
+  thoi_gian_ket_thuc?: Date;
   lop: {
     khoa_id: string;
     loai_lop: loai_lop_hoc;

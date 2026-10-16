@@ -34,8 +34,9 @@ export class DoiBuoiHocController {
   }
 
   @Get('dem-cho-duyet')
-  demChoDuyet(@CurrentUser() user: AuthenticatedUser) {
-    return this.service.demChoDuyet(user);
+  async demChoDuyet(@CurrentUser() user: AuthenticatedUser) {
+    // Bọc object: Nest trả số trần dưới dạng text, client JSON không đọc được.
+    return { cho_duyet: await this.service.demChoDuyet(user) };
   }
 
   @Get(':id/lua-chon')

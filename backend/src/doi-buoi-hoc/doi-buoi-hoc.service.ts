@@ -45,10 +45,38 @@ export interface DeNghiHocVien {
   ghi_chu_xu_ly: string | null;
   qua_han: boolean;
   thu_tu_hang: { k: number; n: number } | null;
+  buoi_nguon: BuoiTomTat | null;
+  buoi_de_nghi: BuoiTomTat | null;
+  buoi_chot: BuoiTomTat | null;
+}
+
+export interface BuoiTomTat {
+  id: string;
+  buoi_so: number;
+  thoi_gian_bat_dau: Date;
+  thoi_gian_ket_thuc: Date | null;
+  lop: { ten_lop: string };
+}
+
+function tomTatBuoi(l: LichTomTat | undefined): BuoiTomTat | null {
+  if (!l) return null;
+  return {
+    id: l.id,
+    buoi_so: l.buoi_so,
+    thoi_gian_bat_dau: l.thoi_gian_bat_dau,
+    thoi_gian_ket_thuc: l.thoi_gian_ket_thuc ?? null,
+    lop: { ten_lop: l.lop.ten_lop },
+  };
 }
 
 export interface LuaChonBuoi {
   lich: LichTomTat;
+  thoi_gian_ket_thuc: Date;
+  /** Buổi trực tiếp: điểm học + phòng. */
+  diem_hoc: { ten: string; dia_chi: string } | null;
+  phong: string | null;
+  /** Buổi không phải trực tiếp/zoom (vd VLE). Zoom luôn null — không lộ link. */
+  dia_diem_hoac_link: string | null;
   si_so: number;
   si_so_toi_da: number | null;
   so_cho_duyet: number;
@@ -62,9 +90,6 @@ export interface DeNghiDuyet extends DeNghiHocVien {
     don_vi: string;
     cum: string | null;
   };
-  buoi_nguon: LichTomTat | null;
-  buoi_de_nghi: LichTomTat | null;
-  buoi_chot: LichTomTat | null;
   si_so: number;
   si_so_toi_da: number | null;
   so_cho_duyet: number;
@@ -319,11 +344,6 @@ export class DoiBuoiHocService {
           don_vi: dang_ky_hoc.hoc_vien.don_vi_cong_tac.ten_don_vi,
           cum: dang_ky_hoc.cum?.ten_cum ?? null,
         },
-        buoi_nguon: lichMap.get(r.lich_nguon_id) ?? null,
-        buoi_de_nghi: lichMap.get(r.lich_de_nghi_id) ?? null,
-        buoi_chot: r.lich_chot_id
-          ? (lichMap.get(r.lich_chot_id) ?? null)
-          : null,
         si_so: s?.si_so ?? 0,
         si_so_toi_da: s?.si_so_toi_da ?? null,
         so_cho_duyet: s?.so_cho_duyet ?? 0,
@@ -776,27 +796,42 @@ export class DoiBuoiHocService {
         lop: { khoa_id: nguon.lop.khoa_id, loai_lop: nguon.lop.loai_lop },
       },
       orderBy: { thoi_gian_bat_dau: 'asc' },
-      select: LICH_TOM_TAT_SELECT,
+      select: {
+        ...LICH_TOM_TAT_SELECT,
+        phong: true,
+        dia_diem_hoac_link: true,
+        diem_hoc: { select: { ten: true, dia_chi: true } },
+      },
     });
     const tuongDuong = ungVien.filter((l) => laBuoiTuongDuong(nguon, l));
     const siSo = await this.query.siSoBuoi(
       tuongDuong.map((l) => l.id),
       now,
     );
-    return tuongDuong.map((lich) => {
-      const s = siSo.get(lich.id) ?? {
-        si_so: 0,
-        si_so_toi_da: lich.lop.si_so_toi_da,
-        so_cho_duyet: 0,
-      };
-      return {
-        lich,
-        si_so: s.si_so,
-        si_so_toi_da: s.si_so_toi_da,
-        so_cho_duyet: s.so_cho_duyet,
-        da_du: s.si_so_toi_da !== null && s.si_so >= s.si_so_toi_da,
-      };
-    });
+    return tuongDuong.map(
+      ({ phong, dia_diem_hoac_link, diem_hoc, ...lich }) => {
+        const s = siSo.get(lich.id) ?? {
+          si_so: 0,
+          si_so_toi_da: lich.lop.si_so_toi_da,
+          so_cho_duyet: 0,
+        };
+        return {
+          lich,
+          thoi_gian_ket_thuc: lich.thoi_gian_ket_thuc as Date,
+          diem_hoc:
+            lich.lop.loai_lop === 'truc_tiep' ? (diem_hoc ?? null) : null,
+          phong: lich.lop.loai_lop === 'truc_tiep' ? (phong ?? null) : null,
+          dia_diem_hoac_link:
+            lich.lop.loai_lop === 'truc_tiep' || lich.lop.loai_lop === 'zoom'
+              ? null
+              : (dia_diem_hoac_link ?? null),
+          si_so: s.si_so,
+          si_so_toi_da: s.si_so_toi_da,
+          so_cho_duyet: s.so_cho_duyet,
+          da_du: s.si_so_toi_da !== null && s.si_so >= s.si_so_toi_da,
+        };
+      },
+    );
   }
 
   // Thứ hạng trong hàng chờ của cùng buổi đề nghị: chỉ tính cho_duyet chưa quá hạn.
@@ -852,6 +887,11 @@ export class DoiBuoiHocService {
       ghi_chu_xu_ly: r.ghi_chu_xu_ly,
       qua_han: quaHan,
       thu_tu_hang: quaHan ? null : (hang.get(r.id) ?? null),
+      buoi_nguon: tomTatBuoi(nguon),
+      buoi_de_nghi: tomTatBuoi(dich),
+      buoi_chot: r.lich_chot_id
+        ? tomTatBuoi(lichMap.get(r.lich_chot_id))
+        : null,
     };
   }
 
