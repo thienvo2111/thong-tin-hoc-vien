@@ -2,7 +2,7 @@
 
 > Đây là **lệnh để người vận hành tự chạy trên VPS**. Trợ lý không SSH, không deploy, không chạy lệnh trên VPS.
 
-Đưa VPS lên `main` (`ba7c595`). Gồm cả `18f6c10` (chỉ FE: link "Muốn đổi lại buổi này?") nếu VPS đang ở `d501f8c`.
+Đưa VPS lên `main` (tính năng ở `ba7c595`). Gồm cả `18f6c10` (chỉ FE: link "Muốn đổi lại buổi này?") nếu VPS đang ở `d501f8c`.
 
 | Nội dung | Ảnh hưởng dữ liệu |
 |---|---|
@@ -41,7 +41,7 @@ git pull origin main && git log --oneline -1
 cd backend && npx prisma migrate status
 ```
 
-Kỳ vọng: HEAD = `ba7c595`, **chỉ 1** migration chưa áp: `20261016200000_phan_cong_ho_tro_lop`. Migration lạ hoặc báo
+Kỳ vọng: HEAD = `12ec0f9` hoặc mới hơn (có `ba7c595`), **chỉ 1** migration chưa áp: `20261016200000_phan_cong_ho_tro_lop`. Migration lạ hoặc báo
 drift → **DỪNG**.
 
 ## 3. Deploy
