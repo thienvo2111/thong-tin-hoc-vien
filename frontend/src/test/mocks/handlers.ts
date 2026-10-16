@@ -720,6 +720,7 @@ export const handlers = [
       updated_at: new Date().toISOString(),
       created_by: 'nd-1',
       mo_dieu_chinh_muc: false,
+      so_buoi_doi_toi_da: 0,
       bat_diem_danh_zoom_luc: null,
       diem_danh_mo_truoc_phut: 30,
       diem_danh_dong_sau_phut: 120,
@@ -1313,6 +1314,8 @@ export const handlers = [
   http.get('/ho-tro-hoc-vien/cum-cua-toi', () => HttpResponse.json(db.hoTroCum)),
   // ADR 0004 G11 (issue #21): số buổi cần nhắc (menu Lịch học).
   http.get('/ho-tro-hoc-vien/nhac-lich/dem', () => HttpResponse.json({ can_nhac: 0 })),
+  // Đổi buổi: số đề nghị chờ duyệt (menu hỗ trợ/admin + khối Vận hành).
+  http.get('/doi-buoi-hoc/dem-cho-duyet', () => HttpResponse.json({ cho_duyet: 0 })),
   http.get('/ho-tro-hoc-vien/hoc-vien', () =>
     HttpResponse.json({ data: db.hoTroHocVien, total: db.hoTroHocVien.length, page: 1, page_size: 20 }),
   ),

@@ -1,7 +1,8 @@
-import { Avatar, Box, Button, Group, Image, Stack, Text } from '@mantine/core';
+import { Avatar, Badge, Box, Button, Group, Image, Stack, Text } from '@mantine/core';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useToi } from '@/auth/AuthContext';
 import logoHcmue from '@/assets/logo-hcmue.png';
+import { useDemDoiBuoi } from '@/api/doiBuoi';
 import { MENU_ADMIN } from './menu';
 
 const NHAN_VAI_TRO: Record<string, string> = {
@@ -10,6 +11,17 @@ const NHAN_VAI_TRO: Record<string, string> = {
   phong_vhxh: 'Phòng VHXH',
   so_gddt: 'Sở GD&ĐT',
 };
+
+/** Huy hiệu số đề nghị đổi buổi chờ duyệt — chỉ mount ở mục của Quản trị (API chỉ cho quan_tri/ho_tro_hoc_vien). */
+function HuyHieuDoiBuoi() {
+  const so = useDemDoiBuoi().data ?? 0;
+  if (so <= 0) return null;
+  return (
+    <Badge ml="auto" size="sm" color="red" aria-label={`${so} đề nghị đổi buổi chờ duyệt`}>
+      {so}
+    </Badge>
+  );
+}
 
 /** Nội dung sidebar quản trị — dùng chung cho sidebar cố định (desktop) và Drawer (mobile), khớp
  * design/redesign-spec.md § 2 + mockup AdminTongQuan.dc.html. */
@@ -58,6 +70,7 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
               >
                 <span aria-hidden>{m.icon}</span>
                 {m.nhan}
+                {m.to === '/admin/doi-buoi' && <HuyHieuDoiBuoi />}
                 {m.sapRaMat && (
                   <Text component="span" fz={10} fw={700} c="#7C93AE" ml="auto">
                     Sắp ra mắt

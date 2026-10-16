@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { NhanDoiBuoi } from './doiBuoi';
 import { apiFetch } from './client';
 import type { LoaiLop } from './types';
 
@@ -28,14 +29,23 @@ export interface BangDiemDanh {
     thoi_gian_ket_thuc: string;
     sua_duoc: boolean;
     ly_do: LyDoKhongSuaDiemDanh | null;
+    /** Spec đổi buổi §5: sĩ số theo buổi khi backend trả. */
+    si_so?: number | null;
+    si_so_toi_da?: number | null;
   }[];
-  hoc_vien: {
-    dang_ky_hoc_id: string;
-    ho_ten: string;
-    don_vi: string;
-    diem_danh: Record<string, ODiemDanh>;
-    bao_vang: Record<string, string>;
-  }[];
+  hoc_vien: HocVienDiemDanh[];
+  /** Người đổi buổi vào lớp — chỉ có ô của buổi chốt; không tính vào sĩ số lớp. */
+  hoc_vien_doi_vao?: HocVienDiemDanh[];
+}
+
+export interface HocVienDiemDanh {
+  dang_ky_hoc_id: string;
+  ho_ten: string;
+  don_vi: string;
+  diem_danh: Record<string, ODiemDanh>;
+  bao_vang: Record<string, string>;
+  /** lich_hoc_id → đổi ra (sang lớp chốt) / đổi vào (từ lớp nguồn). */
+  doi_buoi?: NhanDoiBuoi;
 }
 
 export interface SuaDiemDanhDto {

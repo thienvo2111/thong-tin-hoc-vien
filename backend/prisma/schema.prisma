@@ -483,6 +483,9 @@ model nguoi_dung {
   bao_vang_ghi          bao_vang[]          @relation("bao_vang_nguoi_ghi")
   de_nghi_doi_lop_tao   de_nghi_doi_lop[]   @relation("de_nghi_nguoi_tao")
   de_nghi_doi_lop_xu_ly de_nghi_doi_lop[]   @relation("de_nghi_nguoi_xu_ly")
+  // ADR 0007
+  doi_buoi_nguoi_tao    doi_buoi_hoc[]      @relation("doi_buoi_nguoi_tao")
+  doi_buoi_nguoi_xu_ly  doi_buoi_hoc[]      @relation("doi_buoi_nguoi_xu_ly")
   nhac_lich_da_gui      nhat_ky_nhac_lich[] @relation("nhac_lich_nguoi_gui")
 
   // ADR 0005 Z7 (issue #23)
@@ -770,6 +773,8 @@ model khoa_boi_duong {
   // docs/database-ddl.sql comment tại đây.
   // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học (xuống mức thấp hơn).
   mo_dieu_chinh_muc       Boolean             @default(false)
+  // ADR 0007: số buổi tối đa học viên được đề nghị đổi (0 = tắt; CHECK 0–50 bằng raw SQL).
+  so_buoi_doi_toi_da      Int                 @default(0) @db.SmallInt
   // ADR 0005 (issue #23): tự điểm danh lớp Zoom — mốc bật (NULL = tắt), cửa sổ
   // điểm danh tính theo giờ bắt đầu buổi (CHECK 0–180 / 15–720 bằng raw SQL).
   bat_diem_danh_zoom_luc  DateTime?           @db.Timestamptz(6)
@@ -932,15 +937,19 @@ model lich_hoc_lop {
   // ADR 0005 Z6: mốc cron đã chốt vắng buổi Zoom (NULL = chưa chốt).
   chot_diem_danh_luc DateTime?           @db.Timestamptz(6)
 
-  lop       lop_hoc               @relation(fields: [lop_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  diem_hoc  diem_hoc?             @relation(fields: [diem_hoc_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lop              lop_hoc               @relation(fields: [lop_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  diem_hoc         diem_hoc?             @relation(fields: [diem_hoc_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   // T11 (issue #3): giảng viên được phân công vào buổi này.
-  phan_cong phan_cong_giang_day[]
-  giai_doan giai_doan_khoa        @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  phan_cong        phan_cong_giang_day[]
+  giai_doan        giai_doan_khoa        @relation(fields: [giai_doan_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   // T12 (mo-rong-nls-an-giang.md, 2026-09-30): điểm danh của học viên tại
   // buổi này, nhập qua import diem_danh.
-  diem_danh diem_danh[]
-  bao_vang  bao_vang[]
+  diem_danh        diem_danh[]
+  bao_vang         bao_vang[]
+  // ADR 0007: đề nghị đổi buổi (buổi nguồn / buổi đề nghị / buổi chốt).
+  doi_buoi_nguon   doi_buoi_hoc[]        @relation("doi_buoi_nguon")
+  doi_buoi_de_nghi doi_buoi_hoc[]        @relation("doi_buoi_de_nghi")
+  doi_buoi_chot    doi_buoi_hoc[]        @relation("doi_buoi_chot")
 
   @@unique([lop_id, giai_doan_id, buoi_so], map: "uq_lich_hoc_lop_giai_doan_buoi")
   @@index([lop_id], map: "idx_lich_hoc_lop")
@@ -1033,28 +1042,28 @@ model lop_hoc_nhan_su {
 }
 
 model dang_ky_hoc {
-  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  hoc_vien_id     String             @db.Uuid
-  khoa_id         String             @db.Uuid
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  hoc_vien_id      String             @db.Uuid
+  khoa_id          String             @db.Uuid
   // Phân lớp theo giai đoạn (spec 2026-10-02): lớp gán qua phan_lop_giai_doan
   // (1 lớp mỗi giai đoạn); bảng cũ 1 lớp mỗi loại đã drop ở migration
   // 20261002100000.
-  ngay_dang_ky    DateTime           @default(dbgenerated("CURRENT_DATE")) @db.Date
-  trang_thai      trang_thai_dang_ky @default(cho_duyet)
-  ket_qua         ket_qua_hoc?
-  ngay_hoan_thanh DateTime?          @db.Date
+  ngay_dang_ky     DateTime           @default(dbgenerated("CURRENT_DATE")) @db.Date
+  trang_thai       trang_thai_dang_ky @default(cho_duyet)
+  ket_qua          ket_qua_hoc?
+  ngay_hoan_thanh  DateTime?          @db.Date
   // T5 (mo-rong-nls-an-giang.md, 2026-09-29): import ket_qua_danh_gia ghi đè
   // đúng cột theo cột "loai" (dau_vao|dau_ra) của dòng import.
-  muc_dau_vao     muc_nang_luc?
-  muc_dau_ra      muc_nang_luc?
+  muc_dau_vao      muc_nang_luc?
+  muc_dau_ra       muc_nang_luc?
   // 2026-10-08: mức lớp học học viên tự chọn (chỉ ≤ muc_dau_vao). NULL = học
   // theo mức đánh giá; mức học hiệu lực = muc_hoc_chon ?? muc_dau_vao.
-  muc_hoc_chon    muc_nang_luc?
+  muc_hoc_chon     muc_nang_luc?
   // Thời điểm điều chỉnh mức gần nhất (NULL = chưa điều chỉnh / bị reset khi import hạ mức).
-  muc_hoc_chon_luc DateTime?        @db.Timestamptz(6)
+  muc_hoc_chon_luc DateTime?          @db.Timestamptz(6)
   // QĐ10: cụm học viên (nhóm Zalo hỗ trợ) — gán trực tiếp học viên, không
   // qua lớp nào. NULL = chưa gán cụm.
-  cum_id          String?            @db.Uuid
+  cum_id           String?            @db.Uuid
 
   hoc_vien hoc_vien       @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   khoa     khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -1068,6 +1077,7 @@ model dang_ky_hoc {
   ket_qua_giai_doan  ket_qua_giai_doan[]
   bao_vang           bao_vang[]
   de_nghi_doi_lop    de_nghi_doi_lop[]
+  doi_buoi_hoc       doi_buoi_hoc[]
 
   @@unique([hoc_vien_id, khoa_id], map: "uq_dang_ky_hoc_vien_khoa")
   @@index([hoc_vien_id], map: "idx_dang_ky_hoc_vien")
@@ -1499,6 +1509,33 @@ model de_nghi_doi_lop {
 
   @@index([giai_doan_id, trang_thai], map: "idx_de_nghi_doi_lop_gd")
   @@index([dang_ky_hoc_id], map: "idx_de_nghi_doi_lop_dk")
+}
+
+// ADR 0007 (2026-10-16): học viên đề nghị đổi 1 buổi học sang buổi tương đương
+// của lớp khác. Partial unique uq_doi_buoi_hoat_dong, 2 CHECK và 2 index một
+// phần (idx_doi_buoi_chot/nguon) chỉ có trong SQL migration.
+model doi_buoi_hoc {
+  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dang_ky_hoc_id  String             @db.Uuid
+  lich_nguon_id   String             @db.Uuid
+  lich_de_nghi_id String             @db.Uuid
+  lich_chot_id    String?            @db.Uuid
+  ly_do           String
+  trang_thai      trang_thai_de_nghi @default(cho_duyet)
+  nguoi_tao       String?            @db.Uuid
+  tao_luc         DateTime           @default(now()) @db.Timestamptz(6)
+  nguoi_xu_ly     String?            @db.Uuid
+  xu_ly_luc       DateTime?          @db.Timestamptz(6)
+  ghi_chu_xu_ly   String?
+
+  dang_ky_hoc  dang_ky_hoc   @relation(fields: [dang_ky_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lich_nguon   lich_hoc_lop  @relation("doi_buoi_nguon", fields: [lich_nguon_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lich_de_nghi lich_hoc_lop  @relation("doi_buoi_de_nghi", fields: [lich_de_nghi_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lich_chot    lich_hoc_lop? @relation("doi_buoi_chot", fields: [lich_chot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tao_boi      nguoi_dung?   @relation("doi_buoi_nguoi_tao", fields: [nguoi_tao], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  xu_ly_boi    nguoi_dung?   @relation("doi_buoi_nguoi_xu_ly", fields: [nguoi_xu_ly], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([lich_de_nghi_id, trang_thai, tao_luc], map: "idx_doi_buoi_de_nghi")
 }
 
 // ADR 0004 G10/G11 (issue #21): "Đã gửi" tin nhắn nhắc lịch. Cờ "cần nhắc

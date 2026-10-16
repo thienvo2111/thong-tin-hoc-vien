@@ -1,4 +1,5 @@
-import { Card, Stack, Text } from "@mantine/core";
+import { Badge, Card, Group, Stack, Text } from "@mantine/core";
+import { Link } from "react-router-dom";
 import type { KhoaHocDangKy } from "@/api/types";
 import { dinhDangGio, dinhDangNgay } from "@/lib/ngay";
 
@@ -12,6 +13,8 @@ function buoiSapToi(khoaHoc: KhoaHocDangKy[] | undefined, bayGio = Date.now()) {
         b,
         lop: gd.lop!.ten_lop,
         thucDia: gd.thuc_dia ?? [],
+        khoaId: dk.khoa_id,
+        coDoiBuoi: (dk.khoa?.so_buoi_doi_toi_da ?? 0) > 0,
       })),
     ),
   );
@@ -34,7 +37,8 @@ export function TheBuoiSapToi({
 }: {
   khoaHoc: KhoaHocDangKy[] | undefined;
 }) {
-  const ds = buoiSapToi(khoaHoc);
+  const bayGio = Date.now();
+  const ds = buoiSapToi(khoaHoc, bayGio);
   if (ds.length === 0) return null;
   return (
     <Card withBorder radius="md" p="md">
@@ -42,16 +46,28 @@ export function TheBuoiSapToi({
         <Text fw={700} size="sm">
           Buổi học sắp tới
         </Text>
-        {ds.map(({ b, lop, thucDia }) => (
+        {ds.map(({ b, lop, thucDia, khoaId, coDoiBuoi }) => (
           <Stack key={b.id} gap={2}>
             <Text size="sm" fw={600}>
               {dinhDangNgay(b.thoi_gian_bat_dau)} ·{" "}
               {dinhDangGio(b.thoi_gian_bat_dau)}–
               {dinhDangGio(b.thoi_gian_ket_thuc)}
             </Text>
-            <Text size="sm">
-              {lop} · Buổi {b.buoi_so}
-            </Text>
+            <Group gap="xs">
+              <Text size="sm">
+                {lop} · Buổi {b.buoi_so}
+              </Text>
+              {b.da_doi_buoi && (
+                <Badge size="sm" variant="light">
+                  Đã đổi buổi
+                </Badge>
+              )}
+            </Group>
+            {b.da_doi_buoi && b.lop_chot_ten && (
+              <Text size="sm" c="dimmed">
+                Học tại {b.lop_chot_ten}
+              </Text>
+            )}
             {b.diem_hoc ? (
               <Text size="sm" c="dimmed">
                 {b.diem_hoc.ten}
@@ -69,6 +85,19 @@ export function TheBuoiSapToi({
                 Hỗ trợ tại điểm học: {t.ho_ten} — {t.so_dien_thoai}
               </Text>
             ))}
+            {coDoiBuoi &&
+              !b.da_doi_buoi &&
+              Date.parse(b.thoi_gian_bat_dau) > bayGio && (
+                <Text
+                  component={Link}
+                  to={`/de-nghi-doi-buoi?khoa=${khoaId}&lich=${b.id}`}
+                  size="xs"
+                  c="dimmed"
+                  td="underline"
+                >
+                  Không tham gia được buổi này?
+                </Text>
+              )}
           </Stack>
         ))}
       </Stack>

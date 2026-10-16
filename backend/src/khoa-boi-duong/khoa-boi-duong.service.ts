@@ -69,6 +69,7 @@ import {
   mucHocHieuLuc,
 } from './util/muc-hoc.util';
 import { ThangMucService, nhanMucGoc } from '../sso/thang-muc.service';
+import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 import {
   apDungDiemDanhZoom,
   diemDanhZoomCuaBuoi,
@@ -144,6 +145,7 @@ export class KhoaBoiDuongService {
     private readonly lichHocThayDoi: LichHocThayDoiService,
     private readonly phanCongGiangDay: PhanCongGiangDayService,
     private readonly thangMuc: ThangMucService,
+    private readonly doiBuoiQuery: DoiBuoiHocQueryService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -418,6 +420,7 @@ export class KhoaBoiDuongService {
             ? new Date(dto.thoi_gian_ket_thuc)
             : undefined,
           mo_dieu_chinh_muc: dto.mo_dieu_chinh_muc,
+          so_buoi_doi_toi_da: dto.so_buoi_doi_toi_da,
           bat_diem_danh_zoom_luc: this.mocBatDiemDanhZoom(
             dto.bat_diem_danh_zoom,
             khoa.bat_diem_danh_zoom_luc,
@@ -1291,6 +1294,37 @@ export class KhoaBoiDuongService {
     const diemDanhMap = new Map(
       diemDanhList.map((d) => [`${d.dang_ky_hoc_id}|${d.lich_hoc_id}`, d]),
     );
+    // Spec đổi buổi §5: buổi nguồn đã đổi (đã duyệt, còn hiệu lực) hiện bằng
+    // buổi chốt — giờ/địa điểm/link/giảng viên của buổi chốt.
+    const doiBuoi = dangKyIds.length
+      ? await this.doiBuoiQuery.doiBuoiDaDuyetCuaDangKy(dangKyIds)
+      : [];
+    const chotCuaNguon = new Map(
+      doiBuoi.map((d) => [`${d.dang_ky_hoc_id}|${d.lich_nguon_id}`, d]),
+    );
+    const laBuoiChot = new Set(
+      doiBuoi.map((d) => `${d.dang_ky_hoc_id}|${d.lich_chot_id}`),
+    );
+    const buoiChot = new Map(
+      (doiBuoi.length
+        ? await this.prisma.lich_hoc_lop.findMany({
+            where: { id: { in: doiBuoi.map((d) => d.lich_chot_id) } },
+            include: {
+              giai_doan: true,
+              diem_hoc: { select: DIEM_HOC_TOM_TAT },
+              phan_cong: {
+                select: {
+                  vai_tro: true,
+                  giang_vien: { select: { ho_ten: true } },
+                },
+                orderBy: { created_at: 'asc' },
+              },
+              lop: { select: { ten_lop: true, loai_lop: true } },
+            },
+          })
+        : []
+      ).map((b) => [b.id, b]),
+    );
     const tenLopDiemDanh = new Map(
       diemDanhList.map((d) => [d.lich_hoc.lop_id, d.lich_hoc.lop.ten_lop]),
     );
@@ -1337,7 +1371,11 @@ export class KhoaBoiDuongService {
       const chuyenCanLopCu = tinhChuyenCan(
         new Map(phan_lop_giai_doan.map((p) => [p.giai_doan_id, p.lop_id])),
         diemDanhList
-          .filter((d) => d.dang_ky_hoc_id === dk.id)
+          .filter(
+            (d) =>
+              d.dang_ky_hoc_id === dk.id &&
+              !laBuoiChot.has(`${dk.id}|${d.lich_hoc_id}`),
+          )
           .map((d) => ({
             lop_id: d.lich_hoc.lop_id,
             loai_lop: d.lich_hoc.lop.loai_lop,
@@ -1378,7 +1416,17 @@ export class KhoaBoiDuongService {
             lop: lop
               ? {
                   ...lop,
-                  lich_hoc: lichHocGd.map(({ phan_cong, ...b }) => {
+                  lich_hoc: lichHocGd.map((goc) => {
+                    const doi = chotCuaNguon.get(`${dk.id}|${goc.id}`);
+                    const chot = doi && buoiChot.get(doi.lich_chot_id);
+                    const {
+                      phan_cong,
+                      lop: lopChot,
+                      ...b
+                    } = chot ?? { ...goc, lop: null };
+                    const giauLinkBuoi = lopChot
+                      ? giauLinkZoom && apDungDiemDanhZoom(lopChot, khoa)
+                      : giauLink;
                     const dd = diemDanhMap.get(`${dk.id}|${b.id}`) ?? null;
                     const lopCu = dd
                       ? undefined
@@ -1398,7 +1446,14 @@ export class KhoaBoiDuongService {
                             },
                           }
                         : {}),
-                      ...(giauLink
+                      ...(lopChot
+                        ? {
+                            da_doi_buoi: true,
+                            lop_goc_ten: lop.ten_lop,
+                            lop_chot_ten: lopChot.ten_lop,
+                          }
+                        : {}),
+                      ...(giauLinkBuoi
                         ? {
                             dia_diem_hoac_link: null,
                             diem_danh_zoom: diemDanhZoomCuaBuoi(
@@ -3160,7 +3215,14 @@ export class KhoaBoiDuongService {
       },
     });
     let canhBao: string | undefined;
-    if (!phanLop || phanLop.lop_id !== lop.id) {
+    // Spec đổi buổi §5: buổi chốt của đổi buổi đã duyệt (còn hiệu lực) của
+    // chính đăng ký này không phải học bù.
+    const hocBu =
+      (!phanLop || phanLop.lop_id !== lop.id) &&
+      !(await this.doiBuoiQuery.doiBuoiDaDuyetCuaDangKy([dangKy.id])).some(
+        (d) => d.lich_chot_id === lichHoc.id,
+      );
+    if (hocBu) {
       if (!ghiChu) {
         return {
           error: `Học viên "${ma}" điểm danh ở buổi của lớp "${tenLop}" khác lớp mình đang được gán (học bù) — bắt buộc nhập ghi_chu`,

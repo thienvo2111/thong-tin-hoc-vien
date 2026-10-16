@@ -54,6 +54,8 @@ export interface TrangLop {
       ghi_chu_csvc: string | null;
     } | null;
     giang_vien: GiangVienBuoiTrangLop[];
+    /** Spec đổi buổi §5: sĩ số theo buổi (lớp gốc − đổi ra + đổi vào). */
+    si_so?: number | null;
   }[];
   hoc_vien: {
     dang_ky_hoc_id: string;
@@ -73,7 +75,11 @@ export interface TrangLop {
     /** ADR 0004 G13 (issue #18): lich_hoc_id → lý do báo vắng. */
     bao_vang?: Record<string, string>;
     ket_qua: { ty_le_hoan_thanh: number | null; diem: number | null } | null;
+    /** Spec đổi buổi §5: lich_hoc_id → đổi ra / đổi vào. */
+    doi_buoi?: import('./doiBuoi').NhanDoiBuoi;
   }[];
+  /** Người đổi buổi vào lớp này — không tính vào sĩ số lớp; chỉ có ô của buổi chốt. */
+  hoc_vien_doi_vao?: TrangLop['hoc_vien'];
   // ADR 0004 G14 (issue #18): đề nghị đổi lớp đang chờ, ra hoặc vào lớp này.
   de_nghi_cho?: {
     id: string;

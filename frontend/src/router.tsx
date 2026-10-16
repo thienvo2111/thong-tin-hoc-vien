@@ -68,6 +68,11 @@ export const router = createBrowserRouter([
                 path: '/toi/yeu-cau-ho-tro',
                 lazy: () => import('@/pages/M8/YeuCauHoTro').then((m) => ({ Component: m.default })),
               },
+              {
+                // Trang ẩn (không có menu): người hỗ trợ gửi link qua Zalo. ?khoa=&lich= chọn sẵn.
+                path: '/de-nghi-doi-buoi',
+                lazy: () => import('@/pages/HocVien/DeNghiDoiBuoi').then((m) => ({ Component: m.default })),
+              },
             ],
           },
           {
@@ -154,6 +159,10 @@ export const router = createBrowserRouter([
                   {
                     path: '/ho-tro/yeu-cau-ho-tro',
                     lazy: () => import('@/pages/HoTro/HoTroYeuCauHoTro').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/ho-tro/doi-buoi',
+                    lazy: () => import('@/pages/HoTro/DuyetDoiBuoi').then((m) => ({ Component: m.default })),
                   },
                   {
                     path: '/ho-tro/thong-ke',
@@ -250,6 +259,10 @@ export const router = createBrowserRouter([
                       {
                         path: '/admin/tai-khoan-hoc-vien',
                         lazy: () => import('@/pages/Admin/AdminTaiKhoanHocVien').then((m) => ({ Component: m.default })),
+                      },
+                      {
+                        path: '/admin/doi-buoi',
+                        lazy: () => import('@/pages/HoTro/DuyetDoiBuoi').then((m) => ({ Component: m.default })),
                       },
                       {
                         path: '/admin/nguoi-ho-tro',

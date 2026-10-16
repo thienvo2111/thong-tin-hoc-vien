@@ -12,6 +12,11 @@ export interface DongDiemDanhBuoi {
   giai_doan_id: string;
   buoi_so: number;
   trang_thai: TrangThaiDiemDanh;
+  /**
+   * Spec đổi buổi (R7): dòng ở buổi chốt của đổi buổi đã duyệt, còn hiệu lực —
+   * tính THAY buổi nguồn (lớp, giai đoạn, buổi số của buổi nguồn).
+   */
+  doi_tu?: { lop_id: string; giai_doan_id: string; buoi_so: number };
 }
 
 export interface KetQuaBuoi {
@@ -40,7 +45,8 @@ export function tinhChuyenCan(
   cheDo: CheDoChuyenCan,
 ): Map<string, KetQuaBuoi> {
   const kq = new Map<string, KetQuaBuoi>();
-  for (const d of dong) {
+  for (const goc of dong) {
+    const d = goc.doi_tu ? { ...goc, ...goc.doi_tu } : goc;
     const hienTai = lopHienTai.get(d.giai_doan_id);
     const tuLopCu = d.lop_id !== hienTai;
     // Z8 chỉ áp cho lớp Zoom: dòng trực tiếp (vd học bù) luôn tính như trước.

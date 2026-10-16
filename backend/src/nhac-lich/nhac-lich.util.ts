@@ -148,7 +148,12 @@ export function soanTinNhanGiangVien(d: {
 export function soanTinNhanCum(d: {
   ten_cum: string;
   ngay: Date;
-  buoi: (BuoiTinNhan & { ten_lop: string; thuc_dia: ThucDiaTinNhan[] })[];
+  buoi: (BuoiTinNhan & {
+    ten_lop: string;
+    thuc_dia: ThucDiaTinNhan[];
+    /** Spec đổi buổi §5: họ tên học viên cụm học buổi này theo đổi buổi đã duyệt. */
+    hoc_vien_doi_buoi?: string[];
+  })[];
   // ADR 0005: ngày có ≥1 buổi lớp Zoom của khóa bật điểm danh -> nhắc bấm (không link).
   nhac_diem_danh_zoom?: boolean;
 }): string {
@@ -162,6 +167,9 @@ export function soanTinNhanCum(d: {
       ...dongDiaDiem(b, true),
       ...b.thuc_dia.map(
         (t) => `  Hỗ trợ tại điểm học: ${t.ho_ten} – ${t.so_dien_thoai}`,
+      ),
+      ...(b.hoc_vien_doi_buoi ?? []).map(
+        (ten) => `  ${ten} học buổi ${b.buoi_so} tại ${b.ten_lop}`,
       ),
     );
   }

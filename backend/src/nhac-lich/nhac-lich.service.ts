@@ -8,6 +8,7 @@ import {
 } from '../common/exceptions/app.exceptions';
 import { khoangNgayVn } from '../common/utils/khoang-ngay-vn.util';
 import { layDotLop } from '../trang-lop/trang-lop.service';
+import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 import { apDungDiemDanhZoom } from '../khoa-boi-duong/util/diem-danh-zoom.util';
 import {
   TrangThaiNhac,
@@ -19,11 +20,41 @@ import {
 
 type CapDot = { lop_id: string; giai_doan_id: string };
 
+const MOT_NGAY_MS = 24 * 60 * 60 * 1000;
+
+/** Đổi buổi đã duyệt (còn hiệu lực) của 1 học viên cụm. */
+export interface DoiBuoiCum {
+  cum_id: string;
+  ho_ten: string;
+  lich_nguon_id: string;
+  lich_chot_id: string;
+  xu_ly_luc: Date | null;
+}
+
+// Spec đổi buổi §5: duyệt đổi buổi SAU lần gửi cuối cũng làm buổi chốt "cần nhắc lại".
+export const capNhatTheoDoiBuoi = <
+  T extends { id: string; cap_nhat_luc: Date },
+>(
+  b: T,
+  doi: DoiBuoiCum[],
+): T => {
+  const moiNhat = doi
+    .filter((d) => d.lich_chot_id === b.id && d.xu_ly_luc)
+    .reduce(
+      (max, d) => (d.xu_ly_luc! > max ? d.xu_ly_luc! : max),
+      b.cap_nhat_luc,
+    );
+  return { ...b, cap_nhat_luc: moiNhat };
+};
+
 // ADR 0004 G10/G11 (issue #21): tin nhắn nhắc lịch + "Đã gửi". Nơi gọi tự
 // kiểm phạm vi (hỗ trợ GV: đợt trong khóa của nhóm; hỗ trợ HV: cụm của mình).
 @Injectable()
 export class NhacLichService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly doiBuoi: DoiBuoiHocQueryService,
+  ) {}
 
   // ---------------- Giảng viên ----------------
   async tinNhanGiangVien(lopId: string, gdId: string, giangVienId: string) {
@@ -135,6 +166,60 @@ export class NhacLichService {
     return [...m.values()];
   }
 
+  /**
+   * Spec đổi buổi §5: buổi chốt của học viên cụm cũng là buổi của cụm. Chỉ
+   * đổi buổi có buổi chốt HOẶC buổi nguồn bắt đầu từ `tu` (mặc định đầu hôm
+   * nay giờ VN − 30 ngày) — buổi chốt có thể sớm hơn buổi nguồn, vẫn cần để
+   * trừ người đổi ra ở buổi nguồn.
+   */
+  async doiBuoiCuaCum(
+    cumIds: string[],
+    tu: Date = new Date(khoangNgayVn({}).tu.getTime() - 30 * MOT_NGAY_MS),
+  ): Promise<DoiBuoiCum[]> {
+    if (cumIds.length === 0) return [];
+    const rows = await this.prisma.doi_buoi_hoc.findMany({
+      where: {
+        trang_thai: 'da_duyet',
+        OR: [
+          { lich_chot: { thoi_gian_bat_dau: { gte: tu } } },
+          { lich_nguon: { thoi_gian_bat_dau: { gte: tu } } },
+        ],
+        dang_ky_hoc: { cum_id: { in: cumIds } },
+      },
+      select: {
+        dang_ky_hoc_id: true,
+        lich_chot_id: true,
+        xu_ly_luc: true,
+        dang_ky_hoc: {
+          select: { cum_id: true, hoc_vien: { select: { ho_ten: true } } },
+        },
+      },
+    });
+    if (rows.length === 0) return [];
+    // Hiệu lực (phân lớp hiện tại còn khớp buổi nguồn) do module truy vấn quyết định.
+    const hieuLuc = await this.doiBuoi.doiBuoiDaDuyetCuaDangKy([
+      ...new Set(rows.map((r) => r.dang_ky_hoc_id)),
+    ]);
+    return rows.flatMap((r) => {
+      const h = hieuLuc.find(
+        (x) =>
+          x.dang_ky_hoc_id === r.dang_ky_hoc_id &&
+          x.lich_chot_id === r.lich_chot_id,
+      );
+      return h
+        ? [
+            {
+              cum_id: r.dang_ky_hoc.cum_id!,
+              ho_ten: r.dang_ky_hoc.hoc_vien.ho_ten,
+              lich_nguon_id: h.lich_nguon_id,
+              lich_chot_id: h.lich_chot_id,
+              xu_ly_luc: r.xu_ly_luc,
+            },
+          ]
+        : [];
+    });
+  }
+
   private async nhatKyCum(cumIds: string[], buoiIds: string[]) {
     if (cumIds.length === 0 || buoiIds.length === 0) return [];
     return this.prisma.nhat_ky_nhac_lich.findMany({
@@ -156,8 +241,13 @@ export class NhacLichService {
       giai_doan_id: string;
       cap_nhat_luc: Date;
     }[],
+    // Nơi gọi đã nạp đổi buổi của cụm thì truyền vào, tránh truy vấn lại.
+    doiDaNap?: DoiBuoiCum[],
   ): Promise<Map<string, { cum_id: string; trang_thai: TrangThaiNhac }[]>> {
-    const cap = await this.capDotCuaCum(cumIds);
+    const [cap, doi] = await Promise.all([
+      this.capDotCuaCum(cumIds),
+      doiDaNap ?? this.doiBuoiCuaCum(cumIds),
+    ]);
     const nhatKy = await this.nhatKyCum(
       cumIds,
       buoi.map((b) => b.id),
@@ -168,20 +258,24 @@ export class NhacLichService {
     >();
     for (const b of buoi) {
       const cumCuaBuoi = [
-        ...new Set(
-          cap
+        ...new Set([
+          ...cap
             .filter(
               (c) => c.lop_id === b.lop_id && c.giai_doan_id === b.giai_doan_id,
             )
             .map((c) => c.cum_id),
-        ),
+          ...doi.filter((d) => d.lich_chot_id === b.id).map((d) => d.cum_id),
+        ]),
       ];
       kq.set(
         b.id,
         cumCuaBuoi.map((cumId) => ({
           cum_id: cumId,
           trang_thai: trangThaiNhac(
-            b,
+            capNhatTheoDoiBuoi(
+              b,
+              doi.filter((d) => d.cum_id === cumId),
+            ),
             nhatKy.filter((n) => n.cum_id === cumId),
           ),
         })),
@@ -191,11 +285,17 @@ export class NhacLichService {
   }
 
   private async buoiCuaCum(cumId: string, tu: Date, den: Date) {
-    const cap = await this.capDotCuaCum([cumId]);
-    if (cap.length === 0) return { cap, buoi: [] };
+    const [cap, doi] = await Promise.all([
+      this.capDotCuaCum([cumId]),
+      this.doiBuoiCuaCum([cumId], tu),
+    ]);
+    if (cap.length === 0 && doi.length === 0) return { cap, doi, buoi: [] };
     const buoi = await this.prisma.lich_hoc_lop.findMany({
       where: {
-        OR: cap.map(({ lop_id, giai_doan_id }) => ({ lop_id, giai_doan_id })),
+        OR: [
+          ...cap.map(({ lop_id, giai_doan_id }) => ({ lop_id, giai_doan_id })),
+          { id: { in: doi.map((d) => d.lich_chot_id) } },
+        ],
         thoi_gian_bat_dau: { gte: tu, lte: den },
       },
       select: {
@@ -219,7 +319,7 @@ export class NhacLichService {
       },
       orderBy: [{ thoi_gian_bat_dau: 'asc' }, { buoi_so: 'asc' }],
     });
-    return { cap, buoi };
+    return { cap, doi, buoi };
   }
 
   /** Tin nhắn nhóm Zalo cụm cho 1 ngày (giờ VN): chỉ buổi của lớp có học viên cụm. */
@@ -230,11 +330,11 @@ export class NhacLichService {
     });
     if (!cum) throw new NotFoundAppException('Không tìm thấy cụm hỗ trợ');
     const { tu, den } = khoangNgayVn({ tu_ngay: ngay, den_ngay: ngay });
-    const { cap, buoi } = await this.buoiCuaCum(cumId, tu, den);
-    const thucDia = cap.length
+    const { doi, buoi } = await this.buoiCuaCum(cumId, tu, den);
+    const thucDia = buoi.length
       ? await this.prisma.nhan_su_thuc_dia.findMany({
           where: {
-            OR: cap.map(({ lop_id, giai_doan_id }) => ({
+            OR: buoi.map(({ lop_id, giai_doan_id }) => ({
               lop_id,
               giai_doan_id,
             })),
@@ -258,7 +358,10 @@ export class NhacLichService {
       thuc_dia: thucDia.filter(
         (t) => t.lop_id === b.lop_id && t.giai_doan_id === b.giai_doan_id,
       ),
-      trang_thai_nhac: trangThaiNhac(b, nhatKy),
+      hoc_vien_doi_buoi: doi
+        .filter((d) => d.lich_chot_id === b.id)
+        .map((d) => d.ho_ten),
+      trang_thai_nhac: trangThaiNhac(capNhatTheoDoiBuoi(b, doi), nhatKy),
     }));
     return {
       cum,
@@ -293,18 +396,25 @@ export class NhacLichService {
     dto: { cum_id: string; lich_hoc_ids: string[]; noi_dung: string },
   ) {
     const ids = [...new Set(dto.lich_hoc_ids)];
-    const cap = await this.capDotCuaCum([dto.cum_id]);
-    const hopLe = cap.length
-      ? await this.prisma.lich_hoc_lop.count({
-          where: {
-            id: { in: ids },
-            OR: cap.map(({ lop_id, giai_doan_id }) => ({
-              lop_id,
-              giai_doan_id,
-            })),
-          },
-        })
-      : 0;
+    const [cap, doi] = await Promise.all([
+      this.capDotCuaCum([dto.cum_id]),
+      this.doiBuoiCuaCum([dto.cum_id]),
+    ]);
+    const hopLe =
+      cap.length || doi.length
+        ? await this.prisma.lich_hoc_lop.count({
+            where: {
+              id: { in: ids },
+              OR: [
+                ...cap.map(({ lop_id, giai_doan_id }) => ({
+                  lop_id,
+                  giai_doan_id,
+                })),
+                { id: { in: doi.map((d) => d.lich_chot_id) } },
+              ],
+            },
+          })
+        : 0;
     if (hopLe !== ids.length) {
       throw new ValidationException(
         'Có buổi không thuộc lớp của học viên cụm này',
@@ -327,11 +437,17 @@ export class NhacLichService {
     if (cumIds.length === 0) return 0;
     const { den } = khoangNgayVn({}, 2);
     const tu = new Date();
-    const cap = await this.capDotCuaCum(cumIds);
-    if (cap.length === 0) return 0;
+    const [cap, doi] = await Promise.all([
+      this.capDotCuaCum(cumIds),
+      this.doiBuoiCuaCum(cumIds, tu),
+    ]);
+    if (cap.length === 0 && doi.length === 0) return 0;
     const buoi = await this.prisma.lich_hoc_lop.findMany({
       where: {
-        OR: cap.map(({ lop_id, giai_doan_id }) => ({ lop_id, giai_doan_id })),
+        OR: [
+          ...cap.map(({ lop_id, giai_doan_id }) => ({ lop_id, giai_doan_id })),
+          { id: { in: doi.map((d) => d.lich_chot_id) } },
+        ],
         thoi_gian_bat_dau: { gte: tu, lte: den },
       },
       select: {
@@ -341,7 +457,7 @@ export class NhacLichService {
         cap_nhat_luc: true,
       },
     });
-    const tt = await this.trangThaiCumTheoBuoi(cumIds, buoi);
+    const tt = await this.trangThaiCumTheoBuoi(cumIds, buoi, doi);
     return [...tt.values()].flat().filter((x) => x.trang_thai !== 'da_nhac')
       .length;
   }

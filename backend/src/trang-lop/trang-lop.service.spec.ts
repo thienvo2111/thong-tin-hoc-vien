@@ -1,4 +1,10 @@
-import { DotLop, locTheoVaiTro, VaiTroXemLop } from './trang-lop.service';
+import {
+  apDungDoiBuoi,
+  DotLop,
+  HocVienDot,
+  locTheoVaiTro,
+  VaiTroXemLop,
+} from './trang-lop.service';
 
 // ADR 0004 G9 / đặc tả §3 — test K6: mỗi vai trò thấy đúng tập trường.
 const dot: DotLop = {
@@ -234,5 +240,79 @@ describe('locTheoVaiTro — ma trận liên thông §3', () => {
   it('không làm thay đổi dữ liệu gốc', () => {
     locTheoVaiTro(dot, 'giang_vien');
     expect(dot.hoc_vien[0].so_dien_thoai).toBe('0911111111');
+  });
+});
+
+// Spec đổi buổi §5: trang lớp hiện sĩ số buổi + nhãn đổi ra/đổi vào.
+describe('apDungDoiBuoi', () => {
+  const hvVao: HocVienDot = {
+    ...dot.hoc_vien[0],
+    dang_ky_hoc_id: 'dk9',
+    hoc_vien_id: 'hv9',
+    ho_ten: 'An Vào',
+    so_dien_thoai: '0999999999',
+    // Ô ở buổi khác của lớp (vd buổi của đợt khác không đổi) không được lộ ra.
+    diem_danh: { b1: 'co_mat', b2: 'vang' },
+    bao_vang: {},
+  };
+  const dieuChinh = new Map([
+    [
+      'b1',
+      {
+        ra: [
+          {
+            dang_ky_hoc_id: 'dk1',
+            lop_chot: { id: 'lop-2', ten_lop: 'Lớp 2' },
+          },
+        ],
+        vao: [
+          {
+            dang_ky_hoc_id: 'dk9',
+            lich_nguon_id: 'x1',
+            lop_nguon: { id: 'lop-3', ten_lop: 'Lớp 3' },
+          },
+        ],
+      },
+    ],
+  ]);
+  const siSo = new Map([
+    ['b1', { si_so: 30, si_so_toi_da: 40, so_cho_duyet: 0 }],
+  ]);
+
+  it('gắn si_so từng buổi, nhãn ra cho người đổi đi; người đổi vào ở danh sách riêng', () => {
+    const kq = apDungDoiBuoi(dot, siSo, dieuChinh, [hvVao]);
+    expect(kq.buoi[0].si_so).toBe(30);
+    // Danh sách lớp gốc giữ nguyên số lượng (số liệu cấp lớp không đổi).
+    expect(kq.hoc_vien.map((h) => h.dang_ky_hoc_id)).toEqual(['dk1']);
+    expect(kq.hoc_vien[0].doi_buoi).toEqual({
+      b1: { loai: 'ra', lop: 'Lớp 2' },
+    });
+    expect(kq.hoc_vien_doi_vao).toHaveLength(1);
+    expect(kq.hoc_vien_doi_vao[0]).toMatchObject({
+      dang_ky_hoc_id: 'dk9',
+      doi_buoi: { b1: { loai: 'vao', lop: 'Lớp 3' } },
+      // Chỉ ô của buổi chốt.
+      diem_danh: { b1: 'co_mat' },
+    });
+    expect(kq.hoc_vien_doi_vao[0].diem_danh).not.toHaveProperty('b2');
+  });
+
+  it('người đổi vào cũng bị lọc trường theo vai trò giảng viên', () => {
+    const kq = locTheoVaiTro(
+      apDungDoiBuoi(dot, siSo, dieuChinh, [hvVao]),
+      'giang_vien',
+    );
+    expect(kq.hoc_vien_doi_vao[0].so_dien_thoai).toBeUndefined();
+    expect(kq.hoc_vien_doi_vao[0].cum).toBeUndefined();
+    expect(kq.hoc_vien_doi_vao[0].doi_buoi).toBeDefined();
+    expect(kq.buoi[0].si_so).toBe(30);
+  });
+
+  it('không có đổi buổi → giữ nguyên học viên, buổi không có sĩ số → null', () => {
+    const kq = apDungDoiBuoi(dot, new Map(), new Map(), []);
+    expect(kq.hoc_vien).toHaveLength(1);
+    expect(kq.hoc_vien[0]).not.toHaveProperty('doi_buoi');
+    expect(kq.hoc_vien_doi_vao).toEqual([]);
+    expect(kq.buoi[0].si_so).toBeNull();
   });
 });

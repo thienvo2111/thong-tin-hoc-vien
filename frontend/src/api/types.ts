@@ -314,6 +314,8 @@ export interface KhoaBoiDuong {
   created_by: string | null;
   // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học (chỉ xuống mức thấp hơn).
   mo_dieu_chinh_muc: boolean;
+  // ADR 0007: số buổi tối đa học viên được đề nghị đổi (0 = tắt).
+  so_buoi_doi_toi_da: number;
   // ADR 0005 (issue #23): tự điểm danh lớp Zoom — mốc bật (null = tắt) + cửa sổ (phút).
   bat_diem_danh_zoom_luc: string | null;
   diem_danh_mo_truoc_phut: number;
@@ -613,6 +615,10 @@ export interface LichHocLopToi {
   // ADR 0005 Z8 (issue #27): buổi chưa có dòng ở lớp hiện tại nhưng đã có ở lớp cũ cùng giai
   // đoạn, cùng buoi_so (học viên chuyển lớp) — chỉ để hiển thị.
   diem_danh_lop_cu?: { trang_thai: TrangThaiDiemDanh; ten_lop: string };
+  // Đổi buổi học: buổi này là buổi chốt (thay cho buổi gốc của lớp được phân).
+  da_doi_buoi?: boolean;
+  lop_goc_ten?: string;
+  lop_chot_ten?: string;
 }
 
 export type PhaDiemDanh = 'chua_mo' | 'dang_mo' | 'da_dong';
@@ -705,6 +711,8 @@ export interface KhoaHocDangKy {
     thoi_gian_ket_thuc: string;
     trang_thai: TrangThaiKhoa;
     mo_dieu_chinh_muc: boolean;
+    // Đổi buổi học: 0/thiếu = khóa chưa mở đề nghị đổi buổi.
+    so_buoi_doi_toi_da?: number;
   };
   cum: CumHocVien | null;
   // Phân lớp theo giai đoạn (spec 2026-10-02) — thay lop_truc_tiep/lop_zoom/lop_vle/tien_do_giai_doan.
@@ -1001,6 +1009,8 @@ export interface BuoiHocHoTro {
   khoa: { id: string; ma_khoa: string; ten_khoa: string };
   nhan_su: { ho_ten: string; vai_tro: VaiTroNhanSuLop; so_dien_thoai: string | null }[];
   so_hoc_vien_cum: number;
+  /** Spec đổi buổi §5: họ tên học viên cụm đổi buổi VÀO buổi này (đã tính trong so_hoc_vien_cum). */
+  hoc_vien_doi_buoi?: string[];
   // ADR 0004 G11 (issue #21): trạng thái nhắc của từng cụm có học viên trong lớp.
   nhac_cum?: { cum_id: string; trang_thai: import('./nhacLich').TrangThaiNhac }[];
   // ADR 0004 G9 (issue #15): liên thông — điểm học, phòng, nhóm hỗ trợ giảng viên của khóa.

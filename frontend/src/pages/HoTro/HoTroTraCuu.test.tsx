@@ -136,6 +136,19 @@ describe('Người hỗ trợ — Lịch học', () => {
     expect(screen.getByText(/Thực địa: Anh Tâm \(0933333333\) — Mở phòng/)).toBeInTheDocument();
   });
 
+  // Spec đổi buổi §5: người cụm đổi buổi vào buổi này hiện theo tên.
+  it('buổi có học viên cụm đổi buổi vào: hiện tên từ hoc_vien_doi_buoi', async () => {
+    db.hoTroLichHoc = [{ ...db.hoTroLichHoc[0], hoc_vien_doi_buoi: ['Nguyễn Văn An', 'Trần Thị Bình'] }];
+    render(['/ho-tro/lich-hoc']);
+    expect(await screen.findByText('Đổi buổi vào: Nguyễn Văn An, Trần Thị Bình')).toBeInTheDocument();
+  });
+
+  it('buổi không có ai đổi vào: không hiện dòng đổi buổi', async () => {
+    render(['/ho-tro/lich-hoc']);
+    await screen.findByText('Lớp Zoom 01 · Buổi 1');
+    expect(screen.queryByText(/Đổi buổi vào/)).toBeNull();
+  });
+
   it('không có buổi -> thông báo rỗng', async () => {
     db.hoTroLichHoc = [];
     render(['/ho-tro/lich-hoc']);

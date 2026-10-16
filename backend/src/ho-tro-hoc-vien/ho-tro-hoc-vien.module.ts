@@ -7,10 +7,17 @@ import { HoTroHocVienScopeService } from './ho-tro-hoc-vien-scope.service';
 import { HoTroHocVienService } from './ho-tro-hoc-vien.service';
 import { VanHanhHocVienService } from './van-hanh-hoc-vien.service';
 import { NhacLichModule } from '../nhac-lich/nhac-lich.module';
+import { DoiBuoiHocQueryModule } from '../doi-buoi-hoc/doi-buoi-hoc-query.module';
 
 // ADR 0003: người hỗ trợ học viên theo cụm.
 @Module({
-  imports: [AuthModule, HocVienModule, KhoaBoiDuongModule, NhacLichModule],
+  imports: [
+    AuthModule,
+    HocVienModule,
+    KhoaBoiDuongModule,
+    NhacLichModule,
+    DoiBuoiHocQueryModule,
+  ],
   controllers: [HoTroHocVienController],
   providers: [
     HoTroHocVienScopeService,

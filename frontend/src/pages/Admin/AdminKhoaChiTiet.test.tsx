@@ -92,6 +92,32 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
   });
 
   // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học.
+  // ADR 0007: ô cấu hình số buổi tối đa học viên được đề nghị đổi.
+  describe('Ô "Số buổi tối đa học viên được đề nghị đổi"', () => {
+    it('quan_tri: nhập 3 → PATCH khóa so_buoi_doi_toi_da=3', async () => {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      const bodies: unknown[] = [];
+      server.use(
+        http.patch('/khoa-boi-duong/:id', async ({ params, request }) => {
+          const body = (await request.json()) as Record<string, unknown>;
+          bodies.push(body);
+          Object.assign(db.chiTietKhoa[params.id as string], body);
+          return HttpResponse.json(db.chiTietKhoa[params.id as string]);
+        }),
+      );
+      const user = userEvent.setup();
+      renderTrang('khoa-1');
+      const o = await screen.findByLabelText('Số buổi tối đa học viên được đề nghị đổi (0 = tắt)');
+      expect(o).toHaveValue('0');
+
+      await user.clear(o);
+      await user.type(o, '3');
+      await user.click(screen.getByRole('button', { name: 'Lưu số buổi đổi' }));
+
+      await waitFor(() => expect(bodies).toEqual([{ so_buoi_doi_toi_da: 3 }]));
+    });
+  });
+
   describe('Switch "Cho học viên điều chỉnh mức lớp học"', () => {
     it('quan_tri: bật -> PATCH khóa mo_dieu_chinh_muc=true, switch bật; tắt lại -> false', async () => {
       db.nguoiDung.vai_tro = 'quan_tri';

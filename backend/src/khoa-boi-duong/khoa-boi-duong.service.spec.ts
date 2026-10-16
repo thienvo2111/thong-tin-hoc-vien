@@ -14,6 +14,7 @@ import { DiemHocService } from '../diem-hoc/diem-hoc.service';
 import { LichHocThayDoiService } from './lich-hoc-thay-doi.service';
 import { PhanCongGiangDayService } from '../giang-vien/phan-cong-giang-day.service';
 import { ThangMucService } from '../sso/thang-muc.service';
+import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 
 let nhatKy: { ghi: jest.Mock; ghiNhieu: jest.Mock };
 let phanCongGiangDay: { xungDotKhiDoiGio: jest.Mock };
@@ -21,6 +22,7 @@ let diemHocService: {
   layDiemHocDangHoatDong: jest.Mock;
   canhBaoVuotSoPhong: jest.Mock;
 };
+let doiBuoiQuery: { doiBuoiDaDuyetCuaDangKy: jest.Mock };
 
 // QĐ10 (mo-rong-nls-an-giang.md, 2026-09-30) + phân lớp theo giai đoạn (spec
 // 2026-10-02): test cho phân lớp (phan_lop_giai_doan) + cụm học viên trong
@@ -73,6 +75,7 @@ describe('KhoaBoiDuongService', () => {
     };
     lich_hoc_lop: {
       findUnique: jest.Mock;
+      findMany: jest.Mock;
       create: jest.Mock;
       update: jest.Mock;
       count: jest.Mock;
@@ -146,6 +149,7 @@ describe('KhoaBoiDuongService', () => {
       },
       lich_hoc_lop: {
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn().mockImplementation(({ data }) => ({
           id: 'lich-moi',
           ...data,
@@ -181,6 +185,9 @@ describe('KhoaBoiDuongService', () => {
       layDiemHocDangHoatDong: jest.fn().mockResolvedValue({ id: 'dh-1' }),
       canhBaoVuotSoPhong: jest.fn().mockResolvedValue([]),
     };
+    doiBuoiQuery = {
+      doiBuoiDaDuyetCuaDangKy: jest.fn().mockResolvedValue([]),
+    };
     service = new KhoaBoiDuongService(
       prisma as unknown as PrismaService,
       scopeService as unknown as ScopeService,
@@ -193,6 +200,7 @@ describe('KhoaBoiDuongService', () => {
       ),
       phanCongGiangDay as unknown as PhanCongGiangDayService,
       new ThangMucService(prisma as unknown as PrismaService),
+      doiBuoiQuery as unknown as DoiBuoiHocQueryService,
     );
   });
 
@@ -602,6 +610,150 @@ describe('KhoaBoiDuongService', () => {
           hoc_vien_id: null,
         }),
       ).rejects.toBeInstanceOf(ForbiddenAppException);
+    });
+
+    // Spec đổi buổi §5: buổi nguồn đã đổi (da_duyet, còn hiệu lực) được thay
+    // bằng buổi chốt; khóa kèm so_buoi_doi_toi_da (Ruling R2).
+    it('đổi buổi đã duyệt -> buổi chốt thay buổi nguồn + da_doi_buoi, lop_goc_ten', async () => {
+      prisma.dang_ky_hoc.findMany.mockResolvedValue([
+        {
+          id: 'dk-1',
+          hoc_vien_id: 'hv-1',
+          khoa: {
+            id: 'khoa-1',
+            so_buoi_doi_toi_da: 2,
+            bat_diem_danh_zoom_luc: null,
+            giai_doan: [
+              {
+                id: 'gd-1',
+                thu_tu: 1,
+                ten_giai_doan: 'GĐ 1',
+                hinh_thuc: 'truc_tiep',
+              },
+            ],
+          },
+          phan_lop_giai_doan: [
+            {
+              giai_doan_id: 'gd-1',
+              lop_id: 'lop-a',
+              lop: {
+                id: 'lop-a',
+                ten_lop: 'Lớp A',
+                loai_lop: 'truc_tiep',
+                lich_hoc: [
+                  {
+                    id: 'a-1',
+                    giai_doan_id: 'gd-1',
+                    buoi_so: 1,
+                    dia_diem_hoac_link: 'Phòng A',
+                    phan_cong: [],
+                  },
+                  {
+                    id: 'a-2',
+                    giai_doan_id: 'gd-1',
+                    buoi_so: 2,
+                    dia_diem_hoac_link: 'Phòng A',
+                    phan_cong: [],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ]);
+      doiBuoiQuery.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+        { dang_ky_hoc_id: 'dk-1', lich_nguon_id: 'a-1', lich_chot_id: 'b-1' },
+      ]);
+      prisma.lich_hoc_lop.findMany.mockResolvedValue([
+        {
+          id: 'b-1',
+          giai_doan_id: 'gd-1',
+          buoi_so: 1,
+          dia_diem_hoac_link: 'Phòng B',
+          lop: { id: 'lop-b', ten_lop: 'Lớp B', loai_lop: 'truc_tiep' },
+          phan_cong: [
+            { vai_tro: 'giang_vien', giang_vien: { ho_ten: 'GV B' } },
+          ],
+        },
+      ]);
+
+      const res = await service.khoaHocCuaToi({
+        ...truong,
+        vai_tro: 'hoc_vien',
+        hoc_vien_id: 'hv-1',
+      });
+
+      expect(doiBuoiQuery.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledWith([
+        'dk-1',
+      ]);
+      expect(res[0].khoa).toHaveProperty('so_buoi_doi_toi_da', 2);
+      const [b1, b2] = res[0].giai_doan[0].lop!.lich_hoc;
+      expect(b1).toMatchObject({
+        id: 'b-1',
+        dia_diem_hoac_link: 'Phòng B',
+        da_doi_buoi: true,
+        lop_goc_ten: 'Lớp A',
+        lop_chot_ten: 'Lớp B',
+        giang_vien: [{ ho_ten: 'GV B', vai_tro: 'giang_vien' }],
+      });
+      expect(b1).not.toHaveProperty('lop');
+      expect(b2).toMatchObject({ id: 'a-2', dia_diem_hoac_link: 'Phòng A' });
+      expect(b2).not.toHaveProperty('da_doi_buoi');
+    });
+  });
+
+  // Spec đổi buổi §5: nạp điểm danh ở buổi chốt của đổi buổi đã duyệt không
+  // phải học bù.
+  describe('resolveDiemDanhRow — đổi buổi', () => {
+    const raw = {
+      so_dinh_danh_ca_nhan: '079000000001',
+      ma_khoa: 'K1',
+      ten_lop: 'Lớp B',
+      loai_lop: 'truc_tiep',
+      giai_doan_thu_tu: '1',
+      buoi_so: '1',
+      trang_thai: 'co_mat',
+      nguon: 'ky_ten',
+    };
+    beforeEach(() => {
+      prisma.hoc_vien.findUnique.mockResolvedValue({ id: 'hv-1' });
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue({ id: 'khoa-1' });
+      prisma.dang_ky_hoc.findUnique.mockResolvedValue({ id: 'dk-1' });
+      prisma.lop_hoc.findUnique.mockResolvedValue({ id: 'lop-b' });
+      prisma.giai_doan_khoa.findUnique.mockResolvedValue({ id: 'gd-1' });
+      prisma.lich_hoc_lop.findUnique.mockResolvedValue({ id: 'b-1' });
+      prisma.phan_lop_giai_doan.findUnique.mockResolvedValue({
+        lop_id: 'lop-a',
+      });
+    });
+
+    it('có đổi buổi đã duyệt vào đúng buổi -> không cảnh báo, không bắt ghi_chu', async () => {
+      doiBuoiQuery.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+        { dang_ky_hoc_id: 'dk-1', lich_nguon_id: 'a-1', lich_chot_id: 'b-1' },
+      ]);
+      const kq = await service.resolveDiemDanhRow(raw);
+      expect(kq.error).toBeUndefined();
+      expect(kq.canhBao).toBeUndefined();
+      expect(kq.dto).toMatchObject({
+        dang_ky_hoc_id: 'dk-1',
+        lich_hoc_id: 'b-1',
+      });
+      expect(doiBuoiQuery.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledWith([
+        'dk-1',
+      ]);
+    });
+
+    it('không có đổi buổi hiệu lực (đã hủy/khác buổi) -> vẫn là học bù', async () => {
+      doiBuoiQuery.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+        { dang_ky_hoc_id: 'dk-1', lich_nguon_id: 'a-2', lich_chot_id: 'b-2' },
+      ]);
+      const loi = await service.resolveDiemDanhRow(raw);
+      expect(loi.error).toContain('học bù');
+      const coGhiChu = await service.resolveDiemDanhRow({
+        ...raw,
+        ghi_chu: 'Học bù buổi 1',
+      });
+      expect(coGhiChu.canhBao).toContain('học bù');
     });
   });
 

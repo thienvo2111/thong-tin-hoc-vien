@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Anchor, Badge, Box, Button, Center, Container, Divider, Group, Loader, Paper, Stack, Text, Title } from '@mantine/core';
 import { useMutation } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { capMaSso, useHoSoToi, useKhoaHocToi, type SsoTarget } from '@/api/hocVien';
 import { useCauHinhTrienKhai } from '@/content/trienKhai';
 import { BaiKhaoSat } from '@/components/BaiKhaoSat';
@@ -176,6 +177,7 @@ function KhoiKhoaHoc({
             baiKhaoSat={baiCuaGiaiDoan(gd)}
             tinhTrang={tinhTrang}
             ketQua={ketQuaCuaGiaiDoan(gd)}
+            khoaDoiBuoi={(khoa.so_buoi_doi_toi_da ?? 0) > 0 ? khoa.id : null}
           />
         ))}
 
@@ -306,12 +308,15 @@ function TheGiaiDoan({
   baiKhaoSat,
   tinhTrang,
   ketQua,
+  khoaDoiBuoi,
 }: {
   gd: GiaiDoanCuaToi;
   chuaPhanLop: boolean;
   baiKhaoSat: SsoTarget[] | null;
   tinhTrang?: TinhTrangBaiKhaoSat[];
   ketQua?: ReactNode;
+  /** Id khóa khi khóa bật đổi buổi (so_buoi_doi_toi_da > 0), ngược lại null. */
+  khoaDoiBuoi?: string | null;
 }) {
   return (
     <Paper p="md" radius="md" withBorder data-testid="the-giai-doan">
@@ -338,7 +343,7 @@ function TheGiaiDoan({
               ))}
             </Stack>
           )}
-          <DanhSachBuoi lichHoc={gd.lop.lich_hoc} />
+          <DanhSachBuoi lichHoc={gd.lop.lich_hoc} khoaDoiBuoi={khoaDoiBuoi} />
           {(gd.thuc_dia ?? []).length > 0 && (
             <Text size="sm">
               <b>Hỗ trợ tại điểm học:</b>{' '}
@@ -418,7 +423,7 @@ function KhoiCum({ cum }: { cum: CumHocVien }) {
   );
 }
 
-function DanhSachBuoi({ lichHoc }: { lichHoc: LichHocLopToi[] }) {
+function DanhSachBuoi({ lichHoc, khoaDoiBuoi }: { lichHoc: LichHocLopToi[]; khoaDoiBuoi?: string | null }) {
   if (lichHoc.length === 0) return null;
   // ADR 0005 (issue #24): buổi Zoom của khóa đã bật điểm danh — backend giấu link, trả diem_danh_zoom.
   const buoiZoom = lichHoc.find((b) => b.diem_danh_zoom);
@@ -431,6 +436,11 @@ function DanhSachBuoi({ lichHoc }: { lichHoc: LichHocLopToi[] }) {
             <Text size="sm" fw={600}>
               Buổi {buoi.buoi_so}
             </Text>
+            {buoi.da_doi_buoi && (
+              <Badge size="sm" variant="light">
+                Đã đổi buổi
+              </Badge>
+            )}
             {buoi.diem_danh_zoom ? (
               <NhanDiemDanhZoom dz={buoi.diem_danh_zoom} />
             ) : (
@@ -445,6 +455,12 @@ function DanhSachBuoi({ lichHoc }: { lichHoc: LichHocLopToi[] }) {
             <Text size="xs" c="dimmed" data-testid="diem-danh-lop-cu">
               Buổi {buoi.buoi_so}: đã {NHAN_DIEM_DANH[buoi.diem_danh_lop_cu.trang_thai].toLowerCase()} ở{' '}
               {buoi.diem_danh_lop_cu.ten_lop} (lớp cũ)
+            </Text>
+          )}
+          {buoi.da_doi_buoi && buoi.lop_chot_ten && (
+            <Text size="sm" data-testid="lop-chot">
+              Học tại {buoi.lop_chot_ten}
+              {buoi.lop_goc_ten ? ` (thay cho ${buoi.lop_goc_ten})` : ''}
             </Text>
           )}
           <Text size="sm" c="dimmed">
@@ -492,6 +508,11 @@ function DanhSachBuoi({ lichHoc }: { lichHoc: LichHocLopToi[] }) {
               );
             })()}
           {buoi.diem_danh_zoom?.co_link && <NutDiemDanhZoom buoi={buoi} />}
+          {khoaDoiBuoi && !buoi.da_doi_buoi && Date.parse(buoi.thoi_gian_bat_dau) > Date.now() && (
+            <Text component={Link} to={`/de-nghi-doi-buoi?khoa=${khoaDoiBuoi}&lich=${buoi.id}`} size="xs" c="dimmed" td="underline" mt={4} display="block">
+              Không tham gia được buổi này?
+            </Text>
+          )}
           {canNhacCungNgay(buoi, lichHoc) && (
             <Text size="sm" c="orange.8" mt={4}>
               Buổi này cũng cần bấm điểm danh, kể cả khi bạn vẫn đang ở trong phòng Zoom.
