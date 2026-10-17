@@ -221,6 +221,15 @@ Trang lớp (`GET /ho-tro-giang-vien/lop/{lopId}/giai-doan/{gdId}`) thêm `hoc_v
 
 Bổ sung: trang lớp `buoi[].giang_vien[].nhac`; `GET /ho-tro-hoc-vien/lich-hoc` mỗi buổi thêm `nhac_cum: [{ cum_id, trang_thai }]`; `viec-can-lam` mỗi đợt thêm `nhac_gv` (GV chưa nhắc / cần nhắc lại). Quy tắc bảng kiểm `da_nhac_giang_vien` (bộ mặc định: hạn 3 ngày). Cổng học viên: thẻ **Buổi học sắp tới** (≤ 7 ngày) dùng dữ liệu `GET /hoc-vien/toi/khoa-hoc` sẵn có.
 
+**Thêm ADR 0009 (2026-10-17) — email lịch giảng dạy theo giai đoạn – khóa.** 1 email / (khóa × giai đoạn × giảng viên), gom mọi buổi có phân công qua mọi lớp (mọi hình thức). Chỉ gửi khi bấm nút, đi làn hàng loạt `hang_doi_email` (sự kiện `nhac_lich_giang_vien`). Mỗi email ghi 1 dòng `nhat_ky_nhac_lich` có `hang_doi_email_id`, nên cờ nhắc ở trên và bảng kiểm `da_nhac_giang_vien` được dùng chung. Giảng viên đã có email trước chứa buổi của giai đoạn → bản **cập nhật** (huy hiệu "Có thay đổi", khối buổi bị gỡ). Mọi route kiểm khóa trong nhóm trước (ngoài → `404`); giai đoạn không thuộc khóa → `404`.
+
+| Method | Endpoint | Mô tả | Ai gọi |
+|---|---|---|---|
+| GET | `/ho-tro-giang-vien/khoa` | Khóa trong nhóm: `[{ id, ma_khoa, ten_khoa, giai_doan: [{ id, thu_tu, ten_giai_doan, hinh_thuc, thoi_gian_bat_dau, thoi_gian_ket_thuc }] }]` (giai đoạn `active`, theo `thu_tu`) | `ho_tro_giang_vien` |
+| GET | `/ho-tro-giang-vien/khoa/{khoaId}/giai-doan/{gdId}/email-lich-day` | `{ giai_doan, giang_vien: [{ id, ho_ten, email, so_buoi, so_lop, trang_thai_nhac, email_cuoi: { gui_luc, trang_thai: 'cho_gui'\|'thanh_cong'\|'that_bai', loi } \| null }] }` — mọi GV có phân công trong giai đoạn (lớp `active`) | `ho_tro_giang_vien` |
+| GET | `/ho-tro-giang-vien/khoa/{khoaId}/giai-doan/{gdId}/email-lich-day/{gvId}/xem-truoc` | `{ tieu_de, html, la_cap_nhat, email }` — không ghi DB; GV không có buổi → `404` | `ho_tro_giang_vien` |
+| POST | `/ho-tro-giang-vien/khoa/{khoaId}/giai-doan/{gdId}/email-lich-day/gui` | `{ giang_vien_ids: uuid[1..200], không trùng }` → `200 { da_xep_hang, bo_qua: [{ giang_vien_id, ho_ten, ly_do: 'khong_co_email'\|'khong_co_buoi'\|'loi_he_thong' }] }`. Mỗi GV 1 transaction (hàng đợi + nhật ký nhắc); 1 người lỗi không làm hỏng cả lô. Nhật ký hoạt động `ho_tro_gv_gui_email_lich_day` | `ho_tro_giang_vien` |
+
 **Thêm L7 (issue #20, 2026-10-07) — vai trò `giang_vien` (chỉ đọc) + cổng giảng viên** (ADR 0004 G8). Trang frontend `/giang-day`; API tiền tố **`/cong-giang-vien`** (Nginx thêm tiền tố) — `/giang-vien` vẫn là API danh mục của Quản trị. `nguoi_dung.giang_vien_id` (1–1), CHECK vai trò `giang_vien` ⇔ có `giang_vien_id`, email bắt buộc. Đăng nhập như tài khoản cấp (tên đăng nhập = phần trước @ của email, trùng thì thêm số).
 
 | Method | Endpoint | Mô tả | Ai gọi |

@@ -12,7 +12,7 @@ import { NotFoundAppException } from '../common/exceptions/app.exceptions';
 export class HoTroGiangVienScopeService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async khoaIdsCuaToi(nguoiDungId: string): Promise<string[]> {
+  async khoaIdsCuaToi(nguoiDungId: string): Promise<string[]> {
     const rows = await this.prisma.phan_cong_ho_tro_gv.findMany({
       where: { nguoi_dung_id: nguoiDungId },
       select: { khoa_id: true },
