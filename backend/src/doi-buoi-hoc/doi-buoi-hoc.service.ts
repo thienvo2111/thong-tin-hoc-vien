@@ -28,8 +28,10 @@ import {
   HTTP_THEO_MA,
   KetQuaKiemTra,
   kiemTraGui,
+  buoiTrungGio,
   laBuoiTuongDuong,
   LichTomTat,
+  LichTrung,
   quyetDinhDuyet,
   soLuotDaDung,
   thuTuHang,
@@ -52,6 +54,8 @@ export interface DeNghiHocVien {
   buoi_chot: BuoiTomTat | null;
   /** D11: đề nghị đổi lại (chờ) → buổi chốt của bản đã duyệt cùng buổi nguồn. */
   doi_lai_tu: BuoiTomTat | null;
+  /** Chỉ đề nghị chờ: buổi trên lịch thực tế trùng giờ buổi đề nghị (cảnh báo, không chặn). */
+  trung_lich: LichTrung[];
 }
 
 export interface BuoiTomTat {
@@ -85,6 +89,8 @@ export interface LuaChonBuoi {
   si_so_toi_da: number | null;
   so_cho_duyet: number;
   da_du: boolean;
+  /** Buổi trên lịch thực tế của học viên trùng giờ buổi này (cảnh báo, không chặn). */
+  trung_lich: LichTrung[];
 }
 
 export interface DeNghiDuyet extends DeNghiHocVien {
@@ -173,8 +179,11 @@ export class DoiBuoiHocService {
     const chotCu = chotDaDuyetTheoCap(
       deNghiRows.filter((d) => d.trang_thai === 'da_duyet'),
     );
+    const lichDk = deNghiRows.some((d) => d.trang_thai === 'cho_duyet')
+      ? await this.lichThucTe([dangKy.id])
+      : new Map<string, OLich[]>();
     const deNghi = deNghiRows.map((d) =>
-      this.anhXaDeNghi(d, lichMap, now, hang, chotCu),
+      this.anhXaDeNghi(d, lichMap, now, hang, chotCu, lichDk),
     );
     const daDuyet = new Map(
       deNghi
@@ -230,7 +239,7 @@ export class DoiBuoiHocService {
         thong_diep: 'Buổi đã bắt đầu, không thể đổi',
       });
 
-    const ds = await this.luaChonTuongDuong(nguon, now);
+    const ds = await this.luaChonTuongDuong(nguon, now, dangKy.id);
     const chot = await this.chotDaDuyet(dangKy.id, nguon.id);
     return chot ? ds.filter((x) => x.lich.id !== chot) : ds;
   }
@@ -382,7 +391,7 @@ export class DoiBuoiHocService {
     });
     if (rows.length === 0) return [];
     const chotCu = await this.chotCuChoDoiLai(rows);
-    const [lichMap, hang, siSo] = await Promise.all([
+    const [lichMap, hang, siSo, lichDk] = await Promise.all([
       this.query.lichTomTat([
         ...rows.flatMap((r) =>
           [r.lich_nguon_id, r.lich_de_nghi_id, r.lich_chot_id].filter(
@@ -396,11 +405,19 @@ export class DoiBuoiHocService {
         [...new Set(rows.map((r) => r.lich_de_nghi_id))],
         now,
       ),
+      // Trùng lịch chỉ cho đề nghị chờ: 1 lượt gộp mọi đăng ký của trang.
+      this.lichThucTe([
+        ...new Set(
+          rows
+            .filter((r) => r.trang_thai === 'cho_duyet')
+            .map((r) => r.dang_ky_hoc_id),
+        ),
+      ]),
     ]);
     return rows.map(({ dang_ky_hoc, xu_ly_boi, ...r }) => {
       const s = siSo.get(r.lich_de_nghi_id);
       return {
-        ...this.anhXaDeNghi(r, lichMap, now, hang, chotCu),
+        ...this.anhXaDeNghi(r, lichMap, now, hang, chotCu, lichDk),
         hoc_vien: {
           id: dang_ky_hoc.hoc_vien.id,
           ho_ten: dang_ky_hoc.hoc_vien.ho_ten,
@@ -441,7 +458,7 @@ export class DoiBuoiHocService {
     );
     if (!nguon) throw new NotFoundAppException('Không tìm thấy buổi học');
     const now = new Date();
-    const tatCa = await this.luaChonTuongDuong(nguon, now);
+    const tatCa = await this.luaChonTuongDuong(nguon, now, dn.dang_ky_hoc_id);
     // Đổi lại: không đề xuất chốt vào buổi học viên đang học (bản đã duyệt).
     const chotCu =
       dn.trang_thai === 'cho_duyet' && tatCa.length > 0
@@ -1016,9 +1033,59 @@ export class DoiBuoiHocService {
   }
 
   // Buổi tương đương buổi nguồn, chưa bắt đầu, kèm sĩ số (dùng cho học viên và người duyệt).
+  // Lịch thực tế của mỗi đăng ký: mọi buổi của lớp được phân ở mọi giai đoạn,
+  // buổi nguồn đã đổi (da_duyet còn hiệu lực) thay bằng buổi chốt. Mỗi buổi gắn
+  // `nguon_id` = buổi nguồn mà nó chiếm chỗ. Số truy vấn cố định, không N+1.
+  private async lichThucTe(
+    dangKyIds: string[],
+  ): Promise<Map<string, OLich[]>> {
+    const kq = new Map<string, OLich[]>();
+    if (dangKyIds.length === 0) return kq;
+    const [phanLop, doi] = await Promise.all([
+      this.prisma.phan_lop_giai_doan.findMany({
+        where: { dang_ky_hoc_id: { in: dangKyIds } },
+        select: { dang_ky_hoc_id: true, giai_doan_id: true, lop_id: true },
+      }),
+      this.query.doiBuoiDaDuyetCuaDangKy(dangKyIds),
+    ]);
+    if (phanLop.length === 0) return kq;
+    const chotIds = [...new Set(doi.map((d) => d.lich_chot_id))];
+    const lich = await this.prisma.lich_hoc_lop.findMany({
+      where: {
+        OR: [
+          ...phanLop.map((p) => ({
+            lop_id: p.lop_id,
+            giai_doan_id: p.giai_doan_id,
+          })),
+          ...(chotIds.length ? [{ id: { in: chotIds } }] : []),
+        ],
+      },
+      orderBy: { thoi_gian_bat_dau: 'asc' },
+      select: LICH_TRUNG_SELECT,
+    });
+    const theoId = new Map(lich.map((l) => [l.id, l]));
+    const doiTheoCap = new Map(
+      doi.map((d) => [capKey(d.dang_ky_hoc_id, d.lich_nguon_id), d.lich_chot_id]),
+    );
+    for (const p of phanLop) {
+      const ds = kq.get(p.dang_ky_hoc_id) ?? [];
+      for (const l of lich) {
+        if (l.lop_id !== p.lop_id || l.giai_doan_id !== p.giai_doan_id) continue;
+        const chotId = doiTheoCap.get(capKey(p.dang_ky_hoc_id, l.id));
+        const b = chotId ? theoId.get(chotId) : l;
+        if (b) ds.push({ nguon_id: l.id, buoi: veLichTrung(b) });
+      }
+      kq.set(p.dang_ky_hoc_id, ds);
+    }
+    return kq;
+  }
+
+  // Buổi tương đương buổi nguồn, chưa bắt đầu, kèm sĩ số + trùng lịch của đăng ký
+  // (dùng cho học viên và người duyệt).
   private async luaChonTuongDuong(
     nguon: LichTomTat,
     now: Date,
+    dangKyId: string,
   ): Promise<LuaChonBuoi[]> {
     const ungVien = await this.prisma.lich_hoc_lop.findMany({
       where: {
@@ -1036,10 +1103,14 @@ export class DoiBuoiHocService {
       },
     });
     const tuongDuong = ungVien.filter((l) => laBuoiTuongDuong(nguon, l));
-    const siSo = await this.query.siSoBuoi(
-      tuongDuong.map((l) => l.id),
-      now,
-    );
+    const [siSo, lichDk] = await Promise.all([
+      this.query.siSoBuoi(
+        tuongDuong.map((l) => l.id),
+        now,
+      ),
+      this.lichThucTe([dangKyId]),
+    ]);
+    const lichCuaDk = lichDk.get(dangKyId) ?? [];
     return tuongDuong.map(
       ({ phong, dia_diem_hoac_link, diem_hoc, ...lich }) => {
         const s = siSo.get(lich.id) ?? {
@@ -1061,6 +1132,7 @@ export class DoiBuoiHocService {
           si_so_toi_da: s.si_so_toi_da,
           so_cho_duyet: s.so_cho_duyet,
           da_du: s.si_so_toi_da !== null && s.si_so >= s.si_so_toi_da,
+          trung_lich: trungLich(lichCuaDk, nguon.id, lich),
         };
       },
     );
@@ -1102,9 +1174,11 @@ export class DoiBuoiHocService {
     now: Date,
     hang: Map<string, { k: number; n: number }>,
     chotCu: Map<string, string>,
+    lichDk: Map<string, OLich[]>,
   ): DeNghiHocVien {
     const nguon = lichMap.get(r.lich_nguon_id);
     const dich = lichMap.get(r.lich_de_nghi_id);
+    const dk = lichDk.get(r.dang_ky_hoc_id);
     const doiLai = doiLaiTu(r, chotCu, lichMap);
     const quaHan =
       r.trang_thai === 'cho_duyet' &&
@@ -1129,6 +1203,13 @@ export class DoiBuoiHocService {
         ? tomTatBuoi(lichMap.get(r.lich_chot_id))
         : null,
       doi_lai_tu: doiLai,
+      trung_lich:
+        r.trang_thai === 'cho_duyet' && dk && dich?.thoi_gian_ket_thuc
+          ? trungLich(dk, r.lich_nguon_id, {
+              thoi_gian_bat_dau: dich.thoi_gian_bat_dau,
+              thoi_gian_ket_thuc: dich.thoi_gian_ket_thuc,
+            })
+          : [],
     };
   }
 
@@ -1182,6 +1263,44 @@ export function lyDoHuy(r: {
 
 const capKey = (dangKyId: string, lichNguonId: string) =>
   `${dangKyId}|${lichNguonId}`;
+
+const LICH_TRUNG_SELECT = {
+  id: true,
+  lop_id: true,
+  giai_doan_id: true,
+  buoi_so: true,
+  thoi_gian_bat_dau: true,
+  thoi_gian_ket_thuc: true,
+  lop: { select: { ten_lop: true } },
+} satisfies Prisma.lich_hoc_lopSelect;
+
+/** Một buổi trên lịch thực tế + buổi nguồn mà nó chiếm chỗ. */
+interface OLich {
+  nguon_id: string;
+  buoi: LichTrung;
+}
+
+function veLichTrung(l: LichTrung): LichTrung {
+  return {
+    id: l.id,
+    buoi_so: l.buoi_so,
+    thoi_gian_bat_dau: l.thoi_gian_bat_dau,
+    thoi_gian_ket_thuc: l.thoi_gian_ket_thuc,
+    lop: { ten_lop: l.lop.ten_lop },
+  };
+}
+
+// Bỏ ô của buổi nguồn đang xét (chính nó, hoặc buổi chốt hiện tại nếu đổi lại).
+function trungLich(
+  lich: OLich[],
+  lichNguonId: string,
+  ungVien: { thoi_gian_bat_dau: Date; thoi_gian_ket_thuc: Date },
+): LichTrung[] {
+  return buoiTrungGio(
+    ungVien,
+    lich.filter((o) => o.nguon_id !== lichNguonId).map((o) => o.buoi),
+  );
+}
 
 // (đăng ký|buổi nguồn) → buổi chốt của bản đã duyệt.
 function chotDaDuyetTheoCap(

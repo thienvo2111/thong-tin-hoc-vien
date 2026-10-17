@@ -21,6 +21,8 @@ function lich(
     giai_doan_id: 'gd1',
     buoi_so: 3,
     thoi_gian_bat_dau: ngayMai,
+    // DB: thoi_gian_ket_thuc NOT NULL (cần cho cảnh báo trùng lịch).
+    thoi_gian_ket_thuc: new Date(ngayMai.getTime() + 3_600_000),
     lop: {
       khoa_id: 'k1',
       loai_lop: 'zoom',
@@ -111,6 +113,10 @@ function setup(
           ['ld', { si_so: 5, si_so_toi_da: 40, so_cho_duyet: 0 }],
           ['lc', { si_so: 5, si_so_toi_da: 40, so_cho_duyet: 0 }],
         ]),
+    ),
+    doiBuoiDaDuyetCuaDangKy: jest.fn(
+      async (_ids: string[]) =>
+        [] as { dang_ky_hoc_id: string; lich_nguon_id: string; lich_chot_id: string }[],
     ),
   };
   const nhatKy = { ghi: jest.fn(async () => undefined) };
@@ -762,6 +768,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
         })),
       },
       lich_hoc_lop: { findMany: jest.fn(async () => [] as LichTomTat[]) },
+      phan_lop_giai_doan: { findMany: jest.fn(async (_a?: unknown) => [] as unknown[]) },
     };
     const lichMap = new Map([
       ['ln', lich('ln', 'lopA')],
@@ -779,6 +786,10 @@ describe('DoiBuoiHocService nguoi duyet', () => {
           ]),
         );
       }),
+      doiBuoiDaDuyetCuaDangKy: jest.fn(
+        async (_ids: string[]) =>
+          [] as { dang_ky_hoc_id: string; lich_nguon_id: string; lich_chot_id: string }[],
+      ),
     };
     const nhatKy = { ghi: jest.fn(async (_a?: unknown) => undefined) };
     const scope = { cumIdsCuaToi: jest.fn(async () => ['c1']) };
@@ -1525,5 +1536,231 @@ describe('lyDoHuy', () => {
     expect(
       lyDoHuy({ trang_thai: 'da_huy', nguoi_xu_ly: 'nd1', ghi_chu_xu_ly: GHI_CHU_THAY_THE }),
     ).toBe('huy_duyet');
+  });
+});
+
+describe('DoiBuoiHocService trung lich', () => {
+  const T0 = new Date(Date.now() + 3 * 86_400_000).getTime();
+  const h = (n: number) => new Date(T0 + n * 3_600_000);
+  const gio = (
+    id: string,
+    lopId: string,
+    bd: number,
+    kt: number,
+    over: Partial<LichTomTat> = {},
+  ) =>
+    lich(id, lopId, {
+      thoi_gian_bat_dau: h(bd),
+      thoi_gian_ket_thuc: h(kt),
+      ...over,
+    });
+  const lt = (l: LichTomTat) => ({
+    id: l.id,
+    buoi_so: l.buoi_so,
+    thoi_gian_bat_dau: l.thoi_gian_bat_dau,
+    thoi_gian_ket_thuc: l.thoi_gian_ket_thuc,
+    lop: { ten_lop: l.lop.ten_lop },
+  });
+
+  // Lịch thực tế của dk1: lớp lopA (gd1) + lớp lopE (gd2).
+  //   ln  (gd1 buổi 3) 08–12  = buổi nguồn → luôn bỏ qua
+  //   a4  (gd1 buổi 4) 13–17  → trùng ứng viên lfull (14–18)
+  //   e1  (gd2 buổi 1) 08–10  → đã đổi (da_duyet) sang e1x 15–16 → dùng giờ e1x
+  const ln = gio('ln', 'lopA', 8, 12);
+  const a4 = gio('a4', 'lopA', 13, 17, { buoi_so: 4 });
+  const e1 = gio('e1', 'lopE', 8, 10, { giai_doan_id: 'gd2', buoi_so: 1 });
+  const e1x = gio('e1x', 'lopF', 15, 16, { giai_doan_id: 'gd2', buoi_so: 1 });
+  const ld = gio('ld', 'lopB', 8, 12);
+  const lfull = gio('lfull', 'lopD', 14, 18);
+
+  function setupTrung() {
+    const s = setup();
+    const p = s.prisma as Record<string, any>;
+    p.phan_lop_giai_doan = {
+      findFirst: jest.fn(async () => ({ lop_id: 'lopA' })),
+      findMany: jest.fn(async (_a?: unknown) => [
+        { dang_ky_hoc_id: 'dk1', giai_doan_id: 'gd1', lop_id: 'lopA' },
+        { dang_ky_hoc_id: 'dk1', giai_doan_id: 'gd2', lop_id: 'lopE' },
+      ]),
+    };
+    // Ứng viên có where.buoi_so; lịch thực tế có where.OR.
+    p.lich_hoc_lop = {
+      findMany: jest.fn(async (a: { where: { OR?: unknown } }) =>
+        a.where.OR ? [ln, a4, e1, e1x] : [ld, lfull],
+      ),
+    };
+    s.query.lichTomTat.mockResolvedValue(new Map([['ln', ln]]));
+    s.query.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+      { dang_ky_hoc_id: 'dk1', lich_nguon_id: 'e1', lich_chot_id: 'e1x' },
+    ]);
+    return { ...s, p };
+  }
+
+  it('luaChonHocVien: trung_lich bo buoi nguon, buoi da doi dung gio buoi chot, so truy van co dinh', async () => {
+    const { svc, p, query } = setupTrung();
+    const r = await svc.luaChonHocVien(user, 'ln');
+    expect(r.map((x) => [x.lich.id, x.trung_lich.map((b) => b.id)])).toEqual([
+      ['ld', []],
+      ['lfull', ['a4', 'e1x']],
+    ]);
+    expect(r[1].trung_lich[0]).toEqual(lt(a4));
+    expect(query.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledTimes(1);
+    expect(query.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledWith(['dk1']);
+    expect(p.phan_lop_giai_doan.findMany).toHaveBeenCalledTimes(1);
+    expect(p.phan_lop_giai_doan.findMany).toHaveBeenCalledWith({
+      where: { dang_ky_hoc_id: { in: ['dk1'] } },
+      select: { dang_ky_hoc_id: true, giai_doan_id: true, lop_id: true },
+    });
+    expect(p.lich_hoc_lop.findMany).toHaveBeenCalledTimes(2);
+    const lichArg = p.lich_hoc_lop.findMany.mock.calls.find(
+      (c: any[]) => c[0].where.OR,
+    )[0];
+    expect(lichArg.where).toEqual({
+      OR: [
+        { lop_id: 'lopA', giai_doan_id: 'gd1' },
+        { lop_id: 'lopE', giai_doan_id: 'gd2' },
+        { id: { in: ['e1x'] } },
+      ],
+    });
+  });
+
+  it('luaChonHocVien: buoi da doi (e1) khong con trong lich -> ung vien trung gio goc e1 khong bi canh bao', async () => {
+    const { svc, p } = setupTrung();
+    const trungGioGoc = gio('lg', 'lopG', 9, 10);
+    p.lich_hoc_lop.findMany.mockImplementation(
+      async (a: { where: { OR?: unknown } }) =>
+        a.where.OR ? [ln, a4, e1, e1x] : [trungGioGoc],
+    );
+    const r = await svc.luaChonHocVien(user, 'ln');
+    // lg 09–10 trùng ln (bỏ: buổi nguồn) và e1 gốc (bỏ: đã đổi sang e1x).
+    expect(r[0].trung_lich).toEqual([]);
+  });
+
+  it('luaChonDuyet doi lai: bo buoi chot hien tai cua buoi nguon', async () => {
+    const { svc, p, query } = setupTrung();
+    const lk = gio('lk', 'lopC', 13, 15);
+    p.doi_buoi_hoc.findFirst = jest
+      .fn()
+      .mockResolvedValueOnce({
+        id: 'x1',
+        trang_thai: 'cho_duyet',
+        dang_ky_hoc_id: 'dk1',
+        lich_nguon_id: 'ln',
+        lich_de_nghi_id: 'lfull',
+        lich_chot_id: null,
+        tao_luc: new Date(Date.now() - 60_000),
+        dang_ky_hoc: { hoc_vien_id: 'hv1' },
+      })
+      .mockResolvedValueOnce({ lich_chot_id: 'lk' });
+    p.doi_buoi_hoc.groupBy = jest.fn(async () => []);
+    p.$queryRaw = jest.fn(async () => []);
+    const qt = { id: 'qt', vai_tro: 'quan_tri' } as AuthenticatedUser;
+    query.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+      { dang_ky_hoc_id: 'dk1', lich_nguon_id: 'ln', lich_chot_id: 'lk' },
+    ]);
+    p.lich_hoc_lop.findMany.mockImplementation(
+      async (a: { where: { OR?: unknown } }) =>
+        a.where.OR ? [ln, a4, lk] : [ld, lfull, lk],
+    );
+    const r = await svc.luaChonDuyet(qt, 'x1');
+    // lk (đang học, 13–15) trùng lfull 14–18 nhưng là chốt cũ của chính ln → bỏ.
+    expect(r.map((x) => [x.lich.id, x.trung_lich.map((b) => b.id)])).toEqual([
+      ['ld', []],
+      ['lfull', ['a4']],
+    ]);
+  });
+
+  it('tongQuanHocVien: de nghi cho_duyet co trung_lich cho buoi de nghi', async () => {
+    const { svc, p, query } = setupTrung();
+    const row = (id: string, trang_thai: string, over: object = {}) => ({
+      id,
+      trang_thai,
+      dang_ky_hoc_id: 'dk1',
+      lich_nguon_id: 'ln',
+      lich_de_nghi_id: 'lfull',
+      lich_chot_id: null,
+      ly_do: 'abcde',
+      tao_luc: new Date(Date.now() - 5000),
+      ghi_chu_xu_ly: null,
+      nguoi_xu_ly: null,
+      ...over,
+    });
+    p.doi_buoi_hoc.findMany = jest
+      .fn()
+      .mockResolvedValueOnce([
+        row('a', 'cho_duyet'),
+        row('b', 'tu_choi', { lich_nguon_id: 'a4' }),
+      ])
+      .mockResolvedValueOnce([]);
+    query.lichTomTat.mockResolvedValue(
+      new Map([
+        ['ln', ln],
+        ['lfull', lfull],
+        ['a4', a4],
+      ]),
+    );
+    const r = await svc.tongQuanHocVien(user, 'k1');
+    expect(r.de_nghi.find((d) => d.id === 'a')?.trung_lich.map((b) => b.id)).toEqual(
+      ['a4', 'e1x'],
+    );
+    expect(r.de_nghi.find((d) => d.id === 'b')?.trung_lich).toEqual([]);
+    expect(query.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledTimes(1);
+  });
+
+  it('danhSach: trung_lich gop moi dang ky trong 1 lan (khong N+1), chi cho_duyet', async () => {
+    const { svc, p, query } = setupTrung();
+    const dong = (id: string, dk: string, trang_thai = 'cho_duyet') => ({
+      id,
+      trang_thai,
+      dang_ky_hoc_id: dk,
+      lich_nguon_id: 'ln',
+      lich_de_nghi_id: 'lfull',
+      lich_chot_id: trang_thai === 'da_duyet' ? 'lfull' : null,
+      ly_do: 'abcde',
+      tao_luc: new Date(Date.now() - 5000),
+      ghi_chu_xu_ly: null,
+      nguoi_xu_ly: null,
+      dang_ky_hoc: {
+        hoc_vien: { id: dk, ho_ten: 'A', don_vi_cong_tac: { ten_don_vi: 'X' } },
+        cum: null,
+      },
+      xu_ly_boi: null,
+    });
+    p.$queryRaw = jest.fn(async () => []);
+    p.doi_buoi_hoc.findMany = jest
+      .fn()
+      .mockResolvedValueOnce([
+        dong('x1', 'dk1'),
+        dong('x2', 'dk2'),
+        dong('x3', 'dk3', 'da_duyet'),
+      ])
+      .mockResolvedValue([]);
+    p.phan_lop_giai_doan.findMany.mockResolvedValue([
+      { dang_ky_hoc_id: 'dk1', giai_doan_id: 'gd1', lop_id: 'lopA' },
+      { dang_ky_hoc_id: 'dk1', giai_doan_id: 'gd2', lop_id: 'lopE' },
+      { dang_ky_hoc_id: 'dk2', giai_doan_id: 'gd1', lop_id: 'lopA' },
+    ]);
+    query.lichTomTat.mockResolvedValue(
+      new Map([
+        ['ln', ln],
+        ['lfull', lfull],
+      ]),
+    );
+    query.siSoBuoi.mockResolvedValue(new Map());
+    const qt = { id: 'qt', vai_tro: 'quan_tri' } as AuthenticatedUser;
+    const r = await svc.danhSach(qt, {});
+    expect(r.map((x) => [x.id, x.trung_lich.map((b) => b.id)])).toEqual([
+      ['x1', ['a4', 'e1x']],
+      ['x2', ['a4']],
+      ['x3', []],
+    ]);
+    expect(query.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledTimes(1);
+    expect(query.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledWith(['dk1', 'dk2']);
+    expect(p.phan_lop_giai_doan.findMany).toHaveBeenCalledTimes(1);
+    expect(p.phan_lop_giai_doan.findMany).toHaveBeenCalledWith({
+      where: { dang_ky_hoc_id: { in: ['dk1', 'dk2'] } },
+      select: { dang_ky_hoc_id: true, giai_doan_id: true, lop_id: true },
+    });
+    expect(p.lich_hoc_lop.findMany).toHaveBeenCalledTimes(1);
   });
 });

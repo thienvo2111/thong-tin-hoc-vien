@@ -1,9 +1,11 @@
 import {
   HTTP_THEO_MA,
+  LichTrung,
   LichTomTat,
   MaLoiDoiBuoi,
   chuanHoaLyDo,
   conChoChoDeNghi,
+  buoiTrungGio,
   daBatDau,
   kiemTraGui,
   laBuoiTuongDuong,
@@ -426,5 +428,43 @@ describe('HTTP_THEO_MA', () => {
     ['LY_DO', 400],
   ])('%s -> %i', (ma, http) => {
     expect(HTTP_THEO_MA[ma]).toBe(http);
+  });
+});
+
+describe('buoiTrungGio', () => {
+  const t = (h: string, ngay = '2026-10-21') => new Date(`${ngay}T${h}:00+07:00`);
+  const b = (id: string, bd: Date, kt: Date): LichTrung => ({
+    id,
+    buoi_so: 1,
+    thoi_gian_bat_dau: bd,
+    thoi_gian_ket_thuc: kt,
+    lop: { ten_lop: `Lop ${id}` },
+  });
+  const ungVien = { thoi_gian_bat_dau: t('08:00'), thoi_gian_ket_thuc: t('12:00') };
+
+  it.each([
+    ['trung mot phan (ket thuc sau bat dau)', t('07:00'), t('09:00'), true],
+    ['trung mot phan (bat dau truoc ket thuc)', t('11:00'), t('13:00'), true],
+    ['chua trong ung vien', t('09:00'), t('10:00'), true],
+    ['bao trum ung vien', t('07:00'), t('13:00'), true],
+    ['trung khit', t('08:00'), t('12:00'), true],
+    ['cham mep sau (12:00-17:00)', t('12:00'), t('17:00'), false],
+    ['cham mep truoc (06:00-08:00)', t('06:00'), t('08:00'), false],
+    ['khac ngay cung gio', t('08:00', '2026-10-22'), t('12:00', '2026-10-22'), false],
+  ])('%s -> %s', (_ten, bd, kt, trung) => {
+    expect(buoiTrungGio(ungVien, [b('x', bd, kt)])).toHaveLength(trung ? 1 : 0);
+  });
+
+  it('nhieu buoi trung: tra dung cac buoi trung, giu thu tu', () => {
+    const lich = [
+      b('a', t('07:00'), t('09:00')),
+      b('b', t('12:00'), t('17:00')),
+      b('c', t('10:00'), t('11:00')),
+    ];
+    expect(buoiTrungGio(ungVien, lich).map((x) => x.id)).toEqual(['a', 'c']);
+  });
+
+  it('lich rong -> []', () => {
+    expect(buoiTrungGio(ungVien, [])).toEqual([]);
   });
 });

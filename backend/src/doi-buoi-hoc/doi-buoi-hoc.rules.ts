@@ -239,3 +239,25 @@ export function thuTuHang(
   }).length;
   return { k: truoc + 1, n: dsCho.length };
 }
+
+/** Buổi trên lịch thực tế của học viên (dùng cho cảnh báo trùng giờ). */
+export interface LichTrung {
+  id: string;
+  buoi_so: number;
+  thoi_gian_bat_dau: Date;
+  thoi_gian_ket_thuc: Date;
+  lop: { ten_lop: string };
+}
+
+// Khoảng mở: chạm mép (08:00–12:00 và 12:00–17:00) không tính trùng.
+export function buoiTrungGio(
+  ungVien: { thoi_gian_bat_dau: Date; thoi_gian_ket_thuc: Date },
+  lich: LichTrung[],
+): LichTrung[] {
+  const bd = ungVien.thoi_gian_bat_dau.getTime();
+  const kt = ungVien.thoi_gian_ket_thuc.getTime();
+  return lich.filter(
+    (b) =>
+      bd < b.thoi_gian_ket_thuc.getTime() && b.thoi_gian_bat_dau.getTime() < kt,
+  );
+}
