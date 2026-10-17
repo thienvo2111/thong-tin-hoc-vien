@@ -141,16 +141,38 @@ describe('EmailLichDayService', () => {
           lich_hoc_ids: ['x1', 'x2'],
           gui_luc: GUI_TRUOC,
           hang_doi_email_id: 'hd9',
-          hang_doi_email: { trang_thai: 'that_bai', loi: 'SMTP 550' },
+          hang_doi_email: { trang_thai: 'thanh_cong', loi: null },
         },
       ]);
       const [dong] = (await service.danhSach('k1', 'gd2')).giang_vien;
       expect(dong.trang_thai_nhac).toBe('can_nhac_lai');
       expect(dong.email_cuoi).toEqual({
         gui_luc: GUI_TRUOC,
-        trang_thai: 'that_bai',
-        loi: 'SMTP 550',
+        trang_thai: 'thanh_cong',
+        loi: null,
       });
+    });
+
+    it('email gửi lỗi (that_bai) không tính là đã nhắc, không làm bản 5b, nhưng vẫn hiện Lỗi', async () => {
+      const a = gv('a');
+      prisma.lich_hoc_lop.findMany.mockResolvedValue([
+        buoi('x1', LOP_A, '2026-10-24T00:30:00Z', [{ gv: a }]),
+      ]);
+      prisma.nhat_ky_nhac_lich.findMany.mockResolvedValue([
+        {
+          giang_vien_id: 'a',
+          lich_hoc_ids: ['x1'],
+          gui_luc: GUI_TRUOC,
+          hang_doi_email_id: 'hd9',
+          hang_doi_email: { trang_thai: 'that_bai', loi: 'SMTP 550' },
+        },
+      ]);
+      const [dong] = (await service.danhSach('k1', 'gd2')).giang_vien;
+      expect(dong.trang_thai_nhac).toBe('chua_nhac');
+      expect(dong.email_cuoi?.trang_thai).toBe('that_bai');
+      expect((await service.xemTruoc('k1', 'gd2', 'a')).la_cap_nhat).toBe(
+        false,
+      );
     });
 
     it('giai đoạn thuộc khóa khác → 404', async () => {

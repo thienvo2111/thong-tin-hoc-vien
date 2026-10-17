@@ -13,6 +13,7 @@ import {
 import {
   TrangThaiNhac,
   gopTrangThaiNhac,
+  nhacConHieuLuc,
   trangThaiNhac,
 } from './nhac-lich.util';
 
@@ -68,13 +69,16 @@ export class EmailLichDayService {
       const cua = buoi.filter((b) => day(b, g.id));
       const nk = nhatKy.filter((n) => n.giang_vien_id === g.id);
       const email = nk.find((n) => n.hang_doi_email);
+      const hieuLuc = nk.filter(nhacConHieuLuc);
       return {
         id: g.id,
         ho_ten: g.ho_ten,
         email: g.email,
         so_buoi: cua.length,
         so_lop: new Set(cua.map((b) => b.lop_id)).size,
-        trang_thai_nhac: gopTrangThaiNhac(cua.map((b) => trangThaiNhac(b, nk))),
+        trang_thai_nhac: gopTrangThaiNhac(
+          cua.map((b) => trangThaiNhac(b, hieuLuc)),
+        ),
         email_cuoi: email?.hang_doi_email
           ? {
               gui_luc: email.gui_luc,
@@ -307,7 +311,8 @@ export class EmailLichDayService {
       (p) => p.giang_vien_id === gvId,
     )!.giang_vien;
     const lanCuoi = nc.nhatKy.find(
-      (n) => n.giang_vien_id === gvId && n.hang_doi_email_id,
+      (n) =>
+        n.giang_vien_id === gvId && n.hang_doi_email_id && nhacConHieuLuc(n),
     );
     const lopIds = [...new Set(cua.map((b) => b.lop_id))];
     const [hauCan, thucDia] = await Promise.all([

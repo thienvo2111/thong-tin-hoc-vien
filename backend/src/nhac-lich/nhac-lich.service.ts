@@ -11,6 +11,7 @@ import { layDotLop } from '../trang-lop/trang-lop.service';
 import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 import { apDungDiemDanhZoom } from '../khoa-boi-duong/util/diem-danh-zoom.util';
 import {
+  NHAC_CON_HIEU_LUC,
   TrangThaiNhac,
   gopTrangThaiNhac,
   soanTinNhanCum,
@@ -84,6 +85,7 @@ export class NhacLichService {
         doi_tuong: 'giang_vien',
         giang_vien_id: giangVienId,
         lich_hoc_ids: { hasSome: buoi.map((b) => b.id) },
+        ...NHAC_CON_HIEU_LUC,
       },
       orderBy: { gui_luc: 'desc' },
       select: { gui_luc: true, nguoi: { select: { ho_ten: true } } },

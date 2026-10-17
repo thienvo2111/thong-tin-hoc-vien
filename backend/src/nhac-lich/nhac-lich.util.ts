@@ -2,7 +2,24 @@
 // gửi qua Zalo/SMS rồi bấm "Đã gửi") và cờ nhắc theo (buổi, người nhận).
 // Hàm thuần — câu chữ cố định trong code (v1), không email, không cron.
 
+import type { Prisma } from '@prisma/client';
+
 export type TrangThaiNhac = 'chua_nhac' | 'can_nhac_lai' | 'da_nhac';
+
+/**
+ * ADR 0009: lần nhắc còn tính — tin nhắn Zalo/SMS, hoặc email chưa thất bại hẳn
+ * (đang chờ / đã gửi). Email that_bai không làm "đã nhắc" cờ, bảng kiểm, bản cập nhật.
+ */
+export const NHAC_CON_HIEU_LUC = {
+  OR: [
+    { hang_doi_email_id: null },
+    { hang_doi_email: { trang_thai: { not: 'that_bai' } } },
+  ],
+} satisfies Prisma.nhat_ky_nhac_lichWhereInput;
+
+export const nhacConHieuLuc = (n: {
+  hang_doi_email?: { trang_thai: string } | null;
+}): boolean => n.hang_doi_email?.trang_thai !== 'that_bai';
 
 const UU_TIEN: Record<TrangThaiNhac, number> = {
   da_nhac: 0,

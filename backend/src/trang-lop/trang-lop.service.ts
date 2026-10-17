@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundAppException } from '../common/exceptions/app.exceptions';
-import { TrangThaiNhac, trangThaiNhac } from '../nhac-lich/nhac-lich.util';
+import {
+  NHAC_CON_HIEU_LUC,
+  TrangThaiNhac,
+  trangThaiNhac,
+} from '../nhac-lich/nhac-lich.util';
 import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 import {
   chiOCuaBuoi,
@@ -278,6 +282,7 @@ export async function layDotLop(
         ],
       },
       lich_hoc_ids: { hasSome: dsBuoi.map((b) => b.id) },
+      ...NHAC_CON_HIEU_LUC,
     },
     select: { giang_vien_id: true, lich_hoc_ids: true, gui_luc: true },
   });
