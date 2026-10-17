@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { notifications } from '@mantine/notifications';
@@ -169,8 +169,9 @@ describe('Gửi lịch dạy (ADR 0009)', () => {
     await user.click(screen.getByRole('button', { name: 'Gửi email (2)' }));
     const modal = await screen.findByRole('dialog');
     const nut = within(modal).getByRole('button', { name: 'Gửi' });
-    await user.click(nut);
-    await user.click(nut).catch(() => undefined);
+    // 2 cú bấm liền nhau, không có lần render nào ở giữa (máy chậm / bấm đúp).
+    fireEvent.click(nut);
+    fireEvent.click(nut);
     expect(await screen.findByText(/Đã xếp hàng 2 email/)).toBeInTheDocument();
     expect(soLanPost).toBe(1);
   });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Alert,
@@ -72,6 +72,8 @@ export default function HoTroGvGuiLichDay() {
   const [xemId, setXemId] = useState<string | null>(null);
   const [xacNhan, setXacNhan] = useState(false);
   const xem = useXemTruocEmailLichDay(khoaId, gdId, xemId);
+  // Khóa đồng bộ: isPending của mutation chỉ cập nhật ở lần render sau, bấm đúp vẫn lọt.
+  const dangGui = useRef(false);
   const gvs = useMemo(() => dsQ.data?.giang_vien ?? [], [dsQ.data]);
 
   // Mỗi lần tải danh sách: tích sẵn người có email mà chưa nhắc / cần nhắc lại.
@@ -93,8 +95,12 @@ export default function HoTroGvGuiLichDay() {
   const tenGd = khoa?.giai_doan.find((g) => g.id === gdId)?.ten_giai_doan ?? '';
 
   function guiNgay() {
-    if (gui.isPending) return;
+    if (dangGui.current) return;
+    dangGui.current = true;
     gui.mutate([...chon], {
+      onSettled: () => {
+        dangGui.current = false;
+      },
       onSuccess: (kq) => {
         setXacNhan(false);
         const boQua = kq.bo_qua.length
