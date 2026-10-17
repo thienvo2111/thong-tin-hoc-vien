@@ -11,6 +11,7 @@ const MENU = [
   { to: '/ho-tro-gv/lop', nhan: 'Lớp', end: false },
   { to: '/ho-tro-gv/de-nghi-doi-lop', nhan: 'Đề nghị đổi lớp', end: false },
   { to: '/ho-tro-gv/lich-day', nhan: 'Lịch dạy', end: false },
+  { to: '/ho-tro-gv/gui-lich-day', nhan: 'Gửi lịch dạy', end: false },
   { to: '/ho-tro-gv/danh-muc', nhan: 'Danh mục', end: false },
 ];
 
