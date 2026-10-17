@@ -1,7 +1,7 @@
 # ADR 0009 — Email lịch giảng dạy theo giai đoạn – khóa, gửi bằng nút bấm
 
 - Ngày: 2026-10-17
-- Trạng thái: Đề xuất (chờ duyệt spec)
+- Trạng thái: Đã chấp nhận (2026-10-17)
 - Bổ sung (không thay thế): ADR 0004 G10/G11 — tin nhắn Zalo soạn sẵn + "Đã gửi" giữ nguyên; ADR này làm phần "Email nhắc = để sau" của G10
 - Đặc tả: [2026-10-17-email-lich-giang-day-design.md](../superpowers/specs/2026-10-17-email-lich-giang-day-design.md)
 - Mẫu email đã duyệt: `design/mau-email/5a-lich-day-giang-vien.html`, `design/mau-email/5b-lich-day-giang-vien-cap-nhat.html`
@@ -34,3 +34,10 @@ Hiện người hỗ trợ giảng viên nhắc lịch bằng cách sao chép ti
 - Migration (chỉ thêm, không đổi dữ liệu): (1) `ALTER TYPE loai_su_kien_thong_bao ADD VALUE 'nhac_lich_giang_vien'` (riêng); (2) `ALTER TABLE nhat_ky_nhac_lich ADD COLUMN hang_doi_email_id uuid NULL REFERENCES hang_doi_email(id)`.
 - "Đã nhắc" nghĩa là **đã xếp hàng**. Nếu SMTP lỗi hẳn, nhật ký vẫn còn, nhưng trang gửi hiện trạng thái `that_bai` của dòng hàng đợi để cán bộ gửi lại.
 - Email cũng gửi được cho giai đoạn Zoom. Tin nhắn Zalo (G10) vẫn chỉ cho đợt trực tiếp như cũ.
+- Giao diện: trang `/ho-tro-gv/gui-lich-day` (menu **Gửi lịch dạy**). Hướng dẫn: `docs/huong-dan-gui-lich-day-giang-vien.md`. Thêm `GET /ho-tro-giang-vien/khoa` cho ô chọn khóa/giai đoạn; `bo_qua.ly_do` có thêm `loi_he_thong`.
+
+## Triển khai
+
+- 2 migration **chỉ thêm**: `20261017100000_su_kien_nhac_lich_giang_vien` (enum) → `20261017100100_nhac_lich_hang_doi_email` (cột nullable + index + FK). Không UPDATE/DELETE dòng nào; số dòng mọi bảng không đổi.
+- Trước `prisma migrate deploy`: backup `pg_dump` (mật khẩu lấy từ `DATABASE_URL` trong `backend/.env`).
+- Sau deploy: email chỉ phát sinh khi người hỗ trợ GV bấm **Gửi**. Không có cron mới; `HangDoiEmailProcessor` hiện có sẽ gửi các dòng `nhac_lich_giang_vien`.
