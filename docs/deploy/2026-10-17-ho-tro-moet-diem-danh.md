@@ -2,6 +2,8 @@
 
 > Đây là **lệnh để người vận hành tự chạy trên VPS**. Trợ lý không SSH, không deploy, không chạy lệnh trên VPS.
 
+> **Đã gộp vào** [`2026-10-17-email-lich-day-va-ho-tro-diem-danh.md`](2026-10-17-email-lich-day-va-ho-tro-diem-danh.md) — dùng runbook chung đó.
+
 | Nội dung | Ảnh hưởng dữ liệu |
 |---|---|
 | DS lớp và DS buổi (trang + Excel) có cột **Mã MOET**. Tab **Theo buổi**: cột **Điểm danh** (có mặt/tự điểm danh lúc…, vắng, có phép, đã báo vắng, chưa điểm danh, chưa đến giờ) + dòng tổng; Excel buổi thêm "Điểm danh", "Giờ tự điểm danh". Tab **Cả lớp**: cột **Có mặt / đã diễn ra** (x/y) | **KHÔNG migration**, không đổi `.env`, không đổi Nginx. Chỉ đọc thêm `diem_danh`, `bao_vang` |
