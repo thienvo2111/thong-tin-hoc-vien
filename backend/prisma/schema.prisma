@@ -219,6 +219,8 @@ enum loai_su_kien_thong_bao {
   dat_lai_mat_khau
   // ADR 0003 (2026-10-06): Quản trị sửa câu trả lời yêu cầu hỗ trợ — migration riêng.
   yeu_cau_ho_tro_cap_nhat_tra_loi
+  // ADR 0009 (2026-10-17): email lịch giảng dạy theo giai đoạn — migration riêng.
+  nhac_lich_giang_vien
 }
 
 enum trang_thai_gui_thong_bao {
@@ -1222,7 +1224,9 @@ model hang_doi_email {
   created_at       DateTime                  @default(now()) @db.Timestamptz(6)
   gui_luc          DateTime?                 @db.Timestamptz(6)
 
-  hoc_vien hoc_vien? @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  hoc_vien  hoc_vien?           @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // ADR 0009: lần nhắc lịch giảng viên gửi qua email trỏ về dòng hàng đợi này.
+  nhac_lich nhat_ky_nhac_lich[]
 
   @@index([trang_thai, created_at], map: "idx_hang_doi_email_trang_thai_created_at")
   @@index([hoc_vien_id], map: "idx_hang_doi_email_hoc_vien")
@@ -1574,14 +1578,18 @@ model nhat_ky_nhac_lich {
   noi_dung      String
   nguoi_gui     String?        @db.Uuid
   gui_luc       DateTime       @default(now()) @db.Timestamptz(6)
+  // ADR 0009: NULL = tin nhắn Zalo/SMS (G10); có giá trị = gửi qua email.
+  hang_doi_email_id String?    @db.Uuid
 
-  giang_vien giang_vien?   @relation(fields: [giang_vien_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  cum        cum_hoc_vien? @relation(fields: [cum_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  nguoi      nguoi_dung?   @relation("nhac_lich_nguoi_gui", fields: [nguoi_gui], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  giang_vien     giang_vien?     @relation(fields: [giang_vien_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  cum            cum_hoc_vien?   @relation(fields: [cum_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  nguoi          nguoi_dung?     @relation("nhac_lich_nguoi_gui", fields: [nguoi_gui], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  hang_doi_email hang_doi_email? @relation(fields: [hang_doi_email_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@index([lich_hoc_ids], map: "idx_nhac_lich_buoi", type: Gin)
   @@index([giang_vien_id], map: "idx_nhac_lich_giang_vien")
   @@index([cum_id], map: "idx_nhac_lich_cum")
+  @@index([hang_doi_email_id], map: "idx_nhac_lich_hang_doi")
 }
 
 // Issue #30 (PRD #29, 2026-10-12): Quản trị xóa cứng 1 học viên — mọi dữ liệu
