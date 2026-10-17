@@ -498,7 +498,10 @@ export function mauLichGiangDay(
       'Ban Tổ chức trân trọng gửi Thầy/Cô lịch giảng dạy của giai đoạn dưới đây. Nếu có điểm nào chưa phù hợp, Thầy/Cô vui lòng phản hồi sớm cho nhóm hỗ trợ giảng viên để kịp sắp xếp.',
     ),
     bangThongTin([
-      ['Khóa bồi dưỡng', `${e(p.tenKhoa)}${phu(`<br>Mã khóa: ${e(p.maKhoa)}`)}`],
+      [
+        'Khóa bồi dưỡng',
+        `${e(p.tenKhoa)}${phu(`<br>Mã khóa: ${e(p.maKhoa)}`)}`,
+      ],
       [
         'Giai đoạn',
         `${e(tenGd)}${phu(`<br>${e(HINH_THUC_LABEL[p.giaiDoan.hinhThuc])} · ${ngay(p.giaiDoan.tuNgay)} – ${ngay(p.giaiDoan.denNgay)}`)}`,
