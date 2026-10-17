@@ -268,6 +268,7 @@ function DongDeNghi({ deNghi, onSua }: { deNghi: DeNghiHocVien; onSua: () => voi
             Đổi lại — đang học: {nhanBuoi(deNghi.doi_lai_tu)}
           </Text>
         )}
+        <CanhBaoTrungLich ds={deNghi.trung_lich} />
         <Text size="sm" c="dimmed">
           Lý do: {deNghi.ly_do}
         </Text>

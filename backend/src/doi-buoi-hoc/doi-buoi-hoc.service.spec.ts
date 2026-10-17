@@ -1762,5 +1762,23 @@ describe('DoiBuoiHocService trung lich', () => {
       select: { dang_ky_hoc_id: true, giai_doan_id: true, lop_id: true },
     });
     expect(p.lich_hoc_lop.findMany).toHaveBeenCalledTimes(1);
+    // dk1 + dk2 cùng lớp lopA/gd1 → 1 nhánh OR (khử trùng).
+    expect(p.lich_hoc_lop.findMany.mock.calls[0][0].where).toEqual({
+      OR: [
+        { lop_id: 'lopA', giai_doan_id: 'gd1' },
+        { lop_id: 'lopE', giai_doan_id: 'gd2' },
+        { id: { in: ['e1x'] } },
+      ],
+    });
+  });
+
+  it('luaChonHocVien: khong co ung vien -> [] va khong truy van lich thuc te', async () => {
+    const { svc, p, query } = setupTrung();
+    p.lich_hoc_lop.findMany.mockImplementation(async () => []);
+    await expect(svc.luaChonHocVien(user, 'ln')).resolves.toEqual([]);
+    expect(p.phan_lop_giai_doan.findMany).not.toHaveBeenCalled();
+    expect(query.doiBuoiDaDuyetCuaDangKy).not.toHaveBeenCalled();
+    expect(query.siSoBuoi).not.toHaveBeenCalled();
+    expect(p.lich_hoc_lop.findMany).toHaveBeenCalledTimes(1);
   });
 });

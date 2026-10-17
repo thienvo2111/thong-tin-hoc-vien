@@ -145,6 +145,23 @@ const TRUNG: LichTrung = {
 };
 
 describe("Trang đề nghị đổi buổi (học viên)", () => {
+  it("đề nghị đang chờ có trùng giờ: thẻ hiện 1 dòng cảnh báo; không trùng thì không có", async () => {
+    const trung = deNghiMau({ trung_lich: [TRUNG] });
+    datApi(
+      tongQuanMau({
+        buoi_sap_toi: [{ lich_nguon: lich("ln-1", "Lớp 01"), de_nghi: trung }],
+        de_nghi: [trung, deNghiMau({ id: "dn-2", lich_nguon_id: "ln-2" })],
+      }),
+    );
+    renderTrang("?khoa=khoa-1");
+    const the = await screen.findAllByTestId("de-nghi-cho-duyet");
+    expect(the).toHaveLength(2);
+    expect(within(the[0]).getByTestId("canh-bao-trung-lich")).toHaveTextContent(
+      "Trùng giờ với Buổi 2 · Lớp 09",
+    );
+    expect(within(the[1]).queryByTestId("canh-bao-trung-lich")).toBeNull();
+  });
+
   it("lựa chọn trùng giờ hiện cảnh báo; gửi buổi trùng phải xác nhận: Chọn buổi khác không gửi, Vẫn gửi gọi POST", async () => {
     datApi(tongQuanMau());
     const bodies: unknown[] = [];

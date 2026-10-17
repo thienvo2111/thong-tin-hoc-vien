@@ -1050,13 +1050,17 @@ export class DoiBuoiHocService {
     ]);
     if (phanLop.length === 0) return kq;
     const chotIds = [...new Set(doi.map((d) => d.lich_chot_id))];
+    // Nhiều đăng ký cùng lớp → 1 nhánh OR cho mỗi (lớp, giai đoạn).
+    const capLop = new Map(
+      phanLop.map((p) => [
+        lopKey(p.lop_id, p.giai_doan_id),
+        { lop_id: p.lop_id, giai_doan_id: p.giai_doan_id },
+      ]),
+    );
     const lich = await this.prisma.lich_hoc_lop.findMany({
       where: {
         OR: [
-          ...phanLop.map((p) => ({
-            lop_id: p.lop_id,
-            giai_doan_id: p.giai_doan_id,
-          })),
+          ...capLop.values(),
           ...(chotIds.length ? [{ id: { in: chotIds } }] : []),
         ],
       },
@@ -1064,13 +1068,19 @@ export class DoiBuoiHocService {
       select: LICH_TRUNG_SELECT,
     });
     const theoId = new Map(lich.map((l) => [l.id, l]));
+    const theoLop = new Map<string, typeof lich>();
+    for (const l of lich) {
+      const k = lopKey(l.lop_id, l.giai_doan_id);
+      const ds = theoLop.get(k);
+      if (ds) ds.push(l);
+      else theoLop.set(k, [l]);
+    }
     const doiTheoCap = new Map(
       doi.map((d) => [capKey(d.dang_ky_hoc_id, d.lich_nguon_id), d.lich_chot_id]),
     );
     for (const p of phanLop) {
       const ds = kq.get(p.dang_ky_hoc_id) ?? [];
-      for (const l of lich) {
-        if (l.lop_id !== p.lop_id || l.giai_doan_id !== p.giai_doan_id) continue;
+      for (const l of theoLop.get(lopKey(p.lop_id, p.giai_doan_id)) ?? []) {
         const chotId = doiTheoCap.get(capKey(p.dang_ky_hoc_id, l.id));
         const b = chotId ? theoId.get(chotId) : l;
         if (b) ds.push({ nguon_id: l.id, buoi: veLichTrung(b) });
@@ -1103,6 +1113,7 @@ export class DoiBuoiHocService {
       },
     });
     const tuongDuong = ungVien.filter((l) => laBuoiTuongDuong(nguon, l));
+    if (tuongDuong.length === 0) return [];
     const [siSo, lichDk] = await Promise.all([
       this.query.siSoBuoi(
         tuongDuong.map((l) => l.id),
@@ -1263,6 +1274,8 @@ export function lyDoHuy(r: {
 
 const capKey = (dangKyId: string, lichNguonId: string) =>
   `${dangKyId}|${lichNguonId}`;
+
+const lopKey = (lopId: string, giaiDoanId: string) => `${lopId}|${giaiDoanId}`;
 
 const LICH_TRUNG_SELECT = {
   id: true,
