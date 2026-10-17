@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Alert, Anchor, Badge, Button, Container, Group, Paper, SimpleGrid, Skeleton, Stack, Table, Tabs, Text, Title } from '@mantine/core';
+import { DanhSachTheoBuoi } from '@/components/DanhSachTheoBuoi';
 import { ModalPhanCongBuoi } from '@/pages/Admin/ModalPhanCongBuoi';
 import { KhungThucDia, ModalSuaBuoiGv, TheHauCan } from './VanHanhLop';
 import { KhungBangKiem } from './KhungBangKiem';
@@ -235,75 +236,86 @@ function NoiDung({ d }: { d: TrangLop }) {
               </Anchor>
             </Alert>
           )}
-          {doiVao.length > 0 && (
-            <Text fz="sm" c="dimmed" mb="xs">
-              Thêm {doiVao.length} học viên đổi buổi vào lớp (không tính vào sĩ số lớp) — xem cột Đổi buổi.
-            </Text>
-          )}
-          <Paper withBorder radius={12} style={{ overflow: 'hidden' }}>
-            <Table.ScrollContainer minWidth={760}>
-              <Table verticalSpacing="xs" fz="sm">
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Họ tên</Table.Th>
-                    <Table.Th>Đơn vị</Table.Th>
-                    <Table.Th>Đối tượng</Table.Th>
-                    <Table.Th>Mức đầu vào</Table.Th>
-                    <Table.Th>SĐT</Table.Th>
-                    <Table.Th>Cụm · người hỗ trợ</Table.Th>
-                    <Table.Th>Báo vắng</Table.Th>
-                    <Table.Th>Đổi buổi</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {[...d.hoc_vien, ...doiVao].map((h) => (
-                    <Table.Tr key={h.dang_ky_hoc_id}>
-                      <Table.Td fw={600}>{h.ho_ten}</Table.Td>
-                      <Table.Td>{h.don_vi}</Table.Td>
-                      <Table.Td>{h.doi_tuong ? NHAN_DOI_TUONG[h.doi_tuong] ?? h.doi_tuong : '—'}</Table.Td>
-                      <Table.Td>
-                        {h.muc_dau_vao ? <Badge variant="light">{NHAN_MUC[h.muc_dau_vao] ?? h.muc_dau_vao}</Badge> : '—'}
-                        {h.muc_hoc_chon && (
-                          <Badge variant="outline" ml={4}>
-                            Tự chọn: {NHAN_MUC[h.muc_hoc_chon] ?? h.muc_hoc_chon}
-                          </Badge>
-                        )}
-                      </Table.Td>
-                      <Table.Td>{h.so_dien_thoai ?? '—'}</Table.Td>
-                      <Table.Td>
-                        {h.cum ? (
-                          <>
-                            {h.cum.ten_cum}
-                            {h.cum.nguoi_ho_tro.length > 0 && (
-                              <Text fz="xs" c="dimmed">
-                                {h.cum.nguoi_ho_tro.map((n) => n.ho_ten).join(', ')}
-                              </Text>
-                            )}
-                          </>
-                        ) : (
-                          '—'
-                        )}
-                      </Table.Td>
-                      <Table.Td>
-                        {Object.entries(h.bao_vang ?? {}).map(([lichId, lyDo]) => (
-                          <Badge key={lichId} color="orange" variant="light" title={lyDo} mr={4}>
-                            Buổi {d.buoi.find((b) => b.id === lichId)?.buoi_so ?? '?'}: {lyDo}
-                          </Badge>
+          <Tabs defaultValue="ca-lop" keepMounted={false} variant="pills">
+            <Tabs.List mb="sm">
+              <Tabs.Tab value="ca-lop">Cả lớp</Tabs.Tab>
+              <Tabs.Tab value="theo-buoi">Theo buổi</Tabs.Tab>
+            </Tabs.List>
+            <Tabs.Panel value="ca-lop">
+                {doiVao.length > 0 && (
+                  <Text fz="sm" c="dimmed" mb="xs">
+                    Thêm {doiVao.length} học viên đổi buổi vào lớp (không tính vào sĩ số lớp) — xem cột Đổi buổi.
+                  </Text>
+                )}
+                <Paper withBorder radius={12} style={{ overflow: 'hidden' }}>
+                  <Table.ScrollContainer minWidth={760}>
+                    <Table verticalSpacing="xs" fz="sm">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Họ tên</Table.Th>
+                          <Table.Th>Đơn vị</Table.Th>
+                          <Table.Th>Đối tượng</Table.Th>
+                          <Table.Th>Mức đầu vào</Table.Th>
+                          <Table.Th>SĐT</Table.Th>
+                          <Table.Th>Cụm · người hỗ trợ</Table.Th>
+                          <Table.Th>Báo vắng</Table.Th>
+                          <Table.Th>Đổi buổi</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {[...d.hoc_vien, ...doiVao].map((h) => (
+                          <Table.Tr key={h.dang_ky_hoc_id}>
+                            <Table.Td fw={600}>{h.ho_ten}</Table.Td>
+                            <Table.Td>{h.don_vi}</Table.Td>
+                            <Table.Td>{h.doi_tuong ? NHAN_DOI_TUONG[h.doi_tuong] ?? h.doi_tuong : '—'}</Table.Td>
+                            <Table.Td>
+                              {h.muc_dau_vao ? <Badge variant="light">{NHAN_MUC[h.muc_dau_vao] ?? h.muc_dau_vao}</Badge> : '—'}
+                              {h.muc_hoc_chon && (
+                                <Badge variant="outline" ml={4}>
+                                  Tự chọn: {NHAN_MUC[h.muc_hoc_chon] ?? h.muc_hoc_chon}
+                                </Badge>
+                              )}
+                            </Table.Td>
+                            <Table.Td>{h.so_dien_thoai ?? '—'}</Table.Td>
+                            <Table.Td>
+                              {h.cum ? (
+                                <>
+                                  {h.cum.ten_cum}
+                                  {h.cum.nguoi_ho_tro.length > 0 && (
+                                    <Text fz="xs" c="dimmed">
+                                      {h.cum.nguoi_ho_tro.map((n) => n.ho_ten).join(', ')}
+                                    </Text>
+                                  )}
+                                </>
+                              ) : (
+                                '—'
+                              )}
+                            </Table.Td>
+                            <Table.Td>
+                              {Object.entries(h.bao_vang ?? {}).map(([lichId, lyDo]) => (
+                                <Badge key={lichId} color="orange" variant="light" title={lyDo} mr={4}>
+                                  Buổi {d.buoi.find((b) => b.id === lichId)?.buoi_so ?? '?'}: {lyDo}
+                                </Badge>
+                              ))}
+                            </Table.Td>
+                            <Table.Td>
+                              {Object.entries(h.doi_buoi ?? {}).map(([lichId, n]) => (
+                                <Badge key={lichId} color={n.loai === 'vao' ? 'blue' : 'gray'} variant="light" mr={4}>
+                                  Buổi {d.buoi.find((b) => b.id === lichId)?.buoi_so ?? '?'}: {nhanDoiBuoi(n)}
+                                </Badge>
+                              ))}
+                            </Table.Td>
+                          </Table.Tr>
                         ))}
-                      </Table.Td>
-                      <Table.Td>
-                        {Object.entries(h.doi_buoi ?? {}).map(([lichId, n]) => (
-                          <Badge key={lichId} color={n.loai === 'vao' ? 'blue' : 'gray'} variant="light" mr={4}>
-                            Buổi {d.buoi.find((b) => b.id === lichId)?.buoi_so ?? '?'}: {nhanDoiBuoi(n)}
-                          </Badge>
-                        ))}
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            </Table.ScrollContainer>
-          </Paper>
+                      </Table.Tbody>
+                    </Table>
+                  </Table.ScrollContainer>
+                </Paper>
+            </Tabs.Panel>
+            <Tabs.Panel value="theo-buoi">
+              <DanhSachTheoBuoi d={d} />
+            </Tabs.Panel>
+          </Tabs>
         </Tabs.Panel>
       </Tabs>
 
