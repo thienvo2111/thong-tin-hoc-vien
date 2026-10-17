@@ -22,6 +22,7 @@ import {
   nutBam,
   tieuDeMuc,
 } from './bo-cuc';
+import { lienKetBanDo } from '../../nhac-lich/nhac-lich.util';
 
 // Mẫu nội dung cho 3 loại email "nghiệp vụ chính": đặt lại mật khẩu, lịch học
 // theo giai đoạn, kết quả học tập. Hàm THUẦN (dữ liệu vào -> {tieuDe, html}),
@@ -314,6 +315,228 @@ export function mauLichHoc(p: {
       tieuDe,
       noiDung,
     }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 2b. Lịch giảng dạy (ADR 0009) — 1 email / (khóa × giai đoạn × giảng viên)
+// ---------------------------------------------------------------------------
+export type BuoiLichDay = {
+  buoiSo: number;
+  batDau: Date;
+  ketThuc: Date;
+  diemHoc: { ten: string; diaChi: string } | null;
+  phong: string | null;
+  diaDiemHoacLink: string | null;
+  coThayDoi: boolean;
+};
+
+export type LopLichDay = {
+  tenLop: string;
+  loaiLop: loai_lop_hoc;
+  vaiTro: vai_tro_nhan_su_lop;
+  buoi: BuoiLichDay[];
+  hauCan: {
+    noiOTen: string | null;
+    noiODiaChi: string | null;
+    nhanPhong: Date | null;
+    traPhong: Date | null;
+    phuongTien: string | null;
+    donLuc: Date | null;
+    diemDon: string | null;
+    lienHeDon: string | null;
+  } | null;
+  thucDia: { hoTen: string; soDienThoai: string }[];
+};
+
+export type MauLichGiangDayInput = {
+  hoTen: string;
+  tenKhoa: string;
+  maKhoa: string;
+  giaiDoan: {
+    ten: string;
+    hinhThuc: hinh_thuc_giai_doan;
+    tuNgay: Date;
+    denNgay: Date;
+  };
+  // Đã sắp theo thứ tự hiển thị (lớp có buổi sớm nhất trước).
+  lop: LopLichDay[];
+  nhomHoTro: { hoTen: string; email: string | null }[];
+  // null -> giảng viên chưa có tài khoản Cổng giảng viên, không hiện nút.
+  linkCongGiangVien: string | null;
+  capNhat: {
+    guiLucTruoc: Date;
+    buoiGo: { tenLop: string; buoiSo: number; batDau: Date }[];
+  } | null;
+};
+
+const phu = (html: string) =>
+  `<span style="font-weight:400;color:${MAU.chuPhu};">${html}</span>`;
+const lienKet = (nhan: string, url: string) =>
+  `<a href="${e(url.trim())}" target="_blank" style="color:${MAU.navy};font-weight:600;">${e(nhan)}</a>`;
+
+const theoGio = (ds: BuoiLichDay[]) =>
+  [...ds].sort(
+    (a, b) => a.batDau.getTime() - b.batDau.getTime() || a.buoiSo - b.buoiSo,
+  );
+
+function oDiaDiemLichDay(b: BuoiLichDay, loaiLop: loai_lop_hoc): string {
+  if (b.diemHoc) {
+    return `<b>${e(b.diemHoc.ten)}</b><br>${e(b.diemHoc.diaChi)}${b.phong ? ` · phòng ${e(b.phong)}` : ''}<br>${lienKet('Xem bản đồ', lienKetBanDo(b.diemHoc.diaChi))}`;
+  }
+  const giaTri = b.diaDiemHoacLink?.trim();
+  if (!giaTri) return phu('Đang cập nhật');
+  if (laLienKet(giaTri)) {
+    return lienKet(
+      loaiLop === 'zoom' ? 'Vào phòng Zoom' : 'Mở liên kết',
+      giaTri,
+    );
+  }
+  return e(giaTri);
+}
+
+function dongHauCan(l: LopLichDay): Array<[string, string]> {
+  const dong: Array<[string, string]> = [];
+  const h = l.hauCan;
+  if (h?.noiOTen) {
+    const chiTiet = [
+      h.noiODiaChi && e(h.noiODiaChi),
+      h.nhanPhong && `nhận phòng ${ngay(h.nhanPhong)}`,
+      h.traPhong && `trả phòng ${ngay(h.traPhong)}`,
+    ].filter(Boolean);
+    dong.push([
+      'Chỗ ở',
+      `${e(h.noiOTen)}${chiTiet.length ? phu(`<br>${chiTiet.join(' · ')}`) : ''}`,
+    ]);
+  }
+  if (h && (h.phuongTien || h.donLuc || h.diemDon)) {
+    const chiTiet = [
+      h.donLuc && `Đón lúc ${gio(h.donLuc)} ${thuNgay(h.donLuc)}`,
+      h.diemDon && `tại ${e(h.diemDon)}`,
+      h.lienHeDon && `liên hệ ${e(h.lienHeDon)}`,
+    ].filter(Boolean);
+    dong.push([
+      'Đưa đón',
+      `${e(h.phuongTien ?? '')}${chiTiet.length ? phu(`${h.phuongTien ? '<br>' : ''}${chiTiet.join(' · ')}`) : ''}`,
+    ]);
+  }
+  for (const t of l.thucDia) {
+    dong.push([
+      'Hỗ trợ tại điểm học',
+      `${e(t.hoTen)}${phu(` · ${e(t.soDienThoai)}`)}`,
+    ]);
+  }
+  return dong;
+}
+
+function khoiLopLichDay(l: LopLichDay): string {
+  const th = (t: string) =>
+    `<th align="left" style="padding:8px 10px;font-size:12px;line-height:18px;font-weight:700;color:${MAU.chuPhu};background:${MAU.nen};">${t}</th>`;
+  const td = `padding:10px;border-top:1px solid ${MAU.vien};font-size:14px;line-height:20px;color:${MAU.chu};vertical-align:top;`;
+  const buoi = theoGio(l.buoi);
+  const rows = buoi
+    .map(
+      (b) => `
+  <tr>
+    <td style="${td}width:42%;"><b>${e(thuNgay(b.batDau))}</b><br><span style="color:${MAU.chuPhu};">${gio(b.batDau)} – ${gio(b.ketThuc)} · Buổi ${b.buoiSo}</span>${b.coThayDoi ? `<br>${huyHieu('Có thay đổi', 'canh_bao')}` : ''}</td>
+    <td style="${td}">${oDiaDiemLichDay(b, l.loaiLop)}</td>
+  </tr>`,
+    )
+    .join('');
+  const hauCan = dongHauCan(l);
+  return `
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:16px 0 8px;">
+  <tr><td>
+    <div style="font-size:15px;line-height:22px;font-weight:700;color:${MAU.navyDam};">${e(l.tenLop)}</div>
+    <div style="font-size:13px;line-height:20px;color:${MAU.chuPhu};">${e(LOAI_LOP_LABEL[l.loaiLop])} · Vai trò: ${e(VAI_TRO_LABEL[l.vaiTro])} · ${buoi.length} buổi</div>
+  </td></tr>
+</table>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 12px;border:1px solid ${MAU.vien};border-radius:8px;border-collapse:separate;overflow:hidden;">
+  <tr>${th('Thời gian')}${th('Địa điểm')}</tr>${rows}
+</table>${hauCan.length ? bangThongTin(hauCan) : ''}`;
+}
+
+export function mauLichGiangDay(
+  p: MauLichGiangDayInput,
+): EmailDaDung & { tomTat: string } {
+  const tenGd = p.giaiDoan.ten;
+  const tongBuoi = p.lop.reduce((s, l) => s + l.buoi.length, 0);
+  const cn = p.capNhat;
+
+  const khoiCapNhat = cn
+    ? khoiNoiBat(
+        'canh_bao',
+        `<b>Lịch giảng dạy đã được điều chỉnh.</b> Email này thay thế email gửi lúc ${gio(cn.guiLucTruoc)} ngày ${ngay(new Date(cn.guiLucTruoc.getTime() + VN_OFFSET_MS))}. Buổi có thay đổi được đánh dấu <b>Có thay đổi</b>.`,
+      ) +
+      (cn.buoiGo.length
+        ? khoiNoiBat(
+            'canh_bao',
+            `<b>Không còn trong lịch của Thầy/Cô:</b><br>${cn.buoiGo
+              .map(
+                (b) =>
+                  `${e(b.tenLop)} – Buổi ${b.buoiSo} (${e(thuNgay(b.batDau))})`,
+              )
+              .join('<br>')}`,
+          )
+        : '')
+    : '';
+
+  const khoiNhom = p.nhomHoTro.length
+    ? tieuDeMuc('Liên hệ nhóm hỗ trợ giảng viên') +
+      bangThongTin(
+        p.nhomHoTro.map((n): [string, string] => [
+          n.hoTen,
+          n.email ? lienKet(n.email, `mailto:${n.email}`) : phu('—'),
+        ]),
+      )
+    : '';
+
+  const noiDung = [
+    khoiCapNhat,
+    doanVan(`Kính gửi Thầy/Cô <b>${e(p.hoTen)}</b>,`),
+    doanVan(
+      'Ban Tổ chức trân trọng gửi Thầy/Cô lịch giảng dạy của giai đoạn dưới đây. Nếu có điểm nào chưa phù hợp, Thầy/Cô vui lòng phản hồi sớm cho nhóm hỗ trợ giảng viên để kịp sắp xếp.',
+    ),
+    bangThongTin([
+      ['Khóa bồi dưỡng', `${e(p.tenKhoa)}${phu(`<br>Mã khóa: ${e(p.maKhoa)}`)}`],
+      [
+        'Giai đoạn',
+        `${e(tenGd)}${phu(`<br>${e(HINH_THUC_LABEL[p.giaiDoan.hinhThuc])} · ${ngay(p.giaiDoan.tuNgay)} – ${ngay(p.giaiDoan.denNgay)}`)}`,
+      ],
+      ['Lịch dạy của Thầy/Cô', `${tongBuoi} buổi · ${p.lop.length} lớp`],
+    ]),
+    tieuDeMuc('Lịch dạy chi tiết'),
+    ...p.lop.map(khoiLopLichDay),
+    khoiNhom,
+    khoiNoiBat(
+      'thong_tin',
+      'Lịch có thể được điều chỉnh. Khi có thay đổi, Ban Tổ chức sẽ gửi email cập nhật. Thầy/Cô cũng có thể xem lịch mới nhất trên <b>Cổng giảng viên</b>.',
+    ),
+    p.linkCongGiangVien
+      ? nutBam('Xem lịch dạy trên Cổng giảng viên', p.linkCongGiangVien)
+      : '',
+  ].join('');
+
+  const tomTat = p.lop
+    .flatMap((l) =>
+      theoGio(l.buoi).map(
+        (b) =>
+          `${l.tenLop} – Buổi ${b.buoiSo}: ${thuNgay(b.batDau)}, ${gio(b.batDau)}–${gio(b.ketThuc)}`,
+      ),
+    )
+    .join('\n');
+
+  return {
+    tieuDe: `[BDNLS] ${cn ? 'Cập nhật lịch' : 'Lịch'} giảng dạy ${tenGd} – khóa ${p.maKhoa}`,
+    html: boCucEmail({
+      xemTruoc: cn
+        ? `Lịch giảng dạy ${tenGd} đã điều chỉnh — vui lòng xem lại.`
+        : `Lịch dạy ${tenGd} khóa ${p.maKhoa}: ${tongBuoi} buổi, ${p.lop.length} lớp.`,
+      nhan: cn ? 'CẬP NHẬT LỊCH GIẢNG DẠY' : 'LỊCH GIẢNG DẠY',
+      tieuDe: `Lịch giảng dạy ${tenGd}`,
+      noiDung,
+    }),
+    tomTat,
   };
 }
 

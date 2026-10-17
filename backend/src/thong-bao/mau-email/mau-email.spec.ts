@@ -4,6 +4,8 @@ import {
   gio,
   mauDatLaiMatKhau,
   mauKetQuaHocTap,
+  mauLichGiangDay,
+  MauLichGiangDayInput,
   mauLichHoc,
   mauXacNhanHoSo,
   HoSoTrongEmail,
@@ -430,5 +432,212 @@ describe('mauXacNhanHoSo', () => {
       expect(html).toContain('>Đối tượng</td>');
       expect(html.split('(chưa khai báo)').length - 1).toBe(1);
     });
+  });
+});
+
+// ADR 0009: email lịch giảng dạy theo (khóa × giai đoạn × giảng viên).
+describe('mauLichGiangDay', () => {
+  const t = (iso: string) => new Date(iso);
+  const coBan = (): MauLichGiangDayInput => ({
+    hoTen: 'Nguyễn Văn An',
+    tenKhoa: 'Bồi dưỡng NLS An Giang',
+    maKhoa: 'AG-2026-01',
+    giaiDoan: {
+      ten: 'Giai đoạn 2',
+      hinhThuc: 'truc_tiep',
+      tuNgay: t('2026-10-24T00:00:00Z'),
+      denNgay: t('2026-10-30T00:00:00Z'),
+    },
+    lop: [
+      {
+        tenLop: 'TT-03',
+        loaiLop: 'truc_tiep',
+        vaiTro: 'giang_vien',
+        buoi: [
+          // Cố ý đảo thứ tự: hàm phải tự sắp theo giờ bắt đầu.
+          {
+            buoiSo: 2,
+            batDau: t('2026-10-24T06:30:00Z'),
+            ketThuc: t('2026-10-24T09:30:00Z'),
+            diemHoc: { ten: 'THPT Long Xuyên', diaChi: '12 Trần Hưng Đạo' },
+            phong: 'A2.05',
+            diaDiemHoacLink: null,
+            coThayDoi: false,
+          },
+          {
+            buoiSo: 1,
+            batDau: t('2026-10-24T00:30:00Z'),
+            ketThuc: t('2026-10-24T04:30:00Z'),
+            diemHoc: { ten: 'THPT Long Xuyên', diaChi: '12 Trần Hưng Đạo' },
+            phong: 'A2.05',
+            diaDiemHoacLink: null,
+            coThayDoi: false,
+          },
+          {
+            buoiSo: 3,
+            batDau: t('2026-10-25T00:30:00Z'),
+            ketThuc: t('2026-10-25T04:30:00Z'),
+            diemHoc: null,
+            phong: null,
+            diaDiemHoacLink: 'Hội trường B',
+            coThayDoi: false,
+          },
+        ],
+        hauCan: {
+          noiOTen: 'Khách sạn Đông Xuyên',
+          noiODiaChi: '9A Lương Văn Cù',
+          nhanPhong: t('2026-10-23T00:00:00Z'),
+          traPhong: t('2026-10-25T00:00:00Z'),
+          phuongTien: 'Xe 7 chỗ',
+          donLuc: t('2026-10-22T22:00:00Z'),
+          diemDon: '280 An Dương Vương',
+          lienHeDon: 'Hùng 0909',
+        },
+        thucDia: [{ hoTen: 'Trần Thị B', soDienThoai: '0912345678' }],
+      },
+      {
+        tenLop: 'Zoom-07',
+        loaiLop: 'zoom',
+        vaiTro: 'ho_tro',
+        buoi: [
+          {
+            buoiSo: 1,
+            batDau: t('2026-10-28T12:00:00Z'),
+            ketThuc: t('2026-10-28T14:00:00Z'),
+            diemHoc: null,
+            phong: null,
+            diaDiemHoacLink: 'https://zoom.us/j/1',
+            coThayDoi: false,
+          },
+          {
+            buoiSo: 2,
+            batDau: t('2026-10-30T12:00:00Z'),
+            ketThuc: t('2026-10-30T14:00:00Z'),
+            diemHoc: null,
+            phong: null,
+            diaDiemHoacLink: null,
+            coThayDoi: false,
+          },
+        ],
+        hauCan: null,
+        thucDia: [],
+      },
+    ],
+    nhomHoTro: [{ hoTen: 'Lê Văn C', email: 'levanc@hcmue.edu.vn' }],
+    linkCongGiangVien: 'https://boiduongnls.hcmue.edu.vn/giang-day',
+    capNhat: null,
+  });
+
+  it('5a: tiêu đề, nhãn, tổng số buổi/lớp, vai trò theo từng lớp', () => {
+    const { tieuDe, html } = mauLichGiangDay(coBan());
+    expect(tieuDe).toBe('[BDNLS] Lịch giảng dạy Giai đoạn 2 – khóa AG-2026-01');
+    expect(html).toContain('LỊCH GIẢNG DẠY');
+    expect(html).not.toContain('CẬP NHẬT LỊCH GIẢNG DẠY');
+    expect(html).toContain('5 buổi · 2 lớp');
+    expect(html).toContain('Vai trò: Giảng viên');
+    expect(html).toContain('Vai trò: Hỗ trợ');
+    expect(html).toContain('Trực tiếp · 24/10/2026 – 30/10/2026');
+  });
+
+  it('sắp buổi trong lớp theo giờ bắt đầu dù input bị đảo', () => {
+    const { html } = mauLichGiangDay(coBan());
+    expect(html.indexOf('· Buổi 1<')).toBeLessThan(html.indexOf('· Buổi 2<'));
+  });
+
+  it('giờ hiển thị theo giờ Việt Nam, kể cả khi sang ngày mới', () => {
+    const p = coBan();
+    p.lop[1].buoi[0].batDau = t('2026-10-24T17:30:00Z');
+    p.lop[1].buoi[0].ketThuc = t('2026-10-24T19:00:00Z');
+    const { html } = mauLichGiangDay(p);
+    expect(html).toContain('Chủ nhật, 25/10/2026');
+    expect(html).toContain('00:30 – 02:00');
+  });
+
+  it('địa điểm: điểm học + bản đồ, Zoom, chữ thường, rỗng', () => {
+    const { html } = mauLichGiangDay(coBan());
+    expect(html).toContain('THPT Long Xuyên');
+    expect(html).toContain('phòng A2.05');
+    expect(html).toContain('google.com/maps');
+    expect(html).toContain('href="https://zoom.us/j/1"');
+    expect(html).toContain('Vào phòng Zoom');
+    expect(html).toContain('Hội trường B');
+    expect(html).toContain('Đang cập nhật');
+  });
+
+  it('link https ở lớp không phải Zoom -> "Mở liên kết"; javascript: không thành href', () => {
+    const p = coBan();
+    p.lop[0].buoi[2].diaDiemHoacLink = 'https://meet.example/x';
+    p.lop[1].buoi[1].diaDiemHoacLink = 'javascript:alert(1)';
+    const { html } = mauLichGiangDay(p);
+    expect(html).toContain('Mở liên kết');
+    expect(html).not.toContain('href="javascript');
+  });
+
+  it('hậu cần + thực địa chỉ hiện khi có dữ liệu', () => {
+    const { html } = mauLichGiangDay(coBan());
+    expect(html).toContain('Khách sạn Đông Xuyên');
+    expect(html).toContain('Đưa đón');
+    expect(html).toContain('Trần Thị B');
+    const p = coBan();
+    p.lop[0].hauCan = null;
+    p.lop[0].thucDia = [];
+    const html2 = mauLichGiangDay(p).html;
+    expect(html2).not.toContain('Chỗ ở');
+    expect(html2).not.toContain('Đưa đón');
+    expect(html2).not.toContain('Hỗ trợ tại điểm học');
+  });
+
+  it('nút Cổng giảng viên chỉ hiện khi có link', () => {
+    expect(mauLichGiangDay(coBan()).html).toContain(
+      'href="https://boiduongnls.hcmue.edu.vn/giang-day"',
+    );
+    const p = coBan();
+    p.linkCongGiangVien = null;
+    expect(mauLichGiangDay(p).html).not.toContain(
+      'Xem lịch dạy trên Cổng giảng viên',
+    );
+  });
+
+  it('5b: tiêu đề cập nhật, giờ lần trước, huy hiệu đúng số buổi, khối buổi bị gỡ', () => {
+    const p = coBan();
+    p.lop[0].buoi[0].coThayDoi = true;
+    p.lop[1].buoi[0].coThayDoi = true;
+    p.capNhat = {
+      guiLucTruoc: t('2026-10-17T02:15:00Z'),
+      buoiGo: [
+        { tenLop: 'TT-09', buoiSo: 2, batDau: t('2026-10-24T06:30:00Z') },
+      ],
+    };
+    const { tieuDe, html } = mauLichGiangDay(p);
+    expect(tieuDe).toBe(
+      '[BDNLS] Cập nhật lịch giảng dạy Giai đoạn 2 – khóa AG-2026-01',
+    );
+    expect(html).toContain('CẬP NHẬT LỊCH GIẢNG DẠY');
+    expect(html).toContain('09:15 ngày 17/10/2026');
+    // 2 huy hiệu + 1 lần nhắc trong câu giải thích của khối cảnh báo.
+    expect(html.split('>Có thay đổi</span>').length - 1).toBe(2);
+    expect(html).toContain('Không còn trong lịch của Thầy/Cô');
+    expect(html).toContain('TT-09 – Buổi 2');
+    p.capNhat.buoiGo = [];
+    expect(mauLichGiangDay(p).html).not.toContain(
+      'Không còn trong lịch của Thầy/Cô',
+    );
+  });
+
+  it('escape dữ liệu động', () => {
+    const p = coBan();
+    p.hoTen = '<script>x</script>';
+    const { html } = mauLichGiangDay(p);
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).not.toContain('<script>x');
+  });
+
+  it('tomTat là text thuần, mỗi buổi 1 dòng', () => {
+    const { tomTat } = mauLichGiangDay(coBan());
+    expect(tomTat).not.toContain('<');
+    expect(tomTat).toContain(
+      'TT-03 – Buổi 1: Thứ Bảy, 24/10/2026, 07:30–11:30',
+    );
+    expect(tomTat.split('\n')).toHaveLength(5);
   });
 });
