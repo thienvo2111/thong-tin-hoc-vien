@@ -23,7 +23,22 @@ cd ~/apps/boi-duong-nls && git rev-parse --short HEAD | tee ~/truoc-deploy-moet-
 git pull origin main && cd backend && npx prisma migrate status
 ```
 
-Kỳ vọng: "Database schema is up to date". Có migration chờ → **DỪNG**.
+Tính năng này **không** có migration. Nhưng `main` đã kèm tính năng email lịch giảng dạy (ADR 0009), nên nếu VPS chưa
+deploy phần đó thì sẽ thấy **đúng 2** migration chờ — cả hai chỉ thêm, không sửa/xóa dòng nào:
+
+- `20261017100000_su_kien_nhac_lich_giang_vien`: `ALTER TYPE loai_su_kien_thong_bao ADD VALUE 'nhac_lich_giang_vien'`.
+- `20261017100100_nhac_lich_hang_doi_email`: thêm cột nullable `nhat_ky_nhac_lich.hang_doi_email_id` + index + FK `ON DELETE SET NULL`.
+
+Có 2 migration này → backup trước khi deploy:
+
+```bash
+cd ~/apps/boi-duong-nls
+export DB_URL="$(grep '^DATABASE_URL=' backend/.env | cut -d= -f2- | tr -d '"' | sed 's/?.*//')"
+(umask 077; pg_dump "$DB_URL" -Fc -f ~/backups/postgres/truoc-moet-diem-danh-$(date +%F-%H%M).dump) && ls -lh ~/backups/postgres/ | tail -3
+unset DB_URL
+```
+
+Migration nào khác 2 cái trên → **DỪNG**.
 
 ## 3. Deploy
 
