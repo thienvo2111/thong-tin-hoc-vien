@@ -70,15 +70,20 @@ export class EmailLichDayService {
       const nk = nhatKy.filter((n) => n.giang_vien_id === g.id);
       const email = nk.find((n) => n.hang_doi_email);
       const hieuLuc = nk.filter(nhacConHieuLuc);
+      // Buổi có trong email cuối nhưng nay không dạy (đã gỡ) cũng là thay đổi cần báo.
+      const emailCuoi = hieuLuc.find((n) => n.hang_doi_email_id);
+      const biGo = !!emailCuoi?.lich_hoc_ids.some((id) =>
+        buoi.some((b) => b.id === id && !day(b, g.id)),
+      );
       return {
         id: g.id,
         ho_ten: g.ho_ten,
         email: g.email,
         so_buoi: cua.length,
         so_lop: new Set(cua.map((b) => b.lop_id)).size,
-        trang_thai_nhac: gopTrangThaiNhac(
-          cua.map((b) => trangThaiNhac(b, hieuLuc)),
-        ),
+        trang_thai_nhac: biGo
+          ? 'can_nhac_lai'
+          : gopTrangThaiNhac(cua.map((b) => trangThaiNhac(b, hieuLuc))),
         email_cuoi: email?.hang_doi_email
           ? {
               gui_luc: email.gui_luc,

@@ -33,6 +33,9 @@ Hiện người hỗ trợ giảng viên nhắc lịch bằng cách sao chép ti
 
 - Migration (chỉ thêm, không đổi dữ liệu): (1) `ALTER TYPE loai_su_kien_thong_bao ADD VALUE 'nhac_lich_giang_vien'` (riêng); (2) `ALTER TABLE nhat_ky_nhac_lich ADD COLUMN hang_doi_email_id uuid NULL REFERENCES hang_doi_email(id)`.
 - "Đã nhắc" nghĩa là **đã xếp hàng**. Nếu SMTP lỗi hẳn, nhật ký vẫn còn, nhưng trang gửi hiện trạng thái `that_bai` của dòng hàng đợi để cán bộ gửi lại.
+- Email `that_bai` (hàng đợi thử 3 lần không được) **không** tính là đã nhắc — cả ở trang Gửi lịch dạy, cờ nhắc trang lớp, Việc cần làm lẫn bảng kiểm (`NHAC_CON_HIEU_LUC` trong `nhac-lich.util.ts`); lần gửi lại là bản 5a nếu chưa có email nào tới được.
+- Trang Gửi lịch dạy: giảng viên bị gỡ **bớt** buổi so với email cuối → *Cần nhắc lại*; gửi lại → bản 5b có khối "Không còn trong lịch".
+- **Giới hạn v1:** giảng viên bị gỡ **toàn bộ** buổi của giai đoạn sau khi đã nhận email không còn trong danh sách → không gửi được email "không còn lịch"; cán bộ báo qua Zalo/điện thoại. Buổi bị xóa hẳn, lớp bị ngưng, buổi chuyển giai đoạn cũng không vào khối "Không còn trong lịch". Làm đầy đủ cần lưu loại email (lịch / chỉ báo gỡ) trong `nhat_ky_nhac_lich` — để sau.
 - Email cũng gửi được cho giai đoạn Zoom. Tin nhắn Zalo (G10) vẫn chỉ cho đợt trực tiếp như cũ.
 - Giao diện: trang `/ho-tro-gv/gui-lich-day` (menu **Gửi lịch dạy**). Hướng dẫn: `docs/huong-dan-gui-lich-day-giang-vien.md`. Thêm `GET /ho-tro-giang-vien/khoa` cho ô chọn khóa/giai đoạn; `bo_qua.ly_do` có thêm `loi_he_thong`.
 

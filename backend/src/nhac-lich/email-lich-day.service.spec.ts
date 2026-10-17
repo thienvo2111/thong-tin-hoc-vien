@@ -175,6 +175,34 @@ describe('EmailLichDayService', () => {
       );
     });
 
+    it('bị gỡ bớt buổi sau lần gửi email → cần nhắc lại; gửi lại xong → đã nhắc', async () => {
+      const a = gv('a');
+      const b = gv('b');
+      prisma.lich_hoc_lop.findMany.mockResolvedValue([
+        buoi('x1', LOP_A, '2026-10-24T00:30:00Z', [{ gv: a }]),
+        buoi('x2', LOP_A, '2026-10-24T06:30:00Z', [{ gv: b }]), // đã chuyển a → b
+      ]);
+      const email = (ids: string[]) => ({
+        giang_vien_id: 'a',
+        lich_hoc_ids: ids,
+        gui_luc: GUI_TRUOC,
+        hang_doi_email_id: 'hd9',
+        hang_doi_email: { trang_thai: 'thanh_cong', loi: null },
+      });
+      prisma.nhat_ky_nhac_lich.findMany.mockResolvedValue([
+        email(['x1', 'x2']),
+      ]);
+      let dongA = (await service.danhSach('k1', 'gd2')).giang_vien.find(
+        (g) => g.id === 'a',
+      )!;
+      expect(dongA.trang_thai_nhac).toBe('can_nhac_lai');
+      prisma.nhat_ky_nhac_lich.findMany.mockResolvedValue([email(['x1'])]);
+      dongA = (await service.danhSach('k1', 'gd2')).giang_vien.find(
+        (g) => g.id === 'a',
+      )!;
+      expect(dongA.trang_thai_nhac).toBe('da_nhac');
+    });
+
     it('giai đoạn thuộc khóa khác → 404', async () => {
       prisma.giai_doan_khoa.findUnique.mockResolvedValue({
         id: 'gd2',
