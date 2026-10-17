@@ -341,7 +341,16 @@ describe('Người hỗ trợ lớp — danh sách theo buổi (e2e, ADR 0008 L7
     expect(wb.worksheets).toHaveLength(1);
     expect(wb.worksheets[0].name).toMatch(/^GĐ1 B1 \d{2}-\d{2}$/);
     const dong = vanBan(wb.worksheets[0]);
-    expect(dong[2].split('|')).toContain('Ghi chú');
+    // Dòng 3 = tổng hợp điểm danh (ADR 0008 L8), dòng 4 = tiêu đề cột.
+    expect(dong[2]).toMatch(/^Điểm danh: Có mặt 0 · /);
+    expect(dong[3].split('|')).toEqual(
+      expect.arrayContaining([
+        'Mã MOET',
+        'Điểm danh',
+        'Giờ tự điểm danh',
+        'Ghi chú',
+      ]),
+    );
     expect(dong.join('\n')).toContain('Đổi buổi – từ lớp Zoom B');
     expect(dong).toContain('Đã chuyển sang lớp khác (không học buổi này)');
     expect(dong.join('\n')).toContain(

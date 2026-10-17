@@ -958,6 +958,8 @@ export interface LopCuaToi {
 export interface HocVienCuaLop {
   hoc_vien_id: string;
   ho_ten: string;
+  /** ADR 0008 L5 (sửa 2026-10-17): có mã MOET trên DS lớp/buổi. */
+  ma_dinh_danh_moet: string | null;
   /** dd/mm/yyyy */
   ngay_sinh: string;
   don_vi_cong_tac_ten: string;
@@ -968,6 +970,8 @@ export interface HocVienCuaLop {
   giai_doan: string[];
   day_du: boolean;
   dang_nhap_lan_cuoi: string | null;
+  /** ADR 0008 L8: số buổi có mặt / số buổi đã diễn ra (đổi ra → tính buổi chốt). */
+  chuyen_can: { co_mat: number; da_dien_ra: number };
 }
 
 export interface DanhSachLopHoTro {
@@ -988,16 +992,29 @@ export interface BuoiCuaLopHoTro {
   so_doi_ra: number;
 }
 
-export interface HocVienCuaBuoi extends Omit<HocVienCuaLop, 'giai_doan'> {
+// ADR 0008 L8: điểm danh của 1 dòng tại buổi — nhãn tính ở backend (dùng chung với file Excel).
+export type MaDiemDanhBuoi = 'co_mat' | 'vang' | 'vang_co_phep' | 'da_bao_vang' | 'chua_den_gio' | 'chua_diem_danh';
+
+export interface DiemDanhBuoiHoTro {
+  ma: MaDiemDanhBuoi;
+  nhan: string;
+  tu_diem_danh_luc: string | null;
+}
+
+export type TongDiemDanhBuoi = Record<MaDiemDanhBuoi, number>;
+
+export interface HocVienCuaBuoi extends Omit<HocVienCuaLop, 'giai_doan' | 'chuyen_can'> {
   /** 'vao' = đổi buổi vào (ngoài phạm vi sửa — không có link chi tiết); 'ra' = đã chuyển sang lớp khác. */
   doi_buoi: 'vao' | 'ra' | null;
   ghi_chu: string | null;
+  /** null với người đổi ra. */
+  diem_danh: DiemDanhBuoiHoTro | null;
 }
 
 // GET /ho-tro-hoc-vien/lop/:lopId/buoi/:lichId/hoc-vien
 export interface DanhSachBuoiHoTro {
   lop: LopCuaToi;
-  buoi: BuoiCuaLopHoTro;
+  buoi: BuoiCuaLopHoTro & { tong_diem_danh: TongDiemDanhBuoi };
   hoc_vien: HocVienCuaBuoi[];
   /** Người đổi ra — không học buổi này, liệt kê riêng để không điểm vắng nhầm. */
   doi_ra: HocVienCuaBuoi[];

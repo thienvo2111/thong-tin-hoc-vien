@@ -5,11 +5,14 @@ import { nhanDoiTuong, oKhaoSat, tenSheet } from './xuat-danh-sach-cum.util';
 // ADR 0008 L5: file xuất danh sách LỚP cho người hỗ trợ theo lớp. CÓ NGÀY SINH
 // theo yêu cầu người dùng (để đối chiếu khi hỗ trợ Zoom) — lưu ý ngày sinh =
 // mật khẩu mặc định, file có thể bị chuyển qua Zalo; người dùng đã chấp nhận
-// rủi ro (ADR 0008). Khác ADR 0003 H6 — H6 chỉ áp cho file cụm. Vẫn KHÔNG có
-// số định danh/CCCD, mã MOET, nơi sinh.
+// rủi ro (ADR 0008). Khác ADR 0003 H6 — H6 chỉ áp cho file cụm. Có MÃ MOET
+// theo yêu cầu người dùng 2026-10-17 (ô văn bản, giữ số 0 đầu). Vẫn KHÔNG có
+// số định danh/CCCD, nơi sinh. ADR 0008 L8: thêm cột chuyên cần "x/y".
 
-export interface DongXuatLop {
+/** Cột chung của file lớp và file buổi. */
+export interface DongXuatCoBan {
   ho_ten: string;
+  ma_dinh_danh_moet: string | null;
   ngay_sinh: string; // dd/mm/yyyy
   don_vi_cong_tac_ten: string;
   doi_tuong: string | null;
@@ -21,6 +24,10 @@ export interface DongXuatLop {
   khao_sat: { loai: string; trang_thai: string }[];
 }
 
+export interface DongXuatLop extends DongXuatCoBan {
+  chuyen_can: { co_mat: number; da_dien_ra: number };
+}
+
 export interface SheetLop {
   ten_lop: string;
   loai_lop: string;
@@ -28,9 +35,10 @@ export interface SheetLop {
   hoc_vien: DongXuatLop[];
 }
 
-export const COT_DANH_SACH_LOP = [
+export const COT_CO_BAN = [
   'STT',
   'Họ tên',
+  'Mã MOET',
   'Ngày sinh',
   'Đơn vị công tác',
   'Đối tượng',
@@ -41,6 +49,9 @@ export const COT_DANH_SACH_LOP = [
   'Đã đăng nhập',
   'Khảo sát',
 ];
+
+export const COT_CHUYEN_CAN = 'Có mặt / đã diễn ra';
+export const COT_DANH_SACH_LOP = [...COT_CO_BAN, COT_CHUYEN_CAN];
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -59,7 +70,9 @@ export async function buildDanhSachLopWorkbook(
     const ws = wb.addWorksheet(tenSheet(s.ten_lop, daDung));
     ws.addRow([tieuDeLop(s)]).font = { bold: true, size: 12 };
     ws.addRow(COT_DANH_SACH_LOP).font = { bold: true };
-    s.hoc_vien.forEach((h, i) => ws.addRow(oDongLop(h, i + 1)));
+    s.hoc_vien.forEach((h, i) =>
+      ws.addRow([...oDongCoBan(h, i + 1), oChuyenCan(h.chuyen_can)]),
+    );
     datDoRongCot(ws);
     ws.views = [{ state: 'frozen', ySplit: 2 }];
   }
@@ -72,11 +85,17 @@ export function tieuDeLop(s: Omit<SheetLop, 'hoc_vien'>): string {
   return `Khóa ${s.khoa.ma_khoa} – ${s.khoa.ten_khoa} · Lớp ${loai ?? s.loai_lop}: ${s.ten_lop}`;
 }
 
-/** Các ô của 1 dòng học viên theo COT_DANH_SACH_LOP. */
-export function oDongLop(h: DongXuatLop, stt: number): (string | number)[] {
+/** "x/y" — số buổi có mặt / số buổi đã diễn ra. */
+export function oChuyenCan(c: { co_mat: number; da_dien_ra: number }) {
+  return `${c.co_mat}/${c.da_dien_ra}`;
+}
+
+/** Các ô của 1 dòng học viên theo COT_CO_BAN (mã MOET để dạng văn bản). */
+export function oDongCoBan(h: DongXuatCoBan, stt: number): (string | number)[] {
   return [
     stt,
     h.ho_ten,
+    h.ma_dinh_danh_moet ?? '',
     h.ngay_sinh,
     h.don_vi_cong_tac_ten,
     nhanDoiTuong(h.doi_tuong),
@@ -93,5 +112,6 @@ export function datDoRongCot(ws: ExcelJS.Worksheet) {
   ws.columns.forEach((c) => (c.width = 16));
   ws.getColumn(1).width = 6;
   ws.getColumn(2).width = 28;
-  ws.getColumn(4).width = 36;
+  ws.getColumn(3).numFmt = '@';
+  ws.getColumn(5).width = 36;
 }

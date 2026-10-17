@@ -15,6 +15,7 @@ import { NotFoundAppException } from '../common/exceptions/app.exceptions';
 const hv = (ten: string) => ({
   id: `hv-${ten}`,
   ho_ten: ten,
+  ma_dinh_danh_moet: `00MOET-${ten}`,
   ngay_sinh: 2,
   thang_sinh: 3,
   nam_sinh: 1988,
@@ -25,9 +26,63 @@ const hv = (ten: string) => ({
   nguoi_dung_account: null,
   ket_qua_khao_sat: [],
   dang_ky_hoc: [
-    { id: `dk-${ten}`, khoa_id: 'k', cum: null, phan_lop_giai_doan: [] },
+    {
+      id: `dk-${ten}`,
+      khoa_id: 'k',
+      cum: null,
+      phan_lop_giai_doan: PHAN_LOP.includes(ten)
+        ? [
+            {
+              giai_doan_id: 'G',
+              lop_id: 'C',
+              lop: { ten_lop: 'Zoom 01' },
+              giai_doan: { thu_tu: 1, ten_giai_doan: 'Học Zoom' },
+            },
+          ]
+        : [],
+    },
   ],
 });
+
+// ADR 0008 L8 — điểm danh/báo vắng giả (where lọc như Prisma ở mức cần dùng).
+interface WhereDd {
+  lich_hoc_id?: string | { in: string[] };
+  dang_ky_hoc_id: { in: string[] };
+  trang_thai?: string;
+}
+const khop = (w: WhereDd, r: { lich_hoc_id: string; dang_ky_hoc_id: string }) =>
+  w.dang_ky_hoc_id.in.includes(r.dang_ky_hoc_id) &&
+  (w.lich_hoc_id === undefined ||
+    (typeof w.lich_hoc_id === 'string'
+      ? w.lich_hoc_id === r.lich_hoc_id
+      : w.lich_hoc_id.in.includes(r.lich_hoc_id)));
+const DIEM_DANH = [
+  {
+    dang_ky_hoc_id: 'dk-An',
+    lich_hoc_id: 'L1',
+    trang_thai: 'co_mat',
+    nguon: 'zoom',
+    tu_diem_danh_luc: new Date('2026-10-20T01:05:00Z'),
+  },
+  {
+    dang_ky_hoc_id: 'dk-Dũng',
+    lich_hoc_id: 'L1',
+    trang_thai: 'co_mat',
+    nguon: 'thu_cong',
+    tu_diem_danh_luc: null,
+  },
+  // Cường đổi ra khỏi L1, có mặt ở buổi chốt X9 (lớp Zoom 03).
+  {
+    dang_ky_hoc_id: 'dk-Cường',
+    lich_hoc_id: 'X9',
+    trang_thai: 'co_mat',
+    nguon: 'zoom',
+    tu_diem_danh_luc: null,
+  },
+];
+const BAO_VANG = [
+  { dang_ky_hoc_id: 'dk-Bình', lich_hoc_id: 'L1', ly_do: 'Ốm' },
+];
 
 // Lớp C, giai đoạn G: phân lớp An, Bình, Cường. Cường đổi ra (sang Zoom 03);
 // Dũng (lớp Zoom 02) đổi vào buổi L1.
@@ -124,10 +179,45 @@ function taoService(
       ),
     },
   };
+  Object.assign(prisma, {
+    diem_danh: {
+      findMany: jest.fn(({ where }: { where: WhereDd }) =>
+        Promise.resolve(
+          DIEM_DANH.filter(
+            (d) =>
+              khop(where, d) &&
+              (!where.trang_thai || d.trang_thai === where.trang_thai),
+          ),
+        ),
+      ),
+    },
+    bao_vang: {
+      findMany: jest.fn(({ where }: { where: WhereDd }) =>
+        Promise.resolve(BAO_VANG.filter((v) => khop(where, v))),
+      ),
+    },
+  });
   const scope = { damBaoLopCuaToi: jest.fn().mockResolvedValue(undefined) };
   const nhatKy = { ghi: jest.fn().mockResolvedValue(undefined) };
   const doiBuoiQuery = {
     dieuChinhTheoBuoi: jest.fn().mockResolvedValue(dieuChinh),
+    // Cường đổi L1 -> X9; An có đổi buổi ở lớp khác (L9 -> X8) — bỏ qua.
+    doiBuoiDaDuyetCuaDangKy: jest.fn().mockResolvedValue([
+      { dang_ky_hoc_id: 'dk-Cường', lich_nguon_id: 'L1', lich_chot_id: 'X9' },
+      { dang_ky_hoc_id: 'dk-An', lich_nguon_id: 'L9', lich_chot_id: 'X8' },
+    ]),
+    lichTomTat: jest.fn((ids: string[]) =>
+      Promise.resolve(
+        new Map(
+          ids
+            .filter((id) => id === 'X9')
+            .map((id) => [
+              id,
+              { id, thoi_gian_bat_dau: new Date('2026-10-21T01:00:00Z') },
+            ]),
+        ),
+      ),
+    ),
   };
   const service = new HoTroHocVienService(
     prisma as unknown as PrismaService,
@@ -250,5 +340,85 @@ describe('HoTroHocVienService — danh sách theo buổi (ADR 0008 L7)', () => {
       // L1: 3 trong DS + 1 đổi ra; L2: 3.
       chi_tiet: { lop_id: 'C', lich_ids: ['L1', 'L2'], so_dong: 7 },
     });
+  });
+});
+
+// ADR 0008 L8 — điểm danh trên DS buổi + chuyên cần trên DS lớp. "Bây giờ" =
+// 2026-10-25: L1 (20/10) đã diễn ra, L2 (27/10) chưa.
+describe('HoTroHocVienService — điểm danh theo buổi & chuyên cần (ADR 0008 L8)', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({
+      now: new Date('2026-10-25T00:00:00Z'),
+      doNotFake: [
+        'nextTick',
+        'setImmediate',
+        'clearImmediate',
+        'setTimeout',
+        'clearTimeout',
+        'setInterval',
+        'clearInterval',
+        'queueMicrotask',
+      ],
+    });
+  });
+  afterEach(() => jest.useRealTimers());
+
+  it('hocVienCuaBuoi: diem_danh cho dòng thường + đổi vào (theo đăng ký của họ), báo vắng, MOET; đổi ra null', async () => {
+    const { service } = taoService();
+    const kq = await service.hocVienCuaBuoi('nd', 'C', 'L1');
+    const theoTen = Object.fromEntries(
+      kq.hoc_vien.map((h) => [h.ho_ten, h.diem_danh]),
+    );
+    expect(theoTen['An']).toEqual({
+      ma: 'co_mat',
+      nhan: 'Có mặt – tự điểm danh 08:05',
+      tu_diem_danh_luc: '2026-10-20T01:05:00.000Z',
+    });
+    expect(theoTen['Bình']).toEqual({
+      ma: 'da_bao_vang',
+      nhan: 'Đã báo vắng: Ốm',
+      tu_diem_danh_luc: null,
+    });
+    expect(theoTen['Dũng']).toEqual({
+      ma: 'co_mat',
+      nhan: 'Có mặt (Thủ công)',
+      tu_diem_danh_luc: null,
+    });
+    expect(kq.hoc_vien[0].ma_dinh_danh_moet).toBe('00MOET-An');
+    expect(kq.doi_ra[0]).toEqual(
+      expect.objectContaining({ ho_ten: 'Cường', diem_danh: null }),
+    );
+    expect(kq.buoi.tong_diem_danh).toEqual({
+      co_mat: 2,
+      vang: 0,
+      vang_co_phep: 0,
+      da_bao_vang: 1,
+      chua_diem_danh: 0,
+      chua_den_gio: 0,
+    });
+  });
+
+  it('buổi chưa bắt đầu, không có điểm danh -> Chưa đến giờ', async () => {
+    const { service } = taoService();
+    const kq = await service.hocVienCuaBuoi('nd', 'C', 'L2');
+    expect(kq.hoc_vien.map((h) => h.diem_danh?.ma)).toEqual([
+      'chua_den_gio',
+      'chua_den_gio',
+      'chua_den_gio',
+    ]);
+    expect(kq.buoi.tong_diem_danh.chua_den_gio).toBe(3);
+  });
+
+  it('hocVienCuaLop: chuyen_can x/y — buổi tương lai không tính, đổi ra tính theo buổi chốt; có MOET', async () => {
+    const { service, doiBuoiQuery } = taoService();
+    const kq = await service.hocVienCuaLop('nd', 'C');
+    expect(doiBuoiQuery.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledTimes(1);
+    expect(
+      kq.hoc_vien.map((h) => [h.ho_ten, h.ma_dinh_danh_moet, h.chuyen_can]),
+    ).toEqual([
+      ['An', '00MOET-An', { co_mat: 1, da_dien_ra: 1 }],
+      ['Bình', '00MOET-Bình', { co_mat: 0, da_dien_ra: 1 }],
+      ['Cường', '00MOET-Cường', { co_mat: 1, da_dien_ra: 1 }],
+    ]);
   });
 });

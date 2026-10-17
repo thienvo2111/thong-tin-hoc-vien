@@ -205,3 +205,59 @@ describe('Người hỗ trợ — Danh sách lớp theo buổi', () => {
     await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
   });
 });
+
+// ADR 0008 L5 (sửa 2026-10-17) + L8: mã MOET ở cả 2 tab; điểm danh theo buổi; chuyên cần ở tab Cả lớp.
+/** Màu Mantine của Badge chứa el (đọc từ biến --badge-color trong style inline). */
+function mauBadge(el: HTMLElement): string | undefined {
+  const style = el.closest('.mantine-Badge-root')?.getAttribute('style') ?? '';
+  return /--badge-color:\s*var\(--mantine-color-(\w+)-/.exec(style)?.[1];
+}
+
+describe('Người hỗ trợ — mã MOET, điểm danh, chuyên cần', () => {
+  it('tab Cả lớp: cột Mã MOET (giữ số 0 đầu) và "Có mặt / đã diễn ra" dạng x/y', async () => {
+    render(['/ho-tro/lop/lop-zoom-1']);
+    const bang = await screen.findByRole('table');
+    expect(within(bang).getByRole('columnheader', { name: 'Mã MOET' })).toBeInTheDocument();
+    expect(within(bang).getByRole('columnheader', { name: 'Có mặt / đã diễn ra' })).toBeInTheDocument();
+    const dong = dongChua(within(bang).getByRole('link', { name: 'Lê Thị Zoom' }));
+    expect(within(dong).getByText('0790000123')).toBeInTheDocument();
+    expect(within(dong).getByText('3/4')).toBeInTheDocument();
+  });
+
+  it('tab Theo buổi: cột Mã MOET + Điểm danh, badge theo trạng thái, dòng tổng hợp', async () => {
+    render(['/ho-tro/lop/lop-zoom-1']);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Theo buổi' }));
+    await user.click(await screen.findByRole('textbox', { name: 'Buổi học' }));
+    await user.click(await screen.findByRole('option', { name: 'GĐ1 – Buổi 1 · 20/10 19:00 · 2 HV' }));
+    expect(
+      await screen.findByText('Có mặt 1 · Vắng 0 · Có phép 0 · Báo vắng 1 · Chưa điểm danh 0'),
+    ).toBeInTheDocument();
+    const [bangChinh, bangRa] = screen.getAllByRole('table');
+    expect(within(bangChinh).getByRole('columnheader', { name: 'Mã MOET' })).toBeInTheDocument();
+    expect(within(bangChinh).getByRole('columnheader', { name: 'Điểm danh' })).toBeInTheDocument();
+    const dongThuong = dongChua(within(bangChinh).getByRole('link', { name: 'Lê Thị Zoom' }));
+    expect(within(dongThuong).getByText('0790000123')).toBeInTheDocument();
+    const coMat = within(dongThuong).getByText('Có mặt – tự điểm danh 19:05');
+    expect(mauBadge(coMat)).toBe('green');
+    const dongVao = dongChua(within(bangChinh).getByText('Đặng Văn Vào'));
+    const baoVang = within(dongVao).getByText('Đã báo vắng: Đi công tác');
+    expect(mauBadge(baoVang)).toBe('orange');
+    // Người đổi ra: không có điểm danh tại buổi này.
+    const dongRa = dongChua(within(bangRa).getByText('Phan Thị Ra'));
+    expect(within(dongRa).queryByText(/Có mặt|Vắng|Chưa điểm danh/)).not.toBeInTheDocument();
+  });
+
+  it('buổi 2: Vắng (đỏ) và Chưa điểm danh (xám)', async () => {
+    render(['/ho-tro/lop/lop-zoom-1']);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Theo buổi' }));
+    await user.click(await screen.findByRole('textbox', { name: 'Buổi học' }));
+    await user.click(await screen.findByRole('option', { name: 'GĐ1 – Buổi 2 · 27/10 19:00 · 2 HV' }));
+    expect(
+      await screen.findByText('Có mặt 0 · Vắng 1 · Có phép 0 · Báo vắng 0 · Chưa điểm danh 1'),
+    ).toBeInTheDocument();
+    expect(mauBadge(screen.getByText('Vắng'))).toBe('red');
+    expect(mauBadge(screen.getByText('Chưa điểm danh'))).toBe('gray');
+  });
+});

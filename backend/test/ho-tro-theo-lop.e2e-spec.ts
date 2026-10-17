@@ -289,7 +289,7 @@ describe('Người hỗ trợ học viên theo lớp (e2e, ADR 0008)', () => {
     expect(cum.body).toEqual([]);
   });
 
-  it('lop/:id/hoc-vien trả học viên lớp gốc, có ngày sinh, cụm, giai đoạn', async () => {
+  it('lop/:id/hoc-vien trả học viên lớp gốc, có ngày sinh, mã MOET, cụm, giai đoạn, chuyên cần', async () => {
     const res = await get(
       `/ho-tro-hoc-vien/lop/${lop1}/hoc-vien`,
       hoTroLop.token,
@@ -302,11 +302,14 @@ describe('Người hỗ trợ học viên theo lớp (e2e, ADR 0008)', () => {
         hoc_vien_id: hv.mot,
         ho_ten: 'Nguyễn Văn Một',
         ngay_sinh: '02/03/1988',
+        // ADR 0008 L5 (sửa 2026-10-17): DS lớp có mã MOET.
+        ma_dinh_danh_moet: `HTL-mot-${SUF}`,
         cum: 'Cụm X',
         giai_doan: ['Học Zoom'],
+        // L8: buổi duy nhất chưa diễn ra.
+        chuyen_can: { co_mat: 0, da_dien_ra: 0 },
       }),
     );
-    expect(JSON.stringify(res.body)).not.toContain('HTL-mot');
   });
 
   it('lop/:id/hoc-vien của lớp không được gắn -> 404', async () => {
@@ -318,7 +321,7 @@ describe('Người hỗ trợ học viên theo lớp (e2e, ADR 0008)', () => {
     expect(res.body.error.message).toBe('Không tìm thấy lớp');
   });
 
-  it('xuất xlsx: 1 sheet/lớp, có Ngày sinh, không CCCD/MOET; có nhật ký', async () => {
+  it('xuất xlsx: 1 sheet/lớp, có Ngày sinh + Mã MOET + chuyên cần, không CCCD; có nhật ký', async () => {
     const truoc = await prisma.nhat_ky_hoat_dong.count({
       where: {
         hanh_dong: 'ho_tro_xuat_danh_sach_lop',
@@ -338,10 +341,14 @@ describe('Người hỗ trợ học viên theo lớp (e2e, ADR 0008)', () => {
     const ws = wb.worksheets[0];
     const tieuDe = (ws.getRow(2).values as unknown[]).filter(Boolean);
     expect(tieuDe).toContain('Ngày sinh');
-    expect(tieuDe.join('|')).not.toMatch(/CCCD|định danh|MOET|Nơi sinh/i);
+    expect(tieuDe).toContain('Mã MOET');
+    expect(tieuDe).toContain('Có mặt / đã diễn ra');
+    expect(tieuDe.join('|')).not.toMatch(/CCCD|định danh|Nơi sinh/i);
     const dong = (ws.getRow(3).values as unknown[]).map(String);
     expect(dong).toContain('Nguyễn Văn Một');
+    expect(dong).toContain(`HTL-mot-${SUF}`);
     expect(dong).toContain('02/03/1988');
+    expect(dong).toContain('0/0');
     const sau = await prisma.nhat_ky_hoat_dong.count({
       where: {
         hanh_dong: 'ho_tro_xuat_danh_sach_lop',

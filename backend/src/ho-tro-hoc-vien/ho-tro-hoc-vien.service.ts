@@ -27,6 +27,11 @@ import {
 } from './xuat-danh-sach-lop.util';
 import { buildDanhSachBuoiWorkbook } from './xuat-danh-sach-buoi.util';
 import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
+import {
+  tinhChuyenCanLop,
+  tinhDiemDanhDong,
+  tongDiemDanh,
+} from './diem-danh-lop-buoi.util';
 
 const SO_NGAY_LICH_MAC_DINH = 14;
 
@@ -467,14 +472,33 @@ export class HoTroHocVienService {
     }));
   }
 
-  /** Học viên có phân lớp gốc vào lớp (mọi giai đoạn), xếp theo họ tên. */
+  /**
+   * Học viên có phân lớp gốc vào lớp (mọi giai đoạn), xếp theo họ tên; kèm
+   * chuyên cần "có mặt / đã diễn ra" (ADR 0008 L8).
+   */
   private async layDongLop(lopId: string) {
     const ds = await this.layDongTheoDangKy({
       phan_lop_giai_doan: { some: { lop_id: lopId } },
     });
+    const chuyenCan = await this.chuyenCanTrongLop(
+      lopId,
+      ds.flatMap(({ r }) => r.dang_ky_hoc),
+    );
     return ds
       .map(({ r, dong }) => ({
         ...dong,
+        chuyen_can: r.dang_ky_hoc.reduce(
+          (t, dk) => {
+            const c = chuyenCan.get(dk.id);
+            return c
+              ? {
+                  co_mat: t.co_mat + c.co_mat,
+                  da_dien_ra: t.da_dien_ra + c.da_dien_ra,
+                }
+              : t;
+          },
+          { co_mat: 0, da_dien_ra: 0 },
+        ),
         giai_doan: r.dang_ky_hoc
           .flatMap((dk) => dk.phan_lop_giai_doan)
           .filter((p) => p.lop_id === lopId)
@@ -482,6 +506,74 @@ export class HoTroHocVienService {
           .map((p) => p.giai_doan.ten_giai_doan),
       }))
       .sort(theoHoTen);
+  }
+
+  /**
+   * ADR 0008 L8 — chuyên cần theo đăng ký trong lớp: buổi của lớp ở giai đoạn
+   * được phân vào lớp; đổi ra khỏi buổi thì tính buổi chốt (ADR 0007). Nạp
+   * theo lô: buổi của lớp, đổi buổi hiệu lực, buổi chốt, điểm danh có mặt.
+   */
+  private async chuyenCanTrongLop(
+    lopId: string,
+    dangKy: HocVienDong['dang_ky_hoc'],
+  ) {
+    const kq = new Map<string, { co_mat: number; da_dien_ra: number }>();
+    if (dangKy.length === 0) return kq;
+    const ids = dangKy.map((dk) => dk.id);
+    const [lich, doi] = await Promise.all([
+      this.prisma.lich_hoc_lop.findMany({
+        where: { lop_id: lopId },
+        select: { id: true, giai_doan_id: true, thoi_gian_bat_dau: true },
+      }),
+      this.doiBuoiQuery.doiBuoiDaDuyetCuaDangKy(ids),
+    ]);
+    const lichCuaLop = new Set(lich.map((l) => l.id));
+    const doiRa = doi.filter((d) => lichCuaLop.has(d.lich_nguon_id));
+    const [chot, coMat] = await Promise.all([
+      this.doiBuoiQuery.lichTomTat(doiRa.map((d) => d.lich_chot_id)),
+      this.prisma.diem_danh.findMany({
+        where: {
+          dang_ky_hoc_id: { in: ids },
+          lich_hoc_id: {
+            in: [...lichCuaLop, ...doiRa.map((d) => d.lich_chot_id)],
+          },
+          trang_thai: 'co_mat',
+        },
+        select: { dang_ky_hoc_id: true, lich_hoc_id: true },
+      }),
+    ]);
+    const now = new Date();
+    for (const dk of dangKy) {
+      const chotCuaNguon = new Map<
+        string,
+        { id: string; thoi_gian_bat_dau: Date }
+      >();
+      for (const d of doiRa) {
+        const c = chot.get(d.lich_chot_id);
+        if (d.dang_ky_hoc_id === dk.id && c) {
+          chotCuaNguon.set(d.lich_nguon_id, c);
+        }
+      }
+      kq.set(
+        dk.id,
+        tinhChuyenCanLop({
+          lich,
+          giai_doan_ids: new Set(
+            dk.phan_lop_giai_doan
+              .filter((p) => p.lop_id === lopId)
+              .map((p) => p.giai_doan_id),
+          ),
+          chot_cua_nguon: chotCuaNguon,
+          co_mat: new Set(
+            coMat
+              .filter((d) => d.dang_ky_hoc_id === dk.id)
+              .map((d) => d.lich_hoc_id),
+          ),
+          now,
+        }),
+      );
+    }
+    return kq;
   }
 
   /**
@@ -502,6 +594,7 @@ export class HoTroHocVienService {
           dong: {
             hoc_vien_id: r.id,
             ho_ten: r.ho_ten,
+            ma_dinh_danh_moet: r.ma_dinh_danh_moet,
             ngay_sinh: dinhDangNgaySinh(r.ngay_sinh, r.thang_sinh, r.nam_sinh),
             don_vi_cong_tac_ten: d.don_vi_cong_tac_ten,
             doi_tuong: d.doi_tuong,
@@ -534,7 +627,8 @@ export class HoTroHocVienService {
       this.dauLop([lopId]),
       this.dsBuoi(lopId, lichId),
     ]);
-    return { lop, buoi: buoi.item, ...(await this.layDongBuoi(lopId, buoi)) };
+    const { ds, tong } = await this.layDongBuoi(lopId, buoi);
+    return { lop, buoi: { ...buoi.item, tong_diem_danh: tong }, ...ds };
   }
 
   async xuatDanhSachBuoi(
@@ -551,9 +645,9 @@ export class HoTroHocVienService {
     const sheets = [];
     let soDong = 0;
     for (const b of dsBuoi) {
-      const ds = await this.layDongBuoi(lopId, b);
+      const { ds, tong } = await this.layDongBuoi(lopId, b);
       soDong += ds.hoc_vien.length + ds.doi_ra.length;
-      sheets.push({ lop, buoi: b.item, ...ds });
+      sheets.push({ lop, buoi: { ...b.item, tong_diem_danh: tong }, ...ds });
     }
     const buffer = await buildDanhSachBuoiWorkbook(sheets);
     await this.nhatKy.ghi({
@@ -629,6 +723,8 @@ export class HoTroHocVienService {
   /**
    * Danh sách 1 buổi: phân lớp (lớp, giai đoạn) − đổi ra + đổi vào (ghi chú
    * lớp nguồn); người đổi ra trả riêng ở doi_ra (ghi chú lớp chốt).
+   * ADR 0008 L8: mỗi dòng của danh sách có diem_danh tại CHÍNH buổi này theo
+   * đăng ký của dòng (người đổi vào: đăng ký của họ); đổi ra: diem_danh null.
    */
   private async layDongBuoi(lopId: string, b: BuoiCuaLop) {
     const ra = new Map(
@@ -655,26 +751,79 @@ export class HoTroHocVienService {
     // Tên lớp nguồn/chốt theo đăng ký của dòng (1 học viên có thể nhiều khóa).
     const tenLop = (m: Map<string, string>, r: HocVienDong) =>
       m.get(r.dang_ky_hoc.find((dk) => m.has(dk.id))?.id ?? '') ?? '';
+    const diemDanhCua = await this.diemDanhTaiBuoi(
+      b,
+      [...thuong, ...dsVao].flatMap(({ r }) =>
+        r.dang_ky_hoc.map((dk) => dk.id),
+      ),
+    );
+    const hocVien = [
+      ...thuong.map(({ r, dong }) => ({
+        ...dong,
+        doi_buoi: null as 'vao' | 'ra' | null,
+        ghi_chu: null as string | null,
+        diem_danh: diemDanhCua(r),
+      })),
+      ...dsVao.map(({ r, dong }) => ({
+        ...dong,
+        doi_buoi: 'vao' as const,
+        ghi_chu: `Đổi buổi – từ lớp ${tenLop(vao, r)}`,
+        diem_danh: diemDanhCua(r),
+      })),
+    ].sort(theoHoTen);
     return {
-      hoc_vien: [
-        ...thuong.map(({ dong }) => ({
-          ...dong,
-          doi_buoi: null as 'vao' | 'ra' | null,
-          ghi_chu: null as string | null,
-        })),
-        ...dsVao.map(({ r, dong }) => ({
-          ...dong,
-          doi_buoi: 'vao' as const,
-          ghi_chu: `Đổi buổi – từ lớp ${tenLop(vao, r)}`,
-        })),
-      ].sort(theoHoTen),
-      doi_ra: dsRa
-        .map(({ r, dong }) => ({
-          ...dong,
-          doi_buoi: 'ra' as const,
-          ghi_chu: `Đã chuyển sang lớp ${tenLop(ra, r)} – không học buổi này`,
-        }))
-        .sort(theoHoTen),
+      tong: tongDiemDanh(hocVien.map((h) => h.diem_danh)),
+      ds: {
+        hoc_vien: hocVien,
+        doi_ra: dsRa
+          .map(({ r, dong }) => ({
+            ...dong,
+            doi_buoi: 'ra' as const,
+            ghi_chu: `Đã chuyển sang lớp ${tenLop(ra, r)} – không học buổi này`,
+            diem_danh: null,
+          }))
+          .sort(theoHoTen),
+      },
+    };
+  }
+
+  /**
+   * Điểm danh + báo vắng tại 1 buổi cho các đăng ký (2 truy vấn); trả hàm tính
+   * diem_danh của 1 dòng theo đăng ký khớp danh sách của dòng đó.
+   */
+  private async diemDanhTaiBuoi(b: BuoiCuaLop, dangKyIds: string[]) {
+    const lichId = b.item.lich_id;
+    const where = { lich_hoc_id: lichId, dang_ky_hoc_id: { in: dangKyIds } };
+    const [diemDanh, baoVang] = dangKyIds.length
+      ? await Promise.all([
+          this.prisma.diem_danh.findMany({
+            where,
+            select: {
+              dang_ky_hoc_id: true,
+              trang_thai: true,
+              nguon: true,
+              tu_diem_danh_luc: true,
+            },
+          }),
+          this.prisma.bao_vang.findMany({
+            where,
+            select: { dang_ky_hoc_id: true, ly_do: true },
+          }),
+        ])
+      : [[], []];
+    const ddMap = new Map(diemDanh.map((d) => [d.dang_ky_hoc_id, d]));
+    const bvMap = new Map(baoVang.map((v) => [v.dang_ky_hoc_id, v]));
+    const now = new Date();
+    return (r: HocVienDong) => {
+      const ids = r.dang_ky_hoc.map((dk) => dk.id);
+      const dd = ids.map((x) => ddMap.get(x)).find(Boolean);
+      const bv = ids.map((x) => bvMap.get(x)).find(Boolean);
+      return tinhDiemDanhDong({
+        diem_danh: dd ?? null,
+        bao_vang: bv ?? null,
+        bat_dau: b.item.thoi_gian_bat_dau,
+        now,
+      });
     };
   }
 

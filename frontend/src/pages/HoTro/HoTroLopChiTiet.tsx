@@ -18,7 +18,14 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useBuoiCuaLop, useHocVienCuaBuoi, useHocVienCuaLop, xuatDanhSachBuoiHoTro } from '@/api/hoTro';
-import type { BuoiCuaLopHoTro, HocVienCuaBuoi, HocVienCuaLop } from '@/api/types';
+import type {
+  BuoiCuaLopHoTro,
+  DiemDanhBuoiHoTro,
+  HocVienCuaBuoi,
+  HocVienCuaLop,
+  MaDiemDanhBuoi,
+  TongDiemDanhBuoi,
+} from '@/api/types';
 import { ApiError } from '@/api/client';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangGio, dinhDangNgay } from '@/lib/ngay';
@@ -85,23 +92,25 @@ export default function HoTroLopChiTiet() {
 function BangCaLop({ hocVien }: { hocVien: HocVienCuaLop[] }) {
   return (
     <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
-      <Table.ScrollContainer minWidth={900}>
+      <Table.ScrollContainer minWidth={1100}>
         <Table verticalSpacing="sm" horizontalSpacing="md">
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Họ tên</Table.Th>
+              <Table.Th>Mã MOET</Table.Th>
               <Table.Th>Ngày sinh</Table.Th>
               <Table.Th>Đơn vị</Table.Th>
               <Table.Th>Số điện thoại</Table.Th>
               <Table.Th>Email</Table.Th>
               <Table.Th>Cụm</Table.Th>
               <Table.Th>Giai đoạn</Table.Th>
+              <Table.Th>Có mặt / đã diễn ra</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {hocVien.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={7}>
+                <Table.Td colSpan={9}>
                   <Text c="dimmed" ta="center" py="lg">
                     Lớp chưa có học viên nào.
                   </Text>
@@ -115,12 +124,16 @@ function BangCaLop({ hocVien }: { hocVien: HocVienCuaLop[] }) {
                     {h.ho_ten}
                   </Anchor>
                 </Table.Td>
+                <Table.Td>{h.ma_dinh_danh_moet ?? '—'}</Table.Td>
                 <Table.Td>{h.ngay_sinh}</Table.Td>
                 <Table.Td>{h.don_vi_cong_tac_ten}</Table.Td>
                 <Table.Td>{h.so_dien_thoai_lien_he ?? '—'}</Table.Td>
                 <Table.Td>{h.email_lien_he ?? '—'}</Table.Td>
                 <Table.Td>{h.cum ?? '—'}</Table.Td>
                 <Table.Td>{h.giai_doan.join(', ') || '—'}</Table.Td>
+                <Table.Td>
+                  {h.chuyen_can.co_mat}/{h.chuyen_can.da_dien_ra}
+                </Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
@@ -221,6 +234,9 @@ function TheoBuoi({ lopId }: { lopId: string }) {
       {ds.isError && <Alert color="red">{thongDiepLoiChung(ds.error)}</Alert>}
       {ds.data && (
         <>
+          <Text fz="sm" fw={600}>
+            {moTaTongDiemDanh(ds.data.buoi.tong_diem_danh)}
+          </Text>
           <BangBuoi hocVien={ds.data.hoc_vien} trong="Buổi này chưa có học viên nào." />
           {ds.data.doi_ra.length > 0 && (
             <Stack gap="xs">
@@ -234,26 +250,56 @@ function TheoBuoi({ lopId }: { lopId: string }) {
   );
 }
 
+const MAU_DIEM_DANH: Record<MaDiemDanhBuoi, string> = {
+  co_mat: 'green',
+  vang: 'red',
+  vang_co_phep: 'orange',
+  da_bao_vang: 'orange',
+  chua_diem_danh: 'gray',
+  chua_den_gio: 'gray',
+};
+
+/** ADR 0008 L8 — cùng câu với dòng tổng hợp trong file Excel buổi. */
+function moTaTongDiemDanh(t: TongDiemDanhBuoi): string {
+  return `Có mặt ${t.co_mat} · Vắng ${t.vang} · Có phép ${t.vang_co_phep} · Báo vắng ${t.da_bao_vang} · Chưa điểm danh ${t.chua_diem_danh}`;
+}
+
+function BadgeDiemDanh({ diemDanh }: { diemDanh: DiemDanhBuoiHoTro }) {
+  return (
+    <Badge
+      color={MAU_DIEM_DANH[diemDanh.ma]}
+      variant="light"
+      size="sm"
+      tt="none"
+      style={{ whiteSpace: 'normal', height: 'auto' }}
+    >
+      {diemDanh.nhan}
+    </Badge>
+  );
+}
+
 function BangBuoi({ hocVien, trong }: { hocVien: HocVienCuaBuoi[]; trong: string }) {
   return (
     <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
-      <Table.ScrollContainer minWidth={900}>
+      <Table.ScrollContainer minWidth={1100}>
         <Table verticalSpacing="sm" horizontalSpacing="md">
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Họ tên</Table.Th>
+              <Table.Th>Mã MOET</Table.Th>
               <Table.Th>Ngày sinh</Table.Th>
               <Table.Th>Đơn vị</Table.Th>
               <Table.Th>Số điện thoại</Table.Th>
               <Table.Th>Email</Table.Th>
               <Table.Th>Cụm</Table.Th>
+              <Table.Th>Điểm danh</Table.Th>
               <Table.Th>Ghi chú</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {hocVien.length === 0 && (
               <Table.Tr>
-                <Table.Td colSpan={7}>
+                <Table.Td colSpan={9}>
                   <Text c="dimmed" ta="center" py="lg">
                     {trong}
                   </Text>
@@ -281,11 +327,13 @@ function BangBuoi({ hocVien, trong }: { hocVien: HocVienCuaBuoi[]; trong: string
                     </Group>
                   )}
                 </Table.Td>
+                <Table.Td>{h.ma_dinh_danh_moet ?? '—'}</Table.Td>
                 <Table.Td>{h.ngay_sinh}</Table.Td>
                 <Table.Td>{h.don_vi_cong_tac_ten}</Table.Td>
                 <Table.Td>{h.so_dien_thoai_lien_he ?? '—'}</Table.Td>
                 <Table.Td>{h.email_lien_he ?? '—'}</Table.Td>
                 <Table.Td>{h.cum ?? '—'}</Table.Td>
+                <Table.Td>{h.diem_danh ? <BadgeDiemDanh diemDanh={h.diem_danh} /> : '—'}</Table.Td>
                 <Table.Td>{h.ghi_chu ?? ''}</Table.Td>
               </Table.Tr>
             ))}

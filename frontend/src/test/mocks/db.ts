@@ -859,6 +859,7 @@ export function taoHoTroDanhSachLopMau(): Record<string, DanhSachLopHoTro> {
         {
           hoc_vien_id: 'hv-lop-1',
           ho_ten: 'Lê Thị Zoom',
+          ma_dinh_danh_moet: '0790000123',
           ngay_sinh: '02/03/1988',
           don_vi_cong_tac_ten: 'Trường THCS Mỹ Hòa',
           doi_tuong: 'giao_vien',
@@ -868,6 +869,7 @@ export function taoHoTroDanhSachLopMau(): Record<string, DanhSachLopHoTro> {
           giai_doan: ['Học Zoom'],
           day_du: true,
           dang_nhap_lan_cuoi: null,
+          chuyen_can: { co_mat: 3, da_dien_ra: 4 },
         },
       ],
     },
@@ -906,10 +908,23 @@ export function taoHoTroBuoiLopMau(): Record<string, BuoiCuaLopHoTro[]> {
 export function taoHoTroDanhSachBuoiMau(): Record<string, DanhSachBuoiHoTro> {
   const [lop] = taoHoTroLopMau();
   const [b1, b2] = taoHoTroBuoiLopMau()['lop-zoom-1'];
-  const { giai_doan: _gd, ...goc } = taoHoTroDanhSachLopMau()[lop.lop_id].hoc_vien[0];
+  const { giai_doan: _gd, chuyen_can: _cc, ...goc } = taoHoTroDanhSachLopMau()[lop.lop_id].hoc_vien[0];
   void _gd;
-  const thuong = { ...goc, doi_buoi: null, ghi_chu: null };
+  void _cc;
+  const chuaDiemDanh = { ma: 'chua_diem_danh' as const, nhan: 'Chưa điểm danh', tu_diem_danh_luc: null };
+  const thuong = {
+    ...goc,
+    doi_buoi: null,
+    ghi_chu: null,
+    diem_danh: {
+      ma: 'co_mat' as const,
+      nhan: 'Có mặt – tự điểm danh 19:05',
+      tu_diem_danh_luc: '2026-10-20T12:05:00.000Z',
+    },
+  };
+  const tong = { co_mat: 0, vang: 0, vang_co_phep: 0, da_bao_vang: 0, chua_diem_danh: 0, chua_den_gio: 0 };
   const khac = {
+    ma_dinh_danh_moet: '0790000456',
     ngay_sinh: '05/06/1990',
     don_vi_cong_tac_ten: 'Trường TH Bình Đức',
     doi_tuong: 'giao_vien',
@@ -923,17 +938,27 @@ export function taoHoTroDanhSachBuoiMau(): Record<string, DanhSachBuoiHoTro> {
   return {
     [b1.lich_id]: {
       lop,
-      buoi: b1,
+      buoi: { ...b1, tong_diem_danh: { ...tong, co_mat: 1, da_bao_vang: 1 } },
       hoc_vien: [
-        { ...khac, hoc_vien_id: 'hv-doi-vao', ho_ten: 'Đặng Văn Vào', doi_buoi: 'vao', ghi_chu: 'Đổi buổi – từ lớp Zoom 02' },
+        {
+          ...khac,
+          hoc_vien_id: 'hv-doi-vao',
+          ho_ten: 'Đặng Văn Vào',
+          doi_buoi: 'vao',
+          ghi_chu: 'Đổi buổi – từ lớp Zoom 02',
+          diem_danh: { ma: 'da_bao_vang', nhan: 'Đã báo vắng: Đi công tác', tu_diem_danh_luc: null },
+        },
         thuong,
       ],
-      doi_ra: [{ ...ra, doi_buoi: 'ra', ghi_chu: 'Đã chuyển sang lớp Zoom 03 – không học buổi này' }],
+      doi_ra: [{ ...ra, doi_buoi: 'ra', ghi_chu: 'Đã chuyển sang lớp Zoom 03 – không học buổi này', diem_danh: null }],
     },
     [b2.lich_id]: {
       lop,
-      buoi: b2,
-      hoc_vien: [thuong, { ...ra, doi_buoi: null, ghi_chu: null }],
+      buoi: { ...b2, tong_diem_danh: { ...tong, vang: 1, chua_diem_danh: 1 } },
+      hoc_vien: [
+        { ...thuong, diem_danh: { ma: 'vang', nhan: 'Vắng', tu_diem_danh_luc: null } },
+        { ...ra, doi_buoi: null, ghi_chu: null, diem_danh: chuaDiemDanh },
+      ],
       doi_ra: [],
     },
   };
