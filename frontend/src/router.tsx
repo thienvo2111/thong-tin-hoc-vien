@@ -129,6 +129,11 @@ export const router = createBrowserRouter([
                     path: '/ho-tro-gv/lich-day',
                     lazy: () => import('@/pages/HoTroGv/HoTroGvLichDay').then((m) => ({ Component: m.default })),
                   },
+                  {
+                    // ADR 0009: gửi email lịch giảng dạy theo giai đoạn – khóa.
+                    path: '/ho-tro-gv/gui-lich-day',
+                    lazy: () => import('@/pages/HoTroGv/HoTroGvGuiLichDay').then((m) => ({ Component: m.default })),
+                  },
                 ],
               },
             ],

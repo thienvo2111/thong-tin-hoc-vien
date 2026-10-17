@@ -23,6 +23,8 @@ import { trang_thai_de_nghi } from '@prisma/client';
 import { DeNghiDoiLopService } from './de-nghi-doi-lop.service';
 import { NhacLichService } from '../nhac-lich/nhac-lich.service';
 import { GhiNhacGiangVienDto } from '../nhac-lich/nhac-lich.dto';
+import { EmailLichDayService } from '../nhac-lich/email-lich-day.service';
+import { GuiEmailLichDayDto } from '../nhac-lich/email-lich-day.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
@@ -124,7 +126,68 @@ export class HoTroGiangVienController {
     private readonly deNghi: DeNghiDoiLopService,
     private readonly taiKhoanGv: TaiKhoanGiangVienService,
     private readonly nhacLich: NhacLichService,
+    private readonly emailLichDay: EmailLichDayService,
   ) {}
+
+  // ---------------- ADR 0009: email lịch giảng dạy ----------------
+  /** Khóa trong nhóm + giai đoạn — cho ô chọn ở trang Gửi lịch dạy. */
+  @Get('khoa')
+  async khoaCuaToi(@CurrentUser() user: AuthenticatedUser) {
+    return this.prisma.khoa_boi_duong.findMany({
+      where: { id: { in: await this.scope.khoaIdsCuaToi(user.id) } },
+      select: {
+        id: true,
+        ma_khoa: true,
+        ten_khoa: true,
+        giai_doan: {
+          where: { trang_thai: 'active' },
+          select: {
+            id: true,
+            thu_tu: true,
+            ten_giai_doan: true,
+            hinh_thuc: true,
+            thoi_gian_bat_dau: true,
+            thoi_gian_ket_thuc: true,
+          },
+          orderBy: { thu_tu: 'asc' },
+        },
+      },
+      orderBy: { thoi_gian_bat_dau: 'desc' },
+    });
+  }
+
+  @Get('khoa/:khoaId/giai-doan/:gdId/email-lich-day')
+  async dsEmailLichDay(
+    @Param('khoaId', ParseUUIDPipe) khoaId: string,
+    @Param('gdId', ParseUUIDPipe) gdId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.scope.damBaoKhoaTrongPhamVi(user.id, khoaId);
+    return this.emailLichDay.danhSach(khoaId, gdId);
+  }
+
+  @Get('khoa/:khoaId/giai-doan/:gdId/email-lich-day/:gvId/xem-truoc')
+  async xemTruocEmailLichDay(
+    @Param('khoaId', ParseUUIDPipe) khoaId: string,
+    @Param('gdId', ParseUUIDPipe) gdId: string,
+    @Param('gvId', ParseUUIDPipe) gvId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.scope.damBaoKhoaTrongPhamVi(user.id, khoaId);
+    return this.emailLichDay.xemTruoc(khoaId, gdId, gvId);
+  }
+
+  @Post('khoa/:khoaId/giai-doan/:gdId/email-lich-day/gui')
+  @HttpCode(HttpStatus.OK)
+  async guiEmailLichDay(
+    @Param('khoaId', ParseUUIDPipe) khoaId: string,
+    @Param('gdId', ParseUUIDPipe) gdId: string,
+    @Body() dto: GuiEmailLichDayDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.scope.damBaoKhoaTrongPhamVi(user.id, khoaId);
+    return this.emailLichDay.gui(user, khoaId, gdId, dto.giang_vien_ids);
+  }
 
   // ---------------- L8 (issue #21): tin nhắn nhắc giảng viên ----------------
   @Get('lop/:lopId/giai-doan/:gdId/tin-nhan-nhac/:giangVienId')

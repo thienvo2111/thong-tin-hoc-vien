@@ -2,6 +2,7 @@ import {
   apDungDoiBuoi,
   DotLop,
   HocVienDot,
+  layDotLop,
   locTheoVaiTro,
   VaiTroXemLop,
 } from './trang-lop.service';
@@ -314,5 +315,35 @@ describe('apDungDoiBuoi', () => {
     expect(kq.hoc_vien[0]).not.toHaveProperty('doi_buoi');
     expect(kq.hoc_vien_doi_vao).toEqual([]);
     expect(kq.buoi[0].si_so).toBeNull();
+  });
+});
+
+// ADR 0009 (review #1): email nhắc gửi lỗi hẳn không được tính là "đã nhắc"
+// (cờ nhắc ở trang lớp, Việc cần làm và bảng kiểm da_nhac_giang_vien).
+describe('layDotLop — nhật ký nhắc giảng viên', () => {
+  it('bỏ dòng nhắc qua email có hàng đợi that_bai', async () => {
+    const findManyNhac = jest.fn().mockResolvedValue([]);
+    const rong = { findMany: jest.fn().mockResolvedValue([]) };
+    const prisma = new Proxy(
+      {
+        lop_hoc: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue({ id: 'l1', khoa: { id: 'k1' } }),
+        },
+        giai_doan_khoa: {
+          findUnique: jest.fn().mockResolvedValue({ id: 'gd', khoa_id: 'k1' }),
+        },
+        nhat_ky_nhac_lich: { findMany: findManyNhac },
+      } as Record<string, unknown>,
+      { get: (t, k: string) => t[k] ?? rong },
+    );
+    await layDotLop(prisma as never, 'l1', 'gd');
+    expect(findManyNhac.mock.calls[0][0].where).toMatchObject({
+      OR: [
+        { hang_doi_email_id: null },
+        { hang_doi_email: { trang_thai: { not: 'that_bai' } } },
+      ],
+    });
   });
 });

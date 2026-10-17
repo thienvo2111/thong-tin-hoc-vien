@@ -1103,3 +1103,10 @@ CREATE TABLE nhat_ky_nhac_lich (
         OR (doi_tuong = 'cum' AND cum_id IS NOT NULL AND giang_vien_id IS NULL))
 );
 CREATE INDEX idx_nhac_lich_buoi ON nhat_ky_nhac_lich USING GIN (lich_hoc_ids);
+
+-- ADR 0009 (2026-10-17): email lịch giảng dạy theo giai đoạn. 2 migration riêng, chỉ thêm.
+ALTER TYPE loai_su_kien_thong_bao ADD VALUE 'nhac_lich_giang_vien';
+-- NULL = tin nhắn Zalo/SMS (G10); có giá trị = lần gửi qua email (dòng hàng đợi).
+ALTER TABLE nhat_ky_nhac_lich ADD COLUMN hang_doi_email_id uuid
+    REFERENCES hang_doi_email(id) ON DELETE SET NULL;
+CREATE INDEX idx_nhac_lich_hang_doi ON nhat_ky_nhac_lich(hang_doi_email_id);

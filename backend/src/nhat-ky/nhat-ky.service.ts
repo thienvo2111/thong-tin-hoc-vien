@@ -18,6 +18,7 @@ export type HanhDongNhatKy =
   | 'doi_cum'
   | 'ho_tro_xuat_danh_sach'
   | 'ho_tro_xuat_danh_sach_lop'
+  | 'ho_tro_gv_gui_email_lich_day'
   | 'ho_tro_xuat_danh_sach_buoi'
   | 'sua_tra_loi_ho_tro'
   | 'sua_lich_hoc'
@@ -47,6 +48,7 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   doi_cum: 'Đổi cụm hỗ trợ',
   ho_tro_xuat_danh_sach: 'Người hỗ trợ xuất danh sách cụm',
   ho_tro_xuat_danh_sach_lop: 'Người hỗ trợ xuất danh sách lớp (có ngày sinh)',
+  ho_tro_gv_gui_email_lich_day: 'Người hỗ trợ GV gửi email lịch giảng dạy',
   ho_tro_xuat_danh_sach_buoi:
     'Người hỗ trợ xuất danh sách theo buổi (có ngày sinh)',
   sua_tra_loi_ho_tro: 'Quản trị sửa câu trả lời yêu cầu hỗ trợ',
@@ -79,6 +81,7 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   ho_tro_xuat_danh_sach: 'tai_khoan',
   ho_tro_xuat_danh_sach_lop: 'tai_khoan',
   ho_tro_xuat_danh_sach_buoi: 'tai_khoan',
+  ho_tro_gv_gui_email_lich_day: 'thong_bao',
   sua_tra_loi_ho_tro: 'ho_tro',
   sua_lich_hoc: 'hoc_tap',
   bao_vang: 'hoc_tap',

@@ -1,10 +1,12 @@
-// Render 3 mẫu email với dữ liệu MINH HỌA ra design/mau-email/*.html để xem.
+// Render các mẫu email với dữ liệu MINH HỌA ra design/mau-email/*.html để xem.
 // Chạy: cd backend && npx ts-node -O "{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}" --transpile-only ../design/mau-email/render-preview.ts
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import {
   mauDatLaiMatKhau,
   mauKetQuaHocTap,
+  mauLichGiangDay,
+  MauLichGiangDayInput,
   mauLichHoc,
   mauXacNhanHoSo,
 } from '../../backend/src/thong-bao/mau-email/mau-email';
@@ -141,4 +143,88 @@ out(
     },
     linkHoSo: `${web}/toi/ho-so`,
   }).html,
+);
+
+// ADR 0009: lịch giảng dạy — 5a (lần đầu) và 5b (cập nhật sau khi đổi lịch).
+const lichDay = (capNhat: boolean): MauLichGiangDayInput => ({
+  hoTen: 'Nguyễn Văn An',
+  tenKhoa: 'Bồi dưỡng Năng lực số cho giáo viên tỉnh An Giang',
+  maKhoa: 'AG-2026-01',
+  giaiDoan: {
+    ten: 'Giai đoạn 2 – Học trực tiếp',
+    hinhThuc: 'truc_tiep',
+    tuNgay: t('2026-10-24T00:00:00Z'),
+    denNgay: t('2026-10-30T00:00:00Z'),
+  },
+  lop: [
+    {
+      tenLop: 'Lớp TT-03',
+      loaiLop: 'truc_tiep',
+      vaiTro: 'giang_vien',
+      buoi: [
+        ['2026-10-24T00:30:00Z', '2026-10-24T04:30:00Z', 1, false],
+        ['2026-10-24T06:30:00Z', '2026-10-24T09:30:00Z', 2, capNhat],
+        ['2026-10-25T00:30:00Z', '2026-10-25T04:30:00Z', 3, false],
+      ].map(([bd, kt, so, doi]) => ({
+        buoiSo: so as number,
+        batDau: t(bd as string),
+        ketThuc: t(kt as string),
+        diemHoc: {
+          ten: 'Trường THPT Long Xuyên',
+          diaChi: '12 Trần Hưng Đạo, P. Mỹ Bình, TP. Long Xuyên',
+        },
+        phong: 'A2.05',
+        diaDiemHoacLink: null,
+        coThayDoi: doi as boolean,
+      })),
+      hauCan: {
+        noiOTen: 'Khách sạn Đông Xuyên',
+        noiODiaChi: '9A Lương Văn Cù, TP. Long Xuyên',
+        nhanPhong: t('2026-10-23T00:00:00Z'),
+        traPhong: t('2026-10-25T00:00:00Z'),
+        phuongTien: 'Xe 7 chỗ HCMUE',
+        donLuc: t('2026-10-22T22:00:00Z'),
+        diemDon: 'cổng 280 An Dương Vương',
+        lienHeDon: 'tài xế Hùng 0909 123 456',
+      },
+      thucDia: [{ hoTen: 'Trần Thị B', soDienThoai: '0912 345 678' }],
+    },
+    {
+      tenLop: 'Lớp Zoom-07',
+      loaiLop: 'zoom',
+      vaiTro: 'giang_vien',
+      buoi: [
+        ['2026-10-28T12:00:00Z', 1],
+        ['2026-10-30T12:00:00Z', 2],
+      ].map(([bd, so]) => ({
+        buoiSo: so as number,
+        batDau: t(bd as string),
+        ketThuc: new Date(t(bd as string).getTime() + 2 * 3600 * 1000),
+        diemHoc: null,
+        phong: null,
+        diaDiemHoacLink: 'https://zoom.us/j/1234567890',
+        coThayDoi: false,
+      })),
+      hauCan: null,
+      thucDia: [],
+    },
+  ],
+  nhomHoTro: [
+    { hoTen: 'Lê Văn C', email: 'levanc@hcmue.edu.vn' },
+    { hoTen: 'Phạm Thị D', email: 'phamthid@hcmue.edu.vn' },
+  ],
+  linkCongGiangVien: `${web}/giang-day`,
+  capNhat: capNhat
+    ? {
+        guiLucTruoc: t('2026-10-17T02:15:00Z'),
+        buoiGo: [
+          { tenLop: 'Lớp TT-09', buoiSo: 1, batDau: t('2026-10-26T00:30:00Z') },
+        ],
+      }
+    : null,
+});
+out('5a-lich-day-giang-vien.html', mauLichGiangDay(lichDay(false)).html);
+out(
+  '5b-lich-day-giang-vien-cap-nhat.html',
+  mauLichGiangDay(lichDay(true)).html,
 );
