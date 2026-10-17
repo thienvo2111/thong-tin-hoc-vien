@@ -25,8 +25,17 @@ import {
   buildDanhSachLopWorkbook,
   dinhDangNgaySinh,
 } from './xuat-danh-sach-lop.util';
+import { buildDanhSachBuoiWorkbook } from './xuat-danh-sach-buoi.util';
+import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 
 const SO_NGAY_LICH_MAC_DINH = 14;
+
+const theoHoTen = (
+  a: { ho_ten: string; hoc_vien_id: string },
+  b: { ho_ten: string; hoc_vien_id: string },
+) =>
+  a.ho_ten.localeCompare(b.ho_ten, 'vi') ||
+  a.hoc_vien_id.localeCompare(b.hoc_vien_id);
 
 // whereDangKy: đăng ký học dùng để lấy cụm/lớp của dòng (theo cụm của tôi,
 // hoặc theo lớp được gắn — ADR 0008).
@@ -44,6 +53,7 @@ const includeDong = (whereDangKy: Prisma.dang_ky_hocWhereInput) =>
     dang_ky_hoc: {
       where: whereDangKy,
       select: {
+        id: true,
         khoa_id: true,
         cum: { select: { id: true, ten_cum: true } },
         phan_lop_giai_doan: {
@@ -62,6 +72,9 @@ type HocVienDong = Prisma.hoc_vienGetPayload<{
   include: ReturnType<typeof includeDong>;
 }>;
 
+// Một buổi của lớp kèm điều chỉnh đổi buổi (ADR 0008 L7).
+type BuoiCuaLop = Awaited<ReturnType<HoTroHocVienService['dsBuoi']>>[number];
+
 // ADR 0003 Lát 2 — tra cứu của người hỗ trợ học viên. Mọi hàm nhận caller.id
 // và lọc qua HoTroHocVienScopeService (chỉ đọc ở lát này).
 @Injectable()
@@ -74,6 +87,7 @@ export class HoTroHocVienService {
     private readonly nhatKy: NhatKyService,
     private readonly authService: AuthService,
     private readonly nhacLich: NhacLichService,
+    private readonly doiBuoiQuery: DoiBuoiHocQueryService,
   ) {}
 
   async cumCuaToi(nguoiDungId: string) {
@@ -455,39 +469,213 @@ export class HoTroHocVienService {
 
   /** Học viên có phân lớp gốc vào lớp (mọi giai đoạn), xếp theo họ tên. */
   private async layDongLop(lopId: string) {
-    const coLop = { phan_lop_giai_doan: { some: { lop_id: lopId } } };
-    const rows = await this.prisma.hoc_vien.findMany({
-      where: { dang_ky_hoc: { some: coLop } },
-      include: includeDong(coLop),
+    const ds = await this.layDongTheoDangKy({
+      phan_lop_giai_doan: { some: { lop_id: lopId } },
     });
-    const dong = await Promise.all(
+    return ds
+      .map(({ r, dong }) => ({
+        ...dong,
+        giai_doan: r.dang_ky_hoc
+          .flatMap((dk) => dk.phan_lop_giai_doan)
+          .filter((p) => p.lop_id === lopId)
+          .sort((a, b) => a.giai_doan.thu_tu - b.giai_doan.thu_tu)
+          .map((p) => p.giai_doan.ten_giai_doan),
+      }))
+      .sort(theoHoTen);
+  }
+
+  /**
+   * Dòng học viên (cột của danh sách lớp) cho các đăng ký khớp whereDangKy —
+   * dùng chung cho danh sách lớp và danh sách theo buổi. Kèm bản ghi gốc để
+   * nơi gọi lấy thêm giai đoạn / id đăng ký.
+   */
+  private async layDongTheoDangKy(whereDangKy: Prisma.dang_ky_hocWhereInput) {
+    const rows = await this.prisma.hoc_vien.findMany({
+      where: { dang_ky_hoc: { some: whereDangKy } },
+      include: includeDong(whereDangKy),
+    });
+    return Promise.all(
       rows.map(async (r) => {
         const d = await this.toDong(r);
         return {
-          hoc_vien_id: r.id,
-          ho_ten: r.ho_ten,
-          ngay_sinh: dinhDangNgaySinh(r.ngay_sinh, r.thang_sinh, r.nam_sinh),
-          don_vi_cong_tac_ten: d.don_vi_cong_tac_ten,
-          doi_tuong: d.doi_tuong,
-          so_dien_thoai_lien_he: d.so_dien_thoai_lien_he,
-          email_lien_he: d.email_lien_he,
-          cum: d.cum[0]?.ten_cum ?? null,
-          giai_doan: r.dang_ky_hoc
-            .flatMap((dk) => dk.phan_lop_giai_doan)
-            .filter((p) => p.lop_id === lopId)
-            .sort((a, b) => a.giai_doan.thu_tu - b.giai_doan.thu_tu)
-            .map((p) => p.giai_doan.ten_giai_doan),
-          day_du: d.day_du,
-          dang_nhap_lan_cuoi: d.dang_nhap_lan_cuoi,
-          khao_sat: d.khao_sat,
+          r,
+          dong: {
+            hoc_vien_id: r.id,
+            ho_ten: r.ho_ten,
+            ngay_sinh: dinhDangNgaySinh(r.ngay_sinh, r.thang_sinh, r.nam_sinh),
+            don_vi_cong_tac_ten: d.don_vi_cong_tac_ten,
+            doi_tuong: d.doi_tuong,
+            so_dien_thoai_lien_he: d.so_dien_thoai_lien_he,
+            email_lien_he: d.email_lien_he,
+            cum: d.cum[0]?.ten_cum ?? null,
+            day_du: d.day_du,
+            dang_nhap_lan_cuoi: d.dang_nhap_lan_cuoi,
+            khao_sat: d.khao_sat,
+          },
         };
       }),
     );
-    return dong.sort(
-      (a, b) =>
-        a.ho_ten.localeCompare(b.ho_ten, 'vi') ||
-        a.hoc_vien_id.localeCompare(b.hoc_vien_id),
+  }
+
+  // ---------------------------------------------------------------------
+  // ADR 0008 L7 — danh sách THEO BUỔI của lớp được gắn. Đọc theo buổi đi qua
+  // DoiBuoiHocQueryService (CONTEXT.md "Đổi buổi"): phân lớp − đổi ra + đổi
+  // vào. Người đổi vào vẫn NGOÀI phạm vi sửa (L2); người đổi ra liệt kê riêng.
+  // ---------------------------------------------------------------------
+
+  async buoiCuaLop(nguoiDungId: string, lopId: string) {
+    await this.scope.damBaoLopCuaToi(nguoiDungId, lopId);
+    return (await this.dsBuoi(lopId)).map((b) => b.item);
+  }
+
+  async hocVienCuaBuoi(nguoiDungId: string, lopId: string, lichId: string) {
+    await this.scope.damBaoLopCuaToi(nguoiDungId, lopId);
+    const [[lop], [buoi]] = await Promise.all([
+      this.dauLop([lopId]),
+      this.dsBuoi(lopId, lichId),
+    ]);
+    return { lop, buoi: buoi.item, ...(await this.layDongBuoi(lopId, buoi)) };
+  }
+
+  async xuatDanhSachBuoi(
+    nguoiDungId: string,
+    vaiTro: 'ho_tro_hoc_vien',
+    lopId: string,
+    lichId?: string,
+  ): Promise<Buffer> {
+    await this.scope.damBaoLopCuaToi(nguoiDungId, lopId);
+    const [[lop], dsBuoi] = await Promise.all([
+      this.dauLop([lopId]),
+      this.dsBuoi(lopId, lichId),
+    ]);
+    const sheets = [];
+    let soDong = 0;
+    for (const b of dsBuoi) {
+      const ds = await this.layDongBuoi(lopId, b);
+      soDong += ds.hoc_vien.length + ds.doi_ra.length;
+      sheets.push({ lop, buoi: b.item, ...ds });
+    }
+    const buffer = await buildDanhSachBuoiWorkbook(sheets);
+    await this.nhatKy.ghi({
+      hanh_dong: 'ho_tro_xuat_danh_sach_buoi',
+      nguoi_dung: { id: nguoiDungId, vai_tro: vaiTro },
+      chi_tiet: {
+        lop_id: lopId,
+        lich_ids: dsBuoi.map((b) => b.item.lich_id),
+        so_dong: soDong,
+      },
+    });
+    return buffer;
+  }
+
+  /**
+   * Buổi của lớp (chỉ 1 buổi khi có lichId — không thuộc lớp → 404), kèm sĩ
+   * số buổi = phân lớp (lớp, giai đoạn) − đổi ra + đổi vào.
+   */
+  private async dsBuoi(lopId: string, lichId?: string) {
+    const lich = await this.prisma.lich_hoc_lop.findMany({
+      where: { lop_id: lopId, ...(lichId ? { id: lichId } : {}) },
+      select: {
+        id: true,
+        giai_doan_id: true,
+        buoi_so: true,
+        thoi_gian_bat_dau: true,
+        thoi_gian_ket_thuc: true,
+        giai_doan: { select: { id: true, thu_tu: true, ten_giai_doan: true } },
+      },
+      orderBy: [
+        { giai_doan: { thu_tu: 'asc' } },
+        { buoi_so: 'asc' },
+        { thoi_gian_bat_dau: 'asc' },
+      ],
+    });
+    if (lichId && lich.length === 0) {
+      throw new NotFoundAppException('Không tìm thấy buổi học');
+    }
+    if (lich.length === 0) return [];
+    const [phanLop, dieuChinh] = await Promise.all([
+      this.prisma.phan_lop_giai_doan.groupBy({
+        by: ['giai_doan_id'],
+        where: { lop_id: lopId },
+        _count: { _all: true },
+      }),
+      this.doiBuoiQuery.dieuChinhTheoBuoi(lich.map((l) => l.id)),
+    ]);
+    const demPhanLop = new Map(
+      phanLop.map((p) => [p.giai_doan_id, p._count._all]),
     );
+    return lich.map((l) => {
+      const dc = dieuChinh.get(l.id) ?? { ra: [], vao: [] };
+      return {
+        giai_doan_id: l.giai_doan_id,
+        dieu_chinh: dc,
+        item: {
+          lich_id: l.id,
+          giai_doan: l.giai_doan,
+          buoi_so: l.buoi_so,
+          thoi_gian_bat_dau: l.thoi_gian_bat_dau,
+          thoi_gian_ket_thuc: l.thoi_gian_ket_thuc,
+          si_so:
+            (demPhanLop.get(l.giai_doan_id) ?? 0) -
+            dc.ra.length +
+            dc.vao.length,
+          so_doi_vao: dc.vao.length,
+          so_doi_ra: dc.ra.length,
+        },
+      };
+    });
+  }
+
+  /**
+   * Danh sách 1 buổi: phân lớp (lớp, giai đoạn) − đổi ra + đổi vào (ghi chú
+   * lớp nguồn); người đổi ra trả riêng ở doi_ra (ghi chú lớp chốt).
+   */
+  private async layDongBuoi(lopId: string, b: BuoiCuaLop) {
+    const ra = new Map(
+      b.dieu_chinh.ra.map((x) => [x.dang_ky_hoc_id, x.lop_chot.ten_lop]),
+    );
+    const vao = new Map(
+      b.dieu_chinh.vao.map((x) => [x.dang_ky_hoc_id, x.lop_nguon.ten_lop]),
+    );
+    const boQua = [...ra.keys(), ...vao.keys()];
+    const theoIds = (ids: string[]) =>
+      ids.length
+        ? this.layDongTheoDangKy({ id: { in: ids } })
+        : Promise.resolve([]);
+    const [thuong, dsVao, dsRa] = await Promise.all([
+      this.layDongTheoDangKy({
+        phan_lop_giai_doan: {
+          some: { lop_id: lopId, giai_doan_id: b.giai_doan_id },
+        },
+        ...(boQua.length ? { id: { notIn: boQua } } : {}),
+      }),
+      theoIds([...vao.keys()]),
+      theoIds([...ra.keys()]),
+    ]);
+    // Tên lớp nguồn/chốt theo đăng ký của dòng (1 học viên có thể nhiều khóa).
+    const tenLop = (m: Map<string, string>, r: HocVienDong) =>
+      m.get(r.dang_ky_hoc.find((dk) => m.has(dk.id))?.id ?? '') ?? '';
+    return {
+      hoc_vien: [
+        ...thuong.map(({ dong }) => ({
+          ...dong,
+          doi_buoi: null as 'vao' | 'ra' | null,
+          ghi_chu: null as string | null,
+        })),
+        ...dsVao.map(({ r, dong }) => ({
+          ...dong,
+          doi_buoi: 'vao' as const,
+          ghi_chu: `Đổi buổi – từ lớp ${tenLop(vao, r)}`,
+        })),
+      ].sort(theoHoTen),
+      doi_ra: dsRa
+        .map(({ r, dong }) => ({
+          ...dong,
+          doi_buoi: 'ra' as const,
+          ghi_chu: `Đã chuyển sang lớp ${tenLop(ra, r)} – không học buổi này`,
+        }))
+        .sort(theoHoTen),
+    };
   }
 
   // ---------------------------------------------------------------------

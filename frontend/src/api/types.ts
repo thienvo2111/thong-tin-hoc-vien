@@ -975,6 +975,34 @@ export interface DanhSachLopHoTro {
   hoc_vien: HocVienCuaLop[];
 }
 
+// GET /ho-tro-hoc-vien/lop/:lopId/buoi — buổi của lớp được gắn (ADR 0008 L7).
+// si_so = phân lớp − đổi ra + đổi vào (đổi buổi đã duyệt còn hiệu lực).
+export interface BuoiCuaLopHoTro {
+  lich_id: string;
+  giai_doan: { id: string; thu_tu: number; ten_giai_doan: string };
+  buoi_so: number;
+  thoi_gian_bat_dau: string;
+  thoi_gian_ket_thuc: string;
+  si_so: number;
+  so_doi_vao: number;
+  so_doi_ra: number;
+}
+
+export interface HocVienCuaBuoi extends Omit<HocVienCuaLop, 'giai_doan'> {
+  /** 'vao' = đổi buổi vào (ngoài phạm vi sửa — không có link chi tiết); 'ra' = đã chuyển sang lớp khác. */
+  doi_buoi: 'vao' | 'ra' | null;
+  ghi_chu: string | null;
+}
+
+// GET /ho-tro-hoc-vien/lop/:lopId/buoi/:lichId/hoc-vien
+export interface DanhSachBuoiHoTro {
+  lop: LopCuaToi;
+  buoi: BuoiCuaLopHoTro;
+  hoc_vien: HocVienCuaBuoi[];
+  /** Người đổi ra — không học buổi này, liệt kê riêng để không điểm vắng nhầm. */
+  doi_ra: HocVienCuaBuoi[];
+}
+
 export interface KhaoSatTomTat {
   loai: string;
   trang_thai: 'da_mo' | 'dang_lam' | 'hoan_thanh';

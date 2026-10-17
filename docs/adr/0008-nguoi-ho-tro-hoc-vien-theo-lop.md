@@ -19,6 +19,7 @@ Lớp Zoom có nhân sự hỗ trợ riêng theo lớp (mở phòng, điểm dan
 | L4 | **Vẫn chỉ theo cụm**: định tuyến yêu cầu hỗ trợ, nhắc lịch cụm, thống kê, duyệt đổi buổi, danh sách học viên hiện có (`GET /ho-tro-hoc-vien/hoc-vien` + `/xuat`), lịch học. Người hỗ trợ lớp xem học viên lớp qua trang riêng `/ho-tro/lop`. |
 | L5 | **Excel lớp có NGÀY SINH** theo yêu cầu người dùng (đối chiếu khi hỗ trợ Zoom). Rủi ro: ngày sinh là mật khẩu mặc định, file có thể bị chuyển qua Zalo — người dùng **chấp nhận**. Vẫn **không** có CCCD/số định danh, mã MOET, nơi sinh. ADR 0003 H6 (không ngày sinh) chỉ áp cho file **cụm**. Mỗi lần xuất ghi nhật ký `ho_tro_xuat_danh_sach_lop`. |
 | L6 | **Gán theo lớp, không theo buổi.** Một lớp có thể nhiều người hỗ trợ; một người nhiều lớp. |
+| L7 | **Danh sách theo BUỔI (bổ sung 2026-10-17).** Trang lớp có thêm tab "Theo buổi": danh sách 1 buổi = phân lớp (lớp, giai đoạn) − người đổi ra + người đổi vào, đọc qua `DoiBuoiHocQueryService.dieuChinhTheoBuoi` (chỉ đổi buổi `da_duyet` còn hiệu lực; chờ duyệt/từ chối không làm đổi danh sách). Người **đổi vào** xuất hiện trong danh sách và file buổi, **kể cả ngày sinh**, ghi chú "Đổi buổi – từ lớp <lớp nguồn>" — nhưng vẫn **ngoài phạm vi sửa** (L2 không đổi: không có link chi tiết, mở chi tiết → `404`). Người **đổi ra** không tính vào danh sách buổi, liệt kê riêng ("Đã chuyển sang lớp <lớp chốt> – không học buổi này") để người hỗ trợ không điểm vắng nhầm. Xuất Excel theo buổi (1 sheet/buổi, cột Ghi chú) ghi nhật ký `ho_tro_xuat_danh_sach_buoi`. Tab "Cả lớp" và file lớp giữ lớp gốc như L5. |
 
 ## Phương án đã loại
 
@@ -32,4 +33,5 @@ Lớp Zoom có nhân sự hỗ trợ riêng theo lớp (mở phòng, điểm dan
 - `GET /khoa-boi-duong/{id}` trả thêm `lop_hoc[].nguoi_ho_tro` (chỉ Quản trị); `GET /nguoi-dung/ho-tro` thêm `lop_phu_trach`.
 - API mới cho người hỗ trợ: `GET /ho-tro-hoc-vien/lop-cua-toi`, `GET /ho-tro-hoc-vien/lop/{lopId}/hoc-vien`, `GET /ho-tro-hoc-vien/lop/xuat`.
 - Người hỗ trợ lớp thấy được hồ sơ học viên ở cụm khác — chấp nhận vì cùng là cán bộ HCMUE hỗ trợ học viên đó trong lớp.
-- Học viên đổi buổi **vào** lớp của tôi không nằm trong danh sách/phạm vi của tôi; người hỗ trợ cụm của học viên đó vẫn xử lý.
+- Học viên đổi buổi **vào** lớp của tôi không nằm trong **phạm vi** của tôi (không xem chi tiết/sửa); người hỗ trợ cụm của học viên đó vẫn xử lý. Từ L7 họ **có** trong danh sách theo buổi của buổi chốt (để điểm danh), không có trong tab "Cả lớp".
+- L7 (2026-10-17): API `GET /ho-tro-hoc-vien/lop/{lopId}/buoi`, `GET /ho-tro-hoc-vien/lop/{lopId}/buoi/{lichId}/hoc-vien`, `GET /ho-tro-hoc-vien/lop/{lopId}/buoi/xuat?lich_id=`; không migration.

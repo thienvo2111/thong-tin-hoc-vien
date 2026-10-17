@@ -123,3 +123,85 @@ describe('Người hỗ trợ — Danh sách học viên lớp', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 });
+
+// ADR 0008 L7: tab "Theo buổi" — danh sách từng buổi tính đổi buổi đã duyệt.
+describe('Người hỗ trợ — Danh sách lớp theo buổi', () => {
+  const BUOI_1 = 'GĐ1 – Buổi 1 · 20/10 19:00 · 2 HV';
+  const BUOI_2 = 'GĐ1 – Buổi 2 · 27/10 19:00 · 2 HV';
+
+  async function moBuoi(nhan: string) {
+    render(['/ho-tro/lop/lop-zoom-1']);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Theo buổi' }));
+    await user.click(await screen.findByRole('textbox', { name: 'Buổi học' }));
+    await user.click(await screen.findByRole('option', { name: nhan }));
+    return user;
+  }
+
+  it('liệt kê các buổi của lớp (giai đoạn, buổi, ngày giờ, sĩ số)', async () => {
+    render(['/ho-tro/lop/lop-zoom-1']);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Theo buổi' }));
+    await user.click(await screen.findByRole('textbox', { name: 'Buổi học' }));
+    expect(await screen.findByRole('option', { name: BUOI_1 })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: BUOI_2 })).toBeInTheDocument();
+  });
+
+  it('người đổi vào: badge "Đổi vào", ghi chú lớp nguồn, không có link chi tiết; người thường có link', async () => {
+    await moBuoi(BUOI_1);
+    expect(await screen.findByText('Đặng Văn Vào')).toBeInTheDocument();
+    expect(screen.getByText('1 đổi vào')).toBeInTheDocument();
+    expect(screen.getByText('1 đổi ra')).toBeInTheDocument();
+    const [bangChinh] = screen.getAllByRole('table');
+    const dongVao = dongChua(within(bangChinh).getByText('Đặng Văn Vào'));
+    expect(within(dongVao).getByText('Đổi vào')).toBeInTheDocument();
+    expect(within(dongVao).getByText('Đổi buổi – từ lớp Zoom 02')).toBeInTheDocument();
+    expect(within(dongVao).queryByRole('link')).not.toBeInTheDocument();
+    expect(within(bangChinh).getByRole('link', { name: 'Lê Thị Zoom' })).toHaveAttribute(
+      'href',
+      '/ho-tro/hoc-vien/hv-lop-1',
+    );
+    expect(within(bangChinh).getByRole('columnheader', { name: 'Ghi chú' })).toBeInTheDocument();
+    expect(within(bangChinh).queryByText('Phan Thị Ra')).not.toBeInTheDocument();
+  });
+
+  it('người đổi ra nằm ở mục "Đã chuyển sang lớp khác" kèm ghi chú', async () => {
+    await moBuoi(BUOI_1);
+    expect(
+      await screen.findByRole('heading', { name: 'Đã chuyển sang lớp khác (không học buổi này)' }),
+    ).toBeInTheDocument();
+    const bangRa = screen.getAllByRole('table')[1];
+    const dongRa = dongChua(within(bangRa).getByText('Phan Thị Ra'));
+    expect(within(dongRa).getByText('Đã chuyển sang lớp Zoom 03 – không học buổi này')).toBeInTheDocument();
+    expect(within(dongRa).queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('buổi không có đổi buổi -> không có mục người đổi ra', async () => {
+    await moBuoi(BUOI_2);
+    expect(await screen.findByRole('link', { name: 'Phan Thị Ra' })).toBeInTheDocument();
+    expect(screen.queryByText('Đã chuyển sang lớp khác (không học buổi này)')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('table')).toHaveLength(1);
+  });
+
+  it('Xuất buổi này -> gửi lich_id; Xuất tất cả buổi -> không lich_id', async () => {
+    const goi: string[] = [];
+    server.use(
+      http.get('/ho-tro-hoc-vien/lop/:lopId/buoi/xuat', ({ request }) => {
+        const url = new URL(request.url);
+        goi.push(url.pathname + url.search);
+        return new HttpResponse(new Blob(['xlsx']));
+      }),
+    );
+    const user = await moBuoi(BUOI_2);
+    await user.click(screen.getByRole('button', { name: 'Xuất buổi này' }));
+    await waitFor(() => expect(goi).toEqual(['/ho-tro-hoc-vien/lop/lop-zoom-1/buoi/xuat?lich_id=lich-zoom-2']));
+    await user.click(screen.getByRole('button', { name: 'Xuất tất cả buổi' }));
+    await waitFor(() =>
+      expect(goi).toEqual([
+        '/ho-tro-hoc-vien/lop/lop-zoom-1/buoi/xuat?lich_id=lich-zoom-2',
+        '/ho-tro-hoc-vien/lop/lop-zoom-1/buoi/xuat',
+      ]),
+    );
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
+  });
+});

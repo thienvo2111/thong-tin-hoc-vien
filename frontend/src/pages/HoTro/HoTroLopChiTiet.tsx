@@ -1,11 +1,31 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Alert, Anchor, Button, Container, Group, Paper, Skeleton, Stack, Table, Text, Title } from '@mantine/core';
-import { useHocVienCuaLop } from '@/api/hoTro';
+import {
+  Alert,
+  Anchor,
+  Badge,
+  Button,
+  Container,
+  Group,
+  Paper,
+  Select,
+  Skeleton,
+  Stack,
+  Table,
+  Tabs,
+  Text,
+  Title,
+} from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { useBuoiCuaLop, useHocVienCuaBuoi, useHocVienCuaLop, xuatDanhSachBuoiHoTro } from '@/api/hoTro';
+import type { BuoiCuaLopHoTro, HocVienCuaBuoi, HocVienCuaLop } from '@/api/types';
 import { ApiError } from '@/api/client';
 import { thongDiepLoiChung } from '@/lib/loiApi';
+import { dinhDangGio, dinhDangNgay } from '@/lib/ngay';
+import { taiFileTuBlob } from '@/lib/taiFile';
 import { NHAN_LOAI_LOP, useXuatDanhSachLop } from './HoTroLop';
 
-/** Danh sách học viên của 1 lớp được gắn (ADR 0008) — học viên theo lớp gốc, không tính đổi buổi. */
+/** Danh sách học viên của 1 lớp được gắn (ADR 0008) — tab "Cả lớp" theo lớp gốc; tab "Theo buổi" tính đổi buổi (L7). */
 export default function HoTroLopChiTiet() {
   const { lopId } = useParams<{ lopId: string }>();
   const { data, isLoading, isError, error } = useHocVienCuaLop(lopId);
@@ -43,52 +63,235 @@ export default function HoTroLopChiTiet() {
                 Xuất Excel lớp này
               </Button>
             </Group>
-            <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
-              <Table.ScrollContainer minWidth={900}>
-                <Table verticalSpacing="sm" horizontalSpacing="md">
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th>Họ tên</Table.Th>
-                      <Table.Th>Ngày sinh</Table.Th>
-                      <Table.Th>Đơn vị</Table.Th>
-                      <Table.Th>Số điện thoại</Table.Th>
-                      <Table.Th>Email</Table.Th>
-                      <Table.Th>Cụm</Table.Th>
-                      <Table.Th>Giai đoạn</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {data.hoc_vien.length === 0 && (
-                      <Table.Tr>
-                        <Table.Td colSpan={7}>
-                          <Text c="dimmed" ta="center" py="lg">
-                            Lớp chưa có học viên nào.
-                          </Text>
-                        </Table.Td>
-                      </Table.Tr>
-                    )}
-                    {data.hoc_vien.map((h) => (
-                      <Table.Tr key={h.hoc_vien_id}>
-                        <Table.Td>
-                          <Anchor component={Link} to={`/ho-tro/hoc-vien/${h.hoc_vien_id}`} fw={600} fz="sm">
-                            {h.ho_ten}
-                          </Anchor>
-                        </Table.Td>
-                        <Table.Td>{h.ngay_sinh}</Table.Td>
-                        <Table.Td>{h.don_vi_cong_tac_ten}</Table.Td>
-                        <Table.Td>{h.so_dien_thoai_lien_he ?? '—'}</Table.Td>
-                        <Table.Td>{h.email_lien_he ?? '—'}</Table.Td>
-                        <Table.Td>{h.cum ?? '—'}</Table.Td>
-                        <Table.Td>{h.giai_doan.join(', ') || '—'}</Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-              </Table.ScrollContainer>
-            </Paper>
+            <Tabs defaultValue="ca-lop" keepMounted={false}>
+              <Tabs.List>
+                <Tabs.Tab value="ca-lop">Cả lớp</Tabs.Tab>
+                <Tabs.Tab value="theo-buoi">Theo buổi</Tabs.Tab>
+              </Tabs.List>
+              <Tabs.Panel value="ca-lop" pt="md">
+                <BangCaLop hocVien={data.hoc_vien} />
+              </Tabs.Panel>
+              <Tabs.Panel value="theo-buoi" pt="md">
+                <TheoBuoi lopId={data.lop.lop_id} />
+              </Tabs.Panel>
+            </Tabs>
           </>
         )}
       </Stack>
     </Container>
+  );
+}
+
+function BangCaLop({ hocVien }: { hocVien: HocVienCuaLop[] }) {
+  return (
+    <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
+      <Table.ScrollContainer minWidth={900}>
+        <Table verticalSpacing="sm" horizontalSpacing="md">
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Họ tên</Table.Th>
+              <Table.Th>Ngày sinh</Table.Th>
+              <Table.Th>Đơn vị</Table.Th>
+              <Table.Th>Số điện thoại</Table.Th>
+              <Table.Th>Email</Table.Th>
+              <Table.Th>Cụm</Table.Th>
+              <Table.Th>Giai đoạn</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {hocVien.length === 0 && (
+              <Table.Tr>
+                <Table.Td colSpan={7}>
+                  <Text c="dimmed" ta="center" py="lg">
+                    Lớp chưa có học viên nào.
+                  </Text>
+                </Table.Td>
+              </Table.Tr>
+            )}
+            {hocVien.map((h) => (
+              <Table.Tr key={h.hoc_vien_id}>
+                <Table.Td>
+                  <Anchor component={Link} to={`/ho-tro/hoc-vien/${h.hoc_vien_id}`} fw={600} fz="sm">
+                    {h.ho_ten}
+                  </Anchor>
+                </Table.Td>
+                <Table.Td>{h.ngay_sinh}</Table.Td>
+                <Table.Td>{h.don_vi_cong_tac_ten}</Table.Td>
+                <Table.Td>{h.so_dien_thoai_lien_he ?? '—'}</Table.Td>
+                <Table.Td>{h.email_lien_he ?? '—'}</Table.Td>
+                <Table.Td>{h.cum ?? '—'}</Table.Td>
+                <Table.Td>{h.giai_doan.join(', ') || '—'}</Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </Table.ScrollContainer>
+    </Paper>
+  );
+}
+
+/** "GĐ1 – Buổi 2 · 20/10 19:00 · 30 HV" */
+function nhanBuoi(b: BuoiCuaLopHoTro): string {
+  const ngay = dinhDangNgay(b.thoi_gian_bat_dau).slice(0, 5);
+  return `GĐ${b.giai_doan.thu_tu} – Buổi ${b.buoi_so} · ${ngay} ${dinhDangGio(b.thoi_gian_bat_dau)} · ${b.si_so} HV`;
+}
+
+function useXuatDanhSachBuoi(lopId: string) {
+  const [dangXuat, setDangXuat] = useState<string | null>(null);
+  async function xuat(lichId?: string) {
+    setDangXuat(lichId ?? 'tat-ca');
+    try {
+      const blob = await xuatDanhSachBuoiHoTro(lopId, lichId);
+      const ngay = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      taiFileTuBlob(blob, `ds-buoi-${ngay}.xlsx`);
+    } catch (err) {
+      notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+    } finally {
+      setDangXuat(null);
+    }
+  }
+  return { dangXuat, xuat };
+}
+
+/** Buổi mặc định: buổi gần nhất chưa kết thúc, hết thì buổi cuối. */
+function buoiMacDinh(ds: BuoiCuaLopHoTro[]): string | null {
+  const now = Date.now();
+  return (ds.find((b) => new Date(b.thoi_gian_ket_thuc).getTime() >= now) ?? ds[ds.length - 1])?.lich_id ?? null;
+}
+
+function TheoBuoi({ lopId }: { lopId: string }) {
+  const dsBuoi = useBuoiCuaLop(lopId);
+  const [chon, setChon] = useState<string | null>(null);
+  const lichId = chon ?? (dsBuoi.data ? buoiMacDinh(dsBuoi.data) : null);
+  const ds = useHocVienCuaBuoi(lopId, lichId);
+  const { dangXuat, xuat } = useXuatDanhSachBuoi(lopId);
+  const buoi = dsBuoi.data?.find((b) => b.lich_id === lichId);
+
+  if (dsBuoi.isLoading) return <Skeleton height={120} />;
+  if (dsBuoi.isError) return <Alert color="red">{thongDiepLoiChung(dsBuoi.error)}</Alert>;
+  if (!dsBuoi.data || dsBuoi.data.length === 0) {
+    return (
+      <Alert color="yellow" variant="light">
+        Lớp chưa có lịch học.
+      </Alert>
+    );
+  }
+  return (
+    <Stack gap="md">
+      <Text fz="sm" c="dimmed">
+        Danh sách từng buổi đã tính đổi buổi được duyệt: có người đổi vào từ lớp khác, không có người đã chuyển sang lớp
+        khác.
+      </Text>
+      <Group justify="space-between" align="flex-end">
+        <Group align="flex-end" gap="sm">
+          <Select
+            label="Buổi học"
+            w={340}
+            data={dsBuoi.data.map((b) => ({ value: b.lich_id, label: nhanBuoi(b) }))}
+            value={lichId}
+            onChange={setChon}
+            allowDeselect={false}
+          />
+          {buoi && buoi.so_doi_vao > 0 && (
+            <Badge color="teal" variant="light" size="lg">
+              {buoi.so_doi_vao} đổi vào
+            </Badge>
+          )}
+          {buoi && buoi.so_doi_ra > 0 && (
+            <Badge color="orange" variant="light" size="lg">
+              {buoi.so_doi_ra} đổi ra
+            </Badge>
+          )}
+        </Group>
+        <Group gap="sm">
+          <Button
+            variant="default"
+            onClick={() => lichId && xuat(lichId)}
+            loading={!!lichId && dangXuat === lichId}
+            disabled={!lichId}
+          >
+            Xuất buổi này
+          </Button>
+          <Button variant="default" onClick={() => xuat()} loading={dangXuat === 'tat-ca'}>
+            Xuất tất cả buổi
+          </Button>
+        </Group>
+      </Group>
+      {ds.isLoading && <Skeleton height={120} />}
+      {ds.isError && <Alert color="red">{thongDiepLoiChung(ds.error)}</Alert>}
+      {ds.data && (
+        <>
+          <BangBuoi hocVien={ds.data.hoc_vien} trong="Buổi này chưa có học viên nào." />
+          {ds.data.doi_ra.length > 0 && (
+            <Stack gap="xs">
+              <Title order={5}>Đã chuyển sang lớp khác (không học buổi này)</Title>
+              <BangBuoi hocVien={ds.data.doi_ra} trong="" />
+            </Stack>
+          )}
+        </>
+      )}
+    </Stack>
+  );
+}
+
+function BangBuoi({ hocVien, trong }: { hocVien: HocVienCuaBuoi[]; trong: string }) {
+  return (
+    <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
+      <Table.ScrollContainer minWidth={900}>
+        <Table verticalSpacing="sm" horizontalSpacing="md">
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Họ tên</Table.Th>
+              <Table.Th>Ngày sinh</Table.Th>
+              <Table.Th>Đơn vị</Table.Th>
+              <Table.Th>Số điện thoại</Table.Th>
+              <Table.Th>Email</Table.Th>
+              <Table.Th>Cụm</Table.Th>
+              <Table.Th>Ghi chú</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {hocVien.length === 0 && (
+              <Table.Tr>
+                <Table.Td colSpan={7}>
+                  <Text c="dimmed" ta="center" py="lg">
+                    {trong}
+                  </Text>
+                </Table.Td>
+              </Table.Tr>
+            )}
+            {hocVien.map((h) => (
+              <Table.Tr key={h.hoc_vien_id} bg={h.doi_buoi === 'vao' ? 'var(--mantine-color-teal-light)' : undefined}>
+                <Table.Td>
+                  {/* Đổi vào / đổi ra: ngoài phạm vi sửa của lớp (ADR 0008 L2) → không dẫn tới chi tiết. */}
+                  {h.doi_buoi === null ? (
+                    <Anchor component={Link} to={`/ho-tro/hoc-vien/${h.hoc_vien_id}`} fw={600} fz="sm">
+                      {h.ho_ten}
+                    </Anchor>
+                  ) : (
+                    <Group gap={6} wrap="nowrap">
+                      <Text fw={600} fz="sm">
+                        {h.ho_ten}
+                      </Text>
+                      {h.doi_buoi === 'vao' && (
+                        <Badge color="teal" variant="light" size="sm">
+                          Đổi vào
+                        </Badge>
+                      )}
+                    </Group>
+                  )}
+                </Table.Td>
+                <Table.Td>{h.ngay_sinh}</Table.Td>
+                <Table.Td>{h.don_vi_cong_tac_ten}</Table.Td>
+                <Table.Td>{h.so_dien_thoai_lien_he ?? '—'}</Table.Td>
+                <Table.Td>{h.email_lien_he ?? '—'}</Table.Td>
+                <Table.Td>{h.cum ?? '—'}</Table.Td>
+                <Table.Td>{h.ghi_chu ?? ''}</Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </Table.ScrollContainer>
+    </Paper>
   );
 }

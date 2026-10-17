@@ -21,6 +21,7 @@ import {
   LocHocVienHoTroDto,
   LocLichHocHoTroDto,
   SuaHoSoHoTroDto,
+  XuatBuoiHoTroDto,
   XuatLopHoTroDto,
 } from './dto/ho-tro-hoc-vien.dto';
 import { VanHanhHocVienService } from './van-hanh-hoc-vien.service';
@@ -112,6 +113,48 @@ export class HoTroHocVienController {
         'Cache-Control': 'no-store',
       })
       .send(buffer);
+  }
+
+  // ADR 0008 L7: danh sách theo buổi (phân lớp − đổi ra + đổi vào).
+  @Get('lop/:lopId/buoi')
+  buoiCuaLop(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('lopId', ParseUUIDPipe) lopId: string,
+  ) {
+    return this.service.buoiCuaLop(user.id, lopId);
+  }
+
+  // Khai báo TRƯỚC lop/:lopId/buoi/:lichId/... để 'xuat' không bị route động chắn.
+  @Get('lop/:lopId/buoi/xuat')
+  async xuatBuoi(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('lopId', ParseUUIDPipe) lopId: string,
+    @Query() query: XuatBuoiHoTroDto,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.service.xuatDanhSachBuoi(
+      user.id,
+      'ho_tro_hoc_vien',
+      lopId,
+      query.lich_id,
+    );
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="ds-buoi-${ngayVn()}.xlsx"`,
+        'Cache-Control': 'no-store',
+      })
+      .send(buffer);
+  }
+
+  @Get('lop/:lopId/buoi/:lichId/hoc-vien')
+  hocVienCuaBuoi(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('lopId', ParseUUIDPipe) lopId: string,
+    @Param('lichId', ParseUUIDPipe) lichId: string,
+  ) {
+    return this.service.hocVienCuaBuoi(user.id, lopId, lichId);
   }
 
   @Get('lop/:lopId/hoc-vien')

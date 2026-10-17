@@ -1333,6 +1333,27 @@ export const handlers = [
       headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
     });
   }),
+  // ADR 0008 L7: theo buổi — buoi/xuat khai báo trước buoi/:lichId/hoc-vien.
+  http.get('/ho-tro-hoc-vien/lop/:lopId/buoi', ({ params }) => {
+    const ds = db.hoTroBuoiLop[params.lopId as string];
+    return ds ? HttpResponse.json(ds) : loi(404, 'NOT_FOUND', 'Không tìm thấy lớp');
+  }),
+  http.get('/ho-tro-hoc-vien/lop/:lopId/buoi/xuat', ({ params, request }) => {
+    const ds = db.hoTroBuoiLop[params.lopId as string];
+    if (!ds) return loi(404, 'NOT_FOUND', 'Không tìm thấy lớp');
+    const lichId = new URL(request.url).searchParams.get('lich_id');
+    if (lichId && !ds.some((b) => b.lich_id === lichId)) return loi(404, 'NOT_FOUND', 'Không tìm thấy buổi học');
+    return new HttpResponse(new Blob(['xlsx']), {
+      headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    });
+  }),
+  http.get('/ho-tro-hoc-vien/lop/:lopId/buoi/:lichId/hoc-vien', ({ params }) => {
+    if (!db.hoTroBuoiLop[params.lopId as string]) return loi(404, 'NOT_FOUND', 'Không tìm thấy lớp');
+    const ds = db.hoTroDanhSachBuoi[params.lichId as string];
+    return ds && ds.lop.lop_id === params.lopId
+      ? HttpResponse.json(ds)
+      : loi(404, 'NOT_FOUND', 'Không tìm thấy buổi học');
+  }),
   http.get('/ho-tro-hoc-vien/lop/:lopId/hoc-vien', ({ params }) => {
     const ds = db.hoTroDanhSachLop[params.lopId as string];
     return ds ? HttpResponse.json(ds) : loi(404, 'NOT_FOUND', 'Không tìm thấy lớp');

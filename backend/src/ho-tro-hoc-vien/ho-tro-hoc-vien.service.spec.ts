@@ -6,6 +6,7 @@ import { KhoaBoiDuongService } from '../khoa-boi-duong/khoa-boi-duong.service';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import { AuthService } from '../auth/auth.service';
 import { NhacLichService } from '../nhac-lich/nhac-lich.service';
+import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 
 // Spec đổi buổi §5: lịch học của cụm tính buổi chốt; số học viên cụm theo
 // buổi = phân vào lớp − đổi ra + đổi vào.
@@ -61,6 +62,7 @@ describe('HoTroHocVienService.lichHoc — đổi buổi', () => {
       {} as NhatKyService,
       {} as AuthService,
       nhacLich as unknown as NhacLichService,
+      {} as DoiBuoiHocQueryService,
     );
 
     const kq = await service.lichHoc('nd-1', {});
@@ -119,6 +121,7 @@ describe('HoTroHocVienService.lichHoc — đổi buổi', () => {
       {} as NhatKyService,
       {} as AuthService,
       nhacLich as unknown as NhacLichService,
+      {} as DoiBuoiHocQueryService,
     );
 
     const kq = await service.lichHoc('nd-1', { tu_ngay: '2026-11-10' });

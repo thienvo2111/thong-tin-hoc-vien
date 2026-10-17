@@ -1,8 +1,10 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, apiFetchBlob } from './client';
 import type {
+  BuoiCuaLopHoTro,
   BuoiHocHoTro,
   CumCuaToi,
+  DanhSachBuoiHoTro,
   DanhSachLopHoTro,
   HocVienHoTroChiTiet,
   HocVienHoTroDong,
@@ -101,6 +103,30 @@ export function useHocVienCuaLop(lopId: string | undefined) {
 /** Xuất .xlsx 1 lớp (lopId) hoặc mọi lớp của tôi — file có ngày sinh (ADR 0008 L5). */
 export function xuatDanhSachLopHoTro(lopId?: string): Promise<Blob> {
   return apiFetchBlob(`/ho-tro-hoc-vien/lop/xuat${xayQueryString({ lop_id: lopId })}`);
+}
+
+// ADR 0008 L7: danh sách theo buổi (phân lớp − đổi ra + đổi vào).
+export function useBuoiCuaLop(lopId: string | undefined) {
+  return useQuery({
+    queryKey: [...KHOA, 'lop', lopId, 'buoi'],
+    queryFn: () => apiFetch<BuoiCuaLopHoTro[]>(`/ho-tro-hoc-vien/lop/${lopId}/buoi`),
+    enabled: !!lopId,
+    retry: false,
+  });
+}
+
+export function useHocVienCuaBuoi(lopId: string | undefined, lichId: string | null) {
+  return useQuery({
+    queryKey: [...KHOA, 'lop', lopId, 'buoi', lichId],
+    queryFn: () => apiFetch<DanhSachBuoiHoTro>(`/ho-tro-hoc-vien/lop/${lopId}/buoi/${lichId}/hoc-vien`),
+    enabled: !!lopId && !!lichId,
+    retry: false,
+  });
+}
+
+/** Xuất .xlsx 1 buổi (lichId) hoặc mọi buổi của lớp — 1 sheet/buổi, có ngày sinh. */
+export function xuatDanhSachBuoiHoTro(lopId: string, lichId?: string): Promise<Blob> {
+  return apiFetchBlob(`/ho-tro-hoc-vien/lop/${lopId}/buoi/xuat${xayQueryString({ lich_id: lichId })}`);
 }
 
 // --- Yêu cầu hỗ trợ theo cụm (ADR 0003 Lát 4) ---

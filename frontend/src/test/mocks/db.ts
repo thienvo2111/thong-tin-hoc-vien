@@ -1,7 +1,15 @@
 import type { LopCuaToiGv, TrangLop } from '@/api/hoTroGv';
 import type { BoBangKiem, DanhGiaDot } from '@/api/bangKiem';
 import type { HocVienDaXoa } from '@/api/admin';
-import type { DanhSachLopHoTro, DiemDanhZoomBuoi, KetQuaVaoHoc, LichHocLopToi, LopCuaToi } from '@/api/types';
+import type {
+  BuoiCuaLopHoTro,
+  DanhSachBuoiHoTro,
+  DanhSachLopHoTro,
+  DiemDanhZoomBuoi,
+  KetQuaVaoHoc,
+  LichHocLopToi,
+  LopCuaToi,
+} from '@/api/types';
 import type {
   DiemHoc,
   GiangVien,
@@ -866,6 +874,71 @@ export function taoHoTroDanhSachLopMau(): Record<string, DanhSachLopHoTro> {
   };
 }
 
+// ADR 0008 L7: 2 buổi của Zoom 01 — buổi 1 có 1 người đổi vào (từ Zoom 02) và 1 người đổi ra (sang Zoom 03).
+export function taoHoTroBuoiLopMau(): Record<string, BuoiCuaLopHoTro[]> {
+  const gd = { id: 'gd-zoom', thu_tu: 1, ten_giai_doan: 'Học Zoom' };
+  return {
+    'lop-zoom-1': [
+      {
+        lich_id: 'lich-zoom-1',
+        giai_doan: gd,
+        buoi_so: 1,
+        thoi_gian_bat_dau: '2026-10-20T12:00:00.000Z',
+        thoi_gian_ket_thuc: '2026-10-20T14:00:00.000Z',
+        si_so: 2,
+        so_doi_vao: 1,
+        so_doi_ra: 1,
+      },
+      {
+        lich_id: 'lich-zoom-2',
+        giai_doan: gd,
+        buoi_so: 2,
+        thoi_gian_bat_dau: '2026-10-27T12:00:00.000Z',
+        thoi_gian_ket_thuc: '2026-10-27T14:00:00.000Z',
+        si_so: 2,
+        so_doi_vao: 0,
+        so_doi_ra: 0,
+      },
+    ],
+  };
+}
+
+export function taoHoTroDanhSachBuoiMau(): Record<string, DanhSachBuoiHoTro> {
+  const [lop] = taoHoTroLopMau();
+  const [b1, b2] = taoHoTroBuoiLopMau()['lop-zoom-1'];
+  const { giai_doan: _gd, ...goc } = taoHoTroDanhSachLopMau()[lop.lop_id].hoc_vien[0];
+  void _gd;
+  const thuong = { ...goc, doi_buoi: null, ghi_chu: null };
+  const khac = {
+    ngay_sinh: '05/06/1990',
+    don_vi_cong_tac_ten: 'Trường TH Bình Đức',
+    doi_tuong: 'giao_vien',
+    so_dien_thoai_lien_he: null,
+    email_lien_he: null,
+    cum: null,
+    day_du: true,
+    dang_nhap_lan_cuoi: null,
+  };
+  const ra = { ...khac, hoc_vien_id: 'hv-doi-ra', ho_ten: 'Phan Thị Ra' };
+  return {
+    [b1.lich_id]: {
+      lop,
+      buoi: b1,
+      hoc_vien: [
+        { ...khac, hoc_vien_id: 'hv-doi-vao', ho_ten: 'Đặng Văn Vào', doi_buoi: 'vao', ghi_chu: 'Đổi buổi – từ lớp Zoom 02' },
+        thuong,
+      ],
+      doi_ra: [{ ...ra, doi_buoi: 'ra', ghi_chu: 'Đã chuyển sang lớp Zoom 03 – không học buổi này' }],
+    },
+    [b2.lich_id]: {
+      lop,
+      buoi: b2,
+      hoc_vien: [thuong, { ...ra, doi_buoi: null, ghi_chu: null }],
+      doi_ra: [],
+    },
+  };
+}
+
 // Khu người hỗ trợ học viên (ADR 0003): 1 cụm, 1 học viên, 1 buổi học.
 export function taoHoTroCumMau(): CumCuaToi[] {
   return [
@@ -1288,6 +1361,8 @@ export const db = {
   hoTroCum: taoHoTroCumMau(),
   hoTroLop: taoHoTroLopMau(),
   hoTroDanhSachLop: taoHoTroDanhSachLopMau(),
+  hoTroBuoiLop: taoHoTroBuoiLopMau(),
+  hoTroDanhSachBuoi: taoHoTroDanhSachBuoiMau(),
   hoTroHocVien: taoHoTroHocVienMau(),
   hoTroChiTiet: taoHoTroChiTietMau(),
   hoTroLichHoc: taoHoTroLichHocMau(),
@@ -1333,6 +1408,8 @@ export function resetDb(): void {
   db.hoTroCum = taoHoTroCumMau();
   db.hoTroLop = taoHoTroLopMau();
   db.hoTroDanhSachLop = taoHoTroDanhSachLopMau();
+  db.hoTroBuoiLop = taoHoTroBuoiLopMau();
+  db.hoTroDanhSachBuoi = taoHoTroDanhSachBuoiMau();
   db.hoTroHocVien = taoHoTroHocVienMau();
   db.hoTroChiTiet = taoHoTroChiTietMau();
   db.hoTroLichHoc = taoHoTroLichHocMau();

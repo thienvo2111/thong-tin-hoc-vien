@@ -21,6 +21,13 @@ export class XuatLopHoTroDto {
   lop_id?: string;
 }
 
+// ADR 0008 L7: xuất danh sách theo buổi — có lich_id thì 1 buổi, không thì mọi buổi của lớp.
+export class XuatBuoiHoTroDto {
+  @IsOptional()
+  @IsUUID()
+  lich_id?: string;
+}
+
 // Bộ lọc dùng chung cho GET /ho-tro/hoc-vien và /ho-tro/hoc-vien/xuat.
 export class LocHocVienHoTroDto extends PaginationQueryDto {
   @IsOptional()

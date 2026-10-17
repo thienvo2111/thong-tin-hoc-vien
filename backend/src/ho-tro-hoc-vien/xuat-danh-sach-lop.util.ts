@@ -57,31 +57,41 @@ export async function buildDanhSachLopWorkbook(
   if (sheets.length === 0) wb.addWorksheet('Danh sách');
   for (const s of sheets) {
     const ws = wb.addWorksheet(tenSheet(s.ten_lop, daDung));
-    const loai = NHAN_LOAI_LOP[s.loai_lop as keyof typeof NHAN_LOAI_LOP];
-    ws.addRow([
-      `Khóa ${s.khoa.ma_khoa} – ${s.khoa.ten_khoa} · Lớp ${loai ?? s.loai_lop}: ${s.ten_lop}`,
-    ]).font = { bold: true, size: 12 };
+    ws.addRow([tieuDeLop(s)]).font = { bold: true, size: 12 };
     ws.addRow(COT_DANH_SACH_LOP).font = { bold: true };
-    s.hoc_vien.forEach((h, i) => {
-      ws.addRow([
-        i + 1,
-        h.ho_ten,
-        h.ngay_sinh,
-        h.don_vi_cong_tac_ten,
-        nhanDoiTuong(h.doi_tuong),
-        h.so_dien_thoai_lien_he ?? '',
-        h.email_lien_he ?? '',
-        h.cum ?? '',
-        h.day_du ? 'Đủ' : 'Chưa đủ',
-        h.dang_nhap_lan_cuoi ? 'Rồi' : 'Chưa',
-        oKhaoSat(h.doi_tuong, h.khao_sat),
-      ]);
-    });
-    ws.columns.forEach((c) => (c.width = 16));
-    ws.getColumn(1).width = 6;
-    ws.getColumn(2).width = 28;
-    ws.getColumn(4).width = 36;
+    s.hoc_vien.forEach((h, i) => ws.addRow(oDongLop(h, i + 1)));
+    datDoRongCot(ws);
     ws.views = [{ state: 'frozen', ySplit: 2 }];
   }
   return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+/** Tiêu đề đầu sheet: khóa · loại lớp: tên lớp. */
+export function tieuDeLop(s: Omit<SheetLop, 'hoc_vien'>): string {
+  const loai = NHAN_LOAI_LOP[s.loai_lop as keyof typeof NHAN_LOAI_LOP];
+  return `Khóa ${s.khoa.ma_khoa} – ${s.khoa.ten_khoa} · Lớp ${loai ?? s.loai_lop}: ${s.ten_lop}`;
+}
+
+/** Các ô của 1 dòng học viên theo COT_DANH_SACH_LOP. */
+export function oDongLop(h: DongXuatLop, stt: number): (string | number)[] {
+  return [
+    stt,
+    h.ho_ten,
+    h.ngay_sinh,
+    h.don_vi_cong_tac_ten,
+    nhanDoiTuong(h.doi_tuong),
+    h.so_dien_thoai_lien_he ?? '',
+    h.email_lien_he ?? '',
+    h.cum ?? '',
+    h.day_du ? 'Đủ' : 'Chưa đủ',
+    h.dang_nhap_lan_cuoi ? 'Rồi' : 'Chưa',
+    oKhaoSat(h.doi_tuong, h.khao_sat),
+  ];
+}
+
+export function datDoRongCot(ws: ExcelJS.Worksheet) {
+  ws.columns.forEach((c) => (c.width = 16));
+  ws.getColumn(1).width = 6;
+  ws.getColumn(2).width = 28;
+  ws.getColumn(4).width = 36;
 }
