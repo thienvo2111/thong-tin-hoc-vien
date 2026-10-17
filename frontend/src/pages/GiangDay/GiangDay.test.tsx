@@ -61,6 +61,7 @@ function renderCong(initialEntries: string[]) {
       // Backend đã lọc theo vai trò: bỏ SĐT/email/cụm học viên, liên hệ GV.
       const d = structuredClone(db.trangLopGv);
       d.hoc_vien = d.hoc_vien.map(({ so_dien_thoai: _s, email: _e, cum: _c, ...h }) => ({ ...h, bao_vang: {} }));
+      d.hoc_vien_doi_vao = d.hoc_vien_doi_vao?.map(({ so_dien_thoai: _s, email: _e, cum: _c, ...h }) => h);
       d.hoc_vien[0].bao_vang = { [d.buoi[0].id]: 'Ốm' };
       d.buoi = d.buoi.map((b) => ({ ...b, giang_vien: b.giang_vien.map(({ id, ho_ten, vai_tro }) => ({ id, ho_ten, vai_tro })) }));
       return HttpResponse.json(d);
@@ -148,6 +149,25 @@ describe('Cổng giảng viên', () => {
     expect(screen.getByText('B1: Từ Lớp 07')).toBeInTheDocument();
     expect(screen.getByText('B1: Đổi sang Lớp 05')).toBeInTheDocument();
     expect(screen.getByText(/Thêm 1 học viên đổi buổi vào lớp/)).toBeInTheDocument();
+  });
+
+  it('trang lớp: tab Theo buổi — danh sách của buổi gồm người đổi vào, người đổi ra liệt kê riêng, không có SĐT', async () => {
+    const hv0 = db.trangLopGv.hoc_vien[0];
+    db.trangLopGv.hoc_vien = [{ ...hv0, doi_buoi: { 'lh-1': { loai: 'ra', lop: 'Lớp 05' } } }];
+    db.trangLopGv.hoc_vien_doi_vao = [
+      { ...hv0, dang_ky_hoc_id: 'dk-9', hoc_vien_id: 'hv-9', ho_ten: 'Phan Văn Đến', diem_danh: {}, doi_buoi: { 'lh-1': { loai: 'vao', lop: 'Lớp 07' } } },
+    ];
+    const user = userEvent.setup();
+    renderCong(['/giang-day/lop/lop-1/giai-doan/gd-2']);
+    await user.click(await screen.findByRole('tab', { name: 'Theo buổi' }));
+    const panel = await screen.findByRole('tabpanel', { name: 'Theo buổi' });
+    await user.selectOptions(within(panel).getByLabelText('Buổi'), 'lh-1');
+    const bang = within(panel).getByRole('table');
+    expect(within(bang).getByText('Phan Văn Đến')).toBeInTheDocument();
+    expect(within(bang).getByText('Đổi buổi – từ lớp Lớp 07')).toBeInTheDocument();
+    expect(within(bang).queryByText(hv0.ho_ten)).not.toBeInTheDocument();
+    expect(within(panel).getByText(new RegExp(`${hv0.ho_ten} – đã chuyển sang Lớp 05`))).toBeInTheDocument();
+    expect(within(panel).queryByRole('columnheader', { name: 'SĐT' })).not.toBeInTheDocument();
   });
 });
 

@@ -68,6 +68,23 @@ describe('Khu hỗ trợ giảng viên — trang lớp (L2)', () => {
     expect(screen.getByText(/Thêm 1 học viên đổi buổi vào lớp/)).toBeInTheDocument();
   });
 
+  it('tab Học viên › Theo buổi: danh sách của buổi có SĐT, người đổi vào có ghi chú', async () => {
+    const hv0 = db.trangLopGv.hoc_vien[0];
+    db.trangLopGv.hoc_vien_doi_vao = [
+      { ...hv0, dang_ky_hoc_id: 'dk-9', hoc_vien_id: 'hv-9', ho_ten: 'Phan Văn Đến', so_dien_thoai: '0912999999', cum: null, diem_danh: {}, doi_buoi: { 'lh-1': { loai: 'vao', lop: 'Lớp 07' } } },
+    ];
+    const user = userEvent.setup();
+    render(['/ho-tro-gv/lop/lop-1/giai-doan/gd-2']);
+    await user.click(await screen.findByRole('tab', { name: /Học viên/ }));
+    await user.click(await screen.findByRole('tab', { name: 'Theo buổi' }));
+    const panel = await screen.findByRole('tabpanel', { name: 'Theo buổi' });
+    await user.selectOptions(within(panel).getByLabelText('Buổi'), 'lh-1');
+    const bang = within(panel).getByRole('table');
+    expect(within(bang).getByRole('columnheader', { name: 'SĐT' })).toBeInTheDocument();
+    expect(within(bang).getByText('0912999999')).toBeInTheDocument();
+    expect(within(bang).getByText('Đổi buổi – từ lớp Lớp 07')).toBeInTheDocument();
+  });
+
   it('tab Giảng viên: tên + SĐT gọi được; tab Học viên: SĐT, cụm + người hỗ trợ học viên', async () => {
     const user = userEvent.setup();
     render(['/ho-tro-gv/lop/lop-1/giai-doan/gd-2']);
