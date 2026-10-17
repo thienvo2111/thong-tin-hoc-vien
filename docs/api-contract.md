@@ -591,8 +591,10 @@ Nội bộ, không có endpoint public cho FE trừ 2 mục xem lịch sử/hàn
 
 | Method | Endpoint | Mô tả | Ai gọi |
 |---|---|---|---|
-| GET | `/thong-bao/lich-su?hoc_vien_id=&loai_su_kien=` | Lịch sử gửi cho 1 hồ sơ (đối chiếu khi học viên báo không nhận được), lọc thêm theo loại sự kiện nếu cần | QuảnTrị |
+| GET | `/thong-bao/lich-su?hoc_vien_id=&loai_su_kien=&trang_thai=&q=` | Lịch sử gửi (`nhat_ky_thong_bao`, gồm cả làn ưu tiên gửi ngay) — đối chiếu khi học viên báo không nhận được. Lọc tùy chọn: học viên, loại sự kiện, `trang_thai` (`thanh_cong`/`that_bai`), `q` tìm trong email người nhận hoặc tiêu đề (không phân biệt hoa thường) | QuảnTrị |
 | GET | `/thong-bao/hang-doi` | **Thêm M9**: đếm `hang_doi_email` theo từng `trang_thai` (`cho_gui`/`thanh_cong`/`that_bai`) + số email đã gửi thành công hôm nay (giờ Việt Nam) + hạn mức còn lại | QuảnTrị |
+| GET | `/thong-bao/hang-doi/danh-sach?trang_thai=&loai_su_kien=&q=` | Danh sách `hang_doi_email` (làn hàng loạt), mới nhất trước, phân trang; **không** kèm `noi_dung_html`. `trang_thai`: `cho_gui`/`thanh_cong`/`that_bai`; `q` như trên | QuảnTrị |
+| GET | `/thong-bao/hang-doi/:id` | 1 dòng hàng đợi kèm `noi_dung_html` để xem lại email đã/sẽ gửi. 400 nếu id không phải UUID, 404 nếu không có | QuảnTrị |
 
 ## 9. Cấu hình khảo sát đầu vào & chế độ triển khai (2026-10-02)
 

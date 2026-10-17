@@ -281,6 +281,10 @@ export const router = createBrowserRouter([
                         path: '/admin/nguoi-ho-tro',
                         lazy: () => import('@/pages/Admin/AdminNguoiHoTro').then((m) => ({ Component: m.default })),
                       },
+                      {
+                        path: '/admin/nhat-ky-email',
+                        lazy: () => import('@/pages/Admin/AdminNhatKyEmail').then((m) => ({ Component: m.default })),
+                      },
                     ],
                   },
                 ],

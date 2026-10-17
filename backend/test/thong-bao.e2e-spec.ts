@@ -358,4 +358,103 @@ describe('Dịch vụ Thông báo (e2e)', () => {
         .expect(400);
     });
   });
+
+  // Màn "Nhật ký email": danh sách hàng đợi + xem nội dung. Dòng test tạo
+  // trực tiếp với trang_thai='that_bai' để cron (chỉ rút cho_gui) không đụng.
+  describe('GET /thong-bao/hang-doi/danh-sach + /thong-bao/hang-doi/:id', () => {
+    const email = `nk-email-${uniqueSuffix()}@test.local`;
+    let dongId: string;
+
+    beforeAll(async () => {
+      const dong = await prisma.hang_doi_email.create({
+        data: {
+          loai_su_kien: 'nhac_lich_giang_vien',
+          email_nguoi_nhan: email,
+          tieu_de: 'Lịch giảng dạy e2e',
+          noi_dung_html: '<p>Nội dung e2e</p>',
+          trang_thai: 'that_bai',
+          so_lan_thu: 3,
+          loi: 'SMTP lỗi e2e',
+        },
+      });
+      dongId = dong.id;
+    });
+
+    afterAll(async () => {
+      await prisma.hang_doi_email.deleteMany({
+        where: { email_nguoi_nhan: email },
+      });
+    });
+
+    it('không phải quan_tri -> 403', async () => {
+      await request(app.getHttpServer())
+        .get('/thong-bao/hang-doi/danh-sach')
+        .set('Authorization', `Bearer ${tokenSo}`)
+        .expect(403);
+      await request(app.getHttpServer())
+        .get(`/thong-bao/hang-doi/${dongId}`)
+        .set('Authorization', `Bearer ${tokenSo}`)
+        .expect(403);
+    });
+
+    it('quan_tri lọc theo q + trang_thai, không trả noi_dung_html', async () => {
+      const res = await request(app.getHttpServer())
+        .get(
+          `/thong-bao/hang-doi/danh-sach?q=${encodeURIComponent(email.toUpperCase())}&trang_thai=that_bai`,
+        )
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.data[0]).toMatchObject({
+        id: dongId,
+        email_nguoi_nhan: email,
+        so_lan_thu: 3,
+        loi: 'SMTP lỗi e2e',
+      });
+      expect(res.body.data[0].noi_dung_html).toBeUndefined();
+    });
+
+    it('trang_thai khác -> không thấy dòng', async () => {
+      const res = await request(app.getHttpServer())
+        .get(
+          `/thong-bao/hang-doi/danh-sach?q=${encodeURIComponent(email)}&trang_thai=cho_gui`,
+        )
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(res.body.total).toBe(0);
+    });
+
+    it('trang_thai không thuộc enum -> 400', async () => {
+      await request(app.getHttpServer())
+        .get('/thong-bao/hang-doi/danh-sach?trang_thai=khong_hop_le')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(400);
+    });
+
+    it('chi tiết kèm noi_dung_html', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/thong-bao/hang-doi/${dongId}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(200);
+      expect(res.body.noi_dung_html).toBe('<p>Nội dung e2e</p>');
+    });
+
+    it('id không phải uuid -> 400; uuid không tồn tại -> 404', async () => {
+      await request(app.getHttpServer())
+        .get('/thong-bao/hang-doi/khong-phai-uuid')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(400);
+      await request(app.getHttpServer())
+        .get('/thong-bao/hang-doi/00000000-0000-4000-8000-000000000000')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(404);
+    });
+
+    it('lich-su: trang_thai không thuộc enum -> 400', async () => {
+      await request(app.getHttpServer())
+        .get('/thong-bao/lich-su?trang_thai=khong_hop_le')
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .expect(400);
+    });
+  });
 });

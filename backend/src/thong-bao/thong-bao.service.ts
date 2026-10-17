@@ -11,6 +11,8 @@ import { layFrontendUrl } from '../common/utils/token-xac-thuc.util';
 import { bienNgayVietNam } from './util/gio-viet-nam.util';
 import { apDungDiemDanhZoom } from '../khoa-boi-duong/util/diem-danh-zoom.util';
 import { LichSuThongBaoQueryDto } from './dto/lich-su-thong-bao-query.dto';
+import { HangDoiEmailQueryDto } from './dto/hang-doi-email-query.dto';
+import { NotFoundAppException } from '../common/exceptions/app.exceptions';
 import {
   bangThongTin,
   boCucEmail,
@@ -36,6 +38,15 @@ function layGioiHanHangNgay(): number {
   return Number.isFinite(parsed) && parsed > 0
     ? parsed
     : EMAIL_DAILY_LIMIT_MAC_DINH;
+}
+
+// Tìm theo email người nhận hoặc tiêu đề — dùng chung cho nhat_ky_thong_bao
+// và hang_doi_email (cùng tên cột).
+function dieuKienTimEmail(q: string) {
+  return [
+    { email_nguoi_nhan: { contains: q, mode: 'insensitive' as const } },
+    { tieu_de: { contains: q, mode: 'insensitive' as const } },
+  ];
 }
 
 // Dịch vụ Thông báo — docs/api-contract.md mục 8 + database-ddl.sql PHẦN 4.
@@ -498,6 +509,8 @@ export class ThongBaoService {
     const where: Prisma.nhat_ky_thong_baoWhereInput = {};
     if (query.hoc_vien_id) where.hoc_vien_id = query.hoc_vien_id;
     if (query.loai_su_kien) where.loai_su_kien = query.loai_su_kien;
+    if (query.trang_thai) where.trang_thai = query.trang_thai;
+    if (query.q) where.OR = dieuKienTimEmail(query.q);
 
     const [data, total] = await Promise.all([
       this.prisma.nhat_ky_thong_bao.findMany({
@@ -509,6 +522,49 @@ export class ThongBaoService {
       this.prisma.nhat_ky_thong_bao.count({ where }),
     ]);
     return paginate(data, total, page, pageSize);
+  }
+
+  // GET /thong-bao/hang-doi/danh-sach — không trả noi_dung_html (nặng), xem
+  // nội dung từng email qua chiTietHangDoi().
+  async danhSachHangDoi(query: HangDoiEmailQueryDto) {
+    const page = query.page ?? 1;
+    const pageSize = query.page_size ?? 20;
+    const where: Prisma.hang_doi_emailWhereInput = {};
+    if (query.trang_thai) where.trang_thai = query.trang_thai;
+    if (query.loai_su_kien) where.loai_su_kien = query.loai_su_kien;
+    if (query.q) where.OR = dieuKienTimEmail(query.q);
+
+    const [data, total] = await Promise.all([
+      this.prisma.hang_doi_email.findMany({
+        where,
+        select: {
+          id: true,
+          loai_su_kien: true,
+          hoc_vien_id: true,
+          email_nguoi_nhan: true,
+          tieu_de: true,
+          trang_thai: true,
+          so_lan_thu: true,
+          loi: true,
+          created_at: true,
+          gui_luc: true,
+        },
+        orderBy: { created_at: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.hang_doi_email.count({ where }),
+    ]);
+    return paginate(data, total, page, pageSize);
+  }
+
+  // GET /thong-bao/hang-doi/:id — kèm noi_dung_html để Quản trị xem lại email.
+  async chiTietHangDoi(id: string) {
+    const dong = await this.prisma.hang_doi_email.findUnique({ where: { id } });
+    if (!dong) {
+      throw new NotFoundAppException('Không tìm thấy email trong hàng đợi');
+    }
+    return dong;
   }
 
   // GET /thong-bao/hang-doi — M9, QuảnTrị xem tình trạng hàng đợi + hạn mức.

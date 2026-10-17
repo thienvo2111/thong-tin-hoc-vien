@@ -1,3 +1,4 @@
+import { NotFoundAppException } from '../common/exceptions/app.exceptions';
 import { ThongBaoService } from './thong-bao.service';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -32,6 +33,7 @@ describe('ThongBaoService', () => {
       create: jest.Mock;
       count: jest.Mock;
       findMany: jest.Mock;
+      findUnique: jest.Mock;
       update: jest.Mock;
     };
   };
@@ -69,6 +71,7 @@ describe('ThongBaoService', () => {
         create: jest.fn(),
         count: jest.fn(),
         findMany: jest.fn(),
+        findUnique: jest.fn(),
         update: jest.fn(),
       },
     };
@@ -473,6 +476,88 @@ describe('ThongBaoService', () => {
           skip: 0,
           take: 20,
         }),
+      );
+    });
+  });
+
+  describe('lichSu — lọc trạng thái + tìm kiếm', () => {
+    it('trang_thai + q -> where có trang_thai và OR email/tiêu đề không phân biệt hoa thường', async () => {
+      prisma.nhat_ky_thong_bao.findMany.mockResolvedValue([]);
+      prisma.nhat_ky_thong_bao.count.mockResolvedValue(0);
+      await service.lichSu({
+        trang_thai: 'that_bai',
+        q: 'gv@test',
+        page: 2,
+        page_size: 10,
+      } as never);
+      const where = {
+        trang_thai: 'that_bai',
+        OR: [
+          { email_nguoi_nhan: { contains: 'gv@test', mode: 'insensitive' } },
+          { tieu_de: { contains: 'gv@test', mode: 'insensitive' } },
+        ],
+      };
+      expect(prisma.nhat_ky_thong_bao.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where, skip: 10, take: 10 }),
+      );
+      expect(prisma.nhat_ky_thong_bao.count).toHaveBeenCalledWith({ where });
+    });
+  });
+
+  describe('danhSachHangDoi', () => {
+    it('không filter -> where rỗng, mới nhất trước, không lấy noi_dung_html', async () => {
+      prisma.hang_doi_email.findMany.mockResolvedValue([]);
+      prisma.hang_doi_email.count.mockResolvedValue(0);
+      const kq = await service.danhSachHangDoi({} as never);
+      const goi = prisma.hang_doi_email.findMany.mock.calls[0][0];
+      expect(goi.where).toEqual({});
+      expect(goi.orderBy).toEqual({ created_at: 'desc' });
+      expect(goi.skip).toBe(0);
+      expect(goi.take).toBe(20);
+      expect(goi.select.noi_dung_html).toBeUndefined();
+      expect(goi.select.email_nguoi_nhan).toBe(true);
+      expect(kq).toEqual({ data: [], total: 0, page: 1, page_size: 20 });
+    });
+
+    it('trang_thai + loai_su_kien + q kết hợp AND', async () => {
+      prisma.hang_doi_email.findMany.mockResolvedValue([]);
+      prisma.hang_doi_email.count.mockResolvedValue(0);
+      await service.danhSachHangDoi({
+        trang_thai: 'cho_gui',
+        loai_su_kien: 'nhac_lich_giang_vien',
+        q: 'Lịch',
+      } as never);
+      expect(prisma.hang_doi_email.count).toHaveBeenCalledWith({
+        where: {
+          trang_thai: 'cho_gui',
+          loai_su_kien: 'nhac_lich_giang_vien',
+          OR: [
+            { email_nguoi_nhan: { contains: 'Lịch', mode: 'insensitive' } },
+            { tieu_de: { contains: 'Lịch', mode: 'insensitive' } },
+          ],
+        },
+      });
+    });
+  });
+
+  describe('chiTietHangDoi', () => {
+    it('có dòng -> trả kèm noi_dung_html', async () => {
+      prisma.hang_doi_email.findUnique.mockResolvedValue({
+        id: 'hd-1',
+        noi_dung_html: '<p>x</p>',
+      });
+      await expect(service.chiTietHangDoi('hd-1')).resolves.toMatchObject({
+        noi_dung_html: '<p>x</p>',
+      });
+      expect(prisma.hang_doi_email.findUnique).toHaveBeenCalledWith({
+        where: { id: 'hd-1' },
+      });
+    });
+
+    it('không có -> NotFoundAppException', async () => {
+      prisma.hang_doi_email.findUnique.mockResolvedValue(null);
+      await expect(service.chiTietHangDoi('hd-x')).rejects.toBeInstanceOf(
+        NotFoundAppException,
       );
     });
   });
