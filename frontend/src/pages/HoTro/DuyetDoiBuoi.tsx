@@ -30,6 +30,7 @@ import {
   type LuaChonDuyet,
 } from '@/api/doiBuoi';
 import { useToi } from '@/auth/AuthContext';
+import { CanhBaoTrungLich } from '@/components/CanhBaoTrungLich';
 import { StatusBanner } from '@/components/StatusBanner';
 import { ThanhSiSo } from '@/components/ThanhSiSo';
 import { dinhDangGio, dinhDangNgayGio, dinhDangThuNgay } from '@/lib/ngay';
@@ -270,6 +271,7 @@ function DongChoDuyet({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
             </Group>
           }
         />
+        <CanhBaoTrungLich ds={d.trung_lich} />
         <Text fz="sm">Lý do: {d.ly_do}</Text>
         <Text fz="xs" c="dimmed">
           Gửi lúc {dinhDangNgayGio(d.tao_luc)}
@@ -447,6 +449,7 @@ function LuaChonDong({ c, laQuanTri }: { c: LuaChonDuyet; laQuanTri: boolean }) 
             <Group gap={6} wrap="wrap" mt={2}>
               <ThanhSiSo siSo={c.si_so} toiDa={c.si_so_toi_da} cho={c.so_cho_duyet} w={90} />
             </Group>
+            <CanhBaoTrungLich ds={c.trung_lich} />
             <Text fz="xs" c="dimmed" lh={1.35}>
               {diaDiem ?? ''}
               {c.so_truoc > 0 ? `${diaDiem ? ' · ' : ''}${c.so_truoc} gửi trước` : ''}

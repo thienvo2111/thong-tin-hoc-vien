@@ -32,6 +32,7 @@ import {
   type TongQuanDoiBuoi,
 } from '@/api/doiBuoi';
 import { ApiError } from '@/api/client';
+import { CanhBaoTrungLich, moTaDsTrung } from '@/components/CanhBaoTrungLich';
 import { StatusBanner } from '@/components/StatusBanner';
 import { ThanhSiSo } from '@/components/ThanhSiSo';
 import { dinhDangGio, dinhDangNgayGio } from '@/lib/ngay';
@@ -336,6 +337,8 @@ function FormDoiBuoi({
   const [nguonId, setNguonId] = useState<string | null>(dangSua?.lich_nguon_id ?? nguonKhoa ?? lichBanDau);
   const [dichId, setDichId] = useState<string | null>(dangSua?.lich_de_nghi_id ?? null);
   const [lyDo, setLyDo] = useState(dangSua?.ly_do ?? '');
+  // Buổi chọn trùng giờ buổi khác của học viên → hỏi lại trước khi gửi (cảnh báo, không chặn).
+  const [hoiTrung, setHoiTrung] = useState(false);
   const gui = useGuiDoiBuoi();
   const sua = useSuaDoiBuoi();
   const dangGui = gui.isPending || sua.isPending;
@@ -350,10 +353,17 @@ function FormDoiBuoi({
 
   const { data: luaChon, isLoading, isError, error } = useLuaChonDoiBuoi(nguonHopLe ?? undefined);
   const dichHopLe = luaChon?.some((c) => c.lich.id === dichId && !c.da_du);
+  const trungDich = luaChon?.find((c) => c.lich.id === dichId)?.trung_lich ?? [];
   const laDoiLai =
     !dangSua && tongQuan.de_nghi.some((d) => d.trang_thai === 'da_duyet' && d.lich_nguon_id === nguonHopLe);
 
+  function bamGui() {
+    if (trungDich.length > 0) setHoiTrung(true);
+    else guiDeNghi();
+  }
+
   function guiDeNghi() {
+    setHoiTrung(false);
     if (!nguonHopLe || !dichId) return;
     const body = {
       lich_nguon_id: nguonHopLe,
@@ -421,7 +431,7 @@ function FormDoiBuoi({
         {loi && <StatusBanner loai="error">{thongDiepLoiXungDot(loi)}</StatusBanner>}
 
         <Group gap="xs">
-          <Button loading={dangGui} disabled={!nguonHopLe || !dichHopLe || !lyDoHopLe} onClick={guiDeNghi}>
+          <Button loading={dangGui} disabled={!nguonHopLe || !dichHopLe || !lyDoHopLe} onClick={bamGui}>
             {dangSua ? 'Lưu đề nghị' : 'Gửi đề nghị'}
           </Button>
           {(dangSua || nguonKhoa) && (
@@ -431,6 +441,27 @@ function FormDoiBuoi({
           )}
         </Group>
       </Stack>
+      <Modal opened={hoiTrung} onClose={() => setHoiTrung(false)} title="Buổi chọn bị trùng giờ" centered>
+        <Stack gap="md">
+          <Text size="sm">
+            Buổi này trùng giờ với {moTaDsTrung(trungDich)}. Thầy/Cô vẫn muốn gửi?
+          </Text>
+          <Group justify="flex-end" gap="xs">
+            <Button
+              variant="default"
+              onClick={() => {
+                setHoiTrung(false);
+                setDichId(null);
+              }}
+            >
+              Chọn buổi khác
+            </Button>
+            <Button color="orange" loading={dangGui} onClick={guiDeNghi}>
+              Vẫn gửi
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Paper>
   );
 }
@@ -480,6 +511,7 @@ function NhanLuaChon({ c }: { c: LuaChonBuoi }) {
           </Badge>
         )}
       </Group>
+      <CanhBaoTrungLich ds={c.trung_lich} />
       <DiaDiem c={c} />
     </Box>
   );

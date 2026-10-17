@@ -37,6 +37,8 @@ Sắp theo thời điểm gửi (cũ nhất trước). Mỗi dòng: học viên 
    (học viên sẽ thấy buổi được chốt).
 4. Ghi chú (không bắt buộc) → **Xác nhận duyệt**.
 
+**Trùng giờ**: dòng chữ cam *⚠ Trùng giờ với Buổi … · lớp … · ngày giờ* (trên thẻ chờ duyệt và dưới từng lựa chọn trong cửa sổ Duyệt) = buổi đó trùng giờ một buổi khác học viên đang học. Chỉ là cảnh báo — vẫn duyệt được; nên trao đổi với học viên trước.
+
 **Từ chối**: bấm **Từ chối**, ghi chú bắt buộc (5–500 ký tự, học viên đọc được) → **Gửi từ chối**.
 
 **Quá hạn**: đề nghị mà buổi đã bắt đầu nằm ở mục **Quá hạn** — không duyệt được nữa, chỉ **Từ chối** để đóng.

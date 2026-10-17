@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { server } from "@/test/mocks/server";
@@ -10,6 +10,7 @@ import type {
   BuoiTomTat,
   DeNghiHocVien,
   LichTomTat,
+  LichTrung,
   LuaChonBuoi,
   TongQuanDoiBuoi,
 } from "@/api/doiBuoi";
@@ -64,6 +65,7 @@ function deNghiMau(over: Partial<DeNghiHocVien> = {}): DeNghiHocVien {
     buoi_de_nghi: tomTat(lich("ld-1", "Lớp 02", 1, 50)),
     buoi_chot: null,
     doi_lai_tu: null,
+    trung_lich: [],
     ...over,
   };
 }
@@ -89,6 +91,7 @@ const LUA_CHON: LuaChonBuoi[] = [
     si_so_toi_da: 30,
     so_cho_duyet: 2,
     da_du: false,
+    trung_lich: [],
   },
   {
     lich: lich("ld-2", "Lớp 03", 1, 52),
@@ -100,6 +103,7 @@ const LUA_CHON: LuaChonBuoi[] = [
     si_so_toi_da: 30,
     so_cho_duyet: 0,
     da_du: true,
+    trung_lich: [],
   },
 ];
 
@@ -132,7 +136,56 @@ function renderTrang(query = "?khoa=khoa-1&lich=ln-1") {
   );
 }
 
+const TRUNG: LichTrung = {
+  id: "lx-9",
+  buoi_so: 2,
+  thoi_gian_bat_dau: new Date(Date.now() + 50 * GIO).toISOString(),
+  thoi_gian_ket_thuc: new Date(Date.now() + 52 * GIO).toISOString(),
+  lop: { ten_lop: "Lớp 09" },
+};
+
 describe("Trang đề nghị đổi buổi (học viên)", () => {
+  it("lựa chọn trùng giờ hiện cảnh báo; gửi buổi trùng phải xác nhận: Chọn buổi khác không gửi, Vẫn gửi gọi POST", async () => {
+    datApi(tongQuanMau());
+    const bodies: unknown[] = [];
+    server.use(
+      http.get("/hoc-vien/toi/doi-buoi/lua-chon/:id", () =>
+        HttpResponse.json([{ ...LUA_CHON[0], trung_lich: [TRUNG] }, LUA_CHON[1]]),
+      ),
+      http.post("/hoc-vien/toi/doi-buoi", async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({ id: "dn-moi" }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderTrang();
+    const canhBao = await screen.findByTestId("canh-bao-trung-lich");
+    expect(canhBao).toHaveTextContent(/Trùng giờ với Buổi 2 · Lớp 09 · .+, \d{2}\/\d{2}\/\d{4} \d{2}:\d{2}–\d{2}:\d{2}/);
+    expect(screen.getAllByTestId("canh-bao-trung-lich")).toHaveLength(1);
+
+    const radio = screen.getByRole("radio", { name: /Lớp 02/ });
+    await user.click(radio);
+    await user.type(screen.getByLabelText(/Lý do/), "Bận việc gia đình");
+    await user.click(screen.getByRole("button", { name: "Gửi đề nghị" }));
+    const hoi = await screen.findByRole("dialog", { name: "Buổi chọn bị trùng giờ" });
+    expect(hoi).toHaveTextContent("Buổi này trùng giờ với Buổi 2 · Lớp 09");
+    expect(hoi).toHaveTextContent("Thầy/Cô vẫn muốn gửi?");
+    await user.click(within(hoi).getByRole("button", { name: "Chọn buổi khác" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(bodies).toEqual([]);
+    expect(radio).not.toBeChecked();
+
+    await user.click(radio);
+    await user.click(screen.getByRole("button", { name: "Gửi đề nghị" }));
+    const hoiLai = await screen.findByRole("dialog", { name: "Buổi chọn bị trùng giờ" });
+    await user.click(within(hoiLai).getByRole("button", { name: "Vẫn gửi" }));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        { lich_nguon_id: "ln-1", lich_de_nghi_id: "ld-1", ly_do: "Bận việc gia đình" },
+      ]),
+    );
+  });
+
   it("hiện lượt còn lại, sĩ số, +n đang chờ; buổi đã đủ bị vô hiệu và có chữ Đã đủ", async () => {
     datApi(tongQuanMau());
     renderTrang();

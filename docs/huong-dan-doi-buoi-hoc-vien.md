@@ -22,6 +22,7 @@ Thầy/Cô **không tham gia được một buổi** của lớp mình (ví dụ
 3. Ở mục **Buổi muốn đổi sang**: chọn một buổi trong danh sách. Mỗi dòng ghi lớp, giờ học, địa điểm, sĩ số hiện tại
    (ví dụ `28/30`) và số người **đang chờ** đổi vào buổi đó (`+2 đang chờ`). Buổi ghi **Đã đủ** thì không chọn được.
    - Nên chọn buổi ít người đang chờ để được duyệt nhanh.
+   - Dòng chữ cam **⚠ Trùng giờ với Buổi … · lớp … · ngày giờ** = buổi đó trùng giờ một buổi khác Thầy/Cô đang học. Vẫn gửi được: bấm **Gửi đề nghị** sẽ hỏi lại — **Chọn buổi khác** hoặc **Vẫn gửi**.
 4. Ghi **Lý do** (5–500 ký tự), bấm **Gửi đề nghị**.
 5. Theo dõi đề nghị ở cùng trang:
    - **Đang chờ duyệt** — kèm dòng *Bạn đang xếp thứ k*: đề nghị gửi trước được xét trước.

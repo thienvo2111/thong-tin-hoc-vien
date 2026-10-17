@@ -10,6 +10,7 @@ import type {
   BuoiTomTat,
   DeNghiDuyet,
   LichTomTat,
+  LichTrung,
   LuaChonDuyet,
 } from "@/api/doiBuoi";
 import { RequireQuanTri } from "@/auth/RequireQuanTri";
@@ -65,6 +66,7 @@ function deNghi(over: Partial<DeNghiDuyet> = {}): DeNghiDuyet {
     buoi_de_nghi: tomTat(lich("ld-1", "Lớp 02", 50)),
     buoi_chot: null,
     doi_lai_tu: null,
+    trung_lich: [],
     hoc_vien: {
       id: "hv-1",
       ho_ten: "Nguyễn Thị Lan",
@@ -96,6 +98,7 @@ function luaChon(
     so_truoc: 0,
     duyet_duoc: true,
     da_du: false,
+    trung_lich: [],
     ...over,
   };
 }
@@ -143,7 +146,43 @@ async function moModalDuyet() {
   return user;
 }
 
+const TRUNG: LichTrung = {
+  id: "lx-9",
+  buoi_so: 2,
+  thoi_gian_bat_dau: new Date(Date.now() + 50 * GIO).toISOString(),
+  thoi_gian_ket_thuc: new Date(Date.now() + 52 * GIO).toISOString(),
+  lop: { ten_lop: "Lớp 09" },
+};
+
 describe("Màn duyệt đổi buổi", () => {
+  it("thẻ chờ duyệt có cảnh báo trùng giờ khi buổi đề nghị trùng lịch học viên; không trùng thì không có", async () => {
+    datApi([deNghi({ trung_lich: [TRUNG] }), deNghi({ id: "dn-2" })]);
+    renderTrang("ho_tro_hoc_vien");
+    const the = await screen.findAllByTestId("de-nghi-cho-duyet");
+    expect(within(the[0]).getByTestId("canh-bao-trung-lich")).toHaveTextContent(
+      "Trùng giờ với Buổi 2 · Lớp 09",
+    );
+    expect(within(the[1]).queryByTestId("canh-bao-trung-lich")).toBeNull();
+  });
+
+  it("modal duyệt: lựa chọn trùng giờ có cảnh báo nhưng vẫn chọn được", async () => {
+    datApi([deNghi()]);
+    server.use(
+      http.get("/doi-buoi-hoc/:id/lua-chon", () =>
+        HttpResponse.json([LUA_CHON[0], luaChon("ld-5", "Lớp 05", { trung_lich: [TRUNG] })]),
+      ),
+    );
+    renderTrang("ho_tro_hoc_vien");
+    const user = await moModalDuyet();
+    const trung = await screen.findByRole("radio", { name: /Lớp 05/ });
+    expect(trung).toBeEnabled();
+    const dong = trung.closest(".mantine-Paper-root") as HTMLElement;
+    expect(within(dong).getByTestId("canh-bao-trung-lich")).toHaveTextContent("Trùng giờ với Buổi 2 · Lớp 09");
+    await user.click(trung);
+    expect(trung).toBeChecked();
+    expect(screen.getByRole("button", { name: "Xác nhận duyệt" })).toBeEnabled();
+  });
+
   it("tab Chờ duyệt hiện học viên, thứ tự k/n, sĩ số +n đang chờ, lý do", async () => {
     datApi([deNghi()]);
     renderTrang("ho_tro_hoc_vien");

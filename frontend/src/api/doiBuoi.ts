@@ -47,6 +47,15 @@ export interface BuoiTomTat {
   lop: { ten_lop: string };
 }
 
+/** Buổi trên lịch thực tế của học viên trùng giờ buổi đang xét (chỉ cảnh báo, không chặn). */
+export interface LichTrung {
+  id: string;
+  buoi_so: number;
+  thoi_gian_bat_dau: string;
+  thoi_gian_ket_thuc: string;
+  lop: { ten_lop: string };
+}
+
 export type LyDoHuy = 'hoc_vien_sua' | 'hoc_vien_huy' | 'huy_duyet' | 'thay_the';
 
 export interface DeNghiHocVien {
@@ -67,6 +76,8 @@ export interface DeNghiHocVien {
   buoi_chot: BuoiTomTat | null;
   /** Đề nghị đổi lại (đang chờ): buổi đang học theo bản đã duyệt; còn lại null. */
   doi_lai_tu: BuoiTomTat | null;
+  /** Chỉ đề nghị đang chờ: buổi trùng giờ buổi đề nghị; còn lại []. */
+  trung_lich: LichTrung[];
 }
 
 export interface TongQuanDoiBuoi {
@@ -93,6 +104,8 @@ export interface LuaChonBuoi {
   si_so_toi_da: number | null;
   so_cho_duyet: number;
   da_du: boolean;
+  /** Buổi trên lịch thực tế trùng giờ buổi này (đã bỏ buổi nguồn / buổi đang học khi đổi lại). */
+  trung_lich: LichTrung[];
 }
 
 export interface GuiDoiBuoiBody {
