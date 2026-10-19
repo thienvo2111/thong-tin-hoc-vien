@@ -120,14 +120,21 @@ function HocTap({
                   </Text>
                   {gd.lop.lich_hoc.map((b) => (
                     <Group key={b.id} gap="xs" wrap="nowrap" align="flex-start">
-                      <Text fz="sm" w={64} c="dimmed">
-                        Buổi {b.buoi_so}
+                      {/* ADR 0012: ô học bù đã duyệt là buổi THÊM (buổi gốc vẫn ở chỗ cũ). */}
+                      <Text fz="sm" w={64} c={b.hoc_bu ? 'grape' : 'dimmed'} fw={b.hoc_bu ? 600 : undefined}>
+                        {b.hoc_bu ? 'Học bù' : `Buổi ${b.buoi_so}`}
                       </Text>
                       <Text fz="sm" w={150}>
                         {dinhDangNgayGio(b.thoi_gian_bat_dau)}
                       </Text>
                       <Text fz="sm" style={{ flex: 1 }}>
-                        <LienKet url={b.dia_diem_hoac_link} />
+                        {b.hoc_bu && (
+                          <>
+                            Buổi {b.buoi_so} của {b.lop_goc_ten} — học tại {b.lop_chot_ten}
+                            {b.dia_diem_hoac_link ? ' · ' : ''}
+                          </>
+                        )}
+                        {(!b.hoc_bu || b.dia_diem_hoac_link) && <LienKet url={b.dia_diem_hoac_link} />}
                       </Text>
                       <BaoVangBuoi hocVienId={hocVienId} buoi={b} baoVang={baoVang.find((x) => x.lich_hoc_id === b.id)} />
                     </Group>

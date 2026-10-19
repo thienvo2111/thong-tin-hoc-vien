@@ -273,3 +273,44 @@ describe('Tab Thống kê đổi buổi', () => {
     expect(await choBang()).toBeInTheDocument();
   });
 });
+
+// ADR 0012: lọc Loại đề nghị, số học bù đã duyệt vào buổi, nhãn Học bù trong chi tiết.
+describe('Tab Thống kê đổi buổi — học bù', () => {
+  it('lọc Loại đề nghị gửi loai (CSV) cho bảng và chi tiết buổi', async () => {
+    const urls = datApi();
+    const urlChiTiet: string[] = [];
+    server.use(
+      http.get('/doi-buoi-hoc/thong-ke/buoi/:lichId', ({ request }) => {
+        urlChiTiet.push(request.url);
+        return HttpResponse.json({ ra: [], vao: [] });
+      }),
+    );
+    const user = userEvent.setup();
+    renderTab();
+    await choBang();
+    expect(tham(cuoi(urls)).get('loai')).toBeNull();
+    await chon(user, 'Loại đề nghị', 'Học bù');
+    await waitFor(() => expect(tham(cuoi(urls)).get('loai')).toBe('hoc_bu'));
+    await user.click(screen.getByRole('button', { name: /Xem chi tiết Lớp 01/ }));
+    await waitFor(() => expect(tham(cuoi(urlChiTiet)).get('loai')).toBe('hoc_bu'));
+  });
+
+  it('dòng có vao_hoc_bu > 0 ghi "Học bù đã duyệt: n"; có ghi chú Đổi ra gồm học bù; chi tiết có nhãn Học bù', async () => {
+    datApi(ketQua({ dong: [dong('l1', 'Lớp 01', { vao_hoc_bu: 2 }), dong('l2', 'Lớp 02', { vao_hoc_bu: 0 })] }));
+    server.use(
+      http.get('/doi-buoi-hoc/thong-ke/buoi/:lichId', () =>
+        HttpResponse.json({ ra: [], vao: [hv('vao-hb', { loai: 'hoc_bu' }), hv('vao-db')] }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderTab();
+    const hangA = hang(await choBang());
+    expect(hangA).toHaveTextContent('Học bù đã duyệt: 2');
+    expect(hang(screen.getByRole('button', { name: /Xem chi tiết Lớp 02/ }))).not.toHaveTextContent('Học bù');
+    expect(screen.getByText(/"Đổi ra" gồm cả học bù/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Xem chi tiết Lớp 01/ }));
+    const vao = await within(await screen.findByRole('dialog')).findByRole('region', { name: /Đổi vào/ });
+    expect(within(vao).getAllByText('Học bù')).toHaveLength(1);
+    expect(vao).toHaveTextContent('Học viên vao-hbHọc bù');
+  });
+});

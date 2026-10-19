@@ -520,3 +520,121 @@ describe("Trang đề nghị đổi buổi (học viên)", () => {
     expect(screen.queryByText(/lượt đổi/)).not.toBeInTheDocument();
   });
 });
+
+// ADR 0012: cùng trang, ?loai=hoc_bu — nguồn là buổi đã vắng, lượt học bù riêng.
+describe("Trang đăng ký học bù (học viên, ?loai=hoc_bu)", () => {
+  const VANG = lich("lv-1", "Lớp 01", 2, -48);
+
+  function tongQuanHocBu(over: Partial<TongQuanDoiBuoi> = {}): TongQuanDoiBuoi {
+    return tongQuanMau({
+      so_buoi_hoc_bu_toi_da: 2,
+      so_luot_hoc_bu_da_dung: 1,
+      buoi_co_the_hoc_bu: [
+        { lich_nguon: VANG, trang_thai_diem_danh: "vang", de_nghi: null },
+      ],
+      ...over,
+    });
+  }
+
+  it("tiêu đề, lượt học bù, mục Buổi đã vắng; lựa chọn gọi ?loai=hoc_bu; POST gửi loai", async () => {
+    datApi(tongQuanHocBu());
+    const urls: string[] = [];
+    const bodies: unknown[] = [];
+    server.use(
+      http.get("/hoc-vien/toi/doi-buoi/lua-chon/:id", ({ request }) => {
+        urls.push(new URL(request.url).pathname + new URL(request.url).search);
+        return HttpResponse.json(LUA_CHON);
+      }),
+      http.post("/hoc-vien/toi/doi-buoi", async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({ id: "dn-hb" }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderTrang("?khoa=khoa-1&lich=lv-1&loai=hoc_bu");
+    expect(
+      await screen.findByRole("heading", { name: "Đăng ký học bù" }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("Còn 1/2 lượt học bù")).toBeInTheDocument();
+    expect(
+      (screen.getByRole("textbox", { name: "Buổi đã vắng" }) as HTMLInputElement).value,
+    ).toMatch(/^Lớp 01 · Buổi 2 · /);
+    await user.click(await screen.findByRole("radio", { name: /Lớp 02/ }));
+    expect(screen.getByText("Buổi muốn học bù")).toBeInTheDocument();
+    expect(urls).toEqual(["/hoc-vien/toi/doi-buoi/lua-chon/lv-1?loai=hoc_bu"]);
+    await user.type(screen.getByLabelText(/Lý do/), "Hôm đó bị ốm");
+    await user.click(screen.getByRole("button", { name: "Gửi đề nghị" }));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        {
+          lich_nguon_id: "lv-1",
+          lich_de_nghi_id: "ld-1",
+          ly_do: "Hôm đó bị ốm",
+          loai: "hoc_bu",
+        },
+      ]),
+    );
+  });
+
+  it("khóa chưa bật học bù (0) → thông báo nhẹ; trang đổi buổi vẫn chạy", async () => {
+    datApi(tongQuanMau({ so_buoi_hoc_bu_toi_da: 0 }));
+    renderTrang("?khoa=khoa-1&loai=hoc_bu");
+    expect(
+      await screen.findByText("Khóa học chưa mở đăng ký học bù"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/lượt/)).not.toBeInTheDocument();
+  });
+
+  it("khóa chỉ bật học bù → trang đổi buổi báo chưa mở đổi buổi", async () => {
+    datApi(tongQuanHocBu({ so_buoi_doi_toi_da: 0, buoi_sap_toi: [] }));
+    renderTrang("?khoa=khoa-1");
+    expect(
+      await screen.findByText("Khóa học chưa mở đề nghị đổi buổi"),
+    ).toBeInTheDocument();
+  });
+
+  it("đề nghị học bù có badge Học bù, chỉ hiện ở trang học bù; trang đổi buổi không lẫn", async () => {
+    const hb = deNghiMau({
+      id: "dn-hb",
+      loai: "hoc_bu",
+      lich_nguon_id: "lv-1",
+      buoi_nguon: tomTat(VANG),
+    });
+    datApi(tongQuanHocBu({ de_nghi: [hb] }));
+    const { unmount } = renderTrang("?khoa=khoa-1&loai=hoc_bu");
+    const the = await screen.findByTestId("de-nghi-cho-duyet");
+    expect(within(the).getByText("Học bù")).toBeInTheDocument();
+    expect(within(the).getByText(/^Buổi đã vắng: Lớp 01 · Buổi 2/)).toBeInTheDocument();
+    expect(within(the).getByText(/^Học bù tại: Lớp 02/)).toBeInTheDocument();
+    unmount();
+    renderTrang("?khoa=khoa-1");
+    expect(await screen.findByText("Còn 1/2 lượt đổi")).toBeInTheDocument();
+    expect(screen.queryByTestId("de-nghi-cho-duyet")).not.toBeInTheDocument();
+  });
+
+  it("học bù đã duyệt, buổi học bù chưa bắt đầu → có Đổi lại dù buổi gốc đã qua", async () => {
+    const daDuyet = deNghiMau({
+      id: "dn-hb-duyet",
+      loai: "hoc_bu",
+      trang_thai: "da_duyet",
+      lich_nguon_id: "lv-1",
+      buoi_nguon: tomTat(VANG),
+      lich_chot_id: "ld-9",
+      buoi_chot: tomTat(lich("ld-9", "Lớp 09", 2, 60)),
+    });
+    datApi(
+      tongQuanHocBu({
+        so_luot_hoc_bu_da_dung: 2,
+        buoi_co_the_hoc_bu: [
+          { lich_nguon: VANG, trang_thai_diem_danh: "vang", de_nghi: daDuyet },
+        ],
+        de_nghi: [daDuyet],
+      }),
+    );
+    renderTrang("?khoa=khoa-1&loai=hoc_bu");
+    expect(
+      await screen.findByText("Thầy/Cô đã dùng hết lượt học bù của khóa này."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Đổi lại" })).toBeInTheDocument();
+  });
+});

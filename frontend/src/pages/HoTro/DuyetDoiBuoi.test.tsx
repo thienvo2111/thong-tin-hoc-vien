@@ -513,3 +513,72 @@ describe("Màn duyệt đổi buổi", () => {
     expect(screen.queryByText("Đổi buổi học")).toBeNull();
   });
 });
+
+// ADR 0012: học bù trên màn duyệt — badge, khối "Buổi đã vắng", lọc Loại.
+describe("Màn duyệt đổi buổi — học bù", () => {
+  const hocBu = (over: Partial<DeNghiDuyet> = {}) =>
+    deNghi({
+      id: "dn-hb",
+      loai: "hoc_bu",
+      buoi_nguon: tomTat(lich("ln-v", "Lớp 01", -48)),
+      ...over,
+    });
+
+  it("thẻ chờ duyệt học bù: badge Học bù, khối Buổi đã vắng / Xin học bù tại; đổi buổi không có badge", async () => {
+    datApi([hocBu(), deNghi({ id: "dn-db", loai: "doi_buoi" })]);
+    renderTrang("ho_tro_hoc_vien");
+    const [the1, the2] = await screen.findAllByTestId("de-nghi-cho-duyet");
+    expect(within(the1).getByText("Học bù")).toBeInTheDocument();
+    expect(within(the1).getByRole("group", { name: "Buổi đã vắng" })).toHaveTextContent("Lớp 01");
+    expect(within(the1).getByRole("group", { name: "Xin học bù tại" })).toHaveTextContent("Lớp 02");
+    expect(within(the2).queryByText("Học bù")).toBeNull();
+    expect(within(the2).getByRole("group", { name: "Buổi gốc" })).toBeInTheDocument();
+    // Modal duyệt học bù cũng ghi Buổi đã vắng.
+    const user = userEvent.setup();
+    await user.click(within(the1).getByRole("button", { name: "Duyệt" }));
+    const modal = await screen.findByRole("dialog");
+    expect(within(modal).getByRole("group", { name: "Buổi đã vắng" })).toBeInTheDocument();
+  });
+
+  it("lọc Loại: Học bù gửi loai=hoc_bu cho cả danh sách chính và khối quá hạn; Tất cả bỏ loai", async () => {
+    const urls: string[] = [];
+    datApi([]);
+    server.use(
+      http.get("/doi-buoi-hoc", ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json([]);
+      }),
+    );
+    renderTrang("ho_tro_hoc_vien");
+    await screen.findByText("Không có đề nghị nào đang chờ duyệt.");
+    expect(urls.every((u) => !u.includes("loai="))).toBe(true);
+    const user = userEvent.setup();
+    await user.click(screen.getByText("Học bù"));
+    await waitFor(() => {
+      const coLoai = urls.filter((u) => u.includes("loai=hoc_bu"));
+      expect(coLoai.some((u) => u.includes("qua_han=true"))).toBe(true);
+      expect(coLoai.some((u) => !u.includes("qua_han"))).toBe(true);
+    });
+    await user.click(screen.getByRole("tab", { name: "Đã xử lý" }));
+    await waitFor(() =>
+      expect(urls.some((u) => u.includes("da_xu_ly=true") && u.includes("loai=hoc_bu"))).toBe(true),
+    );
+  });
+
+  it("đã xử lý: học bù đã duyệt (buổi gốc đã qua, buổi chốt chưa bắt đầu) vẫn Hủy duyệt được", async () => {
+    datApi([
+      hocBu({
+        trang_thai: "da_duyet",
+        lich_chot_id: "ld-1",
+        buoi_chot: tomTat(lich("ld-1", "Lớp 02", 50)),
+      }),
+    ]);
+    renderTrang("ho_tro_hoc_vien");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "Đã xử lý" }));
+    const [dong] = await screen.findAllByTestId("de-nghi-da-xu-ly");
+    expect(within(dong).getByText("Học bù")).toBeInTheDocument();
+    expect(within(dong).getByRole("group", { name: "Buổi đã vắng" })).toBeInTheDocument();
+    expect(within(dong).getByRole("button", { name: "Hủy duyệt" })).toBeInTheDocument();
+  });
+});

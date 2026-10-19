@@ -20,12 +20,15 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
+  NHAN_LOAI_DOI_BUOI,
+  laHocBu,
   nhanDaXuLy,
   useChiTietBuoiThongKe,
   useThongKeDoiBuoi,
   xuatThongKeDoiBuoi,
   type DongThongKeDoiBuoi,
   type HocVienDongThongKe,
+  type LoaiDoiBuoi,
   type LocThongKeDoiBuoi,
   type ThongKeDoiBuoi as KetQua,
 } from '@/api/doiBuoi';
@@ -42,6 +45,10 @@ const MUC_OPTIONS = (Object.keys(NHAN_MUC_NANG_LUC) as MucNangLuc[]).map((m) => 
   label: NHAN_MUC_NANG_LUC[m],
 }));
 const LOAI_OPTIONS = (Object.keys(NHAN_LOAI_LOP) as LoaiLop[]).map((m) => ({ value: m, label: NHAN_LOAI_LOP[m] }));
+const LOAI_DE_NGHI_OPTIONS = (Object.keys(NHAN_LOAI_DOI_BUOI) as LoaiDoiBuoi[]).map((m) => ({
+  value: m,
+  label: NHAN_LOAI_DOI_BUOI[m],
+}));
 const BO_LOC_RONG: KetQua['bo_loc'] = { khoa: [], giai_doan: [], lop: [], cum: [] };
 
 /** "Thứ sáu, 20/11" theo giờ Việt Nam (gọn hơn dinhDangThuNgay — bảng nhiều dòng). */
@@ -74,6 +81,9 @@ export default function ThongKeDoiBuoi() {
             </StatusBanner>
           )}
           <OTong tong={data.tong} />
+          <Text fz="xs" c="dimmed">
+            "Đổi ra" gồm cả học bù; người học bù vẫn thuộc buổi đã vắng nên sĩ số buổi đó không giảm.
+          </Text>
           {data.dong.length === 0 ? (
             <Text fz="sm" c="dimmed">
               Không có buổi nào có đề nghị đổi theo bộ lọc.
@@ -166,6 +176,15 @@ function BoLoc({
         data={LOAI_OPTIONS}
         value={loc.loai_lop ?? []}
         onChange={(v) => doi({ loai_lop: mang(v) as LoaiLop[] | undefined })}
+      />
+      <MultiSelect
+        label="Loại đề nghị"
+        size="xs"
+        w={w}
+        clearable
+        data={LOAI_DE_NGHI_OPTIONS}
+        value={loc.loai ?? []}
+        onChange={(v) => doi({ loai: mang(v) as LoaiDoiBuoi[] | undefined })}
       />
       {bo.cum.length > 1 && (
         <MultiSelect
@@ -331,6 +350,11 @@ function BangBuoi({ dong, onChon }: { dong: DongThongKeDoiBuoi[]; onChon: (d: Do
                 </Table.Td>
                 <Table.Td>
                   <NamSo nhan="Đổi vào" so={[d.vao_da_duyet, d.vao_cho, d.vao_qua_han, d.vao_tu_choi, d.vao_huy]} />
+                  {(d.vao_hoc_bu ?? 0) > 0 && (
+                    <Text fz="xs" c="grape.7" lh={1.3}>
+                      Học bù đã duyệt: {d.vao_hoc_bu}
+                    </Text>
+                  )}
                 </Table.Td>
               </Table.Tr>
             );
@@ -387,6 +411,11 @@ function DanhSachHocVien({ tieuDe, nhanBuoi, ds }: { tieuDe: string; nhanBuoi: s
               <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xs">
                 <Text fz="sm" fw={600} lh={1.3}>
                   {h.ho_ten}
+                  {laHocBu(h) && (
+                    <Text span fz="xs" fw={600} c="grape.7" ml={6}>
+                      Học bù
+                    </Text>
+                  )}
                 </Text>
                 <Badge
                   size="xs"

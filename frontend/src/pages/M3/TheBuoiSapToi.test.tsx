@@ -107,3 +107,43 @@ describe("TheBuoiSapToi — link đổi buổi", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("TheBuoiSapToi — học bù (ADR 0012)", () => {
+  it("buổi học bù đã duyệt (ô thêm) → nhãn Học bù + buổi gốc, KHÔNG có link Đổi buổi", () => {
+    renderThe(
+      khoaVoiBuoi(2, 24 * GIO, {
+        hoc_bu: true,
+        lich_goc_id: "lh-goc",
+        lop_goc_ten: "Lớp 01",
+        lop_chot_ten: "Lớp 05",
+      }),
+    );
+    expect(screen.getByText("Học bù")).toBeInTheDocument();
+    expect(
+      screen.getByText("Học bù cho buổi 1 của Lớp 01 — học tại Lớp 05"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Không tham gia được buổi này?" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Muốn đổi lại buổi này?" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("buổi đã bắt đầu có hoc_bu_duoc → link Đăng ký học bù đúng href; không có cờ thì không có", () => {
+    const { unmount } = renderThe(
+      khoaVoiBuoi(2, -1 * GIO, { hoc_bu_duoc: true }),
+    );
+    expect(
+      screen.getByRole("link", { name: "Đăng ký học bù buổi này?" }),
+    ).toHaveAttribute(
+      "href",
+      "/de-nghi-doi-buoi?khoa=khoa-1&lich=lh-test&loai=hoc_bu",
+    );
+    unmount();
+    renderThe(khoaVoiBuoi(2, -1 * GIO, { hoc_bu_duoc: false }));
+    expect(
+      screen.queryByRole("link", { name: "Đăng ký học bù buổi này?" }),
+    ).not.toBeInTheDocument();
+  });
+});

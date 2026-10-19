@@ -859,4 +859,21 @@ Học bù **dùng chung** bảng `doi_buoi_hoc` và mọi route ở 12.1–12.2,
 | `POST /doi-buoi-hoc/{id}/huy-duyet` | Học bù: chỉ chặn khi buổi học bù đã bắt đầu / đã điểm danh buổi học bù; **không** đọc sĩ số buổi gốc |
 | `PATCH /khoa-boi-duong/{id}` | Nhận `so_buoi_hoc_bu_toi_da` (số nguyên 0–50; CHECK `chk_khoa_so_buoi_hoc_bu`). `GET /khoa-boi-duong/{id}` và khóa trong `GET /hoc-vien/toi/khoa-hoc` trả trường này |
 
-Nhật ký (`de_nghi_doi_buoi`, `duyet_doi_buoi`): đề nghị học bù ghi thêm `chi_tiet.loai = 'hoc_bu'` và `mo_ta` "… đăng ký học bù" / "Duyệt học bù" / "Hủy duyệt học bù"; đổi buổi giữ nguyên (không có `loai` = `doi_buoi`). Các màn đọc theo buổi (sĩ số, trang lớp, lịch học viên, Zoom, chuyên cần, thống kê) xử lý `loai` ở bước sau (spec §5).
+Nhật ký (`de_nghi_doi_buoi`, `duyet_doi_buoi`): đề nghị học bù ghi thêm `chi_tiet.loai = 'hoc_bu'` và `mo_ta` "… đăng ký học bù" / "Duyệt học bù" / "Hủy duyệt học bù"; đổi buổi giữ nguyên (không có `loai` = `doi_buoi`). Các màn đọc theo buổi: xem 12.5.
+
+### 12.5 Học bù ở các màn đọc theo buổi (ADR 0012, spec §5)
+
+Quy tắc chung: học bù đã duyệt **thêm** buổi chốt cho học viên, **không** bỏ buổi gốc (đã qua). Đổi buổi giữ nguyên hành vi 12.3. Mọi trường dưới đây chỉ thêm.
+
+| Endpoint | Thay đổi |
+|---|---|
+| `GET /hoc-vien/toi/khoa-hoc` (và `GET /hoc-vien/{id}/khoa-hoc`, `GET /ho-tro-hoc-vien/hoc-vien/{id}` → `hoc_tap`) | `khoa.so_buoi_hoc_bu_toi_da`. Mỗi buổi thêm `hoc_bu_duoc: boolean` = khóa bật học bù ∧ buổi đã bắt đầu ∧ không `co_mat` ∧ chưa có học bù `da_duyet` hoặc `cho_duyet` **còn hạn** (buổi học bù chưa bắt đầu) ∧ chưa có đổi buổi `da_duyet`. Học bù `da_duyet`: buổi gốc giữ nguyên chỗ cũ (vẫn mang `trang_thai_diem_danh` của nó), buổi chốt được **chèn thêm** theo giờ với `hoc_bu: true`, `lich_goc_id`, `lop_goc_ten`, `lop_chot_ten` (không có `da_doi_buoi`) |
+| Trang lớp (cổng giảng viên, hồ sơ lớp hỗ trợ GV), bảng điểm danh lớp, `GET /ho-tro-hoc-vien/lop/{lopId}/buoi/…` | Nhãn `doi_buoi[lich_hoc_id]` thêm `hoc_bu: true` khi là học bù: ở buổi gốc `{ loai: 'ra', lop, hoc_bu: true }` — học viên **vẫn thuộc** danh sách buổi gốc, không tính là đổi ra; ở buổi chốt `{ loai: 'vao', lop, hoc_bu: true }` ("Học bù từ {lớp}"). Danh sách theo buổi (L7): người học bù vẫn ở buổi gốc, `so_doi_ra`/`doi_ra` không tính học bù; ghi chú người vào "Học bù – từ lớp …" |
+| Sĩ số buổi (`si_so` mọi màn: lựa chọn, thống kê, trang lớp) | Học bù **không trừ** ở buổi gốc; **cộng** ở buổi chốt |
+| `GET /ho-tro-hoc-vien/lich-hoc` | `hoc_vien_hoc_bu?: string[]` — họ tên học viên cụm học bù vào buổi (đã tính trong `so_hoc_vien_cum`); `hoc_vien_doi_buoi` chỉ còn đổi buổi; buổi gốc không trừ người học bù |
+| `GET /ho-tro-hoc-vien/di-hoc/{dangKyHocId}` (và bản Quản trị) | `buoi[].doi_buoi` thêm `hoc_bu: boolean` (buổi hiệu dụng là buổi học bù). Chuyên cần tính như đổi buổi: có mặt ở buổi chốt tính cho buổi gốc |
+| `GET /doi-buoi-hoc/thong-ke` | Lọc `loai` (CSV `doi_buoi,hoc_bu`; trống = mọi loại). Mỗi dòng thêm `vao_hoc_bu` = số học bù **đã duyệt** vào buổi (tập con của `vao_da_duyet`). Cột "Ra *" vẫn gồm học bù xuất phát từ buổi gốc (sĩ số buổi gốc không giảm). Học bù chờ chỉ quá hạn theo buổi đề nghị |
+| `GET /doi-buoi-hoc/thong-ke/buoi/{lichId}` | Nhận `loai`; mỗi học viên thêm `loai` |
+| `GET /doi-buoi-hoc/thong-ke/xuat-excel` | Nhận `loai`; sheet buổi thêm cột cuối "Học bù vào (đã duyệt)"; sheet Học viên thêm cột cuối "Loại" (Đổi buổi / Học bù); mô tả bộ lọc ghi "Loại: …" |
+| Vào học Zoom, báo vắng, sửa ô điểm danh, nạp điểm danh Excel | Ở buổi chốt: như đổi buổi (cho phép; không báo học bù). Chốt vắng Zoom **không** bỏ qua người học bù ở buổi gốc |
+| Nhắc lịch cụm | Buổi chốt có dòng "{họ tên} học bù buổi {n} tại {lớp}"; buổi gốc không đổi |

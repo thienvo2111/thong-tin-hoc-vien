@@ -381,6 +381,7 @@ describe('TinhHinhDiHocService', () => {
     expect(doi.doi_buoi).toEqual({
       tu_lop: { id: 'lop-a', ten_lop: 'Lớp A' },
       sang_lop: { id: 'lop-c', ten_lop: 'Lớp C' },
+      hoc_bu: false,
     });
     expect(doi.diem_danh).toMatchObject({
       nguoi_sua: 'Hỗ trợ 1',
@@ -408,6 +409,7 @@ describe('TinhHinhDiHocService', () => {
       lich_hoc_id: 'c2',
       lich_nguon_id: 'a2',
       diem_danh: { ma: 'co_mat' },
+      doi_buoi: { tu_lop: { ten_lop: 'Lớp A' }, sang_lop: { ten_lop: 'Lớp C' }, hoc_bu: true },
     });
   });
 

@@ -123,6 +123,36 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
 
       await waitFor(() => expect(bodies).toEqual([{ so_buoi_doi_toi_da: 3 }]));
     });
+
+    // ADR 0012: ô học bù cạnh ô đổi buổi, 0–50, lưu riêng.
+    it('quan_tri: ô học bù nhập 2 → PATCH so_buoi_hoc_bu_toi_da=2; 51 bị chặn', async () => {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      const bodies: unknown[] = [];
+      server.use(
+        http.patch('/khoa-boi-duong/:id', async ({ params, request }) => {
+          const body = (await request.json()) as Record<string, unknown>;
+          bodies.push(body);
+          Object.assign(db.chiTietKhoa[params.id as string], body);
+          return HttpResponse.json(db.chiTietKhoa[params.id as string]);
+        }),
+      );
+      const user = userEvent.setup();
+      renderTrang('khoa-1');
+      const o = await screen.findByLabelText('Số buổi học bù tối đa mỗi học viên (0 = tắt)');
+      expect(o).toHaveValue('0');
+      const nut = screen.getByRole('button', { name: 'Lưu số buổi học bù' });
+      expect(nut).toBeDisabled();
+
+      await user.clear(o);
+      await nhap(user, o, '51');
+      expect(nut).toBeDisabled();
+      await user.clear(o);
+      await nhap(user, o, '2');
+      await user.click(nut);
+
+      await waitFor(() => expect(bodies).toEqual([{ so_buoi_hoc_bu_toi_da: 2 }]));
+      expect(await screen.findByText('Học viên được đăng ký học bù tối đa 2 buổi')).toBeInTheDocument();
+    });
   });
 
   describe('Switch "Cho học viên điều chỉnh mức lớp học"', () => {

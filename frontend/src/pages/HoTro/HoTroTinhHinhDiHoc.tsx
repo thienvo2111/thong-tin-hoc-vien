@@ -442,10 +442,11 @@ function TheBuoi({ buoi: b, onBoSung }: { buoi: BuoiDiHoc; onBoSung: () => void 
         {b.doi_buoi && (
           <Group gap={6}>
             <Badge color="teal" variant="light" size="sm" tt="none">
-              Đổi buổi
+              {b.doi_buoi.hoc_bu ? 'Học bù' : 'Đổi buổi'}
             </Badge>
             <Text fz="xs">
-              Từ lớp {b.doi_buoi.tu_lop.ten_lop} sang lớp {b.doi_buoi.sang_lop.ten_lop}
+              {b.doi_buoi.hoc_bu ? 'Học bù cho lớp' : 'Từ lớp'} {b.doi_buoi.tu_lop.ten_lop}{' '}
+              {b.doi_buoi.hoc_bu ? 'tại' : 'sang'} lớp {b.doi_buoi.sang_lop.ten_lop}
             </Text>
           </Group>
         )}

@@ -12,18 +12,19 @@ type Buoi = TrangLop['buoi'][number];
 /**
  * Danh sách 1 buổi = học viên lớp gốc − người đổi ra + người đổi vào (spec đổi buổi §5).
  * Chỉ đổi buổi đã duyệt còn hiệu lực — backend đã tính sẵn ở doi_buoi.
+ * Học bù (ADR 0012): người học bù vẫn thuộc buổi gốc (đã qua), chỉ được cộng ở buổi học bù.
  */
 export function dsTheoBuoi(d: TrangLop, lichId: string) {
-  const hocVien: (HocVien & { tuLop: string | null })[] = [];
+  const hocVien: (HocVien & { tuLop: string | null; hocBu?: boolean })[] = [];
   const doiRa: { ho_ten: string; lop: string }[] = [];
   for (const h of d.hoc_vien) {
     const n = h.doi_buoi?.[lichId];
-    if (n?.loai === 'ra') doiRa.push({ ho_ten: h.ho_ten, lop: n.lop });
+    if (n?.loai === 'ra' && !n.hoc_bu) doiRa.push({ ho_ten: h.ho_ten, lop: n.lop });
     else hocVien.push({ ...h, tuLop: null });
   }
   for (const h of d.hoc_vien_doi_vao ?? []) {
     const n = h.doi_buoi?.[lichId];
-    if (n?.loai === 'vao') hocVien.push({ ...h, tuLop: n.lop });
+    if (n?.loai === 'vao') hocVien.push({ ...h, tuLop: n.lop, hocBu: !!n.hoc_bu });
   }
   return { hocVien, doiRa };
 }
@@ -124,7 +125,7 @@ export function DanhSachTheoBuoi({ d }: { d: TrangLop }) {
                     <Table.Td>
                       <ODiemDanh h={h} lichId={buoi.id} />
                     </Table.Td>
-                    <Table.Td>{h.tuLop ? `Đổi buổi – từ lớp ${h.tuLop}` : ''}</Table.Td>
+                    <Table.Td>{h.tuLop ? `${h.hocBu ? 'Học bù' : 'Đổi buổi'} – từ lớp ${h.tuLop}` : ''}</Table.Td>
                   </Table.Tr>
                 ))}
               </Table.Tbody>

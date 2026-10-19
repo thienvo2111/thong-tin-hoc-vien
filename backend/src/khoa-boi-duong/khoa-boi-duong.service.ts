@@ -1371,8 +1371,9 @@ export class KhoaBoiDuongService {
     const laBuoiChot = new Set(
       doiBuoi.map((d) => `${d.dang_ky_hoc_id}|${d.lich_chot_id}`),
     );
-    // ADR 0012 hoc_bu_duoc: buổi gốc đã có học bù (chờ/đã duyệt) hoặc đổi buổi
-    // đã duyệt thì không mời đăng ký học bù. Chỉ truy vấn khi có khóa bật học bù.
+    // ADR 0012 hoc_bu_duoc: buổi gốc đã có học bù (chờ còn hạn/đã duyệt) hoặc đổi
+    // buổi đã duyệt thì không mời đăng ký học bù. Học bù chờ mà buổi học bù đã bắt
+    // đầu (quá hạn) không chặn. Chỉ truy vấn khi có khóa bật học bù.
     const coHocBu = dangKyList.some(
       (dk) => (dk.khoa.so_buoi_hoc_bu_toi_da ?? 0) > 0,
     );
@@ -1382,7 +1383,11 @@ export class KhoaBoiDuongService {
             where: {
               dang_ky_hoc_id: { in: dangKyIds },
               OR: [
-                { loai: 'hoc_bu', trang_thai: { in: ['cho_duyet', 'da_duyet'] } },
+                {
+                  loai: 'hoc_bu',
+                  trang_thai: 'cho_duyet',
+                  lich_de_nghi: { thoi_gian_bat_dau: { gt: new Date() } },
+                },
                 { trang_thai: 'da_duyet' },
               ],
             },

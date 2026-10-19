@@ -707,4 +707,51 @@ describe('M7 — Điểm danh & vào Zoom', () => {
       expect(within(gd2).queryByRole('link', { name: 'Muốn đổi lại buổi này?' })).not.toBeInTheDocument();
     });
   });
+
+  describe('học bù (ADR 0012)', () => {
+    // lh-qua: buổi đã qua, vắng, được học bù; lh-hb: ô học bù đã duyệt (tương lai) cho buổi 1 lớp 01.
+    function datKhoaHocBu(doiBuoi: number) {
+      const [dk] = taoKhoaHocToiMau();
+      const lop = dk.giai_doan[1].lop!;
+      const luc = (gio: number) => new Date(Date.now() + gio * 3600_000).toISOString();
+      lop.lich_hoc = [
+        { ...lop.lich_hoc[0], id: 'lh-qua', buoi_so: 1, thoi_gian_bat_dau: luc(-48), thoi_gian_ket_thuc: luc(-45), trang_thai: 'ket_thuc', trang_thai_diem_danh: 'vang', hoc_bu_duoc: true },
+        { ...lop.lich_hoc[0], id: 'lh-vang2', buoi_so: 2, thoi_gian_bat_dau: luc(-24), thoi_gian_ket_thuc: luc(-21), trang_thai: 'ket_thuc', trang_thai_diem_danh: 'vang', hoc_bu_duoc: false },
+        {
+          ...lop.lich_hoc[0],
+          id: 'lh-hb',
+          buoi_so: 1,
+          thoi_gian_bat_dau: luc(24),
+          thoi_gian_ket_thuc: luc(27),
+          trang_thai: 'chua_dien_ra',
+          trang_thai_diem_danh: null,
+          hoc_bu: true,
+          lich_goc_id: 'lh-qua',
+          lop_goc_ten: 'Lớp 01',
+          lop_chot_ten: 'Lớp 05',
+        },
+      ];
+      dk.khoa = { ...dk.khoa, so_buoi_doi_toi_da: doiBuoi, so_buoi_hoc_bu_toi_da: 2 };
+      db.khoaHocToi = [dk];
+    }
+
+    it('buổi đã qua có hoc_bu_duoc → link học bù đúng href (kể cả khóa tắt đổi buổi); buổi không cờ thì không', async () => {
+      datKhoaHocBu(0);
+      renderDaDangNhap();
+      const gd2 = (await cacTheGiaiDoan())[1];
+      const links = within(gd2).getAllByRole('link', { name: 'Đăng ký học bù buổi này?' });
+      expect(links).toHaveLength(1);
+      expect(links[0]).toHaveAttribute('href', '/de-nghi-doi-buoi?khoa=khoa-1&lich=lh-qua&loai=hoc_bu');
+    });
+
+    it('ô học bù đã duyệt: nhãn Học bù + "Học bù cho buổi 1 của Lớp 01", không có link Đổi buổi', async () => {
+      datKhoaHocBu(2);
+      renderDaDangNhap();
+      const gd2 = (await cacTheGiaiDoan())[1];
+      expect(within(gd2).getByText('Học bù')).toBeInTheDocument();
+      expect(within(gd2).getByTestId('hoc-bu-cho')).toHaveTextContent('Học bù cho buổi 1 của Lớp 01 — học tại Lớp 05');
+      // Buổi học bù ở tương lai nhưng KHÔNG mời đổi buổi (chỉ buổi gốc mới đổi được).
+      expect(within(gd2).queryByRole('link', { name: 'Không tham gia được buổi này?' })).not.toBeInTheDocument();
+    });
+  });
 });

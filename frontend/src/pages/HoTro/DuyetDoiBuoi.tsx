@@ -10,6 +10,7 @@ import {
   Paper,
   Radio,
   ScrollArea,
+  SegmentedControl,
   SimpleGrid,
   Stack,
   Tabs,
@@ -19,6 +20,7 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
+  laHocBu,
   nhanDaXuLy,
   useDsDoiBuoi,
   useDuyetDoiBuoi,
@@ -27,6 +29,7 @@ import {
   useTuChoiDoiBuoi,
   type BuoiTomTat,
   type DeNghiDuyet,
+  type LoaiDoiBuoi,
   type LuaChonDuyet,
 } from '@/api/doiBuoi';
 import { useToi } from '@/auth/AuthContext';
@@ -85,21 +88,37 @@ function KhoiBuoi({
   );
 }
 
+/** Học bù (ADR 0012): buổi gốc là buổi học viên đã vắng. */
+function nhanGoc(d: DeNghiDuyet): string {
+  return laHocBu(d) ? 'Buổi đã vắng' : 'Buổi gốc';
+}
+
+function BadgeHocBu({ d }: { d: DeNghiDuyet }) {
+  if (!laHocBu(d)) return null;
+  return (
+    <Badge color="grape" variant="light">
+      Học bù
+    </Badge>
+  );
+}
+
 /** Buổi gốc → buổi đích, 2 cột trên màn rộng, xếp dọc trên điện thoại. */
 function HaiBuoi({
   goc,
   dich,
+  nhanGoc = 'Buổi gốc',
   nhanDich,
   phuDich,
 }: {
   goc: BuoiTomTat | null;
   dich: BuoiTomTat | null;
+  nhanGoc?: string;
   nhanDich: string;
   phuDich?: ReactNode;
 }) {
   return (
     <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="xs" verticalSpacing={6}>
-      <KhoiBuoi nhan="Buổi gốc" b={goc} mau="gray" />
+      <KhoiBuoi nhan={nhanGoc} b={goc} mau="gray" />
       <KhoiBuoi nhan={nhanDich} b={dich} mau="blue" phu={phuDich} />
     </SimpleGrid>
   );
@@ -126,6 +145,7 @@ export default function DuyetDoiBuoi() {
   const [duyet, setDuyet] = useState<DeNghiDuyet | null>(null);
   const [tuChoi, setTuChoi] = useState<DeNghiDuyet | null>(null);
   const [huyDuyet, setHuyDuyet] = useState<DeNghiDuyet | null>(null);
+  const [loai, setLoai] = useState<'' | LoaiDoiBuoi>('');
   const hanhDong: HanhDong = {
     onDuyet: setDuyet,
     onTuChoi: setTuChoi,
@@ -138,6 +158,24 @@ export default function DuyetDoiBuoi() {
         <Title order={1} size="h2">
           Đổi buổi học
         </Title>
+        {tab !== 'thong_ke' && (
+          <Group gap="xs">
+            <Text fz="sm" fw={600}>
+              Loại
+            </Text>
+            <SegmentedControl
+              size="xs"
+              aria-label="Loại đề nghị"
+              value={loai}
+              onChange={(v) => setLoai(v as '' | LoaiDoiBuoi)}
+              data={[
+                { value: '', label: 'Tất cả' },
+                { value: 'doi_buoi', label: 'Đổi buổi' },
+                { value: 'hoc_bu', label: 'Học bù' },
+              ]}
+            />
+          </Group>
+        )}
         <Tabs value={tab} onChange={setTab} keepMounted={false}>
           <Tabs.List>
             <Tabs.Tab value="cho_duyet">Chờ duyệt</Tabs.Tab>
@@ -146,12 +184,12 @@ export default function DuyetDoiBuoi() {
           </Tabs.List>
           <Tabs.Panel value="cho_duyet" pt="md">
             <Stack gap="lg">
-              <DanhSach chiChoDuyet hanhDong={hanhDong} />
-              <DanhSachQuaHan hanhDong={hanhDong} />
+              <DanhSach chiChoDuyet hanhDong={hanhDong} loai={loai} />
+              <DanhSachQuaHan hanhDong={hanhDong} loai={loai} />
             </Stack>
           </Tabs.Panel>
           <Tabs.Panel value="da_xu_ly" pt="md">
-            <DanhSach chiChoDuyet={false} hanhDong={hanhDong} />
+            <DanhSach chiChoDuyet={false} hanhDong={hanhDong} loai={loai} />
           </Tabs.Panel>
           <Tabs.Panel value="thong_ke" pt="md">
             <ThongKeDoiBuoi />
@@ -167,10 +205,19 @@ export default function DuyetDoiBuoi() {
   );
 }
 
-function DanhSach({ chiChoDuyet, hanhDong }: { chiChoDuyet: boolean; hanhDong: HanhDong }) {
-  const { data, isLoading, isError, error } = useDsDoiBuoi(
-    chiChoDuyet ? { trang_thai: 'cho_duyet' } : { da_xu_ly: true },
-  );
+function DanhSach({
+  chiChoDuyet,
+  hanhDong,
+  loai,
+}: {
+  chiChoDuyet: boolean;
+  hanhDong: HanhDong;
+  loai: '' | LoaiDoiBuoi;
+}) {
+  const { data, isLoading, isError, error } = useDsDoiBuoi({
+    ...(chiChoDuyet ? { trang_thai: 'cho_duyet' } : { da_xu_ly: true }),
+    ...(loai ? { loai } : {}),
+  });
   if (isLoading) return <Loader size="sm" />;
   if (isError) return <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>;
   const ds = data ?? [];
@@ -201,8 +248,8 @@ function DanhSach({ chiChoDuyet, hanhDong }: { chiChoDuyet: boolean; hanhDong: H
 }
 
 /** Đề nghị chờ duyệt đã quá hạn (buổi nguồn hoặc buổi đề nghị đã bắt đầu) — tách riêng, chỉ còn Từ chối. */
-function DanhSachQuaHan({ hanhDong }: { hanhDong: HanhDong }) {
-  const { data } = useDsDoiBuoi({ trang_thai: 'cho_duyet', qua_han: true });
+function DanhSachQuaHan({ hanhDong, loai }: { hanhDong: HanhDong; loai: '' | LoaiDoiBuoi }) {
+  const { data } = useDsDoiBuoi({ trang_thai: 'cho_duyet', qua_han: true, ...(loai ? { loai } : {}) });
   const ds = data ?? [];
   if (ds.length === 0) return null;
   return (
@@ -242,6 +289,7 @@ function DongChoDuyet({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
         <Group justify="space-between" align="flex-start" wrap="nowrap">
           <ThongTinHocVien d={d} />
           <Group gap="xs">
+            <BadgeHocBu d={d} />
             {d.qua_han && (
               <Badge color="red" variant="light">
                 Quá hạn
@@ -263,7 +311,8 @@ function DongChoDuyet({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
         <HaiBuoi
           goc={d.buoi_nguon}
           dich={d.buoi_de_nghi}
-          nhanDich="Xin đổi sang"
+          nhanGoc={nhanGoc(d)}
+          nhanDich={laHocBu(d) ? 'Xin học bù tại' : 'Xin đổi sang'}
           phuDich={
             <Group gap={6} wrap="nowrap">
               <span>Sĩ số buổi:</span>
@@ -291,11 +340,15 @@ function DongChoDuyet({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
   );
 }
 
-/** Hủy duyệt chỉ khi cả buổi chốt lẫn buổi nguồn chưa bắt đầu (server vẫn kiểm lại). */
+/** Hủy duyệt chỉ khi cả buổi chốt lẫn buổi nguồn chưa bắt đầu (server vẫn kiểm lại).
+ *  Học bù: buổi nguồn đã qua sẵn — chỉ xét buổi chốt. */
 function huyDuyetDuoc(d: DeNghiDuyet): boolean {
   if (d.trang_thai !== 'da_duyet' || !d.buoi_chot || !d.buoi_nguon) return false;
   const now = Date.now();
-  return Date.parse(d.buoi_chot.thoi_gian_bat_dau) > now && Date.parse(d.buoi_nguon.thoi_gian_bat_dau) > now;
+  return (
+    Date.parse(d.buoi_chot.thoi_gian_bat_dau) > now &&
+    (laHocBu(d) || Date.parse(d.buoi_nguon.thoi_gian_bat_dau) > now)
+  );
 }
 
 function DongDaXuLy({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
@@ -306,19 +359,23 @@ function DongDaXuLy({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
       <Stack gap="xs">
         <Group justify="space-between" align="flex-start" wrap="nowrap">
           <ThongTinHocVien d={d} />
-          <Badge
-            variant="light"
-            color={d.trang_thai === 'da_duyet' ? 'green' : 'gray'}
-            tt="none"
-            styles={{ root: { height: 'auto', whiteSpace: 'normal', textAlign: 'right' } }}
-          >
-            {nhanDaXuLy(d)}
-          </Badge>
+          <Group gap="xs" wrap="nowrap">
+            <BadgeHocBu d={d} />
+            <Badge
+              variant="light"
+              color={d.trang_thai === 'da_duyet' ? 'green' : 'gray'}
+              tt="none"
+              styles={{ root: { height: 'auto', whiteSpace: 'normal', textAlign: 'right' } }}
+            >
+              {nhanDaXuLy(d)}
+            </Badge>
+          </Group>
         </Group>
         <HaiBuoi
           goc={d.buoi_nguon}
           dich={d.buoi_chot ?? d.buoi_de_nghi}
-          nhanDich={d.buoi_chot ? 'Buổi đã chốt' : 'Đã xin đổi sang'}
+          nhanGoc={nhanGoc(d)}
+          nhanDich={d.buoi_chot ? 'Buổi đã chốt' : laHocBu(d) ? 'Đã xin học bù tại' : 'Đã xin đổi sang'}
         />
         <Text fz="xs" c="dimmed">
           {d.nguoi_xu_ly && d.ly_do_huy !== 'huy_duyet' ? `Xử lý bởi ${d.nguoi_xu_ly}` : ''}
@@ -381,7 +438,7 @@ function ModalDuyet({ deNghi, onDong }: { deNghi: DeNghiDuyet; onDong: () => voi
   return (
     <Modal opened onClose={onDong} size="lg" title={`Duyệt đề nghị của ${deNghi.hoc_vien.ho_ten}`}>
       <Stack gap="sm">
-        <KhoiBuoi nhan="Buổi gốc" b={deNghi.buoi_nguon} mau="gray" />
+        <KhoiBuoi nhan={nhanGoc(deNghi)} b={deNghi.buoi_nguon} mau="gray" />
         {deNghi.doi_lai_tu && (
           <Text fz="xs" c="dimmed">
             Duyệt sẽ thay buổi đang học

@@ -1,9 +1,21 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, apiFetchBlob } from './client';
-import type { LoaiLop, MucNangLuc } from './types';
+import type { LoaiLop, MucNangLuc, TrangThaiDiemDanh } from './types';
 import { taiFileTuBlob } from '@/lib/taiFile';
 
 export type TrangThaiDeNghi = 'cho_duyet' | 'da_duyet' | 'tu_choi' | 'da_huy';
+
+/** ADR 0012: đổi buổi (buổi sắp tới) hay học bù (buổi đã vắng). Thiếu = doi_buoi. */
+export type LoaiDoiBuoi = 'doi_buoi' | 'hoc_bu';
+
+export const NHAN_LOAI_DOI_BUOI: Record<LoaiDoiBuoi, string> = {
+  doi_buoi: 'Đổi buổi',
+  hoc_bu: 'Học bù',
+};
+
+export function laHocBu(d: { loai?: LoaiDoiBuoi }): boolean {
+  return d.loai === 'hoc_bu';
+}
 
 export const NHAN_TRANG_THAI_DE_NGHI: Record<TrangThaiDeNghi, string> = {
   cho_duyet: 'Chờ duyệt',
@@ -60,6 +72,7 @@ export type LyDoHuy = 'hoc_vien_sua' | 'hoc_vien_huy' | 'huy_duyet' | 'thay_the'
 
 export interface DeNghiHocVien {
   id: string;
+  loai?: LoaiDoiBuoi;
   trang_thai: TrangThaiDeNghi;
   lich_nguon_id: string;
   lich_de_nghi_id: string;
@@ -91,6 +104,16 @@ export interface TongQuanDoiBuoi {
     de_nghi_doi_lai?: DeNghiHocVien | null;
   }[];
   de_nghi: DeNghiHocVien[];
+  /** ADR 0012: 0 = khóa chưa mở học bù. Lượt học bù tách riêng lượt đổi buổi. */
+  so_buoi_hoc_bu_toi_da?: number;
+  so_luot_hoc_bu_da_dung?: number;
+  /** Buổi đã qua của lớp được phân, Thầy/Cô không có mặt, chưa có đổi buổi đã duyệt (≤ 30 gần nhất). */
+  buoi_co_the_hoc_bu?: {
+    lich_nguon: LichTomTat;
+    trang_thai_diem_danh: TrangThaiDiemDanh | null;
+    de_nghi: DeNghiHocVien | null;
+    de_nghi_doi_lai?: DeNghiHocVien | null;
+  }[];
 }
 
 export interface LuaChonBuoi {
@@ -112,6 +135,8 @@ export interface GuiDoiBuoiBody {
   lich_nguon_id: string;
   lich_de_nghi_id: string;
   ly_do: string;
+  /** Mặc định doi_buoi; sửa không đổi được loại. */
+  loai?: LoaiDoiBuoi;
 }
 
 export interface DeNghiDuyet extends DeNghiHocVien {
@@ -130,6 +155,7 @@ export interface LuaChonDuyet extends LuaChonBuoi {
 export interface LocDoiBuoi {
   trang_thai?: TrangThaiDeNghi;
   khoa_id?: string;
+  loai?: LoaiDoiBuoi;
   /** true = mọi đề nghị đã xử lý (server sắp xu_ly_luc giảm, tối đa 500). */
   da_xu_ly?: boolean;
   /** Chỉ với trang_thai=cho_duyet: true = đề nghị quá hạn (100 mới nhất); mặc định chỉ còn hạn. */
@@ -170,10 +196,13 @@ export function useTongQuanDoiBuoi(khoaId: string | undefined) {
   });
 }
 
-export function useLuaChonDoiBuoi(lichNguonId: string | undefined) {
+export function useLuaChonDoiBuoi(lichNguonId: string | undefined, loai: LoaiDoiBuoi = 'doi_buoi') {
   return useQuery({
-    queryKey: [KEY, 'lua-chon', lichNguonId],
-    queryFn: () => apiFetch<LuaChonBuoi[]>(`/hoc-vien/toi/doi-buoi/lua-chon/${lichNguonId}`),
+    queryKey: [KEY, 'lua-chon', lichNguonId, loai],
+    queryFn: () =>
+      apiFetch<LuaChonBuoi[]>(
+        `/hoc-vien/toi/doi-buoi/lua-chon/${lichNguonId}${qs({ loai: loai === 'hoc_bu' ? loai : undefined })}`,
+      ),
     enabled: !!lichNguonId,
     retry: false,
   });
@@ -299,6 +328,8 @@ export interface LocThongKeDoiBuoi {
   tu_ngay?: string;
   den_ngay?: string;
   chi_co_cho?: boolean;
+  /** ADR 0012: trống = mọi loại. */
+  loai?: LoaiDoiBuoi[];
 }
 
 export interface DongThongKeDoiBuoi {
@@ -327,6 +358,8 @@ export interface DongThongKeDoiBuoi {
   vao_qua_han: number;
   vao_tu_choi: number;
   vao_huy: number;
+  /** ADR 0012: số học bù đã duyệt vào buổi (tập con của vao_da_duyet). */
+  vao_hoc_bu?: number;
 }
 
 export interface ThongKeDoiBuoi {
@@ -351,6 +384,7 @@ export interface ThongKeDoiBuoi {
 
 export interface HocVienDongThongKe {
   de_nghi_id: string;
+  loai?: LoaiDoiBuoi;
   ho_ten: string;
   don_vi: string;
   cum: string | null;
@@ -377,6 +411,7 @@ export function qsThongKe(loc: LocThongKeDoiBuoi): string {
     tu_ngay: loc.tu_ngay,
     den_ngay: loc.den_ngay,
     chi_co_cho: loc.chi_co_cho ? 'true' : undefined,
+    loai: csv(loc.loai),
   });
 }
 
@@ -390,10 +425,10 @@ export function useThongKeDoiBuoi(loc: LocThongKeDoiBuoi) {
 
 export function useChiTietBuoiThongKe(lichId: string | undefined, loc: LocThongKeDoiBuoi) {
   return useQuery({
-    queryKey: [KEY, 'thong-ke-buoi', lichId, loc.cum_id],
+    queryKey: [KEY, 'thong-ke-buoi', lichId, loc.cum_id, loc.loai],
     queryFn: () =>
       apiFetch<{ ra: HocVienDongThongKe[]; vao: HocVienDongThongKe[] }>(
-        `/doi-buoi-hoc/thong-ke/buoi/${lichId}${qsThongKe({ cum_id: loc.cum_id })}`,
+        `/doi-buoi-hoc/thong-ke/buoi/${lichId}${qsThongKe({ cum_id: loc.cum_id, loai: loc.loai })}`,
       ),
     enabled: !!lichId,
   });

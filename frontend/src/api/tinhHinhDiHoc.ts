@@ -70,7 +70,12 @@ export interface BuoiDiHoc {
   giai_doan: { id: string; thu_tu: number; ten_giai_doan: string };
   buoi_so: number;
   lop: { id: string; ten_lop: string };
-  doi_buoi: null | { tu_lop: { id: string; ten_lop: string }; sang_lop: { id: string; ten_lop: string } };
+  /** hoc_bu (ADR 0012): buổi hiệu dụng là buổi học bù chứ không phải đổi buổi. */
+  doi_buoi: null | {
+    tu_lop: { id: string; ten_lop: string };
+    sang_lop: { id: string; ten_lop: string };
+    hoc_bu?: boolean;
+  };
   thoi_gian_bat_dau: string;
   thoi_gian_ket_thuc: string;
   diem_danh: {

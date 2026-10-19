@@ -125,6 +125,19 @@ describe('Tình hình đi học — người hỗ trợ', () => {
     expect(within(tuongLai).queryByRole('button', { name: 'Điểm danh bổ sung' })).not.toBeInTheDocument();
   });
 
+  it('ADR 0012: buổi hiệu dụng là học bù -> badge "Học bù", không ghi "Từ lớp … sang lớp …"', async () => {
+    const chot = tinhHinhDiHocMock.buoi.find((x) => x.lich_hoc_id === 'l-chot')!;
+    chot.doi_buoi = { ...chot.doi_buoi!, hoc_bu: true };
+    render(['/ho-tro/di-hoc?khoa_id=khoa-1']);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Nguyễn Văn An' }));
+    const dialog = await screen.findByRole('dialog');
+    const doi = await within(dialog).findByTestId('buoi-l-chot');
+    expect(within(doi).getByText('Học bù')).toBeInTheDocument();
+    expect(within(doi).getByText('Học bù cho lớp Zoom 01 tại lớp Zoom 02')).toBeInTheDocument();
+    expect(within(doi).queryByText('Đổi buổi')).not.toBeInTheDocument();
+  });
+
   it('ADR 0010 T7: buổi có mặt nhờ học bù -> nhãn kèm lớp, badge "Lớp khác", lý do thay nút bổ sung', async () => {
     render(['/ho-tro/di-hoc?khoa_id=khoa-1']);
     const user = userEvent.setup();

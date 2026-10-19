@@ -178,6 +178,7 @@ function KhoiKhoaHoc({
             tinhTrang={tinhTrang}
             ketQua={ketQuaCuaGiaiDoan(gd)}
             khoaDoiBuoi={(khoa.so_buoi_doi_toi_da ?? 0) > 0 ? khoa.id : null}
+            khoaId={khoa.id}
           />
         ))}
 
@@ -309,6 +310,7 @@ function TheGiaiDoan({
   tinhTrang,
   ketQua,
   khoaDoiBuoi,
+  khoaId,
 }: {
   gd: GiaiDoanCuaToi;
   chuaPhanLop: boolean;
@@ -317,6 +319,8 @@ function TheGiaiDoan({
   ketQua?: ReactNode;
   /** Id khóa khi khóa bật đổi buổi (so_buoi_doi_toi_da > 0), ngược lại null. */
   khoaDoiBuoi?: string | null;
+  /** ADR 0012: link học bù chỉ dựa vào hoc_bu_duoc (backend đã xét khóa bật). */
+  khoaId?: string;
 }) {
   return (
     <Paper p="md" radius="md" withBorder data-testid="the-giai-doan">
@@ -343,7 +347,7 @@ function TheGiaiDoan({
               ))}
             </Stack>
           )}
-          <DanhSachBuoi lichHoc={gd.lop.lich_hoc} khoaDoiBuoi={khoaDoiBuoi} />
+          <DanhSachBuoi lichHoc={gd.lop.lich_hoc} khoaDoiBuoi={khoaDoiBuoi} khoaId={khoaId} />
           {(gd.thuc_dia ?? []).length > 0 && (
             <Text size="sm">
               <b>Hỗ trợ tại điểm học:</b>{' '}
@@ -423,7 +427,15 @@ function KhoiCum({ cum }: { cum: CumHocVien }) {
   );
 }
 
-function DanhSachBuoi({ lichHoc, khoaDoiBuoi }: { lichHoc: LichHocLopToi[]; khoaDoiBuoi?: string | null }) {
+function DanhSachBuoi({
+  lichHoc,
+  khoaDoiBuoi,
+  khoaId,
+}: {
+  lichHoc: LichHocLopToi[];
+  khoaDoiBuoi?: string | null;
+  khoaId?: string;
+}) {
   if (lichHoc.length === 0) return null;
   // ADR 0005 (issue #24): buổi Zoom của khóa đã bật điểm danh — backend giấu link, trả diem_danh_zoom.
   const buoiZoom = lichHoc.find((b) => b.diem_danh_zoom);
@@ -439,6 +451,11 @@ function DanhSachBuoi({ lichHoc, khoaDoiBuoi }: { lichHoc: LichHocLopToi[]; khoa
             {buoi.da_doi_buoi && (
               <Badge size="sm" variant="light">
                 Đã đổi buổi
+              </Badge>
+            )}
+            {buoi.hoc_bu && (
+              <Badge size="sm" variant="light" color="grape">
+                Học bù
               </Badge>
             )}
             {buoi.diem_danh_zoom ? (
@@ -461,6 +478,12 @@ function DanhSachBuoi({ lichHoc, khoaDoiBuoi }: { lichHoc: LichHocLopToi[]; khoa
             <Text size="sm" data-testid="lop-chot">
               Học tại {buoi.lop_chot_ten}
               {buoi.lop_goc_ten ? ` (thay cho ${buoi.lop_goc_ten})` : ''}
+            </Text>
+          )}
+          {buoi.hoc_bu && (
+            <Text size="sm" data-testid="hoc-bu-cho">
+              Học bù cho buổi {buoi.buoi_so} của {buoi.lop_goc_ten}
+              {buoi.lop_chot_ten ? ` — học tại ${buoi.lop_chot_ten}` : ''}
             </Text>
           )}
           <Text size="sm" c="dimmed">
@@ -509,7 +532,7 @@ function DanhSachBuoi({ lichHoc, khoaDoiBuoi }: { lichHoc: LichHocLopToi[]; khoa
             })()}
           {buoi.diem_danh_zoom?.co_link && <NutDiemDanhZoom buoi={buoi} />}
           {/* D12: đã có điểm danh (Zoom mở trước giờ) thì không đổi được nữa. */}
-          {khoaDoiBuoi && !buoi.da_doi_buoi && buoi.trang_thai_diem_danh == null && Date.parse(buoi.thoi_gian_bat_dau) > Date.now() && (
+          {khoaDoiBuoi && !buoi.da_doi_buoi && !buoi.hoc_bu && buoi.trang_thai_diem_danh == null && Date.parse(buoi.thoi_gian_bat_dau) > Date.now() && (
             <Text component={Link} to={`/de-nghi-doi-buoi?khoa=${khoaDoiBuoi}&lich=${buoi.id}`} size="xs" c="dimmed" td="underline" mt={4} display="block">
               Không tham gia được buổi này?
             </Text>
@@ -517,6 +540,11 @@ function DanhSachBuoi({ lichHoc, khoaDoiBuoi }: { lichHoc: LichHocLopToi[]; khoa
           {khoaDoiBuoi && buoi.da_doi_buoi && buoi.lich_goc_id && buoi.trang_thai_diem_danh == null && Date.parse(buoi.thoi_gian_bat_dau) > Date.now() && (
             <Text component={Link} to={`/de-nghi-doi-buoi?khoa=${khoaDoiBuoi}&lich=${buoi.lich_goc_id}`} size="xs" c="dimmed" td="underline" mt={4} display="block">
               Muốn đổi lại buổi này?
+            </Text>
+          )}
+          {khoaId && buoi.hoc_bu_duoc && (
+            <Text component={Link} to={`/de-nghi-doi-buoi?khoa=${khoaId}&lich=${buoi.id}&loai=hoc_bu`} size="xs" c="dimmed" td="underline" mt={4} display="block">
+              Đăng ký học bù buổi này?
             </Text>
           )}
           {canNhacCungNgay(buoi, lichHoc) && (

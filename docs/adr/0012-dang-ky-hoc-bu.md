@@ -1,7 +1,7 @@
 # ADR 0012 — Học viên đăng ký học bù buổi đã vắng (dùng chung cơ chế đổi buổi)
 
 - Ngày: 2026-10-19
-- Trạng thái: Đề xuất
+- Trạng thái: Đã chấp nhận
 - Bổ sung: ADR 0007 (đổi buổi học) — mọi quyết định D1–D12 giữ nguyên cho `loai = doi_buoi`
 - Đặc tả: [2026-10-19-dang-ky-hoc-bu-design.md](../superpowers/specs/2026-10-19-dang-ky-hoc-bu-design.md)
 

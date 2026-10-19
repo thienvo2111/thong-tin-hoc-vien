@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
-import { db } from '@/test/mocks/db';
+import { db, taoKhoaHocToiMau } from '@/test/mocks/db';
 import { renderVoiRouter } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
 import HoTroTrangChu from './HoTroTrangChu';
@@ -101,6 +101,21 @@ describe('Người hỗ trợ — Chi tiết học viên', () => {
     expect(screen.getByText('Chưa ghi danh khóa nào.')).toBeInTheDocument();
   });
 
+  it('ADR 0012: ô học bù đã duyệt hiện nhãn "Học bù" + buổi gốc, không lặp "Buổi n" thường', async () => {
+    const [dk] = taoKhoaHocToiMau();
+    const lop = dk.giai_doan[1].lop!;
+    const goc = { ...lop.lich_hoc[0], id: 'lh-goc', buoi_so: 3, dia_diem_hoac_link: null };
+    lop.lich_hoc = [
+      goc,
+      { ...goc, id: 'lh-hb', hoc_bu: true, lich_goc_id: 'lh-goc', lop_goc_ten: 'Lớp 01', lop_chot_ten: 'Lớp 05' },
+    ];
+    db.hoTroChiTiet = { ...db.hoTroChiTiet, hoc_tap: [dk] };
+    render(['/ho-tro/hoc-vien/hv-ht-1']);
+    expect(await screen.findByText('Buổi 3 của Lớp 01 — học tại Lớp 05')).toBeInTheDocument();
+    expect(screen.getByText('Học bù')).toBeInTheDocument();
+    expect(screen.getAllByText('Buổi 3')).toHaveLength(1);
+  });
+
   it('học viên ngoài cụm (404) -> báo không tìm thấy', async () => {
     render(['/ho-tro/hoc-vien/khac']);
     expect(await screen.findByText(/Không tìm thấy hồ sơ học viên/)).toBeInTheDocument();
@@ -141,6 +156,13 @@ describe('Người hỗ trợ — Lịch học', () => {
     db.hoTroLichHoc = [{ ...db.hoTroLichHoc[0], hoc_vien_doi_buoi: ['Nguyễn Văn An', 'Trần Thị Bình'] }];
     render(['/ho-tro/lich-hoc']);
     expect(await screen.findByText('Đổi buổi vào: Nguyễn Văn An, Trần Thị Bình')).toBeInTheDocument();
+  });
+
+  it('ADR 0012: buổi có học viên cụm học bù vào: hiện tên từ hoc_vien_hoc_bu', async () => {
+    db.hoTroLichHoc = [{ ...db.hoTroLichHoc[0], hoc_vien_hoc_bu: ['Lê Văn Cường'] }];
+    render(['/ho-tro/lich-hoc']);
+    expect(await screen.findByText('Học bù vào: Lê Văn Cường')).toBeInTheDocument();
+    expect(screen.queryByText(/Đổi buổi vào/)).toBeNull();
   });
 
   it('buổi không có ai đổi vào: không hiện dòng đổi buổi', async () => {

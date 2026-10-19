@@ -25,9 +25,11 @@ import {
   useLuaChonDoiBuoi,
   useSuaDoiBuoi,
   useTongQuanDoiBuoi,
+  laHocBu,
   type BuoiTomTat,
   type DeNghiHocVien,
   type LichTomTat,
+  type LoaiDoiBuoi,
   type LuaChonBuoi,
   type TongQuanDoiBuoi,
 } from '@/api/doiBuoi';
@@ -41,6 +43,7 @@ import { thongDiepLoiXungDot } from '@/lib/loiApi';
 const LY_DO_TOI_THIEU = 5;
 const LY_DO_TOI_DA = 500;
 const KHOA_TAT = 'Khóa học chưa mở đề nghị đổi buổi';
+const KHOA_TAT_HOC_BU = 'Khóa học chưa mở đăng ký học bù';
 
 const NHAN_TRANG_THAI: Record<DeNghiHocVien['trang_thai'], string> = {
   cho_duyet: 'Đang chờ duyệt',
@@ -55,18 +58,20 @@ function nhanBuoi(l: LichTomTat | BuoiTomTat | null | undefined): string {
 }
 
 /** Trang ẩn /de-nghi-doi-buoi — người hỗ trợ gửi link qua Zalo; không có mục menu. */
+/** `?loai=hoc_bu` (ADR 0012): cùng trang, nguồn là buổi đã vắng thay cho buổi sắp tới. */
 export default function DeNghiDoiBuoi() {
   const [params] = useSearchParams();
   const { data: dsKhoa, isLoading, isError, error } = useKhoaHocToi();
   const [khoaChon, setKhoaChon] = useState<string | null>(params.get('khoa'));
+  const loai: LoaiDoiBuoi = params.get('loai') === 'hoc_bu' ? 'hoc_bu' : 'doi_buoi';
 
-  const khoaId = timKhoaId(dsKhoa, khoaChon);
+  const khoaId = timKhoaId(dsKhoa, khoaChon, loai);
 
   return (
     <Container size="sm" py="xl">
       <Stack gap="lg">
         <Title order={1} size="h2">
-          Đề nghị đổi buổi học
+          {loai === 'hoc_bu' ? 'Đăng ký học bù' : 'Đề nghị đổi buổi học'}
         </Title>
 
         {isLoading && (
@@ -90,22 +95,36 @@ export default function DeNghiDoiBuoi() {
             onChange={setKhoaChon}
           />
         )}
-        {khoaId && <KhoiDoiBuoi key={khoaId} khoaId={khoaId} lichBanDau={params.get('lich')} />}
+        {khoaId && <KhoiDoiBuoi key={khoaId + loai} khoaId={khoaId} lichBanDau={params.get('lich')} loai={loai} />}
       </Stack>
     </Container>
   );
 }
 
-/** `?khoa=` hợp lệ > khóa duy nhất > khóa duy nhất đã bật đổi buổi. Nhiều khóa không rõ → phải chọn. */
-function timKhoaId(ds: ReturnType<typeof useKhoaHocToi>['data'], chon: string | null): string | undefined {
+/** `?khoa=` hợp lệ > khóa duy nhất > khóa duy nhất đã bật đổi buổi/học bù. Nhiều khóa không rõ → phải chọn. */
+function timKhoaId(
+  ds: ReturnType<typeof useKhoaHocToi>['data'],
+  chon: string | null,
+  loai: LoaiDoiBuoi,
+): string | undefined {
   if (!ds || ds.length === 0) return undefined;
   if (chon && ds.some((d) => d.khoa_id === chon)) return chon;
   if (ds.length === 1) return ds[0].khoa_id;
-  const bat = ds.filter((d) => (d.khoa.so_buoi_doi_toi_da ?? 0) > 0);
+  const bat = ds.filter(
+    (d) => ((loai === 'hoc_bu' ? d.khoa.so_buoi_hoc_bu_toi_da : d.khoa.so_buoi_doi_toi_da) ?? 0) > 0,
+  );
   return bat.length === 1 ? bat[0].khoa_id : undefined;
 }
 
-function KhoiDoiBuoi({ khoaId, lichBanDau }: { khoaId: string; lichBanDau: string | null }) {
+function KhoiDoiBuoi({
+  khoaId,
+  lichBanDau,
+  loai,
+}: {
+  khoaId: string;
+  lichBanDau: string | null;
+  loai: LoaiDoiBuoi;
+}) {
   const { data, isLoading, isError, error } = useTongQuanDoiBuoi(khoaId);
 
   if (isLoading)
@@ -116,11 +135,26 @@ function KhoiDoiBuoi({ khoaId, lichBanDau }: { khoaId: string; lichBanDau: strin
     );
   if (isError) {
     // Khóa tắt (403) không phải sự cố: thông báo nhẹ, không lỗi đỏ.
-    if (error instanceof ApiError && error.status === 403) return <StatusBanner loai="info">{KHOA_TAT}</StatusBanner>;
+    if (error instanceof ApiError && error.status === 403)
+      return <StatusBanner loai="info">{loai === 'hoc_bu' ? KHOA_TAT_HOC_BU : KHOA_TAT}</StatusBanner>;
     return <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>;
   }
   if (!data) return null;
-  return <NoiDung tongQuan={data} lichBanDau={lichBanDau} />;
+  // Đổi buổi và học bù có công tắc riêng: khóa có thể chỉ bật một loại.
+  if (theoLoai(data, loai).toiDa <= 0)
+    return <StatusBanner loai="info">{loai === 'hoc_bu' ? KHOA_TAT_HOC_BU : KHOA_TAT}</StatusBanner>;
+  return <NoiDung tongQuan={data} lichBanDau={lichBanDau} loai={loai} />;
+}
+
+/** Số liệu theo loại — đổi buổi và học bù có lượt, nguồn và đề nghị riêng (ADR 0012). */
+function theoLoai(tq: TongQuanDoiBuoi, loai: LoaiDoiBuoi) {
+  const hocBu = loai === 'hoc_bu';
+  return {
+    toiDa: hocBu ? tq.so_buoi_hoc_bu_toi_da ?? 0 : tq.so_buoi_doi_toi_da,
+    daDung: hocBu ? tq.so_luot_hoc_bu_da_dung ?? 0 : tq.so_luot_da_dung,
+    buoiNguon: (hocBu ? tq.buoi_co_the_hoc_bu ?? [] : tq.buoi_sap_toi).map((b) => b.lich_nguon),
+    deNghi: tq.de_nghi.filter((d) => (d.loai ?? 'doi_buoi') === loai),
+  };
 }
 
 function laHoatDong(d: DeNghiHocVien): boolean {
@@ -131,19 +165,30 @@ function chuaBatDau(b: BuoiTomTat | null): boolean {
   return !!b && Date.parse(b.thoi_gian_bat_dau) > Date.now();
 }
 
-function NoiDung({ tongQuan, lichBanDau }: { tongQuan: TongQuanDoiBuoi; lichBanDau: string | null }) {
+function NoiDung({
+  tongQuan,
+  lichBanDau,
+  loai,
+}: {
+  tongQuan: TongQuanDoiBuoi;
+  lichBanDau: string | null;
+  loai: LoaiDoiBuoi;
+}) {
   const [dangSua, setDangSua] = useState<DeNghiHocVien | null>(null);
   // Bản đã duyệt đang được "Đổi lại" (D11) — form gửi khóa sẵn buổi nguồn của nó.
   const [doiLai, setDoiLai] = useState<DeNghiHocVien | null>(null);
   const [boQuaLink, setBoQuaLink] = useState(false);
-  const conLai = Math.max(0, tongQuan.so_buoi_doi_toi_da - tongQuan.so_luot_da_dung);
-  const choDuyet = tongQuan.de_nghi.filter((d) => d.trang_thai === 'cho_duyet');
-  const daXuLy = tongQuan.de_nghi.filter((d) => d.trang_thai !== 'cho_duyet');
+  const hocBu = loai === 'hoc_bu';
+  const { toiDa, daDung, deNghi } = theoLoai(tongQuan, loai);
+  const conLai = Math.max(0, toiDa - daDung);
+  const choDuyet = deNghi.filter((d) => d.trang_thai === 'cho_duyet');
+  const daXuLy = deNghi.filter((d) => d.trang_thai !== 'cho_duyet');
   const nguonCoCho = new Set(choDuyet.map((d) => d.lich_nguon_id));
+  // Học bù: buổi gốc đã qua sẵn — chỉ cần buổi học bù đang chốt chưa bắt đầu.
   const duocDoiLai = (d: DeNghiHocVien) =>
     d.trang_thai === 'da_duyet' &&
     !nguonCoCho.has(d.lich_nguon_id) &&
-    chuaBatDau(d.buoi_nguon) &&
+    (hocBu || chuaBatDau(d.buoi_nguon)) &&
     chuaBatDau(d.buoi_chot);
   const moSua = (d: DeNghiHocVien) => {
     setDoiLai(null);
@@ -160,14 +205,15 @@ function NoiDung({ tongQuan, lichBanDau }: { tongQuan: TongQuanDoiBuoi; lichBanD
   // Link ?lich= trỏ tới buổi đã có đề nghị hoạt động → hiện đề nghị đó thay vì form gửi
   // (ưu tiên bản chờ — có thể là đổi lại của bản đã duyệt).
   const cungLink =
-    !boQuaLink && lichBanDau ? tongQuan.de_nghi.filter((d) => laHoatDong(d) && d.lich_nguon_id === lichBanDau) : [];
+    !boQuaLink && lichBanDau ? deNghi.filter((d) => laHoatDong(d) && d.lich_nguon_id === lichBanDau) : [];
   const deNghiCuaLink = cungLink.find((d) => d.trang_thai === 'cho_duyet') ?? cungLink[0];
 
   if (deNghiCuaLink && !dangSua && !doiLai)
     return (
       <Stack gap="lg">
         <StatusBanner loai="info">
-          Buổi này Thầy/Cô đã có đề nghị đổi buổi ({NHAN_TRANG_THAI[deNghiCuaLink.trang_thai].toLowerCase()}).
+          Buổi này Thầy/Cô đã có {hocBu ? 'đăng ký học bù' : 'đề nghị đổi buổi'} (
+          {NHAN_TRANG_THAI[deNghiCuaLink.trang_thai].toLowerCase()}).
         </StatusBanner>
         {deNghiCuaLink.trang_thai === 'cho_duyet' ? (
           <DongDeNghi deNghi={deNghiCuaLink} onSua={() => moSua(deNghiCuaLink)} />
@@ -188,7 +234,7 @@ function NoiDung({ tongQuan, lichBanDau }: { tongQuan: TongQuanDoiBuoi; lichBanD
   return (
     <Stack gap="lg">
       <Text size="sm" fw={600}>
-        Còn {conLai}/{tongQuan.so_buoi_doi_toi_da} lượt đổi
+        Còn {conLai}/{toiDa} {hocBu ? 'lượt học bù' : 'lượt đổi'}
       </Text>
 
       {choDuyet.map((d) => (
@@ -199,13 +245,16 @@ function NoiDung({ tongQuan, lichBanDau }: { tongQuan: TongQuanDoiBuoi; lichBanD
         <FormDoiBuoi
           key={dangSua?.id ?? (doiLai ? 'doi-lai-' + doiLai.id : 'moi')}
           tongQuan={tongQuan}
+          loai={loai}
           dangSua={dangSua}
           nguonKhoa={doiLai?.lich_nguon_id ?? null}
           lichBanDau={lichBanDau}
           onXong={dongForm}
         />
       ) : (
-        <StatusBanner loai="info">Thầy/Cô đã dùng hết lượt đổi buổi của khóa này.</StatusBanner>
+        <StatusBanner loai="info">
+          Thầy/Cô đã dùng hết lượt {hocBu ? 'học bù' : 'đổi buổi'} của khóa này.
+        </StatusBanner>
       )}
 
       {daXuLy.length > 0 && (
@@ -227,6 +276,7 @@ function DongDaXuLy({ d, onDoiLai }: { d: DeNghiHocVien; onDoiLai?: () => void }
     <Paper withBorder radius="md" p="sm">
       <Group gap="xs">
         <Badge variant="light">{NHAN_TRANG_THAI[d.trang_thai]}</Badge>
+        <BadgeHocBu d={d} />
         <Text size="sm">
           {nhanBuoi(d.buoi_nguon)}
           {d.buoi_chot ? ` → ${nhanBuoi(d.buoi_chot)}` : ''}
@@ -256,13 +306,19 @@ function DongDeNghi({ deNghi, onSua }: { deNghi: DeNghiHocVien; onSua: () => voi
           <Badge variant="light" color="yellow">
             {NHAN_TRANG_THAI[deNghi.trang_thai]}
           </Badge>
+          <BadgeHocBu d={deNghi} />
           {deNghi.qua_han && (
             <Badge variant="light" color="red">
               Quá hạn
             </Badge>
           )}
         </Group>
-        <Text size="sm">Buổi cần đổi: {nhanBuoi(deNghi.buoi_nguon)}</Text>
+        <Text size="sm">
+          {laHocBu(deNghi) ? 'Buổi đã vắng' : 'Buổi cần đổi'}: {nhanBuoi(deNghi.buoi_nguon)}
+        </Text>
+        {laHocBu(deNghi) && deNghi.buoi_de_nghi && (
+          <Text size="sm">Học bù tại: {nhanBuoi(deNghi.buoi_de_nghi)}</Text>
+        )}
         {deNghi.doi_lai_tu && (
           <Text size="sm" fw={600}>
             Đổi lại — đang học: {nhanBuoi(deNghi.doi_lai_tu)}
@@ -289,7 +345,12 @@ function DongDeNghi({ deNghi, onSua }: { deNghi: DeNghiHocVien; onSua: () => voi
           </Button>
         </Group>
       </Stack>
-      <Modal opened={xacNhan} onClose={() => setXacNhan(false)} title="Hủy đề nghị đổi buổi?" centered>
+      <Modal
+        opened={xacNhan}
+        onClose={() => setXacNhan(false)}
+        title={laHocBu(deNghi) ? 'Hủy đăng ký học bù?' : 'Hủy đề nghị đổi buổi?'}
+        centered
+      >
         <Stack gap="md">
           <Text size="sm">
             Hủy đề nghị cho {nhanBuoi(deNghi.buoi_nguon)}. Nếu gửi lại, Thầy/Cô sẽ xếp ở cuối hàng chờ.
@@ -321,14 +382,25 @@ function DongDeNghi({ deNghi, onSua }: { deNghi: DeNghiHocVien; onSua: () => voi
   );
 }
 
+function BadgeHocBu({ d }: { d: DeNghiHocVien }) {
+  if (!laHocBu(d)) return null;
+  return (
+    <Badge variant="light" color="grape">
+      Học bù
+    </Badge>
+  );
+}
+
 function FormDoiBuoi({
   tongQuan,
+  loai,
   dangSua,
   nguonKhoa,
   lichBanDau,
   onXong,
 }: {
   tongQuan: TongQuanDoiBuoi;
+  loai: LoaiDoiBuoi;
   dangSua: DeNghiHocVien | null;
   /** Đổi lại: buổi nguồn của bản đã duyệt, không cho chọn buổi khác. */
   nguonKhoa: string | null;
@@ -346,17 +418,18 @@ function FormDoiBuoi({
   const loi = gui.error ?? sua.error;
 
   // Buổi đã có đề nghị đang chờ chỉ đổi qua "Sửa"; buổi đã duyệt vẫn chọn được (= đổi lại).
-  const coCho = new Set(tongQuan.de_nghi.filter((d) => d.trang_thai === 'cho_duyet').map((d) => d.lich_nguon_id));
-  const buoiNguon = tongQuan.buoi_sap_toi.map((b) => b.lich_nguon);
+  const hocBu = loai === 'hoc_bu';
+  const { buoiNguon, deNghi } = theoLoai(tongQuan, loai);
+  const coCho = new Set(deNghi.filter((d) => d.trang_thai === 'cho_duyet').map((d) => d.lich_nguon_id));
   const nguonHopLe = buoiNguon.some((b) => b.id === nguonId) ? nguonId : null;
   const lyDoCat = lyDo.normalize('NFC').trim();
   const lyDoHopLe = lyDoCat.length >= LY_DO_TOI_THIEU && lyDoCat.length <= LY_DO_TOI_DA;
 
-  const { data: luaChon, isLoading, isError, error } = useLuaChonDoiBuoi(nguonHopLe ?? undefined);
+  const { data: luaChon, isLoading, isError, error } = useLuaChonDoiBuoi(nguonHopLe ?? undefined, loai);
   const dichHopLe = luaChon?.some((c) => c.lich.id === dichId && !c.da_du);
   const trungDich = luaChon?.find((c) => c.lich.id === dichId)?.trung_lich ?? [];
   const laDoiLai =
-    !dangSua && tongQuan.de_nghi.some((d) => d.trang_thai === 'da_duyet' && d.lich_nguon_id === nguonHopLe);
+    !dangSua && deNghi.some((d) => d.trang_thai === 'da_duyet' && d.lich_nguon_id === nguonHopLe);
 
   function bamGui() {
     if (trungDich.length > 0) setHoiTrung(true);
@@ -370,12 +443,14 @@ function FormDoiBuoi({
       lich_nguon_id: nguonHopLe,
       lich_de_nghi_id: dichId,
       ly_do: lyDoCat,
+      // Đổi buổi giữ body cũ (server mặc định doi_buoi).
+      ...(hocBu ? { loai } : {}),
     };
     const opts = {
       onSuccess: () => {
         notifications.show({
           color: 'green',
-          message: 'Đã gửi đề nghị đổi buổi',
+          message: hocBu ? 'Đã gửi đăng ký học bù' : 'Đã gửi đề nghị đổi buổi',
         });
         setDichId(null);
         setLyDo('');
@@ -398,7 +473,7 @@ function FormDoiBuoi({
         )}
 
         <Select
-          label="Buổi không tham gia được"
+          label={hocBu ? 'Buổi đã vắng' : 'Buổi không tham gia được'}
           placeholder="Chọn buổi"
           allowDeselect={false}
           disabled={!!dangSua || !!nguonKhoa}
@@ -416,7 +491,10 @@ function FormDoiBuoi({
 
         {nguonHopLe && isLoading && <Loader size="sm" />}
         {nguonHopLe && isError && <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>}
-        {luaChon && <DanhSachLuaChon luaChon={luaChon} dichId={dichId} onChon={setDichId} />}
+        {hocBu && buoiNguon.length === 0 && (
+          <StatusBanner loai="info">Thầy/Cô không có buổi đã vắng nào cần học bù.</StatusBanner>
+        )}
+        {luaChon && <DanhSachLuaChon luaChon={luaChon} dichId={dichId} onChon={setDichId} hocBu={hocBu} />}
 
         <Textarea
           label="Lý do"
@@ -471,15 +549,21 @@ function DanhSachLuaChon({
   luaChon,
   dichId,
   onChon,
+  hocBu,
 }: {
   luaChon: LuaChonBuoi[];
   dichId: string | null;
   onChon: (id: string) => void;
+  hocBu: boolean;
 }) {
   if (luaChon.length === 0)
-    return <StatusBanner loai="info">Hiện chưa có buổi tương đương nào để đổi sang.</StatusBanner>;
+    return (
+      <StatusBanner loai="info">
+        Hiện chưa có buổi tương đương nào để {hocBu ? 'học bù' : 'đổi sang'}.
+      </StatusBanner>
+    );
   return (
-    <Radio.Group label="Buổi muốn đổi sang" value={dichId ?? ''} onChange={onChon}>
+    <Radio.Group label={hocBu ? 'Buổi muốn học bù' : 'Buổi muốn đổi sang'} value={dichId ?? ''} onChange={onChon}>
       <Stack gap="xs" mt="xs">
         {luaChon.map((c) => (
           <Radio

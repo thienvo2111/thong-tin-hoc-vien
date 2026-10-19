@@ -840,10 +840,39 @@ describe('KhoaBoiDuongService', () => {
         expect(findManyDoi.mock.calls[0][0].where).toEqual({
           dang_ky_hoc_id: { in: ['dk-1'] },
           OR: [
-            { loai: 'hoc_bu', trang_thai: { in: ['cho_duyet', 'da_duyet'] } },
+            {
+              loai: 'hoc_bu',
+              trang_thai: 'cho_duyet',
+              lich_de_nghi: { thoi_gian_bat_dau: { gt: expect.any(Date) } },
+            },
             { trang_thai: 'da_duyet' },
           ],
         });
+      });
+
+      it('học bù chờ đã quá hạn (buổi học bù đã bắt đầu) không chặn hoc_bu_duoc', async () => {
+        prisma.dang_ky_hoc.findMany.mockResolvedValue([dkHocBu(2)]);
+        doiBuoiQuery.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([]);
+        prisma.diem_danh.findMany.mockResolvedValue([ddRow('a-3', 'vang')]);
+        // DB chỉ trả học bù chờ CÒN HẠN (lọc lich_de_nghi > now) -> bản quá hạn của a-3 bị loại.
+        const findManyDoi = jest.fn().mockResolvedValue([]);
+        (prisma as Record<string, unknown>).doi_buoi_hoc = { findMany: findManyDoi };
+        const truoc = Date.now();
+        const res = await service.khoaHocCuaToi({
+          ...truong,
+          vai_tro: 'hoc_vien',
+          hoc_vien_id: 'hv-1',
+        });
+        const a3 = res[0].giai_doan[0].lop!.lich_hoc.find((b) => b.id === 'a-3')!;
+        expect(a3.hoc_bu_duoc).toBe(true);
+        const or = findManyDoi.mock.calls[0][0].where.OR;
+        const choHocBu = or.find((x: { trang_thai?: unknown }) => x.trang_thai === 'cho_duyet');
+        expect(choHocBu.loai).toBe('hoc_bu');
+        expect(
+          choHocBu.lich_de_nghi.thoi_gian_bat_dau.gt.getTime(),
+        ).toBeGreaterThanOrEqual(truoc);
+        // Không còn điều kiện cho_duyet không kèm mốc thời gian.
+        expect(JSON.stringify(or)).not.toContain('"in":["cho_duyet"');
       });
 
       it('khóa tắt học bù -> hoc_bu_duoc false, không truy vấn thêm', async () => {

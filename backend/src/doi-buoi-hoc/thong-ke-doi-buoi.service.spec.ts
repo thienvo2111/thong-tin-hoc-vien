@@ -609,7 +609,7 @@ describe('ThongKeDoiBuoiService — học bù', () => {
     ).toMatchObject({ loai: { in: ['hoc_bu'] } });
   });
 
-  it('xuatExcel: sheet Học viên có cột Loại = "Học bù"; sheet buổi có "Học bù vào"', async () => {
+  it('xuatExcel: sheet Học viên có cột Loại = "Học bù"; sheet buổi có "Học bù vào (đã duyệt)"', async () => {
     const { service } = setup({
       lich: [lich('A'), lich('B')],
       deNghi: [hb('1', 'da_duyet', 'A', 'B', 'B')],
@@ -619,7 +619,7 @@ describe('ThongKeDoiBuoiService — học bù', () => {
     await wb.xlsx.load(buf as unknown as ArrayBuffer);
     const [s1, s2] = wb.worksheets;
     const cot1 = (s1.getRow(4).values as unknown[]).slice(1);
-    const iHocBu = cot1.indexOf('Học bù vào') + 1;
+    const iHocBu = cot1.indexOf('Học bù vào (đã duyệt)') + 1;
     expect(iHocBu).toBeGreaterThan(0);
     const giaTri = [5, 6].map((r) => s1.getCell(r, iHocBu).value);
     expect(giaTri.sort()).toEqual([0, 1]);
@@ -798,7 +798,7 @@ describe('buildThongKeDoiBuoiWorkbook', () => {
       'Vào quá hạn',
       'Vào từ chối',
       'Vào hủy',
-      'Học bù vào',
+      'Học bù vào (đã duyệt)',
     ]);
     expect(s1.getRow(4).font?.bold).toBe(true);
     expect(s1.views[0]).toMatchObject({ state: 'frozen', ySplit: 4 });

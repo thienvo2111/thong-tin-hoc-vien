@@ -102,7 +102,7 @@ const COT_BUOI = [
   'Vào quá hạn',
   'Vào từ chối',
   'Vào hủy',
-  'Học bù vào',
+  'Học bù vào (đã duyệt)',
 ];
 
 const COT_HOC_VIEN = [

@@ -62,10 +62,21 @@ export function TheBuoiSapToi({
                   Đã đổi buổi
                 </Badge>
               )}
+              {b.hoc_bu && (
+                <Badge size="sm" variant="light" color="grape">
+                  Học bù
+                </Badge>
+              )}
             </Group>
             {b.da_doi_buoi && b.lop_chot_ten && (
               <Text size="sm" c="dimmed">
                 Học tại {b.lop_chot_ten}
+              </Text>
+            )}
+            {b.hoc_bu && (
+              <Text size="sm" c="dimmed">
+                Học bù cho buổi {b.buoi_so} của {b.lop_goc_ten}
+                {b.lop_chot_ten ? ` — học tại ${b.lop_chot_ten}` : ""}
               </Text>
             )}
             {b.diem_hoc ? (
@@ -88,6 +99,7 @@ export function TheBuoiSapToi({
             {/* D12: đã có điểm danh (Zoom mở trước giờ) thì không đổi được nữa. */}
             {coDoiBuoi &&
               !b.da_doi_buoi &&
+              !b.hoc_bu &&
               b.trang_thai_diem_danh == null &&
               Date.parse(b.thoi_gian_bat_dau) > bayGio && (
                 <Text
@@ -115,6 +127,17 @@ export function TheBuoiSapToi({
                   Muốn đổi lại buổi này?
                 </Text>
               )}
+            {b.hoc_bu_duoc && (
+              <Text
+                component={Link}
+                to={`/de-nghi-doi-buoi?khoa=${khoaId}&lich=${b.id}&loai=hoc_bu`}
+                size="xs"
+                c="dimmed"
+                td="underline"
+              >
+                Đăng ký học bù buổi này?
+              </Text>
+            )}
           </Stack>
         ))}
       </Stack>

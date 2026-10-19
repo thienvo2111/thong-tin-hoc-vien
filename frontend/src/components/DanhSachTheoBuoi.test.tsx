@@ -66,6 +66,25 @@ describe('dsTheoBuoi', () => {
   });
 });
 
+describe('dsTheoBuoi — học bù (ADR 0012)', () => {
+  it('người học bù ở buổi gốc (nhãn ra + hoc_bu) VẪN trong danh sách, không bị coi là đổi ra', () => {
+    const d = dot();
+    d.hoc_vien[1] = hv('B', { doi_buoi: { b1: { loai: 'ra', lop: 'TT-05', hoc_bu: true } } });
+    const kq = dsTheoBuoi(d, 'b1');
+    expect(kq.hocVien.map((h) => h.ho_ten)).toEqual(['HV A', 'HV B', 'HV C']);
+    expect(kq.doiRa).toEqual([]);
+  });
+
+  it('người học bù vào buổi chốt: có trong danh sách, ghi chú "Học bù – từ lớp …"', async () => {
+    const d = dot();
+    d.hoc_vien_doi_vao = [hv('D', { doi_buoi: { b2: { loai: 'vao', lop: 'TT-01', hoc_bu: true } } })];
+    const kq = dsTheoBuoi(d, 'b2');
+    expect(kq.hocVien.find((h) => h.ho_ten === 'HV D')).toMatchObject({ tuLop: 'TT-01', hocBu: true });
+    renderTrang(<DanhSachTheoBuoi d={d} />);
+    expect(await screen.findByText('Học bù – từ lớp TT-01')).toBeInTheDocument();
+  });
+});
+
 describe('buoiMacDinh', () => {
   it('chọn buổi chưa kết thúc sớm nhất; hết buổi thì buổi cuối; không có buổi → null', () => {
     const now = new Date('2026-10-25T00:00:00Z');

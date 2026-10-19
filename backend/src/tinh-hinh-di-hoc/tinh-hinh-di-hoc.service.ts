@@ -89,6 +89,8 @@ interface BuoiCuaDangKy {
   e: Lich;
   lop: { id: string; ten_lop: string };
   doi_buoi: boolean;
+  /** ADR 0012: buổi hiệu dụng là buổi học bù (loai = hoc_bu). */
+  hoc_bu: boolean;
 }
 
 const SO_SANH_TEN = new Intl.Collator('vi');
@@ -280,7 +282,9 @@ export class TinhHinhDiHocService {
         giai_doan: b.giai_doan,
         buoi_so: b.buoi_so,
         lop: b.lop,
-        doi_buoi: b.doi_buoi ? { tu_lop: b.lop_nguon, sang_lop: b.lop } : null,
+        doi_buoi: b.doi_buoi
+          ? { tu_lop: b.lop_nguon, sang_lop: b.lop, hoc_bu: b.hoc_bu }
+          : null,
         thoi_gian_bat_dau: b.e.thoi_gian_bat_dau,
         thoi_gian_ket_thuc: b.e.thoi_gian_ket_thuc,
         diem_danh: {
@@ -577,6 +581,11 @@ export class TinhHinhDiHocService {
     }
     const coLich = new Set(lich.map((l) => l.id));
     const doiRa = doi.filter((d) => coLich.has(d.lich_nguon_id));
+    const hocBu = new Set(
+      doiRa
+        .filter((d) => d.loai === 'hoc_bu')
+        .map((d) => `${d.dang_ky_hoc_id}|${d.lich_nguon_id}`),
+    );
     const chot = await this.doiBuoi.lichTomTat(
       doiRa.map((d) => d.lich_chot_id),
     );
@@ -617,6 +626,7 @@ export class TinhHinhDiHocService {
               : cap.nguon,
             lop: c ? { id: c.lop_id, ten_lop: c.lop.ten_lop } : lopNguon,
             doi_buoi: cap.doi_buoi,
+            hoc_bu: cap.doi_buoi && hocBu.has(`${dk.id}|${cap.nguon.id}`),
           });
         }
       }

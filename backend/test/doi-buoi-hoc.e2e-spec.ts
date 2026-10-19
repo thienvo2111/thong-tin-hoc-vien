@@ -5,6 +5,9 @@ import { createTestApp } from './utils/test-app';
 import { TrangLopService } from '../src/trang-lop/trang-lop.service';
 import { KhoaBoiDuongService } from '../src/khoa-boi-duong/khoa-boi-duong.service';
 import { DoiBuoiHocQueryService } from '../src/doi-buoi-hoc/doi-buoi-hoc-query.service';
+import { napChuyenCan } from '../src/doi-buoi-hoc/nap-chuyen-can';
+import { khoaBuoi } from '../src/common/utils/chuyen-can.util';
+import { PrismaService } from '../src/prisma/prisma.service';
 import {
   prisma,
   taoDonViTest,
@@ -456,5 +459,190 @@ describe('Đổi buổi học (e2e)', () => {
     expect(h.body.error.message).toBe(
       'Học viên đã điểm danh buổi chốt, không thể hủy duyệt',
     );
+  });
+
+  // ADR 0012 (spec học bù §7): HV7 vắng buổi 1 lớp V (import vắng) → đăng ký
+  // học bù ở buổi 1 lớp W → duyệt → lịch THÊM buổi W, buổi V vẫn vắng → nạp có
+  // mặt ở W → chuyên cần buổi 1 = có mặt; sĩ số buổi V không giảm.
+  it('(g) học bù: vắng buổi đã qua → học bù lớp khác → chuyên cần có mặt, sĩ số buổi gốc giữ nguyên', async () => {
+    await prisma.khoa_boi_duong.update({
+      where: { id: khoaId },
+      data: { so_buoi_hoc_bu_toi_da: 1 },
+    });
+    const taoLopBuoi1 = async (ten: string, bd: Date, siSo?: number) => {
+      const l = await prisma.lop_hoc.create({
+        data: {
+          khoa_id: khoaId,
+          loai_lop: 'truc_tiep',
+          muc_nang_luc: 'co_ban',
+          trang_thai: 'active',
+          ten_lop: ten,
+          si_so_toi_da: siSo,
+        },
+      });
+      const lich = await prisma.lich_hoc_lop.create({
+        data: {
+          lop_id: l.id,
+          giai_doan_id: gdId,
+          buoi_so: 1,
+          thoi_gian_bat_dau: bd,
+          thoi_gian_ket_thuc: new Date(bd.getTime() + 3 * GIO),
+        },
+      });
+      return { lopId: l.id, lichId: lich.id };
+    };
+    const v = await taoLopBuoi1('Lớp V', new Date(Date.now() - 2 * NGAY));
+    const w = await taoLopBuoi1('Lớp W', new Date(Date.now() + 3 * NGAY), 5);
+    const v1 = v.lichId;
+    const w1 = w.lichId;
+    const cum = await prisma.cum_hoc_vien.findFirstOrThrow({
+      where: { khoa_id: khoaId },
+    });
+    await taoHocVien('hv7', cum.id, gdId, v.lopId, true);
+    const khoaSvc = app.get(KhoaBoiDuongService);
+    const query = app.get(DoiBuoiHocQueryService);
+    const ghiDiemDanh = async (tenLop: string, trangThai: string) => {
+      const kq = await khoaSvc.resolveDiemDanhRow({
+        ma_dinh_danh_moet: hv.hv7.moet,
+        ma_khoa: maKhoa,
+        ten_lop: tenLop,
+        loai_lop: 'truc_tiep',
+        giai_doan_thu_tu: '1',
+        buoi_so: '1',
+        trang_thai: trangThai,
+        nguon: 'ky_ten',
+      });
+      expect(kq.error).toBeUndefined();
+      expect(kq.canhBao).toBeUndefined();
+      const dto = kq.dto!;
+      await prisma.diem_danh.create({
+        data: {
+          dang_ky_hoc_id: dto.dang_ky_hoc_id,
+          lich_hoc_id: dto.lich_hoc_id,
+          trang_thai: dto.trang_thai,
+          nguon: dto.nguon,
+          ghi_chu: dto.ghi_chu,
+        },
+      });
+      return dto;
+    };
+    type BuoiToi = {
+      id: string;
+      trang_thai_diem_danh: string | null;
+      hoc_bu?: boolean;
+      hoc_bu_duoc?: boolean;
+      lich_goc_id?: string;
+      lop_goc_ten?: string;
+      lop_chot_ten?: string;
+    };
+    const lichCuaToi = async (): Promise<BuoiToi[]> => {
+      const res = await http()
+        .get('/hoc-vien/toi/khoa-hoc')
+        .set(auth('hv7'))
+        .expect(200);
+      const dk = res.body.find((d: { khoa_id: string }) => d.khoa_id === khoaId);
+      return dk.giai_doan[0].lop.lich_hoc;
+    };
+    const siSo = () => query.siSoBuoi([v1, w1], new Date());
+
+    // 1. Import vắng buổi 1 lớp V → buổi được mời học bù.
+    expect((await ghiDiemDanh('Lớp V', 'vang')).lich_hoc_id).toBe(v1);
+    const truoc = await lichCuaToi();
+    expect(truoc.map((b) => b.id)).toEqual([v1]);
+    expect(truoc[0]).toMatchObject({
+      trang_thai_diem_danh: 'vang',
+      hoc_bu_duoc: true,
+    });
+    const tongQuan = await http()
+      .get('/hoc-vien/toi/doi-buoi')
+      .query({ khoa_id: khoaId })
+      .set(auth('hv7'))
+      .expect(200);
+    expect(tongQuan.body).toMatchObject({
+      so_buoi_hoc_bu_toi_da: 1,
+      so_luot_hoc_bu_da_dung: 0,
+    });
+    expect(
+      tongQuan.body.buoi_co_the_hoc_bu.map(
+        (b: { lich_nguon: { id: string }; trang_thai_diem_danh: string }) => [
+          b.lich_nguon.id,
+          b.trang_thai_diem_danh,
+        ],
+      ),
+    ).toEqual([[v1, 'vang']]);
+    const siSoTruoc = await siSo();
+
+    // 2. Đăng ký học bù ở W (lựa chọn ?loai=hoc_bu có W) → duyệt.
+    const lc = await http()
+      .get(`/hoc-vien/toi/doi-buoi/lua-chon/${v1}`)
+      .query({ loai: 'hoc_bu' })
+      .set(auth('hv7'))
+      .expect(200);
+    expect(lc.body.map((c: { lich: { id: string } }) => c.lich.id)).toContain(
+      w1,
+    );
+    const id = (
+      await http()
+        .post('/hoc-vien/toi/doi-buoi')
+        .set(auth('hv7'))
+        .send({
+          lich_nguon_id: v1,
+          lich_de_nghi_id: w1,
+          ly_do: 'Hôm đó bị ốm',
+          loai: 'hoc_bu',
+        })
+        .expect(201)
+    ).body.id as string;
+    const dsHocBu = await http()
+      .get('/doi-buoi-hoc')
+      .query({ trang_thai: 'cho_duyet', loai: 'hoc_bu' })
+      .set(auth('ht'))
+      .expect(200);
+    expect(
+      dsHocBu.body.map((d: { id: string; loai: string }) => [d.id, d.loai]),
+    ).toEqual([[id, 'hoc_bu']]);
+    await duyet(id).expect(200);
+    expect(
+      await prisma.doi_buoi_hoc.findUniqueOrThrow({ where: { id } }),
+    ).toMatchObject({
+      loai: 'hoc_bu',
+      trang_thai: 'da_duyet',
+      lich_chot_id: w1,
+    });
+
+    // 3. Lịch: buổi V giữ nguyên (vẫn vắng), buổi W được THÊM với nhãn học bù.
+    const sau = await lichCuaToi();
+    expect(sau.map((b) => b.id)).toEqual([v1, w1]);
+    expect(sau[0]).toMatchObject({
+      trang_thai_diem_danh: 'vang',
+      hoc_bu_duoc: false,
+    });
+    expect(sau[0].hoc_bu).toBeUndefined();
+    expect(sau[1]).toMatchObject({
+      hoc_bu: true,
+      lich_goc_id: v1,
+      lop_goc_ten: 'Lớp V',
+      lop_chot_ten: 'Lớp W',
+    });
+    // Sĩ số buổi gốc không giảm; buổi học bù được cộng.
+    const siSoSau = await siSo();
+    expect(siSoSau.get(v1)?.si_so).toBe(siSoTruoc.get(v1)?.si_so);
+    expect(siSoSau.get(w1)?.si_so).toBe((siSoTruoc.get(w1)?.si_so ?? 0) + 1);
+
+    // 4. Nạp có mặt ở buổi học bù (không cảnh báo) → chuyên cần buổi 1 = có mặt.
+    expect((await ghiDiemDanh('Lớp W', 'co_mat')).lich_hoc_id).toBe(w1);
+    const cc = await napChuyenCan(app.get(PrismaService), query, [hv.hv7.dk]);
+    expect(cc.get(hv.hv7.dk)?.get(khoaBuoi(gdId, 1))?.trang_thai).toBe(
+      'co_mat',
+    );
+    const ddGoc = await prisma.diem_danh.findUniqueOrThrow({
+      where: {
+        dang_ky_hoc_id_lich_hoc_id: {
+          dang_ky_hoc_id: hv.hv7.dk,
+          lich_hoc_id: v1,
+        },
+      },
+    });
+    expect(ddGoc.trang_thai).toBe('vang');
   });
 });

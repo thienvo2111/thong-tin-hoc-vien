@@ -1,4 +1,4 @@
-# Hướng dẫn đội hỗ trợ — Duyệt đề nghị đổi buổi học
+# Hướng dẫn đội hỗ trợ — Duyệt đề nghị đổi buổi học và học bù
 
 Dành cho **người hỗ trợ học viên (cụm)** và **Quản trị**. Quyết định nền: ADR 0007.
 
@@ -98,3 +98,23 @@ Sĩ số **theo lớp** (trang khóa, báo cáo, Excel chia lớp) **không đ�
 | Báo *Phân lớp của học viên đã thay đổi — hãy từ chối* | Học viên vừa được chuyển lớp; từ chối, nhờ học viên gửi lại nếu cần. |
 | Cần đổi buổi hàng loạt theo danh sách (học viên chưa gửi) | Hiện chưa có nút trên giao diện — gửi danh sách mã + lớp/buổi cho Quản trị kỹ thuật xử lý bằng SQL (mẫu: `data/2026-10-16-doi-buoi-khung-dot2-thanh-thao.sql`). |
 | Xem danh sách đề nghị chờ toàn hệ thống | Quản trị: trang **Vận hành** có khối *Đề nghị đổi buổi chờ duyệt*. |
+
+## 6. Học bù buổi đã vắng (ADR 0012)
+
+Học viên **đã vắng** một buổi (buổi đã diễn ra, không có mặt) đăng ký học bù ở buổi tương đương **chưa bắt đầu** của lớp khác.
+Dùng chung màn **Đổi buổi**, hàng chờ, sĩ số, cửa sổ duyệt.
+
+- **Bật**: Quản trị → trang khóa → ô **Số buổi học bù tối đa mỗi học viên (0 = tắt)** (0–50) → **Lưu số buổi học bù**.
+  Lượt học bù **tách riêng** lượt đổi buổi. Sau khi triển khai, mọi khóa đều **tắt** cho tới khi Quản trị nhập số.
+- **Học viên vào từ**: dòng *Đăng ký học bù buổi này?* dưới buổi đã vắng, hoặc link `/de-nghi-doi-buoi?loai=hoc_bu`.
+- **Màn duyệt**: thẻ có nhãn **Học bù**, khối gốc ghi **Buổi đã vắng**, khối đích **Xin học bù tại**. Bộ lọc **Loại**
+  (Tất cả / Đổi buổi / Học bù) ở trên tab Chờ duyệt và Đã xử lý.
+- **Khác đổi buổi**: buổi gốc đã qua không làm đề nghị quá hạn — chỉ quá hạn khi **buổi học bù** đã bắt đầu.
+  Nếu học viên được ghi **có mặt** ở buổi gốc sau khi gửi thì không duyệt được (*Học viên đã có mặt buổi này, không cần học bù*) — từ chối.
+  **Hủy duyệt** / đổi lại chỉ khi buổi học bù chưa bắt đầu và học viên chưa điểm danh ở buổi học bù.
+- **Sau khi duyệt**: lịch học viên **thêm** buổi học bù (nhãn **Học bù**), buổi vắng vẫn ghi vắng; trang lớp gốc ghi
+  *Học bù tại {lớp}* (học viên **vẫn trong danh sách** buổi gốc), lớp đích ghi *Học bù từ {lớp}*; **sĩ số buổi gốc không giảm**,
+  buổi học bù được cộng. Nạp điểm danh ở buổi học bù không bị báo học bù; có mặt ở buổi học bù tính có mặt cho buổi đã vắng
+  (chuyên cần, **Tình hình đi học** ghi nhãn **Học bù**). Lịch học hỗ trợ ghi *Học bù vào: {họ tên}*.
+- **Thống kê**: lọc **Loại đề nghị**; cột **Đổi ra** gồm cả học bù (người học bù vẫn thuộc buổi gốc nên sĩ số buổi đó không giảm);
+  dòng *Học bù đã duyệt: n* dưới cột **Đổi vào**. Excel có cột **Học bù vào (đã duyệt)** (sheet buổi) và **Loại** (sheet học viên).

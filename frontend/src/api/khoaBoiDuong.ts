@@ -127,6 +127,8 @@ export interface CapNhatKhoaDto {
   mo_dieu_chinh_muc?: boolean;
   // ADR 0007: 0 = tắt đề nghị đổi buổi.
   so_buoi_doi_toi_da?: number;
+  // ADR 0012: 0 = tắt đăng ký học bù (0–50).
+  so_buoi_hoc_bu_toi_da?: number;
   // ADR 0005: true = bật (giữ mốc cũ nếu đã bật), false = tắt.
   bat_diem_danh_zoom?: boolean;
   diem_danh_mo_truoc_phut?: number;

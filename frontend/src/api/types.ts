@@ -316,6 +316,8 @@ export interface KhoaBoiDuong {
   mo_dieu_chinh_muc: boolean;
   // ADR 0007: số buổi tối đa học viên được đề nghị đổi (0 = tắt).
   so_buoi_doi_toi_da: number;
+  // ADR 0012: số buổi học bù tối đa mỗi học viên (0 = tắt).
+  so_buoi_hoc_bu_toi_da?: number;
   // ADR 0005 (issue #23): tự điểm danh lớp Zoom — mốc bật (null = tắt) + cửa sổ (phút).
   bat_diem_danh_zoom_luc: string | null;
   diem_danh_mo_truoc_phut: number;
@@ -623,6 +625,10 @@ export interface LichHocLopToi {
   lich_goc_id?: string;
   lop_goc_ten?: string;
   lop_chot_ten?: string;
+  /** ADR 0012: buổi học bù đã duyệt được THÊM vào lịch (buổi gốc vẫn ở chỗ cũ). */
+  hoc_bu?: boolean;
+  /** ADR 0012: buổi đã qua, Thầy/Cô vắng, khóa bật học bù, chưa có học bù/đổi buổi. */
+  hoc_bu_duoc?: boolean;
 }
 
 export type PhaDiemDanh = 'chua_mo' | 'dang_mo' | 'da_dong';
@@ -717,6 +723,8 @@ export interface KhoaHocDangKy {
     mo_dieu_chinh_muc: boolean;
     // Đổi buổi học: 0/thiếu = khóa chưa mở đề nghị đổi buổi.
     so_buoi_doi_toi_da?: number;
+    // ADR 0012: 0/thiếu = khóa chưa mở đăng ký học bù.
+    so_buoi_hoc_bu_toi_da?: number;
   };
   cum: CumHocVien | null;
   // Phân lớp theo giai đoạn (spec 2026-10-02) — thay lop_truc_tiep/lop_zoom/lop_vle/tien_do_giai_doan.
@@ -1108,6 +1116,8 @@ export interface BuoiHocHoTro {
   so_hoc_vien_cum: number;
   /** Spec đổi buổi §5: họ tên học viên cụm đổi buổi VÀO buổi này (đã tính trong so_hoc_vien_cum). */
   hoc_vien_doi_buoi?: string[];
+  /** ADR 0012: họ tên học viên cụm học bù vào buổi này (đã tính trong so_hoc_vien_cum). */
+  hoc_vien_hoc_bu?: string[];
   // ADR 0004 G11 (issue #21): trạng thái nhắc của từng cụm có học viên trong lớp.
   nhac_cum?: { cum_id: string; trang_thai: import('./nhacLich').TrangThaiNhac }[];
   // ADR 0004 G9 (issue #15): liên thông — điểm học, phòng, nhóm hỗ trợ giảng viên của khóa.

@@ -1,4 +1,4 @@
-# Hướng dẫn học viên — Đề nghị đổi buổi học
+# Hướng dẫn học viên — Đề nghị đổi buổi học và đăng ký học bù
 
 > Tài liệu này **không đăng công khai**. Người hỗ trợ cụm chỉ gửi cho học viên **khi học viên cần đổi buổi**
 > (tin nhắn soạn sẵn ở cuối trang). Chức năng chỉ dùng được khi khóa học đã mở đề nghị đổi buổi.
@@ -62,6 +62,34 @@ Lỡ chọn sai hoặc lịch thay đổi sau khi đề nghị đã được duy
 | Buổi đã đủ sĩ số, hãy chọn buổi khác | Buổi vừa đủ chỗ trong lúc Thầy/Cô thao tác — chọn buổi khác. |
 | Thầy/Cô đang học buổi này rồi | Đổi lại sang đúng buổi đang học theo đề nghị đã duyệt — chọn buổi khác. |
 
+## Đăng ký học bù buổi đã vắng
+
+Thầy/Cô **đã vắng** một buổi (buổi đã diễn ra, không có điểm danh hoặc bị ghi *Vắng* / *Vắng có phép*) thì có thể
+đăng ký **học bù đúng buổi đó** ở một lớp khác cùng nội dung. Chỉ dùng được khi khóa học đã mở đăng ký học bù.
+
+- Buổi học bù phải **tương đương** (cùng số thứ tự, giai đoạn, hình thức, mức) và **chưa bắt đầu**.
+- Buổi Thầy/Cô **đã có mặt** thì không cần học bù; buổi **đã được đổi buổi** thì liên hệ người hỗ trợ.
+- **Lượt học bù tính riêng** với lượt đổi buổi; bị từ chối hoặc đã hủy được trả lại lượt.
+- Buổi vắng **vẫn ghi vắng** trên lịch; buổi học bù được **thêm** vào lịch với nhãn **Học bù**.
+  Có mặt ở buổi học bù thì buổi đó được tính **có mặt** khi xét chuyên cần.
+
+1. Ở menu **Lớp học** (hoặc thẻ **Buổi học sắp tới**), dưới buổi đã vắng bấm dòng chữ nhỏ **Đăng ký học bù buổi này?**
+   - Hoặc mở đường link `https://boiduongnls.hcmue.edu.vn/de-nghi-doi-buoi?loai=hoc_bu`
+2. Trang **Đăng ký học bù** ghi *Còn x/N lượt học bù*. Ở mục **Buổi đã vắng**: chọn buổi (nếu đi từ bước 1 thì đã chọn sẵn).
+3. Ở mục **Buổi muốn học bù**: chọn một buổi (sĩ số, số người đang chờ, cảnh báo trùng giờ như đổi buổi).
+4. Ghi **Lý do** (5–500 ký tự), bấm **Gửi đề nghị**. Đề nghị có nhãn **Học bù**, cần người hỗ trợ duyệt.
+5. **Đã duyệt** → lịch có thêm buổi học bù với dòng *Học bù cho buổi n của {lớp gốc}*; Thầy/Cô đi học buổi đó
+   (lớp Zoom: bấm *Điểm danh & vào Zoom* ở buổi học bù như bình thường).
+6. **Sửa**, **Hủy đề nghị**, **Đổi lại** dùng như đổi buổi; **Đổi lại** chỉ khi buổi học bù chưa bắt đầu.
+
+| Thông báo | Ý nghĩa |
+|---|---|
+| Khóa học chưa mở đăng ký học bù | Khóa chưa dùng chức năng này — liên hệ người hỗ trợ cụm. |
+| Thầy/Cô đã dùng hết lượt học bù của khóa này | Đã dùng đủ số lượt học bù. |
+| Buổi này chưa diễn ra — hãy dùng đổi buổi | Buổi chưa học thì dùng *Không tham gia được buổi này?* |
+| Thầy/Cô đã có mặt buổi này, không cần học bù | Buổi đã được ghi có mặt. |
+| Buổi này đã được đổi, liên hệ người hỗ trợ | Buổi đã có đề nghị đổi buổi được duyệt. |
+
 ---
 
 ## Tin nhắn Zalo soạn sẵn (người hỗ trợ gửi cho học viên)
@@ -74,4 +102,15 @@ Nếu Thầy/Cô không tham gia được một buổi học, có thể đề ng
 3) Ghi lý do → bấm "Gửi đề nghị"
 Đề nghị cần người hỗ trợ duyệt. Chỉ khi thấy "Đã duyệt" Thầy/Cô mới học buổi mới; trước đó vẫn học buổi cũ.
 Lưu ý: sửa đề nghị sẽ về cuối hàng chờ; mỗi khóa có giới hạn số lượt đổi.
+```
+
+Học bù (khi Thầy/Cô đã vắng một buổi):
+
+```
+Kính gửi Thầy/Cô,
+Nếu Thầy/Cô đã vắng một buổi học, có thể đăng ký học bù buổi đó ở lớp khác:
+1) Đăng nhập https://boiduongnls.hcmue.edu.vn/de-nghi-doi-buoi?loai=hoc_bu
+   (hoặc bấm "Đăng ký học bù buổi này?" dưới buổi đã vắng ở mục Lớp học)
+2) Chọn buổi đã vắng → chọn buổi muốn học bù → ghi lý do → bấm "Gửi đề nghị"
+Chỉ khi thấy "Đã duyệt" Thầy/Cô mới đi học buổi học bù. Mỗi khóa có giới hạn số lượt học bù.
 ```

@@ -107,6 +107,11 @@ export default function HoTroLichHoc() {
                         Đổi buổi vào: {(b.hoc_vien_doi_buoi ?? []).join(', ')}
                       </Text>
                     )}
+                    {(b.hoc_vien_hoc_bu ?? []).length > 0 && (
+                      <Text fz="xs" mt={4}>
+                        Học bù vào: {(b.hoc_vien_hoc_bu ?? []).join(', ')}
+                      </Text>
+                    )}
                     {b.dia_diem_hoac_link && (
                       <Text fz="sm" mt={4} style={{ wordBreak: 'break-all' }}>
                         {href ? (
