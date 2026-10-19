@@ -34,7 +34,8 @@ export type MaLoiDoiBuoi =
   | 'DA_XU_LY'
   | 'PHAN_LOP_DOI'
   | 'GIU_CHO'
-  | 'TRUNG_BUOI_CHOT';
+  | 'TRUNG_BUOI_CHOT'
+  | 'DA_DIEM_DANH';
 
 export type KetQuaKiemTra =
   { ok: true } | { ok: false; ma: MaLoiDoiBuoi; thong_diep: string };
@@ -51,6 +52,7 @@ export const HTTP_THEO_MA: Record<MaLoiDoiBuoi, 400 | 403 | 409> = {
   BUOI_DAY: 409,
   GIU_CHO: 409,
   TRUNG_BUOI_CHOT: 400,
+  DA_DIEM_DANH: 400,
 };
 
 const LY_DO_TOI_THIEU = 5;
@@ -127,6 +129,9 @@ export function kiemTraGui(
     ly_do: string | undefined;
     /** Đổi lại (D11): buổi chốt của bản đã duyệt cùng buổi nguồn. */
     buoi_chot_hien_tai?: LichTomTat | null;
+    /** D12: học viên đã có dòng điểm danh ở buổi nguồn / buổi chốt hiện tại. */
+    da_diem_danh_nguon?: boolean;
+    da_diem_danh_chot?: boolean;
   },
   now: Date,
 ): KetQuaKiemTra {
@@ -149,6 +154,8 @@ export function kiemTraGui(
   const chot = x.buoi_chot_hien_tai;
   if (chot && daBatDau(chot, now))
     return loi('DA_BAT_DAU', 'Buổi đã bắt đầu, không thể đổi');
+  if (x.da_diem_danh_nguon || (chot && x.da_diem_danh_chot))
+    return loi('DA_DIEM_DANH', 'Thầy/Cô đã điểm danh buổi này, không thể đổi');
   if (chot && chot.id === x.buoi_dich.id)
     return loi('TRUNG_BUOI_CHOT', 'Thầy/Cô đang học buổi này rồi');
   const toiDa = x.buoi_dich.lop.si_so_toi_da;
@@ -179,6 +186,9 @@ export function quyetDinhDuyet(
     lop_phan_hien_tai: string | null;
     si_so: number;
     so_truoc: number;
+    /** D12: đã điểm danh ở buổi nguồn / buổi chốt cũ (đổi lại) → không đổi. */
+    da_diem_danh_nguon?: boolean;
+    da_diem_danh_chot_cu?: boolean;
   },
   now: Date,
 ): KetQuaDuyet {
@@ -186,6 +196,8 @@ export function quyetDinhDuyet(
     return chan('DA_XU_LY', 'Đề nghị đã được xử lý');
   if (daBatDau(x.buoi_nguon, now) || daBatDau(x.buoi_chot, now))
     return chan('DA_BAT_DAU', 'Buổi đã bắt đầu, không thể đổi');
+  if (x.da_diem_danh_nguon || x.da_diem_danh_chot_cu)
+    return chan('DA_DIEM_DANH', 'Học viên đã điểm danh buổi này, không thể đổi');
   if (!laBuoiTuongDuong(x.buoi_nguon, x.buoi_chot))
     return chan(
       'KHONG_TUONG_DUONG',

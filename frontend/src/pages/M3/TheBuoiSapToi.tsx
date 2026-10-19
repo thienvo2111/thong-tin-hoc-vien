@@ -85,8 +85,10 @@ export function TheBuoiSapToi({
                 Hỗ trợ tại điểm học: {t.ho_ten} — {t.so_dien_thoai}
               </Text>
             ))}
+            {/* D12: đã có điểm danh (Zoom mở trước giờ) thì không đổi được nữa. */}
             {coDoiBuoi &&
               !b.da_doi_buoi &&
+              b.trang_thai_diem_danh == null &&
               Date.parse(b.thoi_gian_bat_dau) > bayGio && (
                 <Text
                   component={Link}
@@ -101,6 +103,7 @@ export function TheBuoiSapToi({
             {coDoiBuoi &&
               b.da_doi_buoi &&
               b.lich_goc_id &&
+              b.trang_thai_diem_danh == null &&
               Date.parse(b.thoi_gian_bat_dau) > bayGio && (
                 <Text
                   component={Link}

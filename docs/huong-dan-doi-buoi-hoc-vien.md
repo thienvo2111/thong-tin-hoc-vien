@@ -10,6 +10,7 @@ Thầy/Cô **không tham gia được một buổi** của lớp mình (ví dụ
 
 - Chỉ đổi sang **buổi cùng số thứ tự, cùng giai đoạn, cùng hình thức và cùng mức** (ví dụ *Buổi 1* của lớp khác cùng mức Thành thạo).
 - Chỉ đổi được buổi **chưa bắt đầu**.
+- Buổi Thầy/Cô **đã điểm danh** (kể cả bấm *Điểm danh & vào Zoom* trước giờ học) thì không đổi, không đổi lại được nữa.
 - Mỗi khóa có **số lượt đổi tối đa**; đề nghị bị từ chối hoặc đã hủy được trả lại lượt.
 - Đề nghị cần **người hỗ trợ duyệt**; chỉ khi thấy trạng thái **Đã duyệt** mới đi học buổi mới.
 

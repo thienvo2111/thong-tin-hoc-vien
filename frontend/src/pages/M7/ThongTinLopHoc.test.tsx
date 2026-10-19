@@ -654,7 +654,7 @@ describe('M7 — Điểm danh & vào Zoom', () => {
       const lop = dk.giai_doan[1].lop!;
       const batDau = (gio: number) => new Date(Date.now() + gio * 3600_000).toISOString();
       lop.lich_hoc = [
-        { ...lop.lich_hoc[0], id: 'lh-tl', buoi_so: 1, thoi_gian_bat_dau: batDau(24), thoi_gian_ket_thuc: batDau(27), trang_thai: 'chua_dien_ra' },
+        { ...lop.lich_hoc[0], id: 'lh-tl', buoi_so: 1, thoi_gian_bat_dau: batDau(24), thoi_gian_ket_thuc: batDau(27), trang_thai: 'chua_dien_ra', trang_thai_diem_danh: null },
         {
           ...lop.lich_hoc[0],
           id: 'lh-doi',
@@ -662,6 +662,7 @@ describe('M7 — Điểm danh & vào Zoom', () => {
           thoi_gian_bat_dau: batDau(48),
           thoi_gian_ket_thuc: batDau(51),
           trang_thai: 'chua_dien_ra',
+          trang_thai_diem_danh: null,
           da_doi_buoi: true,
           lich_goc_id: 'lh-goc',
           lop_goc_ten: 'Lớp 01',
@@ -686,6 +687,16 @@ describe('M7 — Điểm danh & vào Zoom', () => {
         'href',
         '/de-nghi-doi-buoi?khoa=khoa-1&lich=lh-goc',
       );
+    });
+
+    it('buổi đã có điểm danh (Zoom mở trước giờ) → ẩn cả 2 link đổi buổi', async () => {
+      datKhoaDoiBuoi(2);
+      for (const b of db.khoaHocToi[0].giai_doan[1].lop!.lich_hoc) b.trang_thai_diem_danh = 'co_mat';
+      renderDaDangNhap();
+      const gd2 = (await cacTheGiaiDoan())[1];
+      expect(within(gd2).getByText('Đã đổi buổi')).toBeInTheDocument();
+      expect(within(gd2).queryByRole('link', { name: 'Không tham gia được buổi này?' })).not.toBeInTheDocument();
+      expect(within(gd2).queryByRole('link', { name: 'Muốn đổi lại buổi này?' })).not.toBeInTheDocument();
     });
 
     it('khóa tắt (0 lượt): không có link', async () => {

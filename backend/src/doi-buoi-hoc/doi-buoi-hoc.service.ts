@@ -179,11 +179,15 @@ export class DoiBuoiHocService {
     const chotCu = chotDaDuyetTheoCap(
       deNghiRows.filter((d) => d.trang_thai === 'da_duyet'),
     );
-    const lichDk = deNghiRows.some((d) => d.trang_thai === 'cho_duyet')
+    const coCho = deNghiRows.some((d) => d.trang_thai === 'cho_duyet');
+    const lichDk = coCho
       ? await this.lichThucTe([dangKy.id])
       : new Map<string, OLich[]>();
+    const quaHanThem = new Set(
+      coCho ? await this.idQuaHanThem(now, this.prisma, [dangKy.id]) : [],
+    );
     const deNghi = deNghiRows.map((d) =>
-      this.anhXaDeNghi(d, lichMap, now, hang, chotCu, lichDk),
+      this.anhXaDeNghi(d, lichMap, now, hang, chotCu, lichDk, quaHanThem),
     );
     const daDuyet = new Map(
       deNghi
@@ -238,9 +242,23 @@ export class DoiBuoiHocService {
         ma: 'DA_BAT_DAU',
         thong_diep: 'Buổi đã bắt đầu, không thể đổi',
       });
+    const chot = await this.chotDaDuyet(dangKy.id, nguon.id);
+    // D12: đã điểm danh ở buổi nguồn (hoặc buổi đang học nếu đổi lại) → không đổi.
+    const daDiemDanh = await this.prisma.diem_danh.findFirst({
+      where: {
+        dang_ky_hoc_id: dangKy.id,
+        lich_hoc_id: { in: chot ? [nguon.id, chot] : [nguon.id] },
+      },
+      select: { id: true },
+    });
+    if (daDiemDanh)
+      this.nem({
+        ok: false,
+        ma: 'DA_DIEM_DANH',
+        thong_diep: 'Thầy/Cô đã điểm danh buổi này, không thể đổi',
+      });
 
     const ds = await this.luaChonTuongDuong(nguon, now, dangKy.id);
-    const chot = await this.chotDaDuyet(dangKy.id, nguon.id);
     return chot ? ds.filter((x) => x.lich.id !== chot) : ds;
   }
 
@@ -332,8 +350,8 @@ export class DoiBuoiHocService {
     // để không chiếm 500 chỗ đầu của danh sách sắp tao_luc tăng dần.
     const choDuyet = !q.da_xu_ly && q.trang_thai === 'cho_duyet';
     const quaHan = choDuyet && q.qua_han === true;
-    // Đổi lại có buổi đang học đã bắt đầu cũng quá hạn (không duyệt được nữa).
-    const doiLaiQuaHan = choDuyet ? await this.idDoiLaiQuaHan(now) : [];
+    // Đổi lại có buổi đang học đã bắt đầu, hoặc đã điểm danh (D12), cũng quá hạn.
+    const doiLaiQuaHan = choDuyet ? await this.idQuaHanThem(now) : [];
     const locHan: Prisma.doi_buoi_hocWhereInput = !choDuyet
       ? {}
       : quaHan
@@ -390,6 +408,13 @@ export class DoiBuoiHocService {
       },
     });
     if (rows.length === 0) return [];
+    const quaHanThem = new Set(
+      choDuyet
+        ? doiLaiQuaHan
+        : rows.some((r) => r.trang_thai === 'cho_duyet')
+          ? await this.idQuaHanThem(now)
+          : [],
+    );
     const chotCu = await this.chotCuChoDoiLai(rows);
     const [lichMap, hang, siSo, lichDk] = await Promise.all([
       this.query.lichTomTat([
@@ -417,7 +442,7 @@ export class DoiBuoiHocService {
     return rows.map(({ dang_ky_hoc, xu_ly_boi, ...r }) => {
       const s = siSo.get(r.lich_de_nghi_id);
       return {
-        ...this.anhXaDeNghi(r, lichMap, now, hang, chotCu, lichDk),
+        ...this.anhXaDeNghi(r, lichMap, now, hang, chotCu, lichDk, quaHanThem),
         hoc_vien: {
           id: dang_ky_hoc.hoc_vien.id,
           ho_ten: dang_ky_hoc.hoc_vien.ho_ten,
@@ -436,7 +461,7 @@ export class DoiBuoiHocService {
     const cumIds = await this.cumPhamVi(user);
     if (cumIds?.length === 0) return 0;
     const now = new Date();
-    const doiLaiQuaHan = await this.idDoiLaiQuaHan(now);
+    const doiLaiQuaHan = await this.idQuaHanThem(now);
     return this.prisma.doi_buoi_hoc.count({
       where: {
         trang_thai: 'cho_duyet',
@@ -469,7 +494,7 @@ export class DoiBuoiHocService {
     const truoc = await this.prisma.doi_buoi_hoc.groupBy({
       by: ['lich_de_nghi_id'],
       where: {
-        ...this.whereChoTruoc(dn, now, await this.idDoiLaiQuaHan(now)),
+        ...this.whereChoTruoc(dn, now, await this.idQuaHanThem(now)),
         lich_de_nghi_id: { in: ds.map((x) => x.lich.id) },
       },
       _count: { _all: true },
@@ -519,6 +544,20 @@ export class DoiBuoiHocService {
         },
         select: { id: true, lich_chot_id: true },
       });
+      // D12: đã điểm danh ở buổi nguồn / buổi chốt cũ (đổi lại) → không đổi.
+      const diemDanh = await tx.diem_danh.findMany({
+        where: {
+          dang_ky_hoc_id: dn.dang_ky_hoc_id,
+          lich_hoc_id: {
+            in: [
+              dn.lich_nguon_id,
+              ...(banCu?.lich_chot_id ? [banCu.lich_chot_id] : []),
+            ],
+          },
+        },
+        select: { lich_hoc_id: true },
+      });
+      const daDiemDanh = new Set(diemDanh.map((d) => d.lich_hoc_id));
       const lichMap = await this.query.lichTomTat(
         [
           dn.lich_nguon_id,
@@ -544,7 +583,7 @@ export class DoiBuoiHocService {
           ...this.whereChoTruoc(
             { id, tao_luc: hienTai.tao_luc },
             now,
-            await this.idDoiLaiQuaHan(now, tx),
+            await this.idQuaHanThem(now, tx),
           ),
           lich_de_nghi_id: lichChotId,
         },
@@ -559,6 +598,9 @@ export class DoiBuoiHocService {
           lop_phan_hien_tai: phanLop?.lop_id ?? null,
           si_so,
           so_truoc: soTruoc,
+          da_diem_danh_nguon: daDiemDanh.has(dn.lich_nguon_id),
+          da_diem_danh_chot_cu:
+            !!banCu?.lich_chot_id && daDiemDanh.has(banCu.lich_chot_id),
         },
         now,
       );
@@ -688,6 +730,17 @@ export class DoiBuoiHocService {
           ok: false,
           ma: 'DA_BAT_DAU',
           thong_diep: 'Buổi đã bắt đầu, không thể đổi',
+        });
+      // D12: đã điểm danh ở buổi chốt → không đưa học viên về buổi nguồn được nữa.
+      const diemDanhChot = await tx.diem_danh.findFirst({
+        where: { dang_ky_hoc_id: dn.dang_ky_hoc_id, lich_hoc_id: lichChotId },
+        select: { id: true },
+      });
+      if (diemDanhChot)
+        this.nem({
+          ok: false,
+          ma: 'DA_DIEM_DANH',
+          thong_diep: 'Học viên đã điểm danh buổi chốt, không thể hủy duyệt',
         });
       const nguon = lichMap.get(dn.lich_nguon_id);
       const phanLop = nguon
@@ -825,18 +878,32 @@ export class DoiBuoiHocService {
     };
   }
 
-  // Id đề nghị đổi lại đang chờ mà buổi đang học (chốt của bản đã duyệt) đã bắt
-  // đầu → quá hạn như buổi nguồn/đề nghị đã bắt đầu. Tập nhỏ: 1 truy vấn gộp.
-  private async idDoiLaiQuaHan(
+  // Id đề nghị chờ quá hạn ngoài điều kiện thời gian của chính nó (quá hạn như
+  // buổi nguồn/đề nghị đã bắt đầu): đổi lại có buổi đang học (chốt của bản đã
+  // duyệt) đã bắt đầu; hoặc học viên đã có điểm danh ở buổi nguồn / buổi đang
+  // học (D12). Tập nhỏ: 1 truy vấn gộp; dangKyIds để lọc khi chỉ cần 1 học viên.
+  private async idQuaHanThem(
     now: Date,
     db: Db = this.prisma,
+    dangKyIds?: string[],
   ): Promise<string[]> {
+    const loc = dangKyIds
+      ? Prisma.sql`AND c.dang_ky_hoc_id = ANY(${dangKyIds}::uuid[])`
+      : Prisma.empty;
     const rows = await db.$queryRaw<{ id: string }[]>`
       SELECT c.id FROM doi_buoi_hoc c
-      JOIN doi_buoi_hoc d ON d.dang_ky_hoc_id = c.dang_ky_hoc_id
-        AND d.lich_nguon_id = c.lich_nguon_id AND d.trang_thai = 'da_duyet'
-      JOIN lich_hoc_lop l ON l.id = d.lich_chot_id
-      WHERE c.trang_thai = 'cho_duyet' AND l.thoi_gian_bat_dau <= ${now}`;
+      WHERE c.trang_thai = 'cho_duyet' ${loc} AND (
+        EXISTS (SELECT 1 FROM diem_danh dd
+          WHERE dd.dang_ky_hoc_id = c.dang_ky_hoc_id
+            AND dd.lich_hoc_id = c.lich_nguon_id)
+        OR EXISTS (SELECT 1 FROM doi_buoi_hoc d
+          JOIN lich_hoc_lop l ON l.id = d.lich_chot_id
+          WHERE d.dang_ky_hoc_id = c.dang_ky_hoc_id
+            AND d.lich_nguon_id = c.lich_nguon_id AND d.trang_thai = 'da_duyet'
+            AND (l.thoi_gian_bat_dau <= ${now} OR EXISTS (
+              SELECT 1 FROM diem_danh dd
+              WHERE dd.dang_ky_hoc_id = c.dang_ky_hoc_id
+                AND dd.lich_hoc_id = d.lich_chot_id))))`;
     return rows.map((r) => r.id);
   }
 
@@ -988,6 +1055,15 @@ export class DoiBuoiHocService {
         const chotCu = chotCuId
           ? ((await this.query.lichTomTat([chotCuId], tx)).get(chotCuId) ?? null)
           : null;
+        // D12: điểm danh ở buổi nguồn + buổi chốt hiện tại (đổi lại) — 1 truy vấn.
+        const diemDanh = await tx.diem_danh.findMany({
+          where: {
+            dang_ky_hoc_id: x.dangKyId,
+            lich_hoc_id: { in: chotCuId ? [x.nguon.id, chotCuId] : [x.nguon.id] },
+          },
+          select: { lich_hoc_id: true },
+        });
+        const daDiemDanh = new Set(diemDanh.map((d) => d.lich_hoc_id));
         const phanLop = await tx.phan_lop_giai_doan.findFirst({
           where: {
             dang_ky_hoc_id: x.dangKyId,
@@ -1007,6 +1083,8 @@ export class DoiBuoiHocService {
               si_so_dich: siSo.get(x.dich.id)?.si_so ?? 0,
               ly_do: x.dto.ly_do,
               buoi_chot_hien_tai: chotCu,
+              da_diem_danh_nguon: daDiemDanh.has(x.nguon.id),
+              da_diem_danh_chot: !!chotCuId && daDiemDanh.has(chotCuId),
             },
             now,
           ),
@@ -1186,6 +1264,7 @@ export class DoiBuoiHocService {
     hang: Map<string, { k: number; n: number }>,
     chotCu: Map<string, string>,
     lichDk: Map<string, OLich[]>,
+    quaHanThem: Set<string>,
   ): DeNghiHocVien {
     const nguon = lichMap.get(r.lich_nguon_id);
     const dich = lichMap.get(r.lich_de_nghi_id);
@@ -1195,7 +1274,8 @@ export class DoiBuoiHocService {
       r.trang_thai === 'cho_duyet' &&
       ((nguon !== undefined && daBatDau(nguon, now)) ||
         (dich !== undefined && daBatDau(dich, now)) ||
-        (doiLai !== null && daBatDau(doiLai, now)));
+        (doiLai !== null && daBatDau(doiLai, now)) ||
+        quaHanThem.has(r.id));
     return {
       id: r.id,
       trang_thai: r.trang_thai,

@@ -78,9 +78,16 @@ function setup(
     phan_lop_giai_doan: {
       findFirst: jest.fn(async () => ({ lop_id: 'lopA' })),
     },
+    diem_danh: {
+      findMany: jest.fn(async (_a?: unknown) => [] as { lich_hoc_id: string }[]),
+    },
   };
   const prisma = {
     $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
+    $queryRaw: jest.fn(async (..._a: unknown[]) => [] as { id: string }[]),
+    diem_danh: {
+      findFirst: jest.fn(async (_a?: unknown) => null as { id: string } | null),
+    },
     dang_ky_hoc: { findFirst: jest.fn(async () => ({ id: 'dk1' })) },
     khoa_boi_duong: {
       findUnique: jest.fn(async () => ({
@@ -217,6 +224,49 @@ describe('DoiBuoiHocService (hoc vien)', () => {
           ]),
     );
     await expect(svc.gui(user, dto)).rejects.toMatchObject({ status: 400 });
+    expect(tx.doi_buoi_hoc.create).not.toHaveBeenCalled();
+  });
+
+  it('gui: buoi nguon da diem danh -> 400 DA_DIEM_DANH, khong tao (D12)', async () => {
+    const { svc, tx } = setup();
+    tx.diem_danh.findMany.mockResolvedValueOnce([{ lich_hoc_id: 'ln' }]);
+    await expect(svc.gui(user, dto)).rejects.toMatchObject({
+      status: 400,
+      response: {
+        error: expect.objectContaining({
+          message: 'Thầy/Cô đã điểm danh buổi này, không thể đổi',
+        }),
+      },
+    });
+    expect(tx.diem_danh.findMany).toHaveBeenCalledWith({
+      where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln'] } },
+      select: { lich_hoc_id: true },
+    });
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.diem_danh.findMany.mock.invocationCallOrder[0],
+    );
+    expect(tx.doi_buoi_hoc.create).not.toHaveBeenCalled();
+  });
+
+  it('gui doi lai: buoi chot hien tai da diem danh -> 400 DA_DIEM_DANH, khong tao', async () => {
+    const { svc, tx } = setup({
+      hoatDong: [
+        { lich_nguon_id: 'ln', trang_thai: 'da_duyet', lich_chot_id: 'lc' },
+      ],
+    });
+    tx.diem_danh.findMany.mockResolvedValueOnce([{ lich_hoc_id: 'lc' }]);
+    await expect(svc.gui(user, dto)).rejects.toMatchObject({ status: 400 });
+    expect(tx.diem_danh.findMany).toHaveBeenCalledWith({
+      where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln', 'lc'] } },
+      select: { lich_hoc_id: true },
+    });
+    expect(tx.doi_buoi_hoc.create).not.toHaveBeenCalled();
+  });
+
+  it('sua: buoi nguon da diem danh -> 400, khong tao', async () => {
+    const { svc, tx } = setup();
+    tx.diem_danh.findMany.mockResolvedValueOnce([{ lich_hoc_id: 'ln' }]);
+    await expect(svc.sua(user, 'x1', dto)).rejects.toMatchObject({ status: 400 });
     expect(tx.doi_buoi_hoc.create).not.toHaveBeenCalled();
   });
 
@@ -504,6 +554,36 @@ describe('DoiBuoiHocService luaChon / tongQuan', () => {
     });
   });
 
+  it('lua-chon: buoi nguon da diem danh -> 400 DA_DIEM_DANH, khong tim ung vien (D12)', async () => {
+    const { svc, prisma, lichFindMany } = setupDoc();
+    prisma.diem_danh.findFirst.mockResolvedValueOnce({ id: 'dd1' });
+    await expect(svc.luaChonHocVien(user, 'ln')).rejects.toMatchObject({
+      status: 400,
+      response: {
+        error: expect.objectContaining({
+          message: 'Thầy/Cô đã điểm danh buổi này, không thể đổi',
+        }),
+      },
+    });
+    expect(prisma.diem_danh.findFirst).toHaveBeenCalledWith({
+      where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln'] } },
+      select: { id: true },
+    });
+    expect(lichFindMany).not.toHaveBeenCalled();
+  });
+
+  it('lua-chon doi lai: kiem diem danh ca buoi chot hien tai', async () => {
+    const { svc, prisma } = setupDoc();
+    prisma.doi_buoi_hoc.findFirst.mockResolvedValueOnce({
+      lich_chot_id: 'ld',
+    } as never);
+    await svc.luaChonHocVien(user, 'ln');
+    expect(prisma.diem_danh.findFirst).toHaveBeenCalledWith({
+      where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln', 'ld'] } },
+      select: { id: true },
+    });
+  });
+
   it('lua-chon: buoi nguon khong thuoc phan lop hien tai -> 404', async () => {
     const { svc, prisma } = setupDoc();
     (
@@ -624,6 +704,46 @@ describe('DoiBuoiHocService luaChon / tongQuan', () => {
       qua_han: true,
       thu_tu_hang: null,
     });
+  });
+
+  it('tong quan: de nghi cho co buoi nguon da diem danh -> qua han (truy van loc theo dang ky)', async () => {
+    const s = setupDoc();
+    const row = {
+      id: 'a',
+      trang_thai: 'cho_duyet',
+      dang_ky_hoc_id: 'dk1',
+      lich_nguon_id: 'ln',
+      lich_de_nghi_id: 'ld',
+      lich_chot_id: null,
+      ly_do: 'abcde',
+      tao_luc: new Date(Date.now() - 5000),
+      ghi_chu_xu_ly: null,
+      nguoi_xu_ly: null,
+    };
+    (s.prisma.doi_buoi_hoc as Record<string, unknown>).findMany = jest
+      .fn()
+      .mockResolvedValueOnce([row])
+      .mockResolvedValueOnce([]);
+    s.prisma.$queryRaw.mockResolvedValueOnce([{ id: 'a' }]);
+    s.query.lichTomTat.mockResolvedValue(
+      new Map([
+        ['ln', lich('ln', 'lopA')],
+        ['ld', lich('ld', 'lopB')],
+      ]),
+    );
+    const r = await s.svc.tongQuanHocVien(user, 'k1');
+    expect(r.de_nghi[0]).toMatchObject({ id: 'a', qua_han: true, thu_tu_hang: null });
+    expect(s.prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(s.prisma.$queryRaw.mock.calls[0])).toContain('dk1');
+  });
+
+  it('tong quan: khong co de nghi cho -> khong truy van qua han', async () => {
+    const s = setupDoc();
+    (s.prisma.doi_buoi_hoc as Record<string, unknown>).findMany = jest
+      .fn()
+      .mockResolvedValueOnce([]);
+    await s.svc.tongQuanHocVien(user, 'k1');
+    expect(s.prisma.$queryRaw).not.toHaveBeenCalled();
   });
 
   it('tong quan doi lai: 1 luot, de_nghi = ban da duyet, de_nghi_doi_lai + doi_lai_tu', async () => {
@@ -753,6 +873,10 @@ describe('DoiBuoiHocService nguoi duyet', () => {
       },
       phan_lop_giai_doan: {
         findFirst: jest.fn(async () => ({ lop_id: opts.lopPhan ?? 'lopA' })),
+      },
+      diem_danh: {
+        findMany: jest.fn(async (_a?: unknown) => [] as { lich_hoc_id: string }[]),
+        findFirst: jest.fn(async (_a?: unknown) => null as { id: string } | null),
       },
     };
     const prisma = {
@@ -993,6 +1117,25 @@ describe('DoiBuoiHocService nguoi duyet', () => {
       expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
     });
 
+    it('buoi chot cu da diem danh -> 400 DA_DIEM_DANH trong tx, khong cap nhat', async () => {
+      const { svc, tx, nhatKy } = setupDoiLai();
+      tx.diem_danh.findMany.mockResolvedValueOnce([{ lich_hoc_id: 'lc' }]);
+      await expect(svc.duyet(quanTri, 'x1', {})).rejects.toMatchObject({
+        status: 400,
+        response: {
+          error: expect.objectContaining({
+            message: 'Học viên đã điểm danh buổi này, không thể đổi',
+          }),
+        },
+      });
+      expect(tx.diem_danh.findMany).toHaveBeenCalledWith({
+        where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln', 'lc'] } },
+        select: { lich_hoc_id: true },
+      });
+      expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
+    });
+
     it('khong co ban da duyet -> chi 1 updateMany (de nghi thuong)', async () => {
       const { svc, tx, nhatKy } = setupDuyet();
       await svc.duyet(quanTri, 'x1', {});
@@ -1001,6 +1144,29 @@ describe('DoiBuoiHocService nguoi duyet', () => {
         (nhatKy.ghi.mock.calls[0][0] as { chi_tiet: object }).chi_tiet,
       ).not.toHaveProperty('thay_the_id');
     });
+  });
+
+  it('duyet: buoi nguon da diem danh -> 400 DA_DIEM_DANH (ca quan tri), doc trong tx truoc cap nhat', async () => {
+    const { svc, tx, prisma, nhatKy } = setupDuyet();
+    tx.diem_danh.findMany.mockResolvedValueOnce([{ lich_hoc_id: 'ln' }]);
+    await expect(svc.duyet(quanTri, 'x1', {})).rejects.toMatchObject({
+      status: 400,
+      response: {
+        error: expect.objectContaining({
+          message: 'Học viên đã điểm danh buổi này, không thể đổi',
+        }),
+      },
+    });
+    expect(tx.diem_danh.findMany).toHaveBeenCalledWith({
+      where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln'] } },
+      select: { lich_hoc_id: true },
+    });
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.diem_danh.findMany.mock.invocationCallOrder[0],
+    );
+    expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+    expect(prisma.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+    expect(nhatKy.ghi).not.toHaveBeenCalled();
   });
 
   it('duyet: P2002 trong giao dich -> 409 Đề nghị đã được xử lý (khong 500)', async () => {
@@ -1216,6 +1382,28 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     expect(query.siSoBuoi).not.toHaveBeenCalled();
   });
 
+  it('huyDuyet: da diem danh o buoi chot -> 400, khong cap nhat (D12)', async () => {
+    const { svc, tx, nhatKy } = setupDuyet({
+      trangThai: 'da_duyet',
+      lichChot: 'lk',
+    });
+    tx.diem_danh.findFirst.mockResolvedValueOnce({ id: 'dd1' });
+    await expect(svc.huyDuyet(quanTri, 'x1', ghiChu)).rejects.toMatchObject({
+      status: 400,
+      response: {
+        error: expect.objectContaining({
+          message: 'Học viên đã điểm danh buổi chốt, không thể hủy duyệt',
+        }),
+      },
+    });
+    expect(tx.diem_danh.findFirst).toHaveBeenCalledWith({
+      where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: 'lk' },
+      select: { id: true },
+    });
+    expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+    expect(nhatKy.ghi).not.toHaveBeenCalled();
+  });
+
   it('huyDuyet: updateMany 0 dong -> 409', async () => {
     const { svc, nhatKy } = setupDuyet({
       trangThai: 'da_duyet',
@@ -1268,6 +1456,32 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     expect(chinh.id).toEqual({ notIn: ['q1'] });
     expect(quaHan.OR).toHaveLength(3);
     expect(quaHan.OR[2]).toEqual({ id: { in: ['q1'] } });
+  });
+
+  it('danhSach tat ca: de nghi cho trong tap qua han (vd da diem danh) -> qua_han', async () => {
+    const { svc, prisma } = setupDuyet();
+    prisma.doi_buoi_hoc.findMany.mockResolvedValueOnce([
+      {
+        id: 'x1',
+        trang_thai: 'cho_duyet',
+        dang_ky_hoc_id: 'dk1',
+        lich_nguon_id: 'ln',
+        lich_de_nghi_id: 'ld',
+        lich_chot_id: null,
+        ly_do: 'abcde',
+        tao_luc: taoLuc,
+        ghi_chu_xu_ly: null,
+        nguoi_xu_ly: null,
+        dang_ky_hoc: {
+          hoc_vien: { id: 'hv1', ho_ten: 'A', don_vi_cong_tac: { ten_don_vi: 'T' } },
+          cum: null,
+        },
+        xu_ly_boi: null,
+      },
+    ]);
+    prisma.$queryRaw.mockResolvedValue([{ id: 'x1' }]);
+    const r = await svc.danhSach(quanTri, {});
+    expect(r[0]).toMatchObject({ id: 'x1', qua_han: true, thu_tu_hang: null });
   });
 
   it('danhSach da_xu_ly: khong truy van doi lai qua han', async () => {

@@ -23,6 +23,7 @@ function khoaVoiBuoi(
       id: "lh-test",
       thoi_gian_bat_dau: new Date(bd).toISOString(),
       thoi_gian_ket_thuc: new Date(bd + 3 * GIO).toISOString(),
+      trang_thai_diem_danh: null,
       ...them,
     },
   ];
@@ -81,5 +82,28 @@ describe("TheBuoiSapToi — link đổi buổi", () => {
     expect(screen.getByRole("link", { name: "Muốn đổi lại buổi này?" }).getAttribute("href")).toMatch(
       /^\/de-nghi-doi-buoi\?khoa=.+&lich=lh-goc$/,
     );
+  });
+
+  it("buổi đã có điểm danh (Zoom mở trước giờ) → ẩn link đổi buổi", () => {
+    renderThe(khoaVoiBuoi(2, 1 * GIO, { trang_thai_diem_danh: "co_mat" }));
+    expect(screen.getByText(/Buổi 1/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Không tham gia được buổi này?" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("buổi đã đổi + đã điểm danh buổi chốt → ẩn link Đổi lại", () => {
+    renderThe(
+      khoaVoiBuoi(2, 1 * GIO, {
+        da_doi_buoi: true,
+        lich_goc_id: "lh-goc",
+        lop_chot_ten: "Lớp 05",
+        trang_thai_diem_danh: "co_mat",
+      }),
+    );
+    expect(screen.getByText("Đã đổi buổi")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Muốn đổi lại buổi này?" }),
+    ).not.toBeInTheDocument();
   });
 });

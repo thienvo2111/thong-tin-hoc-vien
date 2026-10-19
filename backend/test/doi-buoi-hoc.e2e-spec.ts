@@ -388,4 +388,73 @@ describe('Đổi buổi học (e2e)', () => {
     expect(dongMoi).toMatchObject({ trang_thai: 'da_duyet', lich_chot_id: buoi.h });
     expect(await siSo()).toEqual([0, 1]);
   });
+
+  it('(f) D12: đã điểm danh buổi chốt → đổi lại chờ thành quá hạn, không duyệt / gửi / hủy duyệt được', async () => {
+    // HV6 đang học H (từ (e)); gửi đổi lại sang G khi chưa điểm danh → được.
+    const cho = (
+      await http()
+        .post('/hoc-vien/toi/doi-buoi')
+        .set(auth('hv6'))
+        .send({
+          lich_nguon_id: buoi.f,
+          lich_de_nghi_id: buoi.g,
+          ly_do: 'Trùng lịch công tác',
+        })
+        .expect(201)
+    ).body.id as string;
+    // Điểm danh Zoom mở trước giờ học → đã có dòng điểm danh ở H dù H chưa bắt đầu.
+    await prisma.diem_danh.create({
+      data: {
+        dang_ky_hoc_id: hv.hv6.dk,
+        lich_hoc_id: buoi.h,
+        trang_thai: 'co_mat',
+        nguon: 'ky_ten',
+      },
+    });
+
+    const tongQuan = await http()
+      .get('/hoc-vien/toi/doi-buoi')
+      .query({ khoa_id: khoaId })
+      .set(auth('hv6'))
+      .expect(200);
+    expect(
+      tongQuan.body.de_nghi.find((d: { id: string }) => d.id === cho).qua_han,
+    ).toBe(true);
+    const ds = (q: object) =>
+      http().get('/doi-buoi-hoc').query(q).set(auth('ht')).expect(200);
+    const chinh = await ds({ trang_thai: 'cho_duyet' });
+    expect(chinh.body.map((d: { id: string }) => d.id)).not.toContain(cho);
+    const quaHan = await ds({ trang_thai: 'cho_duyet', qua_han: true });
+    expect(quaHan.body.map((d: { id: string }) => d.id)).toContain(cho);
+
+    const r = await duyet(cho).expect(400);
+    expect(r.body.error.message).toBe(
+      'Học viên đã điểm danh buổi này, không thể đổi',
+    );
+    const lc = await http()
+      .get(`/hoc-vien/toi/doi-buoi/lua-chon/${buoi.f}`)
+      .set(auth('hv6'))
+      .expect(400);
+    expect(lc.body.error.message).toBe(
+      'Thầy/Cô đã điểm danh buổi này, không thể đổi',
+    );
+
+    // HV1 đã duyệt A→B; điểm danh ở B → không hủy duyệt được.
+    await prisma.diem_danh.create({
+      data: {
+        dang_ky_hoc_id: hv.hv1.dk,
+        lich_hoc_id: buoi.b,
+        trang_thai: 'co_mat',
+        nguon: 'ky_ten',
+      },
+    });
+    const h = await http()
+      .post(`/doi-buoi-hoc/${deNghi.hv1}/huy-duyet`)
+      .set(auth('ht'))
+      .send({ ghi_chu: 'Học viên xin quay lại' })
+      .expect(400);
+    expect(h.body.error.message).toBe(
+      'Học viên đã điểm danh buổi chốt, không thể hủy duyệt',
+    );
+  });
 });

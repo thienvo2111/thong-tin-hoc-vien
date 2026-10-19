@@ -43,6 +43,8 @@ Sắp theo thời điểm gửi (cũ nhất trước). Mỗi dòng: học viên 
 
 **Quá hạn**: đề nghị mà buổi đã bắt đầu nằm ở mục **Quá hạn** — không duyệt được nữa, chỉ **Từ chối** để đóng.
 
+**Đã điểm danh**: học viên đã có điểm danh ở buổi gốc hoặc buổi đang học (kể cả điểm danh Zoom mở trước giờ) thì đề nghị cũng vào **Quá hạn**, không duyệt được (*Học viên đã điểm danh buổi này, không thể đổi*); đề nghị đã duyệt mà học viên đã điểm danh ở buổi chốt thì không **Hủy duyệt** được.
+
 **Đổi lại**: thẻ có nhãn **Đổi lại** và khối **Đang học** là học viên xin đổi tiếp một đề nghị *đã duyệt*.
 Cửa sổ duyệt ghi *Duyệt sẽ thay buổi đang học*: duyệt thì buổi mới thay buổi đang học (đề nghị cũ chuyển *Đã thay
 bằng đề nghị đổi lại*, không tốn thêm lượt của học viên); **từ chối** thì học viên vẫn học buổi đã duyệt trước đó.

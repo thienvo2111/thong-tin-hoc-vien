@@ -289,6 +289,69 @@ describe('kiemTraGui', () => {
         ok: true,
       });
     });
+
+    it('đã điểm danh ở buổi chốt hiện tại → DA_DIEM_DANH', () => {
+      expect(
+        kiemTraGui(
+          { ...base, buoi_chot_hien_tai: chotCu, da_diem_danh_chot: true },
+          NOW,
+        ),
+      ).toEqual({
+        ok: false,
+        ma: 'DA_DIEM_DANH',
+        thong_diep: 'Thầy/Cô đã điểm danh buổi này, không thể đổi',
+      });
+    });
+  });
+
+  describe('đã điểm danh (D12)', () => {
+    it('buổi nguồn đã có điểm danh → DA_DIEM_DANH (400)', () => {
+      expect(kiemTraGui({ ...base, da_diem_danh_nguon: true }, NOW)).toEqual({
+        ok: false,
+        ma: 'DA_DIEM_DANH',
+        thong_diep: 'Thầy/Cô đã điểm danh buổi này, không thể đổi',
+      });
+      expect(HTTP_THEO_MA.DA_DIEM_DANH).toBe(400);
+    });
+
+    it('DA_BAT_DAU thắng DA_DIEM_DANH', () => {
+      expect(
+        kiemTraGui(
+          {
+            ...base,
+            buoi_nguon: lich({ lop_id: 'l1', thoi_gian_bat_dau: NOW }),
+            da_diem_danh_nguon: true,
+          },
+          NOW,
+        ),
+      ).toMatchObject({ ok: false, ma: 'DA_BAT_DAU' });
+    });
+
+    it('DA_DIEM_DANH thắng TRUNG_BUOI_CHOT / BUOI_DAY / LY_DO', () => {
+      const chotCu = lich({ id: 'bc', lop_id: 'l3' });
+      expect(
+        kiemTraGui(
+          {
+            ...base,
+            buoi_dich: chotCu,
+            buoi_chot_hien_tai: chotCu,
+            si_so_dich: 30,
+            ly_do: 'x',
+            da_diem_danh_nguon: true,
+          },
+          NOW,
+        ),
+      ).toMatchObject({ ok: false, ma: 'DA_DIEM_DANH' });
+    });
+
+    it('cờ false → hợp lệ', () => {
+      expect(
+        kiemTraGui(
+          { ...base, da_diem_danh_nguon: false, da_diem_danh_chot: false },
+          NOW,
+        ),
+      ).toEqual({ ok: true });
+    });
   });
 });
 
@@ -385,6 +448,56 @@ describe('quyetDinhDuyet', () => {
     });
   });
 
+  describe('đã điểm danh (D12)', () => {
+    const tin = 'Học viên đã điểm danh buổi này, không thể đổi';
+
+    it.each([
+      ['buổi nguồn', { da_diem_danh_nguon: true }],
+      ['buổi chốt cũ (đổi lại)', { da_diem_danh_chot_cu: true }],
+    ])('%s → DA_DIEM_DANH, kể cả quản trị', (_t, co) => {
+      for (const vai_tro of ['ho_tro_hoc_vien', 'quan_tri'] as const)
+        expect(quyetDinhDuyet({ ...base, vai_tro, ...co }, NOW)).toEqual({
+          ket_qua: 'chan',
+          ma: 'DA_DIEM_DANH',
+          thong_diep: tin,
+          canh_bao: [],
+        });
+    });
+
+    it('DA_XU_LY và DA_BAT_DAU thắng DA_DIEM_DANH', () => {
+      expect(
+        quyetDinhDuyet(
+          { ...base, trang_thai: 'da_duyet', da_diem_danh_nguon: true } as never,
+          NOW,
+        ).ma,
+      ).toBe('DA_XU_LY');
+      expect(
+        quyetDinhDuyet(
+          {
+            ...base,
+            buoi_nguon: lich({ lop_id: 'l1', thoi_gian_bat_dau: NOW }),
+            da_diem_danh_nguon: true,
+          },
+          NOW,
+        ).ma,
+      ).toBe('DA_BAT_DAU');
+    });
+
+    it('DA_DIEM_DANH thắng PHAN_LOP_DOI / BUOI_DAY', () => {
+      expect(
+        quyetDinhDuyet(
+          {
+            ...base,
+            lop_phan_hien_tai: 'lx',
+            si_so: 30,
+            da_diem_danh_nguon: true,
+          },
+          NOW,
+        ).ma,
+      ).toBe('DA_DIEM_DANH');
+    });
+  });
+
   it('hợp lệ', () => {
     expect(quyetDinhDuyet(base, NOW)).toEqual({
       ket_qua: 'duyet',
@@ -426,6 +539,7 @@ describe('HTTP_THEO_MA', () => {
     ['KHONG_TUONG_DUONG', 400],
     ['DA_BAT_DAU', 400],
     ['LY_DO', 400],
+    ['DA_DIEM_DANH', 400],
   ])('%s -> %i', (ma, http) => {
     expect(HTTP_THEO_MA[ma]).toBe(http);
   });

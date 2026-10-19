@@ -508,12 +508,13 @@ function DanhSachBuoi({ lichHoc, khoaDoiBuoi }: { lichHoc: LichHocLopToi[]; khoa
               );
             })()}
           {buoi.diem_danh_zoom?.co_link && <NutDiemDanhZoom buoi={buoi} />}
-          {khoaDoiBuoi && !buoi.da_doi_buoi && Date.parse(buoi.thoi_gian_bat_dau) > Date.now() && (
+          {/* D12: đã có điểm danh (Zoom mở trước giờ) thì không đổi được nữa. */}
+          {khoaDoiBuoi && !buoi.da_doi_buoi && buoi.trang_thai_diem_danh == null && Date.parse(buoi.thoi_gian_bat_dau) > Date.now() && (
             <Text component={Link} to={`/de-nghi-doi-buoi?khoa=${khoaDoiBuoi}&lich=${buoi.id}`} size="xs" c="dimmed" td="underline" mt={4} display="block">
               Không tham gia được buổi này?
             </Text>
           )}
-          {khoaDoiBuoi && buoi.da_doi_buoi && buoi.lich_goc_id && Date.parse(buoi.thoi_gian_bat_dau) > Date.now() && (
+          {khoaDoiBuoi && buoi.da_doi_buoi && buoi.lich_goc_id && buoi.trang_thai_diem_danh == null && Date.parse(buoi.thoi_gian_bat_dau) > Date.now() && (
             <Text component={Link} to={`/de-nghi-doi-buoi?khoa=${khoaDoiBuoi}&lich=${buoi.lich_goc_id}`} size="xs" c="dimmed" td="underline" mt={4} display="block">
               Muốn đổi lại buổi này?
             </Text>
