@@ -1445,6 +1445,27 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     expect(where.id).toEqual({ notIn: ['q1'] });
   });
 
+  it('idQuaHanThem: SQL chi xet de nghi co buoi nguon + buoi de nghi chua bat dau, cung moc now', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.demChoDuyet(quanTri);
+    const [strings, ...values] = prisma.$queryRaw.mock.calls[0] as [
+      TemplateStringsArray,
+      ...unknown[],
+    ];
+    const sql = strings.join('?').replace(/\s+/g, ' ');
+    expect(sql).toContain('JOIN lich_hoc_lop ln ON ln.id = c.lich_nguon_id');
+    expect(sql).toContain('JOIN lich_hoc_lop ld ON ld.id = c.lich_de_nghi_id');
+    expect(sql).toContain('ln.thoi_gian_bat_dau > ? AND ld.thoi_gian_bat_dau > ?');
+    expect(sql).toContain('l.thoi_gian_bat_dau <= ?');
+    expect(sql).toContain('FROM diem_danh dd');
+    const ngay = values.filter((v): v is Date => v instanceof Date);
+    expect(ngay).toHaveLength(3);
+    expect(new Set(ngay.map((d) => d.getTime())).size).toBe(1);
+    const where = (prisma.doi_buoi_hoc.count.mock.calls[0][0] as { where: any })
+      .where;
+    expect(where.lich_nguon.thoi_gian_bat_dau.gt).toBe(ngay[0]);
+  });
+
   it('danhSach cho_duyet: doi lai qua han bi loai khoi danh sach chinh, vao danh sach qua han', async () => {
     const { svc, prisma } = setupDuyet();
     prisma.$queryRaw.mockResolvedValue([{ id: 'q1' }]);

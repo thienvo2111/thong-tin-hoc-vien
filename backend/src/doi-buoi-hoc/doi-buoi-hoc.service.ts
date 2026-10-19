@@ -881,7 +881,9 @@ export class DoiBuoiHocService {
   // Id đề nghị chờ quá hạn ngoài điều kiện thời gian của chính nó (quá hạn như
   // buổi nguồn/đề nghị đã bắt đầu): đổi lại có buổi đang học (chốt của bản đã
   // duyệt) đã bắt đầu; hoặc học viên đã có điểm danh ở buổi nguồn / buổi đang
-  // học (D12). Tập nhỏ: 1 truy vấn gộp; dangKyIds để lọc khi chỉ cần 1 học viên.
+  // học (D12). Chỉ xét đề nghị có buổi nguồn và buổi đề nghị CHƯA bắt đầu: đề
+  // nghị đã bắt đầu đã quá hạn theo thời gian → tập id nhỏ, không phình theo thời
+  // gian. 1 truy vấn gộp; dangKyIds để lọc khi chỉ cần 1 học viên.
   private async idQuaHanThem(
     now: Date,
     db: Db = this.prisma,
@@ -892,7 +894,10 @@ export class DoiBuoiHocService {
       : Prisma.empty;
     const rows = await db.$queryRaw<{ id: string }[]>`
       SELECT c.id FROM doi_buoi_hoc c
-      WHERE c.trang_thai = 'cho_duyet' ${loc} AND (
+      JOIN lich_hoc_lop ln ON ln.id = c.lich_nguon_id
+      JOIN lich_hoc_lop ld ON ld.id = c.lich_de_nghi_id
+      WHERE c.trang_thai = 'cho_duyet' ${loc}
+        AND ln.thoi_gian_bat_dau > ${now} AND ld.thoi_gian_bat_dau > ${now} AND (
         EXISTS (SELECT 1 FROM diem_danh dd
           WHERE dd.dang_ky_hoc_id = c.dang_ky_hoc_id
             AND dd.lich_hoc_id = c.lich_nguon_id)
