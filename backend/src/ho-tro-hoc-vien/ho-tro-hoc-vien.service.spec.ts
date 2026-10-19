@@ -84,6 +84,61 @@ describe('HoTroHocVienService.lichHoc — đổi buổi', () => {
     );
   });
 
+  it('học bù (ADR 0012): KHÔNG trừ ở buổi gốc, cộng ở buổi chốt; tên ở hoc_vien_hoc_bu', async () => {
+    const prisma = {
+      phan_lop_giai_doan: {
+        groupBy: jest.fn().mockResolvedValue([
+          { lop_id: 'lop-a', giai_doan_id: 'gd', _count: { _all: 5 } },
+          { lop_id: 'lop-b', giai_doan_id: 'gd', _count: { _all: 3 } },
+        ]),
+      },
+      lich_hoc_lop: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([buoi('a1', 'lop-a'), buoi('b1', 'lop-b')]),
+      },
+      nhan_su_thuc_dia: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const nhacLich = {
+      doiBuoiCuaCum: jest.fn().mockResolvedValue([
+        {
+          cum_id: 'c1',
+          ho_ten: 'An',
+          lich_nguon_id: 'a1',
+          lich_chot_id: 'b1',
+          xu_ly_luc: new Date(),
+          loai: 'hoc_bu',
+        },
+      ]),
+      trangThaiCumTheoBuoi: jest.fn().mockResolvedValue(new Map()),
+    };
+    const service = new HoTroHocVienService(
+      prisma as unknown as PrismaService,
+      {
+        cumLoc: jest.fn().mockResolvedValue(['c1']),
+      } as unknown as HoTroHocVienScopeService,
+      {} as HocVienService,
+      {} as KhoaBoiDuongService,
+      {} as NhatKyService,
+      {} as AuthService,
+      nhacLich as unknown as NhacLichService,
+      {} as DoiBuoiHocQueryService,
+    );
+
+    const kq = await service.lichHoc('nd-1', {});
+
+    expect(kq.find((b) => b.id === 'a1')).toMatchObject({
+      so_hoc_vien_cum: 5,
+      hoc_vien_doi_buoi: [],
+      hoc_vien_hoc_bu: [],
+    });
+    expect(kq.find((b) => b.id === 'b1')).toMatchObject({
+      so_hoc_vien_cum: 4,
+      hoc_vien_doi_buoi: [],
+      hoc_vien_hoc_bu: ['An'],
+    });
+  });
+
   // Buổi chốt hôm qua (ngoài cửa sổ), buổi nguồn ngày mai: vẫn trừ người đổi ra.
   it('buổi chốt sớm hơn cửa sổ, buổi nguồn trong cửa sổ → vẫn trừ đổi ra ở buổi nguồn', async () => {
     const prisma = {

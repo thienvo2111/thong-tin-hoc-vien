@@ -112,6 +112,20 @@ export interface BoNhoKetQuaDanhGia {
   dangKy: Map<string, DangKyKetQuaDanhGia>;
 }
 
+// ADR 0012: chèn buổi học bù (thêm) vào lịch giai đoạn theo giờ bắt đầu,
+// giữ nguyên thứ tự sẵn có của các buổi còn lại.
+function chenTheoGio<T extends { thoi_gian_bat_dau: Date }>(
+  ds: T[],
+  them: T[],
+): T[] {
+  const kq = [...ds];
+  for (const t of them) {
+    const i = kq.findIndex((x) => x.thoi_gian_bat_dau > t.thoi_gian_bat_dau);
+    kq.splice(i < 0 ? kq.length : i, 0, t);
+  }
+  return kq;
+}
+
 const khoaDangKy = (hocVienId: string, khoaId: string) =>
   `${hocVienId}:${khoaId}`;
 
@@ -1357,6 +1371,26 @@ export class KhoaBoiDuongService {
     const laBuoiChot = new Set(
       doiBuoi.map((d) => `${d.dang_ky_hoc_id}|${d.lich_chot_id}`),
     );
+    // ADR 0012 hoc_bu_duoc: buổi gốc đã có học bù (chờ/đã duyệt) hoặc đổi buổi
+    // đã duyệt thì không mời đăng ký học bù. Chỉ truy vấn khi có khóa bật học bù.
+    const coHocBu = dangKyList.some(
+      (dk) => (dk.khoa.so_buoi_hoc_bu_toi_da ?? 0) > 0,
+    );
+    const chanHocBu = new Set(
+      (coHocBu
+        ? await this.prisma.doi_buoi_hoc.findMany({
+            where: {
+              dang_ky_hoc_id: { in: dangKyIds },
+              OR: [
+                { loai: 'hoc_bu', trang_thai: { in: ['cho_duyet', 'da_duyet'] } },
+                { trang_thai: 'da_duyet' },
+              ],
+            },
+            select: { dang_ky_hoc_id: true, lich_nguon_id: true },
+          })
+        : []
+      ).map((d) => `${d.dang_ky_hoc_id}|${d.lich_nguon_id}`),
+    );
     const buoiChot = new Map(
       (doiBuoi.length
         ? await this.prisma.lich_hoc_lop.findMany({
@@ -1468,9 +1502,14 @@ export class KhoaBoiDuongService {
             lop: lop
               ? {
                   ...lop,
-                  lich_hoc: lichHocGd.map((goc) => {
-                    const doi = chotCuaNguon.get(`${dk.id}|${goc.id}`);
-                    const chot = doi && buoiChot.get(doi.lich_chot_id);
+                  lich_hoc: (() => {
+                  // Đổi buổi: buổi chốt THAY buổi gốc. Học bù (ADR 0012): buổi
+                  // gốc giữ nguyên, buổi chốt THÊM vào (hoc_bu: true) theo giờ.
+                  const veBuoi = (
+                    goc: (typeof lichHocGd)[number],
+                    chot: ReturnType<typeof buoiChot.get>,
+                    hocBu: boolean,
+                  ) => {
                     const {
                       phan_cong,
                       lop: lopChot,
@@ -1483,6 +1522,15 @@ export class KhoaBoiDuongService {
                     const lopCu = dd
                       ? undefined
                       : chuyenCanLopCu.get(khoaBuoi(gd.id, b.buoi_so));
+                    // Không có mặt = không có dòng, vang hoặc vang_co_phep.
+                    const hocBuDuoc =
+                      !lopChot &&
+                      (khoa.so_buoi_hoc_bu_toi_da ?? 0) > 0 &&
+                      !!b.thoi_gian_bat_dau &&
+                      b.thoi_gian_bat_dau <= now &&
+                      dd?.trang_thai !== 'co_mat' &&
+                      !chanHocBu.has(`${dk.id}|${goc.id}`) &&
+                      !chotCuaNguon.has(`${dk.id}|${goc.id}`);
                     return {
                       ...b,
                       giang_vien: phan_cong.map((p) => ({
@@ -1498,9 +1546,10 @@ export class KhoaBoiDuongService {
                             },
                           }
                         : {}),
+                      hoc_bu_duoc: hocBuDuoc,
                       ...(lopChot
                         ? {
-                            da_doi_buoi: true,
+                            ...(hocBu ? { hoc_bu: true } : { da_doi_buoi: true }),
                             // Buổi gốc của lớp được phân — để học viên "Đổi lại" (ADR 0007 D11).
                             lich_goc_id: goc.id,
                             lop_goc_ten: lop.ten_lop,
@@ -1519,7 +1568,17 @@ export class KhoaBoiDuongService {
                           }
                         : {}),
                     };
-                  }),
+                  };
+                  const hocBuThem: ReturnType<typeof veBuoi>[] = [];
+                  const ds = lichHocGd.map((goc) => {
+                    const doi = chotCuaNguon.get(`${dk.id}|${goc.id}`);
+                    const chot = doi && buoiChot.get(doi.lich_chot_id);
+                    if (doi?.loai !== 'hoc_bu') return veBuoi(goc, chot, false);
+                    if (chot) hocBuThem.push(veBuoi(goc, chot, true));
+                    return veBuoi(goc, undefined, false);
+                  });
+                  return chenTheoGio(ds, hocBuThem);
+                  })(),
                 }
               : null,
             tien_do: tienDoMap.get(`${dk.id}|${gd.id}`) ?? null,

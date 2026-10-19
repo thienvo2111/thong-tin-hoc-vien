@@ -1301,7 +1301,8 @@ export class DoiBuoiHocService {
           ),
         );
         // Học bù: đổi buổi cho_duyet cùng buổi gốc (đã quá hạn vì buổi gốc đã
-        // bắt đầu) bị tự hủy để không vướng unique uq_doi_buoi_cho (409).
+        // bắt đầu — bất biến do CHUA_DIEN_RA của kiemTraGui ở trên bảo đảm) bị
+        // tự hủy để không vướng unique uq_doi_buoi_cho (409).
         const doiBuoiCho =
           x.loai === 'hoc_bu'
             ? hoatDong.find(
@@ -1326,7 +1327,10 @@ export class DoiBuoiHocService {
               nguoi_xu_ly: null,
             },
           });
-          if (!count) throw new ConflictAppException('Đề nghị đã được xử lý');
+          if (!count)
+            throw new ConflictAppException(
+              'Đề nghị đổi buổi của buổi này vừa thay đổi, vui lòng thử lại',
+            );
         }
         const moi = await tx.doi_buoi_hoc.create({
           data: {
@@ -1353,7 +1357,8 @@ export class DoiBuoiHocService {
 
   // Buổi tương đương buổi nguồn, chưa bắt đầu, kèm sĩ số (dùng cho học viên và người duyệt).
   // Lịch thực tế của mỗi đăng ký: mọi buổi của lớp được phân ở mọi giai đoạn,
-  // buổi nguồn đã đổi (da_duyet còn hiệu lực) thay bằng buổi chốt. Mỗi buổi gắn
+  // buổi nguồn đã đổi (da_duyet còn hiệu lực) thay bằng buổi chốt; học bù thêm
+  // buổi chốt bên cạnh buổi nguồn. Mỗi buổi gắn
   // `nguon_id` = buổi nguồn mà nó chiếm chỗ. Số truy vấn cố định, không N+1.
   private async lichThucTe(
     dangKyIds: string[],
@@ -1395,14 +1400,22 @@ export class DoiBuoiHocService {
       else theoLop.set(k, [l]);
     }
     const doiTheoCap = new Map(
-      doi.map((d) => [capKey(d.dang_ky_hoc_id, d.lich_nguon_id), d.lich_chot_id]),
+      doi.map((d) => [capKey(d.dang_ky_hoc_id, d.lich_nguon_id), d]),
     );
     for (const p of phanLop) {
       const ds = kq.get(p.dang_ky_hoc_id) ?? [];
       for (const l of theoLop.get(lopKey(p.lop_id, p.giai_doan_id)) ?? []) {
-        const chotId = doiTheoCap.get(capKey(p.dang_ky_hoc_id, l.id));
-        const b = chotId ? theoId.get(chotId) : l;
-        if (b) ds.push({ nguon_id: l.id, buoi: veLichTrung(b) });
+        const d = doiTheoCap.get(capKey(p.dang_ky_hoc_id, l.id));
+        // Đổi buổi: buổi chốt THAY buổi nguồn. Học bù: buổi nguồn giữ nguyên,
+        // buổi chốt là ô THÊM (cùng nguon_id để đổi lại bỏ qua được nó).
+        const cacBuoi = !d
+          ? [l]
+          : d.loai === 'hoc_bu'
+            ? [l, theoId.get(d.lich_chot_id)]
+            : [theoId.get(d.lich_chot_id)];
+        for (const b of cacBuoi) {
+          if (b) ds.push({ nguon_id: l.id, buoi: veLichTrung(b) });
+        }
       }
       kq.set(p.dang_ky_hoc_id, ds);
     }

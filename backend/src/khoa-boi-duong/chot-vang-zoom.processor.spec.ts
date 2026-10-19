@@ -117,4 +117,36 @@ describe('ChotVangZoomProcessor — đổi buổi', () => {
       ['dk-doi-vao', 'vang_co_phep'],
     ]);
   });
+
+  it('học bù (ADR 0012): KHÔNG bỏ qua người học bù ở buổi gốc; người học bù vào buổi chốt vẫn bị chốt vắng', async () => {
+    tx.doi_buoi_hoc.findMany.mockResolvedValue([
+      { dang_ky_hoc_id: 'dk-doi-ra' },
+      { dang_ky_hoc_id: 'dk-hoc-bu-vao' },
+    ]);
+    query.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+      {
+        dang_ky_hoc_id: 'dk-doi-ra',
+        lich_nguon_id: 'lich-1',
+        lich_chot_id: 'x',
+        loai: 'hoc_bu',
+      },
+      {
+        dang_ky_hoc_id: 'dk-hoc-bu-vao',
+        lich_nguon_id: 'y',
+        lich_chot_id: 'lich-1',
+        loai: 'hoc_bu',
+      },
+    ]);
+    tx.dang_ky_hoc.findMany.mockResolvedValue([
+      { id: 'dk-hoc-bu-vao', bao_vang: [] },
+    ]);
+
+    await processor.chotVang(now);
+
+    expect(dongGhi().map((d) => [d.dang_ky_hoc_id, d.trang_thai])).toEqual([
+      ['dk-o-lai', 'vang'],
+      ['dk-doi-ra', 'vang'],
+      ['dk-hoc-bu-vao', 'vang'],
+    ]);
+  });
 });

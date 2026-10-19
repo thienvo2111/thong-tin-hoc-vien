@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  loai_doi_buoi,
   loai_lop_hoc,
   muc_nang_luc,
   Prisma,
@@ -25,6 +26,7 @@ import {
 import {
   buildThongKeDoiBuoiWorkbook,
   ngayGioVn,
+  NHAN_LOAI_DOI_BUOI,
   NHAN_LOAI_LOP,
   NHAN_MUC,
 } from './thong-ke-doi-buoi.excel';
@@ -44,6 +46,7 @@ const MS_NGAY = 86_400_000;
 const DE_NGHI_THONG_KE_SELECT = {
   id: true,
   trang_thai: true,
+  loai: true,
   lich_nguon_id: true,
   lich_de_nghi_id: true,
   lich_chot_id: true,
@@ -135,6 +138,8 @@ export interface DongThongKe {
   vao_qua_han: number;
   vao_tu_choi: number;
   vao_huy: number;
+  /** ADR 0012: số học bù đã duyệt vào buổi này (nằm trong vao_da_duyet). */
+  vao_hoc_bu: number;
 }
 
 export interface BoLocThongKe {
@@ -172,6 +177,7 @@ export interface KetQuaThongKe {
 
 export interface HocVienDong {
   de_nghi_id: string;
+  loai: loai_doi_buoi;
   ho_ten: string;
   don_vi: string;
   cum: string | null;
@@ -217,12 +223,18 @@ function quaHan(
     trang_thai: trang_thai_de_nghi;
     lich_nguon_id: string;
     lich_de_nghi_id: string;
+    loai?: loai_doi_buoi;
   },
   batDau: (id: string) => Date | undefined,
   now: Date,
 ): boolean {
   if (d.trang_thai !== 'cho_duyet') return false;
-  return [d.lich_nguon_id, d.lich_de_nghi_id].some((id) => {
+  // Học bù (ADR 0012): buổi gốc vốn đã qua — chỉ buổi đề nghị quyết định quá hạn.
+  const ids =
+    d.loai === 'hoc_bu'
+      ? [d.lich_de_nghi_id]
+      : [d.lich_nguon_id, d.lich_de_nghi_id];
+  return ids.some((id) => {
     const t = batDau(id);
     return t !== undefined && daBatDau({ thoi_gian_bat_dau: t }, now);
   });
@@ -359,7 +371,7 @@ export class ThongKeDoiBuoiService {
   async chiTietBuoi(
     user: AuthenticatedUser,
     lichId: string,
-    loc: Pick<LocThongKeDoiBuoiDto, 'cum_id'>,
+    loc: Pick<LocThongKeDoiBuoiDto, 'cum_id' | 'loai'>,
   ): Promise<{ ra: HocVienDong[]; vao: HocVienDong[] }> {
     const cum = this.giaoCum(await this.cumPhamVi(user), loc.cum_id);
     if (cum?.length === 0) return { ra: [], vao: [] };
@@ -371,6 +383,7 @@ export class ThongKeDoiBuoiService {
           { lich_chot_id: lichId },
         ],
         ...(cum ? { dang_ky_hoc: { cum_id: { in: cum } } } : {}),
+        ...(loc.loai?.length ? { loai: { in: loc.loai } } : {}),
       },
       orderBy: { tao_luc: 'asc' },
       select: DE_NGHI_CHI_TIET_SELECT,
@@ -386,6 +399,7 @@ export class ThongKeDoiBuoiService {
     const batDau = (id: string) => lichMap.get(id)?.thoi_gian_bat_dau;
     const dong = (d: DeNghiChiTiet, kia: string): HocVienDong => ({
       de_nghi_id: d.id,
+      loai: d.loai,
       ho_ten: d.dang_ky_hoc.hoc_vien.ho_ten,
       don_vi: d.dang_ky_hoc.hoc_vien.don_vi_cong_tac.ten_don_vi,
       cum: d.dang_ky_hoc.cum?.ten_cum ?? null,
@@ -448,6 +462,7 @@ export class ThongKeDoiBuoiService {
         xu_ly_luc: d.xu_ly_luc,
         nguoi_xu_ly: d.xu_ly_boi?.ho_ten ?? '',
         ly_do: d.ly_do,
+        loai: NHAN_LOAI_DOI_BUOI[d.loai],
       })),
     });
     await this.nhatKy.ghi({
@@ -503,9 +518,13 @@ export class ThongKeDoiBuoiService {
 
     // Lọc cụm trong bộ nhớ (ds tải theo phạm vi, chưa theo cụm chọn — để bo_loc.cum ổn định).
     const cumChon = cumLoc ? new Set(cumLoc) : null;
-    const theoCum = cumChon
-      ? ds.filter((d) => d.dang_ky_hoc.cum && cumChon.has(d.dang_ky_hoc.cum.id))
-      : ds;
+    const theoCum = ds.filter(
+      (d) =>
+        (!cumChon ||
+          (d.dang_ky_hoc.cum && cumChon.has(d.dang_ky_hoc.cum.id))) &&
+        // Lọc loại (ADR 0012) cũng trong bộ nhớ — bo_loc không đổi theo loại.
+        (!loc.loai?.length || loc.loai.includes(d.loai)),
+    );
 
     const quaLoc = new Map<string, boolean>();
     const qua = (id: string) => {
@@ -518,10 +537,10 @@ export class ThongKeDoiBuoiService {
       return v;
     };
     const batDau = (id: string) => lichMap.get(id)?.thoi_gian_bat_dau;
-    const dem = new Map<string, { ra: Dem; vao: Dem }>();
+    const dem = new Map<string, { ra: Dem; vao: Dem; vaoHocBu: number }>();
     const o = (id: string) => {
       let x = dem.get(id);
-      if (!x) dem.set(id, (x = { ra: demRong(), vao: demRong() }));
+      if (!x) dem.set(id, (x = { ra: demRong(), vao: demRong(), vaoHocBu: 0 }));
       return x;
     };
     const nhomCua = new Map<string, Nhom>();
@@ -530,7 +549,10 @@ export class ThongKeDoiBuoiService {
       nhomCua.set(d.id, n);
       if (qua(d.lich_nguon_id)) o(d.lich_nguon_id).ra[n]++;
       const vao = lichVao(d);
-      if (qua(vao)) o(vao).vao[n]++;
+      if (qua(vao)) {
+        o(vao).vao[n]++;
+        if (d.loai === 'hoc_bu' && n === 'da_duyet') o(vao).vaoHocBu++;
+      }
     }
 
     let ids = [...dem.keys()];
@@ -584,7 +606,7 @@ export class ThongKeDoiBuoiService {
   private async dongThongKe(
     ids: string[],
     lichMap: Map<string, LichThongKe>,
-    dem: Map<string, { ra: Dem; vao: Dem }>,
+    dem: Map<string, { ra: Dem; vao: Dem; vaoHocBu: number }>,
     now: Date,
   ): Promise<DongThongKe[]> {
     if (ids.length === 0) return [];
@@ -607,7 +629,7 @@ export class ThongKeDoiBuoiService {
       const s = siSo.get(l.id);
       const si_so = s?.si_so ?? 0;
       const si_so_toi_da = s?.si_so_toi_da ?? l.lop.si_so_toi_da;
-      const { ra, vao } = dem.get(l.id)!;
+      const { ra, vao, vaoHocBu } = dem.get(l.id)!;
       return {
         lich: {
           id: l.id,
@@ -641,6 +663,7 @@ export class ThongKeDoiBuoiService {
         vao_qua_han: vao.qua_han,
         vao_tu_choi: vao.tu_choi,
         vao_huy: vao.huy,
+        vao_hoc_bu: vaoHocBu,
       };
     });
   }
@@ -696,6 +719,10 @@ export class ThongKeDoiBuoiService {
     if (loc.cum_id?.length)
       phan.push(
         `Cụm: ${loc.cum_id.map((id) => ten(bo.cum, id, (c) => c.ten_cum)).join(', ')}`,
+      );
+    if (loc.loai?.length)
+      phan.push(
+        `Loại: ${loc.loai.map((x) => NHAN_LOAI_DOI_BUOI[x]).join(', ')}`,
       );
     if (loc.tu_ngay) phan.push(`Từ ngày ${ngay(loc.tu_ngay)}`);
     if (loc.den_ngay) phan.push(`Đến ngày ${ngay(loc.den_ngay)}`);

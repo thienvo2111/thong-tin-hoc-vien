@@ -1,5 +1,5 @@
 import * as ExcelJS from 'exceljs';
-import { loai_lop_hoc, muc_nang_luc } from '@prisma/client';
+import { loai_doi_buoi, loai_lop_hoc, muc_nang_luc } from '@prisma/client';
 import { gioVn, ngayVn } from '../nhac-lich/nhac-lich.util';
 
 // Tab Thống kê đổi buổi — file xuất 2 sheet. Sheet "Học viên" có PII (họ tên,
@@ -32,6 +32,8 @@ export interface DongThongKeExcel {
   vao_qua_han: number;
   vao_tu_choi: number;
   vao_huy: number;
+  /** ADR 0012: học bù đã duyệt vào buổi (thiếu = 0). */
+  vao_hoc_bu?: number;
 }
 
 export interface DongHocVienExcel {
@@ -46,6 +48,8 @@ export interface DongHocVienExcel {
   xu_ly_luc: Date | null;
   nguoi_xu_ly: string;
   ly_do: string;
+  /** ADR 0012: "Đổi buổi" / "Học bù" (thiếu = Đổi buổi). */
+  loai?: string;
 }
 
 export interface DuLieuExcelThongKe {
@@ -59,6 +63,11 @@ export const NHAN_MUC: Record<muc_nang_luc, string> = {
   co_ban: 'Cơ bản',
   thanh_thao: 'Thành thạo',
   nang_cao: 'Nâng cao',
+};
+
+export const NHAN_LOAI_DOI_BUOI: Record<loai_doi_buoi, string> = {
+  doi_buoi: 'Đổi buổi',
+  hoc_bu: 'Học bù',
 };
 
 export const NHAN_LOAI_LOP: Record<loai_lop_hoc, string> = {
@@ -93,6 +102,7 @@ const COT_BUOI = [
   'Vào quá hạn',
   'Vào từ chối',
   'Vào hủy',
+  'Học bù vào',
 ];
 
 const COT_HOC_VIEN = [
@@ -107,6 +117,7 @@ const COT_HOC_VIEN = [
   'Xử lý lúc',
   'Người xử lý',
   'Lý do',
+  'Loại',
 ];
 
 /** "dd/mm/yyyy HH:mm" giờ Việt Nam. */
@@ -169,6 +180,7 @@ export async function buildThongKeDoiBuoiWorkbook(
       d.vao_qua_han,
       d.vao_tu_choi,
       d.vao_huy,
+      d.vao_hoc_bu ?? 0,
     ]);
   }
   COT_BUOI.forEach((_, i) => (s1.getColumn(i + 1).width = i < 8 ? 16 : 11));
@@ -191,6 +203,7 @@ export async function buildThongKeDoiBuoiWorkbook(
       h.xu_ly_luc ? ngayGioVn(h.xu_ly_luc) : '',
       h.nguoi_xu_ly,
       h.ly_do,
+      h.loai ?? NHAN_LOAI_DOI_BUOI.doi_buoi,
     ]);
   }
   COT_HOC_VIEN.forEach((_, i) => (s2.getColumn(i + 1).width = 18));

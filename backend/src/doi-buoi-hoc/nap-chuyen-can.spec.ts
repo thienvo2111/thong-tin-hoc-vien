@@ -41,7 +41,7 @@ const row = (
 
 function setup(
   rows: ReturnType<typeof row>[],
-  doi: { lich_nguon_id: string; lich_chot_id: string }[] = [],
+  doi: { lich_nguon_id: string; lich_chot_id: string; loai?: string }[] = [],
 ) {
   // $queryRaw: điểm danh (kèm buổi, lớp, chế độ khóa) / phân lớp theo mảng đăng ký.
   const prisma = {
@@ -150,6 +150,30 @@ describe('napChuyenCan', () => {
       tu_lop_cu: false,
       dong: { lich_hoc_id: 'c2', lop_id: 'lop-c' },
     });
+  });
+
+  it('học bù đã duyệt (ADR 0012): buổi gốc vắng + có mặt ở buổi chốt -> có mặt, như đổi buổi', async () => {
+    const s = setup(
+      [
+        row('a2', 'lop-a', 2, 'vang', 'theo_lop_hien_tai'),
+        row('c2', 'lop-c', 2, 'co_mat', 'theo_lop_hien_tai'),
+      ],
+      [{ lich_nguon_id: 'a2', lich_chot_id: 'c2', loai: 'hoc_bu' }],
+    );
+    expect(await slot(s, 2)).toMatchObject({
+      trang_thai: 'co_mat',
+      tu_lop_cu: false,
+      dong: { lich_hoc_id: 'c2', lop_id: 'lop-c' },
+    });
+    // Vắng cả buổi chốt -> buổi gốc vẫn vắng (dòng của lớp hiện tại khi hòa).
+    const vang = setup(
+      [
+        row('a2', 'lop-a', 2, 'vang', 'theo_lop_hien_tai'),
+        row('c2', 'lop-c', 2, 'vang', 'theo_lop_hien_tai'),
+      ],
+      [{ lich_nguon_id: 'a2', lich_chot_id: 'c2', loai: 'hoc_bu' }],
+    );
+    expect(await slot(vang, 2)).toMatchObject({ trang_thai: 'vang' });
   });
 
   it('trạng thái tốt nhất thắng: vắng ở lớp mình + có mặt học bù -> có mặt (học bù)', async () => {

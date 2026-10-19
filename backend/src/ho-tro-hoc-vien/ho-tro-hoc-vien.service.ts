@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { NhacLichService } from '../nhac-lich/nhac-lich.service';
+import {
+  hocVienVaoBuoi,
+  NhacLichService,
+} from '../nhac-lich/nhac-lich.service';
 import { khoangNgayVn } from '../common/utils/khoang-ngay-vn.util';
 import { boSo0DauDeTimKiem } from '../common/utils/ma-moet.util';
 import * as bcrypt from 'bcryptjs';
@@ -333,13 +336,14 @@ export class HoTroHocVienService {
             nhiem_vu,
           })),
         // Theo buổi: học viên cụm phân vào lớp − đổi ra + đổi vào buổi này.
+        // Học bù (ADR 0012) không trừ ở buổi gốc, chỉ cộng ở buổi chốt.
         so_hoc_vien_cum:
           (soHocVien.get(`${b.lop_id}|${b.giai_doan_id}`) ?? 0) -
-          doi.filter((d) => d.lich_nguon_id === b.id).length +
+          doi.filter((d) => d.lich_nguon_id === b.id && d.loai !== 'hoc_bu')
+            .length +
           doi.filter((d) => d.lich_chot_id === b.id).length,
-        hoc_vien_doi_buoi: doi
-          .filter((d) => d.lich_chot_id === b.id)
-          .map((d) => d.ho_ten),
+        hoc_vien_doi_buoi: hocVienVaoBuoi(doi, b.id, false),
+        hoc_vien_hoc_bu: hocVienVaoBuoi(doi, b.id, true),
         // ADR 0004 G11 (issue #21): trạng thái nhắc từng cụm có học viên trong lớp.
         nhac_cum: nhacCum.get(b.id) ?? [],
       };
@@ -697,7 +701,9 @@ export class HoTroHocVienService {
       phanLop.map((p) => [p.giai_doan_id, p._count._all]),
     );
     return lich.map((l) => {
-      const dc = dieuChinh.get(l.id) ?? { ra: [], vao: [] };
+      const goc = dieuChinh.get(l.id) ?? { ra: [], vao: [] };
+      // Học bù (ADR 0012): học viên vẫn thuộc buổi gốc — không tính là đổi ra.
+      const dc = { ...goc, ra: goc.ra.filter((r) => r.loai !== 'hoc_bu') };
       return {
         giai_doan_id: l.giai_doan_id,
         dieu_chinh: dc,
@@ -749,6 +755,11 @@ export class HoTroHocVienService {
     // Tên lớp nguồn/chốt theo đăng ký của dòng (1 học viên có thể nhiều khóa).
     const tenLop = (m: Map<string, string>, r: HocVienDong) =>
       m.get(r.dang_ky_hoc.find((dk) => m.has(dk.id))?.id ?? '') ?? '';
+    const hocBuVao = new Set(
+      b.dieu_chinh.vao
+        .filter((x) => x.loai === 'hoc_bu')
+        .map((x) => x.dang_ky_hoc_id),
+    );
     const diemDanhCua = await this.diemDanhTaiBuoi(
       b,
       [...thuong, ...dsVao].flatMap(({ r }) =>
@@ -765,7 +776,7 @@ export class HoTroHocVienService {
       ...dsVao.map(({ r, dong }) => ({
         ...dong,
         doi_buoi: 'vao' as const,
-        ghi_chu: `Đổi buổi – từ lớp ${tenLop(vao, r)}`,
+        ghi_chu: `${r.dang_ky_hoc.some((dk) => hocBuVao.has(dk.id)) ? 'Học bù' : 'Đổi buổi'} – từ lớp ${tenLop(vao, r)}`,
         diem_danh: diemDanhCua(r),
       })),
     ].sort(theoHoTen);

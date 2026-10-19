@@ -383,6 +383,45 @@ describe('HoTroHocVienService — danh sách theo buổi (ADR 0008 L7)', () => {
     ]);
   });
 
+  it('học bù (ADR 0012): người học bù ở buổi gốc vẫn trong DS (không doi_ra, không trừ sĩ số); người học bù vào ghi chú "Học bù"', async () => {
+    const { service } = taoService(
+      [],
+      new Map([
+        [
+          'L1',
+          {
+            ra: [
+              {
+                dang_ky_hoc_id: 'dk-Cường',
+                lop_chot: { id: 'C3', ten_lop: 'Zoom 03' },
+                loai: 'hoc_bu',
+              },
+            ],
+            vao: [
+              {
+                dang_ky_hoc_id: 'dk-Dũng',
+                lich_nguon_id: 'L9',
+                lop_nguon: { id: 'C2', ten_lop: 'Zoom 02' },
+                loai: 'hoc_bu',
+              },
+            ],
+          },
+        ],
+        ['L2', { ra: [], vao: [] }],
+      ]) as never,
+    );
+    const ds = await service.buoiCuaLop('nd', 'C');
+    expect(ds[0]).toEqual(
+      expect.objectContaining({ lich_id: 'L1', si_so: 4, so_doi_ra: 0, so_doi_vao: 1 }),
+    );
+    const kq = await service.hocVienCuaBuoi('nd', 'C', 'L1');
+    expect(kq.hoc_vien.map((h) => h.ho_ten)).toEqual(['An', 'Bình', 'Cường', 'Dũng']);
+    expect(kq.doi_ra).toEqual([]);
+    expect(kq.hoc_vien.find((h) => h.ho_ten === 'Dũng')).toEqual(
+      expect.objectContaining({ doi_buoi: 'vao', ghi_chu: 'Học bù – từ lớp Zoom 02' }),
+    );
+  });
+
   it('buổi không có đổi buổi hiệu lực -> đúng danh sách phân lớp, doi_ra rỗng', async () => {
     const { service } = taoService();
     const kq = await service.hocVienCuaBuoi('nd', 'C', 'L2');

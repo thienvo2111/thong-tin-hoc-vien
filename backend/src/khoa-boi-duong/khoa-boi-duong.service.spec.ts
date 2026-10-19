@@ -721,6 +721,174 @@ describe('KhoaBoiDuongService', () => {
       expect(b2).toMatchObject({ id: 'a-2', dia_diem_hoac_link: 'Phòng A' });
       expect(b2).not.toHaveProperty('da_doi_buoi');
     });
+
+    // ADR 0012: học bù THÊM buổi chốt (sắp theo giờ), buổi gốc giữ nguyên;
+    // buổi đã qua có hoc_bu_duoc; khóa kèm so_buoi_hoc_bu_toi_da.
+    describe('học bù', () => {
+      const QUA = (ngay: number) => new Date(Date.now() - ngay * 86_400_000);
+      const SAP = new Date(Date.now() + 5 * 86_400_000);
+      const buoi = (id: string, buoi_so: number, bd: Date) => ({
+        id,
+        giai_doan_id: 'gd-1',
+        buoi_so,
+        thoi_gian_bat_dau: bd,
+        dia_diem_hoac_link: 'Phòng A',
+        phan_cong: [],
+      });
+      const dkHocBu = (soHocBu: number) => ({
+        id: 'dk-1',
+        hoc_vien_id: 'hv-1',
+        khoa: {
+          id: 'khoa-1',
+          so_buoi_doi_toi_da: 2,
+          so_buoi_hoc_bu_toi_da: soHocBu,
+          bat_diem_danh_zoom_luc: null,
+          giai_doan: [
+            { id: 'gd-1', thu_tu: 1, ten_giai_doan: 'GĐ 1', hinh_thuc: 'truc_tiep' },
+          ],
+        },
+        phan_lop_giai_doan: [
+          {
+            giai_doan_id: 'gd-1',
+            lop_id: 'lop-a',
+            lop: {
+              id: 'lop-a',
+              ten_lop: 'Lớp A',
+              loai_lop: 'truc_tiep',
+              lich_hoc: [
+                buoi('a-1', 1, QUA(10)),
+                buoi('a-2', 2, QUA(6)),
+                buoi('a-3', 3, QUA(3)),
+                buoi('a-4', 4, QUA(1)),
+                buoi('a-5', 5, SAP),
+              ],
+            },
+          },
+        ],
+      });
+      const ddRow = (lich_hoc_id: string, trang_thai: string) => ({
+        dang_ky_hoc_id: 'dk-1',
+        lich_hoc_id,
+        trang_thai,
+        tu_diem_danh_luc: null,
+        lich_hoc: {
+          lop_id: lich_hoc_id.startsWith('a') ? 'lop-a' : 'lop-b',
+          giai_doan_id: 'gd-1',
+          buoi_so: 1,
+          lop: { ten_lop: 'x', loai_lop: 'truc_tiep' },
+        },
+      });
+
+      it('thêm buổi chốt theo giờ, buổi gốc giữ nguyên; hoc_bu_duoc đúng điều kiện', async () => {
+        prisma.dang_ky_hoc.findMany.mockResolvedValue([dkHocBu(2)]);
+        // a-1: học bù đã duyệt sang b-1 (giờ nằm giữa a-3 và a-4).
+        doiBuoiQuery.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+          { dang_ky_hoc_id: 'dk-1', lich_nguon_id: 'a-1', lich_chot_id: 'b-1', loai: 'hoc_bu' },
+        ]);
+        prisma.lich_hoc_lop.findMany.mockResolvedValue([
+          {
+            id: 'b-1',
+            giai_doan_id: 'gd-1',
+            buoi_so: 1,
+            thoi_gian_bat_dau: QUA(2),
+            dia_diem_hoac_link: 'Phòng B',
+            lop: { id: 'lop-b', ten_lop: 'Lớp B', loai_lop: 'truc_tiep' },
+            phan_cong: [],
+          },
+        ]);
+        prisma.diem_danh.findMany.mockResolvedValue([
+          ddRow('a-1', 'vang'),
+          ddRow('a-2', 'co_mat'),
+          ddRow('a-4', 'vang_co_phep'),
+          ddRow('b-1', 'co_mat'),
+        ]);
+        // a-3: học bù đang chờ duyệt -> không mời nữa.
+        const findManyDoi = jest
+          .fn()
+          .mockResolvedValue([{ dang_ky_hoc_id: 'dk-1', lich_nguon_id: 'a-3' }]);
+        (prisma as Record<string, unknown>).doi_buoi_hoc = { findMany: findManyDoi };
+
+        const res = await service.khoaHocCuaToi({
+          ...truong,
+          vai_tro: 'hoc_vien',
+          hoc_vien_id: 'hv-1',
+        });
+
+        expect(res[0].khoa).toHaveProperty('so_buoi_hoc_bu_toi_da', 2);
+        const ds = res[0].giai_doan[0].lop!.lich_hoc;
+        expect(ds.map((b) => b.id)).toEqual(['a-1', 'a-2', 'a-3', 'b-1', 'a-4', 'a-5']);
+        const [a1, a2, a3, b1, a4, a5] = ds;
+        // Buổi gốc giữ nguyên (vẫn vắng), không mang nhãn đổi.
+        expect(a1).toMatchObject({ id: 'a-1', trang_thai_diem_danh: 'vang', hoc_bu_duoc: false });
+        expect(a1).not.toHaveProperty('da_doi_buoi');
+        expect(a1).not.toHaveProperty('hoc_bu');
+        expect(b1).toMatchObject({
+          id: 'b-1',
+          hoc_bu: true,
+          lich_goc_id: 'a-1',
+          lop_goc_ten: 'Lớp A',
+          lop_chot_ten: 'Lớp B',
+          trang_thai_diem_danh: 'co_mat',
+          hoc_bu_duoc: false,
+        });
+        expect(b1).not.toHaveProperty('da_doi_buoi');
+        expect(a2.hoc_bu_duoc).toBe(false); // có mặt
+        expect(a3.hoc_bu_duoc).toBe(false); // học bù đang chờ
+        expect(a4.hoc_bu_duoc).toBe(true); // vắng có phép, đã qua
+        expect(a5.hoc_bu_duoc).toBe(false); // chưa diễn ra
+        expect(findManyDoi).toHaveBeenCalledTimes(1);
+        expect(findManyDoi.mock.calls[0][0].where).toEqual({
+          dang_ky_hoc_id: { in: ['dk-1'] },
+          OR: [
+            { loai: 'hoc_bu', trang_thai: { in: ['cho_duyet', 'da_duyet'] } },
+            { trang_thai: 'da_duyet' },
+          ],
+        });
+      });
+
+      it('khóa tắt học bù -> hoc_bu_duoc false, không truy vấn thêm', async () => {
+        prisma.dang_ky_hoc.findMany.mockResolvedValue([dkHocBu(0)]);
+        const findManyDoi = jest.fn();
+        (prisma as Record<string, unknown>).doi_buoi_hoc = { findMany: findManyDoi };
+        const res = await service.khoaHocCuaToi({
+          ...truong,
+          vai_tro: 'hoc_vien',
+          hoc_vien_id: 'hv-1',
+        });
+        expect(
+          res[0].giai_doan[0].lop!.lich_hoc.every((b) => b.hoc_bu_duoc === false),
+        ).toBe(true);
+        expect(findManyDoi).not.toHaveBeenCalled();
+      });
+
+      it('buổi gốc có đổi buổi đã duyệt -> vẫn THAY (không đổi), hoc_bu_duoc false', async () => {
+        prisma.dang_ky_hoc.findMany.mockResolvedValue([dkHocBu(2)]);
+        doiBuoiQuery.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+          { dang_ky_hoc_id: 'dk-1', lich_nguon_id: 'a-4', lich_chot_id: 'b-4', loai: 'doi_buoi' },
+        ]);
+        prisma.lich_hoc_lop.findMany.mockResolvedValue([
+          {
+            id: 'b-4',
+            giai_doan_id: 'gd-1',
+            buoi_so: 4,
+            thoi_gian_bat_dau: QUA(1),
+            lop: { id: 'lop-b', ten_lop: 'Lớp B', loai_lop: 'truc_tiep' },
+            phan_cong: [],
+          },
+        ]);
+        (prisma as Record<string, unknown>).doi_buoi_hoc = {
+          findMany: jest.fn().mockResolvedValue([]),
+        };
+        const res = await service.khoaHocCuaToi({
+          ...truong,
+          vai_tro: 'hoc_vien',
+          hoc_vien_id: 'hv-1',
+        });
+        const ds = res[0].giai_doan[0].lop!.lich_hoc;
+        expect(ds.map((b) => b.id)).toEqual(['a-1', 'a-2', 'a-3', 'b-4', 'a-5']);
+        expect(ds[3]).toMatchObject({ da_doi_buoi: true, hoc_bu_duoc: false });
+      });
+    });
   });
 
   // Spec đổi buổi §5: nạp điểm danh ở buổi chốt của đổi buổi đã duyệt không
@@ -762,6 +930,15 @@ describe('KhoaBoiDuongService', () => {
       expect(doiBuoiQuery.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledWith([
         'dk-1',
       ]);
+    });
+
+    it('học bù đã duyệt (ADR 0012) vào đúng buổi -> cũng không cảnh báo', async () => {
+      doiBuoiQuery.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+        { dang_ky_hoc_id: 'dk-1', lich_nguon_id: 'a-1', lich_chot_id: 'b-1', loai: 'hoc_bu' },
+      ]);
+      const kq = await service.resolveDiemDanhRow(raw);
+      expect(kq.error).toBeUndefined();
+      expect(kq.canhBao).toBeUndefined();
     });
 
     it('không có đổi buổi hiệu lực (đã hủy/khác buổi) -> vẫn là học bù', async () => {

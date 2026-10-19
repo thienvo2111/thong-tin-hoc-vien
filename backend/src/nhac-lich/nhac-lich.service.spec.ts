@@ -1,6 +1,7 @@
 import {
   capNhatTheoDoiBuoi,
   DoiBuoiCum,
+  hocVienVaoBuoi,
   NhacLichService,
 } from './nhac-lich.service';
 import { trangThaiNhac } from './nhac-lich.util';
@@ -111,6 +112,26 @@ describe('NhacLichService — đổi buổi của cụm', () => {
         xu_ly_luc: new Date('2026-11-03T00:00:00Z'),
       },
     ]);
+  });
+
+  it('học bù (ADR 0012): doiBuoiCuaCum mang loai; hocVienVaoBuoi tách đổi buổi / học bù ở buổi chốt', async () => {
+    prisma.doi_buoi_hoc.findMany.mockResolvedValue([
+      banGhi('dk1', 'b1', 'An'),
+      banGhi('dk2', 'b1', 'Bình'),
+    ]);
+    query.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+      { dang_ky_hoc_id: 'dk1', lich_nguon_id: 'a1', lich_chot_id: 'b1', loai: 'hoc_bu' },
+      { dang_ky_hoc_id: 'dk2', lich_nguon_id: 'a2', lich_chot_id: 'b1', loai: 'doi_buoi' },
+    ]);
+    const kq = await service.doiBuoiCuaCum(['c1']);
+    expect(kq.map((d) => [d.ho_ten, d.loai])).toEqual([
+      ['An', 'hoc_bu'],
+      ['Bình', 'doi_buoi'],
+    ]);
+    expect(hocVienVaoBuoi(kq, 'b1', true)).toEqual(['An']);
+    expect(hocVienVaoBuoi(kq, 'b1', false)).toEqual(['Bình']);
+    // Buổi gốc không đổi: không ai "vào" buổi a1.
+    expect(hocVienVaoBuoi(kq, 'a1', true)).toEqual([]);
   });
 
   it('trangThaiCumTheoBuoi: cụm không có ai phân vào lớp vẫn có buổi chốt; dùng đổi buổi đã nạp', async () => {

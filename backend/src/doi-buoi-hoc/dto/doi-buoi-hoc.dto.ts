@@ -150,4 +150,11 @@ export class LocThongKeDoiBuoiDto {
   @Transform(toBool)
   @IsIn([true, false])
   chi_co_cho?: boolean;
+
+  // ADR 0012: lọc theo loại đề nghị (đổi buổi / học bù); trống = mọi loại.
+  @IsOptional()
+  @Transform(tachDanhSach)
+  @IsArray()
+  @IsEnum(loai_doi_buoi, { each: true })
+  loai?: loai_doi_buoi[];
 }

@@ -309,6 +309,26 @@ describe('apDungDoiBuoi', () => {
     expect(kq.buoi[0].si_so).toBe(30);
   });
 
+  it('học bù (ADR 0012): nhãn ra/vào mang hoc_bu: true ("Học bù tại/từ {lớp}")', () => {
+    const hocBu = new Map([
+      [
+        'b1',
+        {
+          ra: dieuChinh.get('b1')!.ra.map((r) => ({ ...r, loai: 'hoc_bu' })),
+          vao: dieuChinh.get('b1')!.vao.map((v) => ({ ...v, loai: 'hoc_bu' })),
+        },
+      ],
+    ]);
+    const kq = apDungDoiBuoi(dot, siSo, hocBu, [hvVao]);
+    expect(kq.hoc_vien[0].doi_buoi).toEqual({
+      b1: { loai: 'ra', lop: 'Lớp 2', hoc_bu: true },
+    });
+    expect(kq.hoc_vien_doi_vao[0]).toMatchObject({
+      doi_buoi: { b1: { loai: 'vao', lop: 'Lớp 3', hoc_bu: true } },
+      diem_danh: { b1: 'co_mat' },
+    });
+  });
+
   it('không có đổi buổi → giữ nguyên học viên, buổi không có sĩ số → null', () => {
     const kq = apDungDoiBuoi(dot, new Map(), new Map(), []);
     expect(kq.hoc_vien).toHaveLength(1);

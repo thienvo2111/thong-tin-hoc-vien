@@ -8,6 +8,7 @@ import {
 } from '../common/exceptions/app.exceptions';
 import { khoangNgayVn } from '../common/utils/khoang-ngay-vn.util';
 import { layDotLop } from '../trang-lop/trang-lop.service';
+import { loai_doi_buoi } from '@prisma/client';
 import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
 import { apDungDiemDanhZoom } from '../khoa-boi-duong/util/diem-danh-zoom.util';
 import {
@@ -30,7 +31,21 @@ export interface DoiBuoiCum {
   lich_nguon_id: string;
   lich_chot_id: string;
   xu_ly_luc: Date | null;
+  /** ADR 0012: học bù không rút học viên khỏi buổi gốc (đã qua). */
+  loai?: loai_doi_buoi;
 }
+
+/** Họ tên học viên cụm học buổi `lichId` theo đổi buổi / học bù đã duyệt. */
+export const hocVienVaoBuoi = (
+  doi: DoiBuoiCum[],
+  lichId: string,
+  hocBu: boolean,
+): string[] =>
+  doi
+    .filter(
+      (d) => d.lich_chot_id === lichId && (d.loai === 'hoc_bu') === hocBu,
+    )
+    .map((d) => d.ho_ten);
 
 // Spec đổi buổi §5: duyệt đổi buổi SAU lần gửi cuối cũng làm buổi chốt "cần nhắc lại".
 export const capNhatTheoDoiBuoi = <
@@ -216,6 +231,7 @@ export class NhacLichService {
               lich_nguon_id: h.lich_nguon_id,
               lich_chot_id: h.lich_chot_id,
               xu_ly_luc: r.xu_ly_luc,
+              loai: h.loai,
             },
           ]
         : [];
@@ -360,9 +376,8 @@ export class NhacLichService {
       thuc_dia: thucDia.filter(
         (t) => t.lop_id === b.lop_id && t.giai_doan_id === b.giai_doan_id,
       ),
-      hoc_vien_doi_buoi: doi
-        .filter((d) => d.lich_chot_id === b.id)
-        .map((d) => d.ho_ten),
+      hoc_vien_doi_buoi: hocVienVaoBuoi(doi, b.id, false),
+      hoc_vien_hoc_bu: hocVienVaoBuoi(doi, b.id, true),
       trang_thai_nhac: trangThaiNhac(capNhatTheoDoiBuoi(b, doi), nhatKy),
     }));
     return {

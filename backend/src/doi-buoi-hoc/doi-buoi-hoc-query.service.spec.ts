@@ -69,6 +69,47 @@ function setup(o: {
 
 const RONG = { lich: [], soPhanLop: 0, daDuyet: [], phanLopHienTai: [] };
 
+const hb = (r: ReturnType<typeof dd>) => ({ ...r, loai: 'hoc_bu' });
+
+describe('DoiBuoiHocQueryService hoc bu (ADR 0012)', () => {
+  it('siSoBuoi: hoc bu KHONG tru o buoi goc, VAN cong o buoi chot', async () => {
+    const { svc } = setup({
+      lich: [lichRow('LA', 'A', QUA_KHU), lichRow('LB', 'B', TUONG_LAI)],
+      soPhanLop: 10,
+      daDuyet: [
+        hb(dd('d1', 'LA', 'LB')),
+        { ...dd('d2', 'LA', 'LB'), loai: 'doi_buoi' },
+      ],
+      phanLopHienTai: [
+        { dang_ky_hoc_id: 'd1', lop_id: 'A' },
+        { dang_ky_hoc_id: 'd2', lop_id: 'A' },
+      ],
+    });
+    const r = await svc.siSoBuoi(['LA', 'LB'], NOW);
+    expect(r.get('LA')!.si_so).toBe(9); // chỉ d2 (đổi buổi) bị trừ
+    expect(r.get('LB')!.si_so).toBe(12); // cả hai cùng cộng
+  });
+
+  it('dieuChinhTheoBuoi + doiBuoiDaDuyetCuaDangKy tra loai', async () => {
+    const { svc, prisma } = setup({
+      ...RONG,
+      daDuyet: [hb(dd('d1', 'LA', 'LB'))],
+      phanLopHienTai: [{ dang_ky_hoc_id: 'd1', lop_id: 'A' }],
+    });
+    const r = await svc.dieuChinhTheoBuoi(['LA', 'LB']);
+    expect(r.get('LA')!.ra).toEqual([
+      { dang_ky_hoc_id: 'd1', lop_chot: { id: 'B', ten_lop: 'Lop B' }, loai: 'hoc_bu' },
+    ]);
+    expect(r.get('LB')!.vao[0].loai).toBe('hoc_bu');
+    expect(await svc.doiBuoiDaDuyetCuaDangKy(['d1'])).toEqual([
+      { dang_ky_hoc_id: 'd1', lich_nguon_id: 'LA', lich_chot_id: 'LB', loai: 'hoc_bu' },
+    ]);
+    for (const c of prisma.doi_buoi_hoc.findMany.mock.calls) {
+      expect(c[0].select.loai).toBe(true);
+    }
+  });
+});
+
 describe('DoiBuoiHocQueryService', () => {
   describe('siSoBuoi', () => {
     it('28 phân lớp, 2 ra, 3 vào -> 29', async () => {

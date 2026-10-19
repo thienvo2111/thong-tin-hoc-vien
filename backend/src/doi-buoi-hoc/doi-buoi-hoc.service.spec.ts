@@ -123,7 +123,7 @@ function setup(
     ),
     doiBuoiDaDuyetCuaDangKy: jest.fn(
       async (_ids: string[]) =>
-        [] as { dang_ky_hoc_id: string; lich_nguon_id: string; lich_chot_id: string }[],
+        [] as { dang_ky_hoc_id: string; lich_nguon_id: string; lich_chot_id: string; loai?: string }[],
     ),
   };
   const nhatKy = { ghi: jest.fn(async () => undefined) };
@@ -1874,6 +1874,25 @@ describe('DoiBuoiHocService trung lich', () => {
     expect(r[0].trung_lich).toEqual([]);
   });
 
+  it('lichThucTe hoc bu: buoi goc e1 GIU NGUYEN, buoi chot e1x la o THEM', async () => {
+    const { svc, p, query } = setupTrung();
+    query.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+      { dang_ky_hoc_id: 'dk1', lich_nguon_id: 'e1', lich_chot_id: 'e1x', loai: 'hoc_bu' },
+    ]);
+    const trungGioGoc = gio('lg', 'lopG', 9, 10);
+    p.lich_hoc_lop.findMany.mockImplementation(
+      async (a: { where: { OR?: unknown } }) =>
+        a.where.OR ? [ln, a4, e1, e1x] : [trungGioGoc, lfull],
+    );
+    const r = await svc.luaChonHocVien(user, 'ln');
+    expect(r.map((x) => [x.lich.id, x.trung_lich.map((b) => b.id)])).toEqual([
+      ['lg', ['e1']],
+      ['lfull', ['a4', 'e1x']],
+    ]);
+    expect(query.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledTimes(1);
+    expect(p.lich_hoc_lop.findMany).toHaveBeenCalledTimes(2);
+  });
+
   it('luaChonDuyet doi lai: bo buoi chot hien tai cua buoi nguon', async () => {
     const { svc, p, query } = setupTrung();
     const lk = gio('lk', 'lopC', 13, 15);
@@ -2737,6 +2756,22 @@ describe('DoiBuoiHocService hoc bu: tu huy doi buoi cho qua han', () => {
     expect(tx.doi_buoi_hoc.create.mock.invocationCallOrder[0]).toBeLessThan(
       nhatKy.ghi.mock.invocationCallOrder[0],
     );
+  });
+
+  it('updateMany tu huy count=0 (doi buoi vua thay doi) -> 409, khong create', async () => {
+    const { svc, tx } = setupTuHuy([
+      { id: 'cu-db', lich_nguon_id: 'ln', trang_thai: 'cho_duyet', lich_chot_id: null, loai: 'doi_buoi' },
+    ]);
+    tx.doi_buoi_hoc.updateMany.mockResolvedValueOnce({ count: 0 } as never);
+    await expect(svc.gui(user, dtoHb)).rejects.toMatchObject({
+      status: 409,
+      response: expect.objectContaining({
+        error: expect.objectContaining({
+          message: 'Đề nghị đổi buổi của buổi này vừa thay đổi, vui lòng thử lại',
+        }),
+      }),
+    });
+    expect(tx.doi_buoi_hoc.create).not.toHaveBeenCalled();
   });
 
   it('khong co doi buoi cho -> khong updateMany, khong nhat ky tu huy', async () => {

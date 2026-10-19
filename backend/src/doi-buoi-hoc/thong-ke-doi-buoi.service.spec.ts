@@ -63,10 +63,12 @@ function deNghi(
   deNghiId: string,
   chot: string | null = null,
   cum: string | null = 'c1',
+  loai: 'doi_buoi' | 'hoc_bu' = 'doi_buoi',
 ) {
   return {
     id,
     trang_thai,
+    loai,
     lich_nguon_id: nguon,
     lich_de_nghi_id: deNghiId,
     lich_chot_id: chot,
@@ -534,6 +536,107 @@ describe('ThongKeDoiBuoiService.thongKe', () => {
   });
 });
 
+// ADR 0012: thống kê tách theo loại đề nghị.
+describe('ThongKeDoiBuoiService — học bù', () => {
+  const hb = (
+    id: string,
+    tt: TrangThai,
+    nguon: string,
+    deNghiId: string,
+    chot: string | null = null,
+  ) => deNghi(id, tt, nguon, deNghiId, chot, 'c1', 'hoc_bu');
+
+  it('học bù chờ duyệt: buổi gốc đã qua KHÔNG làm quá hạn; buổi đề nghị đã bắt đầu thì quá hạn', async () => {
+    const { service } = setup({
+      lich: [
+        lich('G', { batDau: sau(-48) }),
+        lich('B'),
+        lich('E', { batDau: sau(-1) }),
+      ],
+      deNghi: [hb('1', 'cho_duyet', 'G', 'B'), hb('2', 'cho_duyet', 'G', 'E')],
+    });
+    const kq = await service.thongKe(quanTri, {});
+    expect(dongCua(kq, 'B')).toMatchObject({ vao_cho: 1, vao_qua_han: 0 });
+    expect(dongCua(kq, 'E')).toMatchObject({ vao_cho: 0, vao_qua_han: 1 });
+    expect(kq.tong).toMatchObject({ cho_duyet: 1, qua_han: 1 });
+  });
+
+  it('vao_hoc_bu = học bù đã duyệt vào buổi; lọc loai[] chỉ giữ đúng loại', async () => {
+    const data = {
+      lich: [lich('A'), lich('B'), lich('C')],
+      deNghi: [
+        hb('1', 'da_duyet', 'A', 'B', 'B'),
+        hb('2', 'cho_duyet', 'C', 'B'),
+        deNghi('3', 'da_duyet', 'C', 'B', 'B'),
+      ],
+    };
+    const tatCa = await setup(data).service.thongKe(quanTri, {});
+    expect(dongCua(tatCa, 'B')).toMatchObject({
+      vao_da_duyet: 2,
+      vao_cho: 1,
+      vao_hoc_bu: 1,
+    });
+    expect(tatCa.tong.de_nghi).toBe(3);
+
+    const chiHocBu = await setup(data).service.thongKe(quanTri, {
+      loai: ['hoc_bu'],
+    });
+    expect(chiHocBu.tong.de_nghi).toBe(2);
+    expect(dongCua(chiHocBu, 'B')).toMatchObject({
+      vao_da_duyet: 1,
+      vao_cho: 1,
+      vao_hoc_bu: 1,
+    });
+    const chiDoiBuoi = await setup(data).service.thongKe(quanTri, {
+      loai: ['doi_buoi'],
+    });
+    expect(chiDoiBuoi.tong.de_nghi).toBe(1);
+    expect(dongCua(chiDoiBuoi, 'B')).toMatchObject({ vao_hoc_bu: 0 });
+    // bo_loc không đổi theo loại.
+    expect(chiDoiBuoi.bo_loc).toEqual(tatCa.bo_loc);
+  });
+
+  it('chiTietBuoi: mỗi dòng có loai; lọc loai đẩy xuống where', async () => {
+    const { service, prisma } = setup({
+      lich: [lich('A'), lich('B')],
+      deNghi: [hb('1', 'da_duyet', 'A', 'B', 'B')],
+    });
+    const kq = await service.chiTietBuoi(quanTri, 'B', { loai: ['hoc_bu'] });
+    expect(kq.vao[0]).toMatchObject({ de_nghi_id: '1', loai: 'hoc_bu' });
+    expect(
+      (prisma.doi_buoi_hoc.findMany.mock.calls[0] as unknown as [{ where: unknown }])[0]
+        .where,
+    ).toMatchObject({ loai: { in: ['hoc_bu'] } });
+  });
+
+  it('xuatExcel: sheet Học viên có cột Loại = "Học bù"; sheet buổi có "Học bù vào"', async () => {
+    const { service } = setup({
+      lich: [lich('A'), lich('B')],
+      deNghi: [hb('1', 'da_duyet', 'A', 'B', 'B')],
+    });
+    const buf = await service.xuatExcel(quanTri, { loai: ['hoc_bu'] });
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    const [s1, s2] = wb.worksheets;
+    const cot1 = (s1.getRow(4).values as unknown[]).slice(1);
+    const iHocBu = cot1.indexOf('Học bù vào') + 1;
+    expect(iHocBu).toBeGreaterThan(0);
+    const giaTri = [5, 6].map((r) => s1.getCell(r, iHocBu).value);
+    expect(giaTri.sort()).toEqual([0, 1]);
+    const cot2 = (s2.getRow(4).values as unknown[]).slice(1);
+    expect(s2.getCell(5, cot2.indexOf('Loại') + 1).value).toBe('Học bù');
+    expect(String(s1.getCell(2, 1).value)).toContain('Loại: Học bù');
+  });
+
+  it('DTO: loai nhận danh sách "doi_buoi,hoc_bu", từ chối giá trị lạ', async () => {
+    const ok = plainToInstance(LocThongKeDoiBuoiDto, { loai: 'doi_buoi,hoc_bu' });
+    expect(await validate(ok)).toHaveLength(0);
+    expect(ok.loai).toEqual(['doi_buoi', 'hoc_bu']);
+    const sai = plainToInstance(LocThongKeDoiBuoiDto, { loai: 'xyz' });
+    expect((await validate(sai)).length).toBeGreaterThan(0);
+  });
+});
+
 describe('ThongKeDoiBuoiService.chiTietBuoi', () => {
   it('tách ra/vào, buổi kia, nhãn lý do hủy; where lọc buổi + cụm', async () => {
     const huyDuyet = {
@@ -695,6 +798,7 @@ describe('buildThongKeDoiBuoiWorkbook', () => {
       'Vào quá hạn',
       'Vào từ chối',
       'Vào hủy',
+      'Học bù vào',
     ]);
     expect(s1.getRow(4).font?.bold).toBe(true);
     expect(s1.views[0]).toMatchObject({ state: 'frozen', ySplit: 4 });
@@ -716,8 +820,11 @@ describe('buildThongKeDoiBuoiWorkbook', () => {
       'Xử lý lúc',
       'Người xử lý',
       'Lý do',
+      'Loại',
     ]);
     expect(s2.rowCount).toBe(4 + 3);
+    // Thiếu loai (bản cũ) → "Đổi buổi".
+    expect(s2.getCell(5, 12).value).toBe('Đổi buổi');
     expect(s2.getCell(5, 8).value).toBe('20/11/2026 08:00');
   });
 });

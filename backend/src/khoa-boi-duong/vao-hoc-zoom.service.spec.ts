@@ -263,6 +263,25 @@ describe('VaoHocZoomService.vaoHoc', () => {
     });
   });
 
+  it('học bù đã duyệt (ADR 0012) vào buổi Zoom này → cũng ghi co_mat', async () => {
+    prisma.phan_lop_giai_doan.findFirst.mockResolvedValue(null);
+    doiBuoi.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+      {
+        dang_ky_hoc_id: 'dk-1',
+        lich_nguon_id: 'lich-a',
+        lich_chot_id: 'lich-1',
+        loai: 'hoc_bu',
+      },
+    ]);
+    const kq = await service.vaoHoc('lich-1', hocVien, trongCuaSo);
+    expect(kq.ket_qua).toBe('da_ghi_nhan');
+    expect(prisma.diem_danh.create.mock.calls[0][0].data).toMatchObject({
+      dang_ky_hoc_id: 'dk-1',
+      lich_hoc_id: 'lich-1',
+      trang_thai: 'co_mat',
+    });
+  });
+
   it('đổi buổi hiệu lực sang buổi khác (không phải buổi này) → vẫn 403', async () => {
     prisma.phan_lop_giai_doan.findFirst.mockResolvedValue(null);
     doiBuoi.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([

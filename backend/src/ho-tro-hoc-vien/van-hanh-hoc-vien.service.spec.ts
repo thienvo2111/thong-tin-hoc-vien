@@ -88,6 +88,25 @@ describe('VanHanhHocVienService.baoVang — đổi buổi', () => {
     });
   });
 
+  it('học bù đã duyệt (ADR 0012) vào buổi → cũng ghi báo vắng', async () => {
+    prisma.dang_ky_hoc.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'dk-1', khoa_id: 'k' });
+    doiBuoi.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+      {
+        dang_ky_hoc_id: 'dk-1',
+        lich_nguon_id: 'lich-a',
+        lich_chot_id: 'lich-b',
+        loai: 'hoc_bu',
+      },
+    ]);
+    await service.baoVang(user, 'hv-1', dto);
+    expect(prisma.bao_vang.upsert.mock.calls[0][0].create).toMatchObject({
+      dang_ky_hoc_id: 'dk-1',
+      lich_hoc_id: 'lich-b',
+    });
+  });
+
   it('bản ghi đổi buổi đã mất hiệu lực (phân lớp đổi) → 404', async () => {
     prisma.dang_ky_hoc.findFirst
       .mockResolvedValueOnce(null)

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { loai_doi_buoi, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { daBatDau, LichTomTat, tinhSiSoBuoi } from './doi-buoi-hoc.rules';
 
@@ -14,6 +14,7 @@ interface BanGhiDaDuyet {
   dang_ky_hoc_id: string;
   lich_nguon_id: string;
   lich_chot_id: string | null;
+  loai: loai_doi_buoi;
   lich_nguon: { lop_id: string; giai_doan_id: string };
 }
 
@@ -24,11 +25,12 @@ interface SiSo {
 }
 
 interface DieuChinh {
-  ra: { dang_ky_hoc_id: string; lop_chot: LopRef }[];
+  ra: { dang_ky_hoc_id: string; lop_chot: LopRef; loai: loai_doi_buoi }[];
   vao: {
     dang_ky_hoc_id: string;
     lich_nguon_id: string;
     lop_nguon: LopRef;
+    loai: loai_doi_buoi;
   }[];
 }
 
@@ -114,7 +116,10 @@ export class DoiBuoiHocQueryService {
       result.set(l.id, {
         si_so: tinhSiSoBuoi({
           so_phan_lop: demPhanLop.get(`${l.lop_id}|${l.giai_doan_id}`) ?? 0,
-          so_doi_ra: daDuyet.filter((d) => d.lich_nguon_id === l.id).length,
+          // Học bù không rút học viên khỏi buổi gốc (đã qua) — chỉ cộng ở buổi chốt.
+          so_doi_ra: daDuyet.filter(
+            (d) => d.lich_nguon_id === l.id && d.loai !== 'hoc_bu',
+          ).length,
           so_doi_vao: daDuyet.filter((d) => d.lich_chot_id === l.id).length,
         }),
         si_so_toi_da: l.lop.si_so_toi_da,
@@ -141,6 +146,7 @@ export class DoiBuoiHocQueryService {
         dang_ky_hoc_id: true,
         lich_nguon_id: true,
         lich_chot_id: true,
+        loai: true,
         lich_nguon: {
           select: { lop_id: true, giai_doan_id: true, lop: LOP_REF_SELECT },
         },
@@ -152,11 +158,13 @@ export class DoiBuoiHocQueryService {
       result.get(r.lich_nguon_id)?.ra.push({
         dang_ky_hoc_id: r.dang_ky_hoc_id,
         lop_chot: r.lich_chot.lop,
+        loai: r.loai,
       });
       result.get(r.lich_chot_id)?.vao.push({
         dang_ky_hoc_id: r.dang_ky_hoc_id,
         lich_nguon_id: r.lich_nguon_id,
         lop_nguon: r.lich_nguon.lop,
+        loai: r.loai,
       });
     }
     return result;
@@ -165,7 +173,12 @@ export class DoiBuoiHocQueryService {
   async doiBuoiDaDuyetCuaDangKy(
     dangKyIds: string[],
   ): Promise<
-    { dang_ky_hoc_id: string; lich_nguon_id: string; lich_chot_id: string }[]
+    {
+      dang_ky_hoc_id: string;
+      lich_nguon_id: string;
+      lich_chot_id: string;
+      loai: loai_doi_buoi;
+    }[]
   > {
     if (dangKyIds.length === 0) return [];
     const raw = await this.layDaDuyet(
@@ -180,6 +193,7 @@ export class DoiBuoiHocQueryService {
               dang_ky_hoc_id: r.dang_ky_hoc_id,
               lich_nguon_id: r.lich_nguon_id,
               lich_chot_id: r.lich_chot_id,
+              loai: r.loai,
             },
           ]
         : [],
@@ -215,6 +229,7 @@ export class DoiBuoiHocQueryService {
         dang_ky_hoc_id: true,
         lich_nguon_id: true,
         lich_chot_id: true,
+        loai: true,
         lich_nguon: { select: { lop_id: true, giai_doan_id: true } },
         dang_ky_hoc: { select: { hoc_vien_id: true } },
         lich_chot: {
@@ -250,6 +265,7 @@ export class DoiBuoiHocQueryService {
         dang_ky_hoc_id: true,
         lich_nguon_id: true,
         lich_chot_id: true,
+        loai: true,
         lich_nguon: { select: { lop_id: true, giai_doan_id: true } },
       },
     });

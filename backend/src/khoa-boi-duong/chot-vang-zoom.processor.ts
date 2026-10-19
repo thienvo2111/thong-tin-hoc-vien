@@ -171,7 +171,8 @@ export class ChotVangZoomProcessor {
     const cua = (loc: (d: (typeof hieuLuc)[number]) => boolean) =>
       new Set(hieuLuc.filter(loc).map((d) => d.dang_ky_hoc_id));
     return {
-      ra: cua((d) => d.lich_nguon_id === lichId),
+      // ADR 0012: học viên học bù vẫn thuộc buổi gốc → không bỏ qua khi chốt vắng.
+      ra: cua((d) => d.lich_nguon_id === lichId && d.loai !== 'hoc_bu'),
       vao: cua((d) => d.lich_chot_id === lichId),
     };
   }

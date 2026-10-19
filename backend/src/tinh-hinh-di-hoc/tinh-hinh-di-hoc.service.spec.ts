@@ -392,6 +392,25 @@ describe('TinhHinhDiHocService', () => {
     expect(ct.trang_thai_duoc).toEqual(['co_mat', 'vang_co_phep']);
   });
 
+  it('học bù đã duyệt (ADR 0012, loai hoc_bu): tính như đổi buổi — buổi chốt là buổi hiệu dụng', async () => {
+    doiBuoi.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+      {
+        dang_ky_hoc_id: 'dk-an',
+        lich_nguon_id: 'a2',
+        lich_chot_id: 'c2',
+        loai: 'hoc_bu',
+      },
+    ]);
+    const ds = await service.danhSach({}, loc(), NOW);
+    expect(ds.data[0].tong).toMatchObject({ da_dien_ra: 3, co_mat: 2, vang: 1 });
+    const ct = await service.chiTiet({}, 'dk-an', hoTro, NOW);
+    expect(ct.buoi[1]).toMatchObject({
+      lich_hoc_id: 'c2',
+      lich_nguon_id: 'a2',
+      diem_danh: { ma: 'co_mat' },
+    });
+  });
+
   // ADR 0010 T7: Bình học bù buổi 2 (GĐ1) ở lớp khác cùng (giai đoạn, buổi số).
   describe('học bù / lớp khác (tinhChuyenCan)', () => {
     const hocBu = (

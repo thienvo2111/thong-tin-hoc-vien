@@ -136,10 +136,11 @@ export interface LocDoiBuoi {
   qua_han?: boolean;
 }
 
-/** Spec đổi buổi §5: lich_hoc_id → đổi ra (sang lớp chốt) / đổi vào (từ lớp nguồn). */
-export type NhanDoiBuoi = Record<string, { loai: 'ra' | 'vao'; lop: string }>;
+/** Spec đổi buổi §5: lich_hoc_id → đổi ra (sang lớp chốt) / đổi vào (từ lớp nguồn). hoc_bu = học bù (ADR 0012). */
+export type NhanDoiBuoi = Record<string, { loai: 'ra' | 'vao'; lop: string; hoc_bu?: boolean }>;
 
-export function nhanDoiBuoi(n: { loai: 'ra' | 'vao'; lop: string }): string {
+export function nhanDoiBuoi(n: { loai: 'ra' | 'vao'; lop: string; hoc_bu?: boolean }): string {
+  if (n.hoc_bu) return n.loai === 'vao' ? `Học bù từ ${n.lop}` : `Học bù tại ${n.lop}`;
   return n.loai === 'vao' ? `Từ ${n.lop}` : `Đổi sang ${n.lop}`;
 }
 

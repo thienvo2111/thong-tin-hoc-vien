@@ -171,6 +171,44 @@ describe('DiemDanhService — đổi buổi', () => {
     expect(o).toMatchObject({ dang_ky_hoc_id: 'dk-a', trang_thai: 'co_mat' });
   });
 
+  it('học bù (ADR 0012): bảng điểm danh gắn nhãn hoc_bu ở buổi chốt; sửa ô ở buổi chốt được', async () => {
+    doiBuoi.dieuChinhTheoBuoi.mockResolvedValue(
+      new Map([
+        [
+          'b-1',
+          {
+            ra: [],
+            vao: [
+              {
+                dang_ky_hoc_id: 'dk-a',
+                lich_nguon_id: 'a-1',
+                lop_nguon: { id: 'lop-a', ten_lop: 'Lớp A' },
+                loai: 'hoc_bu',
+              },
+            ],
+          },
+        ],
+      ]),
+    );
+    prisma.dang_ky_hoc.findMany.mockResolvedValue([
+      { ...dk('dk-a', 'An Lớp A'), diem_danh: [] },
+    ]);
+    const bang = await service.bangDiemDanh(quanTri, 'lop-b', 'gd-1', now);
+    expect(bang.hoc_vien_doi_vao[0].doi_buoi).toEqual({
+      'b-1': { loai: 'vao', lop: 'Lớp A', hoc_bu: true },
+    });
+    doiBuoi.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
+      { dang_ky_hoc_id: 'dk-a', lich_nguon_id: 'a-1', lich_chot_id: 'b-1', loai: 'hoc_bu' },
+    ]);
+    const o = await service.suaO(
+      quanTri,
+      'lop-b',
+      { dang_ky_hoc_id: 'dk-a', lich_hoc_id: 'b-1', trang_thai: 'co_mat' },
+      now,
+    );
+    expect(o).toMatchObject({ dang_ky_hoc_id: 'dk-a', trang_thai: 'co_mat' });
+  });
+
   it('sửa ô: không thuộc lớp và không có đổi buổi vào buổi này → lỗi', async () => {
     doiBuoi.doiBuoiDaDuyetCuaDangKy.mockResolvedValue([
       { dang_ky_hoc_id: 'dk-a', lich_nguon_id: 'a-2', lich_chot_id: 'b-2' },

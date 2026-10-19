@@ -173,4 +173,24 @@ describe('soạn tin nhắn (G10)', () => {
     expect(s).toContain('  Nguyễn An học buổi 3 tại Lớp 02');
     expect(s).toContain('  Trần Bình học buổi 3 tại Lớp 02');
   });
+
+  // ADR 0012: buổi chốt của học bù vào lịch cụm với nhãn học bù.
+  it('tin cụm: buổi chốt có dòng học viên học bù', () => {
+    const s = soanTinNhanCum({
+      ten_cum: 'Cụm Long Xuyên',
+      ngay: new Date('2026-11-10T01:00:00Z'),
+      buoi: [
+        {
+          ...buoi,
+          buoi_so: 3,
+          ten_lop: 'Lớp 02',
+          thuc_dia: [],
+          hoc_vien_doi_buoi: [],
+          hoc_vien_hoc_bu: ['Lê Cúc'],
+        },
+      ],
+    });
+    expect(s).toContain('  Lê Cúc học bù buổi 3 tại Lớp 02');
+    expect(s).not.toContain('Lê Cúc học buổi');
+  });
 });

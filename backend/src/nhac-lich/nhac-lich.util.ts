@@ -170,6 +170,8 @@ export function soanTinNhanCum(d: {
     thuc_dia: ThucDiaTinNhan[];
     /** Spec đổi buổi §5: họ tên học viên cụm học buổi này theo đổi buổi đã duyệt. */
     hoc_vien_doi_buoi?: string[];
+    /** ADR 0012: họ tên học viên cụm học bù ở buổi này (học bù đã duyệt). */
+    hoc_vien_hoc_bu?: string[];
   })[];
   // ADR 0005: ngày có ≥1 buổi lớp Zoom của khóa bật điểm danh -> nhắc bấm (không link).
   nhac_diem_danh_zoom?: boolean;
@@ -187,6 +189,9 @@ export function soanTinNhanCum(d: {
       ),
       ...(b.hoc_vien_doi_buoi ?? []).map(
         (ten) => `  ${ten} học buổi ${b.buoi_so} tại ${b.ten_lop}`,
+      ),
+      ...(b.hoc_vien_hoc_bu ?? []).map(
+        (ten) => `  ${ten} học bù buổi ${b.buoi_so} tại ${b.ten_lop}`,
       ),
     );
   }
