@@ -173,7 +173,74 @@ describe('Tình hình đi học — người hỗ trợ', () => {
   });
 });
 
+describe('Tình hình đi học — lọc phạm vi cụm / lớp (ADR 0011 P4)', () => {
+  it('chọn "Lớp tôi hỗ trợ" -> pham_vi=lop trên URL và request; "Tất cả" bỏ tham số', async () => {
+    const queries = ghiQueryDanhSach();
+    const { router } = render(['/ho-tro/di-hoc?khoa_id=khoa-1']);
+    await screen.findByRole('table');
+    const user = userEvent.setup();
+    expect(screen.getByRole('radio', { name: 'Cụm của tôi' })).toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'Lớp tôi hỗ trợ' }));
+    await waitFor(() => expect(router.state.location.search).toContain('pham_vi=lop'));
+    await waitFor(() => expect(cuoi(queries)?.get('pham_vi')).toBe('lop'));
+    await user.click(screen.getByRole('radio', { name: 'Tất cả' }));
+    await waitFor(() => expect(router.state.location.search).not.toContain('pham_vi'));
+    await waitFor(() => expect(cuoi(queries)?.has('pham_vi')).toBe(false));
+  });
+
+  it('pham_vi trên URL được giữ khi tải lại; xuất Excel gửi kèm pham_vi', async () => {
+    const xuat: URLSearchParams[] = [];
+    server.events.on('request:start', ({ request }) => {
+      const url = new URL(request.url);
+      if (url.pathname === '/ho-tro-hoc-vien/di-hoc/xuat') xuat.push(url.searchParams);
+    });
+    render(['/ho-tro/di-hoc?khoa_id=khoa-1&pham_vi=cum']);
+    await screen.findByRole('table');
+    expect(screen.getByRole('radio', { name: 'Cụm của tôi' })).toBeChecked();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Xuất Excel' }));
+    await waitFor(() => expect(cuoi(xuat)?.get('pham_vi')).toBe('cum'));
+  });
+
+  it('không có cụm -> ẩn "Cụm của tôi"; không có lớp -> ẩn "Lớp tôi hỗ trợ"', async () => {
+    db.hoTroCum = [];
+    render(['/ho-tro/di-hoc?khoa_id=khoa-1']);
+    expect(await screen.findByRole('radio', { name: 'Lớp tôi hỗ trợ' })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Cụm của tôi' })).not.toBeInTheDocument();
+  });
+
+  it('không có cụm lẫn lớp -> không hiện điều khiển phạm vi', async () => {
+    db.hoTroCum = [];
+    db.hoTroLop = [];
+    render(['/ho-tro/di-hoc?khoa_id=khoa-1']);
+    await screen.findByRole('table');
+    await waitFor(() => expect(screen.queryByRole('radio', { name: 'Tất cả' })).not.toBeInTheDocument());
+    expect(screen.queryByRole('radiogroup', { name: 'Phạm vi' })).not.toBeInTheDocument();
+  });
+
+  it('ô Lớp: lớp tôi hỗ trợ lên đầu (nhóm "Lớp tôi hỗ trợ"), còn lại ở "Lớp khác"', async () => {
+    db.hoTroLop = [{ ...db.hoTroLop[0], lop_id: 'lop-zoom-2', ten_lop: 'Zoom 02' }];
+    render(['/ho-tro/di-hoc?khoa_id=khoa-1']);
+    await screen.findByRole('table');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('textbox', { name: 'Lớp' }));
+    expect(await screen.findByText('Lớp tôi hỗ trợ', { selector: '[class*="groupLabel"]' })).toBeInTheDocument();
+    expect(screen.getByText('Lớp khác', { selector: '[class*="groupLabel"]' })).toBeInTheDocument();
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Zoom · Zoom 02', 'Zoom · Zoom 01']);
+  });
+});
+
 describe('Tình hình đi học — Quản trị', () => {
+  it('không có điều khiển phạm vi, không gửi pham_vi, không gọi API của người hỗ trợ', async () => {
+    const goi: string[] = [];
+    server.events.on('request:start', ({ request }) => goi.push(new URL(request.url).pathname));
+    const queries = ghiQueryDanhSach('/thong-ke/di-hoc');
+    render(['/admin/di-hoc?khoa_id=khoa-1&pham_vi=lop'], 'admin');
+    await screen.findByRole('table');
+    expect(screen.queryByRole('radio', { name: 'Lớp tôi hỗ trợ' })).not.toBeInTheDocument();
+    expect(cuoi(queries)?.has('pham_vi')).toBe(false);
+    expect(goi.some((p) => p.startsWith('/ho-tro-hoc-vien/'))).toBe(false);
+  });
+
   it('gọi API /thong-ke/di-hoc; modal có thêm "Vắng", lý do không bắt buộc', async () => {
     render(['/admin/di-hoc?khoa_id=khoa-1'], 'admin');
     const user = userEvent.setup();

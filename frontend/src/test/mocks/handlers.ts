@@ -60,6 +60,8 @@ function dongXuLy(y: YeuCauHoTro): YeuCauHoTroQuanTri {
     ten_cum: ['Cụm Long Xuyên'],
     da_sua_boi_quan_tri: !!y.thoi_gian_sua_tra_loi,
     hoi_lai: false,
+    // ADR 0011 P2: chỉ phía người hỗ trợ có; Quản trị bỏ qua.
+    lop_ho_tro: [],
     ...(y as Partial<YeuCauHoTroQuanTri>),
   } as YeuCauHoTroQuanTri;
 }

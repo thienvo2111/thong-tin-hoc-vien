@@ -323,16 +323,22 @@ function BangBuoi({ hocVien, trong }: { hocVien: HocVienCuaBuoi[]; trong: string
             {hocVien.map((h) => (
               <Table.Tr key={h.hoc_vien_id} bg={h.doi_buoi === 'vao' ? 'var(--mantine-color-teal-light)' : undefined}>
                 <Table.Td>
-                  {/* Đổi vào / đổi ra: ngoài phạm vi sửa của lớp (ADR 0008 L2) → không dẫn tới chi tiết. */}
+                  {/* ADR 0011 P1: người đổi vào (đổi buổi đã duyệt còn hiệu lực) thuộc phạm vi → có link chi tiết. */}
                   {h.doi_buoi === null ? (
                     <Anchor component={Link} to={`/ho-tro/hoc-vien/${h.hoc_vien_id}`} fw={600} fz="sm">
                       {h.ho_ten}
                     </Anchor>
                   ) : (
                     <Group gap={6} wrap="nowrap">
-                      <Text fw={600} fz="sm">
-                        {h.ho_ten}
-                      </Text>
+                      {h.doi_buoi === 'vao' ? (
+                        <Anchor component={Link} to={`/ho-tro/hoc-vien/${h.hoc_vien_id}`} fw={600} fz="sm">
+                          {h.ho_ten}
+                        </Anchor>
+                      ) : (
+                        <Text fw={600} fz="sm">
+                          {h.ho_ten}
+                        </Text>
+                      )}
                       {h.doi_buoi === 'vao' && (
                         <Badge color="teal" variant="light" size="sm">
                           Đổi vào

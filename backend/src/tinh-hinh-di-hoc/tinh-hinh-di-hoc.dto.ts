@@ -38,6 +38,12 @@ export class LocTinhHinhDiHocDto extends PaginationQueryDto {
   @IsUUID()
   lop_id?: string;
 
+  // ADR 0011 P4: chỉ người hỗ trợ học viên — thu hẹp phạm vi về cụm / lớp
+  // của tôi (mặc định tat_ca = cụm ∪ lớp). Quản trị bỏ qua.
+  @IsOptional()
+  @IsIn(['tat_ca', 'cum', 'lop'])
+  pham_vi?: 'tat_ca' | 'cum' | 'lop';
+
   @IsOptional()
   @Transform(chuoiThanhBoolean)
   @IsIn([true, false])

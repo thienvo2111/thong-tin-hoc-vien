@@ -110,7 +110,7 @@ Chỉ `ho_tro_hoc_vien` (vai trò khác → `403`, kể cả Quản trị). Ph�
 
 #### Người hỗ trợ theo lớp (ADR 0008, 2026-10-16)
 
-Quản trị gắn người hỗ trợ học viên vào **lớp** (`phan_cong_ho_tro_lop`, `PUT /khoa-boi-duong/{id}/lop/{lopId}/nguoi-ho-tro`, mục 3). Phạm vi của `ho_tro_hoc_vien` = cụm ∪ **lớp gốc**: học viên có `dang_ky_hoc` thuộc cụm của tôi **hoặc** có `phan_lop_giai_doan` vào lớp được gắn (đổi buổi không tính — ADR 0007). Mở rộng tự động cho `GET/PATCH /ho-tro-hoc-vien/hoc-vien/{id}`, gửi link/cấp mật khẩu tạm/mở khóa, báo vắng, đề nghị đổi lớp, lớp có thể đổi. **Không đổi** (vẫn chỉ theo cụm): yêu cầu hỗ trợ, nhắc lịch, thống kê, duyệt đổi buổi, `GET /ho-tro-hoc-vien/hoc-vien` + `/hoc-vien/xuat`, `/lich-hoc`. Gỡ phân công có hiệu lực ngay ở request kế tiếp.
+Quản trị gắn người hỗ trợ học viên vào **lớp** (`phan_cong_ho_tro_lop`, `PUT /khoa-boi-duong/{id}/lop/{lopId}/nguoi-ho-tro`, mục 3). Phạm vi của `ho_tro_hoc_vien` = cụm ∪ **lớp gốc**: học viên có `dang_ky_hoc` thuộc cụm của tôi **hoặc** có `phan_lop_giai_doan` vào lớp được gắn ~~(đổi buổi không tính — ADR 0007)~~ **hoặc** (ADR 0011 P1, 2026-10-19) có đổi buổi `da_duyet` còn hiệu lực vào buổi của lớp được gắn. Mở rộng tự động cho `GET/PATCH /ho-tro-hoc-vien/hoc-vien/{id}`, gửi link/cấp mật khẩu tạm/mở khóa, báo vắng, đề nghị đổi lớp, lớp có thể đổi. **Không đổi** (vẫn chỉ theo cụm): yêu cầu hỗ trợ, nhắc lịch, thống kê, duyệt đổi buổi, `GET /ho-tro-hoc-vien/hoc-vien` + `/hoc-vien/xuat`, `/lich-hoc`. Gỡ phân công có hiệu lực ngay ở request kế tiếp.
 
 | Method | Path | Mô tả |
 |---|---|---|
@@ -123,11 +123,11 @@ Quản trị gắn người hỗ trợ học viên vào **lớp** (`phan_cong_ho
 
 #### Tình hình đi học + điểm danh bổ sung (ADR 0010, 2026-10-19)
 
-Phạm vi `ho_tro_hoc_vien` = cụm ∪ lớp gốc (như ADR 0008 L2, qua `HoTroHocVienScopeService.whereDangKyTrongPhamVi`); Quản trị dùng cùng API dưới tiền tố `/thong-ke/di-hoc` (chỉ `quan_tri`, mọi học viên) — **không** thêm tiền tố Nginx. Vai trò khác → `403`. Code: `backend/src/tinh-hinh-di-hoc/`.
+Phạm vi `ho_tro_hoc_vien` = cụm ∪ lớp (như ADR 0008 L2, gồm đổi buổi còn hiệu lực vào lớp — ADR 0011 P1, qua `HoTroHocVienScopeService.whereDangKyTrongPhamVi`); Quản trị dùng cùng API dưới tiền tố `/thong-ke/di-hoc` (chỉ `quan_tri`, mọi học viên) — **không** thêm tiền tố Nginx. Vai trò khác → `403`. Code: `backend/src/tinh-hinh-di-hoc/`.
 
 **Buổi hiệu dụng (T3):** với mỗi `phan_lop_giai_doan` (giai đoạn G, lớp C) của đăng ký, mỗi buổi L của C ở G → E = buổi chốt nếu có đổi buổi `da_duyet` còn hiệu lực ra khỏi L, ngược lại L. Trạng thái tại E như ADR 0008 L8 (`co_mat`/`vang`/`vang_co_phep` theo dòng `diem_danh`; không có dòng nhưng có `bao_vang` → `da_bao_vang`; còn lại `chua_den_gio`/`chua_diem_danh`). `tong` chỉ đếm E **đã bắt đầu**: `{ da_dien_ra, co_mat, vang, vang_co_phep, da_bao_vang, chua_diem_danh }`.
 
-Query lọc chung (`GET /di-hoc`, `/di-hoc/xuat`): `khoa_id` (**bắt buộc**, UUID), `q` (họ tên không dấu/không phân biệt hoa thường **hoặc** mã MOET — khớp chuỗi con, chấp nhận thiếu/thừa số 0 đầu qua `ma-moet.util`), `don_vi_cong_tac_id`, `cum_id` (hỗ trợ: phải là cụm của tôi, khác → `404` "Không tìm thấy cụm hỗ trợ"; Quản trị: cụm bất kỳ), `lop_id` (lớp gốc ở bất kỳ giai đoạn), `co_vang=true` (`tong.vang > 0`), `chua_diem_danh=true` (`tong.chua_diem_danh > 0`), `page`, `page_size` (≤ 200).
+Query lọc chung (`GET /di-hoc`, `/di-hoc/xuat`): `khoa_id` (**bắt buộc**, UUID), `q` (họ tên không dấu/không phân biệt hoa thường **hoặc** mã MOET — khớp chuỗi con, chấp nhận thiếu/thừa số 0 đầu qua `ma-moet.util`), `don_vi_cong_tac_id`, `cum_id` (hỗ trợ: phải là cụm của tôi, khác → `404` "Không tìm thấy cụm hỗ trợ"; Quản trị: cụm bất kỳ), `lop_id` (lớp gốc ở bất kỳ giai đoạn), `pham_vi` (**ADR 0011 P4**, chỉ người hỗ trợ; Quản trị bỏ qua) = `tat_ca` (mặc định, cụm ∪ lớp) \| `cum` (chỉ đăng ký thuộc cụm của tôi) \| `lop` (chỉ phân lớp / đổi buổi còn hiệu lực vào lớp của tôi), giá trị khác → `400`; áp cho cả file xuất (ghi trong `bo_loc` của nhật ký), `co_vang=true` (`tong.vang > 0`), `chua_diem_danh=true` (`tong.chua_diem_danh > 0`), `page`, `page_size` (≤ 200).
 
 | Method | Path | Mô tả |
 |---|---|---|
@@ -138,23 +138,23 @@ Query lọc chung (`GET /di-hoc`, `/di-hoc/xuat`): `khoa_id` (**bắt buộc**, 
 | PUT | `/ho-tro-hoc-vien/di-hoc/{dangKyHocId}/diem-danh` | **T4** body `{ lich_hoc_id, trang_thai: 'co_mat' \| 'vang_co_phep', ly_do }` (`ly_do` bắt buộc, NFC + trim, 1–500; `vang` → `400`). Đăng ký ngoài phạm vi → `404`; `lich_hoc_id` không phải buổi hiệu dụng E của đăng ký (buổi lớp khác không đổi vào, buổi nguồn đã đổi ra) → `400` "Buổi học không thuộc lịch học của học viên"; E chưa bắt đầu → `400` "Buổi học chưa diễn ra"; buổi đã có mặt nhờ dòng ở lớp khác (T7) → `400` "Đã có mặt ở lớp X (học bù/lớp cũ)"; **không giới hạn thời gian** sau buổi. Upsert `diem_danh` qua `DiemDanhService.ghiThuCong` (dùng chung với `PUT /lop/{lopId}/diem-danh`): `nguon = thu_cong`, `ghi_chu = ly_do`, `nguoi_sua`, `cap_nhat_luc`; giữ `tu_diem_danh_luc`. Trả `{ dang_ky_hoc_id, lich_hoc_id, trang_thai, nguon, ghi_chu, tu_diem_danh_luc, cap_nhat_luc, nguoi_sua }`. Nhật ký `ho_tro_diem_danh_bo_sung` (`hoc_vien_id`, `chi_tiet: { dang_ky_hoc_id, lich_hoc_id, trang_thai_cu, trang_thai_moi }`). Import Excel điểm danh sau đó vẫn ghi đè (ADR 0005 Z3) |
 | PUT | `/thong-ke/di-hoc/{dangKyHocId}/diem-danh` | **T5** Quản trị: body `{ lich_hoc_id, trang_thai: 'co_mat' \| 'vang' \| 'vang_co_phep', ly_do? }` (≤ 500), mọi lúc (kể cả buổi chưa diễn ra, như Z7); cùng kiểm tra buổi hiệu dụng. Không ghi nhật ký (như sửa ô Z7) |
 
-#### Yêu cầu hỗ trợ (M8 2026-10-01; theo cụm — ADR 0003 Lát 4, 2026-10-06)
+#### Yêu cầu hỗ trợ (M8 2026-10-01; theo cụm — ADR 0003 Lát 4, 2026-10-06; theo cụm ∪ lớp — ADR 0011, 2026-10-19)
 
 Mô hình 1 hỏi – 1 đáp; hỏi tiếp = ticket mới (cờ `hoi_lai`). **Trả lời = UPDATE có điều kiện `trang_thai = 'cho_xu_ly'`** cho MỌI người trả lời: ticket đã có câu trả lời → `409` "Yêu cầu này đã có người trả lời" (đã đóng → `409` "Ticket đã đóng…"), không ghi đè; email `yeu_cau_ho_tro_tra_loi` chỉ gửi khi ghi thành công. Hạn tự đóng (`da_dong_hieu_luc`, 7 ngày) tính từ `thoi_gian_sua_tra_loi ?? thoi_gian_phan_hoi`.
 
 | Method | Path | Mô tả | Quyền |
 |---|---|---|---|
 | POST | `/yeu-cau-ho-tro/toi` | `{ tinh_huong, noi_dung_hoi }` | Học viên |
-| GET | `/yeu-cau-ho-tro/toi` | Ticket của tôi. Mỗi dòng có `nguoi_tra_loi_hien_thi`: tên cụm của học viên khi người hỗ trợ trả lời, `"Ban tổ chức (HCMUE)"` khi Quản trị trả lời, `null` khi chưa trả lời; `thoi_gian_sua_tra_loi`. **Không** có `tra_loi_boi`/`sua_tra_loi_boi` (H14) | Học viên |
+| GET | `/yeu-cau-ho-tro/toi` | Ticket của tôi. Mỗi dòng có `nguoi_tra_loi_hien_thi`: tên cụm của học viên khi người hỗ trợ trả lời (ADR 0011 P3: người trả lời không giữ cụm nào của học viên nhưng được gắn lớp học viên thuộc → `"Hỗ trợ lớp <tên lớp>"`, lớp ở giai đoạn mới nhất), `"Ban tổ chức (HCMUE)"` khi Quản trị trả lời, `null` khi chưa trả lời; `thoi_gian_sua_tra_loi`. **Không** có `tra_loi_boi`/`sua_tra_loi_boi` (H14) | Học viên |
 | POST | `/yeu-cau-ho-tro/toi/{id}/dong`, `/toi/{id}/danh-gia` | Đóng / đánh giá (`hai_long`\|`chua_hai_long`) ticket đã trả lời | Học viên |
 | GET | `/yeu-cau-ho-tro` | Phân trang; lọc `trang_thai`, `loai_van_de_id`, **`chua_co_cum=true`** (học viên không có `dang_ky_hoc` nào có cụm — chỉ Quản trị xử lý). Dòng thêm `hoc_vien_ho_ten`, `nguoi_tra_loi_ten`, `hoi_lai`, `ten_cum: string[]`, `da_sua_boi_quan_tri` | Quản trị |
 | GET | `/yeu-cau-ho-tro/{id}` | Như 1 dòng ở trên | Quản trị |
 | PATCH | `/yeu-cau-ho-tro/{id}/tra-loi` | `{ noi_dung_tra_loi }` — có điều kiện, xem trên | Quản trị |
 | PATCH | `/yeu-cau-ho-tro/{id}/sua-tra-loi` | `{ noi_dung_tra_loi }` — đính chính câu trả lời (kể cả ticket đã đóng): `409` nếu chưa có câu trả lời; ghi nội dung cũ vào `nhat_ky_hoat_dong` (`sua_tra_loi_ho_tro`), set `thoi_gian_sua_tra_loi`/`sua_tra_loi_boi`, `danh_gia = null`, `trang_thai = 'da_phan_hoi'`, email `yeu_cau_ho_tro_cap_nhat_tra_loi` | Quản trị |
-| GET | `/ho-tro-hoc-vien/yeu-cau-ho-tro` | Ticket của học viên trong cụm của tôi (tính động). Lọc `trang_thai`, `cum_id` (ngoài phạm vi → 404). `cho_xu_ly` xếp cũ nhất trước. Dòng như phía Quản trị, `ten_cum` chỉ gồm cụm trong phạm vi | Người hỗ trợ |
-| GET | `/ho-tro-hoc-vien/yeu-cau-ho-tro/dem` | `{ cho_xu_ly }` cho số đếm trên menu | Người hỗ trợ |
-| GET | `/ho-tro-hoc-vien/yeu-cau-ho-tro/{id}` | Như 1 dòng + `ticket_truoc` (10 ticket khác gần nhất của cùng học viên). Ngoài phạm vi → 404 | Người hỗ trợ |
-| PATCH | `/ho-tro-hoc-vien/yeu-cau-ho-tro/{id}/tra-loi` | `{ noi_dung_tra_loi }` — có điều kiện; ngoài phạm vi → 404 | Người hỗ trợ |
+| GET | `/ho-tro-hoc-vien/yeu-cau-ho-tro` | Ticket của học viên trong phạm vi cụm ∪ lớp của tôi (tính động, ADR 0011 P2). Lọc `trang_thai`, `cum_id` (không phải cụm của tôi → 404 "Không tìm thấy cụm hỗ trợ"), `lop_id` (không phải lớp được gắn → 404 "Không tìm thấy lớp"; khớp phân lớp hoặc đổi buổi còn hiệu lực vào lớp). `cho_xu_ly` xếp cũ nhất trước. Dòng như phía Quản trị (`ten_cum` = mọi cụm của học viên) + `lop_ho_tro: [{ id, ten_lop }]` = các lớp của tôi mà học viên thuộc (giai đoạn mới nhất trước) | Người hỗ trợ |
+| GET | `/ho-tro-hoc-vien/yeu-cau-ho-tro/dem` | `{ cho_xu_ly }` cho số đếm trên menu (gồm ticket theo lớp) | Người hỗ trợ |
+| GET | `/ho-tro-hoc-vien/yeu-cau-ho-tro/{id}` | Như 1 dòng (kèm `lop_ho_tro`) + `ticket_truoc` (10 ticket khác gần nhất của cùng học viên). Ngoài phạm vi → 404 | Người hỗ trợ |
+| PATCH | `/ho-tro-hoc-vien/yeu-cau-ho-tro/{id}/tra-loi` | `{ noi_dung_tra_loi }` — có điều kiện (người hỗ trợ cụm và lớp cùng thấy 1 ticket: ai trả lời trước thắng, người sau `409`); ngoài phạm vi → 404 | Người hỗ trợ |
 
 Frontend khi nhận `409` lúc trả lời: KHÔNG làm mới danh sách ngay, tải lại ticket (`GET .../{id}`) để hiện câu trả lời đã có, giữ nguyên nội dung đang soạn (`components/KhungTraLoiTicket.tsx`).
 

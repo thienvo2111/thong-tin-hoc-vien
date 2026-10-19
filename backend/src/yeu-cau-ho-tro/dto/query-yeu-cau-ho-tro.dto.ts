@@ -21,7 +21,7 @@ export class QueryYeuCauHoTroDto extends PaginationQueryDto {
   chua_co_cum?: boolean;
 }
 
-// GET /ho-tro/yeu-cau-ho-tro — người hỗ trợ học viên (ADR 0003).
+// GET /ho-tro-hoc-vien/yeu-cau-ho-tro — người hỗ trợ học viên (ADR 0003, ADR 0011).
 export class QueryYeuCauHoTroHoTroDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(trang_thai_yeu_cau_ho_tro)
@@ -30,4 +30,9 @@ export class QueryYeuCauHoTroHoTroDto extends PaginationQueryDto {
   @IsOptional()
   @IsUUID()
   cum_id?: string;
+
+  // ADR 0011 P2: lớp được gắn cho tôi (lớp khác → 404 "Không tìm thấy lớp").
+  @IsOptional()
+  @IsUUID()
+  lop_id?: string;
 }

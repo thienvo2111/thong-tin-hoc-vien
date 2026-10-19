@@ -14,7 +14,7 @@ import type {
   TrangThaiYeuCauHoTro,
   YeuCauHoTro,
   YeuCauHoTroChiTietHoTro,
-  YeuCauHoTroQuanTri,
+  YeuCauHoTroHoTro,
 } from './types';
 
 // Khu người hỗ trợ học viên (ADR 0003) — mọi API tự lọc theo cụm được phân công ở backend.
@@ -45,10 +45,11 @@ function xayQueryString(params: object): string {
 
 const KHOA = ['ho-tro'] as const;
 
-export function useCumCuaToi() {
+export function useCumCuaToi(enabled = true) {
   return useQuery({
     queryKey: [...KHOA, 'cum-cua-toi'],
     queryFn: () => apiFetch<CumCuaToi[]>('/ho-tro-hoc-vien/cum-cua-toi'),
+    enabled,
   });
 }
 
@@ -84,10 +85,11 @@ export function xuatDanhSachHoTro(params: LocHocVienHoTro): Promise<Blob> {
 
 // --- Hỗ trợ theo lớp (ADR 0008) ---
 
-export function useLopCuaToi() {
+export function useLopCuaToi(enabled = true) {
   return useQuery({
     queryKey: [...KHOA, 'lop-cua-toi'],
     queryFn: () => apiFetch<LopCuaToi[]>('/ho-tro-hoc-vien/lop-cua-toi'),
+    enabled,
   });
 }
 
@@ -129,11 +131,12 @@ export function xuatDanhSachBuoiHoTro(lopId: string, lichId?: string): Promise<B
   return apiFetchBlob(`/ho-tro-hoc-vien/lop/${lopId}/buoi/xuat${xayQueryString({ lich_id: lichId })}`);
 }
 
-// --- Yêu cầu hỗ trợ theo cụm (ADR 0003 Lát 4) ---
+// --- Yêu cầu hỗ trợ theo cụm ∪ lớp (ADR 0003 Lát 4, ADR 0011 P2) ---
 
 export interface LocYeuCauHoTroHoTro {
   trang_thai?: TrangThaiYeuCauHoTro;
   cum_id?: string;
+  lop_id?: string;
   page?: number;
   page_size?: number;
 }
@@ -141,7 +144,7 @@ export interface LocYeuCauHoTroHoTro {
 export function useYeuCauHoTroCuaCum(params: LocYeuCauHoTroHoTro) {
   return useQuery({
     queryKey: [...KHOA, 'yeu-cau', params],
-    queryFn: () => apiFetch<PaginatedResult<YeuCauHoTroQuanTri>>(`/ho-tro-hoc-vien/yeu-cau-ho-tro${xayQueryString(params)}`),
+    queryFn: () => apiFetch<PaginatedResult<YeuCauHoTroHoTro>>(`/ho-tro-hoc-vien/yeu-cau-ho-tro${xayQueryString(params)}`),
     placeholderData: keepPreviousData,
   });
 }

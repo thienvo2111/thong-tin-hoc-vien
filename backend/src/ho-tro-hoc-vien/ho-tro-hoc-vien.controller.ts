@@ -62,10 +62,11 @@ export class HoTroHocVienController {
   ) {}
 
   // ---------------- ADR 0010: tình hình đi học + điểm danh bổ sung ----------------
-  // Phạm vi = cụm ∪ lớp gốc (T1); cum_id ngoài cụm của tôi → 404 như cumLoc.
-  private async phamViDiHoc(userId: string, cumId?: string) {
-    if (cumId) await this.scope.cumLoc(userId, cumId);
-    return this.scope.whereDangKyTrongPhamVi(userId);
+  // Phạm vi = cụm ∪ lớp (T1, ADR 0011 P1); cum_id ngoài cụm của tôi → 404 như
+  // cumLoc. pham_vi (ADR 0011 P4) thu hẹp về chỉ cụm / chỉ lớp của tôi.
+  private async phamViDiHoc(userId: string, query: LocTinhHinhDiHocDto) {
+    if (query.cum_id) await this.scope.cumLoc(userId, query.cum_id);
+    return this.scope.whereDangKyTrongPhamVi(userId, query.pham_vi);
   }
 
   @Get('di-hoc')
@@ -73,10 +74,7 @@ export class HoTroHocVienController {
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: LocTinhHinhDiHocDto,
   ) {
-    return this.diHoc.danhSach(
-      await this.phamViDiHoc(user.id, query.cum_id),
-      query,
-    );
+    return this.diHoc.danhSach(await this.phamViDiHoc(user.id, query), query);
   }
 
   // Khai báo TRƯỚC di-hoc/:dangKyHocId để 'khoa'/'xuat' không bị route động chắn.
@@ -95,7 +93,7 @@ export class HoTroHocVienController {
     @Res() res: Response,
   ) {
     const buffer = await this.diHoc.xuat(
-      await this.phamViDiHoc(user.id, query.cum_id),
+      await this.phamViDiHoc(user.id, query),
       query,
       user,
     );

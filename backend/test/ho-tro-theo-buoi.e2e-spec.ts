@@ -13,7 +13,7 @@ import {
 } from './utils/test-data';
 
 // ADR 0008 L7: danh sách THEO BUỔI của người hỗ trợ lớp = phân lớp − đổi ra +
-// đổi vào (đổi buổi da_duyet còn hiệu lực). Người đổi vào ngoài phạm vi sửa.
+// đổi vào (đổi buổi da_duyet còn hiệu lực). Người đổi vào thuộc phạm vi (ADR 0011 P1).
 describe('Người hỗ trợ lớp — danh sách theo buổi (e2e, ADR 0008 L7)', () => {
   let app: INestApplication;
   const suf = uniqueSuffix();
@@ -372,9 +372,9 @@ describe('Người hỗ trợ lớp — danh sách theo buổi (e2e, ADR 0008 L7
     );
   });
 
-  it('người đổi vào từ lớp khác vẫn ngoài phạm vi: chi tiết -> 404', async () => {
+  it('ADR 0011 P1: người đổi vào từ lớp khác thuộc phạm vi: chi tiết -> 200', async () => {
     expect((await get(`/ho-tro-hoc-vien/hoc-vien/${hv.cuong}`)).status).toBe(
-      404,
+      200,
     );
     expect((await get(`/ho-tro-hoc-vien/hoc-vien/${hv.an}`)).status).toBe(200);
   });

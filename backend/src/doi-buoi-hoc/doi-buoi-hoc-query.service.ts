@@ -186,6 +186,60 @@ export class DoiBuoiHocQueryService {
     );
   }
 
+  /**
+   * ADR 0011 P1: đổi buổi `da_duyet` còn hiệu lực có buổi CHỐT thuộc một
+   * trong các lớp `lopIds` (học viên đổi VÀO lớp). `hocVienIds` (tùy chọn)
+   * thu hẹp theo học viên. Kèm lớp + giai đoạn của buổi chốt để chọn lớp mới nhất.
+   */
+  async doiVaoLop(
+    lopIds: string[],
+    hocVienIds?: string[],
+  ): Promise<
+    {
+      dang_ky_hoc_id: string;
+      hoc_vien_id: string;
+      lop: LopRef;
+      giai_doan: { thu_tu: number; thoi_gian_bat_dau: Date };
+    }[]
+  > {
+    if (lopIds.length === 0 || hocVienIds?.length === 0) return [];
+    const raw = await this.prisma.doi_buoi_hoc.findMany({
+      where: {
+        trang_thai: 'da_duyet',
+        lich_chot: { lop_id: { in: lopIds } },
+        ...(hocVienIds
+          ? { dang_ky_hoc: { hoc_vien_id: { in: hocVienIds } } }
+          : {}),
+      },
+      select: {
+        dang_ky_hoc_id: true,
+        lich_nguon_id: true,
+        lich_chot_id: true,
+        lich_nguon: { select: { lop_id: true, giai_doan_id: true } },
+        dang_ky_hoc: { select: { hoc_vien_id: true } },
+        lich_chot: {
+          select: {
+            lop: LOP_REF_SELECT,
+            giai_doan: { select: { thu_tu: true, thoi_gian_bat_dau: true } },
+          },
+        },
+      },
+    });
+    const hieuLuc = await this.locHieuLuc(raw, this.prisma);
+    return hieuLuc.flatMap((r) =>
+      r.lich_chot
+        ? [
+            {
+              dang_ky_hoc_id: r.dang_ky_hoc_id,
+              hoc_vien_id: r.dang_ky_hoc.hoc_vien_id,
+              lop: r.lich_chot.lop,
+              giai_doan: r.lich_chot.giai_doan,
+            },
+          ]
+        : [],
+    );
+  }
+
   private layDaDuyet(
     where: Prisma.doi_buoi_hocWhereInput,
     db: Db,

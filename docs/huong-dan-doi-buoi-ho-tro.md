@@ -82,6 +82,7 @@ Quản trị **được duyệt vượt** sĩ số hoặc vượt thứ tự hà
 | Vào học Zoom / báo vắng | Học viên điểm danh, báo vắng được ở buổi chốt |
 | Chuyên cần | Có mặt ở buổi chốt được tính thay buổi gốc |
 | Nhắc lịch cụm | Tin nhắn có dòng "{họ tên} học buổi n tại {lớp}"; duyệt sau lần nhắc cuối → cờ **Cần nhắc lại** |
+| Người hỗ trợ lớp đích | Học viên đổi vào thuộc phạm vi của người hỗ trợ lớp đích (cùng với người hỗ trợ lớp gốc và cụm): mở hồ sơ, sửa thông tin, cấp lại mật khẩu, trả lời **Yêu cầu hỗ trợ** (ký "Hỗ trợ lớp {lớp}"), xem **Tình hình đi học**. Đề nghị chờ duyệt / bị từ chối / bị hủy không tính |
 
 Sĩ số **theo lớp** (trang khóa, báo cáo, Excel chia lớp) **không đổi** — học viên vẫn thuộc lớp gốc.
 

@@ -736,4 +736,123 @@ describe('Tình hình đi học + điểm danh bổ sung (e2e, ADR 0010)', () =>
       });
     });
   });
+
+  // ADR 0011 P1/P4: phạm vi lớp gồm đổi buổi đã duyệt còn hiệu lực VÀO lớp
+  // của tôi; lọc pham_vi = tat_ca | cum | lop. Khai báo cuối file để không đổi
+  // số liệu các test ở trên.
+  // - Em: không cụm, G1→B, đổi b2 → a2 (đã duyệt, còn hiệu lực) → trong phạm vi qua lớp A.
+  // - Giang: không cụm, G1→B, đổi b2 → a2 nhưng CHỜ DUYỆT → ngoài phạm vi.
+  // - Hà: không cụm, G1→C (đã phân lại), đổi b2 → a2 đã duyệt nhưng HẾT hiệu lực → ngoài.
+  describe('ADR 0011: phạm vi theo cụm / lớp + đổi buổi vào lớp', () => {
+    const dk2 = { em: '', giang: '', ha: '' };
+    const tenSx = (b: { data: { ho_ten: string }[] }) => ten(b).sort();
+
+    beforeAll(async () => {
+      const ca: [keyof typeof dk2, string, string, 'da_duyet' | 'cho_duyet'][] =
+        [
+          ['em', 'Đỗ Em', lop.b, 'da_duyet'],
+          ['giang', 'Võ Giang', lop.b, 'cho_duyet'],
+          ['ha', 'Lý Hà', lop.c, 'da_duyet'],
+        ];
+      for (const [k, hoTen, lopG1, trangThai] of ca) {
+        const h = await prisma.hoc_vien.create({
+          data: {
+            nguon_tao: 'import_moet',
+            ma_dinh_danh_moet: `PV${k.toUpperCase()}${SUF}`,
+            ho_ten: hoTen,
+            ngay_sinh: 4,
+            thang_sinh: 5,
+            nam_sinh: 1990,
+            don_vi_cong_tac_id: dv1.donVi.id,
+          },
+        });
+        hocVienIds.push(h.id);
+        const d = await prisma.dang_ky_hoc.create({
+          data: { hoc_vien_id: h.id, khoa_id: khoaId },
+        });
+        dk2[k] = d.id;
+        dangKyIds.push(d.id);
+        await prisma.phan_lop_giai_doan.create({
+          data: { dang_ky_hoc_id: d.id, giai_doan_id: gd.g1, lop_id: lopG1 },
+        });
+        await prisma.doi_buoi_hoc.create({
+          data: {
+            dang_ky_hoc_id: d.id,
+            lich_nguon_id: lich.b2,
+            lich_de_nghi_id: lich.a2,
+            lich_chot_id: trangThai === 'da_duyet' ? lich.a2 : null,
+            ly_do: 'Trùng lịch',
+            trang_thai: trangThai,
+          },
+        });
+      }
+    });
+
+    it('tat_ca (mặc định) = cụm ∪ lớp, gồm người đổi buổi còn hiệu lực vào lớp của tôi', async () => {
+      const ky = ['Lê Cường', 'Nguyễn An', 'Trần Bình', 'Đỗ Em'].sort();
+      expect(tenSx(await ds(''))).toEqual(ky);
+      expect(tenSx(await ds('&pham_vi=tat_ca'))).toEqual(ky);
+    });
+
+    it('pham_vi=cum -> chỉ học viên trong cụm của tôi', async () => {
+      expect(tenSx(await ds('&pham_vi=cum'))).toEqual(
+        ['Lê Cường', 'Nguyễn An'].sort(),
+      );
+    });
+
+    it('pham_vi=lop -> phân lớp gốc + đổi buổi còn hiệu lực vào lớp của tôi', async () => {
+      expect(tenSx(await ds('&pham_vi=lop'))).toEqual(
+        ['Nguyễn An', 'Trần Bình', 'Đỗ Em'].sort(),
+      );
+    });
+
+    it('pham_vi không hợp lệ -> 400', async () => {
+      expect(
+        (await get(`/ho-tro-hoc-vien/di-hoc?khoa_id=${khoaId}&pham_vi=khoa`))
+          .status,
+      ).toBe(400);
+    });
+
+    it('chi tiết người đổi vào -> 200; chờ duyệt / hết hiệu lực -> 404', async () => {
+      const em = await get(`/ho-tro-hoc-vien/di-hoc/${dk2.em}`);
+      expect(em.status).toBe(200);
+      for (const k of ['giang', 'ha'] as const)
+        expect((await get(`/ho-tro-hoc-vien/di-hoc/${dk2[k]}`)).status).toBe(
+          404,
+        );
+    });
+
+    it('xuất Excel theo pham_vi=lop: đúng số dòng, nhật ký ghi bộ lọc', async () => {
+      const res = await get(
+        `/ho-tro-hoc-vien/di-hoc/xuat?khoa_id=${khoaId}&pham_vi=lop`,
+      )
+        .buffer(true)
+        .parse((r, cb) => {
+          const chunks: Buffer[] = [];
+          r.on('data', (c: Buffer) => chunks.push(c));
+          r.on('end', () => cb(null, Buffer.concat(chunks)));
+        });
+      expect(res.status).toBe(200);
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(res.body as unknown as ExcelJS.Buffer);
+      expect(wb.worksheets[0].rowCount).toBe(2 + 3);
+      const nk = await prisma.nhat_ky_hoat_dong.findFirst({
+        where: {
+          hanh_dong: 'ho_tro_xuat_tinh_hinh_di_hoc',
+          nguoi_dung_id: id.ht,
+        },
+        orderBy: { thoi_gian: 'desc' },
+      });
+      expect(nk?.chi_tiet).toMatchObject({
+        bo_loc: { pham_vi: 'lop' },
+        so_dong: 3,
+      });
+    });
+
+    it('Quản trị bỏ qua pham_vi (vẫn thấy mọi học viên của khóa)', async () => {
+      const b = await ds('&pham_vi=cum', token.qt, '/thong-ke/di-hoc');
+      expect(ten(b)).toContain('Phạm Dũng');
+      expect(ten(b)).toContain('Đỗ Em');
+    });
+  });
 });

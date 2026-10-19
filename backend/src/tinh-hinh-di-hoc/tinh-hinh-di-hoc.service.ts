@@ -35,9 +35,10 @@ import { LocTinhHinhDiHocDto } from './tinh-hinh-di-hoc.dto';
 import { buildTinhHinhDiHocWorkbook } from './xuat-tinh-hinh-di-hoc.util';
 
 /**
- * Phạm vi đăng ký học được xem (ADR 0010 T1): người hỗ trợ = cụm ∪ lớp gốc
- * (`HoTroHocVienScopeService.whereDangKyTrongPhamVi`), Quản trị = `{}` (tất
- * cả). `null` = chưa được gắn gì → không thấy ai.
+ * Phạm vi đăng ký học được xem (ADR 0010 T1, ADR 0011 P1/P4): người hỗ trợ =
+ * cụm ∪ lớp (phân lớp gốc hoặc đổi buổi còn hiệu lực vào), có thể thu hẹp về
+ * chỉ cụm / chỉ lớp (`HoTroHocVienScopeService.whereDangKyTrongPhamVi`), Quản
+ * trị = `{}` (tất cả). `null` = chưa được gắn gì → không thấy ai.
  */
 export type PhamViDiHoc = Prisma.dang_ky_hocWhereInput | null;
 

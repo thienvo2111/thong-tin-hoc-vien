@@ -3,7 +3,10 @@ import { Prisma, yeu_cau_ho_tro } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ThongBaoService } from '../thong-bao/thong-bao.service';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
-import { HoTroHocVienScopeService } from '../ho-tro-hoc-vien/ho-tro-hoc-vien-scope.service';
+import {
+  HoTroHocVienScopeService,
+  LopHoTroRef,
+} from '../ho-tro-hoc-vien/ho-tro-hoc-vien-scope.service';
 import {
   ConflictAppException,
   ForbiddenAppException,
@@ -25,6 +28,8 @@ import {
 
 // ADR 0003 H14: học viên không thấy họ tên cán bộ trả lời.
 export const KY_TEN_BAN_TO_CHUC = 'Ban tổ chức (HCMUE)';
+// ADR 0011 P3: người trả lời chỉ liên quan học viên qua lớp được gắn.
+export const kyTenLop = (tenLop: string) => `Hỗ trợ lớp ${tenLop}`;
 
 export type YeuCauHoTroResponse = yeu_cau_ho_tro & {
   // Tên hiển thị của vấn đề: tinh_huong (ticket mới) hoặc tên loại vấn đề (ticket cũ).
@@ -43,11 +48,16 @@ const INCLUDE_LOAI_VAN_DE = {
   loai_van_de: true,
 } satisfies Prisma.yeu_cau_ho_troInclude;
 
-// Phía học viên: đủ dữ liệu để ký tên "Cụm hỗ trợ N" thay họ tên cán bộ.
+// Phía học viên: đủ dữ liệu để ký tên "Cụm hỗ trợ N" / "Hỗ trợ lớp X" thay
+// họ tên cán bộ.
 const INCLUDE_HOC_VIEN = {
   loai_van_de: true,
   tra_loi_boi_user: {
-    select: { vai_tro: true, phan_cong_ho_tro: { select: { cum_id: true } } },
+    select: {
+      vai_tro: true,
+      phan_cong_ho_tro: { select: { cum_id: true } },
+      phan_cong_ho_tro_lop: { select: { lop_id: true } },
+    },
   },
   hoc_vien: {
     select: {
@@ -63,27 +73,24 @@ type YeuCauHoTroHocVienRow = Prisma.yeu_cau_ho_troGetPayload<{
   include: typeof INCLUDE_HOC_VIEN;
 }>;
 
-// Phía quan_tri / người hỗ trợ: tên học viên, người trả lời, cụm của học viên.
-// cumIds = chỉ lấy cụm trong phạm vi người hỗ trợ; undefined = mọi cụm.
-const includeXuLy = (cumIds?: string[]) =>
-  ({
-    loai_van_de: true,
-    hoc_vien: {
-      select: {
-        ho_ten: true,
-        dang_ky_hoc: {
-          where: cumIds
-            ? { cum_id: { in: cumIds } }
-            : { cum_id: { not: null } },
-          select: { cum: { select: { ten_cum: true } } },
-        },
+// Phía quan_tri / người hỗ trợ: tên học viên, người trả lời, mọi cụm của học
+// viên (ADR 0011: người hỗ trợ lớp cũng cần biết học viên thuộc cụm nào).
+const INCLUDE_XU_LY = {
+  loai_van_de: true,
+  hoc_vien: {
+    select: {
+      ho_ten: true,
+      dang_ky_hoc: {
+        where: { cum_id: { not: null } },
+        select: { cum: { select: { ten_cum: true } } },
       },
     },
-    tra_loi_boi_user: { select: { ho_ten: true } },
-  }) satisfies Prisma.yeu_cau_ho_troInclude;
+  },
+  tra_loi_boi_user: { select: { ho_ten: true } },
+} satisfies Prisma.yeu_cau_ho_troInclude;
 
 type YeuCauHoTroXuLyRow = Prisma.yeu_cau_ho_troGetPayload<{
-  include: ReturnType<typeof includeXuLy>;
+  include: typeof INCLUDE_XU_LY;
 }>;
 
 export type YeuCauHoTroQuanTriResponse = YeuCauHoTroResponse & {
@@ -92,6 +99,11 @@ export type YeuCauHoTroQuanTriResponse = YeuCauHoTroResponse & {
   nguoi_tra_loi_ten: string | null;
   ten_cum: string[];
   da_sua_boi_quan_tri: boolean;
+};
+
+// ADR 0011 P2: phía người hỗ trợ thêm các lớp CỦA TÔI mà học viên thuộc.
+export type YeuCauHoTroHoTroResponse = YeuCauHoTroQuanTriResponse & {
+  lop_ho_tro: LopHoTroRef[];
 };
 
 @Injectable()
@@ -130,7 +142,7 @@ export class YeuCauHoTroService {
       include: INCLUDE_HOC_VIEN,
       orderBy: { thoi_gian_tao: 'desc' },
     });
-    return data.map((d) => this.toResponseHocVien(d));
+    return Promise.all(data.map((d) => this.toResponseHocVien(d)));
   }
 
   async chiTietCuaToi(
@@ -215,7 +227,7 @@ export class YeuCauHoTroService {
     const [data, total] = await Promise.all([
       this.prisma.yeu_cau_ho_tro.findMany({
         where,
-        include: includeXuLy(),
+        include: INCLUDE_XU_LY,
         orderBy: { thoi_gian_tao: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -231,7 +243,7 @@ export class YeuCauHoTroService {
   async chiTietQuanTri(id: string) {
     const yeuCau = await this.prisma.yeu_cau_ho_tro.findUnique({
       where: { id },
-      include: includeXuLy(),
+      include: INCLUDE_XU_LY,
     });
     if (!yeuCau)
       throw new NotFoundAppException('Không tìm thấy yêu cầu hỗ trợ');
@@ -290,17 +302,15 @@ export class YeuCauHoTroService {
   async danhSachHoTro(nguoiDungId: string, query: QueryYeuCauHoTroHoTroDto) {
     const page = query.page ?? 1;
     const pageSize = query.page_size ?? 20;
-    const cumIds = await this.layScope().cumLoc(nguoiDungId, query.cum_id);
-    if (cumIds.length === 0) return paginate([], 0, page, pageSize);
-    const where: Prisma.yeu_cau_ho_troWhereInput = {
-      hoc_vien: this.layScope().whereHocVienTrongCum(cumIds),
-    };
+    const phamVi = await this.whereTicketHoTro(nguoiDungId, query);
+    if (!phamVi) return paginate([], 0, page, pageSize);
+    const where: Prisma.yeu_cau_ho_troWhereInput = { ...phamVi };
     if (query.trang_thai) where.trang_thai = query.trang_thai;
 
     const [data, total] = await Promise.all([
       this.prisma.yeu_cau_ho_tro.findMany({
         where,
-        include: includeXuLy(cumIds),
+        include: INCLUDE_XU_LY,
         // Hàng chờ: cũ nhất trước; lịch sử: mới nhất trước.
         orderBy: {
           thoi_gian_tao: query.trang_thai === 'cho_xu_ly' ? 'asc' : 'desc',
@@ -311,7 +321,10 @@ export class YeuCauHoTroService {
       this.prisma.yeu_cau_ho_tro.count({ where }),
     ]);
     return paginate(
-      await Promise.all(data.map((d) => this.voiHoiLai(d))),
+      await this.voiLopHoTro(
+        nguoiDungId,
+        await Promise.all(data.map((d) => this.voiHoiLai(d))),
+      ),
       total,
       page,
       pageSize,
@@ -319,22 +332,19 @@ export class YeuCauHoTroService {
   }
 
   async demHoTro(nguoiDungId: string): Promise<{ cho_xu_ly: number }> {
-    const cumIds = await this.layScope().cumIdsCuaToi(nguoiDungId);
-    if (cumIds.length === 0) return { cho_xu_ly: 0 };
+    const phamVi = await this.whereTicketHoTro(nguoiDungId, {});
+    if (!phamVi) return { cho_xu_ly: 0 };
     const cho_xu_ly = await this.prisma.yeu_cau_ho_tro.count({
-      where: {
-        trang_thai: 'cho_xu_ly',
-        hoc_vien: this.layScope().whereHocVienTrongCum(cumIds),
-      },
+      where: { ...phamVi, trang_thai: 'cho_xu_ly' },
     });
     return { cho_xu_ly };
   }
 
   async chiTietHoTro(nguoiDungId: string, id: string) {
-    const cumIds = await this.damBaoTicketTrongPhamVi(nguoiDungId, id);
+    await this.damBaoTicketTrongPhamVi(nguoiDungId, id);
     const yeuCau = await this.prisma.yeu_cau_ho_tro.findUniqueOrThrow({
       where: { id },
-      include: includeXuLy(cumIds),
+      include: INCLUDE_XU_LY,
     });
     const truoc = await this.prisma.yeu_cau_ho_tro.findMany({
       where: { hoc_vien_id: yeuCau.hoc_vien_id, id: { not: id } },
@@ -342,8 +352,11 @@ export class YeuCauHoTroService {
       orderBy: { thoi_gian_tao: 'desc' },
       take: 10,
     });
+    const [chiTiet] = await this.voiLopHoTro(nguoiDungId, [
+      await this.voiHoiLai(yeuCau),
+    ]);
     return {
-      ...(await this.voiHoiLai(yeuCau)),
+      ...chiTiet,
       ticket_truoc: truoc.map((t) => {
         const r = this.toResponse(t);
         return {
@@ -406,25 +419,60 @@ export class YeuCauHoTroService {
     return this.toResponse(updated);
   }
 
-  /** 404 nếu ticket không tồn tại hoặc học viên của ticket ngoài cụm của người hỗ trợ. Trả cụm của tôi. */
+  /**
+   * ADR 0011 P2: ticket tới người hỗ trợ = học viên có đăng ký trong phạm vi
+   * cụm ∪ lớp (HoTroHocVienScopeService). `cum_id` phải là cụm của tôi,
+   * `lop_id` phải là lớp được gắn cho tôi (ngoài phạm vi → 404); có cả hai
+   * thì cùng 1 đăng ký phải khớp cả hai. null = không thấy ticket nào.
+   */
+  private async whereTicketHoTro(
+    nguoiDungId: string,
+    loc: { cum_id?: string; lop_id?: string },
+  ): Promise<Prisma.yeu_cau_ho_troWhereInput | null> {
+    const scope = this.layScope();
+    const and: Prisma.dang_ky_hocWhereInput[] = [];
+    if (loc.cum_id) {
+      await scope.cumLoc(nguoiDungId, loc.cum_id);
+      and.push({ cum_id: loc.cum_id });
+    }
+    if (loc.lop_id)
+      and.push(await scope.whereDangKyCuaLop(nguoiDungId, loc.lop_id));
+    const dk =
+      and.length > 0
+        ? { AND: and }
+        : await scope.whereDangKyTrongPhamVi(nguoiDungId);
+    return dk ? { hoc_vien: { dang_ky_hoc: { some: dk } } } : null;
+  }
+
+  /** 404 nếu ticket không tồn tại hoặc học viên của ticket ngoài phạm vi cụm ∪ lớp. */
   private async damBaoTicketTrongPhamVi(
     nguoiDungId: string,
     id: string,
-  ): Promise<string[]> {
-    const yeuCau = await this.prisma.yeu_cau_ho_tro.findUnique({
-      where: { id },
-      select: { hoc_vien_id: true },
-    });
-    const cumIds = await this.layScope().cumIdsCuaToi(nguoiDungId);
-    const trongPhamVi =
-      !!yeuCau &&
-      cumIds.length > 0 &&
-      (await this.prisma.dang_ky_hoc.count({
-        where: { hoc_vien_id: yeuCau.hoc_vien_id, cum_id: { in: cumIds } },
+  ): Promise<void> {
+    const phamVi = await this.whereTicketHoTro(nguoiDungId, {});
+    const co =
+      !!phamVi &&
+      (await this.prisma.yeu_cau_ho_tro.count({
+        where: { AND: [{ id }, phamVi] },
       })) > 0;
-    if (!trongPhamVi)
-      throw new NotFoundAppException('Không tìm thấy yêu cầu hỗ trợ');
-    return cumIds;
+    if (!co) throw new NotFoundAppException('Không tìm thấy yêu cầu hỗ trợ');
+  }
+
+  /** Gắn `lop_ho_tro` = các lớp của tôi mà học viên thuộc (phân lớp hoặc đổi buổi vào). */
+  private async voiLopHoTro(
+    nguoiDungId: string,
+    ds: YeuCauHoTroQuanTriResponse[],
+  ): Promise<YeuCauHoTroHoTroResponse[]> {
+    const scope = this.layScope();
+    const lopIds = await scope.lopIdsCuaToi(nguoiDungId);
+    const lopTheoHv = await scope.lopCuaHocVien(
+      lopIds,
+      ds.map((d) => d.hoc_vien_id),
+    );
+    return ds.map((d) => ({
+      ...d,
+      lop_ho_tro: lopTheoHv.get(d.hoc_vien_id) ?? [],
+    }));
   }
 
   private layScope(): HoTroHocVienScopeService {
@@ -478,12 +526,15 @@ export class YeuCauHoTroService {
     };
   }
 
-  // ADR 0003 H14: người hỗ trợ trả lời → ký tên cụm của học viên (ưu tiên cụm
-  // người đó phụ trách, khóa mới nhất); Quản trị → Ban tổ chức. Không trả id
-  // người trả lời/người sửa cho học viên.
-  private toResponseHocVien(
+  // ADR 0003 H14 + ADR 0011 P3: người hỗ trợ trả lời → (1) tên cụm của học
+  // viên mà người đó phụ trách (khóa mới nhất); (2) không giữ cụm nào của học
+  // viên nhưng được gắn lớp học viên thuộc (phân lớp hoặc đổi buổi còn hiệu
+  // lực vào) → "Hỗ trợ lớp X", X = lớp ở giai đoạn mới nhất (lopCuaHocVien);
+  // (3) còn lại → cụm đầu tiên của học viên / Ban tổ chức. Quản trị → Ban tổ
+  // chức. Không trả id người trả lời/người sửa cho học viên.
+  private async toResponseHocVien(
     row: YeuCauHoTroHocVienRow,
-  ): YeuCauHoTroHocVienResponse {
+  ): Promise<YeuCauHoTroHocVienResponse> {
     const { tra_loi_boi_user, hoc_vien, ...yeuCau } = row;
     const rest: Partial<YeuCauHoTroResponse> = this.toResponse(yeuCau);
     delete rest.tra_loi_boi;
@@ -494,8 +545,17 @@ export class YeuCauHoTroService {
         tra_loi_boi_user.phan_cong_ho_tro.map((p) => p.cum_id),
       );
       const cums = hoc_vien.dang_ky_hoc.flatMap((d) => (d.cum ? [d.cum] : []));
+      const cumChung = cums.find((c) => cumNguoiTraLoi.has(c.id));
+      const lopChung = cumChung
+        ? undefined
+        : await this.lopChungVoiNguoiTraLoi(
+            tra_loi_boi_user.phan_cong_ho_tro_lop.map((p) => p.lop_id),
+            yeuCau.hoc_vien_id,
+          );
       kyTen =
-        (cums.find((c) => cumNguoiTraLoi.has(c.id)) ?? cums[0])?.ten_cum ??
+        cumChung?.ten_cum ??
+        (lopChung ? kyTenLop(lopChung.ten_lop) : undefined) ??
+        cums[0]?.ten_cum ??
         KY_TEN_BAN_TO_CHUC;
     } else if (tra_loi_boi_user) {
       kyTen = KY_TEN_BAN_TO_CHUC;
@@ -504,6 +564,15 @@ export class YeuCauHoTroService {
       ...rest,
       nguoi_tra_loi_hien_thi: kyTen,
     } as YeuCauHoTroHocVienResponse;
+  }
+
+  private async lopChungVoiNguoiTraLoi(
+    lopIds: string[],
+    hocVienId: string,
+  ): Promise<LopHoTroRef | undefined> {
+    if (!this.scope || lopIds.length === 0) return undefined;
+    const m = await this.scope.lopCuaHocVien(lopIds, [hocVienId]);
+    return m.get(hocVienId)?.[0];
   }
 
   private tinhDaDongHieuLuc(

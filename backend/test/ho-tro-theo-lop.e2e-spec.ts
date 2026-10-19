@@ -380,14 +380,14 @@ describe('Người hỗ trợ học viên theo lớp (e2e, ADR 0008)', () => {
     expect(sua.status).toBe(200);
   });
 
-  it('học viên lớp không được gắn, hoặc chỉ đổi buổi vào lớp -> 404', async () => {
+  it('học viên lớp không được gắn -> 404; đổi buổi đã duyệt vào lớp -> trong phạm vi (ADR 0011 P1)', async () => {
     expect(
       (await get(`/ho-tro-hoc-vien/hoc-vien/${hv.hai}`, hoTroLop.token)).status,
     ).toBe(404);
     expect(
       (await get(`/ho-tro-hoc-vien/hoc-vien/${hv.doiBuoi}`, hoTroLop.token))
         .status,
-    ).toBe(404);
+    ).toBe(200);
   });
 
   it('ho_tro_giang_vien không gọi được /ho-tro-hoc-vien/lop-cua-toi (403)', async () => {
@@ -405,6 +405,10 @@ describe('Người hỗ trợ học viên theo lớp (e2e, ADR 0008)', () => {
     ).toEqual([]);
     expect(
       (await get(`/ho-tro-hoc-vien/hoc-vien/${hv.mot}`, hoTroLop.token)).status,
+    ).toBe(404);
+    expect(
+      (await get(`/ho-tro-hoc-vien/hoc-vien/${hv.doiBuoi}`, hoTroLop.token))
+        .status,
     ).toBe(404);
     // Người hỗ trợ cụm X vẫn thấy học viên một (cụm không đổi).
     expect(

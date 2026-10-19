@@ -22,9 +22,10 @@ import {
   useChiTietYeuCauHoTroCuaCum,
   useCumCuaToi,
   useLamMoiYeuCauHoTroCuaCum,
+  useLopCuaToi,
   useYeuCauHoTroCuaCum,
 } from '@/api/hoTro';
-import type { TrangThaiYeuCauHoTro, YeuCauHoTroQuanTri } from '@/api/types';
+import type { TrangThaiYeuCauHoTro, YeuCauHoTroHoTro } from '@/api/types';
 import { KhungTraLoiTicket } from '@/components/KhungTraLoiTicket';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
@@ -69,7 +70,7 @@ function TicketTruoc({ id }: { id: string }) {
   );
 }
 
-function TheTicket({ yc, dangMo, onMo, onDong }: { yc: YeuCauHoTroQuanTri; dangMo: boolean; onMo: () => void; onDong: () => void }) {
+function TheTicket({ yc, dangMo, onMo, onDong }: { yc: YeuCauHoTroHoTro; dangMo: boolean; onMo: () => void; onDong: () => void }) {
   const lamMoi = useLamMoiYeuCauHoTroCuaCum();
   return (
     <Paper withBorder radius={12} p="sm">
@@ -80,8 +81,14 @@ function TheTicket({ yc, dangMo, onMo, onDong }: { yc: YeuCauHoTroQuanTri; dangM
               {yc.hoc_vien_ho_ten}
             </Anchor>
             <Text size="xs" c="dimmed">
-              {yc.ten_cum.join(', ')} · {dinhDangNgayGio(yc.thoi_gian_tao)}
+              {[...yc.ten_cum, dinhDangNgayGio(yc.thoi_gian_tao)].join(' · ')}
             </Text>
+            {/* ADR 0011 P2: lớp của tôi mà học viên thuộc (phân lớp hoặc đổi buổi vào). */}
+            {yc.lop_ho_tro.map((l) => (
+              <Badge key={l.id} color="teal" variant="light" size="sm">
+                Lớp {l.ten_lop}
+              </Badge>
+            ))}
           </Group>
           <Group gap={4}>
             {yc.hoi_lai && <Badge color="red">Hỏi lại</Badge>}
@@ -138,26 +145,32 @@ function TheTicket({ yc, dangMo, onMo, onDong }: { yc: YeuCauHoTroQuanTri; dangM
   );
 }
 
-/** Yêu cầu hỗ trợ của học viên trong cụm (ADR 0003 H10–H13). Hàng chờ "Chờ xử lý" xếp cũ nhất trước. */
+/**
+ * Yêu cầu hỗ trợ của học viên trong cụm ∪ lớp của tôi (ADR 0003 H10–H13, ADR 0011 P2). Hàng chờ "Chờ xử lý"
+ * xếp cũ nhất trước. Lọc cụm / lớp nằm trên URL.
+ */
 export default function HoTroYeuCauHoTro() {
   const [searchParams, setSearchParams] = useSearchParams();
   const cumId = searchParams.get('cum_id') ?? '';
+  const lopId = searchParams.get('lop_id') ?? '';
   const [boLoc, setBoLoc] = useState<BoLoc>('cho_xu_ly');
   const [page, setPage] = useState(1);
   const [dangMoId, setDangMoId] = useState<string | null>(null);
   const cums = useCumCuaToi();
+  const lops = useLopCuaToi();
   const { data, isLoading, isError, error } = useYeuCauHoTroCuaCum({
     trang_thai: boLoc === 'tat_ca' ? undefined : boLoc,
     cum_id: cumId || undefined,
+    lop_id: lopId || undefined,
     page,
     page_size: PAGE_SIZE,
   });
   const tongSoTrang = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
-  function doiCum(v: string | null) {
+  function doiLoc(khoa: 'cum_id' | 'lop_id', v: string | null) {
     const next = new URLSearchParams(searchParams);
-    if (v) next.set('cum_id', v);
-    else next.delete('cum_id');
+    if (v) next.set(khoa, v);
+    else next.delete(khoa);
     setSearchParams(next, { replace: true });
     setPage(1);
   }
@@ -184,10 +197,26 @@ export default function HoTroYeuCauHoTro() {
               ...(cums.data ?? []).map((c) => ({ value: c.cum_id, label: `${c.ten_cum} · ${c.ma_khoa}` })),
             ]}
             value={cumId}
-            onChange={doiCum}
+            onChange={(v) => doiLoc('cum_id', v)}
             allowDeselect={false}
             w={{ base: '100%', sm: 240 }}
           />
+          {(lops.data?.length ?? 0) > 0 && (
+            <Select
+              aria-label="Lớp hỗ trợ"
+              data={[
+                { value: '', label: 'Tất cả lớp của tôi' },
+                ...(lops.data ?? []).map((l) => ({
+                  value: l.lop_id,
+                  label: `${l.ten_lop} · ${l.khoa.ma_khoa}`,
+                })),
+              ]}
+              value={lopId}
+              onChange={(v) => doiLoc('lop_id', v)}
+              allowDeselect={false}
+              w={{ base: '100%', sm: 240 }}
+            />
+          )}
         </Group>
         {isLoading && <Skeleton height={120} />}
         {isError && <Alert color="red">{thongDiepLoiChung(error)}</Alert>}

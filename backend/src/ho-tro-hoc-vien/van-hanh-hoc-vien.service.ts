@@ -25,8 +25,9 @@ export class VanHanhHocVienService {
   ) {}
 
   /**
-   * Đăng ký học của học viên thuộc phạm vi của tôi (cụm ∪ lớp gốc được gắn —
-   * ADR 0008 L3), khớp điều kiện thêm.
+   * Đăng ký học của học viên thuộc phạm vi của tôi (cụm ∪ lớp được gắn —
+   * ADR 0008 L3, gồm đổi buổi còn hiệu lực vào lớp — ADR 0011 P1), khớp điều
+   * kiện thêm.
    */
   private async dangKyTrongCum(
     nguoiDungId: string,

@@ -107,6 +107,61 @@ describe('Người hỗ trợ — Yêu cầu hỗ trợ của cụm', () => {
   });
 });
 
+describe('Người hỗ trợ — Yêu cầu hỗ trợ theo lớp (ADR 0011)', () => {
+  function render(initialEntries = ['/ho-tro/yeu-cau-ho-tro']) {
+    datToken('token-gia-lap');
+    db.nguoiDung.vai_tro = 'ho_tro_hoc_vien';
+    return renderVoiRouter([{ path: '/ho-tro/yeu-cau-ho-tro', element: <HoTroYeuCauHoTro /> }], { initialEntries });
+  }
+
+  it('ô "Lớp hỗ trợ" liệt kê lớp của tôi; chọn lớp -> lop_id lên URL và gửi kèm request', async () => {
+    db.danhSachYeuCauHoTro = [ticket()];
+    const queries: URLSearchParams[] = [];
+    server.events.on('request:start', ({ request }) => {
+      const url = new URL(request.url);
+      if (url.pathname === '/ho-tro-hoc-vien/yeu-cau-ho-tro') queries.push(url.searchParams);
+    });
+    const { router } = render();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('textbox', { name: 'Lớp hỗ trợ' }));
+    await user.click(await screen.findByRole('option', { name: 'Zoom 01 · KBD-AG-01' }));
+    await waitFor(() => expect(router.state.location.search).toContain('lop_id=lop-zoom-1'));
+    await waitFor(() => expect(queries[queries.length - 1]?.get('lop_id')).toBe('lop-zoom-1'));
+    server.events.removeAllListeners();
+  });
+
+  it('không được gắn lớp nào -> không có ô "Lớp hỗ trợ"', async () => {
+    db.danhSachYeuCauHoTro = [ticket()];
+    db.hoTroLop = [];
+    render();
+    await screen.findByRole('link', { name: 'Học viên mẫu' });
+    expect(screen.queryByRole('textbox', { name: 'Lớp hỗ trợ' })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Cụm' })).toBeInTheDocument();
+  });
+
+  it('thẻ ticket có nhãn lớp của tôi; học viên chưa có cụm chỉ hiện thời gian', async () => {
+    db.danhSachYeuCauHoTro = [
+      { ...ticket(), ten_cum: [], lop_ho_tro: [{ id: 'lop-zoom-1', ten_lop: 'Zoom 01' }] } as YeuCauHoTro,
+    ];
+    render();
+    const link = await screen.findByRole('link', { name: 'Học viên mẫu' });
+    const the = link.closest('.mantine-Paper-root') as HTMLElement;
+    expect(within(the).getByText('Lớp Zoom 01')).toBeInTheDocument();
+    expect(within(the).getByText('06/10/2026 08:00')).toBeInTheDocument();
+  });
+
+  it('học viên thấy câu trả lời ký "Hỗ trợ lớp X"', async () => {
+    datToken('token-gia-lap');
+    db.danhSachYeuCauHoTro = [
+      ticket({ trang_thai: 'da_phan_hoi', noi_dung_tra_loi: 'Đã ghi nhận', nguoi_tra_loi_hien_thi: 'Hỗ trợ lớp Zoom 01' }),
+    ];
+    renderVoiRouter([{ path: '/toi/yeu-cau-ho-tro', element: <YeuCauHoTroPage /> }], {
+      initialEntries: ['/toi/yeu-cau-ho-tro'],
+    });
+    expect(await screen.findByText('Trả lời · Hỗ trợ lớp Zoom 01:')).toBeInTheDocument();
+  });
+});
+
 describe('Quản trị — Yêu cầu hỗ trợ (ADR 0003)', () => {
   function render() {
     datToken('token-gia-lap');

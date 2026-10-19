@@ -28,6 +28,7 @@ import {
   type BuoiDiHoc,
   type CheDoDiHoc,
   type ChiTietDiHoc,
+  type KhoaLocDiHoc,
   type LocTinhHinhDiHoc,
   type TrangThaiDiemDanh,
   useChiTietDiHoc,
@@ -36,6 +37,7 @@ import {
   useTinhHinhDiHoc,
   xuatTinhHinhDiHoc,
 } from '@/api/tinhHinhDiHoc';
+import { useCumCuaToi, useLopCuaToi } from '@/api/hoTro';
 import { SelectDonViTimKiem } from '@/components/SelectDonViTimKiem';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { chuanHoaNfc } from '@/lib/nfc';
@@ -55,6 +57,7 @@ const NHAN_TRANG_THAI: Record<TrangThaiDiemDanh, string> = {
 // Bộ lọc nằm trên URL (giữ khi tải lại / gửi link). q gõ tự do nên debounce trước khi ghi URL.
 const KHOA_URL = [
   'khoa_id',
+  'pham_vi',
   'q',
   'don_vi_cong_tac_id',
   'cum_id',
@@ -82,6 +85,26 @@ export default function HoTroTinhHinhDiHoc({ cheDo = 'ho_tro' }: { cheDo?: CheDo
 
   const khoa = useKhoaDiHoc(cheDo);
   const khoaChon = khoa.data?.find((k) => k.khoa_id === khoaId);
+  // ADR 0011 P4: chỉ người hỗ trợ — lọc phạm vi cụm / lớp của tôi, lớp của tôi lên đầu ô Lớp.
+  const laHoTro = cheDo === 'ho_tro';
+  const cumCuaToi = useCumCuaToi(laHoTro);
+  const lopCuaToi = useLopCuaToi(laHoTro);
+  const phamVi = laHoTro ? lay('pham_vi') || 'tat_ca' : 'tat_ca';
+  const tuyChonPhamVi = [
+    { value: 'tat_ca', label: 'Tất cả' },
+    ...((cumCuaToi.data?.length ?? 0) > 0 ? [{ value: 'cum', label: 'Cụm của tôi' }] : []),
+    ...((lopCuaToi.data?.length ?? 0) > 0 ? [{ value: 'lop', label: 'Lớp tôi hỗ trợ' }] : []),
+  ];
+  const lopIdsCuaToi = new Set((lopCuaToi.data ?? []).map((l) => l.lop_id));
+  const tuyChonLop = (ds: KhoaLocDiHoc['lop']) =>
+    ds.map((l) => ({ value: l.id, label: `${NHAN_LOAI_LOP[l.loai_lop]} · ${l.ten_lop}` }));
+  const dsLop = khoaChon?.lop ?? [];
+  const nhomLop = laHoTro
+    ? [
+        { group: 'Lớp tôi hỗ trợ', items: tuyChonLop(dsLop.filter((l) => lopIdsCuaToi.has(l.id))) },
+        { group: 'Lớp khác', items: tuyChonLop(dsLop.filter((l) => !lopIdsCuaToi.has(l.id))) },
+      ].filter((n) => n.items.length > 0)
+    : tuyChonLop(dsLop);
 
   function datLoc(thayDoi: Partial<Record<(typeof KHOA_URL)[number], string>>, giuTrang = false) {
     setSearchParams(
@@ -116,6 +139,7 @@ export default function HoTroTinhHinhDiHoc({ cheDo = 'ho_tro' }: { cheDo?: CheDo
       khoaId
         ? {
             khoa_id: khoaId,
+            pham_vi: phamVi === 'tat_ca' ? undefined : (phamVi as LocTinhHinhDiHoc['pham_vi']),
             q: searchParams.get('q') || undefined,
             don_vi_cong_tac_id: searchParams.get('don_vi_cong_tac_id') || undefined,
             cum_id: searchParams.get('cum_id') || undefined,
@@ -126,7 +150,7 @@ export default function HoTroTinhHinhDiHoc({ cheDo = 'ho_tro' }: { cheDo?: CheDo
             page_size: KICH_THUOC_TRANG,
           }
         : null,
-    [khoaId, searchParams, page],
+    [khoaId, searchParams, page, phamVi],
   );
   const { data, isLoading, isError, error, isFetching } = useTinhHinhDiHoc(cheDo, params);
 
@@ -165,6 +189,16 @@ export default function HoTroTinhHinhDiHoc({ cheDo = 'ho_tro' }: { cheDo?: CheDo
           </Alert>
         )}
 
+        {laHoTro && tuyChonPhamVi.length > 1 && (
+          <SegmentedControl
+            aria-label="Phạm vi"
+            value={phamVi}
+            onChange={(v) => datLoc({ pham_vi: v === 'tat_ca' ? '' : v })}
+            data={tuyChonPhamVi}
+            style={{ alignSelf: 'flex-start' }}
+          />
+        )}
+
         <Group gap="sm" wrap="wrap" align="flex-end">
           <Select
             aria-label="Khóa"
@@ -201,10 +235,7 @@ export default function HoTroTinhHinhDiHoc({ cheDo = 'ho_tro' }: { cheDo?: CheDo
           <Select
             aria-label="Lớp"
             placeholder="Tất cả lớp"
-            data={(khoaChon?.lop ?? []).map((l) => ({
-              value: l.id,
-              label: `${NHAN_LOAI_LOP[l.loai_lop]} · ${l.ten_lop}`,
-            }))}
+            data={nhomLop}
             value={lay('lop_id') || null}
             onChange={(v) => datLoc({ lop_id: v ?? '' })}
             clearable

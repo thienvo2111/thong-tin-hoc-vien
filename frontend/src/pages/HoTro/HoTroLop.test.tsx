@@ -147,7 +147,7 @@ describe('Người hỗ trợ — Danh sách lớp theo buổi', () => {
     expect(screen.getByRole('option', { name: BUOI_2 })).toBeInTheDocument();
   });
 
-  it('người đổi vào: badge "Đổi vào", ghi chú lớp nguồn, không có link chi tiết; người thường có link', async () => {
+  it('người đổi vào: badge "Đổi vào", ghi chú lớp nguồn, có link chi tiết (ADR 0011 P1); người thường có link', async () => {
     await moBuoi(BUOI_1);
     expect(await screen.findByText('Đặng Văn Vào')).toBeInTheDocument();
     expect(screen.getByText('1 đổi vào')).toBeInTheDocument();
@@ -156,7 +156,10 @@ describe('Người hỗ trợ — Danh sách lớp theo buổi', () => {
     const dongVao = dongChua(within(bangChinh).getByText('Đặng Văn Vào'));
     expect(within(dongVao).getByText('Đổi vào')).toBeInTheDocument();
     expect(within(dongVao).getByText('Đổi buổi – từ lớp Zoom 02')).toBeInTheDocument();
-    expect(within(dongVao).queryByRole('link')).not.toBeInTheDocument();
+    expect(within(dongVao).getByRole('link', { name: 'Đặng Văn Vào' })).toHaveAttribute(
+      'href',
+      '/ho-tro/hoc-vien/hv-doi-vao',
+    );
     expect(within(bangChinh).getByRole('link', { name: 'Lê Thị Zoom' })).toHaveAttribute(
       'href',
       '/ho-tro/hoc-vien/hv-lop-1',

@@ -394,8 +394,10 @@ export class HoTroHocVienService {
   }
 
   // ---------------------------------------------------------------------
-  // ADR 0008 — người hỗ trợ theo LỚP (lớp gốc qua phan_lop_giai_doan; đổi
-  // buổi không tính). Lớp không được gắn → 404.
+  // ADR 0008 — người hỗ trợ theo LỚP. Danh sách "Cả lớp" = lớp gốc qua
+  // phan_lop_giai_doan (đổi buổi không tính); danh sách buổi = phân lớp − đổi
+  // ra + đổi vào (L7). Phạm vi tra cứu/sửa gồm cả người đổi vào (ADR 0011 P1).
+  // Lớp không được gắn → 404.
   // ---------------------------------------------------------------------
 
   async lopCuaToi(nguoiDungId: string) {

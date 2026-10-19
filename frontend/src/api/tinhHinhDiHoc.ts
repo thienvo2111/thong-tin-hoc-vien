@@ -3,7 +3,7 @@ import { apiFetch, apiFetchBlob } from './client';
 import type { LoaiLop, MaDiemDanhBuoi, NguonTinhDiemDanh, PaginatedResult } from './types';
 
 // ADR 0010 — Tình hình đi học + điểm danh bổ sung. Cùng API cho người hỗ trợ học viên
-// (/ho-tro-hoc-vien/di-hoc, phạm vi cụm ∪ lớp gốc) và Quản trị (/thong-ke/di-hoc, mọi học viên).
+// (/ho-tro-hoc-vien/di-hoc, phạm vi cụm ∪ lớp — ADR 0011) và Quản trị (/thong-ke/di-hoc, mọi học viên).
 
 export type CheDoDiHoc = 'ho_tro' | 'admin';
 
@@ -16,6 +16,8 @@ export type TrangThaiDiemDanh = 'co_mat' | 'vang' | 'vang_co_phep';
 
 export interface LocTinhHinhDiHoc {
   khoa_id: string;
+  /** ADR 0011 P4: chỉ người hỗ trợ — thu hẹp về cụm / lớp của tôi (mặc định tat_ca = cụm ∪ lớp). */
+  pham_vi?: 'tat_ca' | 'cum' | 'lop';
   q?: string;
   don_vi_cong_tac_id?: string;
   cum_id?: string;

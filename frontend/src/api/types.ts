@@ -762,7 +762,10 @@ export interface YeuCauHoTro {
   thoi_gian_dong: string | null;
   /** ADR 0003 H12: Quản trị đã đính chính câu trả lời lúc này (null = chưa sửa). */
   thoi_gian_sua_tra_loi: string | null;
-  /** Chỉ phía học viên (H14): "Cụm hỗ trợ N" hoặc "Ban tổ chức (HCMUE)"; null = chưa trả lời. */
+  /**
+   * Chỉ phía học viên (H14, ADR 0011 P3): "Cụm hỗ trợ N", "Hỗ trợ lớp X" hoặc "Ban tổ chức (HCMUE)";
+   * null = chưa trả lời.
+   */
   nguoi_tra_loi_hien_thi?: string | null;
 }
 
@@ -770,12 +773,17 @@ export interface YeuCauHoTroQuanTri extends YeuCauHoTro {
   hoi_lai: boolean;
   hoc_vien_ho_ten: string;
   nguoi_tra_loi_ten: string | null;
-  /** Cụm của học viên (phía người hỗ trợ: chỉ cụm trong phạm vi). Rỗng = chưa có cụm. */
+  /** Mọi cụm của học viên. Rỗng = chưa có cụm. */
   ten_cum: string[];
   da_sua_boi_quan_tri: boolean;
 }
 
-export interface YeuCauHoTroChiTietHoTro extends YeuCauHoTroQuanTri {
+/** Phía người hỗ trợ học viên (ADR 0011 P2): thêm các lớp CỦA TÔI mà học viên thuộc (phân lớp/đổi buổi vào). */
+export interface YeuCauHoTroHoTro extends YeuCauHoTroQuanTri {
+  lop_ho_tro: { id: string; ten_lop: string }[];
+}
+
+export interface YeuCauHoTroChiTietHoTro extends YeuCauHoTroHoTro {
   ticket_truoc: Pick<
     YeuCauHoTro,
     'id' | 'chu_de' | 'noi_dung_hoi' | 'noi_dung_tra_loi' | 'trang_thai' | 'danh_gia' | 'thoi_gian_tao'
