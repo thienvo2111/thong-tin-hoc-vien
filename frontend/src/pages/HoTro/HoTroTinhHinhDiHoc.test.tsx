@@ -48,7 +48,7 @@ describe('Tình hình đi học — người hỗ trợ', () => {
     }
     const dong = dongChua(within(bang).getByRole('button', { name: 'Nguyễn Văn An' }));
     expect(within(dong).getByText('01000')).toBeInTheDocument();
-    expect(within(dong).getByText('0/2')).toBeInTheDocument();
+    expect(within(dong).getByText('1/3')).toBeInTheDocument();
     expect(within(dong).getByText('GĐ1: Zoom 01')).toBeInTheDocument();
     expect(screen.getByText('25 học viên')).toBeInTheDocument();
     expect(router.state.location.search).toContain('khoa_id=khoa-1');
@@ -123,6 +123,20 @@ describe('Tình hình đi học — người hỗ trợ', () => {
     const tuongLai = within(dialog).getByTestId('buoi-l-3');
     expect(within(tuongLai).getByText('Chưa đến giờ')).toBeInTheDocument();
     expect(within(tuongLai).queryByRole('button', { name: 'Điểm danh bổ sung' })).not.toBeInTheDocument();
+  });
+
+  it('ADR 0010 T7: buổi có mặt nhờ học bù -> nhãn kèm lớp, badge "Lớp khác", lý do thay nút bổ sung', async () => {
+    render(['/ho-tro/di-hoc?khoa_id=khoa-1']);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Nguyễn Văn An' }));
+    const hocBu = await within(await screen.findByRole('dialog')).findByTestId('buoi-l-4');
+    const nhan = within(hocBu).getByText('Có mặt – ở lớp Trực tiếp 05');
+    expect(nhan.closest('.mantine-Badge-root')?.getAttribute('style') ?? '').toContain('green');
+    expect(within(hocBu).getByText('Lớp khác')).toBeInTheDocument();
+    expect(within(hocBu).getByText('Đã có mặt ở lớp Trực tiếp 05 (học bù/lớp cũ)')).toBeInTheDocument();
+    expect(within(hocBu).queryByRole('button', { name: 'Điểm danh bổ sung' })).not.toBeInTheDocument();
+    // Buổi của lớp mình không có badge "Lớp khác".
+    expect(within(screen.getByTestId('buoi-l-1')).queryByText('Lớp khác')).not.toBeInTheDocument();
   });
 
   it('modal bổ sung: chỉ Có mặt / Vắng có phép, bắt buộc lý do, gửi PUT rồi tải lại', async () => {

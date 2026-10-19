@@ -248,16 +248,20 @@ describe('Người hỗ trợ — mã MOET, điểm danh, chuyên cần', () => 
     expect(within(dongRa).queryByText(/Có mặt|Vắng|Chưa điểm danh/)).not.toBeInTheDocument();
   });
 
-  it('buổi 2: Vắng (đỏ) và Chưa điểm danh (xám)', async () => {
+  it('buổi 2: Vắng (đỏ), Chưa điểm danh (xám), có mặt nhờ học bù ở lớp khác (xanh + "Lớp khác")', async () => {
     render(['/ho-tro/lop/lop-zoom-1']);
     const user = userEvent.setup();
     await user.click(await screen.findByRole('tab', { name: 'Theo buổi' }));
     await user.click(await screen.findByRole('textbox', { name: 'Buổi học' }));
     await user.click(await screen.findByRole('option', { name: 'GĐ1 – Buổi 2 · 27/10 19:00 · 2 HV' }));
     expect(
-      await screen.findByText('Có mặt 0 · Vắng 1 · Có phép 0 · Báo vắng 0 · Chưa điểm danh 1'),
+      await screen.findByText('Có mặt 1 · Vắng 1 · Có phép 0 · Báo vắng 0 · Chưa điểm danh 1'),
     ).toBeInTheDocument();
     expect(mauBadge(screen.getByText('Vắng'))).toBe('red');
     expect(mauBadge(screen.getByText('Chưa điểm danh'))).toBe('gray');
+    const dongHocBu = dongChua(screen.getByText('Lý Thị Bù'));
+    expect(mauBadge(within(dongHocBu).getByText('Có mặt – ở lớp Trực tiếp 05'))).toBe('green');
+    expect(within(dongHocBu).getByText('Lớp khác')).toBeInTheDocument();
+    expect(screen.getAllByText('Lớp khác')).toHaveLength(1);
   });
 });

@@ -16,6 +16,8 @@ const CO_MAT: DiemDanhDong = {
   ma: 'co_mat',
   nhan: 'Có mặt – tự điểm danh 08:05',
   tu_diem_danh_luc: '2026-10-20T01:05:00.000Z',
+  nguon_tinh: 'lop_hien_tai',
+  lop_tinh: { id: 'lop-1', ten_lop: 'Zoom 01' },
 };
 const dong = (
   ho_ten: string,
@@ -66,6 +68,8 @@ const sheet = (over: Partial<SheetBuoi> = {}): SheetBuoi => ({
       ma: 'vang',
       nhan: 'Vắng',
       tu_diem_danh_luc: null,
+      nguon_tinh: 'lop_hien_tai',
+      lop_tinh: { id: 'lop-1', ten_lop: 'Zoom 01' },
     }),
   ],
   doi_ra: [],
@@ -124,6 +128,29 @@ describe('buildDanhSachBuoiWorkbook', () => {
       'Vắng',
       '',
       'Đổi buổi – từ lớp Zoom 02',
+    ]);
+  });
+
+  it('ADR 0010 T7: có mặt nhờ lớp khác -> cột Điểm danh ghi nhãn kèm lớp', async () => {
+    const wb = await doc(
+      await buildDanhSachBuoiWorkbook([
+        sheet({
+          hoc_vien: [
+            dong('Chi', null, {
+              ma: 'co_mat',
+              nhan: 'Có mặt – ở lớp Trực tiếp 05',
+              tu_diem_danh_luc: null,
+              nguon_tinh: 'lop_khac',
+              lop_tinh: { id: 'lop-5', ten_lop: 'Trực tiếp 05' },
+            }),
+          ],
+        }),
+      ]),
+    );
+    expect(hang(wb.worksheets[0], 5).slice(-3)).toEqual([
+      'Có mặt – ở lớp Trực tiếp 05',
+      '',
+      '',
     ]);
   });
 

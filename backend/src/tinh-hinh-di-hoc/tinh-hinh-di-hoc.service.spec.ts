@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { TinhHinhDiHocService } from './tinh-hinh-di-hoc.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
@@ -65,6 +66,75 @@ const AN = dangKy('dk-an', 'Nguyễn An', [
 ]);
 const BINH = dangKy('dk-binh', 'Trần Bình', [pl('g1', 1, 'lop-a', 'Lớp A')]);
 
+// ADR 0010 T7: buổi của lớp khác cùng (giai đoạn, buổi số) — học bù.
+// lop-t trực tiếp, lop-z Zoom; c2 = buổi chốt đổi buổi của An.
+const LICH_KHAC = [
+  lich('c2', 'lop-c', 'g1', 2, '04'),
+  lich('t2', 'lop-t', 'g1', 2, '02'),
+  lich('z2', 'lop-z', 'g1', 2, '02'),
+];
+const TAT_CA_LICH = new Map([...LICH, ...LICH_KHAC].map((l) => [l.id, l]));
+const LOP: Record<string, { loai_lop: string; ten_lop: string }> = {
+  'lop-a': { loai_lop: 'zoom', ten_lop: 'Lớp A' },
+  'lop-b': { loai_lop: 'zoom', ten_lop: 'Lớp B' },
+  'lop-c': { loai_lop: 'zoom', ten_lop: 'Lớp C' },
+  'lop-t': { loai_lop: 'truc_tiep', ten_lop: 'Lớp T' },
+  'lop-z': { loai_lop: 'zoom', ten_lop: 'Lớp Z' },
+};
+const PHAN_LOP = [AN, BINH].flatMap((dk) =>
+  dk.phan_lop_giai_doan.map((p) => ({
+    dang_ky_hoc_id: dk.id,
+    giai_doan_id: p.giai_doan_id,
+    lop_id: p.lop_id,
+  })),
+);
+const idsTrongWhere = (where: { dang_ky_hoc_id: string | { in: string[] } }) =>
+  typeof where.dang_ky_hoc_id === 'string'
+    ? [where.dang_ky_hoc_id]
+    : where.dang_ky_hoc_id.in;
+
+interface DongDiemDanhMock {
+  dang_ky_hoc_id: string;
+  lich_hoc_id: string;
+  trang_thai: 'co_mat' | 'vang' | 'vang_co_phep';
+  nguon: string;
+  ghi_chu?: string;
+  cap_nhat_luc?: Date;
+  sua_boi?: { ho_ten: string };
+}
+const DONG_GOC: DongDiemDanhMock[] = [
+  {
+    dang_ky_hoc_id: 'dk-an',
+    lich_hoc_id: 'a1',
+    trang_thai: 'co_mat',
+    nguon: 'zoom',
+  },
+  {
+    dang_ky_hoc_id: 'dk-an',
+    lich_hoc_id: 'a2',
+    trang_thai: 'vang',
+    nguon: 'zoom',
+  },
+  {
+    dang_ky_hoc_id: 'dk-an',
+    lich_hoc_id: 'c2',
+    trang_thai: 'co_mat',
+    nguon: 'thu_cong',
+    ghi_chu: 'Học bù',
+    cap_nhat_luc: d('06'),
+    sua_boi: { ho_ten: 'Hỗ trợ 1' },
+  },
+  {
+    dang_ky_hoc_id: 'dk-an',
+    lich_hoc_id: 'b1',
+    trang_thai: 'vang',
+    nguon: 'zoom',
+  },
+];
+// Dòng thêm theo từng test (học bù) + chế độ chuyên cần của khóa.
+let them: DongDiemDanhMock[] = [];
+let cheDo: 'theo_lop_hien_tai' | 'cong_nhan_lop_cu' = 'theo_lop_hien_tai';
+
 describe('TinhHinhDiHocService', () => {
   let prisma: {
     dang_ky_hoc: {
@@ -87,18 +157,19 @@ describe('TinhHinhDiHocService', () => {
   const hoTro = { id: 'ht-1', vai_tro: 'ho_tro_hoc_vien' as const };
 
   beforeEach(() => {
+    them = [];
+    cheDo = 'theo_lop_hien_tai';
     prisma = {
       dang_ky_hoc: {
         // Trả ngược thứ tự để kiểm tra service tự xếp theo họ tên.
         findMany: jest.fn().mockResolvedValue([BINH, AN]),
         findFirst: jest.fn().mockResolvedValue(AN),
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({
-            khoa: { id: 'k1', ma_khoa: 'K1', ten_khoa: 'Khóa 1' },
-          }),
+        findUnique: jest.fn().mockResolvedValue({
+          khoa: { id: 'k1', ma_khoa: 'K1', ten_khoa: 'Khóa 1' },
+        }),
       },
       lich_hoc_lop: { findMany: jest.fn().mockResolvedValue(LICH) },
+      // Dòng tại buổi hiệu dụng (chi tiết): theo 1 đăng ký.
       diem_danh: {
         findMany: jest
           .fn()
@@ -108,45 +179,11 @@ describe('TinhHinhDiHocService', () => {
             }: {
               where: { dang_ky_hoc_id: string | { in: string[] } };
             }) => {
-              const rows = [
-                {
-                  dang_ky_hoc_id: 'dk-an',
-                  lich_hoc_id: 'a1',
-                  trang_thai: 'co_mat',
-                  nguon: 'zoom',
-                  tu_diem_danh_luc: null,
-                },
-                {
-                  dang_ky_hoc_id: 'dk-an',
-                  lich_hoc_id: 'a2',
-                  trang_thai: 'vang',
-                  nguon: 'zoom',
-                  tu_diem_danh_luc: null,
-                },
-                {
-                  dang_ky_hoc_id: 'dk-an',
-                  lich_hoc_id: 'c2',
-                  trang_thai: 'co_mat',
-                  nguon: 'thu_cong',
-                  tu_diem_danh_luc: null,
-                  ghi_chu: 'Học bù',
-                  cap_nhat_luc: d('06'),
-                  sua_boi: { ho_ten: 'Hỗ trợ 1' },
-                },
-                {
-                  dang_ky_hoc_id: 'dk-an',
-                  lich_hoc_id: 'b1',
-                  trang_thai: 'vang',
-                  nguon: 'zoom',
-                  tu_diem_danh_luc: null,
-                },
-              ];
-              const ids =
-                typeof where.dang_ky_hoc_id === 'string'
-                  ? [where.dang_ky_hoc_id]
-                  : where.dang_ky_hoc_id.in;
+              const ids = idsTrongWhere(where);
               return Promise.resolve(
-                rows.filter((r) => ids.includes(r.dang_ky_hoc_id)),
+                [...DONG_GOC, ...them].filter((r) =>
+                  ids.includes(r.dang_ky_hoc_id),
+                ),
               );
             },
           ),
@@ -164,7 +201,35 @@ describe('TinhHinhDiHocService', () => {
           .fn()
           .mockResolvedValue({ ma_khoa: 'K1', ten_khoa: 'Khóa 1' }),
       },
-      $queryRaw: jest.fn().mockResolvedValue([]),
+      // napChuyenCan: điểm danh mọi lớp (kèm buổi, lớp, chế độ khóa) / phân
+      // lớp theo mảng đăng ký; tìm kiếm họ tên: rỗng.
+      $queryRaw: jest.fn((sql: Prisma.Sql) => {
+        const ids = sql.values[0] as string[];
+        if (sql.sql.includes('FROM diem_danh')) {
+          return Promise.resolve(
+            [...DONG_GOC, ...them]
+              .filter((r) => ids.includes(r.dang_ky_hoc_id))
+              .map((r) => {
+                const l = TAT_CA_LICH.get(r.lich_hoc_id)!;
+                return {
+                  tu_diem_danh_luc: null,
+                  ...r,
+                  lop_id: l.lop_id,
+                  giai_doan_id: l.giai_doan_id,
+                  buoi_so: l.buoi_so,
+                  ...LOP[l.lop_id],
+                  che_do_chuyen_can: cheDo,
+                };
+              }),
+          );
+        }
+        if (sql.sql.includes('FROM phan_lop_giai_doan')) {
+          return Promise.resolve(
+            PHAN_LOP.filter((p) => ids.includes(p.dang_ky_hoc_id)),
+          );
+        }
+        return Promise.resolve([]);
+      }),
     };
     doiBuoi = {
       doiBuoiDaDuyetCuaDangKy: jest
@@ -172,21 +237,17 @@ describe('TinhHinhDiHocService', () => {
         .mockResolvedValue([
           { dang_ky_hoc_id: 'dk-an', lich_nguon_id: 'a2', lich_chot_id: 'c2' },
         ]),
-      lichTomTat: jest.fn().mockResolvedValue(
-        new Map([
-          [
-            'c2',
-            {
-              id: 'c2',
-              lop_id: 'lop-c',
-              giai_doan_id: 'g1',
-              buoi_so: 2,
-              thoi_gian_bat_dau: d('04'),
-              thoi_gian_ket_thuc: d('04'),
-              lop: { ten_lop: 'Lớp C' },
-            },
-          ],
-        ]),
+      lichTomTat: jest.fn().mockImplementation((ids: string[]) =>
+        Promise.resolve(
+          new Map(
+            ids
+              .filter((id) => TAT_CA_LICH.has(id))
+              .map((id) => {
+                const l = TAT_CA_LICH.get(id)!;
+                return [id, { ...l, lop: { ten_lop: LOP[l.lop_id].ten_lop } }];
+              }),
+          ),
+        ),
       ),
     };
     diemDanh = {
@@ -235,9 +296,11 @@ describe('TinhHinhDiHocService', () => {
       'Lớp A',
       'Lớp B',
     ]);
-    // Nạp theo lô: 1 truy vấn buổi, 1 truy vấn điểm danh cho cả trang.
+    // Truy vấn tập hợp: 1 truy vấn buổi; điểm danh + phân lớp mỗi thứ 1 truy
+    // vấn SQL cho cả trang (napChuyenCan).
     expect(prisma.lich_hoc_lop.findMany).toHaveBeenCalledTimes(1);
-    expect(prisma.diem_danh.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.diem_danh.findMany).not.toHaveBeenCalled();
   });
 
   it('lọc co_vang / chua_diem_danh theo số đếm, total sau khi lọc', async () => {
@@ -327,6 +390,124 @@ describe('TinhHinhDiHocService', () => {
     expect(ct.buoi[2].ly_do_khong).toBe('Buổi học chưa diễn ra');
     expect(ct.tong).toMatchObject({ da_dien_ra: 3, co_mat: 2, vang: 1 });
     expect(ct.trang_thai_duoc).toEqual(['co_mat', 'vang_co_phep']);
+  });
+
+  // ADR 0010 T7: Bình học bù buổi 2 (GĐ1) ở lớp khác cùng (giai đoạn, buổi số).
+  describe('học bù / lớp khác (tinhChuyenCan)', () => {
+    const hocBu = (
+      lich_hoc_id: string,
+      trang_thai: 'co_mat' | 'vang' = 'co_mat',
+    ) =>
+      them.push({
+        dang_ky_hoc_id: 'dk-binh',
+        lich_hoc_id,
+        trang_thai,
+        nguon: 'thu_cong',
+      });
+
+    it('học bù ở lớp trực tiếp -> tổng có mặt + hết "chưa điểm danh"; lọc chua_diem_danh bỏ Bình', async () => {
+      hocBu('t2');
+      const kq = await service.danhSach({}, loc(), NOW);
+      expect(kq.data[1].tong).toEqual({
+        da_dien_ra: 2,
+        co_mat: 1,
+        vang: 0,
+        vang_co_phep: 0,
+        da_bao_vang: 1,
+        chua_diem_danh: 0,
+      });
+      expect(
+        (await service.danhSach({}, loc({ chua_diem_danh: true }), NOW)).total,
+      ).toBe(0);
+    });
+
+    it('chi tiết: nhãn + nguồn + lớp tính; hỗ trợ không bổ sung được, Quản trị vẫn được', async () => {
+      hocBu('t2');
+      prisma.dang_ky_hoc.findFirst.mockResolvedValue(BINH);
+      const ct = await service.chiTiet({}, 'dk-binh', hoTro, NOW);
+      const a2 = ct.buoi.find((b) => b.lich_hoc_id === 'a2')!;
+      expect(a2.diem_danh).toMatchObject({
+        ma: 'co_mat',
+        nhan: 'Có mặt – ở lớp Lớp T',
+        nguon_tinh: 'lop_khac',
+        lop_tinh: { id: 'lop-t', ten_lop: 'Lớp T' },
+        // Dòng tại buổi hiệu dụng (nơi bổ sung ghi vào) vẫn trống.
+        trang_thai: null,
+      });
+      expect(a2.bo_sung_duoc).toBe(false);
+      expect(a2.ly_do_khong).toBe('Đã có mặt ở lớp Lớp T (học bù/lớp cũ)');
+      const a1 = ct.buoi.find((b) => b.lich_hoc_id === 'a1')!;
+      expect(a1.diem_danh).toMatchObject({
+        ma: 'da_bao_vang',
+        nguon_tinh: null,
+        lop_tinh: null,
+      });
+      expect(a1.bo_sung_duoc).toBe(true);
+
+      const qt = await service.chiTiet(
+        {},
+        'dk-binh',
+        { vai_tro: 'quan_tri' },
+        NOW,
+      );
+      const qtA2 = qt.buoi.find((b) => b.lich_hoc_id === 'a2')!;
+      expect(qtA2.bo_sung_duoc).toBe(true);
+      expect(qtA2.diem_danh.nguon_tinh).toBe('lop_khac');
+    });
+
+    it('PUT bổ sung buổi đã có mặt nhờ lớp khác: hỗ trợ -> 400, Quản trị -> ghi được', async () => {
+      hocBu('t2');
+      prisma.dang_ky_hoc.findFirst.mockResolvedValue(BINH);
+      const put = (user: {
+        id: string;
+        vai_tro: 'ho_tro_hoc_vien' | 'quan_tri';
+      }) =>
+        service.diemDanhBoSung(
+          {},
+          'dk-binh',
+          user,
+          { lich_hoc_id: 'a2', trang_thai: 'co_mat', ly_do: 'x' },
+          NOW,
+        );
+      await expect(put(hoTro)).rejects.toMatchObject({
+        response: {
+          error: expect.objectContaining({
+            message: 'Đã có mặt ở lớp Lớp T (học bù/lớp cũ)',
+          }),
+        },
+      });
+      expect(diemDanh.ghiThuCong).not.toHaveBeenCalled();
+      await put({ id: 'qt', vai_tro: 'quan_tri' });
+      expect(diemDanh.ghiThuCong).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ lich_hoc_id: 'a2' }),
+        NOW,
+      );
+    });
+
+    it('vắng ở lớp khác không chặn bổ sung, nhãn "Vắng"', async () => {
+      hocBu('t2', 'vang');
+      prisma.dang_ky_hoc.findFirst.mockResolvedValue(BINH);
+      const ct = await service.chiTiet({}, 'dk-binh', hoTro, NOW);
+      const a2 = ct.buoi.find((b) => b.lich_hoc_id === 'a2')!;
+      expect(a2.diem_danh).toMatchObject({
+        ma: 'vang',
+        nhan: 'Vắng',
+        nguon_tinh: 'lop_khac',
+      });
+      expect(a2.bo_sung_duoc).toBe(true);
+    });
+
+    it('học bù ở lớp Zoom: khóa theo lớp hiện tại -> không tính; công nhận lớp cũ -> tính', async () => {
+      hocBu('z2');
+      expect((await service.danhSach({}, loc(), NOW)).data[1].tong.co_mat).toBe(
+        0,
+      );
+      cheDo = 'cong_nhan_lop_cu';
+      expect((await service.danhSach({}, loc(), NOW)).data[1].tong.co_mat).toBe(
+        1,
+      );
+    });
   });
 
   it('chi tiết ngoài phạm vi -> 404', async () => {

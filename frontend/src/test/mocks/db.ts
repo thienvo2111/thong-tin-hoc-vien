@@ -911,7 +911,9 @@ export function taoHoTroDanhSachBuoiMau(): Record<string, DanhSachBuoiHoTro> {
   const { giai_doan: _gd, chuyen_can: _cc, ...goc } = taoHoTroDanhSachLopMau()[lop.lop_id].hoc_vien[0];
   void _gd;
   void _cc;
-  const chuaDiemDanh = { ma: 'chua_diem_danh' as const, nhan: 'Chưa điểm danh', tu_diem_danh_luc: null };
+  const chuaCo = { tu_diem_danh_luc: null, nguon_tinh: null, lop_tinh: null };
+  const lopNay = { nguon_tinh: 'lop_hien_tai' as const, lop_tinh: { id: lop.lop_id, ten_lop: lop.ten_lop } };
+  const chuaDiemDanh = { ma: 'chua_diem_danh' as const, nhan: 'Chưa điểm danh', ...chuaCo };
   const thuong = {
     ...goc,
     doi_buoi: null,
@@ -920,6 +922,7 @@ export function taoHoTroDanhSachBuoiMau(): Record<string, DanhSachBuoiHoTro> {
       ma: 'co_mat' as const,
       nhan: 'Có mặt – tự điểm danh 19:05',
       tu_diem_danh_luc: '2026-10-20T12:05:00.000Z',
+      ...lopNay,
     },
   };
   const tong = { co_mat: 0, vang: 0, vang_co_phep: 0, da_bao_vang: 0, chua_diem_danh: 0, chua_den_gio: 0 };
@@ -946,7 +949,7 @@ export function taoHoTroDanhSachBuoiMau(): Record<string, DanhSachBuoiHoTro> {
           ho_ten: 'Đặng Văn Vào',
           doi_buoi: 'vao',
           ghi_chu: 'Đổi buổi – từ lớp Zoom 02',
-          diem_danh: { ma: 'da_bao_vang', nhan: 'Đã báo vắng: Đi công tác', tu_diem_danh_luc: null },
+          diem_danh: { ma: 'da_bao_vang', nhan: 'Đã báo vắng: Đi công tác', ...chuaCo },
         },
         thuong,
       ],
@@ -954,10 +957,25 @@ export function taoHoTroDanhSachBuoiMau(): Record<string, DanhSachBuoiHoTro> {
     },
     [b2.lich_id]: {
       lop,
-      buoi: { ...b2, tong_diem_danh: { ...tong, vang: 1, chua_diem_danh: 1 } },
+      buoi: { ...b2, tong_diem_danh: { ...tong, co_mat: 1, vang: 1, chua_diem_danh: 1 } },
       hoc_vien: [
-        { ...thuong, diem_danh: { ma: 'vang', nhan: 'Vắng', tu_diem_danh_luc: null } },
+        { ...thuong, diem_danh: { ma: 'vang', nhan: 'Vắng', tu_diem_danh_luc: null, ...lopNay } },
         { ...ra, doi_buoi: null, ghi_chu: null, diem_danh: chuaDiemDanh },
+        // ADR 0010 T7: có mặt nhờ học bù ở lớp khác cùng (giai đoạn, buổi số).
+        {
+          ...khac,
+          hoc_vien_id: 'hv-hoc-bu',
+          ho_ten: 'Lý Thị Bù',
+          doi_buoi: null,
+          ghi_chu: null,
+          diem_danh: {
+            ma: 'co_mat',
+            nhan: 'Có mặt – ở lớp Trực tiếp 05',
+            tu_diem_danh_luc: null,
+            nguon_tinh: 'lop_khac',
+            lop_tinh: { id: 'lop-tt-5', ten_lop: 'Trực tiếp 05' },
+          },
+        },
       ],
       doi_ra: [],
     },

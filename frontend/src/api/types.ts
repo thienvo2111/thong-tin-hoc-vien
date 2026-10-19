@@ -995,10 +995,16 @@ export interface BuoiCuaLopHoTro {
 // ADR 0008 L8: điểm danh của 1 dòng tại buổi — nhãn tính ở backend (dùng chung với file Excel).
 export type MaDiemDanhBuoi = 'co_mat' | 'vang' | 'vang_co_phep' | 'da_bao_vang' | 'chua_den_gio' | 'chua_diem_danh';
 
+// ADR 0010 T7: lớp của dòng điểm danh được tính — lop_khac = học bù hoặc lớp cũ (tinhChuyenCan).
+export type NguonTinhDiemDanh = 'lop_hien_tai' | 'lop_khac';
+
 export interface DiemDanhBuoiHoTro {
   ma: MaDiemDanhBuoi;
   nhan: string;
   tu_diem_danh_luc: string | null;
+  /** null khi chưa có dòng điểm danh được tính. */
+  nguon_tinh: NguonTinhDiemDanh | null;
+  lop_tinh: { id: string; ten_lop: string } | null;
 }
 
 export type TongDiemDanhBuoi = Record<MaDiemDanhBuoi, number>;

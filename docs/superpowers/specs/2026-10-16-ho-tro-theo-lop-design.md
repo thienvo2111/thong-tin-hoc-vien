@@ -86,14 +86,16 @@ Quản trị:
 
 ## 6c. Điểm danh & chuyên cần (L8, 2026-10-17)
 
-- `diem_danh` mỗi dòng DS buổi = `{ ma, nhan, tu_diem_danh_luc }`, đọc tại chính buổi theo `dang_ky_hoc_id` của dòng (đổi vào: đăng ký của họ):
-  - có `diem_danh`: `co_mat` → "Có mặt – tự điểm danh HH:mm" (giờ VN) nếu có `tu_diem_danh_luc`, ngược lại "Có mặt (Zoom|Ký tên|QR|Thủ công)"; `vang` → "Vắng"; `vang_co_phep` → "Vắng có phép";
-  - không có nhưng có `bao_vang` (đăng ký, buổi) → `da_bao_vang` "Đã báo vắng: <lý do>";
+- `diem_danh` mỗi dòng DS buổi = `{ ma, nhan, tu_diem_danh_luc, nguon_tinh, lop_tinh }` theo `dang_ky_hoc_id` của dòng (đổi vào: đăng ký của họ). **Sửa 2026-10-19 (ADR 0010 T7):** trạng thái = kết quả `tinhChuyenCan` (ADR 0005 Z8, như dashboard) cho `(giai_doan, buoi_so)` của buổi, trên mọi dòng `diem_danh` của đăng ký (mọi lớp; đổi buổi tính ở buổi chốt; học bù ở lớp trực tiếp khác luôn tính, ở lớp Zoom khác / lớp cũ chỉ khi khóa `cong_nhan_lop_cu`; trạng thái tốt nhất thắng, hòa → lớp hiện tại):
+  - có kết quả từ lớp hiện tại (`nguon_tinh = 'lop_hien_tai'`): `co_mat` → "Có mặt – tự điểm danh HH:mm" (giờ VN) nếu có `tu_diem_danh_luc`, ngược lại "Có mặt (Zoom|Ký tên|QR|Thủ công)"; `vang` → "Vắng"; `vang_co_phep` → "Vắng có phép";
+  - có kết quả từ lớp khác (`nguon_tinh = 'lop_khac'` — học bù hoặc lớp cũ, không tách được vì không lưu lịch sử phân lớp): "Có mặt – ở lớp X", "Vắng có phép – ở lớp X", "Vắng";
+  - `lop_tinh = { id, ten_lop }` = lớp thật của dòng được dùng (`null` khi chưa có);
+  - không có kết quả nhưng có `bao_vang` (đăng ký, buổi) → `da_bao_vang` "Đã báo vắng: <lý do>";
   - không có gì: buổi chưa bắt đầu → `chua_den_gio` "Chưa đến giờ", đã bắt đầu → `chua_diem_danh` "Chưa điểm danh".
-- Đổi ra: `diem_danh = null`. `buoi.tong_diem_danh = { co_mat, vang, vang_co_phep, da_bao_vang, chua_diem_danh, chua_den_gio }` trên DS buổi.
-- `chuyen_can` mỗi dòng DS lớp: với mỗi buổi L của lớp ở giai đoạn đăng ký được phân vào lớp này, E = buổi chốt nếu đổi buổi `da_duyet` còn hiệu lực ra khỏi L (`doiBuoiDaDuyetCuaDangKy`), ngược lại L. `da_dien_ra` += 1 khi E đã bắt đầu; `co_mat` += 1 khi điểm danh (đăng ký, E) = `co_mat`.
-- Khác `tinhChuyenCan` (dashboard, ADR 0005 Z8): không xét chế độ chuyên cần/điểm danh lớp cũ; mẫu số là buổi đã diễn ra.
-- Nạp theo lô (không N+1): buổi của lớp, đổi buổi hiệu lực, buổi chốt (`lichTomTat`), điểm danh `co_mat`; DS buổi: 1 truy vấn `diem_danh` + 1 `bao_vang` mỗi buổi.
+- Đổi ra: `diem_danh = null`. `buoi.tong_diem_danh = { co_mat, vang, vang_co_phep, da_bao_vang, chua_diem_danh, chua_den_gio }` trên DS buổi. File buổi: cột "Điểm danh" = `nhan` (kèm lớp khi học bù / lớp cũ).
+- `chuyen_can` mỗi dòng DS lớp: với mỗi buổi L của lớp ở giai đoạn đăng ký được phân vào lớp này, E = buổi chốt nếu đổi buổi `da_duyet` còn hiệu lực ra khỏi L (`doiBuoiDaDuyetCuaDangKy`), ngược lại L. `da_dien_ra` += 1 khi E đã bắt đầu; `co_mat` += 1 khi `tinhChuyenCan` của `(giai_doan, buoi_so)` của L = `co_mat`.
+- ~~Khác `tinhChuyenCan`~~ — từ 2026-10-19 không còn lệch dashboard; chỉ khác ở mẫu số (buổi đã diễn ra của lớp đang xem).
+- Truy vấn tập hợp (không N+1): buổi của lớp, đổi buổi hiệu lực, buổi chốt (`lichTomTat`); `napChuyenCan` (`backend/src/doi-buoi-hoc/nap-chuyen-can.ts`) = 1 SQL điểm danh mọi lớp + 1 SQL phân lớp cho mọi đăng ký; DS buổi thêm 1 truy vấn `bao_vang` mỗi buổi.
 
 ## 7. Giao diện
 

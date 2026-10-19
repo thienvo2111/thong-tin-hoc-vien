@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, apiFetchBlob } from './client';
-import type { LoaiLop, MaDiemDanhBuoi, PaginatedResult } from './types';
+import type { LoaiLop, MaDiemDanhBuoi, NguonTinhDiemDanh, PaginatedResult } from './types';
 
 // ADR 0010 — Tình hình đi học + điểm danh bổ sung. Cùng API cho người hỗ trợ học viên
 // (/ho-tro-hoc-vien/di-hoc, phạm vi cụm ∪ lớp gốc) và Quản trị (/thong-ke/di-hoc, mọi học viên).
@@ -74,6 +74,9 @@ export interface BuoiDiHoc {
   diem_danh: {
     ma: MaDiemDanhBuoi;
     nhan: string;
+    /** ADR 0010 T7: lớp của dòng được tính (học bù / lớp cũ = lop_khac); null khi chưa có. */
+    nguon_tinh: NguonTinhDiemDanh | null;
+    lop_tinh: { id: string; ten_lop: string } | null;
     trang_thai: TrangThaiDiemDanh | null;
     nguon: string | null;
     ghi_chu: string | null;

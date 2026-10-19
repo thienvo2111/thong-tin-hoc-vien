@@ -35,6 +35,7 @@ describe('Tình hình đi học + điểm danh bổ sung (e2e, ADR 0010)', () =>
   const cum = { mot: '', hai: '' };
   const lich = { a1: '', a2: '', a3: '', b2: '', c1: '' };
   const dk = { an: '', binh: '', cuong: '', dung: '' };
+  const gd = { g1: '', g2: '' };
 
   const http = () => request(app.getHttpServer());
   const get = (path: string, tk = token.ht) =>
@@ -120,6 +121,8 @@ describe('Tình hình đi học + điểm danh bổ sung (e2e, ADR 0010)', () =>
       });
     const g1 = await taoGd(1);
     const g2 = await taoGd(2);
+    gd.g1 = g1.id;
+    gd.g2 = g2.id;
     const taoLop = async (t: string) =>
       (
         await prisma.lop_hoc.create({
@@ -575,6 +578,162 @@ describe('Tình hình đi học + điểm danh bổ sung (e2e, ADR 0010)', () =>
         token.qt,
       );
       expect(sai.status).toBe(400);
+    });
+  });
+
+  // ADR 0010 T7: trạng thái mỗi buổi = tinhChuyenCan (ADR 0005 Z8) — học bù
+  // ở lớp khác cùng (giai đoạn, buổi số) được tính như dashboard.
+  // Bình (G1→A) học bù buổi 1 ở lớp trực tiếp T; Cường (G1→B) có dòng có mặt
+  // ở lớp Zoom Z buổi 2 (chỉ tính khi khóa công nhận lớp cũ).
+  describe('học bù / lớp khác (T7)', () => {
+    const tt = { t1: '', z2: '' };
+    const lopT = { t: '', z: '' };
+    const ngay = (n: number) => new Date(Date.now() + n * 24 * 3600 * 1000);
+    const taoLopBuoi = async (
+      loai: 'truc_tiep' | 'zoom',
+      ten: string,
+      buoiSo: number,
+      n: number,
+    ) => {
+      const l = await prisma.lop_hoc.create({
+        data: { khoa_id: khoaId, loai_lop: loai, ten_lop: ten },
+      });
+      const b = await prisma.lich_hoc_lop.create({
+        data: {
+          lop_id: l.id,
+          giai_doan_id: gd.g1,
+          buoi_so: buoiSo,
+          thoi_gian_bat_dau: ngay(n),
+          thoi_gian_ket_thuc: new Date(ngay(n).getTime() + 3 * 3600000),
+        },
+      });
+      return [l.id, b.id];
+    };
+
+    beforeAll(async () => {
+      [lopT.t, tt.t1] = await taoLopBuoi('truc_tiep', 'Trực tiếp T', 1, -11);
+      [lopT.z, tt.z2] = await taoLopBuoi('zoom', 'Zoom Z', 2, -7);
+      await prisma.diem_danh.createMany({
+        data: [
+          {
+            dang_ky_hoc_id: dk.binh,
+            lich_hoc_id: tt.t1,
+            trang_thai: 'co_mat',
+            nguon: 'ky_ten',
+            ghi_chu: 'Học bù',
+          },
+          {
+            dang_ky_hoc_id: dk.cuong,
+            lich_hoc_id: tt.z2,
+            trang_thai: 'co_mat',
+            nguon: 'zoom',
+          },
+        ],
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.khoa_boi_duong.update({
+        where: { id: khoaId },
+        data: { che_do_chuyen_can: 'theo_lop_hien_tai' },
+      });
+    });
+
+    it('danh sách: tổng có mặt tính học bù ở lớp trực tiếp khác', async () => {
+      const binh = (await ds('')).data.find((x) => x.ho_ten === 'Trần Bình')!;
+      // a1 có mặt (học bù ở T), a2 chưa điểm danh.
+      expect(binh.tong).toEqual({
+        da_dien_ra: 2,
+        co_mat: 1,
+        vang: 0,
+        vang_co_phep: 0,
+        da_bao_vang: 0,
+        chua_diem_danh: 1,
+      });
+    });
+
+    it('chi tiết: nhãn kèm lớp, nguon_tinh lop_khac, lop_tinh; hỗ trợ không bổ sung được', async () => {
+      const res = await get(`/ho-tro-hoc-vien/di-hoc/${dk.binh}`);
+      expect(res.status).toBe(200);
+      const a1 = (
+        res.body.buoi as {
+          lich_hoc_id: string;
+          diem_danh: Record<string, unknown>;
+          bo_sung_duoc: boolean;
+          ly_do_khong: string | null;
+        }[]
+      ).find((b) => b.lich_hoc_id === lich.a1)!;
+      expect(a1.diem_danh).toMatchObject({
+        ma: 'co_mat',
+        nhan: 'Có mặt – ở lớp Trực tiếp T',
+        nguon_tinh: 'lop_khac',
+        lop_tinh: { id: lopT.t, ten_lop: 'Trực tiếp T' },
+        trang_thai: null,
+      });
+      expect(a1.bo_sung_duoc).toBe(false);
+      expect(a1.ly_do_khong).toBe(
+        'Đã có mặt ở lớp Trực tiếp T (học bù/lớp cũ)',
+      );
+      const qt = await get(`/thong-ke/di-hoc/${dk.binh}`, token.qt);
+      const qtA1 = (
+        qt.body.buoi as { lich_hoc_id: string; bo_sung_duoc: boolean }[]
+      ).find((b) => b.lich_hoc_id === lich.a1)!;
+      expect(qtA1.bo_sung_duoc).toBe(true);
+    });
+
+    it('PUT bổ sung buổi đã có mặt nhờ học bù: hỗ trợ -> 400, Quản trị -> 200 (ghi vào buổi hiệu dụng)', async () => {
+      const body = { lich_hoc_id: lich.a1, trang_thai: 'co_mat', ly_do: 'x' };
+      const ht = await put(
+        `/ho-tro-hoc-vien/di-hoc/${dk.binh}/diem-danh`,
+        body,
+      );
+      expect(ht.status).toBe(400);
+      expect(ht.body.error.message).toBe(
+        'Đã có mặt ở lớp Trực tiếp T (học bù/lớp cũ)',
+      );
+      const qt = await put(
+        `/thong-ke/di-hoc/${dk.binh}/diem-danh`,
+        body,
+        token.qt,
+      );
+      expect(qt.status).toBe(200);
+      expect(qt.body).toMatchObject({
+        lich_hoc_id: lich.a1,
+        trang_thai: 'co_mat',
+      });
+      // Hòa trạng thái -> dòng của lớp hiện tại được dùng.
+      const ct = await get(`/ho-tro-hoc-vien/di-hoc/${dk.binh}`);
+      const a1 = (
+        ct.body.buoi as {
+          lich_hoc_id: string;
+          diem_danh: Record<string, unknown>;
+        }[]
+      ).find((b) => b.lich_hoc_id === lich.a1)!;
+      expect(a1.diem_danh).toMatchObject({
+        nguon_tinh: 'lop_hien_tai',
+        lop_tinh: { id: lop.a },
+      });
+    });
+
+    it('có mặt ở lớp Zoom khác: khóa theo lớp hiện tại -> không tính; công nhận lớp cũ -> tính', async () => {
+      const cuong = async () =>
+        (await ds('')).data.find((x) => x.ho_ten === 'Lê Cường')!.tong;
+      expect((await cuong()).co_mat).toBe(0);
+      await prisma.khoa_boi_duong.update({
+        where: { id: khoaId },
+        data: { che_do_chuyen_can: 'cong_nhan_lop_cu' },
+      });
+      expect(await cuong()).toMatchObject({
+        da_dien_ra: 1,
+        co_mat: 1,
+        chua_diem_danh: 0,
+      });
+      const ct = await get(`/ho-tro-hoc-vien/di-hoc/${dk.cuong}`);
+      expect(ct.body.buoi[0].diem_danh).toMatchObject({
+        ma: 'co_mat',
+        nhan: 'Có mặt – ở lớp Zoom Z',
+        lop_tinh: { id: lopT.z },
+      });
     });
   });
 });

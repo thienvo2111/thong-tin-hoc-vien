@@ -32,6 +32,8 @@ import {
   tinhDiemDanhDong,
   tongDiemDanh,
 } from './diem-danh-lop-buoi.util';
+import { khoaBuoi } from '../common/utils/chuyen-can.util';
+import { napChuyenCan } from '../doi-buoi-hoc/nap-chuyen-can';
 
 const SO_NGAY_LICH_MAC_DINH = 14;
 
@@ -510,8 +512,10 @@ export class HoTroHocVienService {
 
   /**
    * ADR 0008 L8 — chuyên cần theo đăng ký trong lớp: buổi của lớp ở giai đoạn
-   * được phân vào lớp; đổi ra khỏi buổi thì tính buổi chốt (ADR 0007). Nạp
-   * theo lô: buổi của lớp, đổi buổi hiệu lực, buổi chốt, điểm danh có mặt.
+   * được phân vào lớp; đổi ra khỏi buổi thì "đã diễn ra" theo buổi chốt (ADR
+   * 0007); có mặt theo tinhChuyenCan (ADR 0010 T7 — gồm học bù / lớp cũ theo
+   * chế độ của khóa, như dashboard). Nạp theo lô: buổi của lớp, đổi buổi hiệu
+   * lực, buổi chốt, điểm danh mọi lớp của các đăng ký.
    */
   private async chuyenCanTrongLop(
     lopId: string,
@@ -520,28 +524,24 @@ export class HoTroHocVienService {
     const kq = new Map<string, { co_mat: number; da_dien_ra: number }>();
     if (dangKy.length === 0) return kq;
     const ids = dangKy.map((dk) => dk.id);
-    const [lich, doi] = await Promise.all([
+    const [lich, doi, chuyenCan] = await Promise.all([
       this.prisma.lich_hoc_lop.findMany({
         where: { lop_id: lopId },
-        select: { id: true, giai_doan_id: true, thoi_gian_bat_dau: true },
+        select: {
+          id: true,
+          giai_doan_id: true,
+          buoi_so: true,
+          thoi_gian_bat_dau: true,
+        },
       }),
       this.doiBuoiQuery.doiBuoiDaDuyetCuaDangKy(ids),
+      napChuyenCan(this.prisma, this.doiBuoiQuery, ids),
     ]);
     const lichCuaLop = new Set(lich.map((l) => l.id));
     const doiRa = doi.filter((d) => lichCuaLop.has(d.lich_nguon_id));
-    const [chot, coMat] = await Promise.all([
-      this.doiBuoiQuery.lichTomTat(doiRa.map((d) => d.lich_chot_id)),
-      this.prisma.diem_danh.findMany({
-        where: {
-          dang_ky_hoc_id: { in: ids },
-          lich_hoc_id: {
-            in: [...lichCuaLop, ...doiRa.map((d) => d.lich_chot_id)],
-          },
-          trang_thai: 'co_mat',
-        },
-        select: { dang_ky_hoc_id: true, lich_hoc_id: true },
-      }),
-    ]);
+    const chot = await this.doiBuoiQuery.lichTomTat(
+      doiRa.map((d) => d.lich_chot_id),
+    );
     const now = new Date();
     for (const dk of dangKy) {
       const chotCuaNguon = new Map<
@@ -564,11 +564,7 @@ export class HoTroHocVienService {
               .map((p) => p.giai_doan_id),
           ),
           chot_cua_nguon: chotCuaNguon,
-          co_mat: new Set(
-            coMat
-              .filter((d) => d.dang_ky_hoc_id === dk.id)
-              .map((d) => d.lich_hoc_id),
-          ),
+          ket_qua: chuyenCan.get(dk.id) ?? new Map(),
           now,
         }),
       );
@@ -788,38 +784,31 @@ export class HoTroHocVienService {
   }
 
   /**
-   * Điểm danh + báo vắng tại 1 buổi cho các đăng ký (2 truy vấn); trả hàm tính
-   * diem_danh của 1 dòng theo đăng ký khớp danh sách của dòng đó.
+   * Điểm danh tại 1 buổi cho các đăng ký: trạng thái theo tinhChuyenCan của
+   * (giai đoạn, buổi số) của buổi (ADR 0010 T7 — đổi buổi bắt buộc cùng giai
+   * đoạn + buổi số nên người đổi vào dùng cùng khóa), báo vắng tại buổi này.
+   * Trả hàm tính diem_danh của 1 dòng theo đăng ký khớp danh sách của dòng đó.
    */
   private async diemDanhTaiBuoi(b: BuoiCuaLop, dangKyIds: string[]) {
     const lichId = b.item.lich_id;
-    const where = { lich_hoc_id: lichId, dang_ky_hoc_id: { in: dangKyIds } };
-    const [diemDanh, baoVang] = dangKyIds.length
-      ? await Promise.all([
-          this.prisma.diem_danh.findMany({
-            where,
-            select: {
-              dang_ky_hoc_id: true,
-              trang_thai: true,
-              nguon: true,
-              tu_diem_danh_luc: true,
-            },
-          }),
-          this.prisma.bao_vang.findMany({
-            where,
+    const [chuyenCan, baoVang] = await Promise.all([
+      napChuyenCan(this.prisma, this.doiBuoiQuery, dangKyIds),
+      dangKyIds.length
+        ? this.prisma.bao_vang.findMany({
+            where: { lich_hoc_id: lichId, dang_ky_hoc_id: { in: dangKyIds } },
             select: { dang_ky_hoc_id: true, ly_do: true },
-          }),
-        ])
-      : [[], []];
-    const ddMap = new Map(diemDanh.map((d) => [d.dang_ky_hoc_id, d]));
+          })
+        : Promise.resolve([] as { dang_ky_hoc_id: string; ly_do: string }[]),
+    ]);
+    const k = khoaBuoi(b.giai_doan_id, b.item.buoi_so);
     const bvMap = new Map(baoVang.map((v) => [v.dang_ky_hoc_id, v]));
     const now = new Date();
     return (r: HocVienDong) => {
       const ids = r.dang_ky_hoc.map((dk) => dk.id);
-      const dd = ids.map((x) => ddMap.get(x)).find(Boolean);
+      const kq = ids.map((x) => chuyenCan.get(x)?.get(k)).find(Boolean);
       const bv = ids.map((x) => bvMap.get(x)).find(Boolean);
       return tinhDiemDanhDong({
-        diem_danh: dd ?? null,
+        ket_qua: kq ?? null,
         bao_vang: bv ?? null,
         bat_dau: b.item.thoi_gian_bat_dau,
         now,

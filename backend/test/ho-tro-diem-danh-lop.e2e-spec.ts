@@ -44,6 +44,7 @@ describe('Người hỗ trợ lớp — điểm danh theo buổi & chuyên cần
   };
   const batDau: Record<string, Date> = {};
   const dk = { an: '', binh: '', cuong: '', dung: '', em: '' };
+  let gdG1 = '';
   let tuDiemDanhAn: Date;
 
   const http = () => request(app.getHttpServer());
@@ -120,6 +121,7 @@ describe('Người hỗ trợ lớp — điểm danh theo buổi & chuyên cần
         },
       });
     const g1 = await taoGd(1);
+    gdG1 = g1.id;
     const g2 = await taoGd(2);
     const taoLop = async (ten: string) =>
       (
@@ -304,15 +306,21 @@ describe('Người hỗ trợ lớp — điểm danh theo buổi & chuyên cần
       'Trần Bình',
       'Võ Em',
     ]);
+    const lopA = {
+      nguon_tinh: 'lop_hien_tai',
+      lop_tinh: { id: lop.a, ten_lop: 'Zoom A' },
+    };
     expect(dd['Nguyễn An']).toEqual({
       ma: 'co_mat',
       nhan: `Có mặt – tự điểm danh ${gioVn(tuDiemDanhAn)}`,
       tu_diem_danh_luc: tuDiemDanhAn.toISOString(),
+      ...lopA,
     });
     expect(dd['Lê Cường']).toEqual({
       ma: 'co_mat',
       nhan: 'Có mặt (Zoom)',
       tu_diem_danh_luc: null,
+      ...lopA,
     });
     // Đổi vào: điểm danh theo đăng ký của chính Dũng tại A1.
     expect(dd['Phạm Dũng']).toEqual(
@@ -415,5 +423,78 @@ describe('Người hỗ trợ lớp — điểm danh theo buổi & chuyên cần
     expect(an[iDd]).toBe(`Có mặt – tự điểm danh ${gioVn(tuDiemDanhAn)}`);
     expect(an[iDd + 1]).toBe(ngayGioVn(tuDiemDanhAn));
     expect(hang(ws, 8)[iDd]).toBe('Đã báo vắng: Ốm');
+  });
+
+  // ADR 0010 T7: Em học bù buổi 1 (G1) ở lớp trực tiếp khác -> DS buổi A1 ghi
+  // nguồn, tổng có mặt + chuyên cần trên DS lớp tính như dashboard.
+  describe('học bù ở lớp khác (ADR 0010 T7)', () => {
+    let lopT = '';
+    beforeAll(async () => {
+      lopT = (
+        await prisma.lop_hoc.create({
+          data: {
+            khoa_id: khoaId,
+            loai_lop: 'truc_tiep',
+            ten_lop: 'Trực tiếp T',
+          },
+        })
+      ).id;
+      const t1 = await prisma.lich_hoc_lop.create({
+        data: {
+          lop_id: lopT,
+          giai_doan_id: gdG1,
+          buoi_so: 1,
+          thoi_gian_bat_dau: new Date(Date.now() - 5 * 24 * 3600 * 1000),
+          thoi_gian_ket_thuc: new Date(
+            Date.now() - 5 * 24 * 3600 * 1000 + 3 * 3600000,
+          ),
+        },
+      });
+      await prisma.diem_danh.create({
+        data: {
+          dang_ky_hoc_id: dk.em,
+          lich_hoc_id: t1.id,
+          trang_thai: 'co_mat',
+          nguon: 'ky_ten',
+        },
+      });
+    });
+
+    it('DS buổi A1: Em "Có mặt – ở lớp Trực tiếp T", nguon_tinh lop_khac; tổng có mặt tính cả', async () => {
+      const res = await get(
+        `/ho-tro-hoc-vien/lop/${lop.a}/buoi/${lich.a1}/hoc-vien`,
+      );
+      expect(theoTen(res.body.hoc_vien as Dong[])['Võ Em']).toEqual({
+        ma: 'co_mat',
+        nhan: 'Có mặt – ở lớp Trực tiếp T',
+        tu_diem_danh_luc: null,
+        nguon_tinh: 'lop_khac',
+        lop_tinh: { id: lopT, ten_lop: 'Trực tiếp T' },
+      });
+      expect(res.body.buoi.tong_diem_danh).toMatchObject({
+        co_mat: 4,
+        chua_diem_danh: 0,
+      });
+    });
+
+    it('DS lớp: chuyên cần Em tính buổi học bù (1/2)', async () => {
+      const res = await get(`/ho-tro-hoc-vien/lop/${lop.a}/hoc-vien`);
+      const em = (
+        res.body.hoc_vien as { ho_ten: string; chuyen_can: unknown }[]
+      ).find((h) => h.ho_ten === 'Võ Em');
+      expect(em?.chuyen_can).toEqual({ co_mat: 1, da_dien_ra: 2 });
+    });
+
+    it('file buổi A1: cột Điểm danh ghi nhãn kèm lớp học bù', async () => {
+      const res = await taiFile(
+        `/ho-tro-hoc-vien/lop/${lop.a}/buoi/xuat?lich_id=${lich.a1}`,
+      );
+      const ws = await docFile(res.body as Buffer);
+      const iDd = hang(ws, 4).indexOf('Điểm danh');
+      const em = Array.from({ length: ws.rowCount }, (_, i) =>
+        hang(ws, i + 1),
+      ).find((r) => r[1] === 'Võ Em');
+      expect(em?.[iDd]).toBe('Có mặt – ở lớp Trực tiếp T');
+    });
   });
 });

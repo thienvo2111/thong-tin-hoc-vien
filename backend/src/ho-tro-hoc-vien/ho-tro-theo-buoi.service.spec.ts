@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { HoTroHocVienService } from './ho-tro-hoc-vien.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { HoTroHocVienScopeService } from './ho-tro-hoc-vien-scope.service';
@@ -48,7 +49,6 @@ const hv = (ten: string) => ({
 interface WhereDd {
   lich_hoc_id?: string | { in: string[] };
   dang_ky_hoc_id: { in: string[] };
-  trang_thai?: string;
 }
 const khop = (w: WhereDd, r: { lich_hoc_id: string; dang_ky_hoc_id: string }) =>
   w.dang_ky_hoc_id.in.includes(r.dang_ky_hoc_id) &&
@@ -56,7 +56,86 @@ const khop = (w: WhereDd, r: { lich_hoc_id: string; dang_ky_hoc_id: string }) =>
     (typeof w.lich_hoc_id === 'string'
       ? w.lich_hoc_id === r.lich_hoc_id
       : w.lich_hoc_id.in.includes(r.lich_hoc_id)));
-const DIEM_DANH = [
+// Buổi (mọi lớp) để nạp quan hệ lich_hoc của dòng diem_danh và lichTomTat.
+// T5 = lớp trực tiếp khác (học bù) cùng giai đoạn G, buổi 1.
+const LICH_MOI_LOP: Record<
+  string,
+  {
+    lop_id: string;
+    ten_lop: string;
+    loai_lop: string;
+    buoi_so: number;
+    ngay: string;
+  }
+> = {
+  L1: {
+    lop_id: 'C',
+    ten_lop: 'Zoom 01',
+    loai_lop: 'zoom',
+    buoi_so: 1,
+    ngay: '2026-10-20',
+  },
+  L2: {
+    lop_id: 'C',
+    ten_lop: 'Zoom 01',
+    loai_lop: 'zoom',
+    buoi_so: 2,
+    ngay: '2026-10-27',
+  },
+  L9: {
+    lop_id: 'C2',
+    ten_lop: 'Zoom 02',
+    loai_lop: 'zoom',
+    buoi_so: 1,
+    ngay: '2026-10-19',
+  },
+  X9: {
+    lop_id: 'C3',
+    ten_lop: 'Zoom 03',
+    loai_lop: 'zoom',
+    buoi_so: 1,
+    ngay: '2026-10-21',
+  },
+  T5: {
+    lop_id: 'C5',
+    ten_lop: 'Trực tiếp 05',
+    loai_lop: 'truc_tiep',
+    buoi_so: 1,
+    ngay: '2026-10-18',
+  },
+};
+const lichTom = (id: string) => {
+  const l = LICH_MOI_LOP[id];
+  return {
+    id,
+    lop_id: l.lop_id,
+    giai_doan_id: 'G',
+    buoi_so: l.buoi_so,
+    thoi_gian_bat_dau: new Date(`${l.ngay}T01:00:00Z`),
+    lop: { ten_lop: l.ten_lop },
+  };
+};
+type DongDd = {
+  dang_ky_hoc_id: string;
+  lich_hoc_id: string;
+  trang_thai: string;
+  nguon: string;
+  tu_diem_danh_luc: Date | null;
+};
+// Dòng SQL của napChuyenCan: điểm danh kèm buổi, lớp, chế độ khóa.
+const dongSql = (d: DongDd) => {
+  const l = LICH_MOI_LOP[d.lich_hoc_id];
+  return {
+    ...d,
+    lop_id: l.lop_id,
+    giai_doan_id: 'G',
+    buoi_so: l.buoi_so,
+    loai_lop: l.loai_lop,
+    ten_lop: l.ten_lop,
+    che_do_chuyen_can: 'theo_lop_hien_tai',
+  };
+};
+const DIEM_DANH: DongDd[] = [
   {
     dang_ky_hoc_id: 'dk-An',
     lich_hoc_id: 'L1',
@@ -90,6 +169,7 @@ const PHAN_LOP = ['An', 'Cường', 'Bình'];
 const NGOAI = ['Dũng'];
 
 function taoService(
+  them: DongDd[] = [],
   dieuChinh = new Map([
     [
       'L1',
@@ -143,6 +223,22 @@ function taoService(
         },
       ]),
     },
+    // napChuyenCan: điểm danh mọi lớp / lớp hiện tại theo đăng ký (Dũng ở
+    // lớp Zoom 02).
+    $queryRaw: jest.fn((sql: Prisma.Sql) => {
+      const ids = sql.values[0] as string[];
+      return Promise.resolve(
+        sql.sql.includes('FROM diem_danh')
+          ? [...DIEM_DANH, ...them]
+              .filter((d) => ids.includes(d.dang_ky_hoc_id))
+              .map(dongSql)
+          : ids.map((id) => ({
+              dang_ky_hoc_id: id,
+              giai_doan_id: 'G',
+              lop_id: id === 'dk-Dũng' ? 'C2' : 'C',
+            })),
+      );
+    }),
     phan_lop_giai_doan: {
       groupBy: jest.fn(({ by }: { by: string[] }) =>
         Promise.resolve(
@@ -180,17 +276,6 @@ function taoService(
     },
   };
   Object.assign(prisma, {
-    diem_danh: {
-      findMany: jest.fn(({ where }: { where: WhereDd }) =>
-        Promise.resolve(
-          DIEM_DANH.filter(
-            (d) =>
-              khop(where, d) &&
-              (!where.trang_thai || d.trang_thai === where.trang_thai),
-          ),
-        ),
-      ),
-    },
     bao_vang: {
       findMany: jest.fn(({ where }: { where: WhereDd }) =>
         Promise.resolve(BAO_VANG.filter((v) => khop(where, v))),
@@ -201,20 +286,17 @@ function taoService(
   const nhatKy = { ghi: jest.fn().mockResolvedValue(undefined) };
   const doiBuoiQuery = {
     dieuChinhTheoBuoi: jest.fn().mockResolvedValue(dieuChinh),
-    // Cường đổi L1 -> X9; An có đổi buổi ở lớp khác (L9 -> X8) — bỏ qua.
+    // Cường đổi L1 -> X9; Dũng đổi L9 -> L1; An có đổi buổi ở lớp khác
+    // (L9 -> X8) — bỏ qua.
     doiBuoiDaDuyetCuaDangKy: jest.fn().mockResolvedValue([
       { dang_ky_hoc_id: 'dk-Cường', lich_nguon_id: 'L1', lich_chot_id: 'X9' },
+      { dang_ky_hoc_id: 'dk-Dũng', lich_nguon_id: 'L9', lich_chot_id: 'L1' },
       { dang_ky_hoc_id: 'dk-An', lich_nguon_id: 'L9', lich_chot_id: 'X8' },
     ]),
     lichTomTat: jest.fn((ids: string[]) =>
       Promise.resolve(
         new Map(
-          ids
-            .filter((id) => id === 'X9')
-            .map((id) => [
-              id,
-              { id, thoi_gian_bat_dau: new Date('2026-10-21T01:00:00Z') },
-            ]),
+          ids.filter((id) => id in LICH_MOI_LOP).map((id) => [id, lichTom(id)]),
         ),
       ),
     ),
@@ -373,16 +455,22 @@ describe('HoTroHocVienService — điểm danh theo buổi & chuyên cần (ADR 
       ma: 'co_mat',
       nhan: 'Có mặt – tự điểm danh 08:05',
       tu_diem_danh_luc: '2026-10-20T01:05:00.000Z',
+      nguon_tinh: 'lop_hien_tai',
+      lop_tinh: { id: 'C', ten_lop: 'Zoom 01' },
     });
     expect(theoTen['Bình']).toEqual({
       ma: 'da_bao_vang',
       nhan: 'Đã báo vắng: Ốm',
       tu_diem_danh_luc: null,
+      nguon_tinh: null,
+      lop_tinh: null,
     });
     expect(theoTen['Dũng']).toEqual({
       ma: 'co_mat',
       nhan: 'Có mặt (Thủ công)',
       tu_diem_danh_luc: null,
+      nguon_tinh: 'lop_hien_tai',
+      lop_tinh: { id: 'C', ten_lop: 'Zoom 01' },
     });
     expect(kq.hoc_vien[0].ma_dinh_danh_moet).toBe('00MOET-An');
     expect(kq.doi_ra[0]).toEqual(
@@ -412,7 +500,8 @@ describe('HoTroHocVienService — điểm danh theo buổi & chuyên cần (ADR 
   it('hocVienCuaLop: chuyen_can x/y — buổi tương lai không tính, đổi ra tính theo buổi chốt; có MOET', async () => {
     const { service, doiBuoiQuery } = taoService();
     const kq = await service.hocVienCuaLop('nd', 'C');
-    expect(doiBuoiQuery.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledTimes(1);
+    // Theo lô, không theo từng đăng ký: 1 lần cho buổi chốt + 1 lần trong napChuyenCan.
+    expect(doiBuoiQuery.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledTimes(2);
     expect(
       kq.hoc_vien.map((h) => [h.ho_ten, h.ma_dinh_danh_moet, h.chuyen_can]),
     ).toEqual([
@@ -420,5 +509,45 @@ describe('HoTroHocVienService — điểm danh theo buổi & chuyên cần (ADR 
       ['Bình', '00MOET-Bình', { co_mat: 0, da_dien_ra: 1 }],
       ['Cường', '00MOET-Cường', { co_mat: 1, da_dien_ra: 1 }],
     ]);
+  });
+
+  // ADR 0010 T7: Bình học bù buổi 1 (giai đoạn G) ở lớp trực tiếp khác.
+  const HOC_BU_BINH: DongDd = {
+    dang_ky_hoc_id: 'dk-Bình',
+    lich_hoc_id: 'T5',
+    trang_thai: 'co_mat',
+    nguon: 'ky_ten',
+    tu_diem_danh_luc: null,
+  };
+
+  it('học bù ở lớp khác cùng (giai đoạn, buổi số) -> DS buổi ghi "Có mặt – ở lớp …", tổng có mặt tính cả', async () => {
+    const { service } = taoService([HOC_BU_BINH]);
+    const kq = await service.hocVienCuaBuoi('nd', 'C', 'L1');
+    expect(kq.hoc_vien.find((h) => h.ho_ten === 'Bình')?.diem_danh).toEqual({
+      ma: 'co_mat',
+      nhan: 'Có mặt – ở lớp Trực tiếp 05',
+      tu_diem_danh_luc: null,
+      nguon_tinh: 'lop_khac',
+      lop_tinh: { id: 'C5', ten_lop: 'Trực tiếp 05' },
+    });
+    expect(kq.buoi.tong_diem_danh).toMatchObject({ co_mat: 3, da_bao_vang: 0 });
+  });
+
+  it('học bù ở lớp khác -> chuyen_can trên DS lớp tính có mặt (khớp dashboard)', async () => {
+    const { service } = taoService([HOC_BU_BINH]);
+    const kq = await service.hocVienCuaLop('nd', 'C');
+    expect(kq.hoc_vien.find((h) => h.ho_ten === 'Bình')?.chuyen_can).toEqual({
+      co_mat: 1,
+      da_dien_ra: 1,
+    });
+  });
+
+  it('học bù ở lớp Zoom khác, khóa theo lớp hiện tại -> không tính', async () => {
+    const { service } = taoService([{ ...HOC_BU_BINH, lich_hoc_id: 'X9' }]);
+    const kq = await service.hocVienCuaLop('nd', 'C');
+    expect(kq.hoc_vien.find((h) => h.ho_ten === 'Bình')?.chuyen_can).toEqual({
+      co_mat: 0,
+      da_dien_ra: 1,
+    });
   });
 });

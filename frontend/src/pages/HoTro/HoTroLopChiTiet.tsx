@@ -24,6 +24,7 @@ import type {
   HocVienCuaBuoi,
   HocVienCuaLop,
   MaDiemDanhBuoi,
+  NguonTinhDiemDanh,
   TongDiemDanhBuoi,
 } from '@/api/types';
 import { ApiError } from '@/api/client';
@@ -264,17 +265,30 @@ function moTaTongDiemDanh(t: TongDiemDanhBuoi): string {
   return `Có mặt ${t.co_mat} · Vắng ${t.vang} · Có phép ${t.vang_co_phep} · Báo vắng ${t.da_bao_vang} · Chưa điểm danh ${t.chua_diem_danh}`;
 }
 
+/** ADR 0010 T7: nhãn nhỏ khi buổi được tính nhờ dòng ở lớp khác (học bù / lớp cũ). */
+export function BadgeLopKhac({ nguonTinh }: { nguonTinh: NguonTinhDiemDanh | null }) {
+  if (nguonTinh !== 'lop_khac') return null;
+  return (
+    <Badge color="gray" variant="outline" size="xs" tt="none">
+      Lớp khác
+    </Badge>
+  );
+}
+
 function BadgeDiemDanh({ diemDanh }: { diemDanh: DiemDanhBuoiHoTro }) {
   return (
-    <Badge
-      color={MAU_DIEM_DANH[diemDanh.ma]}
-      variant="light"
-      size="sm"
-      tt="none"
-      style={{ whiteSpace: 'normal', height: 'auto' }}
-    >
-      {diemDanh.nhan}
-    </Badge>
+    <Group gap={4} wrap="nowrap">
+      <Badge
+        color={MAU_DIEM_DANH[diemDanh.ma]}
+        variant="light"
+        size="sm"
+        tt="none"
+        style={{ whiteSpace: 'normal', height: 'auto' }}
+      >
+        {diemDanh.nhan}
+      </Badge>
+      <BadgeLopKhac nguonTinh={diemDanh.nguon_tinh} />
+    </Group>
   );
 }
 

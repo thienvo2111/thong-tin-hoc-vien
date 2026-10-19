@@ -70,3 +70,65 @@ export function tinhChuyenCan(
   }
   return kq;
 }
+
+/** phan_lop_giai_doan → dang_ky_hoc_id → (giai_doan_id → lop_id hiện tại). */
+export function lopHienTaiTheoDangKy(
+  phanLop: readonly {
+    dang_ky_hoc_id: string;
+    giai_doan_id: string;
+    lop_id: string;
+  }[],
+): Map<string, Map<string, string>> {
+  const kq = new Map<string, Map<string, string>>();
+  for (const p of phanLop) {
+    const m = kq.get(p.dang_ky_hoc_id) ?? new Map<string, string>();
+    m.set(p.giai_doan_id, p.lop_id);
+    kq.set(p.dang_ky_hoc_id, m);
+  }
+  return kq;
+}
+
+/** Dòng diem_danh (kèm buổi) → đầu vào tinhChuyenCan; doiTu theo `${dang_ky_hoc_id}|${lich_hoc_id}`. */
+export function dongDiemDanhBuoi(
+  d: {
+    dang_ky_hoc_id: string;
+    lich_hoc_id: string;
+    trang_thai: TrangThaiDiemDanh;
+    lich_hoc: {
+      lop_id: string;
+      giai_doan_id: string;
+      buoi_so: number;
+      lop: { loai_lop: string };
+    };
+  },
+  doiTu: ReadonlyMap<string, DongDiemDanhBuoi['doi_tu']>,
+): DongDiemDanhBuoi {
+  return {
+    lop_id: d.lich_hoc.lop_id,
+    loai_lop: d.lich_hoc.lop.loai_lop,
+    giai_doan_id: d.lich_hoc.giai_doan_id,
+    buoi_so: d.lich_hoc.buoi_so,
+    trang_thai: d.trang_thai,
+    doi_tu: doiTu.get(`${d.dang_ky_hoc_id}|${d.lich_hoc_id}`),
+  };
+}
+
+/**
+ * Dòng gốc mà tinhChuyenCan đã chọn cho khóa k (để lấy nhãn/lớp của dòng):
+ * dòng ĐẦU TIÊN cùng khóa, cùng lớp (sau doi_tu) và cùng trạng thái — đúng
+ * dòng mà vòng lặp của tinhChuyenCan giữ lại khi hòa.
+ */
+export function dongDuocChon<D extends DongDiemDanhBuoi>(
+  dong: readonly D[],
+  k: string,
+  kq: KetQuaBuoi,
+): D | undefined {
+  return dong.find((goc) => {
+    const d = goc.doi_tu ? { ...goc, ...goc.doi_tu } : goc;
+    return (
+      khoaBuoi(d.giai_doan_id, d.buoi_so) === k &&
+      d.lop_id === kq.lop_id &&
+      d.trang_thai === kq.trang_thai
+    );
+  });
+}

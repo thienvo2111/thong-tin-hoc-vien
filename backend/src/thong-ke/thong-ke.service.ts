@@ -10,9 +10,12 @@ import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.servi
 import { HOC_VIEN_PHAI_KHAO_SAT } from '../common/utils/doi-tuong-khao-sat.util';
 import {
   CheDoChuyenCan,
+  dongDiemDanhBuoi,
   DongDiemDanhBuoi,
+  lopHienTaiTheoDangKy,
   tinhChuyenCan,
 } from '../common/utils/chuyen-can.util';
+import { napDoiTuTheoBuoiChot } from '../doi-buoi-hoc/nap-chuyen-can';
 import {
   BuoiChuyenCan,
   ChuyenCanResult,
@@ -378,7 +381,7 @@ export class ThongKeService {
       },
     });
     if (dsDong.length === 0) return [];
-    const doiTu = await this.doiTuTheoBuoiChot([
+    const doiTu = await napDoiTuTheoBuoiChot(this.doiBuoi, [
       ...new Set(dsDong.map((d) => d.dang_ky_hoc_id)),
     ]);
 
@@ -386,12 +389,7 @@ export class ThongKeService {
       where: { dang_ky_hoc: where },
       select: { dang_ky_hoc_id: true, giai_doan_id: true, lop_id: true },
     });
-    const lopHienTai = new Map<string, Map<string, string>>();
-    for (const p of phanLop) {
-      const m = lopHienTai.get(p.dang_ky_hoc_id) ?? new Map<string, string>();
-      m.set(p.giai_doan_id, p.lop_id);
-      lopHienTai.set(p.dang_ky_hoc_id, m);
-    }
+    const lopHienTai = lopHienTaiTheoDangKy(phanLop);
 
     const thuTuGiaiDoan = new Map<string, number>();
     const theoDangKy = new Map<
@@ -404,14 +402,7 @@ export class ThongKeService {
         cheDo: d.dang_ky_hoc.khoa.che_do_chuyen_can,
         dong: [],
       };
-      nhom.dong.push({
-        lop_id: d.lich_hoc.lop_id,
-        loai_lop: d.lich_hoc.lop.loai_lop,
-        giai_doan_id: d.lich_hoc.giai_doan_id,
-        buoi_so: d.lich_hoc.buoi_so,
-        trang_thai: d.trang_thai,
-        doi_tu: doiTu.get(`${d.dang_ky_hoc_id}|${d.lich_hoc_id}`),
-      });
+      nhom.dong.push(dongDiemDanhBuoi(d, doiTu));
       theoDangKy.set(d.dang_ky_hoc_id, nhom);
     }
 
@@ -449,35 +440,6 @@ export class ThongKeService {
         const tong = c.co_mat + c.vang_co_phep + c.vang;
         return { ...c, ty_le_co_mat: tong > 0 ? c.co_mat / tong : null };
       });
-  }
-
-  // Spec đổi buổi (R7): `${dang_ky_hoc_id}|${lich_chot_id}` → buổi nguồn, để
-  // dòng điểm danh ở buổi chốt tính thay buổi nguồn trong tinhChuyenCan.
-  private async doiTuTheoBuoiChot(
-    dangKyIds: string[],
-  ): Promise<Map<string, DongDiemDanhBuoi['doi_tu']>> {
-    const doi = await this.doiBuoi.doiBuoiDaDuyetCuaDangKy(dangKyIds);
-    if (doi.length === 0) return new Map();
-    const nguon = await this.doiBuoi.lichTomTat(
-      doi.map((d) => d.lich_nguon_id),
-    );
-    return new Map(
-      doi.flatMap((d) => {
-        const l = nguon.get(d.lich_nguon_id);
-        return l
-          ? [
-              [
-                `${d.dang_ky_hoc_id}|${d.lich_chot_id}`,
-                {
-                  lop_id: l.lop_id,
-                  giai_doan_id: l.giai_doan_id,
-                  buoi_so: l.buoi_so,
-                },
-              ] as const,
-            ]
-          : [];
-      }),
-    );
   }
 
   private async vleTheoKhoang(where: Prisma.dang_ky_hocWhereInput) {

@@ -9,7 +9,7 @@ import type {
 } from '@/api/tinhHinhDiHoc';
 
 // ADR 0010: Tình hình đi học — 25 học viên giả để thử phân trang (20/trang); "Nguyễn Văn An" có 1 buổi vắng,
-// 1 buổi đổi sang lớp khác, 1 buổi tương lai.
+// 1 buổi đổi sang lớp khác, 1 buổi tương lai, 1 buổi có mặt nhờ học bù ở lớp khác (ADR 0010 T7).
 const KHOA: KhoaLocDiHoc[] = [
   {
     khoa_id: 'khoa-1',
@@ -37,15 +37,22 @@ function taoDong(i: number): DongTinhHinhDiHoc {
       { giai_doan_id: 'gd-1', thu_tu: 1, ten_giai_doan: 'Học Zoom', lop_id: 'lop-zoom-1', ten_lop: 'Zoom 01' },
     ],
     tong: an
-      ? { da_dien_ra: 2, co_mat: 0, vang: 1, vang_co_phep: 0, da_bao_vang: 0, chua_diem_danh: 1 }
+      ? { da_dien_ra: 3, co_mat: 1, vang: 1, vang_co_phep: 0, da_bao_vang: 0, chua_diem_danh: 1 }
       : { da_dien_ra: 2, co_mat: 2, vang: 0, vang_co_phep: 0, da_bao_vang: 0, chua_diem_danh: 0 },
   };
 }
 
 function taoBuoi(): BuoiDiHoc[] {
-  const dd = (ma: BuoiDiHoc['diem_danh']['ma'], nhan: string, trang_thai: TrangThaiDiemDanh | null = null) => ({
+  const lop1 = { id: 'lop-zoom-1', ten_lop: 'Zoom 01' };
+  const dd = (
+    ma: BuoiDiHoc['diem_danh']['ma'],
+    nhan: string,
+    trang_thai: TrangThaiDiemDanh | null = null,
+  ): BuoiDiHoc['diem_danh'] => ({
     ma,
     nhan,
+    nguon_tinh: trang_thai ? 'lop_hien_tai' : null,
+    lop_tinh: trang_thai ? lop1 : null,
     trang_thai,
     nguon: trang_thai ? 'zoom' : null,
     ghi_chu: null,
@@ -54,7 +61,6 @@ function taoBuoi(): BuoiDiHoc[] {
     tu_diem_danh_luc: null,
   });
   const gd = { id: 'gd-1', thu_tu: 1, ten_giai_doan: 'Học Zoom' };
-  const lop1 = { id: 'lop-zoom-1', ten_lop: 'Zoom 01' };
   return [
     {
       lich_hoc_id: 'l-1',
@@ -94,6 +100,23 @@ function taoBuoi(): BuoiDiHoc[] {
       diem_danh: dd('chua_den_gio', 'Chưa đến giờ'),
       bo_sung_duoc: false,
       ly_do_khong: 'Buổi học chưa diễn ra',
+    },
+    {
+      lich_hoc_id: 'l-4',
+      lich_nguon_id: 'l-4',
+      giai_doan: gd,
+      buoi_so: 4,
+      lop: lop1,
+      doi_buoi: null,
+      thoi_gian_bat_dau: '2026-10-10T00:30:00.000Z',
+      thoi_gian_ket_thuc: '2026-10-10T03:30:00.000Z',
+      diem_danh: {
+        ...dd('co_mat', 'Có mặt – ở lớp Trực tiếp 05'),
+        nguon_tinh: 'lop_khac',
+        lop_tinh: { id: 'lop-tt-5', ten_lop: 'Trực tiếp 05' },
+      },
+      bo_sung_duoc: false,
+      ly_do_khong: 'Đã có mặt ở lớp Trực tiếp 05 (học bù/lớp cũ)',
     },
   ];
 }
@@ -156,6 +179,8 @@ function handlersCho(goc: string, trangThaiDuoc: TrangThaiDiemDanh[]) {
           ma: body.trang_thai,
           nhan:
             body.trang_thai === 'co_mat' ? 'Có mặt (Thủ công)' : body.trang_thai === 'vang' ? 'Vắng' : 'Vắng có phép',
+          nguon_tinh: 'lop_hien_tai',
+          lop_tinh: b.lop,
           trang_thai: body.trang_thai,
           nguon: 'thu_cong',
           ghi_chu: body.ly_do ?? null,

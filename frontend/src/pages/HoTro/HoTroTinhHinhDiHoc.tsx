@@ -42,7 +42,7 @@ import { chuanHoaNfc } from '@/lib/nfc';
 import { dinhDangGio, dinhDangNgayGio } from '@/lib/ngay';
 import { taiFileTuBlob } from '@/lib/taiFile';
 import { NHAN_LOAI_LOP } from './HoTroLop';
-import { MAU_DIEM_DANH } from './HoTroLopChiTiet';
+import { BadgeLopKhac, MAU_DIEM_DANH } from './HoTroLopChiTiet';
 
 const KICH_THUOC_TRANG = 20;
 
@@ -395,15 +395,18 @@ function TheBuoi({ buoi: b, onBoSung }: { buoi: BuoiDiHoc; onBoSung: () => void 
               {dinhDangNgayGio(b.thoi_gian_bat_dau)}–{dinhDangGio(b.thoi_gian_ket_thuc)}
             </Text>
           </Stack>
-          <Badge
-            color={MAU_DIEM_DANH[dd.ma]}
-            variant="light"
-            size="sm"
-            tt="none"
-            style={{ whiteSpace: 'normal', height: 'auto' }}
-          >
-            {dd.nhan}
-          </Badge>
+          <Stack gap={2} align="flex-end">
+            <Badge
+              color={MAU_DIEM_DANH[dd.ma]}
+              variant="light"
+              size="sm"
+              tt="none"
+              style={{ whiteSpace: 'normal', height: 'auto' }}
+            >
+              {dd.nhan}
+            </Badge>
+            <BadgeLopKhac nguonTinh={dd.nguon_tinh} />
+          </Stack>
         </Group>
         {b.doi_buoi && (
           <Group gap={6}>
@@ -420,6 +423,11 @@ function TheBuoi({ buoi: b, onBoSung }: { buoi: BuoiDiHoc; onBoSung: () => void 
             Sửa bởi {dd.nguoi_sua}
             {dd.cap_nhat_luc ? ` lúc ${dinhDangNgayGio(dd.cap_nhat_luc)}` : ''}
             {dd.ghi_chu ? ` · Lý do: ${dd.ghi_chu}` : ''}
+          </Text>
+        )}
+        {!b.bo_sung_duoc && dd.nguon_tinh === 'lop_khac' && b.ly_do_khong && (
+          <Text fz="xs" c="dimmed">
+            {b.ly_do_khong}
           </Text>
         )}
         {b.bo_sung_duoc && (
