@@ -18,6 +18,7 @@ import {
   DuyetDoiBuoiDto,
   GhiChuXuLyDto,
   LocDoiBuoiDto,
+  LocLoaiDoiBuoiDto,
   LocThongKeDoiBuoiDto,
 } from './dto/doi-buoi-hoc.dto';
 import { DoiBuoiHocService } from './doi-buoi-hoc.service';
@@ -41,9 +42,12 @@ export class DoiBuoiHocController {
   }
 
   @Get('dem-cho-duyet')
-  async demChoDuyet(@CurrentUser() user: AuthenticatedUser) {
+  async demChoDuyet(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: LocLoaiDoiBuoiDto = {},
+  ) {
     // Bọc object: Nest trả số trần dưới dạng text, client JSON không đọc được.
-    return { cho_duyet: await this.service.demChoDuyet(user) };
+    return { cho_duyet: await this.service.demChoDuyet(user, q.loai) };
   }
 
   // Tab Thống kê — khai báo TRƯỚC các route ':id/...'.

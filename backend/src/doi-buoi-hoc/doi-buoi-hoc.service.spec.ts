@@ -161,7 +161,7 @@ describe('DoiBuoiHocService (hoc vien)', () => {
         dang_ky_hoc_id: 'dk1',
         trang_thai: { in: ['cho_duyet', 'da_duyet'] },
       },
-      select: { lich_nguon_id: true, trang_thai: true, lich_chot_id: true },
+      select: { lich_nguon_id: true, trang_thai: true, lich_chot_id: true, loai: true },
     });
   });
 
@@ -240,7 +240,7 @@ describe('DoiBuoiHocService (hoc vien)', () => {
     });
     expect(tx.diem_danh.findMany).toHaveBeenCalledWith({
       where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln'] } },
-      select: { lich_hoc_id: true },
+      select: { lich_hoc_id: true, trang_thai: true },
     });
     expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
       tx.diem_danh.findMany.mock.invocationCallOrder[0],
@@ -258,7 +258,7 @@ describe('DoiBuoiHocService (hoc vien)', () => {
     await expect(svc.gui(user, dto)).rejects.toMatchObject({ status: 400 });
     expect(tx.diem_danh.findMany).toHaveBeenCalledWith({
       where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln', 'lc'] } },
-      select: { lich_hoc_id: true },
+      select: { lich_hoc_id: true, trang_thai: true },
     });
     expect(tx.doi_buoi_hoc.create).not.toHaveBeenCalled();
   });
@@ -286,6 +286,7 @@ describe('DoiBuoiHocService (hoc vien)', () => {
         lich_de_nghi_id: 'ld',
         ly_do: 'Ban viec dot xuat',
         nguoi_tao: 'u1',
+        loai: 'doi_buoi',
       },
       select: { id: true },
     });
@@ -939,7 +940,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
       tao_luc: { lt: taoLuc },
       id: { not: 'x1' },
     });
-    expect(where.lich_nguon.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
+    expect(where.OR[1].lich_nguon.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
     expect(where.lich_de_nghi.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
   });
 
@@ -1052,7 +1053,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
           trang_thai: 'da_duyet',
           id: { not: 'x1' },
         },
-        select: { id: true, lich_chot_id: true },
+        select: { id: true, lich_chot_id: true, loai: true },
       });
       expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
         tx.doi_buoi_hoc.findFirst.mock.invocationCallOrder[0],
@@ -1130,7 +1131,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
       });
       expect(tx.diem_danh.findMany).toHaveBeenCalledWith({
         where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln', 'lc'] } },
-        select: { lich_hoc_id: true },
+        select: { lich_hoc_id: true, trang_thai: true },
       });
       expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
       expect(nhatKy.ghi).not.toHaveBeenCalled();
@@ -1159,7 +1160,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     });
     expect(tx.diem_danh.findMany).toHaveBeenCalledWith({
       where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln'] } },
-      select: { lich_hoc_id: true },
+      select: { lich_hoc_id: true, trang_thai: true },
     });
     expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
       tx.diem_danh.findMany.mock.invocationCallOrder[0],
@@ -1432,7 +1433,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
       trang_thai: 'cho_duyet',
       dang_ky_hoc: { cum_id: { in: ['c1'] } },
     });
-    expect(where.lich_nguon.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
+    expect(where.OR[1].lich_nguon.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
     expect(where.lich_de_nghi.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
   });
 
@@ -1455,7 +1456,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     const sql = strings.join('?').replace(/\s+/g, ' ');
     expect(sql).toContain('JOIN lich_hoc_lop ln ON ln.id = c.lich_nguon_id');
     expect(sql).toContain('JOIN lich_hoc_lop ld ON ld.id = c.lich_de_nghi_id');
-    expect(sql).toContain('ln.thoi_gian_bat_dau > ? AND ld.thoi_gian_bat_dau > ?');
+    expect(sql).toContain('ln.thoi_gian_bat_dau > ?) AND ld.thoi_gian_bat_dau > ?');
     expect(sql).toContain('l.thoi_gian_bat_dau <= ?');
     expect(sql).toContain('FROM diem_danh dd');
     const ngay = values.filter((v): v is Date => v instanceof Date);
@@ -1463,7 +1464,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     expect(new Set(ngay.map((d) => d.getTime())).size).toBe(1);
     const where = (prisma.doi_buoi_hoc.count.mock.calls[0][0] as { where: any })
       .where;
-    expect(where.lich_nguon.thoi_gian_bat_dau.gt).toBe(ngay[0]);
+    expect(where.OR[1].lich_nguon.thoi_gian_bat_dau.gt).toBe(ngay[0]);
   });
 
   it('danhSach cho_duyet: doi lai qua han bi loai khoi danh sach chinh, vao danh sach qua han', async () => {
@@ -1551,9 +1552,11 @@ describe('DoiBuoiHocService nguoi duyet', () => {
       dang_ky_hoc: { khoa_id: 'k1' },
     });
     // Mac dinh chi de nghi con han: ca buoi nguon lan buoi de nghi chua bat dau.
-    expect(arg.where.lich_nguon.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
+    expect(arg.where.OR).toEqual([
+      { loai: 'hoc_bu' },
+      { lich_nguon: { thoi_gian_bat_dau: { gt: expect.any(Date) } } },
+    ]);
     expect(arg.where.lich_de_nghi.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
-    expect(arg.where.OR).toBeUndefined();
     expect(arg.orderBy).toEqual({ tao_luc: 'asc' });
     expect(arg.take).toBe(500);
     expect(query.siSoBuoi).toHaveBeenCalledTimes(1);
@@ -2015,5 +2018,669 @@ describe('DoiBuoiHocService trung lich', () => {
     expect(query.doiBuoiDaDuyetCuaDangKy).not.toHaveBeenCalled();
     expect(query.siSoBuoi).not.toHaveBeenCalled();
     expect(p.lich_hoc_lop.findMany).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ADR 0012 — học bù (loai = hoc_bu) dùng chung cơ chế đổi buổi.
+// ---------------------------------------------------------------------------
+describe('DoiBuoiHocService hoc bu (hoc vien)', () => {
+  const dtoHb = { ...dto, loai: 'hoc_bu' as const, ly_do: 'Bi om hom do' };
+  const gocDaQua = () => lich('ln', 'lopA', { thoi_gian_bat_dau: hqua });
+
+  function setupHb(
+    opts: Parameters<typeof setup>[0] & { doi?: number; hocBu?: number } = {},
+  ) {
+    const s = setup(opts);
+    s.prisma.khoa_boi_duong.findUnique.mockResolvedValue({
+      so_buoi_doi_toi_da: opts.doi ?? 0,
+      so_buoi_hoc_bu_toi_da: opts.hocBu ?? 1,
+    } as never);
+    s.query.lichTomTat.mockResolvedValue(
+      new Map([
+        ['ln', gocDaQua()],
+        ['ld', lich('ld', 'lopB')],
+        ['lc', lich('lc', 'lopC')],
+      ]),
+    );
+    return s;
+  }
+
+  const loiVoi = (status: number, message: string) => ({
+    status,
+    response: { error: expect.objectContaining({ message }) },
+  });
+
+  it('gui: khoa chua bat hoc bu (doi buoi van bat) -> 403, khong vao tx', async () => {
+    const { svc, prisma } = setupHb({ doi: 2, hocBu: 0 });
+    await expect(svc.gui(user, dtoHb)).rejects.toMatchObject(
+      loiVoi(403, 'Khóa học chưa mở đăng ký học bù'),
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('gui: doi buoi tat nhung hoc bu bat -> tao loai hoc_bu, nhat ky co loai', async () => {
+    const { svc, tx, nhatKy } = setupHb({ doi: 0, hocBu: 1 });
+    await expect(svc.gui(user, dtoHb)).resolves.toEqual({ id: 'moi' });
+    expect(tx.doi_buoi_hoc.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ loai: 'hoc_bu', lich_nguon_id: 'ln' }),
+      select: { id: true },
+    });
+    expect(nhatKy.ghi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hanh_dong: 'de_nghi_doi_buoi',
+        chi_tiet: expect.objectContaining({ loai: 'hoc_bu' }),
+      }),
+    );
+  });
+
+  it('gui: doc diem_danh buoi goc trong tx sau lock; co_mat -> 400 DA_CO_MAT, khong tao', async () => {
+    const { svc, tx } = setupHb();
+    tx.diem_danh.findMany.mockResolvedValueOnce([
+      { lich_hoc_id: 'ln', trang_thai: 'co_mat' },
+    ] as never);
+    await expect(svc.gui(user, dtoHb)).rejects.toMatchObject(
+      loiVoi(400, 'Thầy/Cô đã có mặt buổi này, không cần học bù'),
+    );
+    expect(tx.diem_danh.findMany).toHaveBeenCalledWith({
+      where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln'] } },
+      select: { lich_hoc_id: true, trang_thai: true },
+    });
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.diem_danh.findMany.mock.invocationCallOrder[0],
+    );
+    expect(tx.doi_buoi_hoc.create).not.toHaveBeenCalled();
+  });
+
+  it.each(['vang', 'vang_co_phep'])('gui: buoi goc diem danh %s -> tao', async (t) => {
+    const { svc, tx } = setupHb();
+    tx.diem_danh.findMany.mockResolvedValueOnce([
+      { lich_hoc_id: 'ln', trang_thai: t },
+    ] as never);
+    await expect(svc.gui(user, dtoHb)).resolves.toEqual({ id: 'moi' });
+  });
+
+  it('gui: buoi goc chua dien ra -> 400 CHUA_DIEN_RA', async () => {
+    const { svc, tx, query } = setupHb();
+    query.lichTomTat.mockResolvedValue(
+      new Map([
+        ['ln', lich('ln', 'lopA')],
+        ['ld', lich('ld', 'lopB')],
+      ]),
+    );
+    await expect(svc.gui(user, dtoHb)).rejects.toMatchObject(
+      loiVoi(400, 'Buổi này chưa diễn ra — hãy dùng đổi buổi'),
+    );
+    expect(tx.doi_buoi_hoc.create).not.toHaveBeenCalled();
+  });
+
+  it('gui: buoi goc da co doi buoi da_duyet -> 400 DA_DOI_BUOI truoc unique (khong 409/500)', async () => {
+    const { svc, tx } = setupHb({
+      hoatDong: [
+        { lich_nguon_id: 'ln', trang_thai: 'da_duyet', lich_chot_id: 'lc', loai: 'doi_buoi' } as never,
+      ],
+    });
+    await expect(svc.gui(user, dtoHb)).rejects.toMatchObject(
+      loiVoi(400, 'Buổi này đã được đổi, liên hệ người hỗ trợ'),
+    );
+    expect(tx.doi_buoi_hoc.create).not.toHaveBeenCalled();
+  });
+
+  it('gui: luot tach theo loai — doi buoi khong tinh vao luot hoc bu', async () => {
+    const { svc, tx } = setupHb({
+      hocBu: 1,
+      hoatDong: [
+        { lich_nguon_id: 'n1', trang_thai: 'da_duyet', lich_chot_id: 'c1', loai: 'doi_buoi' },
+        { lich_nguon_id: 'n2', trang_thai: 'cho_duyet', lich_chot_id: null, loai: 'doi_buoi' },
+      ] as never,
+    });
+    await expect(svc.gui(user, dtoHb)).resolves.toEqual({ id: 'moi' });
+    expect(tx.doi_buoi_hoc.findMany).toHaveBeenCalledWith({
+      where: {
+        dang_ky_hoc_id: 'dk1',
+        trang_thai: { in: ['cho_duyet', 'da_duyet'] },
+      },
+      select: { lich_nguon_id: true, trang_thai: true, lich_chot_id: true, loai: true },
+    });
+  });
+
+  it('gui: het luot hoc bu -> 400 thong diep hoc bu', async () => {
+    const { svc, tx } = setupHb({
+      hocBu: 1,
+      hoatDong: [
+        { lich_nguon_id: 'n1', trang_thai: 'cho_duyet', lich_chot_id: null, loai: 'hoc_bu' },
+      ] as never,
+    });
+    await expect(svc.gui(user, dtoHb)).rejects.toMatchObject(
+      loiVoi(400, 'Thầy/Cô đã dùng hết 1 lượt học bù của khóa này'),
+    );
+    expect(tx.doi_buoi_hoc.create).not.toHaveBeenCalled();
+  });
+
+  it('gui doi buoi: de nghi hoc bu khong tieu luot doi buoi', async () => {
+    const { svc, tx } = setup({
+      soBuoi: 1,
+      hoatDong: [
+        { lich_nguon_id: 'n1', trang_thai: 'da_duyet', lich_chot_id: 'c1', loai: 'hoc_bu' },
+      ] as never,
+    });
+    await expect(svc.gui(user, dto)).resolves.toEqual({ id: 'moi' });
+    expect(tx.doi_buoi_hoc.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ loai: 'doi_buoi' }),
+      select: { id: true },
+    });
+  });
+
+  it('gui doi lai hoc bu: ban hoc bu da duyet cung buoi goc -> khong ton luot, kiem diem danh buoi chot', async () => {
+    const { svc, tx } = setupHb({
+      hocBu: 1,
+      hoatDong: [
+        { lich_nguon_id: 'ln', trang_thai: 'da_duyet', lich_chot_id: 'lc', loai: 'hoc_bu' },
+      ] as never,
+    });
+    await expect(svc.gui(user, dtoHb)).resolves.toEqual({ id: 'moi' });
+    expect(tx.diem_danh.findMany).toHaveBeenCalledWith({
+      where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln', 'lc'] } },
+      select: { lich_hoc_id: true, trang_thai: true },
+    });
+  });
+
+  it('sua: khong doi duoc loai -> 400, khong vao tx', async () => {
+    const { svc, prisma } = setupHb();
+    await expect(svc.sua(user, 'x1', dtoHb)).rejects.toMatchObject(
+      loiVoi(400, 'Không đổi được loại đề nghị khi sửa'),
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('sua hoc bu: giu loai cua ban cu (body khong gui loai), gate theo hoc bu', async () => {
+    const { svc, prisma, tx } = setupHb({ doi: 0, hocBu: 1 });
+    prisma.doi_buoi_hoc.findFirst.mockResolvedValueOnce({
+      id: 'x1',
+      dang_ky_hoc_id: 'dk1',
+      lich_nguon_id: 'ln',
+      trang_thai: 'cho_duyet',
+      loai: 'hoc_bu',
+      dang_ky_hoc: { khoa_id: 'k1' },
+    } as never);
+    await expect(svc.sua(user, 'x1', dto)).resolves.toEqual({ id: 'moi' });
+    expect(tx.doi_buoi_hoc.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ loai: 'hoc_bu' }),
+      select: { id: true },
+    });
+  });
+
+  it('huy hoc bu: doi buoi tat nhung hoc bu bat -> huy duoc', async () => {
+    const { svc, prisma } = setupHb({ doi: 0, hocBu: 1 });
+    prisma.doi_buoi_hoc.findFirst.mockResolvedValueOnce({
+      id: 'x1',
+      dang_ky_hoc_id: 'dk1',
+      lich_nguon_id: 'ln',
+      trang_thai: 'cho_duyet',
+      loai: 'hoc_bu',
+      dang_ky_hoc: { khoa_id: 'k1' },
+    } as never);
+    await expect(svc.huyHocVien(user, 'x1')).resolves.toEqual({
+      trang_thai: 'da_huy',
+    });
+  });
+});
+
+describe('DoiBuoiHocService hoc bu (tong quan / lua chon)', () => {
+  function setupTq(opts: { doi?: number; hocBu?: number } = {}) {
+    const s = setup();
+    const p = s.prisma as Record<string, any>;
+    p.khoa_boi_duong.findUnique.mockResolvedValue({
+      so_buoi_doi_toi_da: opts.doi ?? 2,
+      so_buoi_hoc_bu_toi_da: opts.hocBu ?? 2,
+    });
+    p.phan_lop_giai_doan = {
+      findFirst: jest.fn(async () => ({ lop_id: 'lopA' })),
+      findMany: jest.fn(async () => [{ giai_doan_id: 'gd1', lop_id: 'lopA' }]),
+    };
+    const qua = (id: string, ms: number) =>
+      lich(id, 'lopA', { thoi_gian_bat_dau: new Date(Date.now() - ms) });
+    const lichFindMany = jest.fn(async (a: any) =>
+      a.where.thoi_gian_bat_dau?.lte
+        ? [qua('p1', 1000), qua('p2', 2000), qua('p3', 3000), qua('p4', 4000)]
+        : [lich('ln', 'lopA')],
+    );
+    p.lich_hoc_lop = { findMany: lichFindMany };
+    p.diem_danh.findMany = jest.fn(async () => [
+      { lich_hoc_id: 'p1', trang_thai: 'co_mat' },
+      { lich_hoc_id: 'p2', trang_thai: 'vang' },
+    ]);
+    const row = (id: string, over: object) => ({
+      id,
+      trang_thai: 'cho_duyet',
+      dang_ky_hoc_id: 'dk1',
+      lich_nguon_id: 'p3',
+      lich_de_nghi_id: 'ld',
+      lich_chot_id: null,
+      ly_do: 'abcde',
+      tao_luc: new Date(Date.now() - 5000),
+      ghi_chu_xu_ly: null,
+      nguoi_xu_ly: null,
+      loai: 'hoc_bu',
+      ...over,
+    });
+    p.doi_buoi_hoc.findMany = jest
+      .fn()
+      .mockResolvedValueOnce([
+        row('hb', {}),
+        row('db', { lich_nguon_id: 'p4', trang_thai: 'da_duyet', lich_chot_id: 'lc', loai: 'doi_buoi' }),
+      ])
+      .mockResolvedValue([
+        {
+          id: 'hb',
+          tao_luc: new Date(Date.now() - 5000),
+          lich_de_nghi_id: 'ld',
+          loai: 'hoc_bu',
+          lich_nguon: { thoi_gian_bat_dau: hqua },
+        },
+      ]);
+    s.query.lichTomTat.mockResolvedValue(
+      new Map([
+        ['p3', qua('p3', 3000)],
+        ['p4', qua('p4', 4000)],
+        ['ld', lich('ld', 'lopB')],
+        ['lc', lich('lc', 'lopC')],
+      ]),
+    );
+    return { ...s, lichFindMany };
+  }
+
+  it('tong quan: so_buoi_hoc_bu_toi_da, luot tach loai, buoi_co_the_hoc_bu (bo co_mat + da doi buoi), truy van co dinh', async () => {
+    const s = setupTq();
+    const r = await s.svc.tongQuanHocVien(user, 'k1');
+    expect(r.so_buoi_hoc_bu_toi_da).toBe(2);
+    expect(r.so_luot_hoc_bu_da_dung).toBe(1);
+    expect(r.so_luot_da_dung).toBe(1);
+    expect(r.buoi_co_the_hoc_bu.map((b) => b.lich_nguon.id)).toEqual(['p2', 'p3']);
+    expect(r.buoi_co_the_hoc_bu[0]).toMatchObject({
+      trang_thai_diem_danh: 'vang',
+      de_nghi: null,
+    });
+    expect(r.buoi_co_the_hoc_bu[1]).toMatchObject({
+      trang_thai_diem_danh: null,
+      de_nghi: { id: 'hb', loai: 'hoc_bu', qua_han: false, thu_tu_hang: { k: 1, n: 1 } },
+    });
+    expect(r.de_nghi.map((d) => [d.id, d.loai])).toEqual([
+      ['hb', 'hoc_bu'],
+      ['db', 'doi_buoi'],
+    ]);
+    // buổi đã qua: 30 gần nhất, 1 truy vấn; điểm danh: 1 truy vấn.
+    const daQua = s.lichFindMany.mock.calls.filter(
+      (c) => (c[0] as any).where.thoi_gian_bat_dau?.lte,
+    );
+    expect(daQua).toHaveLength(1);
+    expect(daQua[0][0]).toMatchObject({
+      orderBy: { thoi_gian_bat_dau: 'desc' },
+      take: 30,
+    });
+    expect((s.prisma as any).diem_danh.findMany).toHaveBeenCalledTimes(1);
+    expect((s.prisma as any).diem_danh.findMany).toHaveBeenCalledWith({
+      where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['p1', 'p2', 'p3', 'p4'] } },
+      select: { lich_hoc_id: true, trang_thai: true },
+    });
+  });
+
+  it('tong quan: hoc bu tat -> khong truy van buoi da qua / diem danh', async () => {
+    const s = setupTq({ hocBu: 0 });
+    const r = await s.svc.tongQuanHocVien(user, 'k1');
+    expect(r.buoi_co_the_hoc_bu).toEqual([]);
+    expect(
+      s.lichFindMany.mock.calls.some((c) => (c[0] as any).where.thoi_gian_bat_dau?.lte),
+    ).toBe(false);
+    expect((s.prisma as any).diem_danh.findMany).not.toHaveBeenCalled();
+  });
+
+  it('tong quan: doi buoi tat + hoc bu bat -> khong 403, buoi_sap_toi rong', async () => {
+    const s = setupTq({ doi: 0 });
+    const r = await s.svc.tongQuanHocVien(user, 'k1');
+    expect(r.buoi_sap_toi).toEqual([]);
+    expect(r.buoi_co_the_hoc_bu.length).toBeGreaterThan(0);
+  });
+
+  it('tong quan: ca hai tat -> 403', async () => {
+    const s = setupTq({ doi: 0, hocBu: 0 });
+    await expect(s.svc.tongQuanHocVien(user, 'k1')).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
+  describe('luaChonHocVien loai=hoc_bu', () => {
+    function setupLc() {
+      const s = setupTq();
+      const p = s.prisma as Record<string, any>;
+      s.query.lichTomTat.mockResolvedValue(
+        new Map([['ln', lich('ln', 'lopA', { thoi_gian_bat_dau: hqua })]]),
+      );
+      p.lich_hoc_lop.findMany = jest.fn(async () => [lich('ld', 'lopB')]);
+      p.diem_danh.findMany = jest.fn(async () => [] as unknown[]);
+      p.doi_buoi_hoc.findFirst = jest.fn(async () => null);
+      s.query.siSoBuoi.mockResolvedValue(
+        new Map([['ld', { si_so: 1, si_so_toi_da: 40, so_cho_duyet: 0 }]]),
+      );
+      return { ...s, p };
+    }
+
+    it('buoi goc da qua, khong co mat -> ung vien chua bat dau', async () => {
+      const { svc, p } = setupLc();
+      const r = await svc.luaChonHocVien(user, 'ln', 'hoc_bu');
+      expect(r.map((x) => x.lich.id)).toEqual(['ld']);
+      expect(p.diem_danh.findMany).toHaveBeenCalledWith({
+        where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln'] } },
+        select: { lich_hoc_id: true, trang_thai: true },
+      });
+    });
+
+    it('buoi goc chua dien ra -> 400 CHUA_DIEN_RA', async () => {
+      const { svc, query } = setupLc();
+      query.lichTomTat.mockResolvedValue(new Map([['ln', lich('ln', 'lopA')]]));
+      await expect(svc.luaChonHocVien(user, 'ln', 'hoc_bu')).rejects.toMatchObject({
+        status: 400,
+      });
+    });
+
+    it('co mat -> 400 DA_CO_MAT', async () => {
+      const { svc, p } = setupLc();
+      p.diem_danh.findMany.mockResolvedValueOnce([
+        { lich_hoc_id: 'ln', trang_thai: 'co_mat' },
+      ]);
+      await expect(svc.luaChonHocVien(user, 'ln', 'hoc_bu')).rejects.toMatchObject({
+        status: 400,
+        response: {
+          error: expect.objectContaining({
+            message: 'Thầy/Cô đã có mặt buổi này, không cần học bù',
+          }),
+        },
+      });
+    });
+
+    it('buoi goc da doi buoi da_duyet -> 400 DA_DOI_BUOI', async () => {
+      const { svc, p } = setupLc();
+      p.doi_buoi_hoc.findFirst.mockResolvedValueOnce({
+        loai: 'doi_buoi',
+        lich_chot_id: 'lc',
+      });
+      await expect(svc.luaChonHocVien(user, 'ln', 'hoc_bu')).rejects.toMatchObject({
+        status: 400,
+        response: {
+          error: expect.objectContaining({
+            message: 'Buổi này đã được đổi, liên hệ người hỗ trợ',
+          }),
+        },
+      });
+    });
+
+    it('khoa chua bat hoc bu -> 403', async () => {
+      const { svc, p } = setupLc();
+      p.khoa_boi_duong.findUnique.mockResolvedValue({
+        so_buoi_doi_toi_da: 2,
+        so_buoi_hoc_bu_toi_da: 0,
+      });
+      await expect(svc.luaChonHocVien(user, 'ln', 'hoc_bu')).rejects.toMatchObject({
+        status: 403,
+      });
+    });
+  });
+});
+
+describe('DoiBuoiHocService hoc bu (nguoi duyet)', () => {
+  const quanTri = { id: 'qt', vai_tro: 'quan_tri' } as AuthenticatedUser;
+  const ghiChu = { ghi_chu: 'Da trao doi voi hoc vien' };
+  const deNghiHb = (over: object = {}) => ({
+    id: 'x1',
+    trang_thai: 'cho_duyet',
+    dang_ky_hoc_id: 'dk1',
+    lich_nguon_id: 'ln',
+    lich_de_nghi_id: 'ld',
+    lich_chot_id: null,
+    tao_luc: new Date(Date.now() - 60_000),
+    loai: 'hoc_bu',
+    dang_ky_hoc: { hoc_vien_id: 'hv1' },
+    ...over,
+  });
+
+  function setupD(over: object = {}) {
+    const tx = {
+      $executeRaw: jest.fn(async (..._a: unknown[]) => 0),
+      $queryRaw: jest.fn(async (..._a: unknown[]) => [] as unknown[]),
+      doi_buoi_hoc: {
+        findUnique: jest.fn(async () => deNghiHb(over)),
+        findFirst: jest.fn(async (_a?: unknown) => null as unknown),
+        count: jest.fn(async (_a?: unknown) => 0),
+        updateMany: jest.fn(async (_a?: unknown) => ({ count: 1 })),
+      },
+      phan_lop_giai_doan: { findFirst: jest.fn(async () => ({ lop_id: 'lopA' })) },
+      diem_danh: {
+        findMany: jest.fn(async (_a?: unknown) => [] as unknown[]),
+        findFirst: jest.fn(async (_a?: unknown) => null as unknown),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
+      $queryRaw: jest.fn(async (..._a: unknown[]) => [] as unknown[]),
+      doi_buoi_hoc: {
+        findFirst: jest.fn(async (_a?: unknown) => deNghiHb(over) as unknown),
+        findMany: jest.fn(async (_a?: unknown) => [] as unknown[]),
+        count: jest.fn(async (_a?: unknown) => 0),
+        groupBy: jest.fn(async (_a?: unknown) => [] as unknown[]),
+        updateMany: jest.fn(async (_a?: unknown) => ({ count: 1 })),
+      },
+      lich_hoc_lop: { findMany: jest.fn(async () => [lich('ld', 'lopB')]) },
+      phan_lop_giai_doan: { findMany: jest.fn(async () => [] as unknown[]) },
+    };
+    const lichMap = new Map([
+      ['ln', lich('ln', 'lopA', { thoi_gian_bat_dau: hqua })],
+      ['ld', lich('ld', 'lopB')],
+      ['lc', lich('lc', 'lopC')],
+    ]);
+    const query = {
+      lichTomTat: jest.fn(async (..._a: unknown[]) => lichMap),
+      siSoBuoi: jest.fn(
+        async (ids: string[], ..._r: unknown[]) =>
+          new Map(ids.map((i) => [i, { si_so: 5, si_so_toi_da: 40, so_cho_duyet: 0 }])),
+      ),
+      doiBuoiDaDuyetCuaDangKy: jest.fn(async () => [] as unknown[]),
+    };
+    const nhatKy = { ghi: jest.fn(async (_a?: unknown) => undefined) };
+    const svc = new DoiBuoiHocService(
+      prisma as never,
+      query as never,
+      nhatKy as never,
+      { cumIdsCuaToi: jest.fn(async () => ['c1']) } as never,
+    );
+    return { svc, tx, prisma, query, nhatKy, lichMap };
+  }
+
+  it('duyet: buoi goc da qua + vang -> duyet, khong chan D2/D12 buoi goc; nhat ky co loai', async () => {
+    const { svc, tx, nhatKy } = setupD();
+    tx.diem_danh.findMany.mockResolvedValueOnce([
+      { lich_hoc_id: 'ln', trang_thai: 'vang' },
+    ]);
+    await expect(svc.duyet(quanTri, 'x1', {})).resolves.toEqual({
+      trang_thai: 'da_duyet',
+      canh_bao: [],
+    });
+    expect(tx.$executeRaw.mock.calls[0][1]).toBe('doi_buoi:ld');
+    expect(nhatKy.ghi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hanh_dong: 'duyet_doi_buoi',
+        chi_tiet: expect.objectContaining({ loai: 'hoc_bu', lich_chot_id: 'ld' }),
+      }),
+    );
+  });
+
+  it('duyet: hoc vien duoc ghi co_mat SAU khi gui -> 400 DA_CO_MAT (doc trong tx sau lock), khong cap nhat', async () => {
+    const { svc, tx, nhatKy } = setupD();
+    tx.diem_danh.findMany.mockResolvedValueOnce([
+      { lich_hoc_id: 'ln', trang_thai: 'co_mat' },
+    ]);
+    await expect(svc.duyet(quanTri, 'x1', {})).rejects.toMatchObject({
+      status: 400,
+      response: {
+        error: expect.objectContaining({
+          message: 'Học viên đã có mặt buổi này, không cần học bù',
+        }),
+      },
+    });
+    expect(tx.diem_danh.findMany).toHaveBeenCalledWith({
+      where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['ln'] } },
+      select: { lich_hoc_id: true, trang_thai: true },
+    });
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.diem_danh.findMany.mock.invocationCallOrder[0],
+    );
+    expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+    expect(nhatKy.ghi).not.toHaveBeenCalled();
+  });
+
+  it('duyet: buoi goc co doi buoi da_duyet -> 400 DA_DOI_BUOI, khong ha ban doi buoi', async () => {
+    const { svc, tx } = setupD();
+    tx.doi_buoi_hoc.findFirst.mockResolvedValueOnce({
+      id: 'db',
+      lich_chot_id: 'lc',
+      loai: 'doi_buoi',
+    });
+    await expect(svc.duyet(quanTri, 'x1', {})).rejects.toMatchObject({
+      status: 400,
+      response: {
+        error: expect.objectContaining({
+          message: 'Buổi này đã được đổi, liên hệ người hỗ trợ',
+        }),
+      },
+    });
+    expect(tx.doi_buoi_hoc.findFirst).toHaveBeenCalledWith({
+      where: {
+        dang_ky_hoc_id: 'dk1',
+        lich_nguon_id: 'ln',
+        trang_thai: 'da_duyet',
+        id: { not: 'x1' },
+      },
+      select: { id: true, lich_chot_id: true, loai: true },
+    });
+    expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('duyet doi lai hoc bu: ha ban hoc bu cu roi nang ban moi', async () => {
+    const { svc, tx } = setupD();
+    tx.doi_buoi_hoc.findFirst.mockResolvedValueOnce({
+      id: 'cu',
+      lich_chot_id: 'lc',
+      loai: 'hoc_bu',
+    });
+    await expect(svc.duyet(quanTri, 'x1', {})).resolves.toMatchObject({
+      trang_thai: 'da_duyet',
+    });
+    expect(tx.doi_buoi_hoc.updateMany).toHaveBeenCalledTimes(2);
+  });
+
+  it('tuChoi: nhat ky co loai hoc_bu', async () => {
+    const { svc, nhatKy } = setupD();
+    await svc.tuChoi(quanTri, 'x1', ghiChu);
+    expect(nhatKy.ghi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chi_tiet: { de_nghi_id: 'x1', tu_choi: true, loai: 'hoc_bu' },
+      }),
+    );
+  });
+
+  it('huyDuyet hoc bu: buoi goc da qua khong chan, khong doc si so buoi goc', async () => {
+    const { svc, query, tx } = setupD({ trang_thai: 'da_duyet', lich_chot_id: 'lc' });
+    await expect(svc.huyDuyet(quanTri, 'x1', ghiChu)).resolves.toEqual({
+      trang_thai: 'da_huy',
+      canh_bao: [],
+    });
+    expect(query.siSoBuoi).not.toHaveBeenCalled();
+    expect(tx.doi_buoi_hoc.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'x1', trang_thai: 'da_duyet' } }),
+    );
+  });
+
+  it('huyDuyet hoc bu: buoi hoc bu da bat dau -> 400', async () => {
+    const { svc, lichMap, tx } = setupD({ trang_thai: 'da_duyet', lich_chot_id: 'lc' });
+    lichMap.set('lc', lich('lc', 'lopC', { thoi_gian_bat_dau: hqua }));
+    await expect(svc.huyDuyet(quanTri, 'x1', ghiChu)).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('luaChonDuyet hoc bu: duyet_duoc du buoi goc da qua', async () => {
+    const { svc, prisma } = setupD();
+    prisma.doi_buoi_hoc.findFirst
+      .mockResolvedValueOnce(deNghiHb())
+      .mockResolvedValueOnce(null);
+    const r = await svc.luaChonDuyet(quanTri, 'x1');
+    expect(r.map((x) => [x.lich.id, x.duyet_duoc])).toEqual([['ld', true]]);
+  });
+
+  it('danhSach: tra loai; cho duyet con han khong loai hoc bu co buoi goc da qua; loc loai', async () => {
+    const { svc, prisma } = setupD();
+    prisma.doi_buoi_hoc.findMany.mockResolvedValueOnce([
+      {
+        ...deNghiHb(),
+        ly_do: 'abcde',
+        ghi_chu_xu_ly: null,
+        nguoi_xu_ly: null,
+        dang_ky_hoc: {
+          hoc_vien: { id: 'hv1', ho_ten: 'A', don_vi_cong_tac: { ten_don_vi: 'T' } },
+          cum: null,
+        },
+        xu_ly_boi: null,
+      },
+    ]);
+    prisma.doi_buoi_hoc.findMany.mockResolvedValueOnce([]); // đổi lại: bản đã duyệt
+    prisma.doi_buoi_hoc.findMany.mockResolvedValueOnce([
+      {
+        id: 'x1',
+        tao_luc: new Date(Date.now() - 60_000),
+        lich_de_nghi_id: 'ld',
+        loai: 'hoc_bu',
+        lich_nguon: { thoi_gian_bat_dau: hqua },
+      },
+    ]);
+    const r = await svc.danhSach(quanTri, { trang_thai: 'cho_duyet', loai: 'hoc_bu' });
+    expect(r[0]).toMatchObject({ id: 'x1', loai: 'hoc_bu', qua_han: false, thu_tu_hang: { k: 1, n: 1 } });
+    const where = (prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any).where;
+    expect(where.loai).toBe('hoc_bu');
+    expect(where.OR).toEqual([
+      { loai: 'hoc_bu' },
+      { lich_nguon: { thoi_gian_bat_dau: { gt: expect.any(Date) } } },
+    ]);
+    expect(where.lich_de_nghi.thoi_gian_bat_dau.gt).toBeInstanceOf(Date);
+  });
+
+  it('danhSach qua han: buoi goc da bat dau chi tinh cho doi buoi', async () => {
+    const { svc, prisma } = setupD();
+    await svc.danhSach(quanTri, { trang_thai: 'cho_duyet', qua_han: true });
+    const where = (prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any).where;
+    expect(where.OR[0]).toEqual({
+      loai: 'doi_buoi',
+      lich_nguon: { thoi_gian_bat_dau: { lte: expect.any(Date) } },
+    });
+  });
+
+  it('demChoDuyet: loc loai + hoc bu khong bi loai vi buoi goc da qua', async () => {
+    const { svc, prisma } = setupD();
+    await svc.demChoDuyet(quanTri, 'hoc_bu');
+    const where = (prisma.doi_buoi_hoc.count.mock.calls[0][0] as any).where;
+    expect(where.loai).toBe('hoc_bu');
+    expect(where.OR).toEqual([
+      { loai: 'hoc_bu' },
+      { lich_nguon: { thoi_gian_bat_dau: { gt: expect.any(Date) } } },
+    ]);
+  });
+
+  it('idQuaHanThem: hoc bu xet buoi goc co_mat va ban da duyet khac loai', async () => {
+    const { svc, prisma } = setupD();
+    await svc.demChoDuyet(quanTri);
+    const [strings] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray];
+    const sql = strings.join('?').replace(/\s+/g, ' ');
+    expect(sql).toContain("(c.loai = 'hoc_bu' OR ln.thoi_gian_bat_dau > ?)");
+    expect(sql).toContain("(c.loai = 'doi_buoi' OR dd.trang_thai = 'co_mat')");
+    expect(sql).toContain('d.loai <> c.loai');
   });
 });

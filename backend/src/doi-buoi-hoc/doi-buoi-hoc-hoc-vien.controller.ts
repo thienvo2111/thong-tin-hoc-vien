@@ -11,7 +11,7 @@ import {
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
-import { GuiDoiBuoiDto } from './dto/doi-buoi-hoc.dto';
+import { GuiDoiBuoiDto, LocLoaiDoiBuoiDto } from './dto/doi-buoi-hoc.dto';
 import { DoiBuoiHocService } from './doi-buoi-hoc.service';
 
 // Dùng chung prefix 'hoc-vien/toi' với DangKyHocController (chấp nhận được).
@@ -34,8 +34,9 @@ export class DoiBuoiHocHocVienController {
   luaChon(
     @CurrentUser() user: AuthenticatedUser,
     @Param('lichNguonId', ParseUUIDPipe) lichNguonId: string,
+    @Query() q: LocLoaiDoiBuoiDto,
   ) {
-    return this.service.luaChonHocVien(user, lichNguonId);
+    return this.service.luaChonHocVien(user, lichNguonId, q.loai);
   }
 
   @Roles('hoc_vien')

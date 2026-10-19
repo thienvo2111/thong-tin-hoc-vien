@@ -582,3 +582,279 @@ describe('buoiTrungGio', () => {
     expect(buoiTrungGio(ungVien, [])).toEqual([]);
   });
 });
+
+// ADR 0012 / spec học bù §2: buổi gốc đã vắng, buổi học bù chưa bắt đầu.
+describe('học bù (loai = hoc_bu)', () => {
+  const gocDaQua = lich({
+    id: 'bn',
+    lop_id: 'l1',
+    thoi_gian_bat_dau: new Date(NOW.getTime() - NGAY),
+  });
+  type TrangThaiDd = 'co_mat' | 'vang' | 'vang_co_phep' | null;
+
+  describe('kiemTraGui', () => {
+    const base = {
+      loai: 'hoc_bu' as const,
+      so_buoi_doi_toi_da: 0,
+      so_luot_da_dung: 0,
+      so_buoi_hoc_bu_toi_da: 2,
+      so_luot_hoc_bu_da_dung: 0,
+      buoi_nguon: gocDaQua,
+      buoi_dich: dich,
+      lop_phan_hien_tai: 'l1' as string | null,
+      si_so_dich: 10,
+      ly_do: 'Bị ốm hôm đó' as string | undefined,
+      trang_thai_diem_danh_nguon: null as TrangThaiDd,
+      nguon_co_doi_buoi_da_duyet: false,
+    };
+
+    it.each<[MaLoiDoiBuoi, Partial<typeof base>, string]>([
+      ['KHOA_TAT', { so_buoi_hoc_bu_toi_da: 0 }, 'Khóa học chưa mở đăng ký học bù'],
+      [
+        'HET_LUOT',
+        { so_luot_hoc_bu_da_dung: 2 },
+        'Thầy/Cô đã dùng hết 2 lượt học bù của khóa này',
+      ],
+      ['KHONG_THUOC_LOP', { lop_phan_hien_tai: 'lx' }, 'Buổi này không thuộc lớp của bạn'],
+      [
+        'CHUA_DIEN_RA',
+        { buoi_nguon: lich({ id: 'bn', lop_id: 'l1' }) },
+        'Buổi này chưa diễn ra — hãy dùng đổi buổi',
+      ],
+      [
+        'DA_CO_MAT',
+        { trang_thai_diem_danh_nguon: 'co_mat' },
+        'Thầy/Cô đã có mặt buổi này, không cần học bù',
+      ],
+      [
+        'DA_DOI_BUOI',
+        { nguon_co_doi_buoi_da_duyet: true },
+        'Buổi này đã được đổi, liên hệ người hỗ trợ',
+      ],
+      [
+        'KHONG_TUONG_DUONG',
+        { buoi_dich: lich({ lop_id: 'l2', buoi_so: 5 }) },
+        'Buổi chọn không tương đương với buổi của bạn',
+      ],
+      [
+        'DA_BAT_DAU',
+        { buoi_dich: lich({ lop_id: 'l2', thoi_gian_bat_dau: NOW }) },
+        'Buổi học bù đã bắt đầu, hãy chọn buổi khác',
+      ],
+      ['BUOI_DAY', { si_so_dich: 30 }, 'Buổi đã đủ sĩ số, hãy chọn buổi khác'],
+      ['LY_DO', { ly_do: 'abc' }, 'Lý do phải từ 5 đến 500 ký tự'],
+    ])('%s', (ma, over, thong_diep) => {
+      expect(kiemTraGui({ ...base, ...over }, NOW)).toEqual({
+        ok: false,
+        ma,
+        thong_diep,
+      });
+    });
+
+    it('mã mới đều 400', () => {
+      expect(HTTP_THEO_MA.CHUA_DIEN_RA).toBe(400);
+      expect(HTTP_THEO_MA.DA_CO_MAT).toBe(400);
+      expect(HTTP_THEO_MA.DA_DOI_BUOI).toBe(400);
+    });
+
+    it('hợp lệ: buổi gốc đã qua, không có điểm danh', () => {
+      expect(kiemTraGui(base, NOW)).toEqual({ ok: true });
+    });
+
+    it.each(['vang', 'vang_co_phep'] as const)('điểm danh %s → hợp lệ', (t) => {
+      expect(
+        kiemTraGui({ ...base, trang_thai_diem_danh_nguon: t }, NOW),
+      ).toEqual({ ok: true });
+    });
+
+    it('không dùng công tắc / lượt đổi buổi', () => {
+      expect(
+        kiemTraGui({ ...base, so_buoi_doi_toi_da: 0, so_luot_da_dung: 9 }, NOW),
+      ).toEqual({ ok: true });
+    });
+
+    it('da_diem_danh_nguon (D12 đổi buổi) không áp cho học bù', () => {
+      expect(kiemTraGui({ ...base, da_diem_danh_nguon: true }, NOW)).toEqual({
+        ok: true,
+      });
+    });
+
+    it('thứ tự: KHOA_TAT > HET_LUOT > KHONG_THUOC_LOP > CHUA_DIEN_RA', () => {
+      const chuaDienRa = lich({ id: 'bn', lop_id: 'l1' });
+      expect(
+        kiemTraGui(
+          { ...base, so_buoi_hoc_bu_toi_da: 0, so_luot_hoc_bu_da_dung: 5 },
+          NOW,
+        ),
+      ).toMatchObject({ ma: 'KHOA_TAT' });
+      expect(
+        kiemTraGui(
+          { ...base, so_luot_hoc_bu_da_dung: 2, lop_phan_hien_tai: 'lx' },
+          NOW,
+        ),
+      ).toMatchObject({ ma: 'HET_LUOT' });
+      expect(
+        kiemTraGui(
+          { ...base, lop_phan_hien_tai: 'lx', buoi_nguon: chuaDienRa },
+          NOW,
+        ),
+      ).toMatchObject({ ma: 'KHONG_THUOC_LOP' });
+      expect(
+        kiemTraGui(
+          {
+            ...base,
+            buoi_nguon: chuaDienRa,
+            trang_thai_diem_danh_nguon: 'co_mat',
+          },
+          NOW,
+        ),
+      ).toMatchObject({ ma: 'CHUA_DIEN_RA' });
+    });
+
+    it('thứ tự: DA_CO_MAT > DA_DOI_BUOI > KHONG_TUONG_DUONG > DA_BAT_DAU', () => {
+      const khongTd = lich({ lop_id: 'l2', buoi_so: 5, thoi_gian_bat_dau: NOW });
+      expect(
+        kiemTraGui(
+          {
+            ...base,
+            trang_thai_diem_danh_nguon: 'co_mat',
+            nguon_co_doi_buoi_da_duyet: true,
+            buoi_dich: khongTd,
+          },
+          NOW,
+        ),
+      ).toMatchObject({ ma: 'DA_CO_MAT' });
+      expect(
+        kiemTraGui(
+          { ...base, nguon_co_doi_buoi_da_duyet: true, buoi_dich: khongTd },
+          NOW,
+        ),
+      ).toMatchObject({ ma: 'DA_DOI_BUOI' });
+      expect(kiemTraGui({ ...base, buoi_dich: khongTd }, NOW)).toMatchObject({
+        ma: 'KHONG_TUONG_DUONG',
+      });
+    });
+
+    describe('đổi lại học bù (đã có bản học bù đã duyệt)', () => {
+      const chotCu = lich({ id: 'bc', lop_id: 'l3' });
+
+      it('trùng buổi chốt hiện tại → TRUNG_BUOI_CHOT', () => {
+        expect(
+          kiemTraGui(
+            { ...base, buoi_dich: chotCu, buoi_chot_hien_tai: chotCu },
+            NOW,
+          ),
+        ).toMatchObject({ ma: 'TRUNG_BUOI_CHOT' });
+      });
+
+      it('buổi chốt hiện tại đã bắt đầu → DA_BAT_DAU', () => {
+        const daQua = lich({ id: 'bc', lop_id: 'l3', thoi_gian_bat_dau: NOW });
+        expect(
+          kiemTraGui({ ...base, buoi_chot_hien_tai: daQua }, NOW),
+        ).toMatchObject({ ma: 'DA_BAT_DAU' });
+      });
+
+      it('đã điểm danh buổi chốt hiện tại → DA_DIEM_DANH', () => {
+        expect(
+          kiemTraGui(
+            { ...base, buoi_chot_hien_tai: chotCu, da_diem_danh_chot: true },
+            NOW,
+          ),
+        ).toMatchObject({ ma: 'DA_DIEM_DANH' });
+      });
+
+      it('buổi khác, chưa bắt đầu → hợp lệ', () => {
+        expect(kiemTraGui({ ...base, buoi_chot_hien_tai: chotCu }, NOW)).toEqual({
+          ok: true,
+        });
+      });
+    });
+  });
+
+  describe('quyetDinhDuyet', () => {
+    const base = {
+      loai: 'hoc_bu' as const,
+      vai_tro: 'ho_tro_hoc_vien' as 'quan_tri' | 'ho_tro_hoc_vien',
+      trang_thai: 'cho_duyet' as const,
+      buoi_nguon: gocDaQua,
+      buoi_chot: dich,
+      lop_phan_hien_tai: 'l1' as string | null,
+      si_so: 10,
+      so_truoc: 0,
+      trang_thai_diem_danh_nguon: null as TrangThaiDd,
+      nguon_co_doi_buoi_da_duyet: false,
+    };
+
+    it('buổi gốc đã qua + có dòng điểm danh vắng → duyệt (bỏ D2/D12 buổi gốc)', () => {
+      expect(
+        quyetDinhDuyet(
+          { ...base, trang_thai_diem_danh_nguon: 'vang', da_diem_danh_nguon: true },
+          NOW,
+        ),
+      ).toEqual({ ket_qua: 'duyet', canh_bao: [] });
+    });
+
+    it.each<[MaLoiDoiBuoi, Record<string, unknown>]>([
+      ['DA_XU_LY', { trang_thai: 'tu_choi' }],
+      ['CHUA_DIEN_RA', { buoi_nguon: lich({ id: 'bn', lop_id: 'l1' }) }],
+      ['DA_CO_MAT', { trang_thai_diem_danh_nguon: 'co_mat' }],
+      ['DA_DOI_BUOI', { nguon_co_doi_buoi_da_duyet: true }],
+      ['DA_BAT_DAU', { buoi_chot: lich({ lop_id: 'l2', thoi_gian_bat_dau: NOW }) }],
+      ['DA_DIEM_DANH', { da_diem_danh_chot_cu: true }],
+      ['KHONG_TUONG_DUONG', { buoi_chot: lich({ lop_id: 'l2', buoi_so: 5 }) }],
+      ['PHAN_LOP_DOI', { lop_phan_hien_tai: 'lx' }],
+      ['BUOI_DAY', { si_so: 30 }],
+    ])('chặn %s', (ma, over) => {
+      const kq = quyetDinhDuyet({ ...base, ...over } as typeof base, NOW);
+      expect(kq).toMatchObject({ ket_qua: 'chan', ma });
+      expect(kq.thong_diep).toBeTruthy();
+    });
+
+    it('DA_CO_MAT chặn cả quản trị, thông điệp cho người duyệt', () => {
+      expect(
+        quyetDinhDuyet(
+          { ...base, vai_tro: 'quan_tri', trang_thai_diem_danh_nguon: 'co_mat' },
+          NOW,
+        ),
+      ).toMatchObject({
+        ket_qua: 'chan',
+        ma: 'DA_CO_MAT',
+        thong_diep: 'Học viên đã có mặt buổi này, không cần học bù',
+      });
+    });
+
+    it('quản trị vượt sĩ số → duyệt + cảnh báo như đổi buổi', () => {
+      expect(
+        quyetDinhDuyet({ ...base, vai_tro: 'quan_tri', si_so: 30 }, NOW),
+      ).toEqual({ ket_qua: 'duyet', canh_bao: ['Vượt sĩ số 31/30'] });
+    });
+
+    it('đổi buổi (không truyền loai) vẫn chặn buổi gốc đã bắt đầu', () => {
+      const { loai: _l, ...doiBuoi } = base;
+      expect(quyetDinhDuyet(doiBuoi, NOW)).toMatchObject({
+        ket_qua: 'chan',
+        ma: 'DA_BAT_DAU',
+      });
+    });
+  });
+
+  describe('soLuotDaDung theo loại', () => {
+    const ds = [
+      { trang_thai: 'da_duyet' as const, lich_nguon_id: 'n1', loai: 'doi_buoi' as const },
+      { trang_thai: 'cho_duyet' as const, lich_nguon_id: 'n2', loai: 'hoc_bu' as const },
+      { trang_thai: 'da_duyet' as const, lich_nguon_id: 'n3', loai: 'hoc_bu' as const },
+      { trang_thai: 'cho_duyet' as const, lich_nguon_id: 'n3', loai: 'hoc_bu' as const },
+      { trang_thai: 'tu_choi' as const, lich_nguon_id: 'n4', loai: 'hoc_bu' as const },
+      { trang_thai: 'cho_duyet' as const, lich_nguon_id: 'n5' },
+    ];
+
+    it('mặc định đếm đổi buổi (dòng thiếu loai = doi_buoi)', () => {
+      expect(soLuotDaDung(ds)).toBe(2);
+      expect(soLuotDaDung(ds, 'doi_buoi')).toBe(2);
+    });
+
+    it('học bù: buổi gốc khác nhau, chờ|đã duyệt, cùng loại', () => {
+      expect(soLuotDaDung(ds, 'hoc_bu')).toBe(2);
+    });
+  });
+});

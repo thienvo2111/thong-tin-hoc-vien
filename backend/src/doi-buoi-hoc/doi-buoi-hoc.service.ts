@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, trang_thai_de_nghi } from '@prisma/client';
+import {
+  loai_doi_buoi,
+  Prisma,
+  trang_thai_de_nghi,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
@@ -40,6 +44,8 @@ import {
 export interface DeNghiHocVien {
   id: string;
   trang_thai: trang_thai_de_nghi;
+  /** ADR 0012: doi_buoi | hoc_bu. */
+  loai: loai_doi_buoi;
   lich_nguon_id: string;
   lich_de_nghi_id: string;
   lich_chot_id: string | null;
@@ -109,6 +115,7 @@ export interface DeNghiDuyet extends DeNghiHocVien {
 interface DeNghiRow {
   id: string;
   trang_thai: trang_thai_de_nghi;
+  loai?: loai_doi_buoi;
   dang_ky_hoc_id: string;
   lich_nguon_id: string;
   lich_de_nghi_id: string;
@@ -121,6 +128,9 @@ interface DeNghiRow {
 
 const TRANG_THAI_HOAT_DONG: trang_thai_de_nghi[] = ['cho_duyet', 'da_duyet'];
 const TIN_KHOA_TAT = 'Khóa học chưa mở đề nghị đổi buổi';
+const TIN_HOC_BU_TAT = 'Khóa học chưa mở đăng ký học bù';
+// ADR 0012: tổng quan học viên chỉ xét 30 buổi đã qua gần nhất cho học bù.
+const SO_BUOI_DA_QUA = 30;
 const TIN_GHI_CHU = 'Ghi chú phải từ 5 đến 500 ký tự';
 
 @Injectable()
@@ -139,7 +149,9 @@ export class DoiBuoiHocService {
   async tongQuanHocVien(user: AuthenticatedUser, khoaId: string) {
     const hocVienId = this.assertHocVienId(user);
     const dangKy = await this.dangKyCuaCaller(hocVienId, khoaId);
-    const soBuoiToiDa = await this.soBuoiDoiToiDa(khoaId);
+    const cauHinh = await this.cauHinhKhoa(khoaId);
+    if (cauHinh.doi <= 0 && cauHinh.hocBu <= 0)
+      throw new ForbiddenAppException(TIN_KHOA_TAT);
     const now = new Date();
 
     const [phanLop, deNghiRows] = await Promise.all([
@@ -153,17 +165,35 @@ export class DoiBuoiHocService {
         select: DE_NGHI_SELECT,
       }),
     ]);
-    const lichSapToi = phanLop.length
-      ? await this.prisma.lich_hoc_lop.findMany({
+    const capLop = phanLop.map((p) => ({
+      lop_id: p.lop_id,
+      giai_doan_id: p.giai_doan_id,
+    }));
+    // ADR 0012: buổi đã qua (học bù) chỉ đọc khi khóa bật học bù.
+    const [lichSapToi, lichDaQua] = await Promise.all([
+      capLop.length && cauHinh.doi > 0
+        ? this.prisma.lich_hoc_lop.findMany({
+            where: { thoi_gian_bat_dau: { gt: now }, OR: capLop },
+            orderBy: { thoi_gian_bat_dau: 'asc' },
+            select: LICH_TOM_TAT_SELECT,
+          })
+        : Promise.resolve([]),
+      capLop.length && cauHinh.hocBu > 0
+        ? this.prisma.lich_hoc_lop.findMany({
+            where: { thoi_gian_bat_dau: { lte: now }, OR: capLop },
+            orderBy: { thoi_gian_bat_dau: 'desc' },
+            take: SO_BUOI_DA_QUA,
+            select: LICH_TOM_TAT_SELECT,
+          })
+        : Promise.resolve([]),
+    ]);
+    const diemDanhDaQua = lichDaQua.length
+      ? await this.prisma.diem_danh.findMany({
           where: {
-            thoi_gian_bat_dau: { gt: now },
-            OR: phanLop.map((p) => ({
-              lop_id: p.lop_id,
-              giai_doan_id: p.giai_doan_id,
-            })),
+            dang_ky_hoc_id: dangKy.id,
+            lich_hoc_id: { in: lichDaQua.map((l) => l.id) },
           },
-          orderBy: { thoi_gian_bat_dau: 'asc' },
-          select: LICH_TOM_TAT_SELECT,
+          select: { lich_hoc_id: true, trang_thai: true },
         })
       : [];
 
@@ -189,19 +219,37 @@ export class DoiBuoiHocService {
     const deNghi = deNghiRows.map((d) =>
       this.anhXaDeNghi(d, lichMap, now, hang, chotCu, lichDk, quaHanThem),
     );
-    const daDuyet = new Map(
-      deNghi
-        .filter((d) => d.trang_thai === 'da_duyet')
-        .map((d) => [d.lich_nguon_id, d]),
-    );
-    const choDuyet = new Map(
-      deNghi
-        .filter((d) => d.trang_thai === 'cho_duyet')
-        .map((d) => [d.lich_nguon_id, d]),
+    const theoNguon = (loai: loai_doi_buoi, tt: trang_thai_de_nghi) =>
+      new Map(
+        deNghi
+          .filter((d) => d.loai === loai && d.trang_thai === tt)
+          .map((d) => [d.lich_nguon_id, d]),
+      );
+    const daDuyet = theoNguon('doi_buoi', 'da_duyet');
+    const choDuyet = theoNguon('doi_buoi', 'cho_duyet');
+    const hocBuDaDuyet = theoNguon('hoc_bu', 'da_duyet');
+    const hocBuCho = theoNguon('hoc_bu', 'cho_duyet');
+    const ttDiemDanh = new Map(
+      diemDanhDaQua.map((d) => [d.lich_hoc_id, d.trang_thai]),
     );
     return {
-      so_buoi_doi_toi_da: soBuoiToiDa,
+      so_buoi_doi_toi_da: cauHinh.doi,
       so_luot_da_dung: soLuotDaDung(deNghiRows),
+      so_buoi_hoc_bu_toi_da: cauHinh.hocBu,
+      so_luot_hoc_bu_da_dung: soLuotDaDung(deNghiRows, 'hoc_bu'),
+      // B2 + B6: buổi đã qua, không có mặt, không có đổi buổi đã duyệt.
+      buoi_co_the_hoc_bu: lichDaQua
+        .filter((l) => ttDiemDanh.get(l.id) !== 'co_mat' && !daDuyet.has(l.id))
+        .map((l) => {
+          const duyet = hocBuDaDuyet.get(l.id) ?? null;
+          const cho = hocBuCho.get(l.id) ?? null;
+          return {
+            lich_nguon: l,
+            trang_thai_diem_danh: ttDiemDanh.get(l.id) ?? null,
+            de_nghi: duyet ?? cho,
+            de_nghi_doi_lai: duyet ? cho : null,
+          };
+        }),
       buoi_sap_toi: lichSapToi.map((l) => {
         const duyet = daDuyet.get(l.id) ?? null;
         const cho = choDuyet.get(l.id) ?? null;
@@ -219,6 +267,7 @@ export class DoiBuoiHocService {
   async luaChonHocVien(
     user: AuthenticatedUser,
     lichNguonId: string,
+    loai: loai_doi_buoi = 'doi_buoi',
   ): Promise<LuaChonBuoi[]> {
     const hocVienId = this.assertHocVienId(user);
     const nguon = (await this.query.lichTomTat([lichNguonId])).get(lichNguonId);
@@ -228,7 +277,7 @@ export class DoiBuoiHocService {
       nguon.lop.khoa_id,
       'Không tìm thấy buổi học',
     );
-    await this.soBuoiDoiToiDa(nguon.lop.khoa_id);
+    await this.luotToiDa(nguon.lop.khoa_id, loai);
     const phanLop = await this.prisma.phan_lop_giai_doan.findFirst({
       where: { dang_ky_hoc_id: dangKy.id, giai_doan_id: nguon.giai_doan_id },
       select: { lop_id: true },
@@ -236,17 +285,31 @@ export class DoiBuoiHocService {
     if (phanLop?.lop_id !== nguon.lop_id)
       throw new NotFoundAppException('Không tìm thấy buổi học');
     const now = new Date();
+    const chot =
+      loai === 'hoc_bu'
+        ? await this.kiemTraNguonHocBu(dangKy.id, nguon, now)
+        : await this.kiemTraNguonDoiBuoi(dangKy.id, nguon, now);
+    const ds = await this.luaChonTuongDuong(nguon, now, dangKy.id);
+    return chot ? ds.filter((x) => x.lich.id !== chot) : ds;
+  }
+
+  // Đổi buổi: buổi nguồn chưa bắt đầu, chưa điểm danh (D2, D12). Trả buổi chốt hiện tại.
+  private async kiemTraNguonDoiBuoi(
+    dangKyId: string,
+    nguon: LichTomTat,
+    now: Date,
+  ): Promise<string | null> {
     if (daBatDau(nguon, now))
       this.nem({
         ok: false,
         ma: 'DA_BAT_DAU',
         thong_diep: 'Buổi đã bắt đầu, không thể đổi',
       });
-    const chot = await this.chotDaDuyet(dangKy.id, nguon.id);
+    const chot = await this.chotDaDuyet(dangKyId, nguon.id);
     // D12: đã điểm danh ở buổi nguồn (hoặc buổi đang học nếu đổi lại) → không đổi.
     const daDiemDanh = await this.prisma.diem_danh.findFirst({
       where: {
-        dang_ky_hoc_id: dangKy.id,
+        dang_ky_hoc_id: dangKyId,
         lich_hoc_id: { in: chot ? [nguon.id, chot] : [nguon.id] },
       },
       select: { id: true },
@@ -257,9 +320,58 @@ export class DoiBuoiHocService {
         ma: 'DA_DIEM_DANH',
         thong_diep: 'Thầy/Cô đã điểm danh buổi này, không thể đổi',
       });
+    return chot;
+  }
 
-    const ds = await this.luaChonTuongDuong(nguon, now, dangKy.id);
-    return chot ? ds.filter((x) => x.lich.id !== chot) : ds;
+  // ADR 0012 B2/B6: buổi gốc đã bắt đầu, không có mặt, chưa có đổi buổi đã
+  // duyệt; đổi lại học bù → D12 ở buổi chốt hiện tại. Trả buổi chốt hiện tại.
+  private async kiemTraNguonHocBu(
+    dangKyId: string,
+    nguon: LichTomTat,
+    now: Date,
+  ): Promise<string | null> {
+    if (!daBatDau(nguon, now))
+      this.nem({
+        ok: false,
+        ma: 'CHUA_DIEN_RA',
+        thong_diep: 'Buổi này chưa diễn ra — hãy dùng đổi buổi',
+      });
+    const ban = await this.prisma.doi_buoi_hoc.findFirst({
+      where: {
+        dang_ky_hoc_id: dangKyId,
+        lich_nguon_id: nguon.id,
+        trang_thai: 'da_duyet',
+      },
+      select: { loai: true, lich_chot_id: true },
+    });
+    const laHocBu = ban?.loai === 'hoc_bu';
+    const chot = laHocBu ? ban.lich_chot_id : null;
+    const diemDanh = await this.prisma.diem_danh.findMany({
+      where: {
+        dang_ky_hoc_id: dangKyId,
+        lich_hoc_id: { in: chot ? [nguon.id, chot] : [nguon.id] },
+      },
+      select: { lich_hoc_id: true, trang_thai: true },
+    });
+    if (diemDanh.some((d) => d.lich_hoc_id === nguon.id && d.trang_thai === 'co_mat'))
+      this.nem({
+        ok: false,
+        ma: 'DA_CO_MAT',
+        thong_diep: 'Thầy/Cô đã có mặt buổi này, không cần học bù',
+      });
+    if (ban && !laHocBu)
+      this.nem({
+        ok: false,
+        ma: 'DA_DOI_BUOI',
+        thong_diep: 'Buổi này đã được đổi, liên hệ người hỗ trợ',
+      });
+    if (chot && diemDanh.some((d) => d.lich_hoc_id === chot))
+      this.nem({
+        ok: false,
+        ma: 'DA_DIEM_DANH',
+        thong_diep: 'Thầy/Cô đã điểm danh buổi này, không thể đổi',
+      });
+    return chot;
   }
 
   async gui(user: AuthenticatedUser, dto: GuiDoiBuoiDto) {
@@ -270,9 +382,11 @@ export class DoiBuoiHocService {
       nguon.lop.khoa_id,
       'Không tìm thấy buổi học',
     );
-    const soBuoiToiDa = await this.soBuoiDoiToiDa(nguon.lop.khoa_id);
+    const loai = dto.loai ?? 'doi_buoi';
+    const soBuoiToiDa = await this.luotToiDa(nguon.lop.khoa_id, loai);
     const moi = await this.taoTrongGiaoDich({
       dangKyId: dangKy.id,
+      loai,
       soBuoiToiDa,
       nguon,
       dich,
@@ -280,10 +394,11 @@ export class DoiBuoiHocService {
       nguoiTao: user.id,
       huyId: null,
     });
-    await this.ghiNhatKyGui(hocVienId, 'Gửi đề nghị đổi buổi', {
+    await this.ghiNhatKyGui(hocVienId, moTaTheoLoai(loai, 'Gửi'), {
       de_nghi_id: moi.id,
       lich_nguon_id: dto.lich_nguon_id,
       lich_de_nghi_id: dto.lich_de_nghi_id,
+      ...chiTietLoai(loai),
     });
     return moi;
   }
@@ -295,10 +410,14 @@ export class DoiBuoiHocService {
       throw new ValidationException(
         'Không đổi được buổi nguồn khi sửa đề nghị',
       );
-    const soBuoiToiDa = await this.soBuoiDoiToiDa(cu.dang_ky_hoc.khoa_id);
+    const loai = cu.loai ?? 'doi_buoi';
+    if (dto.loai && dto.loai !== loai)
+      throw new ValidationException('Không đổi được loại đề nghị khi sửa');
+    const soBuoiToiDa = await this.luotToiDa(cu.dang_ky_hoc.khoa_id, loai);
     const { nguon, dich } = await this.taiHaiBuoi(dto);
     const moi = await this.taoTrongGiaoDich({
       dangKyId: cu.dang_ky_hoc_id,
+      loai,
       soBuoiToiDa,
       nguon,
       dich,
@@ -306,11 +425,12 @@ export class DoiBuoiHocService {
       nguoiTao: user.id,
       huyId: id,
     });
-    await this.ghiNhatKyGui(hocVienId, 'Sửa đề nghị đổi buổi', {
+    await this.ghiNhatKyGui(hocVienId, moTaTheoLoai(loai, 'Sửa'), {
       de_nghi_id: moi.id,
       de_nghi_cu_id: id,
       lich_nguon_id: dto.lich_nguon_id,
       lich_de_nghi_id: dto.lich_de_nghi_id,
+      ...chiTietLoai(loai),
     });
     return moi;
   }
@@ -318,7 +438,8 @@ export class DoiBuoiHocService {
   async huyHocVien(user: AuthenticatedUser, id: string) {
     const hocVienId = this.assertHocVienId(user);
     const cu = await this.taiDeNghiCuaCaller(hocVienId, id);
-    await this.soBuoiDoiToiDa(cu.dang_ky_hoc.khoa_id);
+    const loai = cu.loai ?? 'doi_buoi';
+    await this.luotToiDa(cu.dang_ky_hoc.khoa_id, loai);
     const { count } = await this.prisma.doi_buoi_hoc.updateMany({
       where: { id, trang_thai: 'cho_duyet', dang_ky_hoc_id: cu.dang_ky_hoc_id },
       data: {
@@ -328,9 +449,10 @@ export class DoiBuoiHocService {
       },
     });
     if (!count) throw new ConflictAppException('Đề nghị đã được xử lý');
-    await this.ghiNhatKyGui(hocVienId, 'Hủy đề nghị đổi buổi', {
+    await this.ghiNhatKyGui(hocVienId, moTaTheoLoai(loai, 'Hủy'), {
       de_nghi_id: id,
       huy: true,
+      ...chiTietLoai(loai),
     });
     return { trang_thai: 'da_huy' as const };
   }
@@ -357,13 +479,17 @@ export class DoiBuoiHocService {
       : quaHan
         ? {
             OR: [
-              { lich_nguon: { thoi_gian_bat_dau: { lte: now } } },
+              // ADR 0012: buổi gốc đã bắt đầu chỉ làm quá hạn đổi buổi.
+              {
+                loai: 'doi_buoi',
+                lich_nguon: { thoi_gian_bat_dau: { lte: now } },
+              },
               { lich_de_nghi: { thoi_gian_bat_dau: { lte: now } } },
               ...(doiLaiQuaHan.length ? [{ id: { in: doiLaiQuaHan } }] : []),
             ],
           }
         : {
-            lich_nguon: { thoi_gian_bat_dau: { gt: now } },
+            ...nguonConHan(now),
             lich_de_nghi: { thoi_gian_bat_dau: { gt: now } },
             ...(doiLaiQuaHan.length ? { id: { notIn: doiLaiQuaHan } } : {}),
           };
@@ -374,6 +500,7 @@ export class DoiBuoiHocService {
           : q.trang_thai
             ? { trang_thai: q.trang_thai }
             : {}),
+        ...(q.loai ? { loai: q.loai } : {}),
         ...locHan,
         dang_ky_hoc: {
           ...(cumIds ? { cum_id: { in: cumIds } } : {}),
@@ -457,7 +584,10 @@ export class DoiBuoiHocService {
     });
   }
 
-  async demChoDuyet(user: AuthenticatedUser): Promise<number> {
+  async demChoDuyet(
+    user: AuthenticatedUser,
+    loai?: loai_doi_buoi,
+  ): Promise<number> {
     const cumIds = await this.cumPhamVi(user);
     if (cumIds?.length === 0) return 0;
     const now = new Date();
@@ -465,9 +595,10 @@ export class DoiBuoiHocService {
     return this.prisma.doi_buoi_hoc.count({
       where: {
         trang_thai: 'cho_duyet',
+        ...(loai ? { loai } : {}),
         ...(doiLaiQuaHan.length ? { id: { notIn: doiLaiQuaHan } } : {}),
         ...(cumIds ? { dang_ky_hoc: { cum_id: { in: cumIds } } } : {}),
-        lich_nguon: { thoi_gian_bat_dau: { gt: now } },
+        ...nguonConHan(now),
         lich_de_nghi: { thoi_gian_bat_dau: { gt: now } },
       },
     });
@@ -500,14 +631,15 @@ export class DoiBuoiHocService {
       _count: { _all: true },
     });
     const dem = new Map(truoc.map((g) => [g.lich_de_nghi_id, g._count._all]));
-    const nguonDaBatDau = daBatDau(nguon, now);
+    // ADR 0012: học bù không đòi buổi gốc chưa bắt đầu.
+    const nguonConHanDuyet = dn.loai === 'hoc_bu' || !daBatDau(nguon, now);
     return ds.map((x) => {
       const so_truoc = dem.get(x.lich.id) ?? 0;
       return {
         ...x,
         so_truoc,
         duyet_duoc:
-          !nguonDaBatDau &&
+          nguonConHanDuyet &&
           conChoChoDeNghi({
             si_so: x.si_so,
             si_so_toi_da: x.si_so_toi_da,
@@ -526,6 +658,7 @@ export class DoiBuoiHocService {
     const ghiChu = this.ghiChuTuyChon(dto.ghi_chu);
     const dn = await this.taiDeNghiTrongPhamVi(user, id);
     const lichChotId = dto.lich_chot_id ?? dn.lich_de_nghi_id;
+    const loai = dn.loai ?? 'doi_buoi';
     const now = new Date();
     const kq = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'doi_buoi:' + lichChotId}))`;
@@ -535,16 +668,20 @@ export class DoiBuoiHocService {
       });
       if (!hienTai) throw new NotFoundAppException('Không tìm thấy đề nghị');
       // D11: bản đã duyệt cùng (đăng ký, buổi nguồn) → đề nghị này là đổi lại.
-      const banCu = await tx.doi_buoi_hoc.findFirst({
+      const banTruoc = await tx.doi_buoi_hoc.findFirst({
         where: {
           dang_ky_hoc_id: dn.dang_ky_hoc_id,
           lich_nguon_id: dn.lich_nguon_id,
           trang_thai: 'da_duyet',
           id: { not: id },
         },
-        select: { id: true, lich_chot_id: true },
+        select: { id: true, lich_chot_id: true, loai: true },
       });
+      // ADR 0012 B6: bản đã duyệt KHÁC loại không bị thay (học bù → DA_DOI_BUOI).
+      const banCu =
+        banTruoc && (banTruoc.loai ?? 'doi_buoi') === loai ? banTruoc : null;
       // D12: đã điểm danh ở buổi nguồn / buổi chốt cũ (đổi lại) → không đổi.
+      // Học bù: trạng thái ở buổi gốc đọc lại trong tx (DA_CO_MAT).
       const diemDanh = await tx.diem_danh.findMany({
         where: {
           dang_ky_hoc_id: dn.dang_ky_hoc_id,
@@ -555,7 +692,7 @@ export class DoiBuoiHocService {
             ],
           },
         },
-        select: { lich_hoc_id: true },
+        select: { lich_hoc_id: true, trang_thai: true },
       });
       const daDiemDanh = new Set(diemDanh.map((d) => d.lich_hoc_id));
       const lichMap = await this.query.lichTomTat(
@@ -591,6 +728,7 @@ export class DoiBuoiHocService {
       const si_so = siSo.get(lichChotId)?.si_so ?? 0;
       const quyetDinh = quyetDinhDuyet(
         {
+          loai,
           vai_tro: user.vai_tro === 'quan_tri' ? 'quan_tri' : 'ho_tro_hoc_vien',
           trang_thai: hienTai.trang_thai,
           buoi_nguon: nguon,
@@ -601,6 +739,10 @@ export class DoiBuoiHocService {
           da_diem_danh_nguon: daDiemDanh.has(dn.lich_nguon_id),
           da_diem_danh_chot_cu:
             !!banCu?.lich_chot_id && daDiemDanh.has(banCu.lich_chot_id),
+          trang_thai_diem_danh_nguon:
+            diemDanh.find((d) => d.lich_hoc_id === dn.lich_nguon_id)
+              ?.trang_thai ?? null,
+          nguon_co_doi_buoi_da_duyet: !!banTruoc && !banCu,
         },
         now,
       );
@@ -665,15 +807,20 @@ export class DoiBuoiHocService {
         thay_the_id: banCu?.id ?? null,
       };
     }).catch(trungLaDaXuLy);
-    await this.ghiNhatKyDuyet(dn.dang_ky_hoc.hoc_vien_id, 'Duyệt đổi buổi', {
-      de_nghi_id: id,
-      lich_nguon_id: dn.lich_nguon_id,
-      lich_de_nghi_id: dn.lich_de_nghi_id,
-      lich_chot_id: lichChotId,
-      vuot_si_so: kq.vuot_si_so,
-      vuot_thu_tu: kq.vuot_thu_tu,
-      ...(kq.thay_the_id ? { thay_the_id: kq.thay_the_id } : {}),
-    });
+    await this.ghiNhatKyDuyet(
+      dn.dang_ky_hoc.hoc_vien_id,
+      loai === 'hoc_bu' ? 'Duyệt học bù' : 'Duyệt đổi buổi',
+      {
+        de_nghi_id: id,
+        lich_nguon_id: dn.lich_nguon_id,
+        lich_de_nghi_id: dn.lich_de_nghi_id,
+        lich_chot_id: lichChotId,
+        vuot_si_so: kq.vuot_si_so,
+        vuot_thu_tu: kq.vuot_thu_tu,
+        ...(kq.thay_the_id ? { thay_the_id: kq.thay_the_id } : {}),
+        ...chiTietLoai(loai),
+      },
+    );
     return { trang_thai: 'da_duyet', canh_bao: kq.canh_bao };
   }
 
@@ -694,10 +841,11 @@ export class DoiBuoiHocService {
       },
     });
     if (!count) throw new ConflictAppException('Đề nghị đã được xử lý');
+    const loai = dn.loai ?? 'doi_buoi';
     await this.ghiNhatKyDuyet(
       dn.dang_ky_hoc.hoc_vien_id,
-      'Từ chối đề nghị đổi buổi',
-      { de_nghi_id: id, tu_choi: true },
+      moTaTheoLoai(loai, 'Từ chối'),
+      { de_nghi_id: id, tu_choi: true, ...chiTietLoai(loai) },
     );
     return { trang_thai: 'tu_choi' };
   }
@@ -712,6 +860,10 @@ export class DoiBuoiHocService {
     if (dn.trang_thai !== 'da_duyet' || !dn.lich_chot_id)
       throw new ConflictAppException('Đề nghị đã được xử lý');
     const lichChotId = dn.lich_chot_id;
+    const loai = dn.loai ?? 'doi_buoi';
+    // ADR 0012: học bù — buổi gốc đã qua, học viên vẫn thuộc buổi gốc (spec §5)
+    // → chỉ xét buổi chốt, không đọc sĩ số buổi gốc.
+    const hocBu = loai === 'hoc_bu';
     const now = new Date();
     // Hủy duyệt đưa học viên về buổi nguồn → khóa CÙNG namespace với duyệt
     // (doi_buoi:<lich>) theo buổi nguồn, rồi mới đọc sĩ số buổi nguồn.
@@ -721,7 +873,8 @@ export class DoiBuoiHocService {
         [dn.lich_nguon_id, lichChotId],
         tx,
       );
-      const daBatDauMot = [dn.lich_nguon_id, lichChotId].some((lid) => {
+      const xet = hocBu ? [lichChotId] : [dn.lich_nguon_id, lichChotId];
+      const daBatDauMot = xet.some((lid) => {
         const l = lichMap.get(lid);
         return l !== undefined && daBatDau(l, now);
       });
@@ -742,7 +895,7 @@ export class DoiBuoiHocService {
           ma: 'DA_DIEM_DANH',
           thong_diep: 'Học viên đã điểm danh buổi chốt, không thể hủy duyệt',
         });
-      const nguon = lichMap.get(dn.lich_nguon_id);
+      const nguon = hocBu ? undefined : lichMap.get(dn.lich_nguon_id);
       const phanLop = nguon
         ? await tx.phan_lop_giai_doan.findFirst({
             where: {
@@ -785,11 +938,12 @@ export class DoiBuoiHocService {
     });
     await this.ghiNhatKyDuyet(
       dn.dang_ky_hoc.hoc_vien_id,
-      'Hủy duyệt đổi buổi',
+      hocBu ? 'Hủy duyệt học bù' : 'Hủy duyệt đổi buổi',
       {
         de_nghi_id: id,
         huy_duyet: true,
         vuot_si_so: kq.vuot_si_so,
+        ...chiTietLoai(loai),
       },
     );
     return { trang_thai: 'da_huy', canh_bao: kq.canh_bao };
@@ -854,6 +1008,7 @@ export class DoiBuoiHocService {
         lich_de_nghi_id: true,
         lich_chot_id: true,
         tao_luc: true,
+        loai: true,
         dang_ky_hoc: { select: { hoc_vien_id: true } },
       },
     });
@@ -861,7 +1016,8 @@ export class DoiBuoiHocService {
     return dn;
   }
 
-  // Đề nghị cho_duyet gửi trước đề nghị này, buổi nguồn & buổi đề nghị chưa bắt đầu.
+  // Đề nghị cho_duyet gửi trước đề nghị này, buổi đề nghị chưa bắt đầu; buổi
+  // nguồn chưa bắt đầu (đổi buổi) — học bù không xét buổi gốc (ADR 0012).
   private whereChoTruoc(
     dn: { id: string; tao_luc: Date },
     now: Date,
@@ -873,7 +1029,7 @@ export class DoiBuoiHocService {
       id: doiLaiQuaHan.length
         ? { not: dn.id, notIn: doiLaiQuaHan }
         : { not: dn.id },
-      lich_nguon: { thoi_gian_bat_dau: { gt: now } },
+      ...nguonConHan(now),
       lich_de_nghi: { thoi_gian_bat_dau: { gt: now } },
     };
   }
@@ -884,6 +1040,9 @@ export class DoiBuoiHocService {
   // học (D12). Chỉ xét đề nghị có buổi nguồn và buổi đề nghị CHƯA bắt đầu: đề
   // nghị đã bắt đầu đã quá hạn theo thời gian → tập id nhỏ, không phình theo thời
   // gian. 1 truy vấn gộp; dangKyIds để lọc khi chỉ cần 1 học viên.
+  // ADR 0012 (học bù): buổi gốc đã qua nên không xét thời gian buổi gốc; điểm
+  // danh buổi gốc chỉ tính khi co_mat (DA_CO_MAT); bản da_duyet KHÁC loại cùng
+  // buổi gốc (DA_DOI_BUOI) cũng quá hạn.
   private async idQuaHanThem(
     now: Date,
     db: Db = this.prisma,
@@ -897,15 +1056,17 @@ export class DoiBuoiHocService {
       JOIN lich_hoc_lop ln ON ln.id = c.lich_nguon_id
       JOIN lich_hoc_lop ld ON ld.id = c.lich_de_nghi_id
       WHERE c.trang_thai = 'cho_duyet' ${loc}
-        AND ln.thoi_gian_bat_dau > ${now} AND ld.thoi_gian_bat_dau > ${now} AND (
+        AND (c.loai = 'hoc_bu' OR ln.thoi_gian_bat_dau > ${now})
+        AND ld.thoi_gian_bat_dau > ${now} AND (
         EXISTS (SELECT 1 FROM diem_danh dd
           WHERE dd.dang_ky_hoc_id = c.dang_ky_hoc_id
-            AND dd.lich_hoc_id = c.lich_nguon_id)
+            AND dd.lich_hoc_id = c.lich_nguon_id
+            AND (c.loai = 'doi_buoi' OR dd.trang_thai = 'co_mat'))
         OR EXISTS (SELECT 1 FROM doi_buoi_hoc d
           JOIN lich_hoc_lop l ON l.id = d.lich_chot_id
           WHERE d.dang_ky_hoc_id = c.dang_ky_hoc_id
             AND d.lich_nguon_id = c.lich_nguon_id AND d.trang_thai = 'da_duyet'
-            AND (l.thoi_gian_bat_dau <= ${now} OR EXISTS (
+            AND (d.loai <> c.loai OR l.thoi_gian_bat_dau <= ${now} OR EXISTS (
               SELECT 1 FROM diem_danh dd
               WHERE dd.dang_ky_hoc_id = c.dang_ky_hoc_id
                 AND dd.lich_hoc_id = d.lich_chot_id))))`;
@@ -959,14 +1120,31 @@ export class DoiBuoiHocService {
     throw new ValidationException(loi.thong_diep);
   }
 
-  private async soBuoiDoiToiDa(khoaId: string): Promise<number> {
+  private async cauHinhKhoa(
+    khoaId: string,
+  ): Promise<{ doi: number; hocBu: number }> {
     const khoa = await this.prisma.khoa_boi_duong.findUnique({
       where: { id: khoaId },
-      select: { so_buoi_doi_toi_da: true },
+      select: { so_buoi_doi_toi_da: true, so_buoi_hoc_bu_toi_da: true },
     });
-    if (!khoa || khoa.so_buoi_doi_toi_da <= 0)
-      throw new ForbiddenAppException(TIN_KHOA_TAT);
-    return khoa.so_buoi_doi_toi_da;
+    return {
+      doi: khoa?.so_buoi_doi_toi_da ?? 0,
+      hocBu: khoa?.so_buoi_hoc_bu_toi_da ?? 0,
+    };
+  }
+
+  // Công tắc + lượt tối đa theo loại (ADR 0012 B4); 0 → 403.
+  private async luotToiDa(
+    khoaId: string,
+    loai: loai_doi_buoi,
+  ): Promise<number> {
+    const cauHinh = await this.cauHinhKhoa(khoaId);
+    const toiDa = loai === 'hoc_bu' ? cauHinh.hocBu : cauHinh.doi;
+    if (toiDa <= 0)
+      throw new ForbiddenAppException(
+        loai === 'hoc_bu' ? TIN_HOC_BU_TAT : TIN_KHOA_TAT,
+      );
+    return toiDa;
   }
 
   private async dangKyCuaCaller(
@@ -993,6 +1171,7 @@ export class DoiBuoiHocService {
         dang_ky_hoc_id: true,
         lich_nguon_id: true,
         trang_thai: true,
+        loai: true,
         dang_ky_hoc: { select: { khoa_id: true } },
       },
     });
@@ -1016,6 +1195,8 @@ export class DoiBuoiHocService {
   // rồi (nếu sửa) hủy bản cũ có điều kiện, đếm lượt, kiểm, tạo.
   private async taoTrongGiaoDich(x: {
     dangKyId: string;
+    loai: loai_doi_buoi;
+    /** Lượt tối đa của đúng loại x.loai. */
     soBuoiToiDa: number;
     nguon: LichTomTat;
     dich: LichTomTat;
@@ -1047,16 +1228,26 @@ export class DoiBuoiHocService {
             dang_ky_hoc_id: x.dangKyId,
             trang_thai: { in: TRANG_THAI_HOAT_DONG },
           },
-          select: { lich_nguon_id: true, trang_thai: true, lich_chot_id: true },
+          select: {
+            lich_nguon_id: true,
+            trang_thai: true,
+            lich_chot_id: true,
+            loai: true,
+          },
         });
         // Buổi nguồn đang gửi không tính vào lượt đã dùng: đổi lại (D11) không
         // tốn thêm lượt; đề nghị chờ thứ 2 cùng buổi nguồn bị unique chặn (409).
+        // ADR 0012 B4: lượt đếm theo loại.
         const soLuot = soLuotDaDung(
           hoatDong.filter((d) => d.lich_nguon_id !== x.nguon.id),
+          x.loai,
         );
-        const chotCuId = hoatDong.find(
+        const cungLoai = (d: { loai?: loai_doi_buoi }) =>
+          (d.loai ?? 'doi_buoi') === x.loai;
+        const banNguon = hoatDong.filter(
           (d) => d.lich_nguon_id === x.nguon.id && d.trang_thai === 'da_duyet',
-        )?.lich_chot_id;
+        );
+        const chotCuId = banNguon.find(cungLoai)?.lich_chot_id;
         const chotCu = chotCuId
           ? ((await this.query.lichTomTat([chotCuId], tx)).get(chotCuId) ?? null)
           : null;
@@ -1066,7 +1257,7 @@ export class DoiBuoiHocService {
             dang_ky_hoc_id: x.dangKyId,
             lich_hoc_id: { in: chotCuId ? [x.nguon.id, chotCuId] : [x.nguon.id] },
           },
-          select: { lich_hoc_id: true },
+          select: { lich_hoc_id: true, trang_thai: true },
         });
         const daDiemDanh = new Set(diemDanh.map((d) => d.lich_hoc_id));
         const phanLop = await tx.phan_lop_giai_doan.findFirst({
@@ -1080,8 +1271,11 @@ export class DoiBuoiHocService {
         this.nem(
           kiemTraGui(
             {
+              loai: x.loai,
               so_buoi_doi_toi_da: x.soBuoiToiDa,
               so_luot_da_dung: soLuot,
+              so_buoi_hoc_bu_toi_da: x.soBuoiToiDa,
+              so_luot_hoc_bu_da_dung: soLuot,
               buoi_nguon: x.nguon,
               buoi_dich: x.dich,
               lop_phan_hien_tai: phanLop?.lop_id ?? null,
@@ -1090,6 +1284,11 @@ export class DoiBuoiHocService {
               buoi_chot_hien_tai: chotCu,
               da_diem_danh_nguon: daDiemDanh.has(x.nguon.id),
               da_diem_danh_chot: !!chotCuId && daDiemDanh.has(chotCuId),
+              trang_thai_diem_danh_nguon:
+                diemDanh.find((d) => d.lich_hoc_id === x.nguon.id)
+                  ?.trang_thai ?? null,
+              // B6: kiểm TRƯỚC khi chạm unique uq_doi_buoi_* → 400, không 409/500.
+              nguon_co_doi_buoi_da_duyet: banNguon.some((d) => !cungLoai(d)),
             },
             now,
           ),
@@ -1101,6 +1300,7 @@ export class DoiBuoiHocService {
             lich_de_nghi_id: x.dto.lich_de_nghi_id,
             ly_do: chuanHoaLyDo(x.dto.ly_do) as string,
             nguoi_tao: x.nguoiTao,
+            loai: x.loai,
           },
           select: { id: true },
         });
@@ -1251,10 +1451,14 @@ export class DoiBuoiHocService {
         id: true,
         tao_luc: true,
         lich_de_nghi_id: true,
+        loai: true,
         lich_nguon: { select: { thoi_gian_bat_dau: true } },
       },
     });
-    const conHan = hangDoi.filter((h) => !daBatDau(h.lich_nguon, now));
+    // ADR 0012: học bù không quá hạn vì buổi gốc đã qua.
+    const conHan = hangDoi.filter(
+      (h) => h.loai === 'hoc_bu' || !daBatDau(h.lich_nguon, now),
+    );
     for (const r of cho) {
       const ds = conHan.filter((h) => h.lich_de_nghi_id === r.lich_de_nghi_id);
       ketQua.set(r.id, thuTuHang(r, ds));
@@ -1275,15 +1479,18 @@ export class DoiBuoiHocService {
     const dich = lichMap.get(r.lich_de_nghi_id);
     const dk = lichDk.get(r.dang_ky_hoc_id);
     const doiLai = doiLaiTu(r, chotCu, lichMap);
+    const loai = r.loai ?? 'doi_buoi';
+    // ADR 0012: buổi gốc đã bắt đầu chỉ làm quá hạn đổi buổi.
     const quaHan =
       r.trang_thai === 'cho_duyet' &&
-      ((nguon !== undefined && daBatDau(nguon, now)) ||
+      ((loai === 'doi_buoi' && nguon !== undefined && daBatDau(nguon, now)) ||
         (dich !== undefined && daBatDau(dich, now)) ||
         (doiLai !== null && daBatDau(doiLai, now)) ||
         quaHanThem.has(r.id));
     return {
       id: r.id,
       trang_thai: r.trang_thai,
+      loai,
       lich_nguon_id: r.lich_nguon_id,
       lich_de_nghi_id: r.lich_de_nghi_id,
       lich_chot_id: r.lich_chot_id,
@@ -1334,7 +1541,31 @@ const DE_NGHI_SELECT = {
   tao_luc: true,
   ghi_chu_xu_ly: true,
   nguoi_xu_ly: true,
+  loai: true,
 } satisfies Prisma.doi_buoi_hocSelect;
+
+// ADR 0012: đề nghị chờ còn hạn — buổi nguồn chưa bắt đầu chỉ áp cho đổi buổi
+// (buổi gốc của học bù luôn đã qua).
+function nguonConHan(now: Date): Prisma.doi_buoi_hocWhereInput {
+  return {
+    OR: [
+      { loai: 'hoc_bu' },
+      { lich_nguon: { thoi_gian_bat_dau: { gt: now } } },
+    ],
+  };
+}
+
+// Nhật ký: chỉ ghi `loai` cho học bù — dòng không có `loai` = doi_buoi (giữ
+// nguyên chi_tiet nhật ký đổi buổi).
+function chiTietLoai(loai: loai_doi_buoi): { loai?: 'hoc_bu' } {
+  return loai === 'hoc_bu' ? { loai } : {};
+}
+
+function moTaTheoLoai(loai: loai_doi_buoi, hanhDong: string): string {
+  return loai === 'hoc_bu'
+    ? `${hanhDong} đăng ký học bù`
+    : `${hanhDong} đề nghị đổi buổi`;
+}
 
 // Đề nghị bị hủy không do người duyệt: server tự ghi ghi_chu_xu_ly để phân biệt
 // học viên sửa (bản cũ bị thay) với học viên tự hủy. Bản ghi cũ (trước khi có

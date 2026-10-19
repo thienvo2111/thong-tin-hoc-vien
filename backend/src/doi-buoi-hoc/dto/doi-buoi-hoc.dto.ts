@@ -1,4 +1,9 @@
-import { loai_lop_hoc, muc_nang_luc, trang_thai_de_nghi } from '@prisma/client';
+import {
+  loai_doi_buoi,
+  loai_lop_hoc,
+  muc_nang_luc,
+  trang_thai_de_nghi,
+} from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -26,12 +31,28 @@ export class GuiDoiBuoiDto {
 
   @IsString()
   ly_do: string;
+
+  // ADR 0012: mặc định doi_buoi; sửa không đổi được loại.
+  @IsOptional()
+  @IsEnum(loai_doi_buoi)
+  loai?: loai_doi_buoi;
+}
+
+// ADR 0012: lọc theo loại (dem-cho-duyet, lua-chon học viên).
+export class LocLoaiDoiBuoiDto {
+  @IsOptional()
+  @IsEnum(loai_doi_buoi)
+  loai?: loai_doi_buoi;
 }
 
 export class LocDoiBuoiDto {
   @IsOptional()
   @IsEnum(trang_thai_de_nghi)
   trang_thai?: trang_thai_de_nghi;
+
+  @IsOptional()
+  @IsEnum(loai_doi_buoi)
+  loai?: loai_doi_buoi;
 
   @IsOptional()
   @IsUUID()

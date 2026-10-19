@@ -411,6 +411,26 @@ describe('KhoaBoiDuongService', () => {
       ).rejects.toBeInstanceOf(ValidationException);
       expect(prisma.khoa_boi_duong.update).not.toHaveBeenCalled();
     });
+
+    // ADR 0012: công tắc + lượt học bù, độc lập lượt đổi buổi.
+    it('so_buoi_hoc_bu_toi_da -> ghi đúng cột, không đụng so_buoi_doi_toi_da', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoaDaDuyet);
+      prisma.khoa_boi_duong.update.mockResolvedValue(khoaDaDuyet);
+
+      await service.capNhatKhoa(
+        'khoa-1',
+        { so_buoi_hoc_bu_toi_da: 3 } as never,
+        quanTri,
+      );
+
+      expect(prisma.khoa_boi_duong.update).toHaveBeenCalledWith({
+        where: { id: 'khoa-1' },
+        data: expect.objectContaining({
+          so_buoi_hoc_bu_toi_da: 3,
+          so_buoi_doi_toi_da: undefined,
+        }),
+      });
+    });
   });
 
   describe('themLop', () => {

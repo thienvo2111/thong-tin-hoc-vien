@@ -778,6 +778,8 @@ model khoa_boi_duong {
   mo_dieu_chinh_muc       Boolean             @default(false)
   // ADR 0007: số buổi tối đa học viên được đề nghị đổi (0 = tắt; CHECK 0–50 bằng raw SQL).
   so_buoi_doi_toi_da      Int                 @default(0) @db.SmallInt
+  // ADR 0012: số buổi học bù tối đa mỗi học viên (0 = tắt; CHECK 0–50 bằng raw SQL).
+  so_buoi_hoc_bu_toi_da   Int                 @default(0) @db.SmallInt
   // ADR 0005 (issue #23): tự điểm danh lớp Zoom — mốc bật (NULL = tắt), cửa sổ
   // điểm danh tính theo giờ bắt đầu buổi (CHECK 0–180 / 15–720 bằng raw SQL).
   bat_diem_danh_zoom_luc  DateTime?           @db.Timestamptz(6)
@@ -1534,6 +1536,12 @@ model de_nghi_doi_lop {
   @@index([dang_ky_hoc_id], map: "idx_de_nghi_doi_lop_dk")
 }
 
+// ADR 0012 (2026-10-19): đổi buổi hoặc học bù buổi đã vắng.
+enum loai_doi_buoi {
+  doi_buoi
+  hoc_bu
+}
+
 // ADR 0007 (2026-10-16): học viên đề nghị đổi 1 buổi học sang buổi tương đương
 // của lớp khác. Partial unique uq_doi_buoi_cho + uq_doi_buoi_da_duyet (D11, đổi
 // lại), 2 CHECK và 2 index một phần (idx_doi_buoi_chot/nguon) chỉ có trong SQL
@@ -1551,6 +1559,8 @@ model doi_buoi_hoc {
   nguoi_xu_ly     String?            @db.Uuid
   xu_ly_luc       DateTime?          @db.Timestamptz(6)
   ghi_chu_xu_ly   String?
+  // ADR 0012: doi_buoi (mọi dòng cũ) | hoc_bu (buổi gốc đã vắng).
+  loai            loai_doi_buoi      @default(doi_buoi)
 
   dang_ky_hoc  dang_ky_hoc   @relation(fields: [dang_ky_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   lich_nguon   lich_hoc_lop  @relation("doi_buoi_nguon", fields: [lich_nguon_id], references: [id], onDelete: Cascade, onUpdate: NoAction)

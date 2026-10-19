@@ -421,6 +421,7 @@ export class KhoaBoiDuongService {
             : undefined,
           mo_dieu_chinh_muc: dto.mo_dieu_chinh_muc,
           so_buoi_doi_toi_da: dto.so_buoi_doi_toi_da,
+          so_buoi_hoc_bu_toi_da: dto.so_buoi_hoc_bu_toi_da,
           bat_diem_danh_zoom_luc: this.mocBatDiemDanhZoom(
             dto.bat_diem_danh_zoom,
             khoa.bat_diem_danh_zoom_luc,
