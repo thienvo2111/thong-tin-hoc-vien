@@ -44,5 +44,9 @@ export default defineConfig(({ mode }) => ({
     // Test thao tác form bằng user-event mất 2–3 giây khi chạy riêng; chạy cả suite song song trên máy
     // 4 nhân thì vượt ngưỡng 5 giây mặc định.
     testTimeout: 15000,
+    // Mặc định vitest dùng (số nhân - 1) worker; trên máy 4 nhân, 3 worker jsdom tranh CPU làm test gõ form
+    // chậm gấp ~3 lần và cả bộ lâu hơn. Đo 2026-10-19: 3 worker 13 phút + 1 test hết giờ, 2 worker 12 phút pass hết.
+    maxWorkers: '50%',
+    minWorkers: 1,
   },
 }));
