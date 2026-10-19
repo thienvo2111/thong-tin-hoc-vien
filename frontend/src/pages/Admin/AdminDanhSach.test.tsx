@@ -188,6 +188,12 @@ describe('Admin — Danh sách học viên', () => {
   });
 });
 
+// Gõ từng phím re-render cả modal mỗi ký tự → chậm khi chạy cả bộ song song; dán cả chuỗi cho kết quả như nhau.
+async function nhap(user: ReturnType<typeof userEvent.setup>, o: Element, giaTri: string) {
+  await user.click(o);
+  await user.paste(giaTri);
+}
+
 // POST /hoc-vien/tao-le — Quản trị tạo lẻ 1 học viên (cùng quy tắc import MOET).
 describe('Admin — Danh sách học viên — Thêm học viên lẻ', () => {
   async function moModal(user: ReturnType<typeof userEvent.setup>) {
@@ -199,11 +205,11 @@ describe('Admin — Danh sách học viên — Thêm học viên lẻ', () => {
   }
 
   async function dienBatBuoc(user: ReturnType<typeof userEvent.setup>, modal: ReturnType<typeof within>) {
-    await user.type(modal.getByRole('textbox', { name: 'Họ và tên' }), 'Trần Văn Lẻ');
-    await user.type(modal.getByRole('textbox', { name: 'Ngày sinh' }), '5');
-    await user.type(modal.getByRole('textbox', { name: 'Tháng sinh' }), '3');
-    await user.type(modal.getByRole('textbox', { name: 'Năm sinh' }), '1985');
-    await user.type(modal.getByRole('textbox', { name: 'Trường (đơn vị công tác)' }), 'Long Xuyên');
+    await nhap(user, modal.getByRole('textbox', { name: 'Họ và tên' }), 'Trần Văn Lẻ');
+    await nhap(user, modal.getByRole('textbox', { name: 'Ngày sinh' }), '5');
+    await nhap(user, modal.getByRole('textbox', { name: 'Tháng sinh' }), '3');
+    await nhap(user, modal.getByRole('textbox', { name: 'Năm sinh' }), '1985');
+    await nhap(user, modal.getByRole('textbox', { name: 'Trường (đơn vị công tác)' }), 'Long Xuyên');
     await user.click(await screen.findByRole('option', { name: 'THPT Long Xuyên — Phường Long Xuyên' }));
   }
 
@@ -225,7 +231,7 @@ describe('Admin — Danh sách học viên — Thêm học viên lẻ', () => {
     const user = userEvent.setup();
     const modal = await moModal(user);
 
-    await user.type(modal.getByRole('textbox', { name: 'Mã định danh MOET' }), ' 0123456789 ');
+    await nhap(user, modal.getByRole('textbox', { name: 'Mã định danh MOET' }), ' 0123456789 ');
     await dienBatBuoc(user, modal);
     await user.type(modal.getByRole('textbox', { name: 'Chuyên môn' }), 'Toán, Tin học,');
     await user.click(modal.getByRole('textbox', { name: 'Khóa bồi dưỡng' }));
@@ -286,7 +292,7 @@ describe('Admin — Danh sách học viên — Thêm học viên lẻ', () => {
     );
     const user = userEvent.setup();
     const modal = await moModal(user);
-    await user.type(modal.getByRole('textbox', { name: 'Số ĐDCN/CCCD' }), '123456789012');
+    await nhap(user, modal.getByRole('textbox', { name: 'Số ĐDCN/CCCD' }), '123456789012');
     await dienBatBuoc(user, modal);
     await user.click(modal.getByRole('button', { name: 'Tạo học viên' }));
 

@@ -12,6 +12,13 @@ import AdminKhoaChiTiet from './AdminKhoaChiTiet';
 // danh lẻ...) — các test gõ form dài vượt 15s mặc định trên máy chậm.
 vi.setConfig({ testTimeout: 30000 });
 
+// Gõ từng phím = mỗi ký tự re-render cả trang (state form nằm ở component trang) → chuỗi dài mất vài giây.
+// Dán cả chuỗi trong 1 sự kiện input: cùng kết quả trên form, nhanh hơn nhiều khi chạy cả bộ song song.
+async function nhap(user: ReturnType<typeof userEvent.setup>, o: Element, giaTri: string) {
+  await user.click(o);
+  await user.paste(giaTri);
+}
+
 function renderTrang(id: string) {
   datToken('token-gia-lap');
   return renderVoiRouter([{ path: '/admin/khoa-boi-duong/:id', element: <AdminKhoaChiTiet /> }], {
@@ -111,7 +118,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
       expect(o).toHaveValue('0');
 
       await user.clear(o);
-      await user.type(o, '3');
+      await nhap(user, o, '3');
       await user.click(screen.getByRole('button', { name: 'Lưu số buổi đổi' }));
 
       await waitFor(() => expect(bodies).toEqual([{ so_buoi_doi_toi_da: 3 }]));
@@ -223,9 +230,9 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
       expect(nutLuu).toBeDisabled(); // chưa đổi
 
       await user.clear(moTruoc);
-      await user.type(moTruoc, '15');
+      await nhap(user, moTruoc, '15');
       await user.clear(dongSau);
-      await user.type(dongSau, '90');
+      await nhap(user, dongSau, '90');
       expect(nutLuu).toBeEnabled();
       await user.click(nutLuu);
 
@@ -244,7 +251,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
       renderTrang('khoa-1');
       const o = await screen.findByLabelText(nhan);
       await user.clear(o);
-      await user.type(o, giaTri);
+      await nhap(user, o, giaTri);
       expect(screen.getByRole('button', { name: 'Lưu' })).toBeDisabled();
     });
 
@@ -300,7 +307,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
 
     const oTenKhoa = screen.getByLabelText(/^Tên khóa/);
     await user.clear(oTenKhoa);
-    await user.type(oTenKhoa, 'Bồi dưỡng NLS – Mức cơ bản (đã sửa)');
+    await nhap(user, oTenKhoa, 'Bồi dưỡng NLS – Mức cơ bản (đã sửa)');
     await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
 
     expect(await screen.findByText('Bồi dưỡng NLS – Mức cơ bản (đã sửa)')).toBeInTheDocument();
@@ -314,7 +321,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
 
     await user.click(screen.getByRole('button', { name: 'Sửa khóa' }));
-    await user.type(await screen.findByRole('textbox', { name: /^Hoặc chọn trường/ }), 'Long Xuyên');
+    await nhap(user, await screen.findByRole('textbox', { name: /^Hoặc chọn trường/ }), 'Long Xuyên');
     await user.click(await screen.findByRole('option', { name: 'THPT Long Xuyên — Phường Long Xuyên' }));
     await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
 
@@ -329,7 +336,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
 
     await user.click(screen.getByRole('button', { name: '+ Tạo lớp mới' }));
-    await user.type(await screen.findByLabelText(/^Tên lớp/), 'Lớp 02 – Nhóm cơ bản B');
+    await nhap(user, await screen.findByLabelText(/^Tên lớp/), 'Lớp 02 – Nhóm cơ bản B');
     // getByRole('textbox', ...) thay vì getByLabelText: dropdown (role=listbox) của Select cũng mang
     // aria-labelledby trỏ tới đúng label này — getByLabelText khớp cả 2, gây lỗi "multiple elements"
     // (cùng quy ước đã ghi trong AdminHocVienChiTiet.test.tsx).
@@ -347,7 +354,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
 
     await user.click(screen.getByRole('button', { name: '+ Tạo lớp mới' }));
-    await user.type(await screen.findByLabelText(/^Tên lớp/), 'Lớp 01 – Nhóm cơ bản A');
+    await nhap(user, await screen.findByLabelText(/^Tên lớp/), 'Lớp 01 – Nhóm cơ bản A');
     await user.click(screen.getByRole('textbox', { name: /^Loại lớp/ }));
     await user.click(await screen.findByRole('option', { name: 'Trực tiếp' }));
     await user.click(screen.getByRole('button', { name: 'Tạo lớp' }));
@@ -368,7 +375,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
 
     const oTenLop = await screen.findByLabelText(/^Tên lớp/);
     await user.clear(oTenLop);
-    await user.type(oTenLop, 'Lớp 01 – Đổi tên');
+    await nhap(user, oTenLop, 'Lớp 01 – Đổi tên');
     await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
 
     expect(await screen.findByText('Lớp 01 – Đổi tên')).toBeInTheDocument();
@@ -405,8 +412,8 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     await user.click(await screen.findByRole('option', { name: /Học trực tiếp/ }));
     const batDau = within(modal).getByLabelText(/^Bắt đầu/);
     const ketThuc = within(modal).getByLabelText(/^Kết thúc/);
-    await user.type(batDau, '2026-10-05T08:00');
-    await user.type(ketThuc, '2026-10-05T11:00');
+    await nhap(user, batDau, '2026-10-05T08:00');
+    await nhap(user, ketThuc, '2026-10-05T11:00');
 
     const nutThem = within(modal).getByRole('button', { name: 'Thêm buổi học' });
     expect(within(modal).getByText('Bắt buộc với giai đoạn trực tiếp')).toBeInTheDocument();
@@ -417,7 +424,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     });
     await user.click(within(modal).getByRole('textbox', { name: /^Điểm học/ }));
     await user.click(await screen.findByRole('option', { name: /THPT Long Xuyên/ }));
-    await user.type(within(modal).getByLabelText(/^Phòng/), 'P.101');
+    await nhap(user, within(modal).getByLabelText(/^Phòng/), 'P.101');
     expect(nutThem).toBeEnabled();
     await user.click(nutThem);
 
@@ -476,7 +483,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     await user.click(within(modal).getByRole('button', { name: '+ Thêm giảng viên' }));
     await user.click(within(modal).getByRole('textbox', { name: 'Giảng viên' }));
     await user.click(await screen.findByRole('option', { name: /Nguyễn Văn Long/ }));
-    await user.type(within(modal).getByLabelText('Số giờ'), '3');
+    await nhap(user, within(modal).getByLabelText('Số giờ'), '3');
     await user.click(within(modal).getByRole('button', { name: 'Lưu phân công' }));
 
     await waitFor(() =>
@@ -500,7 +507,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     expect(await screen.findByText('Nguyễn Văn Long — Giảng viên')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '+ Thêm nhân sự' }));
-    await user.type(await screen.findByLabelText(/^Họ tên/), 'Trần Thị Mai');
+    await nhap(user, await screen.findByLabelText(/^Họ tên/), 'Trần Thị Mai');
     await user.click(screen.getByRole('textbox', { name: /^Vai trò/ }));
     await user.click(await screen.findByRole('option', { name: 'Hỗ trợ' }));
     await user.click(screen.getByRole('button', { name: 'Thêm nhân sự' }));
@@ -518,12 +525,12 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     await user.click(screen.getByRole('button', { name: '+ Tạo giai đoạn' }));
 
     // khoa-1 (mock) đã có GĐ1..GĐ4 (phân lớp theo giai đoạn) -> tạo GĐ5 để không trùng thứ tự.
-    await user.type(await screen.findByLabelText(/^Thứ tự/), '5');
-    await user.type(screen.getByLabelText(/^Tên giai đoạn/), 'Giai đoạn 5 — Tập trung');
+    await nhap(user, await screen.findByLabelText(/^Thứ tự/), '5');
+    await nhap(user, screen.getByLabelText(/^Tên giai đoạn/), 'Giai đoạn 5 — Tập trung');
     await user.click(screen.getByRole('textbox', { name: /^Hình thức/ }));
     await user.click(await screen.findByRole('option', { name: 'Trực tiếp' }));
-    await user.type(screen.getByLabelText(/^Ngày bắt đầu/), '2026-10-05');
-    await user.type(screen.getByLabelText(/^Ngày kết thúc/), '2026-10-10');
+    await nhap(user, screen.getByLabelText(/^Ngày bắt đầu/), '2026-10-05');
+    await nhap(user, screen.getByLabelText(/^Ngày kết thúc/), '2026-10-10');
     await user.click(screen.getByRole('button', { name: 'Tạo giai đoạn' }));
 
     expect(await screen.findByText('Giai đoạn 5 — Tập trung')).toBeInTheDocument();
@@ -539,7 +546,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     expect(await screen.findByText('Cụm Long Xuyên')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '+ Tạo cụm' }));
-    await user.type(await screen.findByLabelText(/^Tên cụm/), 'Cụm Châu Đốc');
+    await nhap(user, await screen.findByLabelText(/^Tên cụm/), 'Cụm Châu Đốc');
     await user.click(screen.getByRole('button', { name: 'Tạo cụm' }));
 
     expect(await screen.findByText('Cụm Châu Đốc')).toBeInTheDocument();
@@ -680,14 +687,14 @@ describe('Admin — Chi tiết khóa: phân lớp theo giai đoạn', () => {
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
     await user.click(screen.getByRole('tab', { name: 'Giai đoạn' }));
     await user.click(screen.getByRole('button', { name: '+ Tạo giai đoạn' }));
-    await user.type(await screen.findByLabelText(/^Thứ tự/), '6');
-    await user.type(screen.getByLabelText(/^Tên giai đoạn/), 'Đánh giá đầu ra');
+    await nhap(user, await screen.findByLabelText(/^Thứ tự/), '6');
+    await nhap(user, screen.getByLabelText(/^Tên giai đoạn/), 'Đánh giá đầu ra');
     await user.click(screen.getByRole('textbox', { name: /^Hình thức/ }));
     await user.click(await screen.findByRole('option', { name: 'Đánh giá' }));
-    await user.type(screen.getByLabelText(/^Ngày bắt đầu/), '2026-12-15');
-    await user.type(screen.getByLabelText(/^Ngày kết thúc/), '2026-12-31');
-    await user.type(screen.getByLabelText('Link hoặc địa điểm'), 'https://vle.example/dg');
-    await user.type(screen.getByLabelText('Hướng dẫn'), 'Làm bài 60 phút');
+    await nhap(user, screen.getByLabelText(/^Ngày bắt đầu/), '2026-12-15');
+    await nhap(user, screen.getByLabelText(/^Ngày kết thúc/), '2026-12-31');
+    await nhap(user, screen.getByLabelText('Link hoặc địa điểm'), 'https://vle.example/dg');
+    await nhap(user, screen.getByLabelText('Hướng dẫn'), 'Làm bài 60 phút');
     await user.click(screen.getByRole('button', { name: 'Tạo giai đoạn' }));
 
     await waitFor(() => expect(bodies).toHaveLength(1));
