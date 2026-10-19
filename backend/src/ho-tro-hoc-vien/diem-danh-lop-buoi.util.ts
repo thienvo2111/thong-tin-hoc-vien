@@ -92,6 +92,35 @@ export interface DauVaoChuyenCan {
   now: Date;
 }
 
+/** Buổi hiệu dụng của 1 buổi nguồn L (ADR 0007/0008 L8, ADR 0010 T3). */
+export interface CapBuoiHieuDung<L, C> {
+  nguon: L;
+  /** Buổi chốt nếu đã đổi ra khỏi L (đổi buổi da_duyet còn hiệu lực), ngược lại chính L. */
+  hieu_dung: L | C;
+  doi_buoi: boolean;
+}
+
+/**
+ * Hàm dùng chung cho chuyên cần trong lớp (L8) và tình hình đi học (ADR
+ * 0010): mỗi buổi L thuộc giai đoạn được phân vào lớp → buổi hiệu dụng E =
+ * buổi chốt nếu đã đổi ra khỏi L, ngược lại L.
+ */
+export function buoiHieuDung<
+  L extends BuoiChuyenCan,
+  C extends { id: string; thoi_gian_bat_dau: Date },
+>(v: {
+  lich: readonly L[];
+  giai_doan_ids: ReadonlySet<string>;
+  chot_cua_nguon: ReadonlyMap<string, C>;
+}): CapBuoiHieuDung<L, C>[] {
+  return v.lich
+    .filter((l) => v.giai_doan_ids.has(l.giai_doan_id))
+    .map((l) => {
+      const chot = v.chot_cua_nguon.get(l.id);
+      return { nguon: l, hieu_dung: chot ?? l, doi_buoi: !!chot };
+    });
+}
+
 /**
  * Chuyên cần của 1 đăng ký trong lớp (ADR 0008 L8, khớp ADR 0007 "chuyên cần
  * tính điểm danh ở buổi chốt"): mỗi buổi L thuộc giai đoạn được phân vào lớp →
@@ -104,12 +133,40 @@ export function tinhChuyenCanLop(v: DauVaoChuyenCan): {
 } {
   let coMat = 0;
   let daDienRa = 0;
-  for (const l of v.lich) {
-    if (!v.giai_doan_ids.has(l.giai_doan_id)) continue;
-    const e = v.chot_cua_nguon.get(l.id) ?? l;
+  for (const { hieu_dung: e } of buoiHieuDung(v)) {
     if (e.thoi_gian_bat_dau.getTime() > v.now.getTime()) continue;
     daDienRa += 1;
     if (v.co_mat.has(e.id)) coMat += 1;
   }
   return { co_mat: coMat, da_dien_ra: daDienRa };
+}
+
+/** Tổng tình hình đi học của 1 đăng ký (ADR 0010 T3) — chỉ buổi hiệu dụng đã bắt đầu. */
+export interface TongDiHoc {
+  da_dien_ra: number;
+  co_mat: number;
+  vang: number;
+  vang_co_phep: number;
+  da_bao_vang: number;
+  chua_diem_danh: number;
+}
+
+export function tongDiHoc(
+  ds: readonly { ma: MaDiemDanh; bat_dau: Date }[],
+  now: Date,
+): TongDiHoc {
+  const tong: TongDiHoc = {
+    da_dien_ra: 0,
+    co_mat: 0,
+    vang: 0,
+    vang_co_phep: 0,
+    da_bao_vang: 0,
+    chua_diem_danh: 0,
+  };
+  for (const d of ds) {
+    if (d.bat_dau.getTime() > now.getTime()) continue;
+    tong.da_dien_ra += 1;
+    if (d.ma !== 'chua_den_gio') tong[d.ma] += 1;
+  }
+  return tong;
 }

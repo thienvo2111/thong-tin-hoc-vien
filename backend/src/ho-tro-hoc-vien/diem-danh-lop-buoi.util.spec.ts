@@ -1,5 +1,7 @@
 import {
+  buoiHieuDung,
   tinhChuyenCanLop,
+  tongDiHoc,
   tinhDiemDanhDong,
   tongDiemDanh,
 } from './diem-danh-lop-buoi.util';
@@ -197,5 +199,70 @@ describe('tinhChuyenCanLop', () => {
         co_mat: new Set(['L1', 'L4']),
       }),
     ).toEqual({ co_mat: 1, da_dien_ra: 1 });
+  });
+});
+
+// ADR 0010 T3: hàm buổi hiệu dụng dùng chung + tổng tình hình đi học.
+describe('buoiHieuDung', () => {
+  const l = (id: string, gd: string, ngay: string) => ({
+    id,
+    giai_doan_id: gd,
+    thoi_gian_bat_dau: new Date(ngay),
+  });
+  it('chỉ buổi thuộc giai đoạn được phân; đổi ra -> E là buổi chốt, cờ doi_buoi', () => {
+    const chot = { id: 'c2', thoi_gian_bat_dau: new Date('2026-10-04') };
+    const kq = buoiHieuDung({
+      lich: [
+        l('a1', 'g1', '2026-10-01'),
+        l('a2', 'g1', '2026-10-03'),
+        l('a9', 'g2', '2026-10-05'),
+      ],
+      giai_doan_ids: new Set(['g1']),
+      chot_cua_nguon: new Map([['a2', chot]]),
+    });
+    expect(kq.map((c) => [c.nguon.id, c.hieu_dung.id, c.doi_buoi])).toEqual([
+      ['a1', 'a1', false],
+      ['a2', 'c2', true],
+    ]);
+  });
+});
+
+describe('tongDiHoc', () => {
+  const now = new Date('2026-10-10T00:00:00Z');
+  const qua = new Date('2026-10-01T00:00:00Z');
+  const toi = new Date('2026-10-20T00:00:00Z');
+  it('chỉ đếm buổi đã bắt đầu; đủ 6 khóa; báo vắng tính riêng', () => {
+    expect(
+      tongDiHoc(
+        [
+          { ma: 'co_mat', bat_dau: qua },
+          { ma: 'vang', bat_dau: qua },
+          { ma: 'vang_co_phep', bat_dau: qua },
+          { ma: 'da_bao_vang', bat_dau: qua },
+          { ma: 'chua_diem_danh', bat_dau: qua },
+          { ma: 'chua_den_gio', bat_dau: toi },
+          // Dữ liệu lệch: có dòng điểm danh ở buổi tương lai -> không tính.
+          { ma: 'co_mat', bat_dau: toi },
+        ],
+        now,
+      ),
+    ).toEqual({
+      da_dien_ra: 5,
+      co_mat: 1,
+      vang: 1,
+      vang_co_phep: 1,
+      da_bao_vang: 1,
+      chua_diem_danh: 1,
+    });
+  });
+  it('rỗng -> toàn 0', () => {
+    expect(tongDiHoc([], now)).toEqual({
+      da_dien_ra: 0,
+      co_mat: 0,
+      vang: 0,
+      vang_co_phep: 0,
+      da_bao_vang: 0,
+      chua_diem_danh: 0,
+    });
   });
 });

@@ -12,6 +12,7 @@ const MENU = [
   { to: '/ho-tro', nhan: 'Cụm của tôi', end: true },
   { to: '/ho-tro/lop', nhan: 'Lớp hỗ trợ', end: false },
   { to: '/ho-tro/hoc-vien', nhan: 'Học viên', end: false },
+  { to: '/ho-tro/di-hoc', nhan: 'Tình hình đi học', end: false },
   { to: '/ho-tro/lich-hoc', nhan: 'Lịch học', end: false },
   { to: '/ho-tro/doi-buoi', nhan: 'Đổi buổi', end: false },
   { to: '/ho-tro/yeu-cau-ho-tro', nhan: 'Yêu cầu hỗ trợ', end: false },

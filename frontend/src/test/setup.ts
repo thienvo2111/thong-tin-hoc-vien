@@ -5,6 +5,7 @@ import { server } from './mocks/server';
 import { resetDb } from './mocks/db';
 import { datLaiCauHinhKhaoSatMock } from './mocks/cauHinhKhaoSat';
 import { datLaiThangMucMock, datLaiTinhTrangKhaoSatMock } from './mocks/sso';
+import { datLaiTinhHinhDiHocMock } from './mocks/tinhHinhDiHoc';
 import { xoaToken } from '@/auth/tokenStore';
 
 // findBy*/waitFor mặc định chờ 1 giây — đủ khi chạy riêng 1 file, nhưng cả suite song song trên máy 4 nhân
@@ -59,6 +60,7 @@ afterEach(() => {
   datLaiCauHinhKhaoSatMock();
   datLaiTinhTrangKhaoSatMock();
   datLaiThangMucMock();
+  datLaiTinhHinhDiHocMock();
   xoaToken();
   localStorage.clear();
   cleanup();

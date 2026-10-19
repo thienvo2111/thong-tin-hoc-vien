@@ -30,6 +30,7 @@ import { NhacLichModule } from './nhac-lich/nhac-lich.module';
 import { VanHanhModule } from './van-hanh/van-hanh.module';
 import { DiemDanhModule } from './diem-danh/diem-danh.module';
 import { DoiBuoiHocModule } from './doi-buoi-hoc/doi-buoi-hoc.module';
+import { TinhHinhDiHocModule } from './tinh-hinh-di-hoc/tinh-hinh-di-hoc.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { DoiBuoiHocModule } from './doi-buoi-hoc/doi-buoi-hoc.module';
     VanHanhModule,
     DiemDanhModule,
     DoiBuoiHocModule,
+    TinhHinhDiHocModule,
     DanhMucModule,
     ImportModule,
     BaoCaoModule,

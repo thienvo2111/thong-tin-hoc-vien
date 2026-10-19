@@ -9,5 +9,7 @@ import { DoiBuoiHocQueryModule } from '../doi-buoi-hoc/doi-buoi-hoc-query.module
   imports: [HoTroGiangVienModule, DoiBuoiHocQueryModule],
   controllers: [DiemDanhController],
   providers: [DiemDanhService],
+  // ADR 0010: ghi tay dùng chung cho điểm danh bổ sung (Tình hình đi học).
+  exports: [DiemDanhService],
 })
 export class DiemDanhModule {}

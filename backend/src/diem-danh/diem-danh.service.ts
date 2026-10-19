@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, trang_thai_diem_danh } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
@@ -255,10 +255,28 @@ export class DiemDanhService {
       );
     }
 
-    // Sửa tay: nguon = thu_cong, ghi người sửa; KHÔNG đụng tu_diem_danh_luc.
-    const ghiChu = dto.ghi_chu?.normalize('NFC').trim() || null;
+    return this.ghiThuCong(user, dto, now);
+  }
+
+  /**
+   * Ghi tay 1 ô điểm danh (ADR 0005 Z7, ADR 0010 T4) — dùng chung cho sửa ô
+   * bảng điểm danh và điểm danh bổ sung ở màn Tình hình đi học. Nơi gọi đã
+   * kiểm quyền/phạm vi/buổi. nguon = thu_cong, ghi người sửa; KHÔNG đụng
+   * tu_diem_danh_luc.
+   */
+  async ghiThuCong(
+    user: Pick<AuthenticatedUser, 'id'>,
+    o: {
+      dang_ky_hoc_id: string;
+      lich_hoc_id: string;
+      trang_thai: trang_thai_diem_danh;
+      ghi_chu?: string | null;
+    },
+    now: Date = new Date(),
+  ) {
+    const ghiChu = o.ghi_chu?.normalize('NFC').trim() || null;
     const ghi = {
-      trang_thai: dto.trang_thai,
+      trang_thai: o.trang_thai,
       nguon: 'thu_cong' as const,
       ghi_chu: ghiChu,
       nguoi_sua: user.id,
@@ -267,21 +285,21 @@ export class DiemDanhService {
     const dd = await this.prisma.diem_danh.upsert({
       where: {
         dang_ky_hoc_id_lich_hoc_id: {
-          dang_ky_hoc_id: dto.dang_ky_hoc_id,
-          lich_hoc_id: dto.lich_hoc_id,
+          dang_ky_hoc_id: o.dang_ky_hoc_id,
+          lich_hoc_id: o.lich_hoc_id,
         },
       },
       create: {
-        dang_ky_hoc_id: dto.dang_ky_hoc_id,
-        lich_hoc_id: dto.lich_hoc_id,
+        dang_ky_hoc_id: o.dang_ky_hoc_id,
+        lich_hoc_id: o.lich_hoc_id,
         ...ghi,
       },
       update: ghi,
       select: CHON_O,
     });
     return {
-      dang_ky_hoc_id: dto.dang_ky_hoc_id,
-      lich_hoc_id: dto.lich_hoc_id,
+      dang_ky_hoc_id: o.dang_ky_hoc_id,
+      lich_hoc_id: o.lich_hoc_id,
       ...oDiemDanh(dd),
     };
   }

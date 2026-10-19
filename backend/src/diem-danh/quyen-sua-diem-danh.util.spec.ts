@@ -1,6 +1,7 @@
 import {
   HAN_SUA_HO_TRO_GV_MS,
   quyenSuaDiemDanh,
+  trangThaiSuaDuoc,
 } from './quyen-sua-diem-danh.util';
 
 describe('quyenSuaDiemDanh (ADR 0005 Z7)', () => {
@@ -47,17 +48,40 @@ describe('quyenSuaDiemDanh (ADR 0005 Z7)', () => {
     });
   });
 
-  it('giảng viên, hỗ trợ HV, vai trò khác -> khong_co_quyen', () => {
-    for (const vt of [
-      'giang_vien',
-      'ho_tro_hoc_vien',
-      'hoc_vien',
-      'truong',
-    ] as const) {
+  it('giảng viên, vai trò khác -> khong_co_quyen', () => {
+    for (const vt of ['giang_vien', 'hoc_vien', 'truong', 'so_gddt'] as const) {
       expect(quyenSuaDiemDanh(vt, truoc(1000), now)).toEqual({
         sua_duoc: false,
         ly_do: 'khong_co_quyen',
       });
     }
+  });
+
+  // ADR 0010 T4: điểm danh bổ sung của người hỗ trợ học viên.
+  it('ho_tro_hoc_vien: buổi chưa diễn ra -> chua_dien_ra', () => {
+    expect(quyenSuaDiemDanh('ho_tro_hoc_vien', truoc(-1), now)).toEqual({
+      sua_duoc: false,
+      ly_do: 'chua_dien_ra',
+    });
+  });
+
+  it('ho_tro_hoc_vien: buổi đã bắt đầu, kể cả 30 ngày trước -> sửa được (không giới hạn thời gian)', () => {
+    for (const bd of [now, truoc(HAN_SUA_HO_TRO_GV_MS + 1), truoc(30 * NGAY)]) {
+      expect(quyenSuaDiemDanh('ho_tro_hoc_vien', bd, now)).toEqual({
+        sua_duoc: true,
+        ly_do: null,
+      });
+    }
+  });
+
+  it('trangThaiSuaDuoc: hỗ trợ HV không được ghi "vắng"; quản trị/hỗ trợ GV đủ 3 trạng thái', () => {
+    expect(trangThaiSuaDuoc('ho_tro_hoc_vien')).toEqual([
+      'co_mat',
+      'vang_co_phep',
+    ]);
+    for (const vt of ['quan_tri', 'ho_tro_giang_vien'] as const) {
+      expect(trangThaiSuaDuoc(vt)).toEqual(['co_mat', 'vang', 'vang_co_phep']);
+    }
+    expect(trangThaiSuaDuoc('giang_vien')).toEqual([]);
   });
 });

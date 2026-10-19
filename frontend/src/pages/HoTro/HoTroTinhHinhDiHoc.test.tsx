@@ -1,0 +1,178 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { server } from '@/test/mocks/server';
+import { db } from '@/test/mocks/db';
+import { tinhHinhDiHocMock } from '@/test/mocks/tinhHinhDiHoc';
+import { renderVoiRouter } from '@/test/testUtils';
+import { datToken } from '@/auth/tokenStore';
+import HoTroTinhHinhDiHoc, { TinhHinhDiHocQuanTri } from './HoTroTinhHinhDiHoc';
+
+// ADR 0010 — Tình hình đi học: bộ lọc trên URL, phân trang server, xuất Excel, chi tiết buổi, điểm danh bổ sung.
+function render(initialEntries: string[], cheDo: 'ho_tro' | 'admin' = 'ho_tro') {
+  datToken('token-gia-lap');
+  db.nguoiDung.vai_tro = cheDo === 'admin' ? 'quan_tri' : 'ho_tro_hoc_vien';
+  const path = cheDo === 'admin' ? '/admin/di-hoc' : '/ho-tro/di-hoc';
+  return renderVoiRouter([{ path, element: cheDo === 'admin' ? <TinhHinhDiHocQuanTri /> : <HoTroTinhHinhDiHoc /> }], {
+    initialEntries,
+  });
+}
+
+afterEach(() => server.events.removeAllListeners());
+
+const cuoi = <T,>(ds: T[]): T | undefined => ds[ds.length - 1];
+
+/** Ghi lại query string của mọi GET danh sách (không gồm /khoa, /xuat, chi tiết). */
+function ghiQueryDanhSach(goc = '/ho-tro-hoc-vien/di-hoc') {
+  const queries: URLSearchParams[] = [];
+  server.events.on('request:start', ({ request }) => {
+    const url = new URL(request.url);
+    if (request.method === 'GET' && url.pathname === goc) queries.push(url.searchParams);
+  });
+  return queries;
+}
+
+function dongChua(el: HTMLElement): HTMLElement {
+  const tr = el.closest('tr');
+  if (!tr) throw new Error('Không thấy dòng bảng');
+  return tr;
+}
+
+describe('Tình hình đi học — người hỗ trợ', () => {
+  it('mặc định chọn khóa đầu, hiện bảng từ API: cột, tổng, số học viên', async () => {
+    const { router } = render(['/ho-tro/di-hoc']);
+    const bang = await screen.findByRole('table');
+    for (const cot of ['Họ tên', 'Mã MOET', 'Trường', 'Cụm', 'Lớp', 'Có mặt/đã diễn ra', 'Vắng', 'Chưa điểm danh']) {
+      expect(within(bang).getByRole('columnheader', { name: cot })).toBeInTheDocument();
+    }
+    const dong = dongChua(within(bang).getByRole('button', { name: 'Nguyễn Văn An' }));
+    expect(within(dong).getByText('01000')).toBeInTheDocument();
+    expect(within(dong).getByText('0/2')).toBeInTheDocument();
+    expect(within(dong).getByText('GĐ1: Zoom 01')).toBeInTheDocument();
+    expect(screen.getByText('25 học viên')).toBeInTheDocument();
+    expect(router.state.location.search).toContain('khoa_id=khoa-1');
+  });
+
+  it('bộ lọc ghi lên URL và gửi đúng tham số; đổi bộ lọc về trang 1', async () => {
+    const queries = ghiQueryDanhSach();
+    const { router } = render(['/ho-tro/di-hoc?khoa_id=khoa-1&page=2']);
+    await screen.findByRole('table');
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText('Có buổi vắng'));
+    await waitFor(() => expect(router.state.location.search).toContain('co_vang=true'));
+    expect(router.state.location.search).not.toContain('page=');
+    await waitFor(() => expect(cuoi(queries)?.get('co_vang')).toBe('true'));
+    expect(cuoi(queries)?.get('page')).toBe('1');
+
+    await user.type(screen.getByRole('textbox', { name: 'Tìm kiếm' }), '1003');
+    await waitFor(() => expect(router.state.location.search).toContain('q=1003'), { timeout: 2000 });
+    await waitFor(() => expect(cuoi(queries)?.get('q')).toBe('1003'));
+  });
+
+  it('chọn cụm và lớp từ danh sách khóa -> cum_id, lop_id trên URL', async () => {
+    const { router } = render(['/ho-tro/di-hoc?khoa_id=khoa-1']);
+    await screen.findByRole('table');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('textbox', { name: 'Cụm' }));
+    await user.click(await screen.findByRole('option', { name: 'Cụm Long Xuyên' }));
+    await waitFor(() => expect(router.state.location.search).toContain('cum_id=cum-1'));
+    await user.click(screen.getByRole('textbox', { name: 'Lớp' }));
+    await user.click(await screen.findByRole('option', { name: 'Zoom · Zoom 02' }));
+    await waitFor(() => expect(router.state.location.search).toContain('lop_id=lop-zoom-2'));
+  });
+
+  it('phân trang server: trang 2 gửi page=2 và hiện 5 dòng còn lại', async () => {
+    const queries = ghiQueryDanhSach();
+    render(['/ho-tro/di-hoc?khoa_id=khoa-1']);
+    await screen.findByRole('table');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '2' }));
+    await waitFor(() => expect(cuoi(queries)?.get('page')).toBe('2'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Học viên 24' })).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Nguyễn Văn An' })).not.toBeInTheDocument();
+  });
+
+  it('Xuất Excel gửi bộ lọc hiện tại, không gửi phân trang', async () => {
+    const xuat: string[] = [];
+    server.use(
+      http.get('/ho-tro-hoc-vien/di-hoc/xuat', ({ request }) => {
+        xuat.push(new URL(request.url).search);
+        return new HttpResponse(new Blob(['xlsx']));
+      }),
+    );
+    render(['/ho-tro/di-hoc?khoa_id=khoa-1&co_vang=true&page=1']);
+    await screen.findByRole('table');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Xuất Excel' }));
+    await waitFor(() => expect(xuat).toEqual(['?khoa_id=khoa-1&co_vang=true']));
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
+  });
+
+  it('bấm dòng -> drawer từng buổi: trạng thái, nhãn đổi buổi, buổi tương lai không có nút bổ sung', async () => {
+    render(['/ho-tro/di-hoc?khoa_id=khoa-1']);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Nguyễn Văn An' }));
+    const dialog = await screen.findByRole('dialog');
+    const b1 = await within(dialog).findByTestId('buoi-l-1');
+    expect(within(b1).getByText('Vắng')).toBeInTheDocument();
+    expect(within(b1).getByRole('button', { name: 'Điểm danh bổ sung' })).toBeInTheDocument();
+    const doi = within(dialog).getByTestId('buoi-l-chot');
+    expect(within(doi).getByText('Đổi buổi')).toBeInTheDocument();
+    expect(within(doi).getByText('Từ lớp Zoom 01 sang lớp Zoom 02')).toBeInTheDocument();
+    const tuongLai = within(dialog).getByTestId('buoi-l-3');
+    expect(within(tuongLai).getByText('Chưa đến giờ')).toBeInTheDocument();
+    expect(within(tuongLai).queryByRole('button', { name: 'Điểm danh bổ sung' })).not.toBeInTheDocument();
+  });
+
+  it('modal bổ sung: chỉ Có mặt / Vắng có phép, bắt buộc lý do, gửi PUT rồi tải lại', async () => {
+    render(['/ho-tro/di-hoc?khoa_id=khoa-1']);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Nguyễn Văn An' }));
+    const b1 = await screen.findByTestId('buoi-l-1');
+    await user.click(within(b1).getByRole('button', { name: 'Điểm danh bổ sung' }));
+    const modal = await screen.findByRole('dialog', { name: 'Điểm danh bổ sung' });
+    expect(
+      within(modal).getByText('Nếu Quản trị nạp lại file điểm danh của buổi này, kết quả bổ sung sẽ bị ghi đè.'),
+    ).toBeInTheDocument();
+    expect(within(modal).getByText('Có mặt')).toBeInTheDocument();
+    expect(within(modal).getByText('Vắng có phép')).toBeInTheDocument();
+    expect(within(modal).queryByText('Vắng')).not.toBeInTheDocument();
+
+    await user.click(within(modal).getByRole('button', { name: 'Xác nhận' }));
+    expect(await within(modal).findByText('Bắt buộc nhập lý do')).toBeInTheDocument();
+    expect(tinhHinhDiHocMock.daGhi).toHaveLength(0);
+
+    await user.type(within(modal).getByRole('textbox', { name: /Lý do/ }), 'Có ảnh chụp Zoom');
+    await user.click(within(modal).getByRole('button', { name: 'Xác nhận' }));
+    await waitFor(() =>
+      expect(tinhHinhDiHocMock.daGhi).toEqual([
+        {
+          url: '/ho-tro-hoc-vien/di-hoc/dk-dh-0/diem-danh',
+          body: { lich_hoc_id: 'l-1', trang_thai: 'co_mat', ly_do: 'Có ảnh chụp Zoom' },
+        },
+      ]),
+    );
+    const sau = await screen.findByTestId('buoi-l-1');
+    expect(await within(sau).findByText('Có mặt (Thủ công)')).toBeInTheDocument();
+    expect(within(sau).getByText(/Lý do: Có ảnh chụp Zoom/)).toBeInTheDocument();
+  });
+});
+
+describe('Tình hình đi học — Quản trị', () => {
+  it('gọi API /thong-ke/di-hoc; modal có thêm "Vắng", lý do không bắt buộc', async () => {
+    render(['/admin/di-hoc?khoa_id=khoa-1'], 'admin');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Nguyễn Văn An' }));
+    const b = await screen.findByTestId('buoi-l-chot');
+    await user.click(within(b).getByRole('button', { name: 'Điểm danh bổ sung' }));
+    const modal = await screen.findByRole('dialog', { name: 'Điểm danh bổ sung' });
+    await user.click(within(modal).getByText('Vắng'));
+    await user.click(within(modal).getByRole('button', { name: 'Xác nhận' }));
+    await waitFor(() =>
+      expect(tinhHinhDiHocMock.daGhi).toEqual([
+        { url: '/thong-ke/di-hoc/dk-dh-0/diem-danh', body: { lich_hoc_id: 'l-chot', trang_thai: 'vang' } },
+      ]),
+    );
+  });
+});

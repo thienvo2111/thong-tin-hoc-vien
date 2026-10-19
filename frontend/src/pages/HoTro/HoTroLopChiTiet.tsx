@@ -250,7 +250,7 @@ function TheoBuoi({ lopId }: { lopId: string }) {
   );
 }
 
-const MAU_DIEM_DANH: Record<MaDiemDanhBuoi, string> = {
+export const MAU_DIEM_DANH: Record<MaDiemDanhBuoi, string> = {
   co_mat: 'green',
   vang: 'red',
   vang_co_phep: 'orange',

@@ -19,6 +19,8 @@ export const MENU_ADMIN: MucMenuAdmin[] = [
   // Tra soát email đã gửi/đang chờ/thất bại (/thong-bao/*).
   { to: '/admin/nhat-ky-email', nhan: 'Nhật ký email', icon: '✉️', chiQuanTri: true },
   { to: '/admin/doi-buoi', nhan: 'Đổi buổi', icon: '🔁', chiQuanTri: true },
+  // ADR 0010: tình hình đi học + điểm danh bổ sung.
+  { to: '/admin/di-hoc', nhan: 'Tình hình đi học', icon: '🗒️', chiQuanTri: true },
   { to: '/admin/hoc-vien', nhan: 'Học viên', icon: '👥' },
   { to: '/admin/khoa-boi-duong', nhan: 'Khóa bồi dưỡng', icon: '🎓' },
   { to: '/admin/dot-xac-nhan', nhan: 'Đợt xác nhận', icon: '🗓️', chiQuanTri: true },

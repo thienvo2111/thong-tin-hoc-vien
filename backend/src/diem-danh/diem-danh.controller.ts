@@ -14,8 +14,9 @@ import { DiemDanhService } from './diem-danh.service';
 import { BangDiemDanhQueryDto, SuaDiemDanhDto } from './diem-danh.dto';
 
 // ADR 0005 Z7 (issue #26): bảng điểm danh của lớp + sửa nhanh 1 ô. Dùng tiền
-// tố /lop sẵn có (Nginx đã proxy). Giảng viên chỉ đọc (G8), hỗ trợ HV chỉ báo
-// vắng (G13) -> không có vai trò ở đây.
+// tố /lop sẵn có (Nginx đã proxy). Giảng viên chỉ đọc (G8), hỗ trợ HV không
+// sửa ở bảng lớp -> không có vai trò ở đây (hỗ trợ HV điểm danh bổ sung qua
+// /ho-tro-hoc-vien/di-hoc, ADR 0010).
 @Roles('quan_tri', 'ho_tro_giang_vien')
 @Controller('lop')
 export class DiemDanhController {

@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   Res,
 } from '@nestjs/common';
@@ -33,6 +34,12 @@ import {
   LopCoTheDoiQueryDto,
   TaoDeNghiDoiLopDto,
 } from './dto/van-hanh-hoc-vien.dto';
+import { TinhHinhDiHocService } from '../tinh-hinh-di-hoc/tinh-hinh-di-hoc.service';
+import {
+  DiemDanhBoSungHoTroDto,
+  LocTinhHinhDiHocDto,
+} from '../tinh-hinh-di-hoc/tinh-hinh-di-hoc.dto';
+import { XLSX_HEADERS } from '../tinh-hinh-di-hoc/tinh-hinh-di-hoc.controller';
 
 /** yyyymmdd theo giờ Việt Nam — đặt tên file xuất. */
 const ngayVn = () =>
@@ -51,7 +58,75 @@ export class HoTroHocVienController {
     private readonly vanHanh: VanHanhHocVienService,
     private readonly nhacLich: NhacLichService,
     private readonly scope: HoTroHocVienScopeService,
+    private readonly diHoc: TinhHinhDiHocService,
   ) {}
+
+  // ---------------- ADR 0010: tình hình đi học + điểm danh bổ sung ----------------
+  // Phạm vi = cụm ∪ lớp gốc (T1); cum_id ngoài cụm của tôi → 404 như cumLoc.
+  private async phamViDiHoc(userId: string, cumId?: string) {
+    if (cumId) await this.scope.cumLoc(userId, cumId);
+    return this.scope.whereDangKyTrongPhamVi(userId);
+  }
+
+  @Get('di-hoc')
+  async danhSachDiHoc(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: LocTinhHinhDiHocDto,
+  ) {
+    return this.diHoc.danhSach(
+      await this.phamViDiHoc(user.id, query.cum_id),
+      query,
+    );
+  }
+
+  // Khai báo TRƯỚC di-hoc/:dangKyHocId để 'khoa'/'xuat' không bị route động chắn.
+  @Get('di-hoc/khoa')
+  async diHocKhoa(@CurrentUser() user: AuthenticatedUser) {
+    return this.diHoc.khoaChoLoc(
+      await this.scope.whereDangKyTrongPhamVi(user.id),
+      await this.scope.cumIdsCuaToi(user.id),
+    );
+  }
+
+  @Get('di-hoc/xuat')
+  async xuatDiHoc(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: LocTinhHinhDiHocDto,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.diHoc.xuat(
+      await this.phamViDiHoc(user.id, query.cum_id),
+      query,
+      user,
+    );
+    res.set(XLSX_HEADERS(`tinh-hinh-di-hoc-${ngayVn()}.xlsx`)).send(buffer);
+  }
+
+  @Get('di-hoc/:dangKyHocId')
+  async chiTietDiHoc(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('dangKyHocId', ParseUUIDPipe) dangKyHocId: string,
+  ) {
+    return this.diHoc.chiTiet(
+      await this.scope.whereDangKyTrongPhamVi(user.id),
+      dangKyHocId,
+      user,
+    );
+  }
+
+  @Put('di-hoc/:dangKyHocId/diem-danh')
+  async diemDanhBoSung(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('dangKyHocId', ParseUUIDPipe) dangKyHocId: string,
+    @Body() dto: DiemDanhBoSungHoTroDto,
+  ) {
+    return this.diHoc.diemDanhBoSung(
+      await this.scope.whereDangKyTrongPhamVi(user.id),
+      dangKyHocId,
+      user,
+      dto,
+    );
+  }
 
   // ---------------- ADR 0004 L8 (issue #21): tin nhắn nhắc cụm ----------------
   @Get('cum/:cumId/tin-nhan-nhac')

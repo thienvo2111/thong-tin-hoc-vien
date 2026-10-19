@@ -181,6 +181,11 @@ export const router = createBrowserRouter([
                     path: '/ho-tro/thong-ke',
                     lazy: () => import('@/pages/HoTro/HoTroThongKe').then((m) => ({ Component: m.default })),
                   },
+                  {
+                    // ADR 0010: tình hình đi học + điểm danh bổ sung.
+                    path: '/ho-tro/di-hoc',
+                    lazy: () => import('@/pages/HoTro/HoTroTinhHinhDiHoc').then((m) => ({ Component: m.default })),
+                  },
                 ],
               },
             ],
@@ -280,6 +285,12 @@ export const router = createBrowserRouter([
                       {
                         path: '/admin/nguoi-ho-tro',
                         lazy: () => import('@/pages/Admin/AdminNguoiHoTro').then((m) => ({ Component: m.default })),
+                      },
+                      {
+                        // ADR 0010 T5: cùng trang với người hỗ trợ, phạm vi toàn hệ thống.
+                        path: '/admin/di-hoc',
+                        lazy: () =>
+                          import('@/pages/HoTro/HoTroTinhHinhDiHoc').then((m) => ({ Component: m.TinhHinhDiHocQuanTri })),
                       },
                       {
                         path: '/admin/nhat-ky-email',
