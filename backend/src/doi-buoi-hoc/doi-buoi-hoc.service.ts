@@ -384,7 +384,7 @@ export class DoiBuoiHocService {
     );
     const loai = dto.loai ?? 'doi_buoi';
     const soBuoiToiDa = await this.luotToiDa(nguon.lop.khoa_id, loai);
-    const moi = await this.taoTrongGiaoDich({
+    const { moi, tuHuyId } = await this.taoTrongGiaoDich({
       dangKyId: dangKy.id,
       loai,
       soBuoiToiDa,
@@ -400,6 +400,7 @@ export class DoiBuoiHocService {
       lich_de_nghi_id: dto.lich_de_nghi_id,
       ...chiTietLoai(loai),
     });
+    await this.ghiNhatKyTuHuy(hocVienId, tuHuyId);
     return moi;
   }
 
@@ -415,7 +416,7 @@ export class DoiBuoiHocService {
       throw new ValidationException('Không đổi được loại đề nghị khi sửa');
     const soBuoiToiDa = await this.luotToiDa(cu.dang_ky_hoc.khoa_id, loai);
     const { nguon, dich } = await this.taiHaiBuoi(dto);
-    const moi = await this.taoTrongGiaoDich({
+    const { moi, tuHuyId } = await this.taoTrongGiaoDich({
       dangKyId: cu.dang_ky_hoc_id,
       loai,
       soBuoiToiDa,
@@ -432,6 +433,7 @@ export class DoiBuoiHocService {
       lich_de_nghi_id: dto.lich_de_nghi_id,
       ...chiTietLoai(loai),
     });
+    await this.ghiNhatKyTuHuy(hocVienId, tuHuyId);
     return moi;
   }
 
@@ -1040,9 +1042,11 @@ export class DoiBuoiHocService {
   // học (D12). Chỉ xét đề nghị có buổi nguồn và buổi đề nghị CHƯA bắt đầu: đề
   // nghị đã bắt đầu đã quá hạn theo thời gian → tập id nhỏ, không phình theo thời
   // gian. 1 truy vấn gộp; dangKyIds để lọc khi chỉ cần 1 học viên.
-  // ADR 0012 (học bù): buổi gốc đã qua nên không xét thời gian buổi gốc; điểm
-  // danh buổi gốc chỉ tính khi co_mat (DA_CO_MAT); bản da_duyet KHÁC loại cùng
-  // buổi gốc (DA_DOI_BUOI) cũng quá hạn.
+  // ADR 0012 — nhánh học bù (c.loai = 'hoc_bu'): chỉ đòi buổi học bù CHƯA bắt
+  // đầu (buổi gốc luôn đã qua, không xét giờ buổi gốc); quá hạn thêm khi học
+  // viên đã được ghi co_mat ở buổi gốc (DA_CO_MAT), khi cùng buổi gốc có bản
+  // da_duyet KHÁC loại (đổi buổi → DA_DOI_BUOI), hoặc đổi lại có buổi học bù
+  // đang giữ đã bắt đầu / đã điểm danh. Nhánh đổi buổi giữ nguyên như trên.
   private async idQuaHanThem(
     now: Date,
     db: Db = this.prisma,
@@ -1203,7 +1207,7 @@ export class DoiBuoiHocService {
     dto: GuiDoiBuoiDto;
     nguoiTao: string;
     huyId: string | null;
-  }): Promise<{ id: string }> {
+  }): Promise<{ moi: { id: string }; tuHuyId: string | null }> {
     const now = new Date();
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -1229,6 +1233,7 @@ export class DoiBuoiHocService {
             trang_thai: { in: TRANG_THAI_HOAT_DONG },
           },
           select: {
+            id: true,
             lich_nguon_id: true,
             trang_thai: true,
             lich_chot_id: true,
@@ -1272,6 +1277,8 @@ export class DoiBuoiHocService {
           kiemTraGui(
             {
               loai: x.loai,
+              // soBuoiToiDa + soLuot đã là giá trị của đúng loại x.loai; hàm
+              // thuần chỉ đọc cặp trường của loại đó.
               so_buoi_doi_toi_da: x.soBuoiToiDa,
               so_luot_da_dung: soLuot,
               so_buoi_hoc_bu_toi_da: x.soBuoiToiDa,
@@ -1293,7 +1300,35 @@ export class DoiBuoiHocService {
             now,
           ),
         );
-        return tx.doi_buoi_hoc.create({
+        // Học bù: đổi buổi cho_duyet cùng buổi gốc (đã quá hạn vì buổi gốc đã
+        // bắt đầu) bị tự hủy để không vướng unique uq_doi_buoi_cho (409).
+        const doiBuoiCho =
+          x.loai === 'hoc_bu'
+            ? hoatDong.find(
+                (d) =>
+                  d.lich_nguon_id === x.nguon.id &&
+                  d.trang_thai === 'cho_duyet' &&
+                  (d.loai ?? 'doi_buoi') === 'doi_buoi',
+              )
+            : undefined;
+        if (doiBuoiCho) {
+          const { count } = await tx.doi_buoi_hoc.updateMany({
+            where: {
+              id: doiBuoiCho.id,
+              trang_thai: 'cho_duyet',
+              loai: 'doi_buoi',
+              dang_ky_hoc_id: x.dangKyId,
+            },
+            data: {
+              trang_thai: 'da_huy',
+              xu_ly_luc: now,
+              ghi_chu_xu_ly: GHI_CHU_TU_HUY_QUA_HAN,
+              nguoi_xu_ly: null,
+            },
+          });
+          if (!count) throw new ConflictAppException('Đề nghị đã được xử lý');
+        }
+        const moi = await tx.doi_buoi_hoc.create({
           data: {
             dang_ky_hoc_id: x.dangKyId,
             lich_nguon_id: x.dto.lich_nguon_id,
@@ -1304,6 +1339,7 @@ export class DoiBuoiHocService {
           },
           select: { id: true },
         });
+        return { moi, tuHuyId: doiBuoiCho?.id ?? null };
       });
     } catch (e) {
       if (
@@ -1516,6 +1552,17 @@ export class DoiBuoiHocService {
     };
   }
 
+  // Review fix: đổi buổi chờ quá hạn bị tự hủy khi gửi học bù cùng buổi gốc.
+  private async ghiNhatKyTuHuy(hocVienId: string, tuHuyId: string | null) {
+    if (!tuHuyId) return;
+    await this.nhatKy.ghi({
+      hanh_dong: 'de_nghi_doi_buoi',
+      hoc_vien_id: hocVienId,
+      mo_ta: 'Tự hủy đổi buổi quá hạn khi đăng ký học bù',
+      chi_tiet: { de_nghi_id: tuHuyId, tu_dong: true },
+    });
+  }
+
   private ghiNhatKyGui(
     hocVienId: string,
     moTa: string,
@@ -1572,6 +1619,10 @@ function moTaTheoLoai(loai: loai_doi_buoi, hanhDong: string): string {
 // ghi chú này) được coi là tự hủy.
 export const GHI_CHU_HOC_VIEN_SUA = 'Học viên đã sửa (thay bằng đề nghị mới)';
 export const GHI_CHU_HOC_VIEN_HUY = 'Học viên tự hủy';
+// ADR 0012: đổi buổi chờ quá hạn tự hủy khi học viên gửi học bù cùng buổi gốc
+// (lyDoHuy xếp vào hoc_vien_huy — server ghi thay học viên, nguoi_xu_ly null).
+export const GHI_CHU_TU_HUY_QUA_HAN =
+  'Tự hủy: đã quá hạn, học viên chuyển sang đăng ký học bù';
 // D11: bản đã duyệt bị thay khi duyệt đề nghị đổi lại (server ghi, nguoi_xu_ly null).
 export const GHI_CHU_THAY_THE = 'Đã thay bằng đề nghị đổi lại';
 

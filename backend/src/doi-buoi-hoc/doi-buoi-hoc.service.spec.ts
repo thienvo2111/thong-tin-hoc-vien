@@ -161,7 +161,7 @@ describe('DoiBuoiHocService (hoc vien)', () => {
         dang_ky_hoc_id: 'dk1',
         trang_thai: { in: ['cho_duyet', 'da_duyet'] },
       },
-      select: { lich_nguon_id: true, trang_thai: true, lich_chot_id: true, loai: true },
+      select: { id: true, lich_nguon_id: true, trang_thai: true, lich_chot_id: true, loai: true },
     });
   });
 
@@ -2140,7 +2140,7 @@ describe('DoiBuoiHocService hoc bu (hoc vien)', () => {
         dang_ky_hoc_id: 'dk1',
         trang_thai: { in: ['cho_duyet', 'da_duyet'] },
       },
-      select: { lich_nguon_id: true, trang_thai: true, lich_chot_id: true, loai: true },
+      select: { id: true, lich_nguon_id: true, trang_thai: true, lich_chot_id: true, loai: true },
     });
   });
 
@@ -2682,5 +2682,98 @@ describe('DoiBuoiHocService hoc bu (nguoi duyet)', () => {
     expect(sql).toContain("(c.loai = 'hoc_bu' OR ln.thoi_gian_bat_dau > ?)");
     expect(sql).toContain("(c.loai = 'doi_buoi' OR dd.trang_thai = 'co_mat')");
     expect(sql).toContain('d.loai <> c.loai');
+  });
+});
+
+// Review fix 1: đổi buổi chờ (đã quá hạn) cùng buổi gốc → tự hủy rồi tạo học bù.
+describe('DoiBuoiHocService hoc bu: tu huy doi buoi cho qua han', () => {
+  function setupTuHuy(hoatDong: unknown[]) {
+    const s = setup({ hoatDong: hoatDong as never });
+    s.prisma.khoa_boi_duong.findUnique.mockResolvedValue({
+      so_buoi_doi_toi_da: 0,
+      so_buoi_hoc_bu_toi_da: 1,
+    } as never);
+    s.query.lichTomTat.mockResolvedValue(
+      new Map([
+        ['ln', lich('ln', 'lopA', { thoi_gian_bat_dau: hqua })],
+        ['ld', lich('ld', 'lopB')],
+      ]),
+    );
+    return s;
+  }
+  const dtoHb = { ...dto, loai: 'hoc_bu' as const };
+
+  it('doi buoi cho_duyet cung buoi goc -> updateMany da_huy (co dieu kien) roi create, khong 409; nhat ky tu_dong sau commit', async () => {
+    const { svc, tx, nhatKy, order } = setupTuHuy([
+      { id: 'cu-db', lich_nguon_id: 'ln', trang_thai: 'cho_duyet', lich_chot_id: null, loai: 'doi_buoi' },
+    ]);
+    tx.doi_buoi_hoc.create.mockImplementation(async () => {
+      order.push('create');
+      return { id: 'moi' };
+    });
+    await expect(svc.gui(user, dtoHb)).resolves.toEqual({ id: 'moi' });
+    expect(tx.doi_buoi_hoc.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'cu-db',
+        trang_thai: 'cho_duyet',
+        loai: 'doi_buoi',
+        dang_ky_hoc_id: 'dk1',
+      },
+      data: {
+        trang_thai: 'da_huy',
+        xu_ly_luc: expect.any(Date),
+        ghi_chu_xu_ly: 'Tự hủy: đã quá hạn, học viên chuyển sang đăng ký học bù',
+        nguoi_xu_ly: null,
+      },
+    });
+    expect(order.indexOf('updateMany')).toBeLessThan(order.indexOf('create'));
+    expect(order.indexOf('lock')).toBeLessThan(order.indexOf('updateMany'));
+    expect(nhatKy.ghi).toHaveBeenCalledWith({
+      hanh_dong: 'de_nghi_doi_buoi',
+      hoc_vien_id: 'hv1',
+      mo_ta: 'Tự hủy đổi buổi quá hạn khi đăng ký học bù',
+      chi_tiet: { de_nghi_id: 'cu-db', tu_dong: true },
+    });
+    expect(tx.doi_buoi_hoc.create.mock.invocationCallOrder[0]).toBeLessThan(
+      nhatKy.ghi.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('khong co doi buoi cho -> khong updateMany, khong nhat ky tu huy', async () => {
+    const { svc, tx, nhatKy } = setupTuHuy([]);
+    await svc.gui(user, dtoHb);
+    expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+    expect(nhatKy.ghi).toHaveBeenCalledTimes(1);
+  });
+
+  it('kiem tra hoc bu that bai (co_mat) -> khong tu huy', async () => {
+    const { svc, tx } = setupTuHuy([
+      { id: 'cu-db', lich_nguon_id: 'ln', trang_thai: 'cho_duyet', lich_chot_id: null, loai: 'doi_buoi' },
+    ]);
+    tx.diem_danh.findMany.mockResolvedValueOnce([
+      { lich_hoc_id: 'ln', trang_thai: 'co_mat' },
+    ] as never);
+    await expect(svc.gui(user, dtoHb)).rejects.toMatchObject({ status: 400 });
+    expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('gui doi buoi khong tu huy gi', async () => {
+    const { svc, tx } = setup({
+      hoatDong: [
+        { id: 'k', lich_nguon_id: 'khac', trang_thai: 'cho_duyet', lich_chot_id: null },
+      ] as never,
+    });
+    await svc.gui(user, dto);
+    expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('lyDoHuy: ghi chu tu huy qua han -> hoc_vien_huy', () => {
+    expect(
+      lyDoHuy({
+        trang_thai: 'da_huy',
+        nguoi_xu_ly: null,
+        ghi_chu_xu_ly: 'Tự hủy: đã quá hạn, học viên chuyển sang đăng ký học bù',
+      }),
+    ).toBe('hoc_vien_huy');
   });
 });
