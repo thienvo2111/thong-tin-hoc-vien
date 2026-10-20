@@ -113,6 +113,9 @@ CREATE TYPE trang_thai_hang_doi_email AS ENUM ('cho_gui', 'thanh_cong', 'that_ba
 -- T14 (mo-rong-nls-an-giang.md, 2026-09-28): đợt xác nhận cho hồ sơ
 -- import_moet — xem PHẦN 2b bên dưới.
 CREATE TYPE loai_dot_xac_nhan AS ENUM ('kiem_tra_bo_sung', 'xac_nhan_truoc_danh_gia');
+
+-- ADR 0013: nguồn mốc của nhu cầu mức học (lớp của giai đoạn / mức đầu vào chốt).
+CREATE TYPE nguon_moc_nhu_cau AS ENUM ('lop', 'muc_chot');
 -- 2026-10-02 (migration 20261002120000): học viên tự chọn, gửi sang hệ thống khảo sát qua SSO.
 CREATE TYPE doi_tuong_hoc_vien AS ENUM ('giao_vien', 'can_bo_quan_ly');
 
@@ -461,6 +464,42 @@ CREATE TABLE dot_xac_nhan (
 );
 
 CREATE INDEX idx_dot_xac_nhan_khoa ON dot_xac_nhan(khoa_id);
+
+-- ADR 0013 (migration 20261020100000_dot_nhu_cau_muc): đợt thu nhu cầu mức học
+-- sau khi xếp lớp. Không ghi đè dang_ky_hoc.muc_*.
+CREATE TABLE dot_nhu_cau_muc (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    khoa_id         uuid NOT NULL REFERENCES khoa_boi_duong(id) ON DELETE CASCADE,
+    ten_dot         varchar(255) NOT NULL,
+    mo_luc          timestamptz NOT NULL,
+    dong_luc        timestamptz NOT NULL,
+    created_by      uuid REFERENCES nguoi_dung(id),
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT chk_dot_nhu_cau_muc_thoi_gian CHECK (dong_luc > mo_luc)
+);
+
+CREATE INDEX idx_dot_nhu_cau_muc_khoa ON dot_nhu_cau_muc(khoa_id);
+
+CREATE TABLE nhu_cau_muc_hoc_vien (
+    id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    dot_id           uuid NOT NULL REFERENCES dot_nhu_cau_muc(id) ON DELETE CASCADE,
+    dang_ky_hoc_id   uuid NOT NULL REFERENCES dang_ky_hoc(id) ON DELETE CASCADE,
+    muc_chon         muc_nang_luc NOT NULL,
+    muc_moc          muc_nang_luc NOT NULL,
+    nguon_moc        nguon_moc_nhu_cau NOT NULL,
+    lop_id_luc_chon  uuid REFERENCES lop_hoc(id) ON DELETE SET NULL,
+    chon_luc         timestamptz NOT NULL DEFAULT now(),
+    cap_nhat_luc     timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT uq_nhu_cau_muc_dot_dang_ky UNIQUE (dot_id, dang_ky_hoc_id),
+    CONSTRAINT chk_nhu_cau_muc_chon_le_moc CHECK (
+        array_position(ARRAY['co_ban','thanh_thao','nang_cao']::muc_nang_luc[], muc_chon)
+        <= array_position(ARRAY['co_ban','thanh_thao','nang_cao']::muc_nang_luc[], muc_moc))
+);
+
+CREATE INDEX idx_nhu_cau_muc_dang_ky ON nhu_cau_muc_hoc_vien(dang_ky_hoc_id);
 
 -- "Đợt đang mở" của 1 học viên (DotXacNhanService.dotDangMoCuaHocVien) = đợt
 -- có mo_luc <= now() < dong_luc VÀ (khoa_id IS NULL HOẶC học viên đã ghi danh

@@ -255,6 +255,11 @@ enum loai_lop_hoc {
 // thuật cho CREATE TYPE mới — chỉ ALTER TYPE ... ADD VALUE mới bị Postgres
 // chặn dùng cùng transaction — nhưng làm theo đúng cấu trúc "migration A/B"
 // mà tài liệu task đã chốt để nhất quán).
+enum nguon_moc_nhu_cau {
+  lop
+  muc_chot
+}
+
 enum loai_dot_xac_nhan {
   kiem_tra_bo_sung
   xac_nhan_truoc_danh_gia
@@ -467,6 +472,7 @@ model nguoi_dung {
   nhat_ky_dat_lai_mat_khau_cua_toi   nhat_ky_dat_lai_mat_khau[] @relation("nhat_ky_dlmk_nguoi_dung")
   nhat_ky_dat_lai_mat_khau_thuc_hien nhat_ky_dat_lai_mat_khau[] @relation("nhat_ky_dlmk_thuc_hien_boi")
   dot_xac_nhan_created_by            dot_xac_nhan[]             @relation("dot_xac_nhan_created_by")
+  dot_nhu_cau_muc_created_by         dot_nhu_cau_muc[]          @relation("dot_nhu_cau_muc_created_by")
   lich_su_thay_doi_thuc_hien         lich_su_thay_doi_ho_so[]   @relation("lich_su_thay_doi_nguoi_sua")
   yeu_cau_ho_tro_tra_loi_boi         yeu_cau_ho_tro[]           @relation("yeu_cau_ho_tro_tra_loi_boi")
   yeu_cau_ho_tro_sua_tra_loi_boi     yeu_cau_ho_tro[]           @relation("yeu_cau_ho_tro_sua_tra_loi_boi")
@@ -697,6 +703,46 @@ model dot_xac_nhan {
   @@index([khoa_id], map: "idx_dot_xac_nhan_khoa")
 }
 
+// ADR 0013: đợt thu nhu cầu mức học sau khi xếp lớp. Không ghi đè
+// dang_ky_hoc.muc_*; chỉ ghi nhận. CHECK (chk_dot_nhu_cau_muc_thoi_gian,
+// chk_nhu_cau_muc_chon_le_moc) thêm bằng raw SQL trong migration.
+model dot_nhu_cau_muc {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  khoa_id    String   @db.Uuid
+  ten_dot    String   @db.VarChar(255)
+  mo_luc     DateTime @db.Timestamptz(6)
+  dong_luc   DateTime @db.Timestamptz(6)
+  created_by String?  @db.Uuid
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  khoa            khoa_boi_duong @relation(fields: [khoa_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  created_by_user nguoi_dung?    @relation("dot_nhu_cau_muc_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  nhu_cau nhu_cau_muc_hoc_vien[]
+
+  @@index([khoa_id], map: "idx_dot_nhu_cau_muc_khoa")
+}
+
+model nhu_cau_muc_hoc_vien {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dot_id          String            @db.Uuid
+  dang_ky_hoc_id  String            @db.Uuid
+  muc_chon        muc_nang_luc
+  muc_moc         muc_nang_luc
+  nguon_moc       nguon_moc_nhu_cau
+  lop_id_luc_chon String?           @db.Uuid
+  chon_luc        DateTime          @default(now()) @db.Timestamptz(6)
+  cap_nhat_luc    DateTime          @default(now()) @db.Timestamptz(6)
+
+  dot          dot_nhu_cau_muc @relation(fields: [dot_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  dang_ky      dang_ky_hoc     @relation(fields: [dang_ky_hoc_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lop_luc_chon lop_hoc?        @relation(fields: [lop_id_luc_chon], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@unique([dot_id, dang_ky_hoc_id], map: "uq_nhu_cau_muc_dot_dang_ky")
+  @@index([dang_ky_hoc_id], map: "idx_nhu_cau_muc_dang_ky")
+}
+
 model xac_nhan_ho_so {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   dot_id          String    @db.Uuid
@@ -795,6 +841,7 @@ model khoa_boi_duong {
   lop_hoc             lop_hoc[]
   dang_ky_hoc         dang_ky_hoc[]
   dot_xac_nhan        dot_xac_nhan[]
+  dot_nhu_cau_muc     dot_nhu_cau_muc[]
   cau_hinh_khao_sat   cau_hinh_khao_sat_khoa?
   // QĐ10: cụm học viên (nhóm Zalo hỗ trợ theo địa lý) — độc lập với cây đơn
   // vị công tác, thuộc trực tiếp về khóa.
@@ -874,11 +921,12 @@ model lop_hoc {
   hau_can_giang_vien hau_can_giang_vien[]
   nhan_su_thuc_dia   nhan_su_thuc_dia[]
 
-  trang_thai_muc_kiem_tra trang_thai_muc_kiem_tra[]
-  de_nghi_tu_lop          de_nghi_doi_lop[]         @relation("de_nghi_lop_hien_tai")
-  de_nghi_den_lop         de_nghi_doi_lop[]         @relation("de_nghi_lop_de_nghi")
+  trang_thai_muc_kiem_tra  trang_thai_muc_kiem_tra[]
+  de_nghi_tu_lop           de_nghi_doi_lop[]         @relation("de_nghi_lop_hien_tai")
+  de_nghi_den_lop          de_nghi_doi_lop[]         @relation("de_nghi_lop_de_nghi")
   // ADR 0008: người hỗ trợ học viên được gắn vào lớp.
-  phan_cong_ho_tro_lop    phan_cong_ho_tro_lop[]
+  phan_cong_ho_tro_lop     phan_cong_ho_tro_lop[]
+  nhu_cau_muc_lop_luc_chon nhu_cau_muc_hoc_vien[]
 
   @@unique([khoa_id, loai_lop, ten_lop], map: "uq_lop_ten_trong_khoa")
   @@index([khoa_id], map: "idx_lop_khoa")
@@ -1101,6 +1149,7 @@ model dang_ky_hoc {
   bao_vang           bao_vang[]
   de_nghi_doi_lop    de_nghi_doi_lop[]
   doi_buoi_hoc       doi_buoi_hoc[]
+  nhu_cau_muc        nhu_cau_muc_hoc_vien[]
 
   @@unique([hoc_vien_id, khoa_id], map: "uq_dang_ky_hoc_vien_khoa")
   @@index([hoc_vien_id], map: "idx_dang_ky_hoc_vien")
@@ -1580,16 +1629,16 @@ enum doi_tuong_nhac {
 }
 
 model nhat_ky_nhac_lich {
-  id            String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  doi_tuong     doi_tuong_nhac
-  giang_vien_id String?        @db.Uuid
-  cum_id        String?        @db.Uuid
-  lich_hoc_ids  String[]       @db.Uuid
-  noi_dung      String
-  nguoi_gui     String?        @db.Uuid
-  gui_luc       DateTime       @default(now()) @db.Timestamptz(6)
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  doi_tuong         doi_tuong_nhac
+  giang_vien_id     String?        @db.Uuid
+  cum_id            String?        @db.Uuid
+  lich_hoc_ids      String[]       @db.Uuid
+  noi_dung          String
+  nguoi_gui         String?        @db.Uuid
+  gui_luc           DateTime       @default(now()) @db.Timestamptz(6)
   // ADR 0009: NULL = tin nhắn Zalo/SMS (G10); có giá trị = gửi qua email.
-  hang_doi_email_id String?    @db.Uuid
+  hang_doi_email_id String?        @db.Uuid
 
   giang_vien     giang_vien?     @relation(fields: [giang_vien_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   cum            cum_hoc_vien?   @relation(fields: [cum_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
