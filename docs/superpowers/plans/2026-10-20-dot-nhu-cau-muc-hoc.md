@@ -23,6 +23,18 @@
 - Test: `npm run test:e2e -- <file>` (đã có `--forceExit`), `npx vitest run <file>`. Luôn đặt timeout, không chạy watch.
 - Mỗi task: commit rồi `git push` ngay. Commit message ghi "(CO migration)" hoặc "(khong migration)".
 
+## An toàn DB (BẮT BUỘC — chép nguyên văn vào brief mọi subagent)
+
+Nguồn: sự cố 2026-10-19, khi `migrate diff --shadow-database-url <DB dev>` xóa trắng DB dev.
+
+1. **Chỉ DB dev `localhost:5432/thong_tin_hoc_vien`** (container `thong-tin-hoc-vien-db`). **Không bao giờ** trỏ vào DB VPS/prod, kể cả qua SSH tunnel hay NAT 2463. Không SSH, không deploy.
+2. **CẤM:** `prisma migrate dev`, `prisma migrate reset`, `prisma db push`, `--shadow-database-url`, `--force-reset`, và mọi `DROP DATABASE`/`TRUNCATE`.
+3. **Migration viết tay** (`migration.sql`), áp bằng `npx prisma migrate deploy`; lệnh này chỉ chạy migration còn thiếu, không dùng shadow DB. Kiểm drift chỉ bằng `npx prisma migrate status` và `npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script` (không shadow).
+4. **Trước mọi lệnh ghi schema:** (a) in `DATABASE_URL` đã che mật khẩu, và **dừng nếu chuỗi không chứa `@localhost:5432/thong_tin_hoc_vien?`**; (b) backup: `docker exec thong-tin-hoc-vien-db pg_dump -U postgres -Fc thong_tin_hoc_vien > backend/backups/truoc-dot-nhu-cau-muc-<yyyymmdd-HHMM>.dump`, rồi kiểm tra file > 1 MB. Nếu `pg_dump` hỏi mật khẩu thì truyền `-e PGPASSWORD=<lấy từ DATABASE_URL>`, không gõ tay.
+5. **e2e chạy trên DB dev**, vì `backend/.env.test` không tồn tại. Fixture phải dùng `uniqueSuffix()`. `afterAll` **chỉ xóa theo id đã tạo**: không `deleteMany` thiếu `where`, không `where` theo điều kiện rộng (ví dụ theo `khoa_id` của khóa thật).
+6. Worktree chưa có `backend/.env`. Chép từ `D:/cungcapthongtin-hocvien/backend/.env` (đã gitignore, không commit), rồi kiểm tra theo mục 4a. `node_modules` có thể là junction dùng chung, nên `prisma generate` sẽ ghi đè client chung. Chỉ chạy `generate` sau khi schema đã đúng.
+7. Có lỗi DB lạ thì **dừng và báo**, không tự "sửa" bằng reset hay xóa dữ liệu.
+
 ## Review Focus
 
 1. **Học viên đã qua hết các giai đoạn.** Mốc phải lấy lớp của giai đoạn gần nhất đã qua, không được báo "chưa có mốc". Test `tinhMocNhuCau` case "mọi giai đoạn đã kết thúc" ở Task 2.
@@ -46,7 +58,7 @@
   - `nhu_cau_muc_hoc_vien { id uuid, dot_id FK ON DELETE CASCADE, dang_ky_hoc_id FK→dang_ky_hoc ON DELETE CASCADE, muc_chon muc_nang_luc, muc_moc muc_nang_luc, nguon_moc nguon_moc_nhu_cau, lop_id_luc_chon uuid? FK→lop_hoc ON DELETE SET NULL, chon_luc timestamptz default now(), cap_nhat_luc timestamptz default now() }`, có `@@unique([dot_id, dang_ky_hoc_id])` và index `(dang_ky_hoc_id)`.
 
 - [ ] **Step 1:** Thêm model vào schema, theo mẫu `dot_xac_nhan` (schema.prisma:681).
-- [ ] **Step 2:** Chạy `cd backend && npx prisma migrate dev --create-only --name dot_nhu_cau_muc`, đổi tên thư mục thành `20261020100000_dot_nhu_cau_muc`. Nối thêm SQL vào cuối file:
+- [ ] **Step 2:** **Viết tay** `backend/prisma/migrations/20261020100000_dot_nhu_cau_muc/migration.sql` (không dùng `migrate dev`). Nội dung: `CREATE TYPE "nguon_moc_nhu_cau"`, 2 `CREATE TABLE`, các index, các FK đúng như mục Interfaces, theo mẫu SQL của `20260928070056_t14_dot_xac_nhan_tables/migration.sql`. Nối thêm vào cuối file:
   ```sql
   ALTER TABLE "dot_nhu_cau_muc" ADD CONSTRAINT "chk_dot_nhu_cau_muc_thoi_gian" CHECK ("dong_luc" > "mo_luc");
   ALTER TABLE "nhu_cau_muc_hoc_vien" ADD CONSTRAINT "chk_nhu_cau_muc_chon_le_moc" CHECK (
@@ -54,9 +66,12 @@
     <= array_position(ARRAY['co_ban','thanh_thao','nang_cao']::muc_nang_luc[], "muc_moc"));
   ```
   Kiểm tra: file chỉ có `CREATE TYPE`, `CREATE TABLE`, `CREATE INDEX`, `ALTER TABLE ... ADD CONSTRAINT`; không có `DROP` hay `ALTER COLUMN`.
-- [ ] **Step 3:** Chạy `npx prisma migrate dev` trên DB dev (localhost, **không** dùng `--shadow-database-url`), rồi `npx prisma generate`. Kỳ vọng: "Applied migration 20261020100000_dot_nhu_cau_muc".
-- [ ] **Step 4:** Chạy `npx tsc --noEmit -p backend`. Kỳ vọng: không lỗi.
-- [ ] **Step 5:** Commit `feat(nhu-cau-muc): schema 2 bang dot_nhu_cau_muc + nhu_cau_muc_hoc_vien (CO migration, chi them bang)`, rồi push.
+- [ ] **Step 3:** Làm đủ mục 4 của "An toàn DB": kiểm tra URL, rồi backup. Ghi số dòng trước khi áp: `SELECT count(*) FROM dang_ky_hoc;`, `SELECT count(*) FROM hoc_vien;`.
+- [ ] **Step 4:** Chạy `cd backend && npx prisma migrate status`. Kỳ vọng: chỉ còn chờ đúng `20261020100000_dot_nhu_cau_muc`. Nếu có migration lạ đang chờ, hoặc báo drift, thì **dừng và báo**.
+- [ ] **Step 5:** Chạy `npx prisma migrate deploy`, rồi `npx prisma generate`. Kỳ vọng: "Applying migration `20261020100000_dot_nhu_cau_muc`". Đếm lại 2 bảng ở Step 3: số dòng phải bằng trước khi áp.
+- [ ] **Step 6:** Chạy `npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --script`. Kỳ vọng: rỗng, hoặc chỉ còn khác biệt đã có từ trước (CHECK raw SQL). Nếu khác biệt nằm ở 2 bảng mới thì sửa `schema.prisma` hoặc `migration.sql` cho khớp. **Không** tạo migration thứ 2 bằng tay khi chưa báo.
+- [ ] **Step 7:** Chạy `npx tsc --noEmit -p backend`. Kỳ vọng: không lỗi.
+- [ ] **Step 8:** Commit `feat(nhu-cau-muc): schema 2 bang dot_nhu_cau_muc + nhu_cau_muc_hoc_vien (CO migration, chi them bang)`, chỉ add `schema.prisma`, thư mục migration, `docs/database-ddl.sql` (KHÔNG add `backend/.env`, `backend/backups/`), rồi push.
 
 ### Task 2: Hàm thuần tính mốc và mức được chọn
 
