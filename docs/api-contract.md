@@ -877,3 +877,58 @@ Quy tắc chung: học bù đã duyệt **thêm** buổi chốt cho học viên,
 | `GET /doi-buoi-hoc/thong-ke/xuat-excel` | Nhận `loai`; sheet buổi thêm cột cuối "Học bù vào (đã duyệt)"; sheet Học viên thêm cột cuối "Loại" (Đổi buổi / Học bù); mô tả bộ lọc ghi "Loại: …" |
 | Vào học Zoom, báo vắng, sửa ô điểm danh, nạp điểm danh Excel | Ở buổi chốt: như đổi buổi (cho phép; không báo học bù). Chốt vắng Zoom **không** bỏ qua người học bù ở buổi gốc |
 | Nhắc lịch cụm | Buổi chốt có dòng "{họ tên} học bù buổi {n} tại {lớp}"; buổi gốc không đổi |
+
+## 13. Đợt nhu cầu mức học (ADR 0013, 2026-10-20)
+
+Học viên chọn mức học mong muốn theo **đợt** do Quản trị mở trên từng khóa. Chỉ lưu `nhu_cau_muc_hoc_vien`; **không** ghi `dang_ky_hoc.muc_dau_vao`, `muc_hoc_chon`, `muc_hoc_chon_luc`, `phan_lop_giai_doan` (không đổi xếp lớp). Lỗi theo dạng chuẩn `{ error: { code, message, fields? } }`. Mã mới: `DOT_NHU_CAU_DONG` (403) "Đợt nhu cầu mức học đã đóng".
+
+**Đối tượng Đợt**: `{ id, khoa_id, ten_dot, mo_luc, dong_luc, trang_thai: 'chua_mo'|'dang_mo'|'da_dong', so_ban_ghi }` (`trang_thai` suy ra từ giờ server; `so_ban_ghi` = số lựa chọn đã thu).
+
+### 13.1 Quản trị (`quan_tri`)
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| GET | `/khoa-boi-duong/{khoaId}/dot-nhu-cau-muc` | Danh sách đợt của khóa, `mo_luc` mới nhất trước → `Đợt[]`. Khóa không tồn tại → mảng rỗng |
+| POST | `/khoa-boi-duong/{khoaId}/dot-nhu-cau-muc` | Body `{ ten_dot (1–255 ký tự), mo_luc, dong_luc }` (ISO 8601). `dong_luc` phải sau `mo_luc` → `400`; trùng thời gian đợt khác của cùng khóa → `409` (`fields[0].field = 'mo_luc'`); khóa không có → `404`. Trả `201` + `Đợt` |
+| PATCH | `/dot-nhu-cau-muc/{id}` | Body mọi trường tùy chọn `{ ten_dot?, mo_luc?, dong_luc? }`. Cùng kiểm tra `400`/`409` (bỏ qua chính đợt này); `404` nếu không có đợt. Trả `200` + `Đợt` |
+| POST | `/dot-nhu-cau-muc/{id}/dong` | Đóng đợt đang mở (đặt `dong_luc = now`). Đợt chưa mở → `400` "Đợt chưa mở, không thể đóng"; đã đóng → `400` "Đợt đã đóng". Trả `201` + `Đợt` |
+| DELETE | `/dot-nhu-cau-muc/{id}` | Chỉ khi `so_ban_ghi = 0`. Có dữ liệu → `409` "Đợt đã có dữ liệu nhu cầu, không thể xóa". Thành công `204` |
+
+### 13.2 Học viên (`hoc_vien`, prefix `/hoc-vien/toi/nhu-cau-muc`)
+
+**Đối tượng NhuCauMucCuaToi**:
+
+```json
+{
+  "dot": { "id": "…", "ten_dot": "…", "mo_luc": "…", "dong_luc": "…", "trang_thai": "dang_mo" },
+  "khoa": { "id": "…", "ten_khoa": "…" },
+  "du_dieu_kien": true,
+  "ly_do_khong_du": null,
+  "moc": { "muc": "thanh_thao", "nguon": "lop", "lop": { "id": "…", "ten_lop": "…" }, "giai_doan": { "id": "…", "ten_giai_doan": "…" } },
+  "cac_muc_duoc_chon": ["co_ban", "thanh_thao"],
+  "lua_chon": { "muc_chon": "co_ban", "muc_moc": "thanh_thao", "nguon_moc": "lop", "chon_luc": "…", "cap_nhat_luc": "…" }
+}
+```
+
+`moc` null khi chưa có mốc; `moc.nguon` = `lop` | `muc_chot`; `lua_chon` null khi chưa chọn; `ly_do_khong_du` = `nhan_vien` | `trang_thai_dang_ky` | `chua_co_moc` | null. `cac_muc_duoc_chon` = mọi mức ≤ mốc (thứ tự co_ban < thanh_thao < nang_cao), rỗng khi không đủ điều kiện.
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| GET | `/hoc-vien/toi/nhu-cau-muc` | Các đợt **đang mở** của khóa học viên có đăng ký `da_duyet`/`da_phan_lop` (nhân viên bị loại) → `NhuCauMucCuaToi[]`, chỉ phần tử `du_dieu_kien = true` (có mốc) |
+| GET | `/hoc-vien/toi/nhu-cau-muc/{dotId}` | Chi tiết 1 đợt (mọi trạng thái, kể cả đã đóng, trả lựa chọn đã lưu và mốc **hiện tại**). Đợt không tồn tại hoặc học viên không có đăng ký khóa đó → `404` (không lộ thông tin đợt) |
+| PUT | `/hoc-vien/toi/nhu-cau-muc/{dotId}` | Body `{ muc: 'co_ban'\|'thanh_thao'\|'nang_cao' }`. Upsert theo `(dot, đăng ký)` — gọi lại để đổi, 2 request đồng thời không tạo 2 dòng. Lưu kèm `muc_moc`, `nguon_moc`, lớp lúc chọn. Trả `200` + `NhuCauMucCuaToi` |
+
+Lỗi PUT: đợt chưa mở/đã đóng → `403` `DOT_NHU_CAU_DONG`; không đủ điều kiện (nhân viên, đăng ký chưa duyệt, chưa có mốc) → `400` thông điệp theo `ly_do_khong_du`; `muc` cao hơn mốc → `400` "Chỉ được chọn mức bằng hoặc thấp hơn mức hiện tại (…)" (`fields[0].field = 'muc'`) — kể cả khi mốc bị hạ sau lúc chọn (GET vẫn trả lựa chọn cũ).
+
+### 13.3 Thống kê (`/thong-ke`, vai trò thống kê như các báo cáo khác; phạm vi theo tài khoản)
+
+Query chung: `dot_id` (UUID, bắt buộc) + bộ lọc thống kê hiện có (`don_vi_ids`, `doi_tuong`, …). `khoa_id` do server lấy theo đợt, giá trị client gửi bị bỏ qua. Nhân viên bị loại; `doi_tuong` NULL vẫn tính. Đợt không tồn tại → `404`.
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| GET | `/thong-ke/nhu-cau-muc-dot` | `{ dot: { id, ten_dot, khoa_id, ma_khoa, ten_khoa, mo_luc, dong_luc, trang_thai }, tong_du_dieu_kien, da_chon, chua_chon, ty_le_da_chon (0–100, 1 chữ số thập phân), ma_tran: [{ muc_moc, muc_chon, so_luong }], theo_truong: [{ don_vi_id, ten, tong, da_chon, chua_chon, ha_muc }] }` — `ha_muc` = số học viên chọn mức thấp hơn mốc. Mẫu số = học viên đủ điều kiện (có mốc, lấy mốc hiện tại nếu chưa chọn) |
+| GET | `/thong-ke/nhu-cau-muc-dot/xuat-excel` | `.xlsx` (tên `nhu-cau-muc-{ma_khoa}-{yyyymmdd}.xlsx`, `Cache-Control: no-store`), mỗi đăng ký 1 dòng **có PII** (họ tên, mã MOET, SĐT, đơn vị, trường, mốc hiện tại, lớp, mức đầu vào, `muc_hoc_chon`, lựa chọn của đợt). `don_vi_ids` rỗng = toàn phạm vi tài khoản. Ghi `nhat_ky` `hanh_dong = 'xuat_nhu_cau_muc_dot'`, `chi_tiet { dot_id, khoa_id, don_vi_ids, doi_tuong, so_dong }` |
+
+### 13.4 Schema (migration `20261020100000_dot_nhu_cau_muc`, chỉ thêm)
+
+Enum `nguon_moc_nhu_cau` (`lop`, `muc_chot`); bảng `dot_nhu_cau_muc` (CHECK `chk_dot_nhu_cau_muc_thoi_gian`: `dong_luc > mo_luc`; FK khóa `ON DELETE CASCADE`); bảng `nhu_cau_muc_hoc_vien` (unique `uq_nhu_cau_muc_dot_dang_ky`; CHECK `chk_nhu_cau_muc_chon_le_moc`: `muc_chon` ≤ `muc_moc`; FK đợt/đăng ký `CASCADE`, `lop_id_luc_chon` `SET NULL`).
