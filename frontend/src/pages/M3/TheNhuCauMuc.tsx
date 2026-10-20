@@ -35,8 +35,9 @@ function TheMotDot({ nc }: { nc: NhuCauMucCuaToi }) {
         borderWidth: 2,
       }}
     >
-      <Group justify="space-between" align="flex-start" wrap="nowrap" gap="sm">
-        <Box>
+      {/* wrap: màn 360px không đủ chỗ cho nhãn "Đã chọn: Thành thạo" cạnh tiêu đề — nhãn xuống dòng thay vì bị cắt. */}
+      <Group justify="space-between" align="flex-start" wrap="wrap" gap="sm">
+        <Box style={{ flex: '1 1 12rem' }}>
           <Title order={2} size="h4">
             {dot.ten_dot}
           </Title>
@@ -44,7 +45,7 @@ function TheMotDot({ nc }: { nc: NhuCauMucCuaToi }) {
             {nc.khoa.ten_khoa}
           </Text>
         </Box>
-        <Badge color={mau} variant="filled" size="lg">
+        <Badge color={mau} variant="filled" size="lg" style={{ flexShrink: 0 }}>
           {lua_chon ? `Đã chọn: ${nhanMucNangLuc(lua_chon.muc_chon)}` : 'Chưa chọn'}
         </Badge>
       </Group>

@@ -136,7 +136,7 @@ export function KhoiDotNhuCauMuc({ khoaId }: { khoaId: string }) {
           </Text>
         )}
         {data && data.length > 0 && (
-          <Table.ScrollContainer minWidth={640}>
+          <Table.ScrollContainer minWidth={820}>
             <Table verticalSpacing="xs" horizontalSpacing="sm">
               <Table.Thead>
                 <Table.Tr>
@@ -151,11 +151,14 @@ export function KhoiDotNhuCauMuc({ khoaId }: { khoaId: string }) {
               <Table.Tbody>
                 {data.map((d) => (
                   <Table.Tr key={d.id}>
-                    <Table.Td fw={600}>{d.ten_dot}</Table.Td>
+                    <Table.Td fw={600} miw={180}>
+                      {d.ten_dot}
+                    </Table.Td>
                     <Table.Td style={{ whiteSpace: 'nowrap' }}>{dinhDangNgayGio(d.mo_luc)}</Table.Td>
                     <Table.Td style={{ whiteSpace: 'nowrap' }}>{dinhDangNgayGio(d.dong_luc)}</Table.Td>
                     <Table.Td>
-                      <Badge color={MAU_TRANG_THAI[d.trang_thai]} radius="xl">
+                      {/* minWidth max-content: ô hẹp không được cắt nhãn thành "ĐA…". */}
+                      <Badge color={MAU_TRANG_THAI[d.trang_thai]} radius="xl" style={{ minWidth: 'max-content' }}>
                         {NHAN_TRANG_THAI[d.trang_thai]}
                       </Badge>
                     </Table.Td>
