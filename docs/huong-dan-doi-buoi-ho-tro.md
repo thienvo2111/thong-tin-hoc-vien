@@ -22,9 +22,17 @@ Dành cho **người hỗ trợ học viên (cụm)** và **Quản trị**. Quy�
 
 Màn hình: người hỗ trợ cụm → menu **Đổi buổi** (số trên menu = số đề nghị đang chờ); Quản trị → menu **Đổi buổi** (🔁).
 
+**Thanh lọc** (trên tab Chờ duyệt / Đã xử lý; tải lại trang vẫn giữ bộ lọc):
+
+- **Khóa**: người hỗ trợ cụm được chọn sẵn khóa đang diễn ra; Quản trị phải **chọn khóa** trước (chỉ tự chọn khi đúng 1 khóa đang diễn ra) — chưa chọn thì màn hình ghi *Chọn khóa để xem*.
+- **Cụm**, **Lớp** (không bắt buộc): Lớp khớp cả lớp gốc lẫn lớp xin đổi sang. Người hỗ trợ chỉ thấy cụm của mình.
+- **Tìm học viên**: gõ họ tên (không cần dấu) hoặc mã MOET (thiếu số 0 đầu vẫn tìm được), từ 2 ký tự.
+- **Loại**: Tất cả / Đổi buổi / Học bù.
+- Danh sách **không tự cập nhật** liên tục: bấm **Tải lại** để xem đề nghị mới; bên cạnh ghi *Cập nhật lúc giờ:phút*. Duyệt / từ chối xong thì thẻ tự biến mất, không cần tải lại.
+
 ### Tab **Chờ duyệt**
 
-Sắp theo thời điểm gửi (cũ nhất trước). Mỗi dòng: học viên (đơn vị, cụm), buổi gốc → buổi đề nghị, lý do, thời điểm gửi,
+Sắp theo thời điểm gửi (cũ nhất trước) — cả mục **Quá hạn** cũng vậy. Mỗi dòng: học viên (đơn vị, cụm), buổi gốc → buổi đề nghị, lý do, thời điểm gửi,
 **Thứ tự gửi** `k/n` (vị trí trong hàng chờ của buổi đề nghị), sĩ số buổi đề nghị và số đang chờ.
 
 1. Bấm **Duyệt** → cửa sổ **Chọn buổi chốt** liệt kê mọi buổi tương đương còn chưa bắt đầu, kèm sĩ số, *+n đang chờ*,
@@ -52,7 +60,7 @@ Buổi đang học không có trong danh sách chọn buổi chốt.
 
 ### Tab **Đã xử lý**
 
-Xem đề nghị đã duyệt / từ chối / hủy, buổi chốt, người xử lý, ghi chú. Nhãn *Đã thay bằng đề nghị đổi lại* = bản
+Xem đề nghị đã duyệt / từ chối / hủy, buổi chốt, người xử lý, ghi chú. Mỗi trang 50 đề nghị (mới xử lý nhất trước) — dùng **Trang trước / Trang sau**. Nhãn *Đã thay bằng đề nghị đổi lại* = bản
 đã duyệt được thay khi duyệt đề nghị đổi lại (hệ thống tự ghi, không phải ai hủy).
 **Hủy duyệt**: chỉ khi cả buổi gốc và buổi chốt chưa bắt đầu; ghi chú bắt buộc. Nếu buổi gốc đã đủ sĩ số
 thì người hỗ trợ cụm **không hủy được** (Quản trị vẫn làm được, kèm cảnh báo).

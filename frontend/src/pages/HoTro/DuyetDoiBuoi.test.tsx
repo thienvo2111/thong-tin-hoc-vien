@@ -7,6 +7,7 @@ import { db } from "@/test/mocks/db";
 import { renderVoiRouter } from "@/test/testUtils";
 import { datToken } from "@/auth/tokenStore";
 import type {
+  BoLocDoiBuoi,
   BuoiTomTat,
   DeNghiDuyet,
   LichTomTat,
@@ -114,7 +115,32 @@ const LUA_CHON: LuaChonDuyet[] = [
   }),
 ];
 
+const NGAY = 86_400_000;
+const ngay = (lech: number) => new Date(Date.now() + lech * NGAY).toISOString().slice(0, 10) + "T00:00:00.000Z";
+type KhoaBoLoc = BoLocDoiBuoi["khoa"][number];
+const khoa = (id: string, batDau: number, ketThuc: number): KhoaBoLoc => ({
+  id,
+  ma_khoa: id.toUpperCase(),
+  ten_khoa: `Khóa ${id}`,
+  thoi_gian_bat_dau: ngay(batDau),
+  thoi_gian_ket_thuc: ngay(ketThuc),
+});
+// Mặc định: đúng 1 khóa đang diễn ra → cả hỗ trợ lẫn quản trị đều tự chọn.
+const BO_LOC: BoLocDoiBuoi = {
+  khoa: [khoa("khoa-1", -10, 30)],
+  cum: [
+    { id: "cum-1", ten_cum: "Cụm An Giang", khoa_id: "khoa-1" },
+    { id: "cum-2", ten_cum: "Cụm Châu Đốc", khoa_id: "khoa-1" },
+  ],
+  lop: [{ id: "lop-1", ten_lop: "Lớp 01", khoa_id: "khoa-1" }],
+};
+
+function datBoLoc(bo: BoLocDoiBuoi) {
+  server.use(http.get("/doi-buoi-hoc/bo-loc", () => HttpResponse.json(bo)));
+}
+
 function datApi(ds: DeNghiDuyet[], dem = 0, quaHan: DeNghiDuyet[] = []) {
+  datBoLoc(BO_LOC);
   server.use(
     http.get("/doi-buoi-hoc", ({ request }) =>
       HttpResponse.json(
@@ -130,13 +156,50 @@ function datApi(ds: DeNghiDuyet[], dem = 0, quaHan: DeNghiDuyet[] = []) {
   );
 }
 
-function renderTrang(vaiTro: string) {
+function renderTrang(vaiTro: string, url = "/ho-tro/doi-buoi") {
   datToken("token-gia-lap");
   db.nguoiDung.vai_tro = vaiTro;
   return renderVoiRouter(
     [{ path: "/ho-tro/doi-buoi", element: <DuyetDoiBuoi /> }],
+    { initialEntries: [url] },
+  );
+}
+
+/** Trang trong HoTroLayout (có badge dem-cho-duyet đang hiển thị). */
+function renderTrongLayout() {
+  server.use(http.get("/ho-tro-hoc-vien/cum-cua-toi", () => HttpResponse.json([])));
+  datToken("token-gia-lap");
+  db.nguoiDung.vai_tro = "ho_tro_hoc_vien";
+  return renderVoiRouter(
+    [
+      {
+        element: <HoTroLayout />,
+        children: [
+          { path: "/ho-tro/doi-buoi", element: <DuyetDoiBuoi /> },
+          { path: "/ho-tro/khac", element: <div>Trang khác</div> },
+        ],
+      },
+    ],
     { initialEntries: ["/ho-tro/doi-buoi"] },
   );
+}
+
+/** Ghi lại mọi GET danh sách / badge để đếm số lượt gọi. */
+function ghiYeuCau(ds: (u: URL) => DeNghiDuyet[] = () => []) {
+  const ds_urls: URL[] = [];
+  const dem_urls: URL[] = [];
+  server.use(
+    http.get("/doi-buoi-hoc", ({ request }) => {
+      const u = new URL(request.url);
+      ds_urls.push(u);
+      return HttpResponse.json(ds(u));
+    }),
+    http.get("/doi-buoi-hoc/dem-cho-duyet", ({ request }) => {
+      dem_urls.push(new URL(request.url));
+      return HttpResponse.json({ cho_duyet: 1 });
+    }),
+  );
+  return { ds_urls, dem_urls };
 }
 
 async function moModalDuyet() {
@@ -466,26 +529,30 @@ describe("Màn duyệt đổi buổi", () => {
     expect(dong).not.toHaveTextContent("Hủy duyệt");
   });
 
-  it("tab Đã xử lý gọi server với da_xu_ly=true và báo khi chạm giới hạn 500", async () => {
-    let url = "";
-    const dong = Array.from({ length: 500 }, (_, i) =>
-      deNghi({ id: `dn-${i}`, trang_thai: "tu_choi" }),
-    );
+  it("tab Đã xử lý phân trang 50: Trang sau gửi trang=2; trang cuối (<50) khóa Trang sau", async () => {
     datApi([]);
-    server.use(
-      http.get("/doi-buoi-hoc", ({ request }) => {
-        if (!request.url.includes("da_xu_ly")) return HttpResponse.json([]);
-        url = request.url;
-        return HttpResponse.json(dong);
-      }),
-    );
+    const { ds_urls } = ghiYeuCau((u) => {
+      if (u.searchParams.get("da_xu_ly") !== "true") return [];
+      const trang = u.searchParams.get("trang") ?? "1";
+      const so = trang === "1" ? 50 : 10;
+      return Array.from({ length: so }, (_, i) =>
+        deNghi({ id: `dn-${trang}-${i}`, trang_thai: "tu_choi" }),
+      );
+    });
     renderTrang("ho_tro_hoc_vien");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("tab", { name: "Đã xử lý" }));
-    expect(
-      await screen.findByText("Chỉ hiển thị 500 đề nghị xử lý gần nhất"),
-    ).toBeInTheDocument();
-    expect(url).toContain("da_xu_ly=true");
+    await waitFor(() => expect(screen.getAllByTestId("de-nghi-da-xu-ly")).toHaveLength(50));
+    const dau = ds_urls.find((u) => u.searchParams.get("da_xu_ly") === "true")!;
+    expect(dau.searchParams.get("trang")).toBeNull();
+    expect(dau.searchParams.get("khoa_id")).toBe("khoa-1");
+    expect(screen.getByRole("button", { name: "Trang trước" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Trang sau" }));
+    await waitFor(() => expect(screen.getAllByTestId("de-nghi-da-xu-ly")).toHaveLength(10));
+    expect(ds_urls.some((u) => u.searchParams.get("trang") === "2")).toBe(true);
+    expect(screen.getByRole("button", { name: "Trang sau" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Trang trước" })).toBeEnabled();
+    expect(screen.getByText("Trang 2")).toBeInTheDocument();
   });
 
   it("hỗ trợ cụm: buổi đề nghị không duyệt được -> không chọn sẵn, có gợi ý, nút xác nhận disabled", async () => {
@@ -584,5 +651,218 @@ describe("Màn duyệt đổi buổi — học bù", () => {
     expect(within(dong).getByText("Học bù")).toBeInTheDocument();
     expect(within(dong).getByRole("group", { name: "Buổi đã vắng" })).toBeInTheDocument();
     expect(within(dong).getByRole("button", { name: "Hủy duyệt" })).toBeInTheDocument();
+  });
+});
+
+describe("Màn duyệt đổi buổi — bộ lọc, Tải lại, giảm tải", () => {
+  it("quản trị: nhiều khóa đang diễn ra -> không tự chọn, báo Chọn khóa để xem, KHÔNG gọi danh sách", async () => {
+    datApi([]);
+    datBoLoc({ ...BO_LOC, khoa: [khoa("khoa-1", -10, 30), khoa("khoa-2", -5, 30)] });
+    const { ds_urls } = ghiYeuCau();
+    renderTrang("quan_tri");
+    expect(await screen.findByText("Chọn khóa để xem")).toBeInTheDocument();
+    // Chờ thêm 1 nhịp: vẫn không có lượt gọi danh sách nào.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(ds_urls).toHaveLength(0);
+    // Chọn khóa → mới tải.
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("textbox", { name: "Khóa" }));
+    await user.click(await screen.findByRole("option", { name: /KHOA-2/ }));
+    await waitFor(() => expect(ds_urls.length).toBeGreaterThan(0));
+    expect(ds_urls.every((u) => u.searchParams.get("khoa_id") === "khoa-2")).toBe(true);
+  });
+
+  it("quản trị: không có khóa đang diễn ra -> không tự chọn", async () => {
+    datApi([]);
+    datBoLoc({ ...BO_LOC, khoa: [khoa("khoa-1", -60, -30)] });
+    const { ds_urls } = ghiYeuCau();
+    renderTrang("quan_tri");
+    expect(await screen.findByText("Chọn khóa để xem")).toBeInTheDocument();
+    expect(ds_urls).toHaveLength(0);
+  });
+
+  it("quản trị: đúng 1 khóa đang diễn ra -> tự chọn khóa đó", async () => {
+    datApi([]);
+    datBoLoc({ ...BO_LOC, khoa: [khoa("khoa-cu", -90, -60), khoa("khoa-1", -10, 30)] });
+    const { ds_urls } = ghiYeuCau();
+    renderTrang("quan_tri");
+    await waitFor(() => expect(ds_urls.length).toBeGreaterThan(0));
+    expect(ds_urls[0].searchParams.get("khoa_id")).toBe("khoa-1");
+  });
+
+  it("hỗ trợ: chọn sẵn khóa đang diễn ra bắt đầu muộn nhất", async () => {
+    datApi([]);
+    datBoLoc({
+      ...BO_LOC,
+      khoa: [khoa("khoa-cu", -90, -60), khoa("khoa-a", -20, 30), khoa("khoa-b", -5, 30), khoa("khoa-sau", 30, 60)],
+    });
+    const { ds_urls } = ghiYeuCau();
+    renderTrang("ho_tro_hoc_vien");
+    await waitFor(() => expect(ds_urls.length).toBeGreaterThan(0));
+    expect(ds_urls.every((u) => u.searchParams.get("khoa_id") === "khoa-b")).toBe(true);
+  });
+
+  it("hỗ trợ: không khóa nào đang diễn ra -> chọn khóa bắt đầu muộn nhất", async () => {
+    datApi([]);
+    datBoLoc({ ...BO_LOC, khoa: [khoa("khoa-cu", -90, -60), khoa("khoa-sau", 30, 60)] });
+    const { ds_urls } = ghiYeuCau();
+    renderTrang("ho_tro_hoc_vien");
+    await waitFor(() => expect(ds_urls.length).toBeGreaterThan(0));
+    expect(ds_urls[0].searchParams.get("khoa_id")).toBe("khoa-sau");
+  });
+
+  it("bộ lọc trên URL (tải lại trang vẫn giữ): khoa/cụm/lớp/q/loại gửi lên server", async () => {
+    datApi([]);
+    const { ds_urls } = ghiYeuCau();
+    renderTrang(
+      "ho_tro_hoc_vien",
+      "/ho-tro/doi-buoi?khoa_id=khoa-1&cum_id=cum-2&lop_id=lop-1&q=Lan&loai=hoc_bu",
+    );
+    await waitFor(() => expect(ds_urls.length).toBeGreaterThanOrEqual(2));
+    for (const u of ds_urls) {
+      expect(u.searchParams.get("khoa_id")).toBe("khoa-1");
+      expect(u.searchParams.get("cum_id")).toBe("cum-2");
+      expect(u.searchParams.get("lop_id")).toBe("lop-1");
+      expect(u.searchParams.get("q")).toBe("Lan");
+      expect(u.searchParams.get("loai")).toBe("hoc_bu");
+    }
+    expect(screen.getByRole("textbox", { name: "Tìm học viên" })).toHaveValue("Lan");
+  });
+
+  it("chọn Cụm + gõ tìm học viên (debounce, ≥2 ký tự) -> gửi cum_id và q", async () => {
+    datApi([]);
+    const { ds_urls } = ghiYeuCau();
+    renderTrang("ho_tro_hoc_vien");
+    await waitFor(() => expect(ds_urls.length).toBeGreaterThan(0));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("textbox", { name: "Cụm" }));
+    await user.click(await screen.findByRole("option", { name: "Cụm Châu Đốc" }));
+    await waitFor(() => expect(ds_urls.some((u) => u.searchParams.get("cum_id") === "cum-2")).toBe(true));
+    // 1 ký tự: không gửi q.
+    await user.type(screen.getByRole("textbox", { name: "Tìm học viên" }), "N");
+    await new Promise((r) => setTimeout(r, 500));
+    expect(ds_urls.some((u) => u.searchParams.has("q"))).toBe(false);
+    await user.type(screen.getByRole("textbox", { name: "Tìm học viên" }), "guyễn");
+    await waitFor(
+      () => expect(ds_urls.some((u) => u.searchParams.get("q") === "Nguyễn" && u.searchParams.get("cum_id") === "cum-2")).toBe(true),
+      { timeout: 2000 },
+    );
+  });
+
+  it("Duyệt thành công: gỡ thẻ tại chỗ, KHÔNG tải lại danh sách, chỉ tải lại badge", async () => {
+    datApi([]);
+    const { ds_urls, dem_urls } = ghiYeuCau((u) =>
+      u.searchParams.get("qua_han") === "true" ? [] : [deNghi(), deNghi({ id: "dn-2", hoc_vien: { ...deNghi().hoc_vien, ho_ten: "Trần Văn Bình" } })],
+    );
+    server.use(
+      http.post("/doi-buoi-hoc/:id/duyet", () => HttpResponse.json({ trang_thai: "da_duyet", canh_bao: [] })),
+    );
+    renderTrongLayout();
+    await waitFor(() => expect(screen.getAllByTestId("de-nghi-cho-duyet")).toHaveLength(2));
+    const soDs = ds_urls.length;
+    const soDem = dem_urls.length;
+    const user = userEvent.setup();
+    const [the1] = screen.getAllByTestId("de-nghi-cho-duyet");
+    await user.click(within(the1).getByRole("button", { name: "Duyệt" }));
+    await screen.findByText("Chọn buổi chốt");
+    await user.click(screen.getByRole("button", { name: "Xác nhận duyệt" }));
+    await screen.findByText("Đã duyệt đề nghị");
+    await waitFor(() => expect(screen.getAllByTestId("de-nghi-cho-duyet")).toHaveLength(1));
+    expect(screen.queryByText("Nguyễn Thị Lan")).toBeNull();
+    expect(screen.getByText("Trần Văn Bình")).toBeInTheDocument();
+    await waitFor(() => expect(dem_urls.length).toBe(soDem + 1));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(ds_urls.length).toBe(soDs);
+  });
+
+  it("Từ chối thành công cũng gỡ thẻ, không tải lại danh sách", async () => {
+    datApi([]);
+    const { ds_urls } = ghiYeuCau((u) => (u.searchParams.get("qua_han") === "true" ? [] : [deNghi()]));
+    server.use(http.post("/doi-buoi-hoc/:id/tu-choi", () => HttpResponse.json({ trang_thai: "tu_choi" })));
+    renderTrang("ho_tro_hoc_vien");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Từ chối" }));
+    const soDs = ds_urls.length;
+    await user.type(screen.getByLabelText(/Ghi chú/), "Không phù hợp lịch");
+    await user.click(screen.getByRole("button", { name: "Gửi từ chối" }));
+    expect(await screen.findByText("Không có đề nghị nào đang chờ duyệt.")).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(ds_urls.length).toBe(soDs);
+  });
+
+  it("Tải lại: gọi lại danh sách đang mở + badge; hiện Cập nhật lúc", async () => {
+    datApi([]);
+    const { ds_urls, dem_urls } = ghiYeuCau();
+    renderTrongLayout();
+    expect(await screen.findByText(/Cập nhật lúc \d{2}:\d{2}/)).toBeInTheDocument();
+    await waitFor(() => expect(ds_urls).toHaveLength(2));
+    const soDem = dem_urls.length;
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Tải lại" }));
+    await waitFor(() => expect(ds_urls).toHaveLength(4));
+    expect(ds_urls.slice(2).every((u) => u.searchParams.get("trang_thai") === "cho_duyet")).toBe(true);
+    expect(dem_urls.length).toBe(soDem + 1);
+  });
+
+  it("Hủy duyệt: thẻ vẫn ở Đã xử lý — tải lại danh sách Đã xử lý, hiện trạng thái Hủy duyệt", async () => {
+    datApi([]);
+    let daHuy = false;
+    const { ds_urls } = ghiYeuCau((u) =>
+      u.searchParams.get("da_xu_ly") === "true"
+        ? [
+            daHuy
+              ? deNghi({ id: "dn-a", trang_thai: "da_huy", ly_do_huy: "huy_duyet", nguoi_xu_ly: "Cán bộ B", buoi_chot: tomTat(lich("ld-1", "Lớp 02", 50)) })
+              : deNghi({ id: "dn-a", trang_thai: "da_duyet", buoi_chot: tomTat(lich("ld-1", "Lớp 02", 50)) }),
+          ]
+        : [],
+    );
+    server.use(
+      http.post("/doi-buoi-hoc/:id/huy-duyet", () => {
+        daHuy = true;
+        return HttpResponse.json({ trang_thai: "da_huy", canh_bao: [] });
+      }),
+    );
+    renderTrang("ho_tro_hoc_vien");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "Đã xử lý" }));
+    await user.click(await screen.findByRole("button", { name: "Hủy duyệt" }));
+    const soDaXuLy = ds_urls.filter((u) => u.searchParams.get("da_xu_ly") === "true").length;
+    await user.type(screen.getByLabelText(/Ghi chú/), "Học viên xin ở lại");
+    await user.click(screen.getByRole("button", { name: "Xác nhận hủy duyệt" }));
+    expect(await screen.findByText("Hủy duyệt bởi Cán bộ B")).toBeInTheDocument();
+    expect(screen.getAllByTestId("de-nghi-da-xu-ly")).toHaveLength(1);
+    expect(ds_urls.filter((u) => u.searchParams.get("da_xu_ly") === "true").length).toBe(soDaXuLy + 1);
+    expect(screen.queryByRole("button", { name: "Hủy duyệt" })).toBeNull();
+  });
+
+  it("Tải lại cũng tải lại bộ lọc (bo-loc)", async () => {
+    datApi([]);
+    let soBoLoc = 0;
+    server.use(
+      http.get("/doi-buoi-hoc/bo-loc", () => {
+        soBoLoc += 1;
+        return HttpResponse.json(BO_LOC);
+      }),
+    );
+    ghiYeuCau();
+    renderTrang("ho_tro_hoc_vien");
+    await screen.findByText(/Cập nhật lúc/);
+    expect(soBoLoc).toBe(1);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Tải lại" }));
+    await waitFor(() => expect(soBoLoc).toBe(2));
+  });
+
+  it("badge dùng cache 60s: chuyển trang trong layout không gọi lại dem-cho-duyet", async () => {
+    datApi([]);
+    const { dem_urls } = ghiYeuCau();
+    const { router } = renderTrongLayout();
+    await waitFor(() => expect(dem_urls.length).toBeGreaterThan(0));
+    const soDem = dem_urls.length;
+    await router.navigate("/ho-tro/khac");
+    expect(await screen.findByText("Trang khác")).toBeInTheDocument();
+    await router.navigate("/ho-tro/doi-buoi");
+    await screen.findByText("Đổi buổi học");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(dem_urls.length).toBe(soDem);
   });
 });

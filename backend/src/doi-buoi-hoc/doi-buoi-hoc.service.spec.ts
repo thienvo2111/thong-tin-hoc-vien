@@ -1590,7 +1590,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     expect(arg.orderBy).toEqual({ xu_ly_luc: { sort: 'desc', nulls: 'last' } });
   });
 
-  it('danhSach: da_xu_ly -> 3 trang thai da xu ly, xu_ly_luc giam, van gioi han cum + 500', async () => {
+  it('danhSach: da_xu_ly -> 3 trang thai da xu ly, xu_ly_luc giam, van gioi han cum, trang 50', async () => {
     const { svc, prisma } = setupDuyet();
     await svc.danhSach(hoTro, { da_xu_ly: true });
     const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
@@ -1598,8 +1598,28 @@ describe('DoiBuoiHocService nguoi duyet', () => {
       trang_thai: { in: ['da_duyet', 'tu_choi', 'da_huy'] },
       dang_ky_hoc: { cum_id: { in: ['c1'] } },
     });
-    expect(arg.orderBy).toEqual({ xu_ly_luc: { sort: 'desc', nulls: 'last' } });
+    expect(arg.orderBy).toEqual([
+      { xu_ly_luc: { sort: 'desc', nulls: 'last' } },
+      { id: 'asc' },
+    ]);
+    expect(arg.take).toBe(50);
+    expect(arg.skip).toBeUndefined();
+  });
+
+  it('danhSach: da_xu_ly trang=3 -> skip 100, take 50', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.danhSach(hoTro, { da_xu_ly: true, trang: 3 });
+    const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
+    expect(arg.take).toBe(50);
+    expect(arg.skip).toBe(100);
+  });
+
+  it('danhSach: trang bi bo qua ngoai da_xu_ly', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.danhSach(hoTro, { trang_thai: 'cho_duyet', trang: 2 });
+    const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
     expect(arg.take).toBe(500);
+    expect(arg.skip).toBeUndefined();
   });
 
   it('danhSach: ly_do_huy phan biet hoc vien sua / tu huy / huy duyet', async () => {
@@ -1683,7 +1703,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     expect(r.find((x) => x.id === 'x2')?.doi_lai_tu).toBeNull();
   });
 
-  it('danhSach: cho_duyet qua_han=true -> chi qua han, moi nhat truoc, 100', async () => {
+  it('danhSach: cho_duyet qua_han=true -> chi qua han, gui truoc len dau, 100', async () => {
     const { svc, prisma } = setupDuyet();
     await svc.danhSach(hoTro, { trang_thai: 'cho_duyet', qua_han: true });
     const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
@@ -1699,7 +1719,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
       Date,
     );
     expect(arg.where.lich_nguon).toBeUndefined();
-    expect(arg.orderBy).toEqual({ tao_luc: 'desc' });
+    expect(arg.orderBy).toEqual({ tao_luc: 'asc' });
     expect(arg.take).toBe(100);
   });
 
@@ -1708,7 +1728,240 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     await svc.danhSach(hoTro, { da_xu_ly: true, qua_han: true });
     const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
     expect(arg.where.OR).toBeUndefined();
-    expect(arg.take).toBe(500);
+    expect(arg.take).toBe(50);
+  });
+
+  // ---- Bộ lọc màn duyệt: cụm / lớp / tìm học viên + quá hạn thu hẹp ----
+
+  const sqlCua = (call: unknown[]) => {
+    const [strings, ...values] = call as [TemplateStringsArray, ...unknown[]];
+    // Prisma.sql lồng: lấy cả strings của fragment để kiểm.
+    const phan = values
+      .filter(
+        (v): v is { sql: string; values: unknown[] } =>
+          typeof v === 'object' && v !== null && 'sql' in v,
+      )
+      .map((v) => `${v.sql} ${JSON.stringify(v.values)}`);
+    return `${strings.join('?')} ${phan.join(' ')}`.replace(/\s+/g, ' ');
+  };
+
+  it('danhSach: cum_id trong pham vi -> loc dung cum do', async () => {
+    const { svc, prisma, scope } = setupDuyet();
+    scope.cumIdsCuaToi.mockResolvedValueOnce(['c1', 'c2']);
+    await svc.danhSach(hoTro, { trang_thai: 'cho_duyet', cum_id: 'c2' });
+    const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
+    expect(arg.where.dang_ky_hoc).toEqual({ cum_id: { in: ['c2'] } });
+  });
+
+  it('danhSach: cum_id ngoai pham vi ho tro -> [] khong truy van', async () => {
+    const { svc, prisma } = setupDuyet();
+    await expect(
+      svc.danhSach(hoTro, { trang_thai: 'cho_duyet', cum_id: 'c9' }),
+    ).resolves.toEqual([]);
+    expect(prisma.doi_buoi_hoc.findMany).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('danhSach: quan tri cum_id bat ky -> loc cum', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.danhSach(quanTri, { da_xu_ly: true, cum_id: 'c9', khoa_id: 'k1' });
+    const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
+    expect(arg.where.dang_ky_hoc).toEqual({ cum_id: { in: ['c9'] }, khoa_id: 'k1' });
+  });
+
+  it('danhSach: lop_id -> lop goc HOAC lop de nghi', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.danhSach(quanTri, { da_xu_ly: true, lop_id: 'lop1' });
+    const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
+    expect(arg.where.AND).toEqual([
+      {
+        OR: [
+          { lich_nguon: { lop_id: 'lop1' } },
+          { lich_de_nghi: { lop_id: 'lop1' } },
+        ],
+      },
+    ]);
+  });
+
+  it('danhSach: q -> ho ten khong dau (trong khoa) HOAC ma MOET bo so 0 dau', async () => {
+    const { svc, prisma } = setupDuyet();
+    prisma.$queryRaw.mockResolvedValueOnce([{ id: 'hvA' }]);
+    await svc.danhSach(quanTri, { da_xu_ly: true, khoa_id: 'k1', q: '  0123 ' });
+    // Prisma.sql (không phải tagged call): câu SQL nằm trong đối tượng Sql.
+    const tim = prisma.$queryRaw.mock.calls[0][0] as unknown as Prisma.Sql;
+    expect(tim.sql).toContain('unaccent(lower(h.ho_ten))');
+    expect(tim.sql).toContain('d.khoa_id = ?::uuid');
+    expect(tim.values[0]).toBe('k1');
+    const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
+    expect(arg.where.AND).toEqual([
+      {
+        dang_ky_hoc: {
+          OR: [
+            { hoc_vien_id: { in: ['hvA'] } },
+            {
+              hoc_vien: {
+                ma_dinh_danh_moet: { contains: '123', mode: 'insensitive' },
+              },
+            },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it('danhSach: q khong co khoa_id -> chi tim ma MOET, khong quet ten toan bang', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.danhSach(quanTri, { da_xu_ly: true, q: 'Lan' });
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
+    expect(arg.where.AND[0].dang_ky_hoc.OR).toEqual([
+      { hoc_vien_id: { in: [] } },
+      { hoc_vien: { ma_dinh_danh_moet: { contains: 'Lan', mode: 'insensitive' } } },
+    ]);
+  });
+
+  it('danhSach: q < 2 ky tu -> bo qua, khong truy van ten', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.danhSach(quanTri, { da_xu_ly: true, q: ' a ' });
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
+    expect(arg.where.AND).toBeUndefined();
+  });
+
+  it('danhSach cho_duyet: quaHanThem thu hep JOIN dang_ky_hoc theo khoa + cum', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.danhSach(hoTro, { trang_thai: 'cho_duyet', khoa_id: 'k1' });
+    const sql = sqlCua(prisma.$queryRaw.mock.calls[0]);
+    expect(sql).toContain('JOIN dang_ky_hoc k ON k.id = c.dang_ky_hoc_id');
+    expect(sql).toContain('k.khoa_id =');
+    expect(sql).toContain('k.cum_id = ANY(');
+    expect(sql).toContain('"k1"');
+    expect(sql).toContain('["c1"]');
+  });
+
+  it('danhSach cho_duyet: quan tri khong loc -> quaHanThem khong JOIN dang_ky_hoc (nhu cu)', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.danhSach(quanTri, { trang_thai: 'cho_duyet' });
+    const sql = sqlCua(prisma.$queryRaw.mock.calls[0]);
+    expect(sql).not.toContain('JOIN dang_ky_hoc k');
+  });
+
+  it('demChoDuyet: ho tro -> quaHanThem chi xet cum cua minh', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.demChoDuyet(hoTro);
+    const sql = sqlCua(prisma.$queryRaw.mock.calls[0]);
+    expect(sql).toContain('k.cum_id = ANY(');
+    expect(sql).not.toContain('k.khoa_id');
+  });
+
+  it('duyet / luaChonDuyet: hang cho (whereChoTruoc) dung tap qua han KHONG thu hep', async () => {
+    const { svc, prisma, tx } = setupDuyet();
+    await svc.luaChonDuyet(hoTro, 'x1').catch(() => undefined);
+    await svc.duyet(hoTro, 'x1', {}).catch(() => undefined);
+    const calls = [...prisma.$queryRaw.mock.calls, ...tx.$queryRaw.mock.calls];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const c of calls) expect(sqlCua(c)).not.toContain('JOIN dang_ky_hoc k');
+  });
+
+  it('danhSach loc cum/lop/q: thu_tu_hang van tinh tren TOAN hang cho cua buoi de nghi', async () => {
+    const { svc, prisma } = setupDuyet();
+    const dong = {
+      id: 'x2',
+      trang_thai: 'cho_duyet',
+      dang_ky_hoc_id: 'dk2',
+      lich_nguon_id: 'ln',
+      lich_de_nghi_id: 'ld',
+      lich_chot_id: null,
+      ly_do: 'abcde',
+      tao_luc: taoLuc,
+      ghi_chu_xu_ly: null,
+      nguoi_xu_ly: null,
+      loai: 'doi_buoi',
+      dang_ky_hoc: {
+        hoc_vien: { id: 'hv2', ho_ten: 'B', don_vi_cong_tac: { ten_don_vi: 'X' } },
+        cum: { ten_cum: 'Cum 1' },
+      },
+      xu_ly_boi: null,
+    };
+    // Hàng chờ buổi ld: 1 đề nghị cụm khác gửi trước (x0) + x2.
+    const hangDoi = [
+      { id: 'x0', tao_luc: new Date(taoLuc.getTime() - 1000), lich_de_nghi_id: 'ld', loai: 'doi_buoi', lich_nguon: { thoi_gian_bat_dau: ngayMai } },
+      { id: 'x2', tao_luc: taoLuc, lich_de_nghi_id: 'ld', loai: 'doi_buoi', lich_nguon: { thoi_gian_bat_dau: ngayMai } },
+    ];
+    prisma.doi_buoi_hoc.findMany.mockImplementation(async (a: any) => {
+      if (a.select?.dang_ky_hoc) return [dong];
+      if (a.where?.lich_de_nghi_id) return hangDoi;
+      return [];
+    });
+    const r = await svc.danhSach(hoTro, {
+      trang_thai: 'cho_duyet',
+      cum_id: 'c1',
+      lop_id: 'lopB',
+      q: 'Bình',
+    });
+    const truyVanHang = prisma.doi_buoi_hoc.findMany.mock.calls
+      .map((c) => c[0] as any)
+      .find((a) => a.where?.lich_de_nghi_id);
+    expect(truyVanHang.where).toEqual({
+      trang_thai: 'cho_duyet',
+      lich_de_nghi_id: { in: ['ld'] },
+    });
+    expect(r[0].thu_tu_hang).toEqual({ k: 2, n: 2 });
+  });
+
+  it('boLoc: ho tro -> 3 truy van gop theo cum cua minh', async () => {
+    const { svc, prisma } = setupDuyet();
+    const p = prisma as any;
+    p.khoa_boi_duong = { findMany: jest.fn(async () => [{ id: 'k1' }]) };
+    p.cum_hoc_vien = { findMany: jest.fn(async () => [{ id: 'c1' }]) };
+    p.lop_hoc = { findMany: jest.fn(async () => [{ id: 'lop1' }]) };
+    const r = await svc.boLoc(hoTro);
+    expect(r).toEqual({ khoa: [{ id: 'k1' }], cum: [{ id: 'c1' }], lop: [{ id: 'lop1' }] });
+    expect(p.khoa_boi_duong.findMany.mock.calls[0][0].where).toEqual({
+      dang_ky_hoc: {
+        some: { cum_id: { in: ['c1'] }, doi_buoi_hoc: { some: {} } },
+      },
+    });
+    expect(p.cum_hoc_vien.findMany.mock.calls[0][0].where).toEqual({
+      id: { in: ['c1'] },
+      dang_ky_hoc: { some: { doi_buoi_hoc: { some: {} } } },
+    });
+    const dn = { some: { dang_ky_hoc: { cum_id: { in: ['c1'] } } } };
+    expect(p.lop_hoc.findMany.mock.calls[0][0].where).toEqual({
+      lich_hoc: { some: { OR: [{ doi_buoi_nguon: dn }, { doi_buoi_de_nghi: dn }] } },
+    });
+    expect(p.khoa_boi_duong.findMany.mock.calls[0][0].select).toEqual({
+      id: true,
+      ma_khoa: true,
+      ten_khoa: true,
+      thoi_gian_bat_dau: true,
+      thoi_gian_ket_thuc: true,
+    });
+    for (const m of [p.khoa_boi_duong, p.cum_hoc_vien, p.lop_hoc])
+      expect(m.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('boLoc: quan tri -> khong gioi han cum', async () => {
+    const { svc, prisma } = setupDuyet();
+    const p = prisma as any;
+    p.khoa_boi_duong = { findMany: jest.fn(async () => []) };
+    p.cum_hoc_vien = { findMany: jest.fn(async () => []) };
+    p.lop_hoc = { findMany: jest.fn(async () => []) };
+    await svc.boLoc(quanTri);
+    expect(p.cum_hoc_vien.findMany.mock.calls[0][0].where).toEqual({
+      dang_ky_hoc: { some: { doi_buoi_hoc: { some: {} } } },
+    });
+    expect(p.lop_hoc.findMany.mock.calls[0][0].where).toEqual({
+      lich_hoc: {
+        some: { OR: [{ doi_buoi_nguon: { some: {} } }, { doi_buoi_de_nghi: { some: {} } }] },
+      },
+    });
+  });
+
+  it('boLoc: ho tro khong co cum -> rong, khong truy van', async () => {
+    const { svc, scope } = setupDuyet();
+    scope.cumIdsCuaToi.mockResolvedValueOnce([]);
+    await expect(svc.boLoc(hoTro)).resolves.toEqual({ khoa: [], cum: [], lop: [] });
   });
 
   it('danhSach: ho tro khong co cum -> []', async () => {

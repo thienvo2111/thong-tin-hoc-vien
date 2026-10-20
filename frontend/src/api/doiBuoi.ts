@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, apiFetchBlob } from './client';
 import type { LoaiLop, MucNangLuc, TrangThaiDiemDanh } from './types';
@@ -195,10 +196,27 @@ export interface LocDoiBuoi {
   trang_thai?: TrangThaiDeNghi;
   khoa_id?: string;
   loai?: LoaiDoiBuoi;
-  /** true = mọi đề nghị đã xử lý (server sắp xu_ly_luc giảm, tối đa 500). */
+  /** true = mọi đề nghị đã xử lý (server sắp xu_ly_luc giảm, trang 50 dòng). */
   da_xu_ly?: boolean;
-  /** Chỉ với trang_thai=cho_duyet: true = đề nghị quá hạn (100 mới nhất); mặc định chỉ còn hạn. */
+  /** Chỉ với trang_thai=cho_duyet: true = đề nghị quá hạn (100 gửi sớm nhất); mặc định chỉ còn hạn. */
   qua_han?: boolean;
+  cum_id?: string;
+  /** Lớp gốc HOẶC lớp đề nghị. */
+  lop_id?: string;
+  /** Họ tên (không dấu) hoặc mã MOET, ≥ 2 ký tự. */
+  q?: string;
+  /** Chỉ với da_xu_ly: trang (từ 1), mỗi trang TRANG_DA_XU_LY dòng. */
+  trang?: number;
+}
+
+/** Khớp TRANG_DA_XU_LY của server: ít hơn số này = trang cuối. */
+export const TRANG_DA_XU_LY = 50;
+
+/** GET /doi-buoi-hoc/bo-loc — chỉ khóa/cụm/lớp có đề nghị trong phạm vi người duyệt. */
+export interface BoLocDoiBuoi {
+  khoa: { id: string; ma_khoa: string; ten_khoa: string; thoi_gian_bat_dau: string; thoi_gian_ket_thuc: string }[];
+  cum: { id: string; ten_cum: string; khoa_id: string }[];
+  lop: { id: string; ten_lop: string; khoa_id: string }[];
 }
 
 /** Spec đổi buổi §5: lich_hoc_id → đổi ra (sang lớp chốt) / đổi vào (từ lớp nguồn). hoc_bu = học bù (ADR 0012). */
@@ -289,7 +307,10 @@ export function useHuyDoiBuoi() {
 
 // ---- Người duyệt (/doi-buoi-hoc) — giao diện ở Task 9 ----
 
-export function useDsDoiBuoi(q: LocDoiBuoi = {}) {
+// Màn duyệt: danh sách + badge dùng cache 60s; muốn mới ngay thì bấm Tải lại.
+const STALE_DUYET = 60_000;
+
+export function useDsDoiBuoi(q: LocDoiBuoi = {}, enabled = true) {
   return useQuery({
     queryKey: [KEY, 'ds', q],
     queryFn: () =>
@@ -298,8 +319,19 @@ export function useDsDoiBuoi(q: LocDoiBuoi = {}) {
           ...q,
           da_xu_ly: q.da_xu_ly ? 'true' : undefined,
           qua_han: q.qua_han ? 'true' : undefined,
+          trang: q.trang && q.trang > 1 ? String(q.trang) : undefined,
         })}`,
       ),
+    enabled,
+    staleTime: STALE_DUYET,
+  });
+}
+
+export function useBoLocDoiBuoi() {
+  return useQuery({
+    queryKey: [KEY, 'bo-loc'],
+    queryFn: () => apiFetch<BoLocDoiBuoi>('/doi-buoi-hoc/bo-loc'),
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -307,7 +339,52 @@ export function useDemDoiBuoi() {
   return useQuery({
     queryKey: [KEY, 'dem'],
     queryFn: async () => (await apiFetch<{ cho_duyet: number }>('/doi-buoi-hoc/dem-cho-duyet')).cho_duyet,
+    staleTime: STALE_DUYET,
   });
+}
+
+/** Đổi trang trong layout: chỉ tải lại badge khi đã quá staleTime (không hủy lượt đang tải). */
+export function useLamMoiDemDoiBuoiKhiCu() {
+  const qc = useQueryClient();
+  return useCallback(
+    () => qc.refetchQueries({ queryKey: [KEY, 'dem'], stale: true }, { cancelRefetch: false }),
+    [qc],
+  );
+}
+
+/** Nút Tải lại: tải lại danh sách đang mở + badge. */
+export function useTaiLaiDuyetDoiBuoi() {
+  const qc = useQueryClient();
+  return useCallback(
+    () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: [KEY, 'ds'] }),
+        qc.invalidateQueries({ queryKey: [KEY, 'dem'] }),
+        qc.invalidateQueries({ queryKey: [KEY, 'bo-loc'] }),
+      ]),
+    [qc],
+  );
+}
+
+const laDsDaXuLy = (q: { queryKey: readonly unknown[] }) =>
+  q.queryKey[1] === 'ds' && (q.queryKey[2] as LocDoiBuoi | undefined)?.da_xu_ly === true;
+
+/** Sau Duyệt / Từ chối: gỡ thẻ khỏi các danh sách đang cache (không tải lại), đánh dấu cũ để
+ *  lần mở sau tải mới; chỉ tải lại badge. Server vẫn kiểm sĩ số/hàng chờ khi duyệt.
+ *  Hủy duyệt (giuTrongDaXuLy): đề nghị vẫn thuộc Đã xử lý (da_huy) → tải lại danh sách Đã xử lý đang mở. */
+function useGoTheSauXuLy(giuTrongDaXuLy = false) {
+  const qc = useQueryClient();
+  return async (_kq: unknown, vars: { id: string }) => {
+    // Hủy lượt tải danh sách đang chạy để phản hồi cũ không làm thẻ đã gỡ hiện lại.
+    await qc.cancelQueries({ queryKey: [KEY, 'ds'] });
+    if (!giuTrongDaXuLy)
+      qc.setQueriesData<DeNghiDuyet[]>({ queryKey: [KEY, 'ds'] }, (cu) => cu?.filter((d) => d.id !== vars.id));
+    void qc.invalidateQueries({ queryKey: [KEY], refetchType: 'none' });
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: [KEY, 'dem'] }),
+      giuTrongDaXuLy ? qc.invalidateQueries({ predicate: laDsDaXuLy }) : undefined,
+    ]);
+  };
 }
 
 export function useLuaChonDuyet(id: string | undefined) {
@@ -315,11 +392,13 @@ export function useLuaChonDuyet(id: string | undefined) {
     queryKey: [KEY, 'lua-chon-duyet', id],
     queryFn: () => apiFetch<LuaChonDuyet[]>(`/doi-buoi-hoc/${id}/lua-chon`),
     enabled: !!id,
+    // Sĩ số / hàng chờ luôn đọc mới mỗi lần mở modal duyệt.
+    staleTime: 0,
   });
 }
 
 export function useDuyetDoiBuoi() {
-  const lamMoi = useLamMoiHocVien();
+  const lamMoi = useGoTheSauXuLy();
   return useMutation({
     mutationFn: ({ id, ...body }: { id: string; lich_chot_id?: string; ghi_chu?: string }) =>
       apiFetch<{ trang_thai: 'da_duyet'; canh_bao: string[] }>(`/doi-buoi-hoc/${id}/duyet`, {
@@ -331,7 +410,7 @@ export function useDuyetDoiBuoi() {
 }
 
 export function useTuChoiDoiBuoi() {
-  const lamMoi = useLamMoiHocVien();
+  const lamMoi = useGoTheSauXuLy();
   return useMutation({
     mutationFn: ({ id, ghi_chu }: { id: string; ghi_chu: string }) =>
       apiFetch<{ trang_thai: 'tu_choi' }>(`/doi-buoi-hoc/${id}/tu-choi`, {
@@ -343,7 +422,7 @@ export function useTuChoiDoiBuoi() {
 }
 
 export function useHuyDuyetDoiBuoi() {
-  const lamMoi = useLamMoiHocVien();
+  const lamMoi = useGoTheSauXuLy(true);
   return useMutation({
     mutationFn: ({ id, ghi_chu }: { id: string; ghi_chu: string }) =>
       apiFetch<{ trang_thai: 'da_huy'; canh_bao: string[] }>(`/doi-buoi-hoc/${id}/huy-duyet`, {

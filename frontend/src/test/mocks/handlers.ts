@@ -1387,6 +1387,8 @@ export const handlers = [
   http.get('/ho-tro-hoc-vien/nhac-lich/dem', () => HttpResponse.json({ can_nhac: 0 })),
   // Đổi buổi: số đề nghị chờ duyệt (menu hỗ trợ/admin + khối Vận hành).
   http.get('/doi-buoi-hoc/dem-cho-duyet', () => HttpResponse.json({ cho_duyet: 0 })),
+  // Bộ lọc màn duyệt đổi buổi (mặc định rỗng).
+  http.get('/doi-buoi-hoc/bo-loc', () => HttpResponse.json({ khoa: [], cum: [], lop: [] })),
   http.get('/ho-tro-hoc-vien/hoc-vien', () =>
     HttpResponse.json({ data: db.hoTroHocVien, total: db.hoTroHocVien.length, page: 1, page_size: 20 }),
   ),
