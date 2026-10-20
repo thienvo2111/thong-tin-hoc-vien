@@ -259,6 +259,22 @@ trang.
 
 ---
 
+## Nhu cầu mức học theo đợt (`/toi/nhu-cau-muc`) — ADR 0013, bổ sung 2026-10-20
+
+(Mã màn hình M9 đã dùng cho Hướng dẫn; mục này mã nguồn nằm ở `pages/M9/NhuCauMuc.tsx`.)
+
+- **Thẻ ở `/toi`** (`TheNhuCauMuc`): ngay sau hộp chào mừng, trước thông báo cập nhật. Mỗi đợt API trả về một thẻ:
+  tên đợt, "Hạn chót: dd/mm/yyyy HH:mm", trạng thái "Chưa chọn" (viền cam) / "Đã chọn: <mức>" (xanh), nút
+  "Chọn nhu cầu" -> `/toi/nhu-cau-muc?dot=<id>`. Không có đợt -> không hiện gì.
+- **Trang chọn**, 3 khối theo thứ tự (D8): "Thông tin của Thầy/Cô" -> "Mức – lớp đang được phân công" (kèm nguồn
+  mốc: theo lớp đang học / theo mức chính thức (chốt)) -> "Nhu cầu bồi dưỡng".
+- Radio chỉ gồm các mức **bằng hoặc thấp hơn** mốc (`cac_muc_duoc_chon` từ API). Bấm Lưu -> hộp xác nhận -> PUT.
+- Đợt `da_dong` hoặc PUT trả 403 `DOT_NHU_CAU_DONG` -> chỉ xem: "Đợt đã đóng lúc …" + lựa chọn cuối.
+- `du_dieu_kien=false` -> thông báo lý do (vd "Chưa có mức/lớp, chưa thể đăng ký nhu cầu"). Thiếu `?dot=` hoặc
+  API 404 -> "Không tìm thấy đợt".
+
+---
+
 ## Kiểm tra trước khi phát hành (bắt buộc)
 
 - [ ] Chạy toàn luồng M0 → M5 trên điện thoại Android và iPhone, trong trình duyệt nhúng của Zalo.

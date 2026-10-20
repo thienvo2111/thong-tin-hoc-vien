@@ -1388,3 +1388,31 @@ export interface NhuCauMucHocResult {
   /** 2026-10-10: số lượt đăng ký của nhân viên (không xếp lớp đợt này) đã loại khỏi mọi số trên. */
   so_nhan_vien_loai_tru: number;
 }
+
+// ADR 0013 — nhu cầu mức học theo đợt (khớp backend NhuCauMucCuaToi / MocNhuCau).
+export type TrangThaiDotNhuCau = 'chua_mo' | 'dang_mo' | 'da_dong';
+export type NguonMocNhuCau = 'lop' | 'muc_chot';
+export type LyDoKhongDuNhuCau = 'nhan_vien' | 'trang_thai_dang_ky' | 'chua_co_moc';
+
+export interface MocNhuCau {
+  muc: MucNangLuc;
+  nguon: NguonMocNhuCau;
+  lop: { id: string; ten_lop: string } | null;
+  giai_doan: { id: string; ten_giai_doan: string } | null;
+}
+
+export interface NhuCauMucCuaToi {
+  dot: { id: string; ten_dot: string; mo_luc: string; dong_luc: string; trang_thai: TrangThaiDotNhuCau };
+  khoa: { id: string; ten_khoa: string };
+  du_dieu_kien: boolean;
+  ly_do_khong_du: LyDoKhongDuNhuCau | null;
+  moc: MocNhuCau | null;
+  cac_muc_duoc_chon: MucNangLuc[];
+  lua_chon: {
+    muc_chon: MucNangLuc;
+    muc_moc: MucNangLuc;
+    nguon_moc: NguonMocNhuCau;
+    chon_luc: string;
+    cap_nhat_luc: string;
+  } | null;
+}

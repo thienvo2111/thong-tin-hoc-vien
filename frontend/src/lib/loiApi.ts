@@ -15,6 +15,8 @@ export function thongDiepLoiChung(err: unknown): string {
       return 'Số CCCD này đã được dùng cho một hồ sơ khác. Liên hệ hỗ trợ.';
     case 'DOT_XAC_NHAN_DONG':
       return 'Đã hết thời gian chỉnh sửa';
+    case 'DOT_NHU_CAU_DONG':
+      return 'Đợt nhu cầu mức học đã đóng';
     case 'DIEU_CHINH_MUC_DONG':
       return 'Đã hết thời gian điều chỉnh mức lớp học';
     case 'UNAUTHORIZED':
@@ -34,6 +36,10 @@ export function loiFieldsThanhMap(err: unknown): Record<string, string> {
 
 export function laLoiDotDong(err: unknown): boolean {
   return err instanceof ApiError && err.status === 403 && err.code === 'DOT_XAC_NHAN_DONG';
+}
+
+export function laLoiDotNhuCauDong(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 403 && err.code === 'DOT_NHU_CAU_DONG';
 }
 
 /** Như thongDiepLoiChung nhưng giữ thông điệp server cho 409 — dùng ở các thao tác có xung đột KHÔNG phải

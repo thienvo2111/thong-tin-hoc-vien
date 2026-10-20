@@ -435,6 +435,27 @@ export const handlers = [
 
   http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json(db.khoaHocToi)),
 
+  // ADR 0013: nhu cầu mức học theo đợt.
+  http.get('/hoc-vien/toi/nhu-cau-muc', () => HttpResponse.json(db.nhuCauMuc)),
+  http.get('/hoc-vien/toi/nhu-cau-muc/:dotId', ({ params }) => {
+    const nc = db.nhuCauMuc.find((x) => x.dot.id === params.dotId);
+    return nc ? HttpResponse.json(nc) : loi(404, 'NOT_FOUND', 'Không tìm thấy đợt nhu cầu mức học');
+  }),
+  http.put('/hoc-vien/toi/nhu-cau-muc/:dotId', async ({ params, request }) => {
+    const nc = db.nhuCauMuc.find((x) => x.dot.id === params.dotId);
+    if (!nc) return loi(404, 'NOT_FOUND', 'Không tìm thấy đợt nhu cầu mức học');
+    if (nc.dot.trang_thai === 'da_dong') return loi(403, 'DOT_NHU_CAU_DONG', 'Đợt nhu cầu mức học đã đóng');
+    const { muc } = (await request.json()) as { muc: MucNangLuc };
+    if (!nc.moc || !nc.cac_muc_duoc_chon.includes(muc)) {
+      return loi(400, 'VALIDATION_ERROR', 'Dữ liệu không hợp lệ', {
+        fields: [{ field: 'muc', message: 'Mức chọn vượt quá mức hiện tại' }],
+      });
+    }
+    const luc = new Date().toISOString();
+    nc.lua_chon = { muc_chon: muc, muc_moc: nc.moc.muc, nguon_moc: nc.moc.nguon, chon_luc: nc.lua_chon?.chon_luc ?? luc, cap_nhat_luc: luc };
+    return HttpResponse.json(nc);
+  }),
+
   // ADR 0005 (issue #24): học viên bấm "Điểm danh & vào Zoom".
   http.post('/lich-hoc/:id/vao-hoc', () => HttpResponse.json(db.vaoHocZoom)),
 

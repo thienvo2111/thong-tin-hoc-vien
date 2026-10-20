@@ -16,6 +16,7 @@ import { CountdownTimer } from '@/components/CountdownTimer';
 import { nhanMucNangLuc } from '@/lib/mucNangLuc';
 import { useCapNhatMoi, type CapNhatMoi } from './capNhatMoi';
 import { TheBuoiSapToi } from './TheBuoiSapToi';
+import { TheNhuCauMuc } from './TheNhuCauMuc';
 
 /** Xưng hô theo giới tính; chưa có giới tính -> "Thầy/Cô". */
 function xungHo(gioiTinh: HocVien['gioi_tinh'] | undefined) {
@@ -67,6 +68,8 @@ export default function TrangChinh() {
         )}
 
         {isError && <StatusBanner loai="error">{thongDiepLoiChung(error)}</StatusBanner>}
+
+        <TheNhuCauMuc />
 
         {data && (
           <>

@@ -65,6 +65,10 @@ export const router = createBrowserRouter([
                 lazy: () => import('@/pages/M6/DanhGiaDauVao').then((m) => ({ Component: m.default })),
               },
               {
+                path: '/toi/nhu-cau-muc',
+                lazy: () => import('@/pages/M9/NhuCauMuc').then((m) => ({ Component: m.default })),
+              },
+              {
                 path: '/toi/yeu-cau-ho-tro',
                 lazy: () => import('@/pages/M8/YeuCauHoTro').then((m) => ({ Component: m.default })),
               },

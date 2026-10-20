@@ -1,6 +1,7 @@
 import type { LopCuaToiGv, TrangLop } from '@/api/hoTroGv';
 import type { BoBangKiem, DanhGiaDot } from '@/api/bangKiem';
 import type { HocVienDaXoa } from '@/api/admin';
+import type { NhuCauMucCuaToi } from '@/api/types';
 import type {
   BuoiCuaLopHoTro,
   DanhSachBuoiHoTro,
@@ -1421,6 +1422,8 @@ export const db = {
   bangKiemKhoa: {} as Record<string, BoBangKiem>,
   danhGiaDot: taoDanhGiaDotMau(),
   hocVienDaXoa: taoHocVienDaXoaMau(),
+  // ADR 0013: mặc định không có đợt nhu cầu mức nào đang mở cho học viên.
+  nhuCauMuc: [] as NhuCauMucCuaToi[],
 };
 
 export function resetDb(): void {
@@ -1468,4 +1471,30 @@ export function resetDb(): void {
   db.bangKiemKhoa = {};
   db.danhGiaDot = taoDanhGiaDotMau();
   db.hocVienDaXoa = taoHocVienDaXoaMau();
+  db.nhuCauMuc = [];
+}
+
+/** ADR 0013: 1 đợt nhu cầu mức mẫu — mốc thanh_thao theo lớp, chưa chọn, đang mở. */
+export function taoNhuCauMucMau(ghiDe: Partial<NhuCauMucCuaToi> = {}): NhuCauMucCuaToi {
+  return {
+    dot: {
+      id: '11111111-1111-4111-8111-111111111111',
+      ten_dot: 'Đợt 1 – Nhu cầu mức học',
+      mo_luc: '2026-10-01T00:00:00.000Z',
+      dong_luc: '2026-10-30T09:30:00.000Z',
+      trang_thai: 'dang_mo',
+    },
+    khoa: { id: 'khoa-1', ten_khoa: 'Bồi dưỡng năng lực số' },
+    du_dieu_kien: true,
+    ly_do_khong_du: null,
+    moc: {
+      muc: 'thanh_thao',
+      nguon: 'lop',
+      lop: { id: 'lop-1', ten_lop: 'Lớp A1' },
+      giai_doan: { id: 'gd-1', ten_giai_doan: 'Giai đoạn 1' },
+    },
+    cac_muc_duoc_chon: ['co_ban', 'thanh_thao'],
+    lua_chon: null,
+    ...ghiDe,
+  };
 }
