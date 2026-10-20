@@ -17,7 +17,7 @@ import {
   HOC_VIEN_PHAI_XEP_LOP,
   phaiXepLop,
 } from '../common/utils/doi-tuong-khao-sat.util';
-import { NHAN_MUC } from '../doi-buoi-hoc/thong-ke-doi-buoi.excel';
+import { NHAN_MUC } from '../khoa-boi-duong/util/muc-hoc.util';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { TrangThaiDot, trangThaiDot } from './dot-nhu-cau-muc.service';
 import {
@@ -50,7 +50,7 @@ export interface NhuCauMucCuaToi {
   > | null;
 }
 
-const TRANG_THAI_DU: trang_thai_dang_ky[] = ['da_duyet', 'da_phan_lop'];
+export const TRANG_THAI_DU: trang_thai_dang_ky[] = ['da_duyet', 'da_phan_lop'];
 
 const THONG_DIEP_KHONG_DU: Record<LyDoKhongDu, string> = {
   nhan_vien: 'Nhân viên không tham gia chọn nhu cầu mức học',
@@ -59,31 +59,32 @@ const THONG_DIEP_KHONG_DU: Record<LyDoKhongDu, string> = {
   chua_co_moc: 'Chưa có mức hiện tại để chọn nhu cầu mức học',
 };
 
+/** Giai đoạn active của khóa — dùng chung với thống kê theo đợt. */
+export const GIAI_DOAN_MOC_ARGS = {
+  where: { trang_thai: 'active' },
+  orderBy: { thu_tu: 'asc' },
+  select: {
+    id: true,
+    ten_giai_doan: true,
+    thu_tu: true,
+    thoi_gian_bat_dau: true,
+    thoi_gian_ket_thuc: true,
+  },
+} satisfies Prisma.khoa_boi_duong$giai_doanArgs;
+
+export const PHAN_LOP_MOC_ARGS = {
+  select: {
+    giai_doan_id: true,
+    lop: { select: { id: true, ten_lop: true, muc_nang_luc: true } },
+  },
+} satisfies Prisma.dang_ky_hoc$phan_lop_giai_doanArgs;
+
 const DANG_KY_INCLUDE = {
   hoc_vien: { select: { doi_tuong: true } },
   khoa: {
-    select: {
-      id: true,
-      ten_khoa: true,
-      giai_doan: {
-        where: { trang_thai: 'active' },
-        orderBy: { thu_tu: 'asc' },
-        select: {
-          id: true,
-          ten_giai_doan: true,
-          thu_tu: true,
-          thoi_gian_bat_dau: true,
-          thoi_gian_ket_thuc: true,
-        },
-      },
-    },
+    select: { id: true, ten_khoa: true, giai_doan: GIAI_DOAN_MOC_ARGS },
   },
-  phan_lop_giai_doan: {
-    select: {
-      giai_doan_id: true,
-      lop: { select: { id: true, ten_lop: true, muc_nang_luc: true } },
-    },
-  },
+  phan_lop_giai_doan: PHAN_LOP_MOC_ARGS,
 } satisfies Prisma.dang_ky_hocInclude;
 
 type DangKyNap = Prisma.dang_ky_hocGetPayload<{
@@ -91,6 +92,24 @@ type DangKyNap = Prisma.dang_ky_hocGetPayload<{
 }>;
 
 const ngayISO = (d: Date) => d.toISOString().slice(0, 10);
+
+type GiaiDoanNap = DangKyNap['khoa']['giai_doan'][number];
+type PhanLopNap = DangKyNap['phan_lop_giai_doan'][number];
+
+/** Giai đoạn active của khóa + phân lớp của 1 đăng ký → đầu vào tinhMocNhuCau. */
+export function giaiDoanPhanLop(
+  giaiDoan: GiaiDoanNap[],
+  phanLop: PhanLopNap[],
+): GiaiDoanPhanLop[] {
+  return giaiDoan.map((gd) => ({
+    giai_doan_id: gd.id,
+    ten_giai_doan: gd.ten_giai_doan,
+    thu_tu: gd.thu_tu,
+    bat_dau: ngayISO(gd.thoi_gian_bat_dau),
+    ket_thuc: ngayISO(gd.thoi_gian_ket_thuc),
+    lop: phanLop.find((p) => p.giai_doan_id === gd.id)?.lop ?? null,
+  }));
+}
 
 // ADR 0013 — học viên xem/chọn nhu cầu mức học theo đợt. Chỉ ghi
 // nhu_cau_muc_hoc_vien; không đụng dang_ky_hoc.muc_* / phan_lop_giai_doan (D1).
@@ -249,16 +268,7 @@ export class NhuCauMucHocVienService {
     dk: DangKyNap,
     now: Date,
   ): { lyDo: LyDoKhongDu | null; moc: MocNhuCau | null } {
-    const gds: GiaiDoanPhanLop[] = dk.khoa.giai_doan.map((gd) => ({
-      giai_doan_id: gd.id,
-      ten_giai_doan: gd.ten_giai_doan,
-      thu_tu: gd.thu_tu,
-      bat_dau: ngayISO(gd.thoi_gian_bat_dau),
-      ket_thuc: ngayISO(gd.thoi_gian_ket_thuc),
-      lop:
-        dk.phan_lop_giai_doan.find((p) => p.giai_doan_id === gd.id)?.lop ??
-        null,
-    }));
+    const gds = giaiDoanPhanLop(dk.khoa.giai_doan, dk.phan_lop_giai_doan);
     const moc = tinhMocNhuCau(gds, dk.muc_dau_vao, homNayVN(now));
     if (!phaiXepLop(dk.hoc_vien.doi_tuong)) return { lyDo: 'nhan_vien', moc };
     if (!TRANG_THAI_DU.includes(dk.trang_thai)) {

@@ -9,6 +9,7 @@ import { CanDonDocService } from './can-don-doc.service';
 import { DanhSachHocVienService } from './danh-sach-hoc-vien.service';
 import { MucNlsService } from './muc-nls.service';
 import { NhuCauMucHocService } from './nhu-cau-muc-hoc.service';
+import { NhuCauMucDotService } from './nhu-cau-muc-dot.service';
 import { ThongKeController } from './thong-ke.controller';
 import { ThongKeScopeService } from './thong-ke-scope.service';
 import { ThongKeService } from './thong-ke.service';
@@ -30,6 +31,7 @@ import { XepHangService } from './xep-hang.service';
     ChatLuongHoSoService,
     MucNlsService,
     NhuCauMucHocService,
+    NhuCauMucDotService,
     DanhSachHocVienService,
   ],
   exports: [ThongKeScopeService],

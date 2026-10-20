@@ -1,5 +1,12 @@
-import { Prisma, doi_tuong_hoc_vien, muc_nang_luc } from '@prisma/client';
+import {
+  Prisma,
+  doi_tuong_hoc_vien,
+  muc_nang_luc,
+  nguon_moc_nhu_cau,
+} from '@prisma/client';
 import type { NguonMucDanhGia } from '../khoa-boi-duong/util/muc-hoc.util';
+import type { MocNhuCau } from '../nhu-cau-muc/util/moc-nhu-cau.util';
+import type { TrangThaiDot } from '../nhu-cau-muc/dot-nhu-cau-muc.service';
 
 export interface PhamViThongKe {
   /** Phạm vi ∩ bộ lọc, dùng trực tiếp cho truy vấn dang_ky_hoc. */
@@ -385,4 +392,66 @@ export interface DongDangKyNhuCauMuc {
   ten_khoa: string;
   /** 2026-10-10: nhan_vien -> loại khỏi mọi đếm (xem doi-tuong-khao-sat.util.ts#phaiXepLop). */
   doi_tuong: doi_tuong_hoc_vien | null;
+}
+
+// ── ADR 0013: thống kê nhu cầu mức học theo đợt ──────────────────────────
+
+/** 1 đăng ký học trong khóa của đợt: đủ điều kiện (D6) hoặc đã có lựa chọn. */
+export interface DongNhuCauMucDot {
+  dang_ky_hoc_id: string;
+  hoc_vien: {
+    ho_ten: string;
+    ma_moet: string | null;
+    so_dien_thoai: string | null;
+    /** Đơn vị công tác của học viên. */
+    don_vi: { id: string; ten: string };
+    /** Đơn vị công tác nếu là trường, không thì đơn vị cha nếu là trường. */
+    truong: { id: string; ten: string } | null;
+  };
+  moc_hien_tai: MocNhuCau | null;
+  lop_hien_tai: string | null;
+  muc_dau_vao: muc_nang_luc | null;
+  muc_hoc_chon: muc_nang_luc | null;
+  lua_chon: {
+    muc_chon: muc_nang_luc;
+    muc_moc: muc_nang_luc;
+    nguon_moc: nguon_moc_nhu_cau;
+    lop_luc_chon: string | null;
+    chon_luc: Date;
+    cap_nhat_luc: Date;
+  } | null;
+}
+
+export interface NhuCauMucDotTruong {
+  don_vi_id: string;
+  ten: string;
+  tong: number;
+  da_chon: number;
+  chua_chon: number;
+  ha_muc: number;
+}
+
+export interface NhuCauMucDotResult {
+  tong_du_dieu_kien: number;
+  da_chon: number;
+  chua_chon: number;
+  /** 0–100, 1 chữ số thập phân. */
+  ty_le_da_chon: number;
+  ma_tran: {
+    muc_moc: muc_nang_luc;
+    muc_chon: muc_nang_luc;
+    so_luong: number;
+  }[];
+  theo_truong: NhuCauMucDotTruong[];
+}
+
+export interface DotThongKe {
+  id: string;
+  ten_dot: string;
+  khoa_id: string;
+  ma_khoa: string;
+  ten_khoa: string;
+  mo_luc: Date;
+  dong_luc: Date;
+  trang_thai: TrangThaiDot;
 }

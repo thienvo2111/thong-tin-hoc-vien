@@ -17,6 +17,9 @@ import { CanDonDocService } from './can-don-doc.service';
 import { DanhSachHocVienService } from './danh-sach-hoc-vien.service';
 import { MucNlsService } from './muc-nls.service';
 import { NhuCauMucHocService } from './nhu-cau-muc-hoc.service';
+import { NhuCauMucDotService } from './nhu-cau-muc-dot.service';
+import { NhuCauMucDotQueryDto } from './dto/nhu-cau-muc-dot-query.dto';
+import { homNayVN } from '../nhu-cau-muc/util/moc-nhu-cau.util';
 import { TienDoTruongService } from './tien-do-truong.service';
 import { XepHangService } from './xep-hang.service';
 
@@ -35,6 +38,7 @@ export class ThongKeController {
     private readonly mucNlsService: MucNlsService,
     private readonly nhuCauMucHocService: NhuCauMucHocService,
     private readonly danhSachHocVienService: DanhSachHocVienService,
+    private readonly nhuCauMucDotService: NhuCauMucDotService,
   ) {}
 
   @Get('bo-loc')
@@ -80,6 +84,35 @@ export class ThongKeController {
         'Content-Type':
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': 'attachment; filename="nhu-cau-muc-hoc.xlsx"',
+      })
+      .send(buffer);
+  }
+
+  // ADR 0013: nhu cầu mức học theo đợt (khoa_id theo đợt).
+  @Get('nhu-cau-muc-dot')
+  nhuCauMucDot(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: NhuCauMucDotQueryDto,
+  ) {
+    return this.nhuCauMucDotService.thongKe(user, q);
+  }
+
+  // Mỗi đăng ký 1 dòng (có PII); don_vi_ids rỗng = toàn phạm vi tài khoản.
+  @Get('nhu-cau-muc-dot/xuat-excel')
+  async nhuCauMucDotXuatExcel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: NhuCauMucDotQueryDto,
+    @Res() res: Response,
+  ) {
+    const { buffer, dot } = await this.nhuCauMucDotService.xuatExcel(user, q);
+    const ngay = homNayVN().replace(/-/g, '');
+    const ten = `nhu-cau-muc-${dot.ma_khoa}-${ngay}.xlsx`;
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${ten.replace(/[^\w.-]/g, '_')}"`,
+        'Cache-Control': 'no-store',
       })
       .send(buffer);
   }

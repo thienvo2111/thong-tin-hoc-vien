@@ -1,6 +1,7 @@
 import * as ExcelJS from 'exceljs';
 import { loai_doi_buoi, loai_lop_hoc, muc_nang_luc } from '@prisma/client';
 import { gioVn, ngayVn } from '../nhac-lich/nhac-lich.util';
+import { NHAN_MUC } from '../khoa-boi-duong/util/muc-hoc.util';
 
 // Tab Thống kê đổi buổi — file xuất 2 sheet. Sheet "Học viên" có PII (họ tên,
 // đơn vị, cụm) như các file xuất danh sách khác; service ghi nhật ký mỗi lần xuất.
@@ -59,11 +60,7 @@ export interface DuLieuExcelThongKe {
   hoc_vien: DongHocVienExcel[];
 }
 
-export const NHAN_MUC: Record<muc_nang_luc, string> = {
-  co_ban: 'Cơ bản',
-  thanh_thao: 'Thành thạo',
-  nang_cao: 'Nâng cao',
-};
+export { NHAN_MUC };
 
 export const NHAN_LOAI_DOI_BUOI: Record<loai_doi_buoi, string> = {
   doi_buoi: 'Đổi buổi',

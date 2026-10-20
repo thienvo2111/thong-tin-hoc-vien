@@ -12,6 +12,13 @@ export const THU_TU_MUC: Record<muc_nang_luc, number> = {
   nang_cao: 3,
 };
 
+/** Nhãn tiếng Việt của mức lớp học. */
+export const NHAN_MUC: Record<muc_nang_luc, string> = {
+  co_ban: 'Cơ bản',
+  thanh_thao: 'Thành thạo',
+  nang_cao: 'Nâng cao',
+};
+
 // Bài trên hệ thống khảo sát dùng làm đánh giá đầu vào — khớp FE M7 (baiDauVao).
 export const LOAI_BAI_DAU_VAO = 'danh-gia';
 
