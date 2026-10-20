@@ -70,6 +70,7 @@ import { ChonNhomHoTroGv } from './ChonNhomHoTroGv';
 import { BangKiemEditor } from './BangKiemEditor';
 import { CauHinhDiemDanhZoom } from './CauHinhDiemDanhZoom';
 import { CauHinhDoiBuoi } from './CauHinhDoiBuoi';
+import { KhoiDotNhuCauMuc } from './KhoiDotNhuCauMuc';
 import { CanhBaoZoomThieuLink } from './CanhBaoZoomThieuLink';
 import { BangDiemDanhLop } from '@/components/BangDiemDanhLop';
 
@@ -878,6 +879,7 @@ export default function AdminKhoaChiTiet() {
               </Paper>
             )}
 
+            {laQuanTri && <KhoiDotNhuCauMuc khoaId={khoaId} />}
             {laQuanTri && <CauHinhDoiBuoi key={khoa.so_buoi_doi_toi_da} khoa={khoa} />}
             {laQuanTri && <CauHinhDiemDanhZoom khoa={khoa} />}
             <CanhBaoZoomThieuLink soBuoi={khoa.so_buoi_zoom_thieu_link} />

@@ -1,7 +1,7 @@
 import type { LopCuaToiGv, TrangLop } from '@/api/hoTroGv';
 import type { BoBangKiem, DanhGiaDot } from '@/api/bangKiem';
 import type { HocVienDaXoa } from '@/api/admin';
-import type { NhuCauMucCuaToi } from '@/api/types';
+import type { DotNhuCauMuc, NhuCauMucCuaToi } from '@/api/types';
 import type {
   BuoiCuaLopHoTro,
   DanhSachBuoiHoTro,
@@ -1390,6 +1390,7 @@ export const db = {
   danhSachKhoa: taoDanhSachKhoaMau(),
   chiTietKhoa: taoChiTietKhoaMau(taoDanhSachKhoaMau()),
   danhSachDotXacNhan: taoDanhSachDotXacNhanMau(),
+  danhSachDotNhuCauMuc: [] as DotNhuCauMuc[],
   baoCaoXacNhan: taoBaoCaoXacNhanMau(),
   baoCaoSuaTruongMoet: taoBaoCaoSuaTruongMoetMau(),
   baoCaoDieuKienDanhGia: taoBaoCaoDieuKienDanhGiaMau(),
@@ -1439,6 +1440,7 @@ export function resetDb(): void {
   db.danhSachKhoa = taoDanhSachKhoaMau();
   db.chiTietKhoa = taoChiTietKhoaMau(db.danhSachKhoa);
   db.danhSachDotXacNhan = taoDanhSachDotXacNhanMau();
+  db.danhSachDotNhuCauMuc = [];
   db.baoCaoXacNhan = taoBaoCaoXacNhanMau();
   db.baoCaoSuaTruongMoet = taoBaoCaoSuaTruongMoetMau();
   db.baoCaoDieuKienDanhGia = taoBaoCaoDieuKienDanhGiaMau();

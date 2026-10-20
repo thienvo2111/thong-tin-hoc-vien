@@ -1416,3 +1416,20 @@ export interface NhuCauMucCuaToi {
     cap_nhat_luc: string;
   } | null;
 }
+
+/** Đợt nhu cầu mức học (quản trị) — khớp backend DotNhuCauMuc. */
+export interface DotNhuCauMuc {
+  id: string;
+  khoa_id: string;
+  ten_dot: string;
+  mo_luc: string;
+  dong_luc: string;
+  trang_thai: TrangThaiDotNhuCau;
+  so_ban_ghi: number;
+}
+
+export interface DotNhuCauMucDto {
+  ten_dot: string;
+  mo_luc: string;
+  dong_luc: string;
+}

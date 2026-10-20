@@ -1451,6 +1451,10 @@ export const handlers = [
     });
   }),
   http.get('/hoc-vien/:id/nhat-ky', () => HttpResponse.json(db.nhatKyHocVien)),
+  // --- Đợt nhu cầu mức học (quan_tri) — ADR 0013. Mặc định: danh sách theo db, thao tác ghi test tự override. ---
+  http.get('/khoa-boi-duong/:khoaId/dot-nhu-cau-muc', ({ params }) =>
+    HttpResponse.json(db.danhSachDotNhuCauMuc.filter((d) => d.khoa_id === params.khoaId)),
+  ),
 ];
 
 export { loi };
