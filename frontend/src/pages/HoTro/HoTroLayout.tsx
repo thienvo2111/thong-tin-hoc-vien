@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Badge, Box, Button, Group, Image, ScrollArea, Text } from '@mantine/core';
 import { useDemYeuCauHoTroCuaCum } from '@/api/hoTro';
 import { useDemNhacLichCum } from '@/api/nhacLich';
-import { useDemDoiBuoi } from '@/api/doiBuoi';
+import { useDemDoiBuoi, useLamMoiDemDoiBuoiKhiCu } from '@/api/doiBuoi';
 import { useToi } from '@/auth/AuthContext';
 import logoHcmue from '@/assets/logo-hcmue.png';
 import { tokenKhac } from '@/theme';
@@ -39,12 +39,12 @@ export default function HoTroLayout() {
     void refetchNhac();
   }, [pathname, refetchNhac]);
   const soCanNhac = demNhac.data?.can_nhac ?? 0;
-  // Đề nghị đổi buổi chờ duyệt: tải lại mỗi lần chuyển trang như các số đếm khác.
+  // Đề nghị đổi buổi chờ duyệt: đổi trang chỉ tải lại khi số đếm đã cũ (staleTime 60s).
   const demDoiBuoi = useDemDoiBuoi();
-  const refetchDoiBuoi = demDoiBuoi.refetch;
+  const lamMoiDoiBuoi = useLamMoiDemDoiBuoiKhiCu();
   useEffect(() => {
-    void refetchDoiBuoi();
-  }, [pathname, refetchDoiBuoi]);
+    void lamMoiDoiBuoi();
+  }, [pathname, lamMoiDoiBuoi]);
   const soDoiBuoi = demDoiBuoi.data ?? 0;
 
   async function xuLyDangXuat() {

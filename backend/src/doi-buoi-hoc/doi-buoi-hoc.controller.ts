@@ -50,6 +50,12 @@ export class DoiBuoiHocController {
     return { cho_duyet: await this.service.demChoDuyet(user, q.loai) };
   }
 
+  // Bộ lọc màn duyệt: khóa/cụm/lớp có đề nghị trong phạm vi cụm của người gọi.
+  @Get('bo-loc')
+  boLoc(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.boLoc(user);
+  }
+
   // Tab Thống kê — khai báo TRƯỚC các route ':id/...'.
   @Get('thong-ke')
   thongKe(

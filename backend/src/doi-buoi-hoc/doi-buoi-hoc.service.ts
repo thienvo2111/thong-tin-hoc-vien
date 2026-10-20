@@ -14,6 +14,8 @@ import {
 } from '../common/exceptions/app.exceptions';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import { HoTroHocVienScopeService } from '../ho-tro-hoc-vien/ho-tro-hoc-vien-scope.service';
+import { boSo0DauDeTimKiem } from '../common/utils/ma-moet.util';
+import { dieuKienKhongDau } from '../common/utils/tim-kiem-khong-dau.util';
 import {
   DuyetDoiBuoiDto,
   GhiChuXuLyDto,
@@ -123,6 +125,25 @@ export interface DeNghiDuyet extends DeNghiHocVien {
   nguoi_xu_ly: string | null;
 }
 
+/** GET /doi-buoi-hoc/bo-loc: chỉ khóa/cụm/lớp có đề nghị trong phạm vi người duyệt. */
+export interface BoLocDoiBuoi {
+  khoa: {
+    id: string;
+    ma_khoa: string;
+    ten_khoa: string;
+    thoi_gian_bat_dau: Date;
+    thoi_gian_ket_thuc: Date;
+  }[];
+  cum: { id: string; ten_cum: string; khoa_id: string }[];
+  lop: { id: string; ten_lop: string; khoa_id: string }[];
+}
+
+/** Thu hẹp quaHanThem theo đăng ký (khóa / cụm) — chỉ dùng khi tập kết quả cũng đã lọc như vậy. */
+interface PhamViQuaHan {
+  khoaId?: string;
+  cumIds?: string[] | null;
+}
+
 interface DeNghiRow {
   id: string;
   trang_thai: trang_thai_de_nghi;
@@ -142,6 +163,10 @@ const TIN_KHOA_TAT = 'Khóa học chưa mở đề nghị đổi buổi';
 const TIN_HOC_BU_TAT = 'Khóa học chưa mở đăng ký học bù';
 // ADR 0012: tổng quan học viên chỉ xét 30 buổi đã qua gần nhất cho học bù.
 const SO_BUOI_DA_QUA = 30;
+// Tab Đã xử lý: phân trang 50 dòng (?trang=).
+export const TRANG_DA_XU_LY = 50;
+// Ô tìm học viên: ngắn hơn thì bỏ qua.
+const TIM_TOI_THIEU = 2;
 const TIN_GHI_CHU = 'Ghi chú phải từ 5 đến 500 ký tự';
 
 @Injectable()
@@ -480,6 +505,12 @@ export class DoiBuoiHocService {
   ): Promise<DeNghiDuyet[]> {
     const cumIds = await this.cumPhamVi(user);
     if (cumIds?.length === 0) return [];
+    // cum_id ngoài phạm vi cụm của ho_tro → rỗng (không lộ cụm khác).
+    if (q.cum_id && cumIds && !cumIds.includes(q.cum_id)) return [];
+    const cumLoc = q.cum_id ? [q.cum_id] : cumIds;
+    // Tập quá hạn chỉ dùng để loại/gắn nhãn dòng của chính danh sách này → thu
+    // hẹp cùng khóa/cụm, không quét cho_duyet toàn hệ thống.
+    const phamVi: PhamViQuaHan = { khoaId: q.khoa_id, cumIds: cumLoc };
     const now = new Date();
     // Tab Chờ duyệt: đề nghị quá hạn không bao giờ tự đóng (D7) → tách riêng
     // để không chiếm 500 chỗ đầu của danh sách sắp tao_luc tăng dần.
@@ -487,7 +518,7 @@ export class DoiBuoiHocService {
     const quaHan = choDuyet && q.qua_han === true;
     // Đổi lại có buổi đang học đã bắt đầu, hoặc đã điểm danh (D12), cũng quá hạn.
     const quaHanCho = choDuyet
-      ? await this.quaHanThem(now)
+      ? await this.quaHanThem(now, this.prisma, undefined, phamVi)
       : new Map<string, LyDoQuaHan>();
     const doiLaiQuaHan = [...quaHanCho.keys()];
     const locHan: Prisma.doi_buoi_hocWhereInput = !choDuyet
@@ -509,6 +540,8 @@ export class DoiBuoiHocService {
             lich_de_nghi: { thoi_gian_bat_dau: { gt: now } },
             ...(doiLaiQuaHan.length ? { id: { notIn: doiLaiQuaHan } } : {}),
           };
+    const locThem = await this.locLopVaHocVien(q);
+    const trang = q.trang ?? 1;
     const rows = await this.prisma.doi_buoi_hoc.findMany({
       where: {
         ...(q.da_xu_ly
@@ -519,20 +552,24 @@ export class DoiBuoiHocService {
         ...(q.loai ? { loai: q.loai } : {}),
         ...locHan,
         dang_ky_hoc: {
-          ...(cumIds ? { cum_id: { in: cumIds } } : {}),
+          ...(cumLoc ? { cum_id: { in: cumLoc } } : {}),
           ...(q.khoa_id ? { khoa_id: q.khoa_id } : {}),
         },
+        ...(locThem.length ? { AND: locThem } : {}),
       },
+      // Chờ duyệt (còn hạn lẫn quá hạn): gửi trước lên đầu. Đã xử lý: thêm id
+      // để phân trang ổn định.
       orderBy: q.da_xu_ly
-        ? { xu_ly_luc: { sort: 'desc', nulls: 'last' } }
+        ? [{ xu_ly_luc: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }]
         : !q.trang_thai
           ? { tao_luc: 'desc' }
-          : quaHan
-            ? { tao_luc: 'desc' }
-            : q.trang_thai === 'cho_duyet'
-              ? { tao_luc: 'asc' }
-              : { xu_ly_luc: { sort: 'desc', nulls: 'last' } },
-      take: quaHan ? 100 : 500,
+          : q.trang_thai === 'cho_duyet'
+            ? { tao_luc: 'asc' }
+            : { xu_ly_luc: { sort: 'desc', nulls: 'last' } },
+      take: q.da_xu_ly ? TRANG_DA_XU_LY : quaHan ? 100 : 500,
+      ...(q.da_xu_ly && trang > 1
+        ? { skip: (trang - 1) * TRANG_DA_XU_LY }
+        : {}),
       select: {
         ...DE_NGHI_SELECT,
         dang_ky_hoc: {
@@ -554,7 +591,7 @@ export class DoiBuoiHocService {
     const quaHanThem = choDuyet
       ? quaHanCho
       : rows.some((r) => r.trang_thai === 'cho_duyet')
-        ? await this.quaHanThem(now)
+        ? await this.quaHanThem(now, this.prisma, undefined, phamVi)
         : new Map<string, LyDoQuaHan>();
     const chotCu = await this.chotCuChoDoiLai(rows);
     const [lichMap, hang, siSo, lichDk] = await Promise.all([
@@ -605,7 +642,13 @@ export class DoiBuoiHocService {
     const cumIds = await this.cumPhamVi(user);
     if (cumIds?.length === 0) return 0;
     const now = new Date();
-    const doiLaiQuaHan = await this.idQuaHanThem(now);
+    // Badge giữ phạm vi người dùng; quá hạn thêm chỉ xét cụm của mình.
+    const doiLaiQuaHan = await this.idQuaHanThem(
+      now,
+      this.prisma,
+      undefined,
+      cumIds ? { cumIds } : undefined,
+    );
     return this.prisma.doi_buoi_hoc.count({
       where: {
         trang_thai: 'cho_duyet',
@@ -616,6 +659,53 @@ export class DoiBuoiHocService {
         lich_de_nghi: { thoi_gian_bat_dau: { gt: now } },
       },
     });
+  }
+
+  // Bộ lọc màn duyệt: 3 truy vấn cố định (không N+1), cùng phạm vi cụm với danhSach.
+  async boLoc(user: AuthenticatedUser): Promise<BoLocDoiBuoi> {
+    const cumIds = await this.cumPhamVi(user);
+    if (cumIds?.length === 0) return { khoa: [], cum: [], lop: [] };
+    const dangKy: Prisma.dang_ky_hocWhereInput = cumIds
+      ? { cum_id: { in: cumIds } }
+      : {};
+    const deNghi: Prisma.Doi_buoi_hocListRelationFilter = {
+      some: cumIds ? { dang_ky_hoc: dangKy } : {},
+    };
+    const [khoa, cum, lop] = await Promise.all([
+      this.prisma.khoa_boi_duong.findMany({
+        where: {
+          dang_ky_hoc: { some: { ...dangKy, doi_buoi_hoc: { some: {} } } },
+        },
+        select: {
+          id: true,
+          ma_khoa: true,
+          ten_khoa: true,
+          thoi_gian_bat_dau: true,
+          thoi_gian_ket_thuc: true,
+        },
+        orderBy: { thoi_gian_bat_dau: 'desc' },
+      }),
+      this.prisma.cum_hoc_vien.findMany({
+        where: {
+          ...(cumIds ? { id: { in: cumIds } } : {}),
+          dang_ky_hoc: { some: { doi_buoi_hoc: { some: {} } } },
+        },
+        select: { id: true, ten_cum: true, khoa_id: true },
+        orderBy: { ten_cum: 'asc' },
+      }),
+      this.prisma.lop_hoc.findMany({
+        where: {
+          lich_hoc: {
+            some: {
+              OR: [{ doi_buoi_nguon: deNghi }, { doi_buoi_de_nghi: deNghi }],
+            },
+          },
+        },
+        select: { id: true, ten_lop: true, khoa_id: true },
+        orderBy: { ten_lop: 'asc' },
+      }),
+    ]);
+    return { khoa, cum, lop };
   }
 
   async luaChonDuyet(
@@ -1059,12 +1149,15 @@ export class DoiBuoiHocService {
   // viên đã được ghi co_mat ở buổi gốc (DA_CO_MAT), khi cùng buổi gốc có bản
   // da_duyet KHÁC loại (đổi buổi → DA_DOI_BUOI), hoặc đổi lại có buổi học bù
   // đang giữ đã bắt đầu / đã điểm danh. Nhánh đổi buổi giữ nguyên như trên.
+  // phamVi (khóa/cụm của đăng ký) chỉ dùng khi tập kết quả cũng lọc như vậy;
+  // whereChoTruoc (hàng chờ của 1 buổi, mọi cụm) phải dùng tập không thu hẹp.
   private async idQuaHanThem(
     now: Date,
     db: Db = this.prisma,
     dangKyIds?: string[],
+    phamVi?: PhamViQuaHan,
   ): Promise<string[]> {
-    return [...(await this.quaHanThem(now, db, dangKyIds)).keys()];
+    return [...(await this.quaHanThem(now, db, dangKyIds, phamVi)).keys()];
   }
 
   // Như idQuaHanThem, kèm lý do: CASE xét lần lượt điểm danh buổi gốc → bản đã
@@ -1073,10 +1166,23 @@ export class DoiBuoiHocService {
     now: Date,
     db: Db = this.prisma,
     dangKyIds?: string[],
+    phamVi?: PhamViQuaHan,
   ): Promise<Map<string, LyDoQuaHan>> {
     const loc = dangKyIds
       ? Prisma.sql`AND c.dang_ky_hoc_id = ANY(${dangKyIds}::uuid[])`
       : Prisma.empty;
+    const joinPhamVi =
+      phamVi?.khoaId || phamVi?.cumIds
+        ? Prisma.sql`JOIN dang_ky_hoc k ON k.id = c.dang_ky_hoc_id${
+            phamVi.khoaId
+              ? Prisma.sql` AND k.khoa_id = ${phamVi.khoaId}::uuid`
+              : Prisma.empty
+          }${
+            phamVi.cumIds
+              ? Prisma.sql` AND k.cum_id = ANY(${phamVi.cumIds}::uuid[])`
+              : Prisma.empty
+          }`
+        : Prisma.empty;
     const rows = await db.$queryRaw<{ id: string; ly_do?: LyDoQuaHan }[]>`
       SELECT c.id, CASE
         WHEN EXISTS (SELECT 1 FROM diem_danh dd
@@ -1101,6 +1207,7 @@ export class DoiBuoiHocService {
       FROM doi_buoi_hoc c
       JOIN lich_hoc_lop ln ON ln.id = c.lich_nguon_id
       JOIN lich_hoc_lop ld ON ld.id = c.lich_de_nghi_id
+      ${joinPhamVi}
       WHERE c.trang_thai = 'cho_duyet' ${loc}
         AND (c.loai = 'hoc_bu' OR ln.thoi_gian_bat_dau > ${now})
         AND ld.thoi_gian_bat_dau > ${now} AND (
@@ -1119,6 +1226,51 @@ export class DoiBuoiHocService {
     return new Map(
       rows.map((r) => [r.id, r.ly_do ?? 'da_diem_danh_buoi_dang_hoc']),
     );
+  }
+
+  // Lọc thêm của danhSach: lớp (gốc HOẶC đề nghị) + tìm học viên (họ tên không
+  // dấu hoặc mã MOET thiếu số 0 đầu — cùng cách Tình hình đi học).
+  private async locLopVaHocVien(
+    q: LocDoiBuoiDto,
+  ): Promise<Prisma.doi_buoi_hocWhereInput[]> {
+    const loc: Prisma.doi_buoi_hocWhereInput[] = [];
+    if (q.lop_id)
+      loc.push({
+        OR: [
+          { lich_nguon: { lop_id: q.lop_id } },
+          { lich_de_nghi: { lop_id: q.lop_id } },
+        ],
+      });
+    const tu = q.q?.trim() ?? '';
+    if (tu.length < TIM_TOI_THIEU) return loc;
+    const dk = dieuKienKhongDau(Prisma.sql`h.ho_ten`, tu);
+    const idsTheoTen = dk
+      ? (
+          await this.prisma.$queryRaw<{ id: string }[]>(
+            q.khoa_id
+              ? Prisma.sql`SELECT h.id FROM "hoc_vien" h
+                  JOIN "dang_ky_hoc" d ON d.hoc_vien_id = h.id
+                  WHERE d.khoa_id = ${q.khoa_id}::uuid AND ${dk}`
+              : Prisma.sql`SELECT h.id FROM "hoc_vien" h WHERE ${dk}`,
+          )
+        ).map((r) => r.id)
+      : [];
+    loc.push({
+      dang_ky_hoc: {
+        OR: [
+          { hoc_vien_id: { in: idsTheoTen } },
+          {
+            hoc_vien: {
+              ma_dinh_danh_moet: {
+                contains: boSo0DauDeTimKiem(tu),
+                mode: 'insensitive',
+              },
+            },
+          },
+        ],
+      },
+    });
+    return loc;
   }
 
   private ghiChuBatBuoc(s: string | undefined): string {

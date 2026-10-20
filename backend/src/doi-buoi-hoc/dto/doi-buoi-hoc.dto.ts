@@ -4,17 +4,20 @@ import {
   muc_nang_luc,
   trang_thai_de_nghi,
 } from '@prisma/client';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
   IsDateString,
   IsEnum,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
+  MaxLength,
+  Min,
 } from 'class-validator';
 import {
   tachDanhSach,
@@ -74,6 +77,32 @@ export class LocDoiBuoiDto {
   )
   @IsIn([true, false])
   qua_han?: boolean;
+
+  // Cụm ngoài phạm vi của ho_tro → danh sách rỗng.
+  @IsOptional()
+  @IsUUID()
+  cum_id?: string;
+
+  // Lớp gốc (lich_nguon.lop_id) HOẶC lớp đề nghị (lich_de_nghi.lop_id).
+  @IsOptional()
+  @IsUUID()
+  lop_id?: string;
+
+  // Họ tên (không dấu) hoặc mã MOET (chấp nhận thiếu số 0 đầu); < 2 ký tự bỏ qua.
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @MaxLength(100)
+  q?: string;
+
+  // Chỉ với da_xu_ly: trang 50 dòng (mặc định 1).
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  trang?: number;
 }
 
 // ghi_chu kiểm bằng chuanHoaLyDo trong service (5–500 sau NFC + trim).

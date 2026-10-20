@@ -1,4 +1,7 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import type { UseQueryResult } from '@tanstack/react-query';
+import { useDebouncedValue } from '@mantine/hooks';
 import {
   Badge,
   Box,
@@ -11,11 +14,13 @@ import {
   Radio,
   ScrollArea,
   SegmentedControl,
+  Select,
   SimpleGrid,
   Stack,
   Tabs,
   Text,
   Textarea,
+  TextInput,
   Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -23,21 +28,26 @@ import {
   laHocBu,
   nhanQuaHan,
   nhanDaXuLy,
+  TRANG_DA_XU_LY,
+  useBoLocDoiBuoi,
   useDsDoiBuoi,
   useDuyetDoiBuoi,
   useHuyDuyetDoiBuoi,
   useLuaChonDuyet,
+  useTaiLaiDuyetDoiBuoi,
   useTuChoiDoiBuoi,
+  type BoLocDoiBuoi,
   type BuoiTomTat,
   type DeNghiDuyet,
   type LoaiDoiBuoi,
+  type LocDoiBuoi,
   type LuaChonDuyet,
 } from '@/api/doiBuoi';
 import { useToi } from '@/auth/AuthContext';
 import { CanhBaoTrungLich } from '@/components/CanhBaoTrungLich';
 import { StatusBanner } from '@/components/StatusBanner';
 import { ThanhSiSo } from '@/components/ThanhSiSo';
-import { dinhDangGio, dinhDangNgayGio, dinhDangThuNgay } from '@/lib/ngay';
+import { dinhDangGio, dinhDangNgayGio, dinhDangThuNgay, ngayIsoVn } from '@/lib/ngay';
 import { thongDiepLoiXungDot } from '@/lib/loiApi';
 import ThongKeDoiBuoi from './ThongKeDoiBuoi';
 
@@ -45,6 +55,7 @@ const GHI_CHU_TOI_THIEU = 5;
 const GHI_CHU_TOI_DA = 500;
 const GIOI_HAN_DANH_SACH = 500; // khớp take: 500 của server
 const GIOI_HAN_QUA_HAN = 100; // khớp take: 100 của server khi qua_han=true
+const TIM_TOI_THIEU = 2; // ô tìm học viên: ngắn hơn thì không gửi
 
 /** Khối 1 buổi, gọn 2 dòng: [nhãn] tên lớp / Buổi n · thứ-ngày · giờ (+ dòng phụ nhỏ). */
 function KhoiBuoi({
@@ -140,18 +151,116 @@ interface HanhDong {
   onHuyDuyet: (d: DeNghiDuyet) => void;
 }
 
-/** Màn duyệt đề nghị đổi buổi — dùng chung cho /ho-tro/doi-buoi (hỗ trợ cụm) và /admin/doi-buoi (Quản trị). */
+/** Khóa đang diễn ra (hôm nay theo giờ VN nằm trong [bắt đầu, kết thúc]), bắt đầu muộn nhất trước. */
+function khoaDangDienRa(ds: BoLocDoiBuoi['khoa']): BoLocDoiBuoi['khoa'] {
+  const nay = ngayIsoVn(new Date().toISOString());
+  return ds
+    .filter((k) => k.thoi_gian_bat_dau.slice(0, 10) <= nay && nay <= k.thoi_gian_ket_thuc.slice(0, 10))
+    .sort((a, b) => b.thoi_gian_bat_dau.localeCompare(a.thoi_gian_bat_dau));
+}
+
+/** Hỗ trợ: khóa đang diễn ra (không có thì khóa bắt đầu muộn nhất). Quản trị: chỉ khi đúng 1 khóa đang diễn ra. */
+function khoaMacDinh(ds: BoLocDoiBuoi['khoa'], laQuanTri: boolean): string | null {
+  const dangDien = khoaDangDienRa(ds);
+  if (laQuanTri) return dangDien.length === 1 ? dangDien[0].id : null;
+  if (dangDien.length > 0) return dangDien[0].id;
+  return [...ds].sort((a, b) => b.thoi_gian_bat_dau.localeCompare(a.thoi_gian_bat_dau))[0]?.id ?? null;
+}
+
+function docLoai(v: string | null): '' | LoaiDoiBuoi {
+  return v === 'doi_buoi' || v === 'hoc_bu' ? v : '';
+}
+
+/** Màn duyệt đề nghị đổi buổi — dùng chung cho /ho-tro/doi-buoi (hỗ trợ cụm) và /admin/doi-buoi (Quản trị).
+ *  Bộ lọc nằm trên URL (tải lại trang vẫn giữ); danh sách chỉ tải khi đã có khóa. */
 export default function DuyetDoiBuoi() {
+  const { nguoiDung } = useToi();
+  const laQuanTri = nguoiDung?.vai_tro === 'quan_tri';
+  const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState<string | null>('cho_duyet');
   const [duyet, setDuyet] = useState<DeNghiDuyet | null>(null);
   const [tuChoi, setTuChoi] = useState<DeNghiDuyet | null>(null);
   const [huyDuyet, setHuyDuyet] = useState<DeNghiDuyet | null>(null);
-  const [loai, setLoai] = useState<'' | LoaiDoiBuoi>('');
   const hanhDong: HanhDong = {
     onDuyet: setDuyet,
     onTuChoi: setTuChoi,
     onHuyDuyet: setHuyDuyet,
   };
+
+  const boLoc = useBoLocDoiBuoi();
+  const bo = boLoc.data;
+  const khoaId = params.get('khoa_id') ?? (bo ? khoaMacDinh(bo.khoa, laQuanTri) : null);
+  const cumId = params.get('cum_id') ?? undefined;
+  const lopId = params.get('lop_id') ?? undefined;
+  const loai = docLoai(params.get('loai'));
+  const [tuKhoa, setTuKhoa] = useState(params.get('q') ?? '');
+  const [tuKhoaTre] = useDebouncedValue(tuKhoa.trim(), 400);
+  const q = tuKhoaTre.length >= TIM_TOI_THIEU ? tuKhoaTre : undefined;
+
+  function doiParam(thay: Record<string, string | null | undefined>) {
+    setParams(
+      (cu) => {
+        const p = new URLSearchParams(cu);
+        for (const [k, v] of Object.entries(thay)) {
+          if (v) p.set(k, v);
+          else p.delete(k);
+        }
+        return p;
+      },
+      { replace: true },
+    );
+  }
+
+  // Ô tìm kiếm: ghi lên URL sau khi gõ xong (debounce), không ghi khi chưa đổi.
+  useEffect(() => {
+    setParams(
+      (cu) => {
+        if ((cu.get('q') ?? undefined) === q) return cu;
+        const p = new URLSearchParams(cu);
+        if (q) p.set('q', q);
+        else p.delete('q');
+        return p;
+      },
+      { replace: true },
+    );
+  }, [q, setParams]);
+
+  const loc: LocDoiBuoi = {
+    ...(khoaId ? { khoa_id: khoaId } : {}),
+    ...(cumId ? { cum_id: cumId } : {}),
+    ...(lopId ? { lop_id: lopId } : {}),
+    ...(q ? { q } : {}),
+    ...(loai ? { loai } : {}),
+  };
+  // Đổi bộ lọc → về trang 1 của Đã xử lý.
+  const khoaLoc = JSON.stringify(loc);
+  const [trangState, setTrangState] = useState({ khoaLoc, trang: 1 });
+  const trang = trangState.khoaLoc === khoaLoc ? trangState.trang : 1;
+
+  const coKhoa = !!khoaId;
+  const choQ = useDsDoiBuoi({ ...loc, trang_thai: 'cho_duyet' }, coKhoa && tab === 'cho_duyet');
+  const quaHanQ = useDsDoiBuoi({ ...loc, trang_thai: 'cho_duyet', qua_han: true }, coKhoa && tab === 'cho_duyet');
+  const daXuLyQ = useDsDoiBuoi({ ...loc, da_xu_ly: true, trang }, coKhoa && tab === 'da_xu_ly');
+  const taiLai = useTaiLaiDuyetDoiBuoi();
+  const dangTai = tab === 'cho_duyet' ? choQ.isFetching || quaHanQ.isFetching : daXuLyQ.isFetching;
+  const capNhatLuc = tab === 'cho_duyet' ? choQ.dataUpdatedAt : daXuLyQ.dataUpdatedAt;
+
+  const cumCuaKhoa = (bo?.cum ?? []).filter((c) => c.khoa_id === khoaId);
+  const lopCuaKhoa = (bo?.lop ?? []).filter((l) => l.khoa_id === khoaId);
+
+  const chuaCoKhoa = boLoc.isLoading ? (
+    <Loader size="sm" />
+  ) : boLoc.isError ? (
+    <StatusBanner loai="error">{thongDiepLoiXungDot(boLoc.error)}</StatusBanner>
+  ) : laQuanTri ? (
+    <Text fz="sm" c="dimmed">
+      Chọn khóa để xem
+    </Text>
+  ) : (
+    <Text fz="sm" c="dimmed">
+      Chưa có đề nghị đổi buổi nào trong cụm của Thầy/Cô.
+    </Text>
+  );
 
   return (
     <Container size="xl" py="lg" px={{ base: 'md', md: 28 }}>
@@ -160,21 +269,75 @@ export default function DuyetDoiBuoi() {
           Đổi buổi học
         </Title>
         {tab !== 'thong_ke' && (
-          <Group gap="xs">
-            <Text fz="sm" fw={600}>
-              Loại
-            </Text>
-            <SegmentedControl
+          <Group gap="xs" align="flex-end" wrap="wrap">
+            <Select
+              label="Khóa"
               size="xs"
-              aria-label="Loại đề nghị"
-              value={loai}
-              onChange={(v) => setLoai(v as '' | LoaiDoiBuoi)}
-              data={[
-                { value: '', label: 'Tất cả' },
-                { value: 'doi_buoi', label: 'Đổi buổi' },
-                { value: 'hoc_bu', label: 'Học bù' },
-              ]}
+              w={260}
+              searchable
+              allowDeselect={false}
+              placeholder="Chọn khóa"
+              nothingFoundMessage="Không có khóa"
+              data={(bo?.khoa ?? []).map((k) => ({ value: k.id, label: `${k.ma_khoa} – ${k.ten_khoa}` }))}
+              value={khoaId}
+              onChange={(v) => doiParam({ khoa_id: v, cum_id: null, lop_id: null })}
             />
+            <Select
+              label="Cụm"
+              size="xs"
+              w={200}
+              clearable
+              searchable
+              placeholder="Tất cả cụm"
+              disabled={!coKhoa}
+              data={cumCuaKhoa.map((c) => ({ value: c.id, label: c.ten_cum }))}
+              value={cumId ?? null}
+              onChange={(v) => doiParam({ cum_id: v })}
+            />
+            <Select
+              label="Lớp"
+              size="xs"
+              w={200}
+              clearable
+              searchable
+              placeholder="Tất cả lớp"
+              disabled={!coKhoa}
+              data={lopCuaKhoa.map((l) => ({ value: l.id, label: l.ten_lop }))}
+              value={lopId ?? null}
+              onChange={(v) => doiParam({ lop_id: v })}
+            />
+            <TextInput
+              label="Tìm học viên"
+              size="xs"
+              w={220}
+              placeholder="Họ tên hoặc mã MOET"
+              value={tuKhoa}
+              onChange={(e) => setTuKhoa(e.currentTarget.value)}
+            />
+            <Stack gap={4}>
+              <Text fz="xs" fw={500}>
+                Loại
+              </Text>
+              <SegmentedControl
+                size="xs"
+                aria-label="Loại đề nghị"
+                value={loai}
+                onChange={(v) => doiParam({ loai: docLoai(v) || null })}
+                data={[
+                  { value: '', label: 'Tất cả' },
+                  { value: 'doi_buoi', label: 'Đổi buổi' },
+                  { value: 'hoc_bu', label: 'Học bù' },
+                ]}
+              />
+            </Stack>
+            <Button size="xs" variant="default" onClick={() => void taiLai()} loading={dangTai} disabled={!coKhoa}>
+              Tải lại
+            </Button>
+            {coKhoa && capNhatLuc > 0 && (
+              <Text fz="xs" c="dimmed" pb={6}>
+                Cập nhật lúc {dinhDangGio(new Date(capNhatLuc).toISOString())}
+              </Text>
+            )}
           </Group>
         )}
         <Tabs value={tab} onChange={setTab} keepMounted={false}>
@@ -184,13 +347,28 @@ export default function DuyetDoiBuoi() {
             <Tabs.Tab value="thong_ke">Thống kê</Tabs.Tab>
           </Tabs.List>
           <Tabs.Panel value="cho_duyet" pt="md">
-            <Stack gap="lg">
-              <DanhSach chiChoDuyet hanhDong={hanhDong} loai={loai} />
-              <DanhSachQuaHan hanhDong={hanhDong} loai={loai} />
-            </Stack>
+            {coKhoa ? (
+              <Stack gap="lg">
+                <DanhSach kq={choQ} chiChoDuyet hanhDong={hanhDong} />
+                <DanhSachQuaHan kq={quaHanQ} hanhDong={hanhDong} />
+              </Stack>
+            ) : (
+              chuaCoKhoa
+            )}
           </Tabs.Panel>
           <Tabs.Panel value="da_xu_ly" pt="md">
-            <DanhSach chiChoDuyet={false} hanhDong={hanhDong} loai={loai} />
+            {coKhoa ? (
+              <Stack gap="sm">
+                <DanhSach kq={daXuLyQ} chiChoDuyet={false} hanhDong={hanhDong} trang={trang} />
+                <PhanTrang
+                  trang={trang}
+                  coTrangSau={(daXuLyQ.data?.length ?? 0) >= TRANG_DA_XU_LY}
+                  onDoi={(t) => setTrangState({ khoaLoc, trang: t })}
+                />
+              </Stack>
+            ) : (
+              chuaCoKhoa
+            )}
           </Tabs.Panel>
           <Tabs.Panel value="thong_ke" pt="md">
             <ThongKeDoiBuoi />
@@ -206,35 +384,51 @@ export default function DuyetDoiBuoi() {
   );
 }
 
+function PhanTrang({ trang, coTrangSau, onDoi }: { trang: number; coTrangSau: boolean; onDoi: (t: number) => void }) {
+  if (trang === 1 && !coTrangSau) return null;
+  return (
+    <Group gap="xs" justify="center">
+      <Button size="xs" variant="default" disabled={trang <= 1} onClick={() => onDoi(trang - 1)}>
+        Trang trước
+      </Button>
+      <Text fz="sm">Trang {trang}</Text>
+      <Button size="xs" variant="default" disabled={!coTrangSau} onClick={() => onDoi(trang + 1)}>
+        Trang sau
+      </Button>
+    </Group>
+  );
+}
+
 function DanhSach({
+  kq,
   chiChoDuyet,
   hanhDong,
-  loai,
+  trang = 1,
 }: {
+  kq: UseQueryResult<DeNghiDuyet[]>;
   chiChoDuyet: boolean;
   hanhDong: HanhDong;
-  loai: '' | LoaiDoiBuoi;
+  trang?: number;
 }) {
-  const { data, isLoading, isError, error } = useDsDoiBuoi({
-    ...(chiChoDuyet ? { trang_thai: 'cho_duyet' } : { da_xu_ly: true }),
-    ...(loai ? { loai } : {}),
-  });
+  const { data, isLoading, isError, error } = kq;
   if (isLoading) return <Loader size="sm" />;
   if (isError) return <StatusBanner loai="error">{thongDiepLoiXungDot(error)}</StatusBanner>;
   const ds = data ?? [];
   if (ds.length === 0)
     return (
       <Text fz="sm" c="dimmed">
-        {chiChoDuyet ? 'Không có đề nghị nào đang chờ duyệt.' : 'Chưa có đề nghị nào đã xử lý.'}
+        {chiChoDuyet
+          ? 'Không có đề nghị nào đang chờ duyệt.'
+          : trang > 1
+            ? 'Không còn đề nghị nào ở trang này.'
+            : 'Chưa có đề nghị nào đã xử lý.'}
       </Text>
     );
   return (
     <Stack gap="sm">
-      {ds.length >= GIOI_HAN_DANH_SACH && (
+      {chiChoDuyet && ds.length >= GIOI_HAN_DANH_SACH && (
         <StatusBanner loai="info">
-          {chiChoDuyet
-            ? `Chỉ hiển thị ${GIOI_HAN_DANH_SACH} đề nghị chờ duyệt gửi sớm nhất — xử lý bớt để thấy các đề nghị sau`
-            : `Chỉ hiển thị ${GIOI_HAN_DANH_SACH} đề nghị xử lý gần nhất`}
+          {`Chỉ hiển thị ${GIOI_HAN_DANH_SACH} đề nghị chờ duyệt gửi sớm nhất — xử lý bớt để thấy các đề nghị sau`}
         </StatusBanner>
       )}
       {ds.map((d) =>
@@ -249,9 +443,8 @@ function DanhSach({
 }
 
 /** Đề nghị chờ duyệt đã quá hạn (buổi đã bắt đầu, đã có mặt/điểm danh, …) — tách riêng, chỉ còn Từ chối; mỗi thẻ ghi lý do. */
-function DanhSachQuaHan({ hanhDong, loai }: { hanhDong: HanhDong; loai: '' | LoaiDoiBuoi }) {
-  const { data } = useDsDoiBuoi({ trang_thai: 'cho_duyet', qua_han: true, ...(loai ? { loai } : {}) });
-  const ds = data ?? [];
+function DanhSachQuaHan({ kq, hanhDong }: { kq: UseQueryResult<DeNghiDuyet[]>; hanhDong: HanhDong }) {
+  const ds = kq.data ?? [];
   if (ds.length === 0) return null;
   return (
     <Stack gap="sm" data-testid="khoi-qua-han">
@@ -260,7 +453,7 @@ function DanhSachQuaHan({ hanhDong, loai }: { hanhDong: HanhDong; loai: '' | Loa
         {ds.length >= GIOI_HAN_QUA_HAN ? '+' : ''}) — không còn duyệt được, chỉ còn từ chối
       </Text>
       {ds.length >= GIOI_HAN_QUA_HAN && (
-        <StatusBanner loai="info">Chỉ hiển thị {GIOI_HAN_QUA_HAN} đề nghị quá hạn gửi gần nhất</StatusBanner>
+        <StatusBanner loai="info">Chỉ hiển thị {GIOI_HAN_QUA_HAN} đề nghị quá hạn gửi sớm nhất</StatusBanner>
       )}
       {ds.map((d) => (
         <DongChoDuyet key={d.id} d={d} hanhDong={hanhDong} />
