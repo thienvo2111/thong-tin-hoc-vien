@@ -58,7 +58,10 @@ describe('Thống kê nhu cầu mức theo đợt (e2e)', () => {
   const lopIds: string[] = [];
   const hocVienIds: string[] = [];
   const dangKyIds: string[] = [];
+  const lichIds: string[] = [];
+  const diemDanhIds: string[] = [];
   const ten: Record<string, string> = {};
+  const dkCua: Record<string, string> = {};
 
   const http = () => request(app.getHttpServer());
   const bearer = () => ({ Authorization: `Bearer ${token}` });
@@ -96,6 +99,7 @@ describe('Thống kê nhu cầu mức theo đợt (e2e)', () => {
       },
     });
     dangKyIds.push(dangKy.id);
+    dkCua[nhan] = dangKy.id;
     if (o.lopMuc) {
       await prisma.phan_lop_giai_doan.create({
         data: {
@@ -238,6 +242,41 @@ describe('Thống kê nhu cầu mức theo đợt (e2e)', () => {
       trangThai: 'cho_duyet',
     });
     await taoHocVien('KM', { donViId: T1, lopMuc: null });
+
+    // Số buổi (Excel): lớp cơ bản có 2 buổi đã qua + 1 buổi tương lai; C có
+    // mặt buổi 1, vắng buổi 2 → đã diễn ra 2, có mặt 1, vắng 1.
+    const buoi: string[] = [];
+    for (const [buoiSo, n] of [
+      [1, -3],
+      [2, -2],
+      [3, 3],
+    ]) {
+      const l = await prisma.lich_hoc_lop.create({
+        data: {
+          lop_id: lop.co_ban,
+          giai_doan_id: gdId,
+          buoi_so: buoiSo,
+          thoi_gian_bat_dau: new Date(ngay(n).getTime() + 2 * H),
+          thoi_gian_ket_thuc: new Date(ngay(n).getTime() + 5 * H),
+        },
+      });
+      lichIds.push(l.id);
+      buoi.push(l.id);
+    }
+    for (const [i, trangThai] of [
+      [0, 'co_mat'],
+      [1, 'vang'],
+    ] as const) {
+      const dd = await prisma.diem_danh.create({
+        data: {
+          dang_ky_hoc_id: dkCua.C,
+          lich_hoc_id: buoi[i],
+          trang_thai: trangThai,
+          nguon: 'thu_cong',
+        },
+      });
+      diemDanhIds.push(dd.id);
+    }
   });
 
   afterAll(async () => {
@@ -249,6 +288,12 @@ describe('Thống kê nhu cầu mức theo đợt (e2e)', () => {
         console.error(`[cleanup thong-ke-nhu-cau-muc-dot] ${tenBuoc} lỗi:`, e);
       }
     };
+    await buoc('diem_danh', () =>
+      prisma.diem_danh.deleteMany({ where: { id: { in: diemDanhIds } } }),
+    );
+    await buoc('lich_hoc_lop', () =>
+      prisma.lich_hoc_lop.deleteMany({ where: { id: { in: lichIds } } }),
+    );
     await buoc('nhu_cau_muc_hoc_vien', () =>
       prisma.nhu_cau_muc_hoc_vien.deleteMany({
         where: {
@@ -390,7 +435,7 @@ describe('Thống kê nhu cầu mức theo đợt (e2e)', () => {
     }
     expect(rHeader).toBeGreaterThan(0);
     const tenCot = (n: string) => {
-      for (let c = 1; c <= 20; c++)
+      for (let c = 1; c <= 30; c++)
         if (ws.getCell(rHeader, c).value === n) return c;
       return -1;
     };
@@ -403,6 +448,30 @@ describe('Thống kê nhu cầu mức theo đợt (e2e)', () => {
     expect(Object.keys(dong).sort()).toEqual([ten.C, ten.G].sort());
     expect(dong[ten.C]).toBe('Chưa chọn');
     expect(dong[ten.G]).toBe('Cơ bản');
+
+    // Số buổi: header ngay sau "Cập nhật lúc", trước "# Mức chốt".
+    const COT_BUOI = [
+      'Buổi đã diễn ra',
+      'Buổi có mặt',
+      'Buổi vắng',
+      'Vắng có phép',
+      'Đã báo vắng',
+      'Chưa điểm danh',
+    ];
+    const c0 = tenCot('Cập nhật lúc') + 1;
+    expect(COT_BUOI.map((_, i) => ws.getCell(rHeader, c0 + i).value)).toEqual(
+      COT_BUOI,
+    );
+    expect(ws.getCell(rHeader, c0 + 6).value).toBe('# Mức chốt');
+    const soBuoi: Record<string, unknown[]> = {};
+    for (let r = rHeader + 1; r <= ws.rowCount; r++) {
+      soBuoi[String(ws.getCell(r, cTen).value)] = COT_BUOI.map(
+        (_, i) => ws.getCell(r, c0 + i).value,
+      );
+    }
+    expect(soBuoi[ten.C]).toEqual([2, 1, 1, 0, 0, 0]);
+    // G chưa phân lớp → 0 buổi.
+    expect(soBuoi[ten.G]).toEqual([0, 0, 0, 0, 0, 0]);
   });
 
   it('xuất Excel không lọc → đủ 4 dòng, không có nhân viên', async () => {

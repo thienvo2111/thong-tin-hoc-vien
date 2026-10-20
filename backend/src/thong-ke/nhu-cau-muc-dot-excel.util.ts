@@ -1,6 +1,7 @@
 import * as ExcelJS from 'exceljs';
 import type { muc_nang_luc, nguon_moc_nhu_cau } from '@prisma/client';
 import { NHAN_MUC } from '../khoa-boi-duong/util/muc-hoc.util';
+import type { TongDiHoc } from '../ho-tro-hoc-vien/diem-danh-lop-buoi.util';
 import { thoiDiemVn } from '../hoc-vien/util/danh-sach-hoc-vien-truong-excel.util';
 import { tongHopNhuCauMucDot } from './nhu-cau-muc-dot.tong-hop';
 import { DongNhuCauMucDot, DotThongKe, MoTaBieuMau } from './thong-ke.types';
@@ -28,12 +29,23 @@ const COT: { nhan: string; rong: number; text?: boolean }[] = [
   { nhan: 'Nhu cầu chọn', rong: 14 },
   { nhan: 'Chọn lúc', rong: 18 },
   { nhan: 'Cập nhật lúc', rong: 18 },
+  { nhan: 'Buổi đã diễn ra', rong: 12 },
+  { nhan: 'Buổi có mặt', rong: 12 },
+  { nhan: 'Buổi vắng', rong: 12 },
+  { nhan: 'Vắng có phép', rong: 12 },
+  { nhan: 'Đã báo vắng', rong: 12 },
+  { nhan: 'Chưa điểm danh', rong: 12 },
   { nhan: '# Mức chốt', rong: 14 },
   { nhan: '# Nhu cầu lần 1', rong: 16 },
 ];
 
 export const COT_NHU_CAU_MUC_DOT = COT.map((c) => c.nhan);
 export const CHUA_CHON = 'Chưa chọn';
+const GHI_CHU_SO_BUOI =
+  'Số buổi tính đến thời điểm xuất, cùng cách tính màn Tình hình đi học';
+
+/** Tổng đi học theo dang_ky_hoc_id; thiếu = 0 buổi. */
+export type SoBuoiTheoDangKy = ReadonlyMap<string, TongDiHoc>;
 
 const BORDER_MONG: Partial<ExcelJS.Borders> = {
   top: { style: 'thin' },
@@ -50,7 +62,11 @@ const NEN_HEADER: ExcelJS.Fill = {
 const muc = (m: muc_nang_luc | null | undefined) => (m ? NHAN_MUC[m] : '');
 const gio = (d: Date | null | undefined) => (d ? thoiDiemVn(d) : '');
 
-function giaTriDong(d: DongNhuCauMucDot, stt: number): (string | number)[] {
+function giaTriDong(
+  d: DongNhuCauMucDot,
+  stt: number,
+  t: TongDiHoc | undefined,
+): (string | number)[] {
   const lc = d.lua_chon;
   return [
     stt,
@@ -67,6 +83,12 @@ function giaTriDong(d: DongNhuCauMucDot, stt: number): (string | number)[] {
     lc ? NHAN_MUC[lc.muc_chon] : CHUA_CHON,
     gio(lc?.chon_luc),
     gio(lc?.cap_nhat_luc),
+    t?.da_dien_ra ?? 0,
+    t?.co_mat ?? 0,
+    t?.vang ?? 0,
+    t?.vang_co_phep ?? 0,
+    t?.da_bao_vang ?? 0,
+    t?.chua_diem_danh ?? 0,
     muc(d.muc_dau_vao),
     muc(d.muc_hoc_chon),
   ];
@@ -86,6 +108,7 @@ function tieuDe(
   dot: DotThongKe,
   moTa: MoTaBieuMau,
   soCot: number,
+  ghiChu?: string,
 ): number {
   const dong: [string, Partial<ExcelJS.Font>?][] = [
     ['NHU CẦU MỨC HỌC THEO ĐỢT', { bold: true, size: 14 }],
@@ -94,6 +117,7 @@ function tieuDe(
     [`Phạm vi: ${moTa.pham_vi} — Đối tượng: ${moTa.doi_tuong}`],
     [`Thời điểm xuất: ${thoiDiemVn(moTa.ngay_xuat)}`],
   ];
+  if (ghiChu) dong.push([ghiChu, { italic: true }]);
   dong.forEach(([chu, font], i) => {
     sheet.mergeCells(i + 1, 1, i + 1, soCot);
     const o = sheet.getCell(i + 1, 1);
@@ -178,16 +202,17 @@ function sheetDanhSach(
   dot: DotThongKe,
   rows: DongNhuCauMucDot[],
   moTa: MoTaBieuMau,
+  soBuoi: SoBuoiTheoDangKy,
 ) {
   const sheet = wb.addWorksheet('Danh sách');
   const soCot = COT.length;
-  const hangHeader = tieuDe(sheet, dot, moTa, soCot) + 2;
+  const hangHeader = tieuDe(sheet, dot, moTa, soCot, GHI_CHU_SO_BUOI) + 2;
   COT.forEach((c, i) => {
     oHeader(sheet.getCell(hangHeader, i + 1), c.nhan);
     sheet.getColumn(i + 1).width = c.rong;
   });
   rows.forEach((d, i) => {
-    giaTriDong(d, i + 1).forEach((v, c) => {
+    giaTriDong(d, i + 1, soBuoi.get(d.dang_ky_hoc_id)).forEach((v, c) => {
       const o = sheet.getCell(hangHeader + 1 + i, c + 1);
       o.value = v;
       o.border = BORDER_MONG;
@@ -207,9 +232,10 @@ export async function buildNhuCauMucDotWorkbook(
   dot: DotThongKe,
   rows: DongNhuCauMucDot[],
   moTa: MoTaBieuMau,
+  soBuoi: SoBuoiTheoDangKy = new Map(),
 ): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   sheetTongHop(wb, dot, rows, moTa);
-  sheetDanhSach(wb, dot, rows, moTa);
+  sheetDanhSach(wb, dot, rows, moTa, soBuoi);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }

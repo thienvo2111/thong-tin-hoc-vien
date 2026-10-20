@@ -24,6 +24,7 @@ import {
   buoiHieuDung,
   lyDoDaCoMatLopKhac,
   tinhDiemDanhDong,
+  TongDiHoc,
   tongDiHoc,
 } from '../ho-tro-hoc-vien/diem-danh-lop-buoi.util';
 import { khoaBuoi } from '../common/utils/chuyen-can.util';
@@ -230,6 +231,28 @@ export class TinhHinhDiHocService {
       },
     });
     return buffer;
+  }
+
+  /**
+   * Tổng đi học theo đăng ký (cùng cách tính danh sách ADR 0010) cho nơi
+   * khác dùng lại, vd Excel nhu cầu mức theo đợt. Id không tồn tại → không có
+   * trong Map. Nạp theo lô: không N+1.
+   */
+  async tongTheoDangKy(
+    dangKyIds: string[],
+    now: Date = new Date(),
+  ): Promise<Map<string, TongDiHoc>> {
+    const ds: DangKyDong[] = [];
+    for (const lo of chiaLo([...new Set(dangKyIds)])) {
+      ds.push(
+        ...(await this.prisma.dang_ky_hoc.findMany({
+          where: { id: { in: lo } },
+          select: CHON_DANG_KY,
+        })),
+      );
+    }
+    const dong = await this.tinhDong(ds, now);
+    return new Map(dong.map((d) => [d.dang_ky_hoc_id, d.tong]));
   }
 
   /** Chi tiết từng buổi hiệu dụng của 1 đăng ký (ngoài phạm vi → 404). */

@@ -303,6 +303,54 @@ describe('TinhHinhDiHocService', () => {
     expect(prisma.diem_danh.findMany).not.toHaveBeenCalled();
   });
 
+  describe('tongTheoDangKy (Excel nhu cầu theo đợt)', () => {
+    const KHONG_LOP = dangKy('dk-khong', 'Lê Không Lớp', []);
+    const ZERO = {
+      da_dien_ra: 0,
+      co_mat: 0,
+      vang: 0,
+      vang_co_phep: 0,
+      da_bao_vang: 0,
+      chua_diem_danh: 0,
+    };
+
+    it('trả tổng y như danh sách Tình hình đi học theo id; chưa phân lớp → toàn 0', async () => {
+      prisma.dang_ky_hoc.findMany.mockResolvedValue([BINH, KHONG_LOP, AN]);
+      const kq = await service.tongTheoDangKy(
+        ['dk-an', 'dk-binh', 'dk-khong'],
+        NOW,
+      );
+      expect(prisma.dang_ky_hoc.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: { in: ['dk-an', 'dk-binh', 'dk-khong'] } },
+        }),
+      );
+      expect(kq.get('dk-an')).toEqual({
+        da_dien_ra: 3,
+        co_mat: 2,
+        vang: 1,
+        vang_co_phep: 0,
+        da_bao_vang: 0,
+        chua_diem_danh: 0,
+      });
+      expect(kq.get('dk-binh')).toEqual({
+        ...ZERO,
+        da_dien_ra: 2,
+        da_bao_vang: 1,
+        chua_diem_danh: 1,
+      });
+      expect(kq.get('dk-khong')).toEqual(ZERO);
+      // Nạp theo lô: 1 truy vấn buổi cho mọi đăng ký.
+      expect(prisma.lich_hoc_lop.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('mảng rỗng → Map rỗng, không truy vấn', async () => {
+      const kq = await service.tongTheoDangKy([], NOW);
+      expect(kq.size).toBe(0);
+      expect(prisma.dang_ky_hoc.findMany).not.toHaveBeenCalled();
+    });
+  });
+
   it('lọc co_vang / chua_diem_danh theo số đếm, total sau khi lọc', async () => {
     const vang = await service.danhSach({}, loc({ co_vang: true }), NOW);
     expect(vang.total).toBe(1);

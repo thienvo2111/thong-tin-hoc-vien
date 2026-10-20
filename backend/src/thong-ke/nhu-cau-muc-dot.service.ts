@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { NotFoundAppException } from '../common/exceptions/app.exceptions';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
+import { TinhHinhDiHocService } from '../tinh-hinh-di-hoc/tinh-hinh-di-hoc.service';
 import {
   HOC_VIEN_PHAI_XEP_LOP,
   phaiXepLop,
@@ -90,6 +91,7 @@ export class NhuCauMucDotService {
     private readonly prisma: PrismaService,
     private readonly scope: ThongKeScopeService,
     private readonly nhatKy: NhatKyService,
+    private readonly tinhHinhDiHoc: TinhHinhDiHocService,
   ) {}
 
   async thongKe(
@@ -105,10 +107,15 @@ export class NhuCauMucDotService {
     q: NhuCauMucDotQueryDto,
   ): Promise<{ buffer: Buffer; dot: DotThongKe }> {
     const { dot, rows, qKhoa, rong } = await this.napDuLieu(user, q);
+    // Số buổi chỉ cần cho Excel (dashboard không tính): 1 lần nạp theo lô.
+    const soBuoi = await this.tinhHinhDiHoc.tongTheoDangKy(
+      rows.map((r) => r.dang_ky_hoc_id),
+    );
     const buffer = await buildNhuCauMucDotWorkbook(
       dot,
       rows,
       await moTaBieuMau(this.prisma, qKhoa, rong),
+      soBuoi,
     );
     // File có PII (họ tên, MOET, SĐT) → ghi nhật ký như danh-sach-hoc-vien.
     await this.nhatKy.ghi({

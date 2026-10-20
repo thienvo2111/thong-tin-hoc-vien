@@ -83,6 +83,12 @@ const HEADER = [
   'Nhu cầu chọn',
   'Chọn lúc',
   'Cập nhật lúc',
+  'Buổi đã diễn ra',
+  'Buổi có mặt',
+  'Buổi vắng',
+  'Vắng có phép',
+  'Đã báo vắng',
+  'Chưa điểm danh',
   '# Mức chốt',
   '# Nhu cầu lần 1',
 ];
@@ -99,6 +105,15 @@ function hangCo(ws: ExcelJS.Worksheet, giaTriCot1: string): number {
   }
   return -1;
 }
+
+const TONG_A = {
+  da_dien_ra: 5,
+  co_mat: 3,
+  vang: 1,
+  vang_co_phep: 0,
+  da_bao_vang: 1,
+  chua_diem_danh: 0,
+};
 
 describe('buildNhuCauMucDotWorkbook', () => {
   it('có 2 sheet "Tổng hợp" và "Danh sách"', async () => {
@@ -136,6 +151,12 @@ describe('buildNhuCauMucDotWorkbook', () => {
       'Cơ bản',
       '06/10/2026 06:05',
       '06/10/2026 09:30',
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
       'Nâng cao',
       'Thành thạo',
     ]);
@@ -145,6 +166,29 @@ describe('buildNhuCauMucDotWorkbook', () => {
     expect(chua[8]).toBe('Mức chốt');
     expect(chua[11]).toBe('Chưa chọn');
     expect(chua[12]).toBe('');
+  });
+
+  it('sheet Danh sách: số buổi lấy theo dang_ky_hoc_id, thiếu → 0, có ghi chú cách tính', async () => {
+    const wb = await docLai(
+      await buildNhuCauMucDotWorkbook(
+        DOT,
+        [DA_CHON, CHUA_CHON],
+        MO_TA,
+        new Map([['dk-1', TONG_A]]),
+      ),
+    );
+    const ws = wb.getWorksheet('Danh sách')!;
+    const rHeader = hangCo(ws, 'STT');
+    const c0 = HEADER.indexOf('Buổi đã diễn ra') + 1;
+    const so = (r: number) =>
+      [0, 1, 2, 3, 4, 5].map((i) => ws.getCell(r, c0 + i).value);
+    expect(so(rHeader + 1)).toEqual([5, 3, 1, 0, 1, 0]);
+    expect(so(rHeader + 2)).toEqual([0, 0, 0, 0, 0, 0]);
+    const tren: string[] = [];
+    for (let r = 1; r < rHeader; r++) tren.push(String(ws.getCell(r, 1).value));
+    expect(tren.join('|')).toContain(
+      'Số buổi tính đến thời điểm xuất, cùng cách tính màn Tình hình đi học',
+    );
   });
 
   it('sheet Tổng hợp có KPI, ma trận và theo trường', async () => {
