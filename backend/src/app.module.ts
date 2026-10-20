@@ -16,6 +16,7 @@ import { ThongBaoModule } from './thong-bao/thong-bao.module';
 import { ValidateModule } from './validate/validate.module';
 import { NguoiDungModule } from './nguoi-dung/nguoi-dung.module';
 import { DotXacNhanModule } from './dot-xac-nhan/dot-xac-nhan.module';
+import { NhuCauMucModule } from './nhu-cau-muc/nhu-cau-muc.module';
 import { YeuCauHoTroModule } from './yeu-cau-ho-tro/yeu-cau-ho-tro.module';
 import { CauHinhKhaoSatModule } from './cau-hinh-khao-sat/cau-hinh-khao-sat.module';
 import { SsoModule } from './sso/sso.module';
@@ -68,6 +69,7 @@ import { TinhHinhDiHocModule } from './tinh-hinh-di-hoc/tinh-hinh-di-hoc.module'
     ValidateModule,
     NguoiDungModule,
     DotXacNhanModule,
+    NhuCauMucModule,
     YeuCauHoTroModule,
     CauHinhKhaoSatModule,
     SsoModule,

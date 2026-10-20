@@ -85,6 +85,13 @@ export class DieuChinhMucDongException extends HttpException {
   }
 }
 
+// ADR 0013: 403 khi học viên chọn nhu cầu mức học ngoài thời gian đợt.
+export class DotNhuCauDongException extends HttpException {
+  constructor(message = 'Đợt nhu cầu mức học đã đóng') {
+    super({ error: { code: 'DOT_NHU_CAU_DONG', message } }, 403);
+  }
+}
+
 // Dùng bởi Dịch vụ Import (mỗi dòng file) để biến lỗi ném ra từ đúng 1 bộ
 // quy tắc validate dùng chung (ValidationException/ConflictAppException của
 // các *_hoc.service.ts) thành 1 chuỗi lý do ngắn gọn cho cột "Lý do".
