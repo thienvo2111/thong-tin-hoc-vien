@@ -147,4 +147,19 @@ describe('M9 — chọn nhu cầu mức học (ADR 0013)', () => {
     render();
     expect(await screen.findByText('Không tìm thấy đợt.')).toBeInTheDocument();
   });
+
+  it('API 500: không báo "Không tìm thấy đợt", hiện lỗi + nút Thử lại gọi lại được', async () => {
+    let lan = 0;
+    server.use(
+      http.get(`*/hoc-vien/toi/nhu-cau-muc/${DOT_ID}`, () => {
+        lan += 1;
+        return HttpResponse.json({ error: { code: 'INTERNAL', message: 'Lỗi máy chủ' } }, { status: 500 });
+      }),
+    );
+    render();
+    expect(await screen.findByText('Lỗi máy chủ')).toBeInTheDocument();
+    expect(screen.queryByText('Không tìm thấy đợt.')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+    await waitFor(() => expect(lan).toBe(2));
+  });
 });

@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useHoSoToi } from '@/api/hocVien';
 import { useChonNhuCauMuc, useNhuCauMucDot } from '@/api/nhuCauMuc';
 import type { LyDoKhongDuNhuCau, MucNangLuc, NhuCauMucCuaToi } from '@/api/types';
+import { ApiError } from '@/api/client';
 import { StatusBanner } from '@/components/StatusBanner';
 import { laLoiDotNhuCauDong, loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
 import { nhanMucNangLuc } from '@/lib/mucNangLuc';
@@ -19,7 +20,8 @@ const THONG_DIEP_KHONG_DU: Record<LyDoKhongDuNhuCau, string> = {
 export default function NhuCauMuc() {
   const [params] = useSearchParams();
   const dotId = params.get('dot');
-  const { data, isLoading, isError } = useNhuCauMucDot(dotId);
+  const { data, isLoading, isError, error, refetch } = useNhuCauMucDot(dotId);
+  const khongTimThay = !dotId || (error instanceof ApiError && error.status === 404);
 
   return (
     <Container size="sm" py="xl">
@@ -32,7 +34,15 @@ export default function NhuCauMuc() {
             <Loader />
           </Center>
         )}
-        {(!dotId || isError) && <StatusBanner loai="error">Không tìm thấy đợt.</StatusBanner>}
+        {khongTimThay && <StatusBanner loai="error">Không tìm thấy đợt.</StatusBanner>}
+        {isError && !khongTimThay && (
+          <Stack gap="xs">
+            <StatusBanner loai="error">{thongDiepLoiChung(error)}</StatusBanner>
+            <Button variant="default" onClick={() => void refetch()} style={{ minHeight: 44 }}>
+              Thử lại
+            </Button>
+          </Stack>
+        )}
         {data && (
           <>
             <ThongTin nc={data} />
