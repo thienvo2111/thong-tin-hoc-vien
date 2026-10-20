@@ -1067,7 +1067,8 @@ export class DoiBuoiHocService {
     return [...(await this.quaHanThem(now, db, dangKyIds)).keys()];
   }
 
-  // Như idQuaHanThem, kèm lý do (CASE theo đúng thứ tự các nhánh của WHERE).
+  // Như idQuaHanThem, kèm lý do: CASE xét lần lượt điểm danh buổi gốc → bản đã
+  // duyệt khác loại → buổi đang học đã bắt đầu → còn lại (đã điểm danh buổi đang học).
   private async quaHanThem(
     now: Date,
     db: Db = this.prisma,
