@@ -21,6 +21,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import {
   laHocBu,
+  nhanQuaHan,
   nhanDaXuLy,
   useDsDoiBuoi,
   useDuyetDoiBuoi,
@@ -247,7 +248,7 @@ function DanhSach({
   );
 }
 
-/** Đề nghị chờ duyệt đã quá hạn (buổi nguồn hoặc buổi đề nghị đã bắt đầu) — tách riêng, chỉ còn Từ chối. */
+/** Đề nghị chờ duyệt đã quá hạn (buổi đã bắt đầu, đã có mặt/điểm danh, …) — tách riêng, chỉ còn Từ chối; mỗi thẻ ghi lý do. */
 function DanhSachQuaHan({ hanhDong, loai }: { hanhDong: HanhDong; loai: '' | LoaiDoiBuoi }) {
   const { data } = useDsDoiBuoi({ trang_thai: 'cho_duyet', qua_han: true, ...(loai ? { loai } : {}) });
   const ds = data ?? [];
@@ -256,7 +257,7 @@ function DanhSachQuaHan({ hanhDong, loai }: { hanhDong: HanhDong; loai: '' | Loa
     <Stack gap="sm" data-testid="khoi-qua-han">
       <Text fw={700} fz="sm">
         Quá hạn ({ds.length}
-        {ds.length >= GIOI_HAN_QUA_HAN ? '+' : ''}) — buổi đã bắt đầu, chỉ còn từ chối
+        {ds.length >= GIOI_HAN_QUA_HAN ? '+' : ''}) — không còn duyệt được, chỉ còn từ chối
       </Text>
       {ds.length >= GIOI_HAN_QUA_HAN && (
         <StatusBanner loai="info">Chỉ hiển thị {GIOI_HAN_QUA_HAN} đề nghị quá hạn gửi gần nhất</StatusBanner>
@@ -325,6 +326,11 @@ function DongChoDuyet({ d, hanhDong }: { d: DeNghiDuyet; hanhDong: HanhDong }) {
         <Text fz="xs" c="dimmed">
           Gửi lúc {dinhDangNgayGio(d.tao_luc)}
         </Text>
+        {d.qua_han && (
+          <Text fz="sm" c="red" data-testid="ly-do-qua-han">
+            Quá hạn: {nhanQuaHan(d)}
+          </Text>
+        )}
         <Group gap="xs">
           {!d.qua_han && (
             <Button size="xs" onClick={() => hanhDong.onDuyet(d)}>

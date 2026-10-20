@@ -33,6 +33,43 @@ export function nhanDaXuLy(d: { trang_thai: TrangThaiDeNghi; ly_do_huy: LyDoHuy 
   return d.nguoi_xu_ly ? `Hủy duyệt bởi ${d.nguoi_xu_ly}` : 'Hủy duyệt';
 }
 
+/** Vì sao đề nghị chờ đã quá hạn (khớp LyDoQuaHan ở backend). */
+export type LyDoQuaHan =
+  | 'buoi_goc_bat_dau'
+  | 'buoi_de_nghi_bat_dau'
+  | 'buoi_dang_hoc_bat_dau'
+  | 'da_co_mat'
+  | 'da_diem_danh_buoi_goc'
+  | 'buoi_goc_da_duyet_khac'
+  | 'da_diem_danh_buoi_dang_hoc';
+
+/** Câu giải thích quá hạn; ai = người đọc (người duyệt gọi "Học viên", học viên gọi "Thầy/Cô"). */
+export function nhanQuaHan(
+  d: { loai?: LoaiDoiBuoi; ly_do_qua_han?: LyDoQuaHan | null },
+  ai: 'ho_tro' | 'hoc_vien' = 'ho_tro',
+): string {
+  const hv = ai === 'ho_tro' ? 'Học viên' : 'Thầy/Cô';
+  const hocBu = laHocBu(d);
+  switch (d.ly_do_qua_han) {
+    case 'buoi_goc_bat_dau':
+      return 'Buổi cần đổi đã bắt đầu';
+    case 'buoi_de_nghi_bat_dau':
+      return hocBu ? 'Buổi học bù đã bắt đầu' : 'Buổi xin đổi sang đã bắt đầu';
+    case 'buoi_dang_hoc_bat_dau':
+      return 'Buổi đang học theo đề nghị đã duyệt trước đó đã bắt đầu';
+    case 'da_co_mat':
+      return `${hv} đã được ghi có mặt ở buổi đã vắng — không cần học bù`;
+    case 'da_diem_danh_buoi_goc':
+      return `${hv} đã có điểm danh ở buổi cần đổi`;
+    case 'buoi_goc_da_duyet_khac':
+      return hocBu ? 'Buổi này đã được đổi buổi' : 'Buổi này đã có học bù được duyệt';
+    case 'da_diem_danh_buoi_dang_hoc':
+      return `${hv} đã điểm danh ở buổi đang học theo đề nghị đã duyệt`;
+    default:
+      return 'Không còn duyệt được';
+  }
+}
+
 /** Tóm tắt 1 buổi học (khớp LichTomTat ở backend). */
 export interface LichTomTat {
   id: string;
@@ -83,6 +120,8 @@ export interface DeNghiHocVien {
   /** Chỉ khi trang_thai = da_huy: học viên sửa (bản cũ bị thay), học viên tự hủy, người duyệt hủy duyệt, hoặc bị thay bởi đề nghị đổi lại. */
   ly_do_huy: LyDoHuy | null;
   qua_han: boolean;
+  /** Chỉ khi qua_han: vì sao không còn duyệt được. */
+  ly_do_qua_han?: LyDoQuaHan | null;
   thu_tu_hang: { k: number; n: number } | null;
   buoi_nguon: BuoiTomTat | null;
   buoi_de_nghi: BuoiTomTat | null;

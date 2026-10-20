@@ -84,7 +84,7 @@ function setup(
   };
   const prisma = {
     $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
-    $queryRaw: jest.fn(async (..._a: unknown[]) => [] as { id: string }[]),
+    $queryRaw: jest.fn(async (..._a: unknown[]) => [] as { id: string; ly_do?: string }[]),
     diem_danh: {
       findFirst: jest.fn(async (_a?: unknown) => null as { id: string } | null),
     },
@@ -703,6 +703,7 @@ describe('DoiBuoiHocService luaChon / tongQuan', () => {
     const r = await s.svc.tongQuanHocVien(user, 'k1');
     expect(r.de_nghi.find((d) => d.id === 'moi')).toMatchObject({
       qua_han: true,
+      ly_do_qua_han: 'buoi_dang_hoc_bat_dau',
       thu_tu_hang: null,
     });
   });
@@ -725,7 +726,7 @@ describe('DoiBuoiHocService luaChon / tongQuan', () => {
       .fn()
       .mockResolvedValueOnce([row])
       .mockResolvedValueOnce([]);
-    s.prisma.$queryRaw.mockResolvedValueOnce([{ id: 'a' }]);
+    s.prisma.$queryRaw.mockResolvedValueOnce([{ id: 'a', ly_do: 'da_diem_danh_buoi_goc' }]);
     s.query.lichTomTat.mockResolvedValue(
       new Map([
         ['ln', lich('ln', 'lopA')],
@@ -733,7 +734,12 @@ describe('DoiBuoiHocService luaChon / tongQuan', () => {
       ]),
     );
     const r = await s.svc.tongQuanHocVien(user, 'k1');
-    expect(r.de_nghi[0]).toMatchObject({ id: 'a', qua_han: true, thu_tu_hang: null });
+    expect(r.de_nghi[0]).toMatchObject({
+      id: 'a',
+      qua_han: true,
+      ly_do_qua_han: 'da_diem_danh_buoi_goc',
+      thu_tu_hang: null,
+    });
     expect(s.prisma.$queryRaw).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(s.prisma.$queryRaw.mock.calls[0])).toContain('dk1');
   });
@@ -857,7 +863,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
         order.push('lock');
         return 0;
       }),
-      $queryRaw: jest.fn(async (..._a: unknown[]) => [] as { id: string }[]),
+      $queryRaw: jest.fn(async (..._a: unknown[]) => [] as { id: string; ly_do?: string }[]),
       doi_buoi_hoc: {
         findUnique: jest.fn(async () => deNghi),
         findFirst: jest.fn(
@@ -882,7 +888,7 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     };
     const prisma = {
       $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)),
-      $queryRaw: jest.fn(async (..._a: unknown[]) => [] as { id: string }[]),
+      $queryRaw: jest.fn(async (..._a: unknown[]) => [] as { id: string; ly_do?: string }[]),
       doi_buoi_hoc: {
         findFirst: jest.fn(async (_a?: unknown) => deNghi as unknown),
         findMany: jest.fn(async (_a?: unknown) => [] as unknown[]),
@@ -1460,7 +1466,8 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     expect(sql).toContain('l.thoi_gian_bat_dau <= ?');
     expect(sql).toContain('FROM diem_danh dd');
     const ngay = values.filter((v): v is Date => v instanceof Date);
-    expect(ngay).toHaveLength(3);
+    // 3 trong WHERE + 1 trong CASE ly_do (buoi dang hoc da bat dau).
+    expect(ngay).toHaveLength(4);
     expect(new Set(ngay.map((d) => d.getTime())).size).toBe(1);
     const where = (prisma.doi_buoi_hoc.count.mock.calls[0][0] as { where: any })
       .where;
@@ -2701,6 +2708,60 @@ describe('DoiBuoiHocService hoc bu (nguoi duyet)', () => {
     expect(sql).toContain("(c.loai = 'hoc_bu' OR ln.thoi_gian_bat_dau > ?)");
     expect(sql).toContain("(c.loai = 'doi_buoi' OR dd.trang_thai = 'co_mat')");
     expect(sql).toContain('d.loai <> c.loai');
+  });
+
+  // Hoc bu da gui, sau do ho tro diem danh bo sung co_mat o buoi goc -> qua han,
+  // ly do phai noi ro (khong phai "buoi da bat dau").
+  const rowDuyet = (over: object = {}) => ({
+    ...deNghiHb(),
+    ly_do: 'abcde',
+    ghi_chu_xu_ly: null,
+    nguoi_xu_ly: null,
+    dang_ky_hoc: {
+      hoc_vien: { id: 'hv1', ho_ten: 'A', don_vi_cong_tac: { ten_don_vi: 'T' } },
+      cum: null,
+    },
+    xu_ly_boi: null,
+    ...over,
+  });
+
+  it('ly_do_qua_han: hoc bu, buoi goc da co_mat -> da_co_mat', async () => {
+    const { svc, prisma } = setupD();
+    prisma.doi_buoi_hoc.findMany.mockResolvedValueOnce([rowDuyet()]);
+    prisma.$queryRaw.mockResolvedValue([{ id: 'x1', ly_do: 'da_co_mat' }]);
+    const r = await svc.danhSach(quanTri, {});
+    expect(r[0]).toMatchObject({ id: 'x1', qua_han: true, ly_do_qua_han: 'da_co_mat' });
+  });
+
+  it('ly_do_qua_han: hoc bu, buoi hoc bu da bat dau -> buoi_de_nghi_bat_dau', async () => {
+    const { svc, prisma, lichMap } = setupD();
+    lichMap.set('ld', lich('ld', 'lopB', { thoi_gian_bat_dau: hqua }));
+    prisma.doi_buoi_hoc.findMany.mockResolvedValueOnce([rowDuyet()]);
+    const r = await svc.danhSach(quanTri, {});
+    expect(r[0]).toMatchObject({ qua_han: true, ly_do_qua_han: 'buoi_de_nghi_bat_dau' });
+  });
+
+  it('ly_do_qua_han: doi buoi, buoi goc da bat dau -> buoi_goc_bat_dau', async () => {
+    const { svc, prisma } = setupD();
+    prisma.doi_buoi_hoc.findMany.mockResolvedValueOnce([rowDuyet({ loai: 'doi_buoi' })]);
+    const r = await svc.danhSach(quanTri, {});
+    expect(r[0]).toMatchObject({ qua_han: true, ly_do_qua_han: 'buoi_goc_bat_dau' });
+  });
+
+  it('ly_do_qua_han: hoc bu con han -> null', async () => {
+    const { svc, prisma } = setupD();
+    prisma.doi_buoi_hoc.findMany.mockResolvedValueOnce([rowDuyet()]);
+    const r = await svc.danhSach(quanTri, {});
+    expect(r[0]).toMatchObject({ qua_han: false, ly_do_qua_han: null });
+  });
+
+  it('quaHanThem: SQL tra ly do theo tung nhanh', async () => {
+    const { svc, prisma } = setupD();
+    await svc.demChoDuyet(quanTri);
+    const [strings] = prisma.$queryRaw.mock.calls[0] as [TemplateStringsArray];
+    const sql = strings.join('?');
+    for (const m of ['da_co_mat', 'da_diem_danh_buoi_goc', 'buoi_goc_da_duyet_khac', 'buoi_dang_hoc_bat_dau', 'da_diem_danh_buoi_dang_hoc'])
+      expect(sql).toContain(`'${m}'`);
   });
 });
 

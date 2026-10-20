@@ -208,10 +208,14 @@ describe("Màn duyệt đổi buổi", () => {
   });
 
   it("đề nghị quá hạn: khối Quá hạn riêng, có nhãn, không có nút Duyệt, vẫn có Từ chối", async () => {
-    datApi([], 0, [deNghi({ qua_han: true })]);
+    datApi([], 0, [deNghi({ qua_han: true, loai: "hoc_bu", ly_do_qua_han: "da_co_mat" })]);
     renderTrang("ho_tro_hoc_vien");
     const khoi = await screen.findByTestId("khoi-qua-han");
-    expect(within(khoi).getByText(/Quá hạn \(1\)/)).toBeInTheDocument();
+    expect(within(khoi).getByText(/Quá hạn \(1\) — không còn duyệt được/)).toBeInTheDocument();
+    // Lý do cụ thể, không phải câu chung "buổi đã bắt đầu".
+    expect(within(khoi).getByTestId("ly-do-qua-han")).toHaveTextContent(
+      "Quá hạn: Học viên đã được ghi có mặt ở buổi đã vắng — không cần học bù",
+    );
     expect(within(khoi).getByText("Quá hạn")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Duyệt" })).toBeNull();
     expect(within(khoi).getByRole("button", { name: "Từ chối" })).toBeInTheDocument();

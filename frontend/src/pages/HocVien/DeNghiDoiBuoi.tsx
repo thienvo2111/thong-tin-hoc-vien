@@ -26,6 +26,7 @@ import {
   useSuaDoiBuoi,
   useTongQuanDoiBuoi,
   laHocBu,
+  nhanQuaHan,
   type BuoiTomTat,
   type DeNghiHocVien,
   type LichTomTat,
@@ -328,6 +329,11 @@ function DongDeNghi({ deNghi, onSua }: { deNghi: DeNghiHocVien; onSua: () => voi
         <Text size="sm" c="dimmed">
           Lý do: {deNghi.ly_do}
         </Text>
+        {deNghi.qua_han && (
+          <Text size="sm" c="red" data-testid="ly-do-qua-han">
+            Quá hạn: {nhanQuaHan(deNghi, 'hoc_vien')}
+          </Text>
+        )}
         {deNghi.thu_tu_hang && (
           <Text size="sm" fw={600}>
             Bạn đang xếp thứ {deNghi.thu_tu_hang.k}

@@ -54,6 +54,8 @@ export interface DeNghiHocVien {
   ghi_chu_xu_ly: string | null;
   ly_do_huy: LyDoHuy | null;
   qua_han: boolean;
+  /** Vì sao quá hạn (chỉ khi qua_han) — để người duyệt biết vì sao chỉ còn từ chối. */
+  ly_do_qua_han: LyDoQuaHan | null;
   thu_tu_hang: { k: number; n: number } | null;
   buoi_nguon: BuoiTomTat | null;
   buoi_de_nghi: BuoiTomTat | null;
@@ -63,6 +65,15 @@ export interface DeNghiHocVien {
   /** Chỉ đề nghị chờ: buổi trên lịch thực tế trùng giờ buổi đề nghị (cảnh báo, không chặn). */
   trung_lich: LichTrung[];
 }
+
+export type LyDoQuaHan =
+  | 'buoi_goc_bat_dau'
+  | 'buoi_de_nghi_bat_dau'
+  | 'buoi_dang_hoc_bat_dau'
+  | 'da_co_mat'
+  | 'da_diem_danh_buoi_goc'
+  | 'buoi_goc_da_duyet_khac'
+  | 'da_diem_danh_buoi_dang_hoc';
 
 export interface BuoiTomTat {
   id: string;
@@ -213,9 +224,9 @@ export class DoiBuoiHocService {
     const lichDk = coCho
       ? await this.lichThucTe([dangKy.id])
       : new Map<string, OLich[]>();
-    const quaHanThem = new Set(
-      coCho ? await this.idQuaHanThem(now, this.prisma, [dangKy.id]) : [],
-    );
+    const quaHanThem = coCho
+      ? await this.quaHanThem(now, this.prisma, [dangKy.id])
+      : new Map<string, LyDoQuaHan>();
     const deNghi = deNghiRows.map((d) =>
       this.anhXaDeNghi(d, lichMap, now, hang, chotCu, lichDk, quaHanThem),
     );
@@ -475,7 +486,10 @@ export class DoiBuoiHocService {
     const choDuyet = !q.da_xu_ly && q.trang_thai === 'cho_duyet';
     const quaHan = choDuyet && q.qua_han === true;
     // Đổi lại có buổi đang học đã bắt đầu, hoặc đã điểm danh (D12), cũng quá hạn.
-    const doiLaiQuaHan = choDuyet ? await this.idQuaHanThem(now) : [];
+    const quaHanCho = choDuyet
+      ? await this.quaHanThem(now)
+      : new Map<string, LyDoQuaHan>();
+    const doiLaiQuaHan = [...quaHanCho.keys()];
     const locHan: Prisma.doi_buoi_hocWhereInput = !choDuyet
       ? {}
       : quaHan
@@ -537,13 +551,11 @@ export class DoiBuoiHocService {
       },
     });
     if (rows.length === 0) return [];
-    const quaHanThem = new Set(
-      choDuyet
-        ? doiLaiQuaHan
-        : rows.some((r) => r.trang_thai === 'cho_duyet')
-          ? await this.idQuaHanThem(now)
-          : [],
-    );
+    const quaHanThem = choDuyet
+      ? quaHanCho
+      : rows.some((r) => r.trang_thai === 'cho_duyet')
+        ? await this.quaHanThem(now)
+        : new Map<string, LyDoQuaHan>();
     const chotCu = await this.chotCuChoDoiLai(rows);
     const [lichMap, hang, siSo, lichDk] = await Promise.all([
       this.query.lichTomTat([
@@ -1052,11 +1064,40 @@ export class DoiBuoiHocService {
     db: Db = this.prisma,
     dangKyIds?: string[],
   ): Promise<string[]> {
+    return [...(await this.quaHanThem(now, db, dangKyIds)).keys()];
+  }
+
+  // Như idQuaHanThem, kèm lý do (CASE theo đúng thứ tự các nhánh của WHERE).
+  private async quaHanThem(
+    now: Date,
+    db: Db = this.prisma,
+    dangKyIds?: string[],
+  ): Promise<Map<string, LyDoQuaHan>> {
     const loc = dangKyIds
       ? Prisma.sql`AND c.dang_ky_hoc_id = ANY(${dangKyIds}::uuid[])`
       : Prisma.empty;
-    const rows = await db.$queryRaw<{ id: string }[]>`
-      SELECT c.id FROM doi_buoi_hoc c
+    const rows = await db.$queryRaw<{ id: string; ly_do?: LyDoQuaHan }[]>`
+      SELECT c.id, CASE
+        WHEN EXISTS (SELECT 1 FROM diem_danh dd
+          WHERE dd.dang_ky_hoc_id = c.dang_ky_hoc_id
+            AND dd.lich_hoc_id = c.lich_nguon_id
+            AND (c.loai = 'doi_buoi' OR dd.trang_thai = 'co_mat'))
+          THEN CASE WHEN c.loai = 'hoc_bu' THEN 'da_co_mat'
+            ELSE 'da_diem_danh_buoi_goc' END
+        WHEN EXISTS (SELECT 1 FROM doi_buoi_hoc d
+          WHERE d.dang_ky_hoc_id = c.dang_ky_hoc_id
+            AND d.lich_nguon_id = c.lich_nguon_id AND d.trang_thai = 'da_duyet'
+            AND d.loai <> c.loai)
+          THEN 'buoi_goc_da_duyet_khac'
+        WHEN EXISTS (SELECT 1 FROM doi_buoi_hoc d
+          JOIN lich_hoc_lop l ON l.id = d.lich_chot_id
+          WHERE d.dang_ky_hoc_id = c.dang_ky_hoc_id
+            AND d.lich_nguon_id = c.lich_nguon_id AND d.trang_thai = 'da_duyet'
+            AND l.thoi_gian_bat_dau <= ${now})
+          THEN 'buoi_dang_hoc_bat_dau'
+        ELSE 'da_diem_danh_buoi_dang_hoc'
+      END AS ly_do
+      FROM doi_buoi_hoc c
       JOIN lich_hoc_lop ln ON ln.id = c.lich_nguon_id
       JOIN lich_hoc_lop ld ON ld.id = c.lich_de_nghi_id
       WHERE c.trang_thai = 'cho_duyet' ${loc}
@@ -1074,7 +1115,9 @@ export class DoiBuoiHocService {
               SELECT 1 FROM diem_danh dd
               WHERE dd.dang_ky_hoc_id = c.dang_ky_hoc_id
                 AND dd.lich_hoc_id = d.lich_chot_id))))`;
-    return rows.map((r) => r.id);
+    return new Map(
+      rows.map((r) => [r.id, r.ly_do ?? 'da_diem_danh_buoi_dang_hoc']),
+    );
   }
 
   private ghiChuBatBuoc(s: string | undefined): string {
@@ -1522,7 +1565,7 @@ export class DoiBuoiHocService {
     hang: Map<string, { k: number; n: number }>,
     chotCu: Map<string, string>,
     lichDk: Map<string, OLich[]>,
-    quaHanThem: Set<string>,
+    quaHanThem: Map<string, LyDoQuaHan>,
   ): DeNghiHocVien {
     const nguon = lichMap.get(r.lich_nguon_id);
     const dich = lichMap.get(r.lich_de_nghi_id);
@@ -1530,12 +1573,17 @@ export class DoiBuoiHocService {
     const doiLai = doiLaiTu(r, chotCu, lichMap);
     const loai = r.loai ?? 'doi_buoi';
     // ADR 0012: buổi gốc đã bắt đầu chỉ làm quá hạn đổi buổi.
-    const quaHan =
-      r.trang_thai === 'cho_duyet' &&
-      ((loai === 'doi_buoi' && nguon !== undefined && daBatDau(nguon, now)) ||
-        (dich !== undefined && daBatDau(dich, now)) ||
-        (doiLai !== null && daBatDau(doiLai, now)) ||
-        quaHanThem.has(r.id));
+    const lyDoQuaHan: LyDoQuaHan | null =
+      r.trang_thai !== 'cho_duyet'
+        ? null
+        : loai === 'doi_buoi' && nguon !== undefined && daBatDau(nguon, now)
+          ? 'buoi_goc_bat_dau'
+          : dich !== undefined && daBatDau(dich, now)
+            ? 'buoi_de_nghi_bat_dau'
+            : doiLai !== null && daBatDau(doiLai, now)
+              ? 'buoi_dang_hoc_bat_dau'
+              : (quaHanThem.get(r.id) ?? null);
+    const quaHan = lyDoQuaHan !== null;
     return {
       id: r.id,
       trang_thai: r.trang_thai,
@@ -1548,6 +1596,7 @@ export class DoiBuoiHocService {
       ghi_chu_xu_ly: r.ghi_chu_xu_ly,
       ly_do_huy: lyDoHuy(r),
       qua_han: quaHan,
+      ly_do_qua_han: lyDoQuaHan,
       thu_tu_hang: quaHan ? null : (hang.get(r.id) ?? null),
       buoi_nguon: tomTatBuoi(nguon),
       buoi_de_nghi: tomTatBuoi(dich),

@@ -301,11 +301,13 @@ describe("Trang đề nghị đổi buổi (học viên)", () => {
   it("đề nghị quá hạn: nhãn buổi thật (buổi đã bắt đầu), không có nút Sửa, vẫn Hủy", async () => {
     const qua = deNghiMau({
       qua_han: true,
+      ly_do_qua_han: "buoi_goc_bat_dau",
       buoi_nguon: tomTat(lich("ln-1", "Lớp Cũ", 4, -5)),
     });
     datApi(tongQuanMau({ buoi_sap_toi: [], de_nghi: [qua] }));
     renderTrang("?khoa=khoa-1");
     expect(await screen.findByText("Quá hạn")).toBeInTheDocument();
+    expect(screen.getByTestId("ly-do-qua-han")).toHaveTextContent("Quá hạn: Buổi cần đổi đã bắt đầu");
     expect(screen.getByText(/Lớp Cũ · Buổi 4/)).toBeInTheDocument();
     expect(screen.queryByText("Buổi học")).not.toBeInTheDocument();
     expect(
