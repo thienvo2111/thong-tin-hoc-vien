@@ -360,19 +360,30 @@ export function useTaiLaiDuyetDoiBuoi() {
       Promise.all([
         qc.invalidateQueries({ queryKey: [KEY, 'ds'] }),
         qc.invalidateQueries({ queryKey: [KEY, 'dem'] }),
+        qc.invalidateQueries({ queryKey: [KEY, 'bo-loc'] }),
       ]),
     [qc],
   );
 }
 
-/** Sau Duyệt / Từ chối / Hủy duyệt: gỡ thẻ khỏi các danh sách đang cache (không tải lại),
- *  đánh dấu cũ để lần mở sau tải mới; chỉ tải lại badge. Server vẫn kiểm sĩ số/hàng chờ khi duyệt. */
-function useGoTheSauXuLy() {
+const laDsDaXuLy = (q: { queryKey: readonly unknown[] }) =>
+  q.queryKey[1] === 'ds' && (q.queryKey[2] as LocDoiBuoi | undefined)?.da_xu_ly === true;
+
+/** Sau Duyệt / Từ chối: gỡ thẻ khỏi các danh sách đang cache (không tải lại), đánh dấu cũ để
+ *  lần mở sau tải mới; chỉ tải lại badge. Server vẫn kiểm sĩ số/hàng chờ khi duyệt.
+ *  Hủy duyệt (giuTrongDaXuLy): đề nghị vẫn thuộc Đã xử lý (da_huy) → tải lại danh sách Đã xử lý đang mở. */
+function useGoTheSauXuLy(giuTrongDaXuLy = false) {
   const qc = useQueryClient();
-  return (_kq: unknown, vars: { id: string }) => {
-    qc.setQueriesData<DeNghiDuyet[]>({ queryKey: [KEY, 'ds'] }, (cu) => cu?.filter((d) => d.id !== vars.id));
+  return async (_kq: unknown, vars: { id: string }) => {
+    // Hủy lượt tải danh sách đang chạy để phản hồi cũ không làm thẻ đã gỡ hiện lại.
+    await qc.cancelQueries({ queryKey: [KEY, 'ds'] });
+    if (!giuTrongDaXuLy)
+      qc.setQueriesData<DeNghiDuyet[]>({ queryKey: [KEY, 'ds'] }, (cu) => cu?.filter((d) => d.id !== vars.id));
     void qc.invalidateQueries({ queryKey: [KEY], refetchType: 'none' });
-    return qc.invalidateQueries({ queryKey: [KEY, 'dem'] });
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: [KEY, 'dem'] }),
+      giuTrongDaXuLy ? qc.invalidateQueries({ predicate: laDsDaXuLy }) : undefined,
+    ]);
   };
 }
 
@@ -411,7 +422,7 @@ export function useTuChoiDoiBuoi() {
 }
 
 export function useHuyDuyetDoiBuoi() {
-  const lamMoi = useGoTheSauXuLy();
+  const lamMoi = useGoTheSauXuLy(true);
   return useMutation({
     mutationFn: ({ id, ghi_chu }: { id: string; ghi_chu: string }) =>
       apiFetch<{ trang_thai: 'da_huy'; canh_bao: string[] }>(`/doi-buoi-hoc/${id}/huy-duyet`, {

@@ -1243,15 +1243,14 @@ export class DoiBuoiHocService {
       });
     const tu = q.q?.trim() ?? '';
     if (tu.length < TIM_TOI_THIEU) return loc;
-    const dk = dieuKienKhongDau(Prisma.sql`h.ho_ten`, tu);
+    // Tìm theo tên chỉ khi có khoa_id (không quét toàn bảng hoc_vien); mã MOET luôn xét.
+    const dk = q.khoa_id ? dieuKienKhongDau(Prisma.sql`h.ho_ten`, tu) : null;
     const idsTheoTen = dk
       ? (
           await this.prisma.$queryRaw<{ id: string }[]>(
-            q.khoa_id
-              ? Prisma.sql`SELECT h.id FROM "hoc_vien" h
-                  JOIN "dang_ky_hoc" d ON d.hoc_vien_id = h.id
-                  WHERE d.khoa_id = ${q.khoa_id}::uuid AND ${dk}`
-              : Prisma.sql`SELECT h.id FROM "hoc_vien" h WHERE ${dk}`,
+            Prisma.sql`SELECT h.id FROM "hoc_vien" h
+              JOIN "dang_ky_hoc" d ON d.hoc_vien_id = h.id
+              WHERE d.khoa_id = ${q.khoa_id}::uuid AND ${dk}`,
           )
         ).map((r) => r.id)
       : [];

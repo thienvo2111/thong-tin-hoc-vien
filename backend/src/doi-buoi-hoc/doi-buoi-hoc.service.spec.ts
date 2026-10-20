@@ -1809,6 +1809,17 @@ describe('DoiBuoiHocService nguoi duyet', () => {
     ]);
   });
 
+  it('danhSach: q khong co khoa_id -> chi tim ma MOET, khong quet ten toan bang', async () => {
+    const { svc, prisma } = setupDuyet();
+    await svc.danhSach(quanTri, { da_xu_ly: true, q: 'Lan' });
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    const arg = prisma.doi_buoi_hoc.findMany.mock.calls[0][0] as any;
+    expect(arg.where.AND[0].dang_ky_hoc.OR).toEqual([
+      { hoc_vien_id: { in: [] } },
+      { hoc_vien: { ma_dinh_danh_moet: { contains: 'Lan', mode: 'insensitive' } } },
+    ]);
+  });
+
   it('danhSach: q < 2 ky tu -> bo qua, khong truy van ten', async () => {
     const { svc, prisma } = setupDuyet();
     await svc.danhSach(quanTri, { da_xu_ly: true, q: ' a ' });

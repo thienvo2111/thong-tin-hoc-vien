@@ -804,6 +804,54 @@ describe("Màn duyệt đổi buổi — bộ lọc, Tải lại, giảm tải",
     expect(dem_urls.length).toBe(soDem + 1);
   });
 
+  it("Hủy duyệt: thẻ vẫn ở Đã xử lý — tải lại danh sách Đã xử lý, hiện trạng thái Hủy duyệt", async () => {
+    datApi([]);
+    let daHuy = false;
+    const { ds_urls } = ghiYeuCau((u) =>
+      u.searchParams.get("da_xu_ly") === "true"
+        ? [
+            daHuy
+              ? deNghi({ id: "dn-a", trang_thai: "da_huy", ly_do_huy: "huy_duyet", nguoi_xu_ly: "Cán bộ B", buoi_chot: tomTat(lich("ld-1", "Lớp 02", 50)) })
+              : deNghi({ id: "dn-a", trang_thai: "da_duyet", buoi_chot: tomTat(lich("ld-1", "Lớp 02", 50)) }),
+          ]
+        : [],
+    );
+    server.use(
+      http.post("/doi-buoi-hoc/:id/huy-duyet", () => {
+        daHuy = true;
+        return HttpResponse.json({ trang_thai: "da_huy", canh_bao: [] });
+      }),
+    );
+    renderTrang("ho_tro_hoc_vien");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("tab", { name: "Đã xử lý" }));
+    await user.click(await screen.findByRole("button", { name: "Hủy duyệt" }));
+    const soDaXuLy = ds_urls.filter((u) => u.searchParams.get("da_xu_ly") === "true").length;
+    await user.type(screen.getByLabelText(/Ghi chú/), "Học viên xin ở lại");
+    await user.click(screen.getByRole("button", { name: "Xác nhận hủy duyệt" }));
+    expect(await screen.findByText("Hủy duyệt bởi Cán bộ B")).toBeInTheDocument();
+    expect(screen.getAllByTestId("de-nghi-da-xu-ly")).toHaveLength(1);
+    expect(ds_urls.filter((u) => u.searchParams.get("da_xu_ly") === "true").length).toBe(soDaXuLy + 1);
+    expect(screen.queryByRole("button", { name: "Hủy duyệt" })).toBeNull();
+  });
+
+  it("Tải lại cũng tải lại bộ lọc (bo-loc)", async () => {
+    datApi([]);
+    let soBoLoc = 0;
+    server.use(
+      http.get("/doi-buoi-hoc/bo-loc", () => {
+        soBoLoc += 1;
+        return HttpResponse.json(BO_LOC);
+      }),
+    );
+    ghiYeuCau();
+    renderTrang("ho_tro_hoc_vien");
+    await screen.findByText(/Cập nhật lúc/);
+    expect(soBoLoc).toBe(1);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Tải lại" }));
+    await waitFor(() => expect(soBoLoc).toBe(2));
+  });
+
   it("badge dùng cache 60s: chuyển trang trong layout không gọi lại dem-cho-duyet", async () => {
     datApi([]);
     const { dem_urls } = ghiYeuCau();
