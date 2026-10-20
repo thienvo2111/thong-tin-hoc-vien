@@ -225,10 +225,12 @@ describe('Thống kê nhu cầu mức theo đợt (e2e)', () => {
       chon: { dot: dotId, muc_chon: 'co_ban', muc_moc: 'thanh_thao' },
     });
     // Loại: nhân viên, chưa duyệt, chưa có mốc.
+    // Nhân viên đã có lựa chọn ở đợt này vẫn bị loại (R4).
     await taoHocVien('NV', {
       donViId: T1,
       lopMuc: 'nang_cao',
       doiTuong: 'nhan_vien',
+      chon: { dot: dotId, muc_chon: 'co_ban', muc_moc: 'nang_cao' },
     });
     await taoHocVien('CD', {
       donViId: T2,
@@ -418,5 +420,27 @@ describe('Thống kê nhu cầu mức theo đợt (e2e)', () => {
     ws.eachRow((row) => row.eachCell((c) => tatCa.push(String(c.value))));
     for (const n of ['A', 'B', 'C', 'G']) expect(tatCa).toContain(ten[n]);
     for (const n of ['NV', 'CD', 'KM']) expect(tatCa).not.toContain(ten[n]);
+
+    const nk = await prisma.nhat_ky_hoat_dong.findMany({
+      where: {
+        hanh_dong: 'xuat_nhu_cau_muc_dot',
+        nguoi_dung_id: quanTri.nguoiDung.id,
+      },
+    });
+    // 2 lần xuất trong file: lọc T2 (2 dòng) và không lọc (4 dòng).
+    expect(nk).toHaveLength(2);
+    const chiTiet = nk.map((n) => n.chi_tiet as Record<string, unknown>);
+    expect(chiTiet).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          dot_id: dotId,
+          khoa_id: khoaId,
+          don_vi_ids: [t2.donVi.id],
+          doi_tuong: null,
+          so_dong: 2,
+        }),
+        expect.objectContaining({ dot_id: dotId, don_vi_ids: [], so_dong: 4 }),
+      ]),
+    );
   });
 });

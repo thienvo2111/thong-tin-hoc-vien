@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { NotFoundAppException } from '../common/exceptions/app.exceptions';
+import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import {
   HOC_VIEN_PHAI_XEP_LOP,
   phaiXepLop,
@@ -19,7 +20,7 @@ import {
   homNayVN,
   tinhMocNhuCau,
 } from '../nhu-cau-muc/util/moc-nhu-cau.util';
-import { ThongKeScopeService } from './thong-ke-scope.service';
+import { donViLoc, ThongKeScopeService } from './thong-ke-scope.service';
 import { moTaBieuMau } from './mo-ta-bieu-mau';
 import { NhuCauMucDotQueryDto } from './dto/nhu-cau-muc-dot-query.dto';
 import { buildNhuCauMucDotWorkbook } from './nhu-cau-muc-dot-excel.util';
@@ -88,6 +89,7 @@ export class NhuCauMucDotService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scope: ThongKeScopeService,
+    private readonly nhatKy: NhatKyService,
   ) {}
 
   async thongKe(
@@ -108,6 +110,18 @@ export class NhuCauMucDotService {
       rows,
       await moTaBieuMau(this.prisma, qKhoa, rong),
     );
+    // File có PII (họ tên, MOET, SĐT) → ghi nhật ký như danh-sach-hoc-vien.
+    await this.nhatKy.ghi({
+      hanh_dong: 'xuat_nhu_cau_muc_dot',
+      nguoi_dung: { id: user.id, vai_tro: user.vai_tro },
+      chi_tiet: {
+        dot_id: dot.id,
+        khoa_id: dot.khoa_id,
+        don_vi_ids: donViLoc(q),
+        doi_tuong: q.doi_tuong ?? null,
+        so_dong: rows.length,
+      },
+    });
     return { buffer, dot };
   }
 
@@ -159,7 +173,10 @@ export class NhuCauMucDotService {
                   trang_thai: { in: TRANG_THAI_DU },
                   hoc_vien: HOC_VIEN_PHAI_XEP_LOP,
                 },
-                { nhu_cau_muc: { some: { dot_id: dot.id } } },
+                {
+                  nhu_cau_muc: { some: { dot_id: dot.id } },
+                  hoc_vien: HOC_VIEN_PHAI_XEP_LOP,
+                },
               ],
             },
           ],
@@ -173,10 +190,9 @@ export class NhuCauMucDotService {
       const gds = giaiDoanPhanLop(giaiDoan, dk.phan_lop_giai_doan);
       const moc = tinhMocNhuCau(gds, dk.muc_dau_vao, homNay);
       const lc = dk.nhu_cau_muc[0] ?? null;
-      const duDieuKien =
-        TRANG_THAI_DU.includes(dk.trang_thai) &&
-        phaiXepLop(dk.hoc_vien.doi_tuong) &&
-        moc !== null;
+      // Nhân viên không bao giờ vào thống kê, kể cả đã chọn trước đó (R4).
+      if (!phaiXepLop(dk.hoc_vien.doi_tuong)) continue;
+      const duDieuKien = TRANG_THAI_DU.includes(dk.trang_thai) && moc !== null;
       if (!duDieuKien && !lc) continue;
       const h = dk.hoc_vien;
       dong.push({
