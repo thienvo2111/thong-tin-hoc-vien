@@ -292,4 +292,19 @@ describe('DashboardThongKe', () => {
     await waitFor(() => expect((url as URL | null)?.searchParams.get('don_vi_cong_tac_id')).toBe('dv-1'));
     click.mockRestore();
   });
+
+  it('chế độ admin có tab "Nhu cầu theo đợt"; chưa chọn khóa thì nhắc chọn khóa', async () => {
+    const r = renderDashboard();
+    await screen.findByTestId('kpi-tham-gia');
+    await userEvent.click(screen.getByRole('tab', { name: 'Nhu cầu theo đợt' }));
+    expect(await screen.findByText('Chọn khóa để xem nhu cầu theo đợt')).toBeInTheDocument();
+    await waitFor(() => expect(r.router.state.location.search).toBe('?tab=nhu_cau_dot'));
+  });
+
+  it('che_do ho_tro → không có tab "Nhu cầu theo đợt", ?tab=nhu_cau_dot rơi về Tổng quan', async () => {
+    renderDashboard('/thong-ke?tab=nhu_cau_dot', 'ho_tro');
+    expect(await screen.findByTestId('kpi-tham-gia')).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Nhu cầu theo đợt' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Chọn khóa để xem nhu cầu theo đợt')).not.toBeInTheDocument();
+  });
 });

@@ -14,6 +14,7 @@ import { KhoiChuyenMuc } from './khoi/KhoiChuyenMuc';
 import { KhoiKetQuaHoc } from './khoi/KhoiKetQuaHoc';
 import { KhoiKhaoSat } from './khoi/KhoiKhaoSat';
 import { KhoiMucNlsTheoTruong } from './khoi/KhoiMucNlsTheoTruong';
+import { KhoiNhuCauMucDot } from './khoi/KhoiNhuCauMucDot';
 import { KhoiNhuCauMucHoc } from './khoi/KhoiNhuCauMucHoc';
 import { KhoiKpiPheu } from './khoi/KhoiKpiPheu';
 import { KhoiTienDoTruong } from './khoi/KhoiTienDoTruong';
@@ -28,10 +29,12 @@ interface Props {
 
 const THAM_SO_TAB = 'tab';
 const TAB_MAC_DINH = 'tong_quan';
-const TAB_VALUES = ['tong_quan', 'ho_so', 'danh_gia', 'nhu_cau', 'hoc_tap'] as const;
+const TAB_VALUES = ['tong_quan', 'ho_so', 'danh_gia', 'nhu_cau', 'nhu_cau_dot', 'hoc_tap'] as const;
 type TabValue = (typeof TAB_VALUES)[number];
 
-function tabHopLe(v: string | null): TabValue {
+// 'nhu_cau_dot' gọi API đợt (chỉ quan_tri) -> chỉ chế độ admin.
+function tabHopLe(v: string | null, cheDo: Props['che_do']): TabValue {
+  if (v === 'nhu_cau_dot' && cheDo !== 'admin') return TAB_MAC_DINH;
   return (TAB_VALUES as readonly string[]).includes(v ?? '') ? (v as TabValue) : TAB_MAC_DINH;
 }
 
@@ -42,7 +45,7 @@ export default function DashboardThongKe({ che_do }: Props) {
   const hienTienDoTruong = !!boLoc.data && boLoc.data.don_vi_co_dinh == null;
 
   const [params, setParams] = useSearchParams();
-  const tabHienTai = tabHopLe(params.get(THAM_SO_TAB));
+  const tabHienTai = tabHopLe(params.get(THAM_SO_TAB), che_do);
 
   function doiTab(v: string | null) {
     if (!v) return;
@@ -131,6 +134,7 @@ export default function DashboardThongKe({ che_do }: Props) {
               <Tabs.Tab value="ho_so">Hồ sơ & đôn đốc</Tabs.Tab>
               <Tabs.Tab value="danh_gia">Đánh giá NLS (thực tế)</Tabs.Tab>
               <Tabs.Tab value="nhu_cau">Nhu cầu mức học</Tabs.Tab>
+              {che_do === 'admin' && <Tabs.Tab value="nhu_cau_dot">Nhu cầu theo đợt</Tabs.Tab>}
               <Tabs.Tab value="hoc_tap">Học tập</Tabs.Tab>
             </Tabs.List>
             <Tabs.Panel value="tong_quan">
@@ -159,6 +163,13 @@ export default function DashboardThongKe({ che_do }: Props) {
                 <KhoiNhuCauMucHoc loc={loc} />
               </Stack>
             </Tabs.Panel>
+            {che_do === 'admin' && (
+              <Tabs.Panel value="nhu_cau_dot">
+                <Stack gap="md" pt="md">
+                  <KhoiNhuCauMucDot loc={loc} />
+                </Stack>
+              </Tabs.Panel>
+            )}
             <Tabs.Panel value="hoc_tap">
               <Stack gap="md" pt="md">
                 <KhoiKetQuaHoc loc={loc} />

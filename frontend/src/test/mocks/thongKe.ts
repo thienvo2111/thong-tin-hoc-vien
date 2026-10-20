@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type {
+  NhuCauMucDotResult,
   BoLocResult,
   CanDonDocResult,
   ChatLuongHoSoDong,
@@ -138,6 +139,34 @@ export const nhuCauMucHocMau: NhuCauMucHocResult = {
   ],
   theo_truong: nhuCauMucHocTruongMau,
   so_nhan_vien_loai_tru: 0,
+};
+
+export const nhuCauMucDotMau: NhuCauMucDotResult = {
+  dot: {
+    id: 'dot-2',
+    ten_dot: 'Đợt 2',
+    khoa_id: 'khoa-1',
+    ma_khoa: 'K1',
+    ten_khoa: 'Khóa 1',
+    mo_luc: '2026-10-10T00:00:00.000Z',
+    dong_luc: '2026-10-20T00:00:00.000Z',
+    trang_thai: 'dang_mo',
+  },
+  tong_du_dieu_kien: 20,
+  da_chon: 15,
+  chua_chon: 5,
+  ty_le_da_chon: 75,
+  ma_tran: [
+    { muc_moc: 'co_ban', muc_chon: 'co_ban', so_luong: 4 },
+    { muc_moc: 'thanh_thao', muc_chon: 'co_ban', so_luong: 2 },
+    { muc_moc: 'thanh_thao', muc_chon: 'thanh_thao', so_luong: 5 },
+    { muc_moc: 'nang_cao', muc_chon: 'thanh_thao', so_luong: 3 },
+    { muc_moc: 'nang_cao', muc_chon: 'nang_cao', so_luong: 1 },
+  ],
+  theo_truong: [
+    { don_vi_id: 'dv-1', ten: 'Trường Tiểu học Cẩm Hà', tong: 12, da_chon: 9, chua_chon: 3, ha_muc: 4 },
+    { don_vi_id: 'dv-2', ten: 'Trường THCS Minh Khai', tong: 8, da_chon: 6, chua_chon: 2, ha_muc: 1 },
+  ],
 };
 
 export const ketQuaHocMau: KetQuaHocCot[] = [
@@ -377,6 +406,14 @@ export const thongKeHandlers = [
   http.get('/thong-ke/nhu-cau-muc-hoc', () => HttpResponse.json(nhuCauMucHocMau)),
   http.get(
     '/thong-ke/nhu-cau-muc-hoc/xuat-excel',
+    () =>
+      new HttpResponse('noi-dung-file-mo-phong', {
+        headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      }),
+  ),
+  http.get('/thong-ke/nhu-cau-muc-dot', () => HttpResponse.json(nhuCauMucDotMau)),
+  http.get(
+    '/thong-ke/nhu-cau-muc-dot/xuat-excel',
     () =>
       new HttpResponse('noi-dung-file-mo-phong', {
         headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },

@@ -1433,3 +1433,14 @@ export interface DotNhuCauMucDto {
   mo_luc: string;
   dong_luc: string;
 }
+
+/** GET /thong-ke/nhu-cau-muc-dot (ADR 0013 D9). `ty_le_da_chon` 0–100. */
+export interface NhuCauMucDotResult {
+  dot: { id: string; ten_dot: string; khoa_id: string; ma_khoa: string; ten_khoa: string; mo_luc: string; dong_luc: string; trang_thai: TrangThaiDotNhuCau };
+  tong_du_dieu_kien: number;
+  da_chon: number;
+  chua_chon: number;
+  ty_le_da_chon: number;
+  ma_tran: { muc_moc: MucNangLuc; muc_chon: MucNangLuc; so_luong: number }[];
+  theo_truong: { don_vi_id: string; ten: string; tong: number; da_chon: number; chua_chon: number; ha_muc: number }[];
+}

@@ -12,6 +12,7 @@ import type {
   KhaoSatResult,
   LoaiMucNls,
   MucNlsResult,
+  NhuCauMucDotResult,
   NhuCauMucHocResult,
   PheuResult,
   SoSanhKhoaCot,
@@ -58,6 +59,21 @@ export async function xuatNhuCauMucHoc(loc: LocThongKe): Promise<void> {
   const blob = await apiFetchBlob(`/thong-ke/nhu-cau-muc-hoc/xuat-excel${xayQuery(loc)}`);
   taiFileTuBlob(blob, 'nhu-cau-muc-hoc.xlsx');
 }
+// Nhu cầu theo đợt (ADR 0013): khoa_id do đợt quyết định nên không gửi.
+const locTheoDot = (loc: LocThongKe, dotId: string) => ({ ...loc, khoa_id: undefined, dot_id: dotId });
+
+export const useNhuCauMucDot = (loc: LocThongKe, dotId: string | null) =>
+  useKhoi<NhuCauMucDotResult>('nhu-cau-muc-dot', 'nhu-cau-muc-dot', locTheoDot(loc, dotId ?? ''), !!dotId);
+
+/** `donViIds` rỗng = toàn phạm vi tài khoản/bộ lọc. */
+export async function xuatNhuCauMucDot(loc: LocThongKe, dotId: string, donViIds: string[]): Promise<void> {
+  const params = donViIds.length
+    ? { ...locTheoDot(loc, dotId), don_vi_id: undefined, cum_id: undefined, don_vi_ids: donViIds.join(',') }
+    : locTheoDot(loc, dotId);
+  const blob = await apiFetchBlob(`/thong-ke/nhu-cau-muc-dot/xuat-excel${xayQuery(params)}`);
+  taiFileTuBlob(blob, 'nhu-cau-muc-theo-dot.xlsx');
+}
+
 export const useKetQuaHoc = (loc: LocThongKe, enabled = true) =>
   useKhoi<KetQuaHocCot[]>('ket-qua', 'ket-qua', loc, enabled);
 export const useKetQuaHocTheoTruong = (loc: LocThongKe, enabled = true) =>
