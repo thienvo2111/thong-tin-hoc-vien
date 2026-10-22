@@ -613,6 +613,26 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
             where: { dang_ky_hoc_id: { in: dkIds } },
           }),
         ).toBe(5);
+
+        const moTaPhanLop = async (hocVienId: string) => {
+          const n = await prisma.nhat_ky_hoat_dong.findFirstOrThrow({
+            where: { hoc_vien_id: hocVienId, hanh_dong: 'phan_lop' },
+            orderBy: { thoi_gian: 'desc' },
+          });
+          return (n.chi_tiet as { mo_ta: string }).mo_ta;
+        };
+        expect(await moTaPhanLop(hv.khacMuc.hocVien.id)).toMatch(
+          /DD Lớp A → DD Lớp B \(nhập file\) — đã điểm danh 2 buổi ở lớp DD Lớp A, không được công nhận \(nấc: cùng mức\)$/,
+        );
+        expect(await moTaPhanLop(hv.cungMuc.hocVien.id)).toMatch(
+          /— đã điểm danh 1 buổi ở lớp DD Lớp A, được công nhận \(nấc: cùng mức\)$/,
+        );
+        expect(await moTaPhanLop(hv.go.hocVien.id)).toMatch(
+          /DD Lớp A → \(gỡ lớp\) \(nhập file\) — đã điểm danh 1 buổi, điểm danh vẫn được giữ$/,
+        );
+        expect(await moTaPhanLop(hv.chuaDiemDanh.hocVien.id)).toMatch(
+          /DD Lớp A → DD Lớp B \(nhập file\)$/,
+        );
       });
 
       const phanLopCua36 = (hocVienId: string) =>
@@ -802,9 +822,18 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
         const nhatKy = await prisma.nhat_ky_hoat_dong.findMany({
           where: {
             hoc_vien_id: hvChuyen.hocVien.id,
-            hanh_dong: 'duyet_doi_buoi',
+            hanh_dong: 'huy_doi_buoi_chuyen_lop',
           },
         });
+        // Dòng "Phân lớp" nêu số đề nghị bị hủy + điểm danh lớp cũ (buổi chốt
+        // B1 ở lớp B, không phải lớp A -> không có phần điểm danh).
+        const phanLopNk = await prisma.nhat_ky_hoat_dong.findFirstOrThrow({
+          where: { hoc_vien_id: hvChuyen.hocVien.id, hanh_dong: 'phan_lop' },
+          orderBy: { thoi_gian: 'desc' },
+        });
+        expect((phanLopNk.chi_tiet as { mo_ta: string }).mo_ta).toMatch(
+          /CL Lớp A → CL Lớp B \(nhập file\) — hủy 2 đổi buổi, 1 học bù$/,
+        );
         expect(
           nhatKy
             .map((n) => (n.chi_tiet as { de_nghi_id: string }).de_nghi_id)
