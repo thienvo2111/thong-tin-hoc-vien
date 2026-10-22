@@ -4,6 +4,9 @@ import * as ExcelJS from 'exceljs';
 import * as bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
 import { createTestApp } from './utils/test-app';
+import { DoiBuoiHocQueryService } from '../src/doi-buoi-hoc/doi-buoi-hoc-query.service';
+import { lyDoHuy } from '../src/doi-buoi-hoc/doi-buoi-hoc.service';
+import { soLuotDaDung } from '../src/doi-buoi-hoc/doi-buoi-hoc.rules';
 import {
   prisma,
   taoDonViTest,
@@ -515,6 +518,198 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
           );
         expect(res.status).toBe(400);
       }
+    });
+
+    // ADR 0014 C5c/C6/C7 (issue #35).
+    describe('chuyển lớp tự hủy đề nghị đổi buổi/học bù của lớp cũ', () => {
+      let khoaCL: { id: string; ma_khoa: string };
+      let hvChuyen: Awaited<ReturnType<typeof taoHocVienMoet>>;
+      let hvGo: Awaited<ReturnType<typeof taoHocVienMoet>>;
+      let hvGiu: Awaited<ReturnType<typeof taoHocVienMoet>>;
+      const dn: Record<string, string> = {};
+      const lich: Record<string, string> = {};
+
+      async function taoDeNghi(
+        ten: string,
+        dangKyId: string,
+        nguon: string,
+        trang_thai: 'cho_duyet' | 'da_duyet' | 'tu_choi',
+        loai: 'doi_buoi' | 'hoc_bu' = 'doi_buoi',
+      ) {
+        const chot =
+          trang_thai === 'da_duyet' ? lich[`B${nguon.slice(1)}`] : null;
+        const r = await prisma.doi_buoi_hoc.create({
+          data: {
+            dang_ky_hoc_id: dangKyId,
+            lich_nguon_id: lich[nguon],
+            lich_de_nghi_id: lich[`B${nguon.slice(1)}`] ?? lich[nguon],
+            lich_chot_id: chot,
+            ly_do: 'Bận công tác đột xuất',
+            trang_thai,
+            loai,
+          },
+        });
+        dn[ten] = r.id;
+      }
+
+      beforeAll(async () => {
+        khoaCL = await taoKhoa();
+        const gd2 = await taoGiaiDoan(khoaCL.id, 2);
+        const gd3 = await taoGiaiDoan(khoaCL.id, 3);
+        const lopA = await taoLop(khoaCL.id, 'zoom', 'CL Lớp A');
+        const lopB = await taoLop(khoaCL.id, 'zoom', 'CL Lớp B');
+        const lopX = await taoLop(khoaCL.id, 'zoom', 'CL Lớp X');
+        const lopV = await taoLop(khoaCL.id, 'vle', 'CL Lớp V');
+        for (const [ten, lop, gd, so] of [
+          ['A1', lopA, gd2, 1],
+          ['A2', lopA, gd2, 2],
+          ['B1', lopB, gd2, 1],
+          ['B2', lopB, gd2, 2],
+          ['X1', lopX, gd2, 1],
+          ['V1', lopV, gd3, 1],
+        ] as const) {
+          lich[ten] = (await taoBuoi(lop.id, gd.id, so)).id;
+        }
+        hvChuyen = await taoHocVienMoet(uniqueSuffix());
+        hvGo = await taoHocVienMoet(uniqueSuffix());
+        hvGiu = await taoHocVienMoet(uniqueSuffix());
+        const dk: Record<string, string> = {};
+        for (const [k, hv] of [
+          ['chuyen', hvChuyen],
+          ['go', hvGo],
+          ['giu', hvGiu],
+        ] as const) {
+          dk[k] = (await ghiDanh(hv.hocVien.id, khoaCL.id)).id;
+          await prisma.phan_lop_giai_doan.createMany({
+            data: [
+              { dang_ky_hoc_id: dk[k], giai_doan_id: gd2.id, lop_id: lopA.id },
+              { dang_ky_hoc_id: dk[k], giai_doan_id: gd3.id, lop_id: lopV.id },
+            ],
+          });
+        }
+        await taoDeNghi('cho', dk.chuyen, 'A1', 'cho_duyet');
+        await taoDeNghi('duyetChuaHoc', dk.chuyen, 'A2', 'da_duyet');
+        await taoDeNghi('hocBuDaHoc', dk.chuyen, 'A1', 'da_duyet', 'hoc_bu');
+        await taoDeNghi('tuChoi', dk.chuyen, 'A2', 'tu_choi');
+        await taoDeNghi('gd3', dk.chuyen, 'V1', 'cho_duyet');
+        await taoDeNghi('lopKhac', dk.chuyen, 'X1', 'cho_duyet');
+        await taoDeNghi('go', dk.go, 'A1', 'cho_duyet');
+        await taoDeNghi('giu', dk.giu, 'A1', 'cho_duyet');
+        // Học viên đã học buổi chốt của bản học bù đã duyệt.
+        await prisma.diem_danh.create({
+          data: {
+            dang_ky_hoc_id: dk.chuyen,
+            lich_hoc_id: lich.B1,
+            trang_thai: 'co_mat',
+            nguon: 'thu_cong',
+          },
+        });
+      });
+
+      const phanLopCua = (hocVienId: string, khoaId: string) =>
+        prisma.phan_lop_giai_doan
+          .findMany({
+            where: { dang_ky_hoc: { hoc_vien_id: hocVienId, khoa_id: khoaId } },
+            include: { lop: true, giai_doan: true },
+          })
+          .then((r) =>
+            Object.fromEntries(
+              r.map((x) => [x.giai_doan.thu_tu, x.lop.ten_lop]),
+            ),
+          );
+
+      const trangThai = async () =>
+        Object.fromEntries(
+          await Promise.all(
+            Object.entries(dn).map(async ([ten, id]) => [
+              ten,
+              await prisma.doi_buoi_hoc.findUniqueOrThrow({ where: { id } }),
+            ]),
+          ),
+        );
+
+      it('kiểm tra: chỉ cảnh báo dòng chuyển lớp; xác nhận: hủy đúng phạm vi, người import, ghi chú, nhật ký, lượt trả lại', async () => {
+        const { importId, ketQua } = await taiLenPhanLop(khoaCL.ma_khoa, [
+          [...H, 'GĐ2'],
+          ['', hvChuyen.tenDangNhap, 'CL Lớp B'],
+          ['', hvGo.tenDangNhap, '-'],
+          ['', hvGiu.tenDangNhap, 'CL Lớp A'],
+        ]);
+        expect(ketQua.danh_sach_loi).toEqual([]);
+        const canhBaoHuy = ketQua.danh_sach_canh_bao.filter((c) =>
+          c.ly_do.includes('sẽ hủy'),
+        );
+        expect(canhBaoHuy).toHaveLength(1);
+        expect(canhBaoHuy[0].dong).toBe(2);
+        expect(canhBaoHuy[0].ly_do).toContain(
+          'chuyển khỏi lớp "CL Lớp A" (GĐ2): sẽ hủy 2 đề nghị đổi buổi, 1 đăng ký học bù — trong đó 1 bản đã duyệt học viên đã điểm danh buổi chốt',
+        );
+        // Bước kiểm tra không ghi gì.
+        expect((await trangThai()).cho.trang_thai).toBe('cho_duyet');
+
+        const truoc = new Date();
+        await xacNhan(importId);
+        expect(await phanLopCua(hvChuyen.hocVien.id, khoaCL.id)).toEqual({
+          2: 'CL Lớp B',
+          3: 'CL Lớp V',
+        });
+
+        const tt = await trangThai();
+        for (const ten of ['cho', 'duyetChuaHoc', 'hocBuDaHoc']) {
+          expect(tt[ten]).toMatchObject({
+            trang_thai: 'da_huy',
+            nguoi_xu_ly: quanTri.nguoiDung.id,
+            ghi_chu_xu_ly: 'Hủy tự động do chuyển lớp (nhập file)',
+          });
+          expect(tt[ten].xu_ly_luc!.getTime()).toBeGreaterThanOrEqual(
+            truoc.getTime() - 1000,
+          );
+          expect(lyDoHuy(tt[ten])).toBe('huy_duyet');
+        }
+        expect(tt.tuChoi.trang_thai).toBe('tu_choi');
+        expect(tt.gd3.trang_thai).toBe('cho_duyet');
+        expect(tt.lopKhac.trang_thai).toBe('cho_duyet');
+        expect(tt.go.trang_thai).toBe('cho_duyet');
+        expect(tt.giu.trang_thai).toBe('cho_duyet');
+
+        // Điểm danh buổi chốt vẫn giữ; buổi chốt không còn học viên đổi vào.
+        expect(
+          await prisma.diem_danh.count({ where: { lich_hoc_id: lich.B1 } }),
+        ).toBe(1);
+        const dieuChinh = await app
+          .get(DoiBuoiHocQueryService)
+          .dieuChinhTheoBuoi([lich.B1, lich.B2]);
+        expect(dieuChinh.get(lich.B1)?.vao).toEqual([]);
+        expect(dieuChinh.get(lich.B2)?.vao).toEqual([]);
+
+        // Lượt đổi buổi / học bù GĐ2 trả lại; còn lại đề nghị GĐ3 + lớp khác.
+        const conLai = await prisma.doi_buoi_hoc.findMany({
+          where: { dang_ky_hoc: { hoc_vien_id: hvChuyen.hocVien.id } },
+        });
+        expect(soLuotDaDung(conLai, 'hoc_bu')).toBe(0);
+        expect(soLuotDaDung(conLai, 'doi_buoi')).toBe(2);
+
+        const nhatKy = await prisma.nhat_ky_hoat_dong.findMany({
+          where: {
+            hoc_vien_id: hvChuyen.hocVien.id,
+            hanh_dong: 'duyet_doi_buoi',
+          },
+        });
+        expect(
+          nhatKy
+            .map((n) => (n.chi_tiet as { de_nghi_id: string }).de_nghi_id)
+            .sort(),
+        ).toEqual([dn.cho, dn.duyetChuaHoc, dn.hocBuDaHoc].sort());
+        expect(
+          nhatKy.every((n) => n.nguoi_dung_id === quanTri.nguoiDung.id),
+        ).toBe(true);
+        // Không gửi email nào (lớp zoom, hủy tự động không báo).
+        expect(
+          await prisma.hang_doi_email.count({
+            where: { hoc_vien_id: hvChuyen.hocVien.id },
+          }),
+        ).toBe(0);
+      });
     });
 
     it('POST thiếu ma_khoa -> 400', async () => {
