@@ -6,6 +6,8 @@ import {
   DongDiemDanhBuoi,
   dongDuocChon,
   lopHienTaiTheoDangKy,
+  MucLop,
+  mucLopTheoPhanLop,
   tinhChuyenCan,
 } from '../common/utils/chuyen-can.util';
 import { TrangThaiDiemDanh } from '../common/utils/diem-danh-bao-vang.util';
@@ -42,6 +44,7 @@ export async function napDoiTuTheoBuoiChot(
                 lop_id: l.lop_id,
                 giai_doan_id: l.giai_doan_id,
                 buoi_so: l.buoi_so,
+                muc_nang_luc: l.lop.muc_nang_luc,
               },
             ] as const,
           ]
@@ -61,6 +64,7 @@ interface DongSql {
   buoi_so: number;
   loai_lop: string;
   ten_lop: string;
+  muc_nang_luc: MucLop;
   che_do_chuyen_can: CheDoChuyenCan;
 }
 
@@ -104,7 +108,7 @@ export async function napChuyenCan(
     prisma.$queryRaw<DongSql[]>(Prisma.sql`
       SELECT d.dang_ky_hoc_id, d.lich_hoc_id, d.trang_thai, d.nguon,
              d.tu_diem_danh_luc, l.lop_id, l.giai_doan_id, l.buoi_so,
-             lh.loai_lop, lh.ten_lop, k.che_do_chuyen_can
+             lh.loai_lop, lh.ten_lop, lh.muc_nang_luc, k.che_do_chuyen_can
       FROM diem_danh d
       JOIN lich_hoc_lop l ON l.id = d.lich_hoc_id
       JOIN lop_hoc lh ON lh.id = l.lop_id
@@ -112,12 +116,20 @@ export async function napChuyenCan(
       JOIN khoa_boi_duong k ON k.id = dk.khoa_id
       WHERE d.dang_ky_hoc_id = ANY(${ids}::uuid[])`),
     prisma.$queryRaw<
-      { dang_ky_hoc_id: string; giai_doan_id: string; lop_id: string }[]
+      {
+        dang_ky_hoc_id: string;
+        giai_doan_id: string;
+        lop_id: string;
+        muc_nang_luc: MucLop;
+      }[]
     >(Prisma.sql`
-      SELECT dang_ky_hoc_id, giai_doan_id, lop_id FROM phan_lop_giai_doan
-      WHERE dang_ky_hoc_id = ANY(${ids}::uuid[])`),
+      SELECT p.dang_ky_hoc_id, p.giai_doan_id, p.lop_id, lh.muc_nang_luc
+      FROM phan_lop_giai_doan p
+      JOIN lop_hoc lh ON lh.id = p.lop_id
+      WHERE p.dang_ky_hoc_id = ANY(${ids}::uuid[])`),
   ]);
   const lopHienTai = lopHienTaiTheoDangKy(phanLop);
+  const mucLop = mucLopTheoPhanLop(phanLop);
   const theoDangKy = new Map<
     string,
     { cheDo: CheDoChuyenCan; dong: DongChuyenCanNap[] }
@@ -135,7 +147,7 @@ export async function napChuyenCan(
             lop_id: d.lop_id,
             giai_doan_id: d.giai_doan_id,
             buoi_so: d.buoi_so,
-            lop: { loai_lop: d.loai_lop },
+            lop: { loai_lop: d.loai_lop, muc_nang_luc: d.muc_nang_luc },
           },
         },
         doiTu,
@@ -153,6 +165,7 @@ export async function napChuyenCan(
       lopHienTai.get(dangKyId) ?? new Map(),
       dong,
       cheDo,
+      mucLop,
     );
     for (const [k, r] of ketQua) {
       const goc = dongDuocChon(dong, k, r);

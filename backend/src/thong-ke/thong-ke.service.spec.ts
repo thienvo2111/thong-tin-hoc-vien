@@ -579,6 +579,7 @@ describe('ThongKeService.chuyenCan', () => {
     trang_thai: string,
     che_do_chuyen_can = 'theo_lop_hien_tai',
     loai_lop = 'zoom',
+    muc_nang_luc: string | null = null,
   ) => ({
     dang_ky_hoc_id,
     trang_thai,
@@ -587,7 +588,7 @@ describe('ThongKeService.chuyenCan', () => {
       giai_doan_id,
       buoi_so,
       giai_doan: { thu_tu },
-      lop: { loai_lop },
+      lop: { loai_lop, muc_nang_luc },
     },
     dang_ky_hoc: { khoa: { che_do_chuyen_can } },
   });
@@ -595,10 +596,12 @@ describe('ThongKeService.chuyenCan', () => {
     dang_ky_hoc_id: string,
     giai_doan_id: string,
     lop_id: string,
+    muc_nang_luc: string | null = null,
   ) => ({
     dang_ky_hoc_id,
     giai_doan_id,
     lop_id,
+    lop: { muc_nang_luc },
   });
   const vle = (...tyLe: (number | null)[]) =>
     prisma.ket_qua_giai_doan.findMany.mockResolvedValue(
@@ -645,7 +648,13 @@ describe('ThongKeService.chuyenCan', () => {
       new Map([
         [
           'a-1',
-          { id: 'a-1', lop_id: 'lop-moi', giai_doan_id: 'gd1', buoi_so: 1 },
+          {
+            id: 'a-1',
+            lop_id: 'lop-moi',
+            giai_doan_id: 'gd1',
+            buoi_so: 1,
+            lop: { muc_nang_luc: null },
+          },
         ],
       ]),
     );
@@ -750,6 +759,33 @@ describe('ThongKeService.chuyenCan', () => {
     expect(r.truc_tiep).toEqual([
       expect.objectContaining({ buoi_so: 1, co_mat: 2, vang: 0 }),
       expect.objectContaining({ buoi_so: 2, co_mat: 1, vang: 0 }),
+    ]);
+  });
+
+  // ADR 0014: cong_nhan_cung_muc — dk1 chuyển lop-cu → lop-moi (cùng mức
+  // co_ban), dk2 chuyển lop-nc (nang_cao) → lop-moi (khác mức).
+  it('chuyển lớp, cong_nhan_cung_muc: chỉ công nhận lớp cũ cùng mức', async () => {
+    const z = (
+      dk: string,
+      lop: string,
+      buoi: number,
+      tt: string,
+      muc: string,
+    ) => dong(dk, lop, 'gd1', 1, buoi, tt, 'cong_nhan_cung_muc', 'zoom', muc);
+    prisma.diem_danh.findMany.mockResolvedValue([
+      z('dk1', 'lop-cu', 1, 'co_mat', 'co_ban'),
+      z('dk1', 'lop-moi', 1, 'vang', 'co_ban'),
+      z('dk2', 'lop-nc', 1, 'co_mat', 'nang_cao'),
+      z('dk2', 'lop-moi', 1, 'vang', 'co_ban'),
+      z('dk2', 'lop-nc', 2, 'co_mat', 'nang_cao'),
+    ]);
+    prisma.phan_lop_giai_doan.findMany.mockResolvedValue([
+      phan('dk1', 'gd1', 'lop-moi', 'co_ban'),
+      phan('dk2', 'gd1', 'lop-moi', 'co_ban'),
+    ]);
+    const r = await service.chuyenCan(caller('quan_tri'), { khoa_id: 'k1' });
+    expect(r.truc_tiep).toEqual([
+      expect.objectContaining({ buoi_so: 1, co_mat: 1, vang: 1 }),
     ]);
   });
 

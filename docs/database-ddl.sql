@@ -572,8 +572,9 @@ CREATE TABLE tai_khoan_vle (
 -- =====================================================================
 
 -- ADR 0005 Z8 (issue #23, migration 20261009120000_diem_danh_zoom): cách tính
--- chuyên cần khi học viên chuyển lớp Zoom cùng giai đoạn.
-CREATE TYPE che_do_chuyen_can AS ENUM ('theo_lop_hien_tai', 'cong_nhan_lop_cu');
+-- chuyên cần khi học viên chuyển lớp Zoom cùng giai đoạn. ADR 0014 (issue #34,
+-- migration 20261022100000_che_do_chuyen_can_cung_muc): thêm cong_nhan_cung_muc.
+CREATE TYPE che_do_chuyen_can AS ENUM ('theo_lop_hien_tai', 'cong_nhan_lop_cu', 'cong_nhan_cung_muc');
 
 CREATE TABLE khoa_boi_duong (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -604,7 +605,8 @@ CREATE TABLE khoa_boi_duong (
     bat_diem_danh_zoom_luc  timestamptz,
     diem_danh_mo_truoc_phut smallint NOT NULL DEFAULT 30,
     diem_danh_dong_sau_phut smallint NOT NULL DEFAULT 120,
-    che_do_chuyen_can       che_do_chuyen_can NOT NULL DEFAULT 'theo_lop_hien_tai',
+    -- ADR 0014 (migration 20261022100100): khóa mới mặc định cong_nhan_cung_muc.
+    che_do_chuyen_can       che_do_chuyen_can NOT NULL DEFAULT 'cong_nhan_cung_muc',
 
     CONSTRAINT uq_khoa_ma UNIQUE (ma_khoa),
     CONSTRAINT chk_khoa_thoi_gian CHECK (thoi_gian_ket_thuc >= thoi_gian_bat_dau),

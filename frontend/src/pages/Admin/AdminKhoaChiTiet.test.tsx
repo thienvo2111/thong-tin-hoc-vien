@@ -294,11 +294,30 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
       expect(select).toHaveValue('Theo lớp hiện tại (học lại các buổi ở lớp mới)');
 
       await user.click(select);
-      await user.click(await screen.findByRole('option', { name: 'Công nhận buổi đã có mặt ở lớp cũ' }));
+      await user.click(await screen.findByRole('option', { name: 'Công nhận buổi đã có mặt ở lớp cũ (bất kể mức)' }));
 
       expect(await screen.findByText('Đã lưu cách tính chuyên cần')).toBeInTheDocument();
       expect(bodies).toEqual([{ che_do_chuyen_can: 'cong_nhan_lop_cu' }]);
-      await waitFor(() => expect(select).toHaveValue('Công nhận buổi đã có mặt ở lớp cũ'));
+      await waitFor(() => expect(select).toHaveValue('Công nhận buổi đã có mặt ở lớp cũ (bất kể mức)'));
+    });
+
+    it('ADR 0014: có 3 nấc; chọn "cùng mức" -> PATCH cong_nhan_cung_muc', async () => {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      const bodies = ghiLaiPatch();
+      const user = userEvent.setup();
+      renderTrang('khoa-1');
+      const select = await screen.findByRole('textbox', { name: 'Chuyên cần khi học viên chuyển lớp Zoom' });
+      await user.click(select);
+      expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
+        'Theo lớp hiện tại (học lại các buổi ở lớp mới)',
+        'Công nhận buổi đã có mặt ở lớp cũ cùng mức',
+        'Công nhận buổi đã có mặt ở lớp cũ (bất kể mức)',
+      ]);
+      await user.click(screen.getByRole('option', { name: 'Công nhận buổi đã có mặt ở lớp cũ cùng mức' }));
+
+      expect(await screen.findByText('Đã lưu cách tính chuyên cần')).toBeInTheDocument();
+      expect(bodies).toEqual([{ che_do_chuyen_can: 'cong_nhan_cung_muc' }]);
+      await waitFor(() => expect(select).toHaveValue('Công nhận buổi đã có mặt ở lớp cũ cùng mức'));
     });
   });
 

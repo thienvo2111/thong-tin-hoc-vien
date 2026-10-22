@@ -23,3 +23,19 @@ describe('UpdateKhoaBoiDuongDto — so_buoi_hoc_bu_toi_da', () => {
     expect(loi.filter((e) => e.property === 'so_buoi_hoc_bu_toi_da')).toHaveLength(0);
   });
 });
+
+// ADR 0014: 3 nấc chuyên cần.
+describe('UpdateKhoaBoiDuongDto — che_do_chuyen_can', () => {
+  const loi = async (v: unknown) =>
+    (await validate(plainToInstance(UpdateKhoaBoiDuongDto, { che_do_chuyen_can: v }))).filter(
+      (e) => e.property === 'che_do_chuyen_can',
+    );
+
+  it.each(['theo_lop_hien_tai', 'cong_nhan_cung_muc', 'cong_nhan_lop_cu'])('%s hợp lệ', async (v) => {
+    expect(await loi(v)).toHaveLength(0);
+  });
+
+  it.each(['khong_co', 'cung_muc', 1])('%s bị từ chối', async (v) => {
+    expect(await loi(v)).toHaveLength(1);
+  });
+});

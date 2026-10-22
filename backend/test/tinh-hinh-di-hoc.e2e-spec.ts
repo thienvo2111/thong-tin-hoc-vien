@@ -718,6 +718,11 @@ describe('Tình hình đi học + điểm danh bổ sung (e2e, ADR 0010)', () =>
     it('có mặt ở lớp Zoom khác: khóa theo lớp hiện tại -> không tính; công nhận lớp cũ -> tính', async () => {
       const cuong = async () =>
         (await ds('')).data.find((x) => x.ho_ten === 'Lê Cường')!.tong;
+      // Khóa mới mặc định cong_nhan_cung_muc (ADR 0014) — đặt tường minh.
+      await prisma.khoa_boi_duong.update({
+        where: { id: khoaId },
+        data: { che_do_chuyen_can: 'theo_lop_hien_tai' },
+      });
       expect((await cuong()).co_mat).toBe(0);
       await prisma.khoa_boi_duong.update({
         where: { id: khoaId },

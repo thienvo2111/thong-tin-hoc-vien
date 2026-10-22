@@ -296,9 +296,11 @@ enum nguon_diem_danh {
 
 // ADR 0005 Z8 (issue #23): cách tính chuyên cần khi học viên chuyển lớp Zoom
 // cùng giai đoạn — theo lớp hiện tại (học lại) hay công nhận buổi có mặt ở lớp cũ.
+// ADR 0014 (issue #34): cong_nhan_cung_muc = chỉ công nhận lớp cũ cùng mức.
 enum che_do_chuyen_can {
   theo_lop_hien_tai
   cong_nhan_lop_cu
+  cong_nhan_cung_muc
 }
 
 // M8 (2026-10-01): Yêu cầu hỗ trợ — ticket 1 câu hỏi/1 câu trả lời của
@@ -831,7 +833,7 @@ model khoa_boi_duong {
   bat_diem_danh_zoom_luc  DateTime?           @db.Timestamptz(6)
   diem_danh_mo_truoc_phut Int                 @default(30) @db.SmallInt
   diem_danh_dong_sau_phut Int                 @default(120) @db.SmallInt
-  che_do_chuyen_can       che_do_chuyen_can   @default(theo_lop_hien_tai)
+  che_do_chuyen_can       che_do_chuyen_can   @default(cong_nhan_cung_muc)
 
   don_vi_dat_hang don_vi_cong_tac @relation(fields: [don_vi_dat_hang_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   nguoi_duyet     nguoi_dung?     @relation("khoa_boi_duong_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)

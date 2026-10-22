@@ -295,7 +295,8 @@ export type DanhGiaDauVao = DanhGiaDauVaoDuDieuKien | DanhGiaDauVaoSsoDuDieuKien
 export type TrangThaiKhoa = 'nhap' | 'cho_duyet' | 'da_duyet' | 'tu_choi' | 'dong_dang_ky';
 
 // ADR 0005 Z8: cách tính chuyên cần khi học viên chuyển lớp Zoom cùng giai đoạn.
-export type CheDoChuyenCan = 'theo_lop_hien_tai' | 'cong_nhan_lop_cu';
+// ADR 0014: cong_nhan_cung_muc = chỉ công nhận lớp cũ cùng mức (mặc định khóa mới).
+export type CheDoChuyenCan = 'theo_lop_hien_tai' | 'cong_nhan_cung_muc' | 'cong_nhan_lop_cu';
 
 export interface KhoaBoiDuong {
   id: string;
