@@ -81,6 +81,13 @@ import {
   DongChiaLop,
   buildDanhSachChiaLopWorkbook,
 } from './util/danh-sach-chia-lop-excel.util';
+import {
+  GHI_CHU_HUY_CHUYEN_LOP,
+  LopCuHocVien,
+  canhBaoHuyDeNghi,
+  deNghiSeHuy,
+  napLopCuTheoKhoa,
+} from './util/lop-cu-phan-lop.util';
 
 type LopHocVoiKhoa = lop_hoc & { khoa: khoa_boi_duong };
 
@@ -91,6 +98,8 @@ type LopHocVoiKhoa = lop_hoc & { khoa: khoa_boi_duong };
 export interface BoNhoPhanLop {
   lopTheoTen: Map<string, Promise<lop_hoc[]>>;
   canhBaoGan: Map<string, Promise<string | undefined>>;
+  // ADR 0014: đề nghị đổi buổi/học bù lớp cũ, nạp 1 lần cho cả khóa.
+  lopCu?: Promise<Map<string, LopCuHocVien>>;
 }
 
 export function taoBoNhoPhanLop(): BoNhoPhanLop {
@@ -2351,6 +2360,19 @@ export class KhoaBoiDuongService {
       }
     }
 
+    // ADR 0014 C5c: chuyển lớp sẽ hủy đề nghị của lớp cũ — chỉ cảnh báo.
+    if (gan.some((g) => g.lop_id)) {
+      boNho.lopCu ??= napLopCuTheoKhoa(this.prisma, { khoa_id: khoa.id });
+      const huy = deNghiSeHuy((await boNho.lopCu).get(hocVien.id), gan);
+      canhBaoList.push(
+        ...canhBaoHuyDeNghi(
+          ma,
+          huy,
+          new Map(giaiDoanList.map((g) => [g.id, g.thu_tu])),
+        ),
+      );
+    }
+
     // 2026-10-10: nhân viên không tham gia tập huấn đợt này (xem
     // doi-tuong-khao-sat.util.ts#phaiXepLop) — không chặn dòng, chỉ cảnh báo
     // để Quản trị biết nếu lỡ gán lớp cho nhân viên.
@@ -2393,8 +2415,14 @@ export class KhoaBoiDuongService {
   // Trả về hocVienChuaCoEmail để ImportService đếm so_hoc_vien_chua_co_email
   // (T3, QĐ6). Email dang_ky_hoc_phan_lop chỉ khi dòng gán ≥ 1 lớp TRỰC TIẾP
   // (giữ nguyên trigger cũ).
+  //
+  // ADR 0014 C6: dòng CHUYỂN lớp hủy đề nghị đổi buổi/học bù của lớp cũ
+  // (nguoi_xu_ly = người import) cùng transaction với ghi phân lớp, không
+  // email. boNho (lượt xác nhận) tránh truy vấn đề nghị theo từng dòng.
   async commitPhanLop(
     dto: PhanLopHocVienRowDto,
+    nguoiImportId?: string,
+    boNho?: BoNhoPhanLop,
   ): Promise<{ hocVienChuaCoEmail: boolean }> {
     const coGanLop = dto.gan.some((g) => g.lop_id);
     const dangKyCu = await this.prisma.dang_ky_hoc.findUnique({
@@ -2434,29 +2462,86 @@ export class KhoaBoiDuongService {
       },
     });
 
-    for (const g of dto.gan) {
-      if (g.lop_id === null) {
-        await this.prisma.phan_lop_giai_doan.deleteMany({
-          where: { dang_ky_hoc_id: dangKy.id, giai_doan_id: g.giai_doan_id },
-        });
-        continue;
-      }
-      await this.prisma.phan_lop_giai_doan.upsert({
-        where: {
-          dang_ky_hoc_id_giai_doan_id: {
-            dang_ky_hoc_id: dangKy.id,
-            giai_doan_id: g.giai_doan_id,
-          },
-        },
-        create: {
-          dang_ky_hoc_id: dangKy.id,
-          giai_doan_id: g.giai_doan_id,
-          lop_id: g.lop_id,
-        },
-        update: { lop_id: g.lop_id },
-      });
+    const lopHienTai = new Map(
+      (dangKyCu?.phan_lop_giai_doan ?? []).map((p) => [
+        p.giai_doan_id,
+        p.lop_id,
+      ]),
+    );
+    const coChuyenLop = dto.gan.some((g) => {
+      const cu = lopHienTai.get(g.giai_doan_id);
+      return !!g.lop_id && !!cu && cu !== g.lop_id;
+    });
+    let huy: ReturnType<typeof deNghiSeHuy> = [];
+    if (coChuyenLop) {
+      const lopCu = boNho
+        ? (boNho.lopCu ??= napLopCuTheoKhoa(this.prisma, {
+            khoa_id: dto.khoa_id,
+          }))
+        : napLopCuTheoKhoa(this.prisma, { id: dangKy.id });
+      huy = deNghiSeHuy(
+        (await lopCu).get(dto.hoc_vien_id),
+        dto.gan,
+        lopHienTai,
+      );
     }
+
+    const lenh: Prisma.PrismaPromise<unknown>[] = dto.gan.map((g) =>
+      g.lop_id === null
+        ? this.prisma.phan_lop_giai_doan.deleteMany({
+            where: { dang_ky_hoc_id: dangKy.id, giai_doan_id: g.giai_doan_id },
+          })
+        : this.prisma.phan_lop_giai_doan.upsert({
+            where: {
+              dang_ky_hoc_id_giai_doan_id: {
+                dang_ky_hoc_id: dangKy.id,
+                giai_doan_id: g.giai_doan_id,
+              },
+            },
+            create: {
+              dang_ky_hoc_id: dangKy.id,
+              giai_doan_id: g.giai_doan_id,
+              lop_id: g.lop_id,
+            },
+            update: { lop_id: g.lop_id },
+          }),
+    );
+    if (huy.length > 0) {
+      lenh.push(
+        this.prisma.doi_buoi_hoc.updateMany({
+          where: {
+            id: { in: huy.map((d) => d.id) },
+            trang_thai: { in: ['cho_duyet', 'da_duyet'] },
+          },
+          data: {
+            trang_thai: 'da_huy',
+            nguoi_xu_ly: nguoiImportId ?? null,
+            xu_ly_luc: new Date(),
+            ghi_chu_xu_ly: GHI_CHU_HUY_CHUYEN_LOP,
+          },
+        }),
+      );
+    }
+    if (lenh.length > 0) await this.prisma.$transaction(lenh);
     await this.ghiNhatKyNhapPhanLop(dto, dangKyCu);
+    if (huy.length > 0) {
+      await this.nhatKy.ghiNhieu(
+        huy.map((d) => ({
+          hanh_dong: 'duyet_doi_buoi' as const,
+          hoc_vien_id: dto.hoc_vien_id,
+          mo_ta:
+            `${d.loai === 'hoc_bu' ? 'Hủy học bù' : 'Hủy đổi buổi'} lớp "${d.ten_lop}" — ` +
+            GHI_CHU_HUY_CHUYEN_LOP,
+          chi_tiet: {
+            de_nghi_id: d.id,
+            tu_dong_chuyen_lop: true,
+            trang_thai_cu: d.trang_thai,
+            da_diem_danh_chot: d.da_diem_danh_chot,
+            ...(d.loai === 'hoc_bu' ? { loai: 'hoc_bu' } : {}),
+          },
+        })),
+      );
+    }
 
     const lopIds = dto.gan.flatMap((g) => (g.lop_id ? [g.lop_id] : []));
     const coLopTrucTiep =

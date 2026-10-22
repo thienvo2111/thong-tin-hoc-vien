@@ -515,6 +515,7 @@ export class ImportService {
           id,
           nhatKy.nguoi_import_id,
           dupKeys,
+          boNho,
         );
         if (hocVienChuaCoEmail) soHocVienChuaCoEmail++;
         if (taiKhoanDonVi) taiKhoanDaTao.push(taiKhoanDonVi);
@@ -1390,6 +1391,7 @@ export class ImportService {
     importId: string,
     nguoiImportId: string,
     dupKeys?: Set<string>,
+    boNho?: BoNhoPhanLop,
   ): Promise<{
     hocVienChuaCoEmail?: boolean;
     taiKhoanDonVi?: TaiKhoanDonViDaTao;
@@ -1407,6 +1409,8 @@ export class ImportService {
       const { hocVienChuaCoEmail } =
         await this.khoaBoiDuongService.commitPhanLop(
           dto as PhanLopHocVienRowDto,
+          nguoiImportId,
+          boNho,
         );
       return { hocVienChuaCoEmail };
     } else if (loai === 'tai_khoan_vle') {

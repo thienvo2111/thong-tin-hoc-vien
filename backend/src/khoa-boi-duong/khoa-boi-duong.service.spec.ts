@@ -82,6 +82,7 @@ describe('KhoaBoiDuongService', () => {
     };
     hoc_vien: { findUnique: jest.Mock };
     diem_danh: { findMany: jest.Mock };
+    doi_buoi_hoc: { findMany: jest.Mock; updateMany: jest.Mock };
     ket_qua_giai_doan: { findMany: jest.Mock };
     nhan_su_thuc_dia: { findMany: jest.Mock };
     ket_qua_khao_sat: { findUnique: jest.Mock };
@@ -162,6 +163,10 @@ describe('KhoaBoiDuongService', () => {
       // bởi khoaHocCuaToi/khoaHocCuaHocVien) nay truy vấn thêm điểm danh/tiến
       // độ giai đoạn — mặc định rỗng, test nào cần dữ liệu cụ thể tự override.
       diem_danh: { findMany: jest.fn().mockResolvedValue([]) },
+      doi_buoi_hoc: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       ket_qua_giai_doan: { findMany: jest.fn().mockResolvedValue([]) },
       nhan_su_thuc_dia: { findMany: jest.fn().mockResolvedValue([]) },
       ket_qua_khao_sat: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -1377,6 +1382,192 @@ describe('KhoaBoiDuongService', () => {
     // dòng chưa điền trong Excel "Danh sách chia lớp" (2026-10-09) khi nhập
     // lại thẳng — trên học viên ĐÃ GHI DANH (dang_ky_hoc đã tồn tại) không
     // được đụng tới lớp/cụm hiện có, không ghi nhật ký, không gửi lại email.
+    describe('ADR 0014 — chuyển lớp tự hủy đề nghị đổi buổi/học bù lớp cũ', () => {
+      // d1 chờ duyệt, d2 đã duyệt chưa học, d3 học bù đã duyệt đã điểm danh
+      // buổi chốt — buổi nguồn ở lop-a GĐ2; d4 ở GĐ3 (lop-c); d5 GĐ2 nhưng
+      // buổi nguồn ở lớp khác (lop-x, không phải lớp hiện tại).
+      const deNghi = (
+        id: string,
+        trang_thai: string,
+        loai: string,
+        gd: string,
+        lop: string,
+        lich_chot_id: string | null,
+      ) => ({
+        id,
+        trang_thai,
+        loai,
+        dang_ky_hoc_id: 'dk-1',
+        lich_chot_id,
+        lich_nguon: {
+          lop_id: lop,
+          giai_doan_id: gd,
+          lop: { ten_lop: lop === 'lop-a' ? 'Lớp A' : 'Lớp khác' },
+        },
+        dang_ky_hoc: {
+          hoc_vien_id: 'hv-1',
+          phan_lop_giai_doan: [
+            { giai_doan_id: 'gd-2', lop_id: 'lop-a' },
+            { giai_doan_id: 'gd-3', lop_id: 'lop-c' },
+          ],
+        },
+      });
+      const dsDeNghi = [
+        deNghi('d1', 'cho_duyet', 'doi_buoi', 'gd-2', 'lop-a', null),
+        deNghi('d2', 'da_duyet', 'doi_buoi', 'gd-2', 'lop-a', 'chot-2'),
+        deNghi('d3', 'da_duyet', 'hoc_bu', 'gd-2', 'lop-a', 'chot-3'),
+        deNghi('d4', 'cho_duyet', 'doi_buoi', 'gd-3', 'lop-c', null),
+        deNghi('d5', 'cho_duyet', 'doi_buoi', 'gd-2', 'lop-x', null),
+      ];
+      const dangKyCu = {
+        cum_id: null,
+        phan_lop_giai_doan: [
+          { giai_doan_id: 'gd-2', lop_id: 'lop-a', lop: { ten_lop: 'Lớp A' } },
+          { giai_doan_id: 'gd-3', lop_id: 'lop-c', lop: { ten_lop: 'Lớp C' } },
+        ],
+      };
+      const lopB = [
+        { id: 'lop-b', ten_lop: 'Lớp B', loai_lop: 'zoom', muc_nang_luc: null },
+      ];
+
+      beforeEach(() => {
+        prisma.doi_buoi_hoc.findMany.mockResolvedValue(dsDeNghi);
+        prisma.diem_danh.findMany.mockResolvedValue([
+          { dang_ky_hoc_id: 'dk-1', lich_hoc_id: 'chot-3' },
+        ]);
+        prisma.dang_ky_hoc.upsert.mockResolvedValue({ id: 'dk-1' });
+        prisma.dang_ky_hoc.findUnique.mockResolvedValue(dangKyCu);
+        prisma.khoa_boi_duong.findUnique.mockResolvedValue({ ten_khoa: 'K' });
+        prisma.lop_hoc.count.mockResolvedValue(0);
+      });
+
+      it('bước kiểm tra: chuyển lớp -> cảnh báo số đề nghị sẽ hủy + số bản đã điểm danh buổi chốt, dòng vẫn hợp lệ', async () => {
+        prisma.lop_hoc.findMany.mockResolvedValue(lopB);
+        const { dto, error, canhBao } = await service.resolvePhanLopRow(
+          { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': 'Lớp B' },
+          khoa,
+        );
+        expect(error).toBeUndefined();
+        expect(dto?.gan).toEqual([{ giai_doan_id: 'gd-2', lop_id: 'lop-b' }]);
+        expect(canhBao).toContain(
+          'chuyển khỏi lớp "Lớp A" (GĐ2): sẽ hủy 2 đề nghị đổi buổi, 1 đăng ký học bù — trong đó 1 bản đã duyệt học viên đã điểm danh buổi chốt',
+        );
+      });
+
+      it('bước kiểm tra: giữ nguyên lớp / gỡ lớp "-" -> không cảnh báo hủy', async () => {
+        prisma.lop_hoc.findMany.mockResolvedValue([
+          { id: 'lop-a', ten_lop: 'Lớp A', loai_lop: 'zoom', muc_nang_luc: null },
+        ]);
+        const { canhBao } = await service.resolvePhanLopRow(
+          { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': 'Lớp A', 'gd:3': '-' },
+          khoa,
+        );
+        expect(canhBao ?? '').not.toContain('sẽ hủy');
+      });
+
+      it('bước kiểm tra: nạp đề nghị/điểm danh 1 lần cho cả lượt (BoNhoPhanLop)', async () => {
+        prisma.lop_hoc.findMany.mockResolvedValue(lopB);
+        const boNho = taoBoNhoPhanLop();
+        for (let i = 0; i < 3; i++) {
+          await service.resolvePhanLopRow(
+            { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': 'Lớp B' },
+            khoa,
+            undefined,
+            boNho,
+          );
+        }
+        expect(prisma.doi_buoi_hoc.findMany).toHaveBeenCalledTimes(1);
+        expect(prisma.diem_danh.findMany).toHaveBeenCalledTimes(1);
+      });
+
+      it('bước xác nhận: chuyển lớp GĐ2 -> hủy d1,d2,d3 (không đụng GĐ3/lớp khác), người import, ghi chú, nhật ký, không email', async () => {
+        await service.commitPhanLop(
+          {
+            hoc_vien_id: 'hv-1',
+            khoa_id: 'khoa-1',
+            gan: [{ giai_doan_id: 'gd-2', lop_id: 'lop-b' }],
+          },
+          'nd-import',
+        );
+        expect(prisma.doi_buoi_hoc.updateMany).toHaveBeenCalledWith({
+          where: {
+            id: { in: ['d1', 'd2', 'd3'] },
+            trang_thai: { in: ['cho_duyet', 'da_duyet'] },
+          },
+          data: {
+            trang_thai: 'da_huy',
+            nguoi_xu_ly: 'nd-import',
+            xu_ly_luc: expect.any(Date),
+            ghi_chu_xu_ly: 'Hủy tự động do chuyển lớp (nhập file)',
+          },
+        });
+        // Cùng 1 transaction với ghi phân lớp (upsert + updateMany).
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(prisma.$transaction.mock.calls[0][0]).toHaveLength(2);
+        const suKien = nhatKy.ghiNhieu.mock.calls.flatMap(
+          (c: unknown[]) => c[0] as { chi_tiet: Record<string, unknown> }[],
+        );
+        expect(suKien.map((x) => x.chi_tiet.de_nghi_id)).toEqual([
+          'd1',
+          'd2',
+          'd3',
+        ]);
+        expect(suKien[2]).toMatchObject({
+          hanh_dong: 'duyet_doi_buoi',
+          hoc_vien_id: 'hv-1',
+          chi_tiet: {
+            loai: 'hoc_bu',
+            da_diem_danh_chot: true,
+            tu_dong_chuyen_lop: true,
+          },
+        });
+        expect(thongBaoService.guiDangKyHocPhanLop).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['giữ nguyên lớp', [{ giai_doan_id: 'gd-2', lop_id: 'lop-a' }]],
+        ['gỡ lớp "-"', [{ giai_doan_id: 'gd-2', lop_id: null }]],
+        ['ô trống (không có trong gan)', []],
+      ])('bước xác nhận: %s -> không hủy đề nghị nào', async (_t, gan) => {
+        await service.commitPhanLop(
+          { hoc_vien_id: 'hv-1', khoa_id: 'khoa-1', gan },
+          'nd-import',
+        );
+        expect(prisma.doi_buoi_hoc.findMany).not.toHaveBeenCalled();
+        expect(prisma.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+        expect(nhatKy.ghiNhieu).not.toHaveBeenCalled();
+      });
+
+      it('bước xác nhận: lần đầu phân lớp (chưa có lớp cũ) -> không hủy', async () => {
+        prisma.dang_ky_hoc.findUnique.mockResolvedValue(null);
+        await service.commitPhanLop(
+          {
+            hoc_vien_id: 'hv-1',
+            khoa_id: 'khoa-1',
+            gan: [{ giai_doan_id: 'gd-2', lop_id: 'lop-b' }],
+          },
+          'nd-import',
+        );
+        expect(prisma.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+      });
+
+      it('bước xác nhận: BoNhoPhanLop đã nạp -> không truy vấn đề nghị lại', async () => {
+        const boNho = taoBoNhoPhanLop();
+        boNho.lopCu = Promise.resolve(new Map());
+        await service.commitPhanLop(
+          {
+            hoc_vien_id: 'hv-1',
+            khoa_id: 'khoa-1',
+            gan: [{ giai_doan_id: 'gd-2', lop_id: 'lop-b' }],
+          },
+          'nd-import',
+          boNho,
+        );
+        expect(prisma.doi_buoi_hoc.findMany).not.toHaveBeenCalled();
+        expect(prisma.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+      });
+    });
+
     it('resolvePhanLopRow + commitPhanLop: dòng chỉ mã định danh trên học viên đã ghi danh -> không đổi gì, không nhật ký, không email', async () => {
       const { dto, error } = await service.resolvePhanLopRow(
         {
