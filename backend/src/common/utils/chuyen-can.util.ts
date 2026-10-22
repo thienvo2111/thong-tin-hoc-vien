@@ -4,7 +4,11 @@
 
 import { TrangThaiDiemDanh } from './diem-danh-bao-vang.util';
 
-export type CheDoChuyenCan = 'theo_lop_hien_tai' | 'cong_nhan_lop_cu';
+export type CheDoChuyenCan =
+  'theo_lop_hien_tai' | 'cong_nhan_cung_muc' | 'cong_nhan_lop_cu';
+
+/** lop_hoc.muc_nang_luc — null = lớp không chia mức. */
+export type MucLop = string | null;
 
 export interface DongDiemDanhBuoi {
   lop_id: string;
@@ -12,11 +16,18 @@ export interface DongDiemDanhBuoi {
   giai_doan_id: string;
   buoi_so: number;
   trang_thai: TrangThaiDiemDanh;
+  /** Mức của lớp của dòng — chỉ cần cho nấc cong_nhan_cung_muc (ADR 0014). */
+  muc_nang_luc?: MucLop;
   /**
    * Spec đổi buổi (R7): dòng ở buổi chốt của đổi buổi đã duyệt, còn hiệu lực —
-   * tính THAY buổi nguồn (lớp, giai đoạn, buổi số của buổi nguồn).
+   * tính THAY buổi nguồn (lớp, giai đoạn, buổi số, mức của buổi nguồn).
    */
-  doi_tu?: { lop_id: string; giai_doan_id: string; buoi_so: number };
+  doi_tu?: {
+    lop_id: string;
+    giai_doan_id: string;
+    buoi_so: number;
+    muc_nang_luc?: MucLop;
+  };
 }
 
 export interface KetQuaBuoi {
@@ -34,15 +45,35 @@ const HANG: Record<TrangThaiDiemDanh, number> = {
 export const khoaBuoi = (giaiDoanId: string, buoiSo: number) =>
   `${giaiDoanId}|${buoiSo}`;
 
+/** ADR 0014 C2: cùng muc_nang_luc, hoặc cả hai lớp không có mức. */
+export const cungMuc = (a: MucLop | undefined, b: MucLop | undefined) =>
+  (a ?? null) === (b ?? null);
+
+/**
+ * ADR 0014 C1: dòng ở lớp Zoom khác lớp hiện tại (cùng giai đoạn, buổi số) có
+ * được công nhận không — dùng chung cho tinhChuyenCan và cảnh báo import.
+ */
+export function congNhanLopKhac(
+  cheDo: CheDoChuyenCan,
+  mucDong: MucLop | undefined,
+  mucHienTai: MucLop | undefined,
+): boolean {
+  if (cheDo === 'cong_nhan_lop_cu') return true;
+  if (cheDo === 'cong_nhan_cung_muc') return cungMuc(mucDong, mucHienTai);
+  return false;
+}
+
 /**
  * lopHienTai: giai_doan_id → lop_id hiện tại (phan_lop_giai_doan) của đăng ký.
- * Trả map khoaBuoi(giai_doan_id, buoi_so) → kết quả; buổi không có dòng hợp lệ
- * thì không có khóa.
+ * mucLopHienTai: lop_id (lớp hiện tại) → muc_nang_luc — chỉ cần cho
+ * cong_nhan_cung_muc. Trả map khoaBuoi(giai_doan_id, buoi_so) → kết quả; buổi
+ * không có dòng hợp lệ thì không có khóa.
  */
 export function tinhChuyenCan(
   lopHienTai: ReadonlyMap<string, string>,
   dong: readonly DongDiemDanhBuoi[],
   cheDo: CheDoChuyenCan,
+  mucLopHienTai: ReadonlyMap<string, MucLop> = new Map(),
 ): Map<string, KetQuaBuoi> {
   const kq = new Map<string, KetQuaBuoi>();
   for (const goc of dong) {
@@ -50,8 +81,13 @@ export function tinhChuyenCan(
     const hienTai = lopHienTai.get(d.giai_doan_id);
     const tuLopCu = d.lop_id !== hienTai;
     // Z8 chỉ áp cho lớp Zoom: dòng trực tiếp (vd học bù) luôn tính như trước.
+    // Chưa có lớp hiện tại ở giai đoạn → không có lớp để so (C2).
     const tinh =
-      d.loai_lop === 'truc_tiep' || cheDo === 'cong_nhan_lop_cu' || !tuLopCu;
+      d.loai_lop === 'truc_tiep' ||
+      !tuLopCu ||
+      cheDo === 'cong_nhan_lop_cu' ||
+      (hienTai !== undefined &&
+        congNhanLopKhac(cheDo, d.muc_nang_luc, mucLopHienTai.get(hienTai)));
     if (!tinh) continue;
     const k = khoaBuoi(d.giai_doan_id, d.buoi_so);
     const cu = kq.get(k);
@@ -69,6 +105,13 @@ export function tinhChuyenCan(
     }
   }
   return kq;
+}
+
+/** Lớp hiện tại (phan_lop kèm mức lớp) → lop_id → muc_nang_luc. */
+export function mucLopTheoPhanLop(
+  phanLop: readonly { lop_id: string; muc_nang_luc: MucLop }[],
+): Map<string, MucLop> {
+  return new Map(phanLop.map((p) => [p.lop_id, p.muc_nang_luc]));
 }
 
 /** phan_lop_giai_doan → dang_ky_hoc_id → (giai_doan_id → lop_id hiện tại). */
@@ -98,7 +141,7 @@ export function dongDiemDanhBuoi(
       lop_id: string;
       giai_doan_id: string;
       buoi_so: number;
-      lop: { loai_lop: string };
+      lop: { loai_lop: string; muc_nang_luc?: MucLop };
     };
   },
   doiTu: ReadonlyMap<string, DongDiemDanhBuoi['doi_tu']>,
@@ -109,6 +152,7 @@ export function dongDiemDanhBuoi(
     giai_doan_id: d.lich_hoc.giai_doan_id,
     buoi_so: d.lich_hoc.buoi_so,
     trang_thai: d.trang_thai,
+    muc_nang_luc: d.lich_hoc.lop.muc_nang_luc,
     doi_tu: doiTu.get(`${d.dang_ky_hoc_id}|${d.lich_hoc_id}`),
   };
 }

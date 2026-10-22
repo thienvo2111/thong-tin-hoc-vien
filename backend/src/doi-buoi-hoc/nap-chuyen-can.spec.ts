@@ -7,7 +7,7 @@ import { khoaBuoi } from '../common/utils/chuyen-can.util';
 // 0005 Z8) trên MỌI dòng diem_danh của đăng ký — học bù, lớp cũ, đổi buổi.
 // Học viên dk1 hiện ở lop-a (GĐ g1). Lớp: lop-a/lop-z zoom, lop-t trực tiếp,
 // lop-c zoom (buổi chốt đổi buổi), lop-cu zoom (lớp cũ trước khi chuyển).
-type CheDo = 'theo_lop_hien_tai' | 'cong_nhan_lop_cu';
+type CheDo = 'theo_lop_hien_tai' | 'cong_nhan_cung_muc' | 'cong_nhan_lop_cu';
 type TT = 'co_mat' | 'vang' | 'vang_co_phep';
 
 const LOAI: Record<string, string> = {
@@ -16,7 +16,11 @@ const LOAI: Record<string, string> = {
   'lop-t': 'truc_tiep',
   'lop-c': 'zoom',
   'lop-cu': 'zoom',
+  'lop-nc': 'zoom',
 };
+// Mức lớp (ADR 0014): lop-nc nâng cao, còn lại cơ bản.
+const MUC: Record<string, string> = { 'lop-nc': 'nang_cao' };
+const muc = (lop: string) => MUC[lop] ?? 'co_ban';
 
 const row = (
   lich: string,
@@ -36,6 +40,7 @@ const row = (
   buoi_so,
   loai_lop: LOAI[lop],
   ten_lop: `Lớp ${lop}`,
+  muc_nang_luc: muc(lop),
   che_do_chuyen_can: cheDo,
 });
 
@@ -54,6 +59,7 @@ function setup(
               dang_ky_hoc_id: id,
               giai_doan_id: 'g1',
               lop_id: 'lop-a',
+              muc_nang_luc: muc('lop-a'),
             })),
       );
     }),
@@ -62,16 +68,19 @@ function setup(
     doiBuoiDaDuyetCuaDangKy: jest
       .fn()
       .mockResolvedValue(doi.map((d) => ({ dang_ky_hoc_id: 'dk1', ...d }))),
-    lichTomTat: jest
-      .fn()
-      .mockResolvedValue(
-        new Map(
-          doi.map((d) => [
-            d.lich_nguon_id,
-            { lop_id: 'lop-a', giai_doan_id: 'g1', buoi_so: 2 },
-          ]),
-        ),
+    lichTomTat: jest.fn().mockResolvedValue(
+      new Map(
+        doi.map((d) => [
+          d.lich_nguon_id,
+          {
+            lop_id: 'lop-a',
+            giai_doan_id: 'g1',
+            buoi_so: 2,
+            lop: { muc_nang_luc: muc('lop-a') },
+          },
+        ]),
       ),
+    ),
   };
   return {
     prisma,
@@ -134,6 +143,31 @@ describe('napChuyenCan', () => {
     ).toMatchObject({
       tu_lop_cu: true,
       dong: { lop_id: 'lop-cu' },
+    });
+  });
+
+  it('cong_nhan_cung_muc: lớp cũ cùng mức tính, khác mức không tính', async () => {
+    expect(
+      await slot(
+        setup([row('cu1', 'lop-cu', 1, 'co_mat', 'cong_nhan_cung_muc')]),
+      ),
+    ).toMatchObject({ trang_thai: 'co_mat', tu_lop_cu: true });
+    expect(
+      await slot(
+        setup([row('nc1', 'lop-nc', 1, 'co_mat', 'cong_nhan_cung_muc')]),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('cong_nhan_cung_muc: đổi buổi sang lớp khác mức vẫn tính thay buổi nguồn (so mức lớp nguồn)', async () => {
+    const s = setup(
+      [row('nc2', 'lop-nc', 2, 'co_mat', 'cong_nhan_cung_muc')],
+      [{ lich_nguon_id: 'a2', lich_chot_id: 'nc2' }],
+    );
+    expect(await slot(s, 2)).toMatchObject({
+      trang_thai: 'co_mat',
+      tu_lop_cu: false,
+      dong: { lich_hoc_id: 'nc2' },
     });
   });
 

@@ -1123,7 +1123,12 @@ describe('Thống kê dashboard (e2e)', () => {
       }[];
     };
 
-    it('theo_lop_hien_tai (mặc định): chỉ lớp hiện tại, B1 = 1 có mặt + 1 vắng', async () => {
+    it('theo_lop_hien_tai: chỉ lớp hiện tại, B1 = 1 có mặt + 1 vắng', async () => {
+      // Khóa mới mặc định cong_nhan_cung_muc (ADR 0014) — đặt tường minh.
+      await prisma.khoa_boi_duong.update({
+        where: { id: khoaC },
+        data: { che_do_chuyen_can: 'theo_lop_hien_tai' },
+      });
       const cot = await chuyenCan();
       expect(cot).toHaveLength(2);
       expect(cot[0]).toMatchObject({

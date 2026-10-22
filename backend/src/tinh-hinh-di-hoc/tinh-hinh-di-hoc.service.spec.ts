@@ -133,7 +133,11 @@ const DONG_GOC: DongDiemDanhMock[] = [
 ];
 // Dòng thêm theo từng test (học bù) + chế độ chuyên cần của khóa.
 let them: DongDiemDanhMock[] = [];
-let cheDo: 'theo_lop_hien_tai' | 'cong_nhan_lop_cu' = 'theo_lop_hien_tai';
+let cheDo: 'theo_lop_hien_tai' | 'cong_nhan_cung_muc' | 'cong_nhan_lop_cu' =
+  'theo_lop_hien_tai';
+// ADR 0014: mức lớp — mọi lớp co_ban, riêng lop-z theo từng test.
+let mucZ: string | null = 'co_ban';
+const mucLop = (lopId: string) => (lopId === 'lop-z' ? mucZ : 'co_ban');
 
 describe('TinhHinhDiHocService', () => {
   let prisma: {
@@ -159,6 +163,7 @@ describe('TinhHinhDiHocService', () => {
   beforeEach(() => {
     them = [];
     cheDo = 'theo_lop_hien_tai';
+    mucZ = 'co_ban';
     prisma = {
       dang_ky_hoc: {
         // Trả ngược thứ tự để kiểm tra service tự xếp theo họ tên.
@@ -218,6 +223,7 @@ describe('TinhHinhDiHocService', () => {
                   giai_doan_id: l.giai_doan_id,
                   buoi_so: l.buoi_so,
                   ...LOP[l.lop_id],
+                  muc_nang_luc: mucLop(l.lop_id),
                   che_do_chuyen_can: cheDo,
                 };
               }),
@@ -225,7 +231,10 @@ describe('TinhHinhDiHocService', () => {
         }
         if (sql.sql.includes('FROM phan_lop_giai_doan')) {
           return Promise.resolve(
-            PHAN_LOP.filter((p) => ids.includes(p.dang_ky_hoc_id)),
+            PHAN_LOP.filter((p) => ids.includes(p.dang_ky_hoc_id)).map((p) => ({
+              ...p,
+              muc_nang_luc: mucLop(p.lop_id),
+            })),
           );
         }
         return Promise.resolve([]);
@@ -244,7 +253,16 @@ describe('TinhHinhDiHocService', () => {
               .filter((id) => TAT_CA_LICH.has(id))
               .map((id) => {
                 const l = TAT_CA_LICH.get(id)!;
-                return [id, { ...l, lop: { ten_lop: LOP[l.lop_id].ten_lop } }];
+                return [
+                  id,
+                  {
+                    ...l,
+                    lop: {
+                      ten_lop: LOP[l.lop_id].ten_lop,
+                      muc_nang_luc: mucLop(l.lop_id),
+                    },
+                  },
+                ];
               }),
           ),
         ),
@@ -451,13 +469,21 @@ describe('TinhHinhDiHocService', () => {
       },
     ]);
     const ds = await service.danhSach({}, loc(), NOW);
-    expect(ds.data[0].tong).toMatchObject({ da_dien_ra: 3, co_mat: 2, vang: 1 });
+    expect(ds.data[0].tong).toMatchObject({
+      da_dien_ra: 3,
+      co_mat: 2,
+      vang: 1,
+    });
     const ct = await service.chiTiet({}, 'dk-an', hoTro, NOW);
     expect(ct.buoi[1]).toMatchObject({
       lich_hoc_id: 'c2',
       lich_nguon_id: 'a2',
       diem_danh: { ma: 'co_mat' },
-      doi_buoi: { tu_lop: { ten_lop: 'Lớp A' }, sang_lop: { ten_lop: 'Lớp C' }, hoc_bu: true },
+      doi_buoi: {
+        tu_lop: { ten_lop: 'Lớp A' },
+        sang_lop: { ten_lop: 'Lớp C' },
+        hoc_bu: true,
+      },
     });
   });
 
@@ -572,6 +598,23 @@ describe('TinhHinhDiHocService', () => {
       expect((await service.danhSach({}, loc(), NOW)).data[1].tong.co_mat).toBe(
         0,
       );
+      cheDo = 'cong_nhan_lop_cu';
+      expect((await service.danhSach({}, loc(), NOW)).data[1].tong.co_mat).toBe(
+        1,
+      );
+    });
+
+    it('học bù ở lớp Zoom, cong_nhan_cung_muc: cùng mức -> tính; khác mức -> không', async () => {
+      hocBu('z2');
+      cheDo = 'cong_nhan_cung_muc';
+      expect((await service.danhSach({}, loc(), NOW)).data[1].tong.co_mat).toBe(
+        1,
+      );
+      mucZ = 'nang_cao';
+      expect((await service.danhSach({}, loc(), NOW)).data[1].tong.co_mat).toBe(
+        0,
+      );
+      // Khác mức nhưng khóa công nhận bất kể mức -> tính.
       cheDo = 'cong_nhan_lop_cu';
       expect((await service.danhSach({}, loc(), NOW)).data[1].tong.co_mat).toBe(
         1,

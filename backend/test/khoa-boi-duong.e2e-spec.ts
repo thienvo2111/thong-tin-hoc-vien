@@ -549,7 +549,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
           .set('Authorization', `Bearer ${tokenQuanTri}`)
           .send(body);
 
-      it('khóa mới: tắt, mặc định 30/120, theo_lop_hien_tai; GET chi tiết trả đủ trường', async () => {
+      it('khóa mới: tắt, mặc định 30/120, cong_nhan_cung_muc (ADR 0014); GET chi tiết trả đủ trường', async () => {
         const res = await request(app.getHttpServer())
           .get(`/khoa-boi-duong/${khoaId}`)
           .set('Authorization', `Bearer ${tokenQuanTri}`)
@@ -558,7 +558,7 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
           bat_diem_danh_zoom_luc: null,
           diem_danh_mo_truoc_phut: 30,
           diem_danh_dong_sau_phut: 120,
-          che_do_chuyen_can: 'theo_lop_hien_tai',
+          che_do_chuyen_can: 'cong_nhan_cung_muc',
         });
       });
 
@@ -598,6 +598,14 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
         expect(bien.body.diem_danh_mo_truoc_phut).toBe(180);
         expect(bien.body.diem_danh_dong_sau_phut).toBe(15);
       });
+
+      it.each(['theo_lop_hien_tai', 'cong_nhan_cung_muc', 'cong_nhan_lop_cu'])(
+        'PATCH che_do_chuyen_can = %s -> lưu (ADR 0014)',
+        async (cheDo) => {
+          const res = await patch({ che_do_chuyen_can: cheDo }).expect(200);
+          expect(res.body.che_do_chuyen_can).toBe(cheDo);
+        },
+      );
 
       it.each([
         [{ diem_danh_mo_truoc_phut: -1 }],

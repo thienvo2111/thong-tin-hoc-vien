@@ -6,9 +6,11 @@ import type { CheDoChuyenCan, KhoaBoiDuong } from '@/api/types';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 
+// ADR 0014: 3 nấc — "cùng mức" so muc_nang_luc lớp cũ với lớp hiện tại.
 const CHE_DO_CHUYEN_CAN: { value: CheDoChuyenCan; label: string }[] = [
   { value: 'theo_lop_hien_tai', label: 'Theo lớp hiện tại (học lại các buổi ở lớp mới)' },
-  { value: 'cong_nhan_lop_cu', label: 'Công nhận buổi đã có mặt ở lớp cũ' },
+  { value: 'cong_nhan_cung_muc', label: 'Công nhận buổi đã có mặt ở lớp cũ cùng mức' },
+  { value: 'cong_nhan_lop_cu', label: 'Công nhận buổi đã có mặt ở lớp cũ (bất kể mức)' },
 ];
 
 // Khoảng hợp lệ khớp UpdateKhoaBoiDuongDto + CHECK trong DB (ADR 0005).
@@ -86,6 +88,7 @@ export function CauHinhDiemDanhZoom({ khoa }: { khoa: KhoaBoiDuong }) {
 
         <Select
           label="Chuyên cần khi học viên chuyển lớp Zoom"
+          description="Lớp trực tiếp (học bù) luôn được tính. Đổi cách tính không xóa điểm danh."
           data={CHE_DO_CHUYEN_CAN}
           value={khoa.che_do_chuyen_can}
           allowDeselect={false}

@@ -13,6 +13,7 @@ import {
   dongDiemDanhBuoi,
   DongDiemDanhBuoi,
   lopHienTaiTheoDangKy,
+  mucLopTheoPhanLop,
   tinhChuyenCan,
 } from '../common/utils/chuyen-can.util';
 import { napDoiTuTheoBuoiChot } from '../doi-buoi-hoc/nap-chuyen-can';
@@ -372,7 +373,7 @@ export class ThongKeService {
             giai_doan_id: true,
             buoi_so: true,
             giai_doan: { select: { thu_tu: true } },
-            lop: { select: { loai_lop: true } },
+            lop: { select: { loai_lop: true, muc_nang_luc: true } },
           },
         },
         dang_ky_hoc: {
@@ -387,9 +388,20 @@ export class ThongKeService {
 
     const phanLop = await this.prisma.phan_lop_giai_doan.findMany({
       where: { dang_ky_hoc: where },
-      select: { dang_ky_hoc_id: true, giai_doan_id: true, lop_id: true },
+      select: {
+        dang_ky_hoc_id: true,
+        giai_doan_id: true,
+        lop_id: true,
+        lop: { select: { muc_nang_luc: true } },
+      },
     });
     const lopHienTai = lopHienTaiTheoDangKy(phanLop);
+    const mucLop = mucLopTheoPhanLop(
+      phanLop.map((p) => ({
+        lop_id: p.lop_id,
+        muc_nang_luc: p.lop.muc_nang_luc,
+      })),
+    );
 
     const thuTuGiaiDoan = new Map<string, number>();
     const theoDangKy = new Map<
@@ -412,6 +424,7 @@ export class ThongKeService {
         lopHienTai.get(dangKyId) ?? new Map(),
         dong,
         cheDo,
+        mucLop,
       );
       for (const [khoa, { trang_thai }] of kq) {
         const [giaiDoanId, buoi] = khoa.split('|');
