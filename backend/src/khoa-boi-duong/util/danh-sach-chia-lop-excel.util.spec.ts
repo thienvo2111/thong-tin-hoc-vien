@@ -1,5 +1,6 @@
 import * as ExcelJS from 'exceljs';
 import {
+  BuoiChiaLop,
   DongChiaLop,
   GiaiDoanChiaLop,
   LopChiaLop,
@@ -389,6 +390,129 @@ describe('buildDanhSachChiaLopWorkbook', () => {
       expect(wb.worksheets.map((s) => s.name)).not.toContain('Nhân viên (không xếp lớp)');
       const sheet2 = wb.getWorksheet('Hướng dẫn')!;
       expect(sheet2.getRow(2).getCell(1).value).toContain('Ô "GĐ<n>');
+    });
+  });
+
+  // 2026-10-22: sheet "Sĩ số theo buổi" — 1 dòng/buổi, sĩ số tính đổi buổi.
+  describe('sheet "Sĩ số theo buổi"', () => {
+    const buoi = (o: Partial<BuoiChiaLop>): BuoiChiaLop => ({
+      giai_doan_thu_tu: 1,
+      ten_lop: 'Lớp A',
+      loai_lop: 'truc_tiep',
+      buoi_so: 1,
+      // 12:00Z = 19:00 giờ VN
+      thoi_gian_bat_dau: new Date('2026-10-20T12:00:00Z'),
+      thoi_gian_ket_thuc: new Date('2026-10-20T14:00:00Z'),
+      so_phan_lop: 30,
+      so_doi_ra: 0,
+      so_doi_vao: 0,
+      so_hoc_bu_vao: 0,
+      si_so_toi_da: 30,
+      ...o,
+    });
+    const docSheet = async (ds: BuoiChiaLop[]) => {
+      const buf = await buildDanhSachChiaLopWorkbook(
+        'K1',
+        giaiDoan,
+        lopHoc,
+        [nangCao, coBan],
+        THANG_MUC_MAC_DINH,
+        ds,
+      );
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+      return { buf, wb, sheet: wb.getWorksheet('Sĩ số theo buổi') };
+    };
+    const giaTri = (sheet: ExcelJS.Worksheet, hang: number) =>
+      (sheet.getRow(hang).values as unknown[]).slice(1);
+
+    it('có lịch -> thêm sau "Tổng hợp theo mức học"; "Phân lớp" vẫn là sheet đầu và nhập lại được', async () => {
+      const { buf, wb } = await docSheet([buoi({})]);
+      expect(wb.worksheets.map((s) => s.name)).toEqual([
+        'Phân lớp',
+        'Hướng dẫn',
+        'Tổng hợp theo mức học',
+        'Sĩ số theo buổi',
+      ]);
+      const { rows } = await readPhanLopWorkbook(buf, new Set([1, 2]));
+      expect(rows).toHaveLength(2);
+    });
+
+    it('không có lịch -> không tạo sheet', async () => {
+      const { wb } = await docSheet([]);
+      expect(wb.worksheets.map((s) => s.name)).not.toContain('Sĩ số theo buổi');
+    });
+
+    it('dòng 1 ghi chú công thức, dòng 2 tiêu đề; sĩ số = phân lớp − đổi ra + đổi vào + học bù vào', async () => {
+      const { sheet } = await docSheet([
+        buoi({
+          so_phan_lop: 30,
+          so_doi_ra: 3,
+          so_doi_vao: 2,
+          so_hoc_bu_vao: 1,
+        }),
+      ]);
+      expect(String(sheet!.getRow(1).getCell(1).value)).toMatch(
+        /^Sĩ số buổi = /,
+      );
+      expect(giaTri(sheet!, 2)).toEqual([
+        'Giai đoạn',
+        'Lớp',
+        'Loại lớp',
+        'Buổi',
+        'Thời gian',
+        'Số phân lớp',
+        'Đổi ra',
+        'Đổi vào',
+        'Học bù vào',
+        'Sĩ số buổi',
+        'Sĩ số tối đa',
+        'Ghi chú',
+      ]);
+      expect(giaTri(sheet!, 3)).toEqual([
+        'GĐ1',
+        'Lớp A',
+        'Lớp trực tiếp',
+        1,
+        '20/10/2026 19:00–21:00',
+        30,
+        3,
+        2,
+        1,
+        30,
+        30,
+        '',
+      ]);
+    });
+
+    it('vượt sĩ số tối đa -> ghi chú; không có tối đa -> ô trống, không cảnh báo', async () => {
+      const { sheet } = await docSheet([
+        buoi({ so_doi_vao: 2 }),
+        buoi({ ten_lop: 'Lớp B', si_so_toi_da: null, so_doi_vao: 5 }),
+      ]);
+      expect(giaTri(sheet!, 3)[11]).toBe('Vượt sĩ số tối đa');
+      expect(giaTri(sheet!, 4)[9]).toBe(35);
+      expect(giaTri(sheet!, 4)[10]).toBe('');
+      expect(giaTri(sheet!, 4)[11]).toBe('');
+    });
+
+    it('sắp theo giai đoạn, tên lớp, buổi số', async () => {
+      const { sheet } = await docSheet([
+        buoi({ giai_doan_thu_tu: 2, ten_lop: 'Lớp A', buoi_so: 1 }),
+        buoi({ ten_lop: 'Lớp B', buoi_so: 2 }),
+        buoi({ ten_lop: 'Lớp B', buoi_so: 1 }),
+        buoi({ ten_lop: 'Lớp A', buoi_so: 3 }),
+      ]);
+      const thuTu = [3, 4, 5, 6].map((h) => {
+        const v = giaTri(sheet!, h);
+        return `${v[0]} ${v[1]} B${v[3]}`;
+      });
+      expect(thuTu).toEqual([
+        'GĐ1 Lớp A B3',
+        'GĐ1 Lớp B B1',
+        'GĐ1 Lớp B B2',
+        'GĐ2 Lớp A B1',
+      ]);
     });
   });
 });

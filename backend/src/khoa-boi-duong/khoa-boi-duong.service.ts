@@ -77,6 +77,7 @@ import {
 } from './util/diem-danh-zoom.util';
 import { khoaBuoi, tinhChuyenCan } from '../common/utils/chuyen-can.util';
 import {
+  BuoiChiaLop,
   DongChiaLop,
   buildDanhSachChiaLopWorkbook,
 } from './util/danh-sach-chia-lop-excel.util';
@@ -2167,8 +2168,65 @@ export class KhoaBoiDuongService {
       khoa.lop_hoc,
       rows,
       thang,
+      await this.siSoTheoBuoiCuaKhoa(
+        khoaId,
+        khoa.giai_doan.map((gd) => gd.id),
+      ),
     );
     return { buffer, maKhoa: khoa.ma_khoa };
+  }
+
+  /**
+   * Sheet "Sĩ số theo buổi": mọi buổi của khóa (giai đoạn active), sĩ số =
+   * phân lớp (lớp, giai đoạn) − đổi ra + đổi vào — cùng công thức danh sách
+   * theo buổi ADR 0008 L7 (đổi buổi qua DoiBuoiHocQueryService; học bù không
+   * trừ ở buổi gốc).
+   */
+  private async siSoTheoBuoiCuaKhoa(
+    khoaId: string,
+    giaiDoanIds: string[],
+  ): Promise<BuoiChiaLop[]> {
+    const lich = await this.prisma.lich_hoc_lop.findMany({
+      where: { lop: { khoa_id: khoaId }, giai_doan_id: { in: giaiDoanIds } },
+      select: {
+        id: true,
+        lop_id: true,
+        giai_doan_id: true,
+        buoi_so: true,
+        thoi_gian_bat_dau: true,
+        thoi_gian_ket_thuc: true,
+        giai_doan: { select: { thu_tu: true } },
+        lop: { select: { ten_lop: true, loai_lop: true, si_so_toi_da: true } },
+      },
+    });
+    if (lich.length === 0) return [];
+    const [phanLop, dieuChinh] = await Promise.all([
+      this.prisma.phan_lop_giai_doan.groupBy({
+        by: ['lop_id', 'giai_doan_id'],
+        where: { lop_id: { in: [...new Set(lich.map((l) => l.lop_id))] } },
+        _count: { _all: true },
+      }),
+      this.doiBuoiQuery.dieuChinhTheoBuoi(lich.map((l) => l.id)),
+    ]);
+    const demPhanLop = new Map(
+      phanLop.map((p) => [`${p.lop_id}|${p.giai_doan_id}`, p._count._all]),
+    );
+    return lich.map((l) => {
+      const dc = dieuChinh.get(l.id) ?? { ra: [], vao: [] };
+      return {
+        giai_doan_thu_tu: l.giai_doan.thu_tu,
+        ten_lop: l.lop.ten_lop,
+        loai_lop: l.lop.loai_lop,
+        buoi_so: l.buoi_so,
+        thoi_gian_bat_dau: l.thoi_gian_bat_dau,
+        thoi_gian_ket_thuc: l.thoi_gian_ket_thuc,
+        so_phan_lop: demPhanLop.get(`${l.lop_id}|${l.giai_doan_id}`) ?? 0,
+        so_doi_ra: dc.ra.filter((r) => r.loai !== 'hoc_bu').length,
+        so_doi_vao: dc.vao.filter((v) => v.loai !== 'hoc_bu').length,
+        so_hoc_bu_vao: dc.vao.filter((v) => v.loai === 'hoc_bu').length,
+        si_so_toi_da: l.lop.si_so_toi_da,
+      };
+    });
   }
 
   // ---------------------------------------------------------------------
