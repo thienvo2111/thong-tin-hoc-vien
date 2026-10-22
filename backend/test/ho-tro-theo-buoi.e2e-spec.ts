@@ -458,6 +458,37 @@ describe('Người hỗ trợ lớp — danh sách theo buổi (e2e, ADR 0008 L7
       expect(await dem()).toBe(truoc + 1);
     });
 
+    // 2026-10-22: file "Danh sách chia lớp" có sheet "Sĩ số theo buổi" — cùng sĩ số với /buoi.
+    it('xuất danh sách chia lớp: sheet "Sĩ số theo buổi" 1 dòng/buổi, tính đổi buổi đã duyệt còn hiệu lực', async () => {
+      const res = await taiFile(
+        `/khoa-boi-duong/${khoaId}/danh-sach-chia-lop/xuat-excel`,
+        quanTri.token,
+      );
+      expect(res.status).toBe(200);
+      const wb = await docFile(res.body as Buffer);
+      expect(wb.worksheets[0].name).toBe('Phân lớp');
+      const ws = wb.getWorksheet('Sĩ số theo buổi')!;
+      // Cột: GĐ|Lớp|Loại|Buổi|Thời gian|Phân lớp|Đổi ra|Đổi vào|Học bù vào|Sĩ số|Tối đa|Ghi chú
+      const dong = vanBan(ws)
+        .slice(2)
+        .map((d) => {
+          const c = d.split('|');
+          return [c[1], c[3], ...c.slice(5, 10)].join(' ');
+        });
+      expect(dong).toEqual([
+        'Zoom A 1 2 1 1 0 2', // Bình đổi ra, Cường đổi vào
+        'Zoom A 2 2 0 0 0 2',
+        'Zoom B 1 4 1 0 0 3', // Cường đổi ra; Dũng chờ duyệt, Em từ chối không tính
+        'Zoom C 1 0 0 1 0 1', // Bình đổi vào; Giang mất hiệu lực không tính
+      ]);
+      const buoi = await http()
+        .get(`/lop/${lop.a}/buoi`)
+        .set(auth(quanTri.token));
+      expect((buoi.body as { si_so: number }[]).map((b) => b.si_so)).toEqual([
+        2, 2,
+      ]);
+    });
+
     it('người hỗ trợ không gọi được API quản trị -> 403', async () => {
       expect((await get(`/lop/${lop.a}/buoi`)).status).toBe(403);
     });

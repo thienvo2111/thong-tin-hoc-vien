@@ -60,6 +60,23 @@ export interface DongChiaLop {
   phan_lop: { giai_doan_id: string; ten_lop: string; loai_lop: loai_lop_hoc }[];
 }
 
+// Sheet "Sĩ số theo buổi" (2026-10-22): 1 dòng/buổi, sĩ số = phân lớp − đổi ra
+// + đổi vào (đổi buổi da_duyet còn hiệu lực, ADR 0007/0008 L7). Học bù (ADR
+// 0012) không trừ ở buổi gốc, chỉ cộng ở buổi học bù.
+export interface BuoiChiaLop {
+  giai_doan_thu_tu: number;
+  ten_lop: string;
+  loai_lop: loai_lop_hoc;
+  buoi_so: number;
+  thoi_gian_bat_dau: Date;
+  thoi_gian_ket_thuc: Date;
+  so_phan_lop: number;
+  so_doi_ra: number;
+  so_doi_vao: number;
+  so_hoc_bu_vao: number;
+  si_so_toi_da: number | null;
+}
+
 const NEN_HEADER_THAM_KHAO: ExcelJS.Fill = {
   type: 'pattern',
   pattern: 'solid',
@@ -97,6 +114,10 @@ function ngayGioVn(d: Date): string {
   return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`;
 }
 
+function gioVn(d: Date): string {
+  return ngayGioVn(d).slice(11);
+}
+
 // Số hiển thị kiểu VN: nguyên thì không có phần thập phân, có thập phân thì dùng dấu phẩy.
 function soVn(n: number): string {
   if (Number.isInteger(n)) return String(n);
@@ -126,6 +147,7 @@ const NHAN_TRANG_THAI_HO_SO_CHUA_DUYET: Record<string, string> = {
 // (xem doi-tuong-khao-sat.util.ts#phaiXepLop) — loại hẳn khỏi "Phân lớp" và
 // "Tổng hợp theo mức học", dồn về sheet riêng này (kể cả chưa duyệt).
 const TEN_SHEET_NHAN_VIEN = 'Nhân viên (không xếp lớp)';
+const TEN_SHEET_SI_SO_BUOI = 'Sĩ số theo buổi';
 
 function lopHienTaiNhanVien(
   r: DongTinhToan,
@@ -214,6 +236,7 @@ export async function buildDanhSachChiaLopWorkbook(
   lopHoc: LopChiaLop[],
   dsRow: DongChiaLop[],
   thang: MucThang[],
+  buoi: BuoiChiaLop[] = [],
 ): Promise<Buffer> {
   const daTinh = dsRow.map(tinhToanDong);
   const nhanVien = daTinh.filter((r) => r.doi_tuong === 'nhan_vien');
@@ -361,6 +384,59 @@ export async function buildDanhSachChiaLopWorkbook(
   ]);
   sheet3.getRow(sheet3.rowCount).font = { bold: true };
   [20, 14].forEach((w, i) => (sheet3.getColumn(i + 1).width = w));
+
+  // ---- Sheet "Sĩ số theo buổi" (chỉ thêm khi khóa có lịch học) ----
+  if (buoi.length > 0) {
+    const sheetBuoi = workbook.addWorksheet(TEN_SHEET_SI_SO_BUOI);
+    const headerBuoi = [
+      'Giai đoạn',
+      'Lớp',
+      'Loại lớp',
+      'Buổi',
+      'Thời gian',
+      'Số phân lớp',
+      'Đổi ra',
+      'Đổi vào',
+      'Học bù vào',
+      'Sĩ số buổi',
+      'Sĩ số tối đa',
+      'Ghi chú',
+    ];
+    sheetBuoi.addRow([
+      'Sĩ số buổi = Số phân lớp − Đổi ra + Đổi vào + Học bù vào (chỉ tính đề nghị đã duyệt còn hiệu lực). Người học bù vẫn thuộc buổi gốc nên không tính vào "Đổi ra".',
+    ]);
+    sheetBuoi.mergeCells(1, 1, 1, headerBuoi.length);
+    sheetBuoi.addRow(headerBuoi);
+    sheetBuoi.getRow(2).font = { bold: true };
+    [...buoi]
+      .sort(
+        (a, b) =>
+          a.giai_doan_thu_tu - b.giai_doan_thu_tu ||
+          a.ten_lop.localeCompare(b.ten_lop, 'vi') ||
+          a.buoi_so - b.buoi_so ||
+          a.thoi_gian_bat_dau.getTime() - b.thoi_gian_bat_dau.getTime(),
+      )
+      .forEach((b) => {
+        const siSo = b.so_phan_lop - b.so_doi_ra + b.so_doi_vao + b.so_hoc_bu_vao;
+        sheetBuoi.addRow([
+          `GĐ${b.giai_doan_thu_tu}`,
+          b.ten_lop,
+          LOAI_LOP_LABEL[b.loai_lop],
+          b.buoi_so,
+          `${ngayGioVn(b.thoi_gian_bat_dau)}–${gioVn(b.thoi_gian_ket_thuc)}`,
+          b.so_phan_lop,
+          b.so_doi_ra,
+          b.so_doi_vao,
+          b.so_hoc_bu_vao,
+          siSo,
+          b.si_so_toi_da ?? '',
+          b.si_so_toi_da !== null && siSo > b.si_so_toi_da ? 'Vượt sĩ số tối đa' : '',
+        ]);
+      });
+    [10, 28, 12, 7, 24, 12, 9, 9, 11, 11, 12, 18].forEach(
+      (w, i) => (sheetBuoi.getColumn(i + 1).width = w),
+    );
+  }
 
   // ---- Sheet "Nhân viên (không xếp lớp)" (chỉ thêm khi có) ----
   if (nhanVien.length > 0) {
