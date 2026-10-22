@@ -222,6 +222,7 @@ function taoService(
           khoa: { id: 'k', ma_khoa: 'K1', ten_khoa: 'Khóa 1' },
         },
       ]),
+      count: jest.fn().mockResolvedValue(1),
     },
     // napChuyenCan: điểm danh mọi lớp / lớp hiện tại theo đăng ký (Dũng ở
     // lớp Zoom 02).
@@ -412,13 +413,26 @@ describe('HoTroHocVienService — danh sách theo buổi (ADR 0008 L7)', () => {
     );
     const ds = await service.buoiCuaLop('nd', 'C');
     expect(ds[0]).toEqual(
-      expect.objectContaining({ lich_id: 'L1', si_so: 4, so_doi_ra: 0, so_doi_vao: 1 }),
+      expect.objectContaining({
+        lich_id: 'L1',
+        si_so: 4,
+        so_doi_ra: 0,
+        so_doi_vao: 1,
+      }),
     );
     const kq = await service.hocVienCuaBuoi('nd', 'C', 'L1');
-    expect(kq.hoc_vien.map((h) => h.ho_ten)).toEqual(['An', 'Bình', 'Cường', 'Dũng']);
+    expect(kq.hoc_vien.map((h) => h.ho_ten)).toEqual([
+      'An',
+      'Bình',
+      'Cường',
+      'Dũng',
+    ]);
     expect(kq.doi_ra).toEqual([]);
     expect(kq.hoc_vien.find((h) => h.ho_ten === 'Dũng')).toEqual(
-      expect.objectContaining({ doi_buoi: 'vao', ghi_chu: 'Học bù – từ lớp Zoom 02' }),
+      expect.objectContaining({
+        doi_buoi: 'vao',
+        ghi_chu: 'Học bù – từ lớp Zoom 02',
+      }),
     );
   });
 
@@ -460,6 +474,40 @@ describe('HoTroHocVienService — danh sách theo buổi (ADR 0008 L7)', () => {
       nguoi_dung: { id: 'nd', vai_tro: 'ho_tro_hoc_vien' },
       // L1: 3 trong DS + 1 đổi ra; L2: 3.
       chi_tiet: { lop_id: 'C', lich_ids: ['L1', 'L2'], so_dong: 7 },
+    });
+  });
+
+  // Quản trị: cùng logic, phạm vi toàn hệ thống — không qua phân công hỗ trợ lớp.
+  it('quan_tri: không kiểm tra phân công, cùng sĩ số/DS như hỗ trợ', async () => {
+    const { service, scope } = taoService();
+    const ht = await service.buoiCuaLop('nd', 'C');
+    scope.damBaoLopCuaToi.mockClear();
+    expect(await service.buoiCuaLop('qt', 'C', 'quan_tri')).toEqual(ht);
+    const ds = await service.hocVienCuaBuoi('qt', 'C', 'L1', 'quan_tri');
+    expect(ds.buoi.lich_id).toBe('L1');
+    expect(scope.damBaoLopCuaToi).not.toHaveBeenCalled();
+  });
+
+  it('quan_tri: lớp không tồn tại -> 404, không đọc buổi', async () => {
+    const { service, prisma } = taoService();
+    prisma.lop_hoc.count.mockResolvedValue(0);
+    for (const goi of [
+      () => service.buoiCuaLop('qt', 'X', 'quan_tri'),
+      () => service.hocVienCuaBuoi('qt', 'X', 'L1', 'quan_tri'),
+      () => service.xuatDanhSachBuoi('qt', 'quan_tri', 'X'),
+    ]) {
+      await expect(goi()).rejects.toBeInstanceOf(NotFoundAppException);
+    }
+    expect(prisma.lich_hoc_lop.findMany).not.toHaveBeenCalled();
+  });
+
+  it('quan_tri xuất: ghi nhật ký xuat_danh_sach_buoi', async () => {
+    const { service, nhatKy } = taoService();
+    await service.xuatDanhSachBuoi('qt', 'quan_tri', 'C', 'L2');
+    expect(nhatKy.ghi).toHaveBeenCalledWith({
+      hanh_dong: 'xuat_danh_sach_buoi',
+      nguoi_dung: { id: 'qt', vai_tro: 'quan_tri' },
+      chi_tiet: { lop_id: 'C', lich_ids: ['L2'], so_dong: 3 },
     });
   });
 });

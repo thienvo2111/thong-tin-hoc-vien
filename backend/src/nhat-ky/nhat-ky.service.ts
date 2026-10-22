@@ -20,6 +20,7 @@ export type HanhDongNhatKy =
   | 'ho_tro_xuat_danh_sach_lop'
   | 'ho_tro_gv_gui_email_lich_day'
   | 'ho_tro_xuat_danh_sach_buoi'
+  | 'xuat_danh_sach_buoi'
   | 'ho_tro_xuat_tinh_hinh_di_hoc'
   | 'xuat_tinh_hinh_di_hoc'
   | 'ho_tro_diem_danh_bo_sung'
@@ -55,6 +56,7 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   ho_tro_gv_gui_email_lich_day: 'Người hỗ trợ GV gửi email lịch giảng dạy',
   ho_tro_xuat_danh_sach_buoi:
     'Người hỗ trợ xuất danh sách theo buổi (có ngày sinh)',
+  xuat_danh_sach_buoi: 'Xuất danh sách theo buổi (có ngày sinh)',
   ho_tro_xuat_tinh_hinh_di_hoc: 'Người hỗ trợ xuất tình hình đi học',
   xuat_tinh_hinh_di_hoc: 'Xuất tình hình đi học',
   ho_tro_diem_danh_bo_sung: 'Người hỗ trợ điểm danh bổ sung',
@@ -89,6 +91,7 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   ho_tro_xuat_danh_sach: 'tai_khoan',
   ho_tro_xuat_danh_sach_lop: 'tai_khoan',
   ho_tro_xuat_danh_sach_buoi: 'tai_khoan',
+  xuat_danh_sach_buoi: 'tai_khoan',
   ho_tro_xuat_tinh_hinh_di_hoc: 'tai_khoan',
   xuat_tinh_hinh_di_hoc: 'tai_khoan',
   ho_tro_diem_danh_bo_sung: 'hoc_tap',

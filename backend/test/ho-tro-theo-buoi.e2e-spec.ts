@@ -24,6 +24,7 @@ describe('Người hỗ trợ lớp — danh sách theo buổi (e2e, ADR 0008 L7
   let khoaId: string;
   let dv: Awaited<ReturnType<typeof taoDonViTest>>;
   let hoTro: { id: string; token: string };
+  let quanTri: { id: string; token: string };
   const lop = { a: '', b: '', c: '' };
   const lich = { a1: '', a2: '', b1: '', c1: '' };
   const hv = { an: '', binh: '', cuong: '', dung: '', em: '', giang: '' };
@@ -31,10 +32,10 @@ describe('Người hỗ trợ lớp — danh sách theo buổi (e2e, ADR 0008 L7
   const http = () => request(app.getHttpServer());
   const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
   const get = (path: string) => http().get(path).set(auth(hoTro.token));
-  const taiFile = (path: string) =>
+  const taiFile = (path: string, token = hoTro.token) =>
     http()
       .get(path)
-      .set(auth(hoTro.token))
+      .set(auth(token))
       .buffer(true)
       .parse((r, cb) => {
         const chunks: Buffer[] = [];
@@ -79,6 +80,10 @@ describe('Người hỗ trợ lớp — danh sách theo buổi (e2e, ADR 0008 L7
       mat_khau: 'QuanTri12345',
     });
     nguoiDungIds.push(qt.nguoiDung.id);
+    const dnQt = await http()
+      .post('/auth/dang-nhap')
+      .send({ ten_dang_nhap: qt.ten_dang_nhap, mat_khau: 'QuanTri12345' });
+    quanTri = { id: qt.nguoiDung.id, token: dnQt.body.token as string };
     const nd = await prisma.nguoi_dung.create({
       data: {
         ho_ten: 'Hỗ trợ buổi',
@@ -377,5 +382,84 @@ describe('Người hỗ trợ lớp — danh sách theo buổi (e2e, ADR 0008 L7
       200,
     );
     expect((await get(`/ho-tro-hoc-vien/hoc-vien/${hv.an}`)).status).toBe(200);
+  });
+
+  describe('Quản trị — cùng logic, phạm vi toàn hệ thống (GET /lop/:id/buoi...)', () => {
+    const getQt = (path: string) => http().get(path).set(auth(quanTri.token));
+
+    it('DS buổi + sĩ số giống người hỗ trợ', async () => {
+      const qt = await getQt(`/lop/${lop.a}/buoi`);
+      const ht = await get(`/ho-tro-hoc-vien/lop/${lop.a}/buoi`);
+      expect(qt.status).toBe(200);
+      expect(qt.body).toEqual(ht.body);
+      expect(qt.body[0]).toEqual(
+        expect.objectContaining({ lich_id: lich.a1, si_so: 2 }),
+      );
+    });
+
+    it('DS 1 buổi: có người đổi vào, người đổi ra nằm ở doi_ra', async () => {
+      const res = await getQt(`/lop/${lop.a}/buoi/${lich.a1}/hoc-vien`);
+      expect(res.status).toBe(200);
+      expect(
+        (res.body.hoc_vien as { hoc_vien_id: string }[]).map(
+          (h) => h.hoc_vien_id,
+        ),
+      ).toEqual([hv.cuong, hv.an]);
+      expect(res.body.doi_ra).toEqual([
+        expect.objectContaining({ hoc_vien_id: hv.binh, doi_buoi: 'ra' }),
+      ]);
+    });
+
+    it('lớp không gắn người hỗ trợ nào vẫn xem được', async () => {
+      const res = await getQt(`/lop/${lop.b}/buoi`);
+      expect(res.status).toBe(200);
+      expect(res.body.map((b: { lich_id: string }) => b.lich_id)).toEqual([
+        lich.b1,
+      ]);
+    });
+
+    it('lớp không tồn tại -> 404; buổi của lớp khác -> 404', async () => {
+      const khongCo = '00000000-0000-4000-8000-000000000000';
+      for (const path of [
+        `/lop/${khongCo}/buoi`,
+        `/lop/${khongCo}/buoi/${lich.a1}/hoc-vien`,
+        `/lop/${khongCo}/buoi/xuat`,
+      ]) {
+        const res = await getQt(path);
+        expect(res.status).toBe(404);
+        expect(res.body.error.message).toBe('Không tìm thấy lớp');
+      }
+      const res = await getQt(`/lop/${lop.a}/buoi/${lich.b1}/hoc-vien`);
+      expect(res.status).toBe(404);
+      expect(res.body.error.message).toBe('Không tìm thấy buổi học');
+    });
+
+    it('xuất tất cả buổi: 1 sheet/buổi, nhật ký xuat_danh_sach_buoi', async () => {
+      const dem = () =>
+        prisma.nhat_ky_hoat_dong.count({
+          where: {
+            hanh_dong: 'xuat_danh_sach_buoi',
+            nguoi_dung_id: quanTri.id,
+          },
+        });
+      const truoc = await dem();
+      const res = await taiFile(`/lop/${lop.a}/buoi/xuat`, quanTri.token);
+      expect(res.status).toBe(200);
+      expect(res.headers['cache-control']).toBe('no-store');
+      expect(res.headers['content-disposition']).toMatch(/ds-buoi-\d{8}\.xlsx/);
+      const wb = await docFile(res.body as Buffer);
+      expect(wb.worksheets.map((w) => w.name.slice(0, 6))).toEqual([
+        'GĐ1 B1',
+        'GĐ1 B2',
+      ]);
+      expect(vanBan(wb.worksheets[0]).join('\n')).toContain(
+        'Đổi buổi – từ lớp Zoom B',
+      );
+      expect(await dem()).toBe(truoc + 1);
+    });
+
+    it('người hỗ trợ không gọi được API quản trị -> 403', async () => {
+      expect((await get(`/lop/${lop.a}/buoi`)).status).toBe(403);
+    });
   });
 });

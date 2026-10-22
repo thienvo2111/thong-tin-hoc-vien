@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import {
   Alert,
   Anchor,
@@ -15,9 +15,15 @@ import {
   Tabs,
   Text,
   Title,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { useBuoiCuaLop, useHocVienCuaBuoi, useHocVienCuaLop, xuatDanhSachBuoiHoTro } from '@/api/hoTro';
+} from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import {
+  useBuoiCuaLop,
+  useHocVienCuaBuoi,
+  useHocVienCuaLop,
+  xuatDanhSachBuoiHoTro,
+  type NguonDanhSachBuoi,
+} from "@/api/hoTro";
 import type {
   BuoiCuaLopHoTro,
   DiemDanhBuoiHoTro,
@@ -26,12 +32,12 @@ import type {
   MaDiemDanhBuoi,
   NguonTinhDiemDanh,
   TongDiemDanhBuoi,
-} from '@/api/types';
-import { ApiError } from '@/api/client';
-import { thongDiepLoiChung } from '@/lib/loiApi';
-import { dinhDangGio, dinhDangNgay } from '@/lib/ngay';
-import { taiFileTuBlob } from '@/lib/taiFile';
-import { NHAN_LOAI_LOP, useXuatDanhSachLop } from './HoTroLop';
+} from "@/api/types";
+import { ApiError } from "@/api/client";
+import { thongDiepLoiChung } from "@/lib/loiApi";
+import { dinhDangGio, dinhDangNgay } from "@/lib/ngay";
+import { taiFileTuBlob } from "@/lib/taiFile";
+import { NHAN_LOAI_LOP, useXuatDanhSachLop } from "./HoTroLop";
 
 /** Danh sách học viên của 1 lớp được gắn (ADR 0008) — tab "Cả lớp" theo lớp gốc; tab "Theo buổi" tính đổi buổi (L7). */
 export default function HoTroLopChiTiet() {
@@ -41,7 +47,7 @@ export default function HoTroLopChiTiet() {
   const khongThay = error instanceof ApiError && error.status === 404;
 
   return (
-    <Container size="xl" py="lg" px={{ base: 'md', md: 28 }}>
+    <Container size="xl" py="lg" px={{ base: "md", md: 28 }}>
       <Stack gap="md">
         <Anchor component={Link} to="/ho-tro/lop" fz="sm">
           ← Lớp hỗ trợ
@@ -65,9 +71,15 @@ export default function HoTroLopChiTiet() {
                 <Title order={3}>
                   {NHAN_LOAI_LOP[data.lop.loai_lop]} · {data.lop.ten_lop}
                 </Title>
-                <Text fz="sm">{data.hoc_vien.length.toLocaleString('vi-VN')} học viên</Text>
+                <Text fz="sm">
+                  {data.hoc_vien.length.toLocaleString("vi-VN")} học viên
+                </Text>
               </Stack>
-              <Button variant="default" onClick={() => xuat(data.lop.lop_id)} loading={dangXuat === data.lop.lop_id}>
+              <Button
+                variant="default"
+                onClick={() => xuat(data.lop.lop_id)}
+                loading={dangXuat === data.lop.lop_id}
+              >
                 Xuất Excel lớp này
               </Button>
             </Group>
@@ -92,7 +104,7 @@ export default function HoTroLopChiTiet() {
 
 function BangCaLop({ hocVien }: { hocVien: HocVienCuaLop[] }) {
   return (
-    <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
+    <Paper withBorder radius={14} style={{ overflow: "hidden" }}>
       <Table.ScrollContainer minWidth={1100}>
         <Table verticalSpacing="sm" horizontalSpacing="md">
           <Table.Thead>
@@ -121,17 +133,22 @@ function BangCaLop({ hocVien }: { hocVien: HocVienCuaLop[] }) {
             {hocVien.map((h) => (
               <Table.Tr key={h.hoc_vien_id}>
                 <Table.Td>
-                  <Anchor component={Link} to={`/ho-tro/hoc-vien/${h.hoc_vien_id}`} fw={600} fz="sm">
+                  <Anchor
+                    component={Link}
+                    to={`/ho-tro/hoc-vien/${h.hoc_vien_id}`}
+                    fw={600}
+                    fz="sm"
+                  >
                     {h.ho_ten}
                   </Anchor>
                 </Table.Td>
-                <Table.Td>{h.ma_dinh_danh_moet ?? '—'}</Table.Td>
+                <Table.Td>{h.ma_dinh_danh_moet ?? "—"}</Table.Td>
                 <Table.Td>{h.ngay_sinh}</Table.Td>
                 <Table.Td>{h.don_vi_cong_tac_ten}</Table.Td>
-                <Table.Td>{h.so_dien_thoai_lien_he ?? '—'}</Table.Td>
-                <Table.Td>{h.email_lien_he ?? '—'}</Table.Td>
-                <Table.Td>{h.cum ?? '—'}</Table.Td>
-                <Table.Td>{h.giai_doan.join(', ') || '—'}</Table.Td>
+                <Table.Td>{h.so_dien_thoai_lien_he ?? "—"}</Table.Td>
+                <Table.Td>{h.email_lien_he ?? "—"}</Table.Td>
+                <Table.Td>{h.cum ?? "—"}</Table.Td>
+                <Table.Td>{h.giai_doan.join(", ") || "—"}</Table.Td>
                 <Table.Td>
                   {h.chuyen_can.co_mat}/{h.chuyen_can.da_dien_ra}
                 </Table.Td>
@@ -150,16 +167,16 @@ function nhanBuoi(b: BuoiCuaLopHoTro): string {
   return `GĐ${b.giai_doan.thu_tu} – Buổi ${b.buoi_so} · ${ngay} ${dinhDangGio(b.thoi_gian_bat_dau)} · ${b.si_so} HV`;
 }
 
-function useXuatDanhSachBuoi(lopId: string) {
+function useXuatDanhSachBuoi(lopId: string, nguon: NguonDanhSachBuoi) {
   const [dangXuat, setDangXuat] = useState<string | null>(null);
   async function xuat(lichId?: string) {
-    setDangXuat(lichId ?? 'tat-ca');
+    setDangXuat(lichId ?? "tat-ca");
     try {
-      const blob = await xuatDanhSachBuoiHoTro(lopId, lichId);
-      const ngay = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const blob = await xuatDanhSachBuoiHoTro(lopId, lichId, nguon);
+      const ngay = new Date().toISOString().slice(0, 10).replace(/-/g, "");
       taiFileTuBlob(blob, `ds-buoi-${ngay}.xlsx`);
     } catch (err) {
-      notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+      notifications.show({ color: "red", message: thongDiepLoiChung(err) });
     } finally {
       setDangXuat(null);
     }
@@ -170,19 +187,34 @@ function useXuatDanhSachBuoi(lopId: string) {
 /** Buổi mặc định: buổi gần nhất chưa kết thúc, hết thì buổi cuối. */
 function buoiMacDinh(ds: BuoiCuaLopHoTro[]): string | null {
   const now = Date.now();
-  return (ds.find((b) => new Date(b.thoi_gian_ket_thuc).getTime() >= now) ?? ds[ds.length - 1])?.lich_id ?? null;
+  return (
+    (
+      ds.find((b) => new Date(b.thoi_gian_ket_thuc).getTime() >= now) ??
+      ds[ds.length - 1]
+    )?.lich_id ?? null
+  );
 }
 
-function TheoBuoi({ lopId }: { lopId: string }) {
-  const dsBuoi = useBuoiCuaLop(lopId);
+/** Tab "Theo buổi" — dùng chung cho người hỗ trợ (lớp được gắn) và Quản trị (mọi lớp, AdminKhoaChiTiet). */
+export function TheoBuoi({
+  lopId,
+  nguon = "ho_tro",
+}: {
+  lopId: string;
+  nguon?: NguonDanhSachBuoi;
+}) {
+  const dsBuoi = useBuoiCuaLop(lopId, nguon);
   const [chon, setChon] = useState<string | null>(null);
   const lichId = chon ?? (dsBuoi.data ? buoiMacDinh(dsBuoi.data) : null);
-  const ds = useHocVienCuaBuoi(lopId, lichId);
-  const { dangXuat, xuat } = useXuatDanhSachBuoi(lopId);
+  const ds = useHocVienCuaBuoi(lopId, lichId, nguon);
+  const { dangXuat, xuat } = useXuatDanhSachBuoi(lopId, nguon);
+  const linkHocVien =
+    nguon === "quan_tri" ? "/admin/hoc-vien" : "/ho-tro/hoc-vien";
   const buoi = dsBuoi.data?.find((b) => b.lich_id === lichId);
 
   if (dsBuoi.isLoading) return <Skeleton height={120} />;
-  if (dsBuoi.isError) return <Alert color="red">{thongDiepLoiChung(dsBuoi.error)}</Alert>;
+  if (dsBuoi.isError)
+    return <Alert color="red">{thongDiepLoiChung(dsBuoi.error)}</Alert>;
   if (!dsBuoi.data || dsBuoi.data.length === 0) {
     return (
       <Alert color="yellow" variant="light">
@@ -193,15 +225,18 @@ function TheoBuoi({ lopId }: { lopId: string }) {
   return (
     <Stack gap="md">
       <Text fz="sm" c="dimmed">
-        Danh sách từng buổi đã tính đổi buổi được duyệt: có người đổi vào từ lớp khác, không có người đã chuyển sang lớp
-        khác.
+        Danh sách từng buổi đã tính đổi buổi được duyệt: có người đổi vào từ lớp
+        khác, không có người đã chuyển sang lớp khác.
       </Text>
       <Group justify="space-between" align="flex-end">
         <Group align="flex-end" gap="sm">
           <Select
             label="Buổi học"
             w={340}
-            data={dsBuoi.data.map((b) => ({ value: b.lich_id, label: nhanBuoi(b) }))}
+            data={dsBuoi.data.map((b) => ({
+              value: b.lich_id,
+              label: nhanBuoi(b),
+            }))}
             value={lichId}
             onChange={setChon}
             allowDeselect={false}
@@ -226,7 +261,11 @@ function TheoBuoi({ lopId }: { lopId: string }) {
           >
             Xuất buổi này
           </Button>
-          <Button variant="default" onClick={() => xuat()} loading={dangXuat === 'tat-ca'}>
+          <Button
+            variant="default"
+            onClick={() => xuat()}
+            loading={dangXuat === "tat-ca"}
+          >
             Xuất tất cả buổi
           </Button>
         </Group>
@@ -238,11 +277,21 @@ function TheoBuoi({ lopId }: { lopId: string }) {
           <Text fz="sm" fw={600}>
             {moTaTongDiemDanh(ds.data.buoi.tong_diem_danh)}
           </Text>
-          <BangBuoi hocVien={ds.data.hoc_vien} trong="Buổi này chưa có học viên nào." />
+          <BangBuoi
+            hocVien={ds.data.hoc_vien}
+            trong="Buổi này chưa có học viên nào."
+            linkHocVien={linkHocVien}
+          />
           {ds.data.doi_ra.length > 0 && (
             <Stack gap="xs">
-              <Title order={5}>Đã chuyển sang lớp khác (không học buổi này)</Title>
-              <BangBuoi hocVien={ds.data.doi_ra} trong="" />
+              <Title order={5}>
+                Đã chuyển sang lớp khác (không học buổi này)
+              </Title>
+              <BangBuoi
+                hocVien={ds.data.doi_ra}
+                trong=""
+                linkHocVien={linkHocVien}
+              />
             </Stack>
           )}
         </>
@@ -252,12 +301,12 @@ function TheoBuoi({ lopId }: { lopId: string }) {
 }
 
 export const MAU_DIEM_DANH: Record<MaDiemDanhBuoi, string> = {
-  co_mat: 'green',
-  vang: 'red',
-  vang_co_phep: 'orange',
-  da_bao_vang: 'orange',
-  chua_diem_danh: 'gray',
-  chua_den_gio: 'gray',
+  co_mat: "green",
+  vang: "red",
+  vang_co_phep: "orange",
+  da_bao_vang: "orange",
+  chua_diem_danh: "gray",
+  chua_den_gio: "gray",
 };
 
 /** ADR 0008 L8 — cùng câu với dòng tổng hợp trong file Excel buổi. */
@@ -266,8 +315,12 @@ function moTaTongDiemDanh(t: TongDiemDanhBuoi): string {
 }
 
 /** ADR 0010 T7: nhãn nhỏ khi buổi được tính nhờ dòng ở lớp khác (học bù / lớp cũ). */
-export function BadgeLopKhac({ nguonTinh }: { nguonTinh: NguonTinhDiemDanh | null }) {
-  if (nguonTinh !== 'lop_khac') return null;
+export function BadgeLopKhac({
+  nguonTinh,
+}: {
+  nguonTinh: NguonTinhDiemDanh | null;
+}) {
+  if (nguonTinh !== "lop_khac") return null;
   return (
     <Badge color="gray" variant="outline" size="xs" tt="none">
       Lớp khác
@@ -283,7 +336,7 @@ function BadgeDiemDanh({ diemDanh }: { diemDanh: DiemDanhBuoiHoTro }) {
         variant="light"
         size="sm"
         tt="none"
-        style={{ whiteSpace: 'normal', height: 'auto' }}
+        style={{ whiteSpace: "normal", height: "auto" }}
       >
         {diemDanh.nhan}
       </Badge>
@@ -292,9 +345,17 @@ function BadgeDiemDanh({ diemDanh }: { diemDanh: DiemDanhBuoiHoTro }) {
   );
 }
 
-function BangBuoi({ hocVien, trong }: { hocVien: HocVienCuaBuoi[]; trong: string }) {
+function BangBuoi({
+  hocVien,
+  trong,
+  linkHocVien,
+}: {
+  hocVien: HocVienCuaBuoi[];
+  trong: string;
+  linkHocVien: string;
+}) {
   return (
-    <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
+    <Paper withBorder radius={14} style={{ overflow: "hidden" }}>
       <Table.ScrollContainer minWidth={1100}>
         <Table verticalSpacing="sm" horizontalSpacing="md">
           <Table.Thead>
@@ -321,17 +382,34 @@ function BangBuoi({ hocVien, trong }: { hocVien: HocVienCuaBuoi[]; trong: string
               </Table.Tr>
             )}
             {hocVien.map((h) => (
-              <Table.Tr key={h.hoc_vien_id} bg={h.doi_buoi === 'vao' ? 'var(--mantine-color-teal-light)' : undefined}>
+              <Table.Tr
+                key={h.hoc_vien_id}
+                bg={
+                  h.doi_buoi === "vao"
+                    ? "var(--mantine-color-teal-light)"
+                    : undefined
+                }
+              >
                 <Table.Td>
                   {/* ADR 0011 P1: người đổi vào (đổi buổi đã duyệt còn hiệu lực) thuộc phạm vi → có link chi tiết. */}
                   {h.doi_buoi === null ? (
-                    <Anchor component={Link} to={`/ho-tro/hoc-vien/${h.hoc_vien_id}`} fw={600} fz="sm">
+                    <Anchor
+                      component={Link}
+                      to={`${linkHocVien}/${h.hoc_vien_id}`}
+                      fw={600}
+                      fz="sm"
+                    >
                       {h.ho_ten}
                     </Anchor>
                   ) : (
                     <Group gap={6} wrap="nowrap">
-                      {h.doi_buoi === 'vao' ? (
-                        <Anchor component={Link} to={`/ho-tro/hoc-vien/${h.hoc_vien_id}`} fw={600} fz="sm">
+                      {h.doi_buoi === "vao" ? (
+                        <Anchor
+                          component={Link}
+                          to={`${linkHocVien}/${h.hoc_vien_id}`}
+                          fw={600}
+                          fz="sm"
+                        >
                           {h.ho_ten}
                         </Anchor>
                       ) : (
@@ -339,7 +417,7 @@ function BangBuoi({ hocVien, trong }: { hocVien: HocVienCuaBuoi[]; trong: string
                           {h.ho_ten}
                         </Text>
                       )}
-                      {h.doi_buoi === 'vao' && (
+                      {h.doi_buoi === "vao" && (
                         <Badge color="teal" variant="light" size="sm">
                           Đổi vào
                         </Badge>
@@ -347,14 +425,16 @@ function BangBuoi({ hocVien, trong }: { hocVien: HocVienCuaBuoi[]; trong: string
                     </Group>
                   )}
                 </Table.Td>
-                <Table.Td>{h.ma_dinh_danh_moet ?? '—'}</Table.Td>
+                <Table.Td>{h.ma_dinh_danh_moet ?? "—"}</Table.Td>
                 <Table.Td>{h.ngay_sinh}</Table.Td>
                 <Table.Td>{h.don_vi_cong_tac_ten}</Table.Td>
-                <Table.Td>{h.so_dien_thoai_lien_he ?? '—'}</Table.Td>
-                <Table.Td>{h.email_lien_he ?? '—'}</Table.Td>
-                <Table.Td>{h.cum ?? '—'}</Table.Td>
-                <Table.Td>{h.diem_danh ? <BadgeDiemDanh diemDanh={h.diem_danh} /> : '—'}</Table.Td>
-                <Table.Td>{h.ghi_chu ?? ''}</Table.Td>
+                <Table.Td>{h.so_dien_thoai_lien_he ?? "—"}</Table.Td>
+                <Table.Td>{h.email_lien_he ?? "—"}</Table.Td>
+                <Table.Td>{h.cum ?? "—"}</Table.Td>
+                <Table.Td>
+                  {h.diem_danh ? <BadgeDiemDanh diemDanh={h.diem_danh} /> : "—"}
+                </Table.Td>
+                <Table.Td>{h.ghi_chu ?? ""}</Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>

@@ -1,5 +1,5 @@
-import { Fragment, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Fragment, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import {
   Alert,
   Anchor,
@@ -22,10 +22,10 @@ import {
   Textarea,
   TextInput,
   Title,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { ApiError } from '@/api/client';
-import { useTenDonViTheoId } from '@/api/danhMuc';
+} from "@mantine/core";
+import { notifications } from "@mantine/notifications";
+import { ApiError } from "@/api/client";
+import { useTenDonViTheoId } from "@/api/danhMuc";
 import {
   useCapNhatCum,
   useCapNhatGiaiDoan,
@@ -41,7 +41,7 @@ import {
   useThemNhanSu,
   useXoaNhanSu,
   xuatDanhSachChiaLop,
-} from '@/api/khoaBoiDuong';
+} from "@/api/khoaBoiDuong";
 import type {
   CumHocVien,
   GiaiDoanKhoa,
@@ -53,68 +53,94 @@ import type {
   TrangThaiActive,
   TrangThaiLichHoc,
   VaiTroNhanSuLop,
-} from '@/api/types';
-import { useToi } from '@/auth/AuthContext';
-import { chuanHoaLienKet } from '@/lib/lienKet';
-import { thongDiepLoiChung, loiFieldsThanhMap } from '@/lib/loiApi';
-import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
-import { locTiengViet } from '@/lib/timKiemTiengViet';
-import { KhoaTrangThaiBadge } from '@/components/KhoaTrangThaiBadge';
-import { SelectDonViTimKiem } from '@/components/SelectDonViTimKiem';
-import { AdminPageHeader } from './AdminPageHeader';
-import { ModalImportLopHoc } from './ModalImportLopHoc';
-import { ChonNguoiHoTroCum, ChonNguoiHoTroLop } from './ChonNguoiHoTroCum';
-import { SelectDiemHoc } from '@/components/SelectDiemHoc';
-import { ModalPhanCongBuoi } from './ModalPhanCongBuoi';
-import { ChonNhomHoTroGv } from './ChonNhomHoTroGv';
-import { BangKiemEditor } from './BangKiemEditor';
-import { CauHinhDiemDanhZoom } from './CauHinhDiemDanhZoom';
-import { CauHinhDoiBuoi } from './CauHinhDoiBuoi';
-import { KhoiDotNhuCauMuc } from './KhoiDotNhuCauMuc';
-import { CanhBaoZoomThieuLink } from './CanhBaoZoomThieuLink';
-import { BangDiemDanhLop } from '@/components/BangDiemDanhLop';
+} from "@/api/types";
+import { useToi } from "@/auth/AuthContext";
+import { chuanHoaLienKet } from "@/lib/lienKet";
+import { thongDiepLoiChung, loiFieldsThanhMap } from "@/lib/loiApi";
+import { dinhDangNgay, dinhDangNgayGio } from "@/lib/ngay";
+import { locTiengViet } from "@/lib/timKiemTiengViet";
+import { KhoaTrangThaiBadge } from "@/components/KhoaTrangThaiBadge";
+import { SelectDonViTimKiem } from "@/components/SelectDonViTimKiem";
+import { AdminPageHeader } from "./AdminPageHeader";
+import { ModalImportLopHoc } from "./ModalImportLopHoc";
+import { ChonNguoiHoTroCum, ChonNguoiHoTroLop } from "./ChonNguoiHoTroCum";
+import { SelectDiemHoc } from "@/components/SelectDiemHoc";
+import { ModalPhanCongBuoi } from "./ModalPhanCongBuoi";
+import { ChonNhomHoTroGv } from "./ChonNhomHoTroGv";
+import { BangKiemEditor } from "./BangKiemEditor";
+import { CauHinhDiemDanhZoom } from "./CauHinhDiemDanhZoom";
+import { CauHinhDoiBuoi } from "./CauHinhDoiBuoi";
+import { KhoiDotNhuCauMuc } from "./KhoiDotNhuCauMuc";
+import { CanhBaoZoomThieuLink } from "./CanhBaoZoomThieuLink";
+import { BangDiemDanhLop } from "@/components/BangDiemDanhLop";
+import { TheoBuoi } from "@/pages/HoTro/HoTroLopChiTiet";
 
-const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
-const MAU_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'blue', zoom: 'grape', vle: 'teal' };
-const TUY_CHON_LOAI_LOP = (Object.keys(NHAN_LOAI_LOP) as LoaiLop[]).map((v) => ({ value: v, label: NHAN_LOAI_LOP[v] }));
+const NHAN_LOAI_LOP: Record<LoaiLop, string> = {
+  truc_tiep: "Trực tiếp",
+  zoom: "Zoom",
+  vle: "VLE",
+};
+const MAU_LOAI_LOP: Record<LoaiLop, string> = {
+  truc_tiep: "blue",
+  zoom: "grape",
+  vle: "teal",
+};
+const TUY_CHON_LOAI_LOP = (Object.keys(NHAN_LOAI_LOP) as LoaiLop[]).map(
+  (v) => ({ value: v, label: NHAN_LOAI_LOP[v] }),
+);
 
-const NHAN_MUC_NANG_LUC: Record<MucNangLuc, string> = { co_ban: 'Cơ bản', thanh_thao: 'Thành thạo', nang_cao: 'Nâng cao' };
-const TUY_CHON_MUC_NANG_LUC = (Object.keys(NHAN_MUC_NANG_LUC) as MucNangLuc[]).map((v) => ({
+const NHAN_MUC_NANG_LUC: Record<MucNangLuc, string> = {
+  co_ban: "Cơ bản",
+  thanh_thao: "Thành thạo",
+  nang_cao: "Nâng cao",
+};
+const TUY_CHON_MUC_NANG_LUC = (
+  Object.keys(NHAN_MUC_NANG_LUC) as MucNangLuc[]
+).map((v) => ({
   value: v,
   label: NHAN_MUC_NANG_LUC[v],
 }));
 
 const NHAN_HINH_THUC_GIAI_DOAN: Record<HinhThucGiaiDoan, string> = {
-  truc_tiep: 'Trực tiếp',
-  truc_tuyen: 'Trực tuyến',
-  danh_gia: 'Đánh giá',
-  khac: 'Khác',
+  truc_tiep: "Trực tiếp",
+  truc_tuyen: "Trực tuyến",
+  danh_gia: "Đánh giá",
+  khac: "Khác",
 };
-const TUY_CHON_HINH_THUC_GIAI_DOAN = (Object.keys(NHAN_HINH_THUC_GIAI_DOAN) as HinhThucGiaiDoan[]).map((v) => ({
+const TUY_CHON_HINH_THUC_GIAI_DOAN = (
+  Object.keys(NHAN_HINH_THUC_GIAI_DOAN) as HinhThucGiaiDoan[]
+).map((v) => ({
   value: v,
   label: NHAN_HINH_THUC_GIAI_DOAN[v],
 }));
 
-const NHAN_VAI_TRO_NHAN_SU: Record<VaiTroNhanSuLop, string> = { giang_vien: 'Giảng viên', ho_tro: 'Hỗ trợ' };
-const TUY_CHON_VAI_TRO_NHAN_SU = (Object.keys(NHAN_VAI_TRO_NHAN_SU) as VaiTroNhanSuLop[]).map((v) => ({
+const NHAN_VAI_TRO_NHAN_SU: Record<VaiTroNhanSuLop, string> = {
+  giang_vien: "Giảng viên",
+  ho_tro: "Hỗ trợ",
+};
+const TUY_CHON_VAI_TRO_NHAN_SU = (
+  Object.keys(NHAN_VAI_TRO_NHAN_SU) as VaiTroNhanSuLop[]
+).map((v) => ({
   value: v,
   label: NHAN_VAI_TRO_NHAN_SU[v],
 }));
 
 const NHAN_TRANG_THAI_LICH_HOC: Record<TrangThaiLichHoc, string> = {
-  chua_dien_ra: 'Chưa diễn ra',
-  dang_dien_ra: 'Đang diễn ra',
-  ket_thuc: 'Kết thúc',
+  chua_dien_ra: "Chưa diễn ra",
+  dang_dien_ra: "Đang diễn ra",
+  ket_thuc: "Kết thúc",
 };
-const TUY_CHON_TRANG_THAI_LICH_HOC = (Object.keys(NHAN_TRANG_THAI_LICH_HOC) as TrangThaiLichHoc[]).map((v) => ({
+const TUY_CHON_TRANG_THAI_LICH_HOC = (
+  Object.keys(NHAN_TRANG_THAI_LICH_HOC) as TrangThaiLichHoc[]
+).map((v) => ({
   value: v,
   label: NHAN_TRANG_THAI_LICH_HOC[v],
 }));
 
 function BadgeHoatDong({ trangThai }: { trangThai: TrangThaiActive }) {
   return (
-    <Badge color={trangThai === 'active' ? 'green' : 'gray'} radius="xl">
-      {trangThai === 'active' ? 'Đang hoạt động' : 'Đã vô hiệu hóa'}
+    <Badge color={trangThai === "active" ? "green" : "gray"} radius="xl">
+      {trangThai === "active" ? "Đang hoạt động" : "Đã vô hiệu hóa"}
     </Badge>
   );
 }
@@ -129,17 +155,21 @@ function thongDiepLoiKhoa(err: unknown): string {
 
 interface FormTaoLop {
   ten_lop: string;
-  loai_lop: LoaiLop | '';
+  loai_lop: LoaiLop | "";
   si_so_toi_da: string;
 }
-const FORM_TAO_LOP_RONG: FormTaoLop = { ten_lop: '', loai_lop: '', si_so_toi_da: '' };
+const FORM_TAO_LOP_RONG: FormTaoLop = {
+  ten_lop: "",
+  loai_lop: "",
+  si_so_toi_da: "",
+};
 
 interface FormSuaLop {
   ten_lop: string;
-  loai_lop: LoaiLop | '';
+  loai_lop: LoaiLop | "";
   si_so_toi_da: string;
   nhom_hoc_vien: string;
-  muc_nang_luc: MucNangLuc | '';
+  muc_nang_luc: MucNangLuc | "";
 }
 
 interface FormBuoiHoc {
@@ -153,13 +183,13 @@ interface FormBuoiHoc {
   phong: string;
 }
 const FORM_BUOI_RONG: FormBuoiHoc = {
-  giai_doan_id: '',
-  buoi_so: '1',
-  thoi_gian_bat_dau: '',
-  thoi_gian_ket_thuc: '',
-  dia_diem_hoac_link: '',
+  giai_doan_id: "",
+  buoi_so: "1",
+  thoi_gian_bat_dau: "",
+  thoi_gian_ket_thuc: "",
+  dia_diem_hoac_link: "",
   diem_hoc_id: null,
-  phong: '',
+  phong: "",
 };
 
 interface FormSuaBuoiHoc extends FormBuoiHoc {
@@ -169,20 +199,25 @@ interface FormSuaBuoiHoc extends FormBuoiHoc {
 
 /** Cảnh báo 🟡 từ API (vd vượt số phòng của điểm học) — không chặn, chỉ báo cho quản trị biết. */
 function baoCanhBao(canhBao: string[] | undefined) {
-  for (const cb of canhBao ?? []) notifications.show({ color: 'yellow', message: cb, autoClose: 8000 });
+  for (const cb of canhBao ?? [])
+    notifications.show({ color: "yellow", message: cb, autoClose: 8000 });
 }
 
 interface FormNhanSu {
   ho_ten: string;
-  vai_tro: VaiTroNhanSuLop | '';
+  vai_tro: VaiTroNhanSuLop | "";
   so_dien_thoai: string;
 }
-const FORM_NHAN_SU_RONG: FormNhanSu = { ho_ten: '', vai_tro: '', so_dien_thoai: '' };
+const FORM_NHAN_SU_RONG: FormNhanSu = {
+  ho_ten: "",
+  vai_tro: "",
+  so_dien_thoai: "",
+};
 
 interface FormGiaiDoan {
   thu_tu: string;
   ten_giai_doan: string;
-  hinh_thuc: HinhThucGiaiDoan | '';
+  hinh_thuc: HinhThucGiaiDoan | "";
   thoi_gian_bat_dau: string;
   thoi_gian_ket_thuc: string;
   // Phân lớp theo giai đoạn (spec 2026-10-02): thông tin chung cho giai đoạn không gán lớp.
@@ -190,13 +225,13 @@ interface FormGiaiDoan {
   huong_dan: string;
 }
 const FORM_GIAI_DOAN_RONG: FormGiaiDoan = {
-  thu_tu: '',
-  ten_giai_doan: '',
-  hinh_thuc: '',
-  thoi_gian_bat_dau: '',
-  thoi_gian_ket_thuc: '',
-  link_hoac_dia_diem: '',
-  huong_dan: '',
+  thu_tu: "",
+  ten_giai_doan: "",
+  hinh_thuc: "",
+  thoi_gian_bat_dau: "",
+  thoi_gian_ket_thuc: "",
+  link_hoac_dia_diem: "",
+  huong_dan: "",
 };
 
 interface FormCum {
@@ -204,14 +239,19 @@ interface FormCum {
   link_zalo: string;
   ghi_chu: string;
 }
-const FORM_CUM_RONG: FormCum = { ten_cum: '', link_zalo: '', ghi_chu: '' };
+const FORM_CUM_RONG: FormCum = { ten_cum: "", link_zalo: "", ghi_chu: "" };
 
 type XacNhanToggle =
-  | { loai: 'lop'; id: string; ten: string; dangHoatDong: boolean }
-  | { loai: 'giai-doan'; id: string; ten: string; dangHoatDong: boolean }
-  | { loai: 'cum'; id: string; ten: string; dangHoatDong: boolean };
+  | { loai: "lop"; id: string; ten: string; dangHoatDong: boolean }
+  | { loai: "giai-doan"; id: string; ten: string; dangHoatDong: boolean }
+  | { loai: "cum"; id: string; ten: string; dangHoatDong: boolean };
 
-type XacNhanXoa = { loai: 'nhan-su'; lopId: string; nhanSuId: string; ten: string };
+type XacNhanXoa = {
+  loai: "nhan-su";
+  lopId: string;
+  nhanSuId: string;
+  ten: string;
+};
 
 interface FormSuaKhoa {
   ma_khoa: string;
@@ -230,18 +270,22 @@ interface FormSuaKhoa {
  */
 export default function AdminKhoaChiTiet() {
   const { id } = useParams<{ id: string }>();
-  const khoaId = id ?? '';
+  const khoaId = id ?? "";
   const { nguoiDung } = useToi();
-  const vaiTro = nguoiDung?.vai_tro ?? '';
-  const laQuanTri = vaiTro === 'quan_tri';
+  const vaiTro = nguoiDung?.vai_tro ?? "";
+  const laQuanTri = vaiTro === "quan_tri";
   // ADR 0005 Z7 (issue #26): bảng điểm danh của 1 lớp, Quản trị sửa nhanh từng ô.
   const [lopDiemDanh, setLopDiemDanh] = useState<LopHoc | null>(null);
+  const [lopTheoBuoi, setLopTheoBuoi] = useState<LopHoc | null>(null);
   const { data: khoa, isLoading, isError, error } = useChiTietKhoa(id);
   const donVi = useDonViChoKhoa();
   // Chỉ gồm so_gddt + khac (danh mục nhỏ, xem useDonViChoKhoa) — Trường chọn qua SelectDonViTimKiem.
   const donViMap = new Map((donVi.data ?? []).map((d) => [d.id, d.ten_don_vi]));
   // Tên đơn vị đặt hàng để hiện ở header "Đặt hàng: ..." — tra thêm theo id khi là trường.
-  const tenDonViDatHang = useTenDonViTheoId([khoa?.don_vi_dat_hang_id], donViMap);
+  const tenDonViDatHang = useTenDonViTheoId(
+    [khoa?.don_vi_dat_hang_id],
+    donViMap,
+  );
 
   // Select "Đơn vị đặt hàng" (form sửa khóa) — cùng cách nhóm với form tạo khóa ở AdminKhoaBoiDuong.
   // Trường chọn riêng qua SelectDonViTimKiem (danh mục trường quá lớn để tải trọn vào 1 Select tĩnh).
@@ -249,9 +293,13 @@ export default function AdminKhoaChiTiet() {
     const list = donVi.data ?? [];
     const nhom = (loai: string, group: string) => ({
       group,
-      items: list.filter((d) => d.loai_don_vi === loai).map((d) => ({ value: d.id, label: d.ten_don_vi })),
+      items: list
+        .filter((d) => d.loai_don_vi === loai)
+        .map((d) => ({ value: d.id, label: d.ten_don_vi })),
     });
-    return [nhom('so_gddt', 'Sở GD&ĐT'), nhom('khac', 'Đơn vị khác')].filter((n) => n.items.length > 0);
+    return [nhom("so_gddt", "Sở GD&ĐT"), nhom("khac", "Đơn vị khác")].filter(
+      (n) => n.items.length > 0,
+    );
   }, [donVi.data]);
 
   // --- Sửa khóa (chỉ quan_tri) ------------------------------------------
@@ -262,14 +310,16 @@ export default function AdminKhoaChiTiet() {
   const [modalSuaKhoa, setModalSuaKhoa] = useState(false);
   const [formSuaKhoa, setFormSuaKhoa] = useState<FormSuaKhoa | null>(null);
   const [loiSuaKhoa, setLoiSuaKhoa] = useState<Record<string, string>>({});
-  const laTruongDatHangSua = !!formSuaKhoa?.don_vi_dat_hang_id && !donViMap.has(formSuaKhoa.don_vi_dat_hang_id);
+  const laTruongDatHangSua =
+    !!formSuaKhoa?.don_vi_dat_hang_id &&
+    !donViMap.has(formSuaKhoa.don_vi_dat_hang_id);
 
   function moModalSuaKhoa() {
     if (!khoa) return;
     setFormSuaKhoa({
       ma_khoa: khoa.ma_khoa,
       ten_khoa: khoa.ten_khoa,
-      dia_diem: khoa.dia_diem ?? '',
+      dia_diem: khoa.dia_diem ?? "",
       thoi_gian_bat_dau: khoa.thoi_gian_bat_dau.slice(0, 10),
       thoi_gian_ket_thuc: khoa.thoi_gian_ket_thuc.slice(0, 10),
       don_vi_dat_hang_id: khoa.don_vi_dat_hang_id,
@@ -292,14 +342,21 @@ export default function AdminKhoaChiTiet() {
       },
       {
         onSuccess: (khoaMoi) => {
-          notifications.show({ color: 'green', message: `Đã lưu thay đổi khóa "${khoaMoi.ten_khoa}"` });
+          notifications.show({
+            color: "green",
+            message: `Đã lưu thay đổi khóa "${khoaMoi.ten_khoa}"`,
+          });
           setModalSuaKhoa(false);
           setFormSuaKhoa(null);
         },
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiSuaKhoa(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else
+            notifications.show({
+              color: "red",
+              message: thongDiepLoiKhoa(err),
+            });
         },
       },
     );
@@ -307,11 +364,11 @@ export default function AdminKhoaChiTiet() {
 
   const formSuaKhoaHopLe =
     !!formSuaKhoa &&
-    formSuaKhoa.ma_khoa.trim() !== '' &&
-    formSuaKhoa.ten_khoa.trim() !== '' &&
-    formSuaKhoa.thoi_gian_bat_dau !== '' &&
-    formSuaKhoa.thoi_gian_ket_thuc !== '' &&
-    formSuaKhoa.don_vi_dat_hang_id !== '';
+    formSuaKhoa.ma_khoa.trim() !== "" &&
+    formSuaKhoa.ten_khoa.trim() !== "" &&
+    formSuaKhoa.thoi_gian_bat_dau !== "" &&
+    formSuaKhoa.thoi_gian_ket_thuc !== "" &&
+    formSuaKhoa.don_vi_dat_hang_id !== "";
 
   // --- Lớp học -------------------------------------------------------------
   const taoLop = useTaoLop(khoaId);
@@ -334,7 +391,7 @@ export default function AdminKhoaChiTiet() {
     try {
       await xuatDanhSachChiaLop(khoa.id, khoa.ma_khoa);
     } catch (err) {
-      notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+      notifications.show({ color: "red", message: thongDiepLoiChung(err) });
     } finally {
       setDangXuatChiaLop(false);
     }
@@ -352,17 +409,26 @@ export default function AdminKhoaChiTiet() {
       {
         ten_lop: formTaoLop.ten_lop.trim(),
         loai_lop: formTaoLop.loai_lop as LoaiLop,
-        si_so_toi_da: formTaoLop.si_so_toi_da ? Number(formTaoLop.si_so_toi_da) : undefined,
+        si_so_toi_da: formTaoLop.si_so_toi_da
+          ? Number(formTaoLop.si_so_toi_da)
+          : undefined,
       },
       {
         onSuccess: (lop) => {
-          notifications.show({ color: 'green', message: `Đã tạo lớp "${lop.ten_lop}"` });
+          notifications.show({
+            color: "green",
+            message: `Đã tạo lớp "${lop.ten_lop}"`,
+          });
           setModalTaoLop(false);
         },
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiTaoLop(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else
+            notifications.show({
+              color: "red",
+              message: thongDiepLoiKhoa(err),
+            });
         },
       },
     );
@@ -373,9 +439,9 @@ export default function AdminKhoaChiTiet() {
     setFormSuaLop({
       ten_lop: lop.ten_lop,
       loai_lop: lop.loai_lop,
-      si_so_toi_da: lop.si_so_toi_da != null ? String(lop.si_so_toi_da) : '',
-      nhom_hoc_vien: lop.nhom_hoc_vien != null ? String(lop.nhom_hoc_vien) : '',
-      muc_nang_luc: lop.muc_nang_luc ?? '',
+      si_so_toi_da: lop.si_so_toi_da != null ? String(lop.si_so_toi_da) : "",
+      nhom_hoc_vien: lop.nhom_hoc_vien != null ? String(lop.nhom_hoc_vien) : "",
+      muc_nang_luc: lop.muc_nang_luc ?? "",
     });
     setLoiSuaLop({});
   }
@@ -389,22 +455,38 @@ export default function AdminKhoaChiTiet() {
         dto: {
           ten_lop: formSuaLop.ten_lop.trim(),
           loai_lop: formSuaLop.loai_lop as LoaiLop,
-          si_so_toi_da: formSuaLop.si_so_toi_da ? Number(formSuaLop.si_so_toi_da) : undefined,
-          nhom_hoc_vien: formSuaLop.nhom_hoc_vien ? Number(formSuaLop.nhom_hoc_vien) : undefined,
+          si_so_toi_da: formSuaLop.si_so_toi_da
+            ? Number(formSuaLop.si_so_toi_da)
+            : undefined,
+          nhom_hoc_vien: formSuaLop.nhom_hoc_vien
+            ? Number(formSuaLop.nhom_hoc_vien)
+            : undefined,
           muc_nang_luc: formSuaLop.muc_nang_luc || undefined,
         },
       },
       {
         onSuccess: (lop) => {
-          notifications.show({ color: 'green', message: `Đã lưu thay đổi lớp "${lop.ten_lop}"` });
-          if (lop.canh_bao) notifications.show({ color: 'yellow', message: lop.canh_bao, autoClose: false });
+          notifications.show({
+            color: "green",
+            message: `Đã lưu thay đổi lớp "${lop.ten_lop}"`,
+          });
+          if (lop.canh_bao)
+            notifications.show({
+              color: "yellow",
+              message: lop.canh_bao,
+              autoClose: false,
+            });
           setLopDangSua(null);
           setFormSuaLop(null);
         },
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiSuaLop(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else
+            notifications.show({
+              color: "red",
+              message: thongDiepLoiKhoa(err),
+            });
         },
       },
     );
@@ -426,9 +508,15 @@ export default function AdminKhoaChiTiet() {
   const [formBuoi, setFormBuoi] = useState<FormBuoiHoc>(FORM_BUOI_RONG);
   const [loiBuoi, setLoiBuoi] = useState<Record<string, string>>({});
 
-  const [buoiDangSua, setBuoiDangSua] = useState<{ lop: LopHoc; lich: LichHocLop } | null>(null);
+  const [buoiDangSua, setBuoiDangSua] = useState<{
+    lop: LopHoc;
+    lich: LichHocLop;
+  } | null>(null);
   // T11 (issue #3): phân công giảng viên vào buổi.
-  const [buoiPhanCong, setBuoiPhanCong] = useState<{ lop: LopHoc; lich: LichHocLop } | null>(null);
+  const [buoiPhanCong, setBuoiPhanCong] = useState<{
+    lop: LopHoc;
+    lich: LichHocLop;
+  } | null>(null);
   const [formSuaBuoi, setFormSuaBuoi] = useState<FormSuaBuoiHoc | null>(null);
   const [loiSuaBuoi, setLoiSuaBuoi] = useState<Record<string, string>>({});
 
@@ -448,7 +536,9 @@ export default function AdminKhoaChiTiet() {
           giai_doan_id: formBuoi.giai_doan_id,
           buoi_so: formBuoi.buoi_so ? Number(formBuoi.buoi_so) : undefined,
           thoi_gian_bat_dau: new Date(formBuoi.thoi_gian_bat_dau).toISOString(),
-          thoi_gian_ket_thuc: new Date(formBuoi.thoi_gian_ket_thuc).toISOString(),
+          thoi_gian_ket_thuc: new Date(
+            formBuoi.thoi_gian_ket_thuc,
+          ).toISOString(),
           dia_diem_hoac_link: formBuoi.dia_diem_hoac_link.trim() || undefined,
           diem_hoc_id: formBuoi.diem_hoc_id ?? undefined,
           phong: formBuoi.phong.trim() || undefined,
@@ -456,14 +546,18 @@ export default function AdminKhoaChiTiet() {
       },
       {
         onSuccess: (lich) => {
-          notifications.show({ color: 'green', message: 'Đã thêm buổi học' });
+          notifications.show({ color: "green", message: "Đã thêm buổi học" });
           baoCanhBao(lich.canh_bao);
           setModalThemBuoi(null);
         },
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiBuoi(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else
+            notifications.show({
+              color: "red",
+              message: thongDiepLoiKhoa(err),
+            });
         },
       },
     );
@@ -476,11 +570,11 @@ export default function AdminKhoaChiTiet() {
       buoi_so: String(lich.buoi_so),
       thoi_gian_bat_dau: isoThanhInputDiaPhuong(lich.thoi_gian_bat_dau),
       thoi_gian_ket_thuc: isoThanhInputDiaPhuong(lich.thoi_gian_ket_thuc),
-      dia_diem_hoac_link: lich.dia_diem_hoac_link ?? '',
+      dia_diem_hoac_link: lich.dia_diem_hoac_link ?? "",
       trang_thai: lich.trang_thai,
       diem_hoc_id: lich.diem_hoc_id ?? null,
-      phong: lich.phong ?? '',
-      ly_do: '',
+      phong: lich.phong ?? "",
+      ly_do: "",
     });
     setLoiSuaBuoi({});
   }
@@ -493,10 +587,17 @@ export default function AdminKhoaChiTiet() {
         lopId: buoiDangSua.lop.id,
         lichHocId: buoiDangSua.lich.id,
         dto: {
-          buoi_so: formSuaBuoi.buoi_so ? Number(formSuaBuoi.buoi_so) : undefined,
-          thoi_gian_bat_dau: new Date(formSuaBuoi.thoi_gian_bat_dau).toISOString(),
-          thoi_gian_ket_thuc: new Date(formSuaBuoi.thoi_gian_ket_thuc).toISOString(),
-          dia_diem_hoac_link: formSuaBuoi.dia_diem_hoac_link.trim() || undefined,
+          buoi_so: formSuaBuoi.buoi_so
+            ? Number(formSuaBuoi.buoi_so)
+            : undefined,
+          thoi_gian_bat_dau: new Date(
+            formSuaBuoi.thoi_gian_bat_dau,
+          ).toISOString(),
+          thoi_gian_ket_thuc: new Date(
+            formSuaBuoi.thoi_gian_ket_thuc,
+          ).toISOString(),
+          dia_diem_hoac_link:
+            formSuaBuoi.dia_diem_hoac_link.trim() || undefined,
           trang_thai: formSuaBuoi.trang_thai,
           diem_hoc_id: formSuaBuoi.diem_hoc_id,
           phong: formSuaBuoi.phong.trim() || null,
@@ -505,7 +606,10 @@ export default function AdminKhoaChiTiet() {
       },
       {
         onSuccess: (lich) => {
-          notifications.show({ color: 'green', message: 'Đã lưu thay đổi buổi học' });
+          notifications.show({
+            color: "green",
+            message: "Đã lưu thay đổi buổi học",
+          });
           baoCanhBao(lich.canh_bao);
           setBuoiDangSua(null);
           setFormSuaBuoi(null);
@@ -513,7 +617,11 @@ export default function AdminKhoaChiTiet() {
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiSuaBuoi(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else
+            notifications.show({
+              color: "red",
+              message: thongDiepLoiKhoa(err),
+            });
         },
       },
     );
@@ -546,13 +654,17 @@ export default function AdminKhoaChiTiet() {
       },
       {
         onSuccess: () => {
-          notifications.show({ color: 'green', message: 'Đã thêm nhân sự' });
+          notifications.show({ color: "green", message: "Đã thêm nhân sự" });
           setModalThemNhanSu(null);
         },
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiNhanSu(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else
+            notifications.show({
+              color: "red",
+              message: thongDiepLoiKhoa(err),
+            });
         },
       },
     );
@@ -562,12 +674,21 @@ export default function AdminKhoaChiTiet() {
   const taoGiaiDoan = useTaoGiaiDoan(khoaId);
   const capNhatGiaiDoan = useCapNhatGiaiDoan(khoaId);
   const [modalTaoGiaiDoan, setModalTaoGiaiDoan] = useState(false);
-  const [formTaoGiaiDoan, setFormTaoGiaiDoan] = useState<FormGiaiDoan>(FORM_GIAI_DOAN_RONG);
-  const [loiTaoGiaiDoan, setLoiTaoGiaiDoan] = useState<Record<string, string>>({});
+  const [formTaoGiaiDoan, setFormTaoGiaiDoan] =
+    useState<FormGiaiDoan>(FORM_GIAI_DOAN_RONG);
+  const [loiTaoGiaiDoan, setLoiTaoGiaiDoan] = useState<Record<string, string>>(
+    {},
+  );
 
-  const [giaiDoanDangSua, setGiaiDoanDangSua] = useState<GiaiDoanKhoa | null>(null);
-  const [formSuaGiaiDoan, setFormSuaGiaiDoan] = useState<FormGiaiDoan | null>(null);
-  const [loiSuaGiaiDoan, setLoiSuaGiaiDoan] = useState<Record<string, string>>({});
+  const [giaiDoanDangSua, setGiaiDoanDangSua] = useState<GiaiDoanKhoa | null>(
+    null,
+  );
+  const [formSuaGiaiDoan, setFormSuaGiaiDoan] = useState<FormGiaiDoan | null>(
+    null,
+  );
+  const [loiSuaGiaiDoan, setLoiSuaGiaiDoan] = useState<Record<string, string>>(
+    {},
+  );
 
   function moModalTaoGiaiDoan() {
     setFormTaoGiaiDoan(FORM_GIAI_DOAN_RONG);
@@ -584,18 +705,26 @@ export default function AdminKhoaChiTiet() {
         hinh_thuc: formTaoGiaiDoan.hinh_thuc as HinhThucGiaiDoan,
         thoi_gian_bat_dau: formTaoGiaiDoan.thoi_gian_bat_dau,
         thoi_gian_ket_thuc: formTaoGiaiDoan.thoi_gian_ket_thuc,
-        link_hoac_dia_diem: formTaoGiaiDoan.link_hoac_dia_diem.trim() || undefined,
+        link_hoac_dia_diem:
+          formTaoGiaiDoan.link_hoac_dia_diem.trim() || undefined,
         huong_dan: formTaoGiaiDoan.huong_dan.trim() || undefined,
       },
       {
         onSuccess: (gd) => {
-          notifications.show({ color: 'green', message: `Đã tạo giai đoạn "${gd.ten_giai_doan}"` });
+          notifications.show({
+            color: "green",
+            message: `Đã tạo giai đoạn "${gd.ten_giai_doan}"`,
+          });
           setModalTaoGiaiDoan(false);
         },
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiTaoGiaiDoan(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else
+            notifications.show({
+              color: "red",
+              message: thongDiepLoiKhoa(err),
+            });
         },
       },
     );
@@ -609,8 +738,8 @@ export default function AdminKhoaChiTiet() {
       hinh_thuc: gd.hinh_thuc,
       thoi_gian_bat_dau: gd.thoi_gian_bat_dau.slice(0, 10),
       thoi_gian_ket_thuc: gd.thoi_gian_ket_thuc.slice(0, 10),
-      link_hoac_dia_diem: gd.link_hoac_dia_diem ?? '',
-      huong_dan: gd.huong_dan ?? '',
+      link_hoac_dia_diem: gd.link_hoac_dia_diem ?? "",
+      huong_dan: gd.huong_dan ?? "",
     });
     setLoiSuaGiaiDoan({});
   }
@@ -633,14 +762,21 @@ export default function AdminKhoaChiTiet() {
       },
       {
         onSuccess: (gd) => {
-          notifications.show({ color: 'green', message: `Đã lưu thay đổi giai đoạn "${gd.ten_giai_doan}"` });
+          notifications.show({
+            color: "green",
+            message: `Đã lưu thay đổi giai đoạn "${gd.ten_giai_doan}"`,
+          });
           setGiaiDoanDangSua(null);
           setFormSuaGiaiDoan(null);
         },
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiSuaGiaiDoan(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else
+            notifications.show({
+              color: "red",
+              message: thongDiepLoiKhoa(err),
+            });
         },
       },
     );
@@ -673,13 +809,20 @@ export default function AdminKhoaChiTiet() {
       },
       {
         onSuccess: (cum) => {
-          notifications.show({ color: 'green', message: `Đã tạo cụm "${cum.ten_cum}"` });
+          notifications.show({
+            color: "green",
+            message: `Đã tạo cụm "${cum.ten_cum}"`,
+          });
           setModalTaoCum(false);
         },
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiTaoCum(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else
+            notifications.show({
+              color: "red",
+              message: thongDiepLoiKhoa(err),
+            });
         },
       },
     );
@@ -687,7 +830,11 @@ export default function AdminKhoaChiTiet() {
 
   function moModalSuaCum(cum: CumHocVien) {
     setCumDangSua(cum);
-    setFormSuaCum({ ten_cum: cum.ten_cum, link_zalo: cum.link_zalo ?? '', ghi_chu: cum.ghi_chu ?? '' });
+    setFormSuaCum({
+      ten_cum: cum.ten_cum,
+      link_zalo: cum.link_zalo ?? "",
+      ghi_chu: cum.ghi_chu ?? "",
+    });
     setLoiSuaCum({});
   }
 
@@ -705,44 +852,68 @@ export default function AdminKhoaChiTiet() {
       },
       {
         onSuccess: (cum) => {
-          notifications.show({ color: 'green', message: `Đã lưu thay đổi cụm "${cum.ten_cum}"` });
+          notifications.show({
+            color: "green",
+            message: `Đã lưu thay đổi cụm "${cum.ten_cum}"`,
+          });
           setCumDangSua(null);
           setFormSuaCum(null);
         },
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
           if (Object.keys(fields).length > 0) setLoiSuaCum(fields);
-          else notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+          else
+            notifications.show({
+              color: "red",
+              message: thongDiepLoiKhoa(err),
+            });
         },
       },
     );
   }
 
   // --- Vô hiệu hóa / kích hoạt lại (lớp, giai đoạn, cụm dùng chung 1 modal xác nhận) --------
-  const [xacNhanToggle, setXacNhanToggle] = useState<XacNhanToggle | null>(null);
+  const [xacNhanToggle, setXacNhanToggle] = useState<XacNhanToggle | null>(
+    null,
+  );
 
   function xuLyXacNhanToggle() {
     if (!xacNhanToggle) return;
-    const trangThaiMoi: TrangThaiActive = xacNhanToggle.dangHoatDong ? 'ngung' : 'active';
+    const trangThaiMoi: TrangThaiActive = xacNhanToggle.dangHoatDong
+      ? "ngung"
+      : "active";
     const onSuccess = () => {
       notifications.show({
-        color: 'green',
-        message: xacNhanToggle.dangHoatDong ? `Đã vô hiệu hóa "${xacNhanToggle.ten}"` : `Đã kích hoạt lại "${xacNhanToggle.ten}"`,
+        color: "green",
+        message: xacNhanToggle.dangHoatDong
+          ? `Đã vô hiệu hóa "${xacNhanToggle.ten}"`
+          : `Đã kích hoạt lại "${xacNhanToggle.ten}"`,
       });
       setXacNhanToggle(null);
     };
-    const onError = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) });
+    const onError = (err: unknown) =>
+      notifications.show({ color: "red", message: thongDiepLoiKhoa(err) });
 
-    if (xacNhanToggle.loai === 'lop') {
-      capNhatLop.mutate({ lopId: xacNhanToggle.id, dto: { trang_thai: trangThaiMoi } }, { onSuccess, onError });
-    } else if (xacNhanToggle.loai === 'giai-doan') {
-      capNhatGiaiDoan.mutate({ giaiDoanId: xacNhanToggle.id, dto: { trang_thai: trangThaiMoi } }, { onSuccess, onError });
+    if (xacNhanToggle.loai === "lop") {
+      capNhatLop.mutate(
+        { lopId: xacNhanToggle.id, dto: { trang_thai: trangThaiMoi } },
+        { onSuccess, onError },
+      );
+    } else if (xacNhanToggle.loai === "giai-doan") {
+      capNhatGiaiDoan.mutate(
+        { giaiDoanId: xacNhanToggle.id, dto: { trang_thai: trangThaiMoi } },
+        { onSuccess, onError },
+      );
     } else {
-      capNhatCum.mutate({ cumId: xacNhanToggle.id, dto: { trang_thai: trangThaiMoi } }, { onSuccess, onError });
+      capNhatCum.mutate(
+        { cumId: xacNhanToggle.id, dto: { trang_thai: trangThaiMoi } },
+        { onSuccess, onError },
+      );
     }
   }
 
-  const dangXuLyToggle = capNhatLop.isPending || capNhatGiaiDoan.isPending || capNhatCum.isPending;
+  const dangXuLyToggle =
+    capNhatLop.isPending || capNhatGiaiDoan.isPending || capNhatCum.isPending;
 
   // --- Xóa nhân sự lớp -------------------------------------------------------
   const [xacNhanXoa, setXacNhanXoa] = useState<XacNhanXoa | null>(null);
@@ -753,59 +924,75 @@ export default function AdminKhoaChiTiet() {
       { lopId: xacNhanXoa.lopId, nhanSuId: xacNhanXoa.nhanSuId },
       {
         onSuccess: () => {
-          notifications.show({ color: 'green', message: `Đã gỡ "${xacNhanXoa.ten}"` });
+          notifications.show({
+            color: "green",
+            message: `Đã gỡ "${xacNhanXoa.ten}"`,
+          });
           setXacNhanXoa(null);
         },
-        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiKhoa(err) }),
+        onError: (err) =>
+          notifications.show({ color: "red", message: thongDiepLoiKhoa(err) }),
       },
     );
   }
 
   // --- Form hợp lệ (validate tối thiểu client-side) -------------------------
-  const formTaoLopHopLe = formTaoLop.ten_lop.trim() !== '' && formTaoLop.loai_lop !== '';
-  const formSuaLopHopLe = !!formSuaLop && formSuaLop.ten_lop.trim() !== '' && formSuaLop.loai_lop !== '';
+  const formTaoLopHopLe =
+    formTaoLop.ten_lop.trim() !== "" && formTaoLop.loai_lop !== "";
+  const formSuaLopHopLe =
+    !!formSuaLop &&
+    formSuaLop.ten_lop.trim() !== "" &&
+    formSuaLop.loai_lop !== "";
   // T10 (issue #2): buổi thuộc giai đoạn hình thức trực tiếp phải có điểm học.
   const laGiaiDoanTrucTiep = (giaiDoanId: string) =>
-    khoa?.giai_doan?.find((g) => g.id === giaiDoanId)?.hinh_thuc === 'truc_tiep';
+    khoa?.giai_doan?.find((g) => g.id === giaiDoanId)?.hinh_thuc ===
+    "truc_tiep";
   const buoiMoiCanDiemHoc = laGiaiDoanTrucTiep(formBuoi.giai_doan_id);
-  const buoiSuaCanDiemHoc = !!formSuaBuoi && laGiaiDoanTrucTiep(formSuaBuoi.giai_doan_id);
+  const buoiSuaCanDiemHoc =
+    !!formSuaBuoi && laGiaiDoanTrucTiep(formSuaBuoi.giai_doan_id);
   const formBuoiHopLe =
-    formBuoi.giai_doan_id !== '' &&
-    formBuoi.thoi_gian_bat_dau !== '' &&
-    formBuoi.thoi_gian_ket_thuc !== '' &&
-    new Date(formBuoi.thoi_gian_ket_thuc) > new Date(formBuoi.thoi_gian_bat_dau) &&
+    formBuoi.giai_doan_id !== "" &&
+    formBuoi.thoi_gian_bat_dau !== "" &&
+    formBuoi.thoi_gian_ket_thuc !== "" &&
+    new Date(formBuoi.thoi_gian_ket_thuc) >
+      new Date(formBuoi.thoi_gian_bat_dau) &&
     (!buoiMoiCanDiemHoc || !!formBuoi.diem_hoc_id);
   const formSuaBuoiHopLe =
     !!formSuaBuoi &&
-    formSuaBuoi.thoi_gian_bat_dau !== '' &&
-    formSuaBuoi.thoi_gian_ket_thuc !== '' &&
-    new Date(formSuaBuoi.thoi_gian_ket_thuc) > new Date(formSuaBuoi.thoi_gian_bat_dau) &&
+    formSuaBuoi.thoi_gian_bat_dau !== "" &&
+    formSuaBuoi.thoi_gian_ket_thuc !== "" &&
+    new Date(formSuaBuoi.thoi_gian_ket_thuc) >
+      new Date(formSuaBuoi.thoi_gian_bat_dau) &&
     (!buoiSuaCanDiemHoc || !!formSuaBuoi.diem_hoc_id);
-  const formNhanSuHopLe = formNhanSu.ho_ten.trim() !== '' && formNhanSu.vai_tro !== '';
+  const formNhanSuHopLe =
+    formNhanSu.ho_ten.trim() !== "" && formNhanSu.vai_tro !== "";
   const formTaoGiaiDoanHopLe =
-    formTaoGiaiDoan.thu_tu !== '' &&
-    formTaoGiaiDoan.ten_giai_doan.trim() !== '' &&
-    formTaoGiaiDoan.hinh_thuc !== '' &&
-    formTaoGiaiDoan.thoi_gian_bat_dau !== '' &&
-    formTaoGiaiDoan.thoi_gian_ket_thuc !== '' &&
+    formTaoGiaiDoan.thu_tu !== "" &&
+    formTaoGiaiDoan.ten_giai_doan.trim() !== "" &&
+    formTaoGiaiDoan.hinh_thuc !== "" &&
+    formTaoGiaiDoan.thoi_gian_bat_dau !== "" &&
+    formTaoGiaiDoan.thoi_gian_ket_thuc !== "" &&
     formTaoGiaiDoan.thoi_gian_ket_thuc >= formTaoGiaiDoan.thoi_gian_bat_dau;
   const formSuaGiaiDoanHopLe =
     !!formSuaGiaiDoan &&
-    formSuaGiaiDoan.thu_tu !== '' &&
-    formSuaGiaiDoan.ten_giai_doan.trim() !== '' &&
-    formSuaGiaiDoan.hinh_thuc !== '' &&
-    formSuaGiaiDoan.thoi_gian_bat_dau !== '' &&
-    formSuaGiaiDoan.thoi_gian_ket_thuc !== '' &&
+    formSuaGiaiDoan.thu_tu !== "" &&
+    formSuaGiaiDoan.ten_giai_doan.trim() !== "" &&
+    formSuaGiaiDoan.hinh_thuc !== "" &&
+    formSuaGiaiDoan.thoi_gian_bat_dau !== "" &&
+    formSuaGiaiDoan.thoi_gian_ket_thuc !== "" &&
     formSuaGiaiDoan.thoi_gian_ket_thuc >= formSuaGiaiDoan.thoi_gian_bat_dau;
-  const formTaoCumHopLe = formTaoCum.ten_cum.trim() !== '';
-  const formSuaCumHopLe = !!formSuaCum && formSuaCum.ten_cum.trim() !== '';
+  const formTaoCumHopLe = formTaoCum.ten_cum.trim() !== "";
+  const formSuaCumHopLe = !!formSuaCum && formSuaCum.ten_cum.trim() !== "";
 
-  const tuyChonGiaiDoan = (khoa?.giai_doan ?? []).map((g) => ({ value: g.id, label: `GĐ ${g.thu_tu} — ${g.ten_giai_doan}` }));
+  const tuyChonGiaiDoan = (khoa?.giai_doan ?? []).map((g) => ({
+    value: g.id,
+    label: `GĐ ${g.thu_tu} — ${g.ten_giai_doan}`,
+  }));
 
   return (
     <>
       <AdminPageHeader title="Chi tiết khóa bồi dưỡng" />
-      <Container size="xl" py="lg" px={{ base: 'md', md: 28 }}>
+      <Container size="xl" py="lg" px={{ base: "md", md: 28 }}>
         {isLoading && (
           <Stack gap="sm">
             {Array.from({ length: 5 }).map((_, i) => (
@@ -819,7 +1006,12 @@ export default function AdminKhoaChiTiet() {
         {khoa && (
           <Stack gap="lg">
             <Breadcrumbs fz={12.5}>
-              <Anchor component={Link} to="/admin/khoa-boi-duong" fz={12.5} c="dimmed">
+              <Anchor
+                component={Link}
+                to="/admin/khoa-boi-duong"
+                fz={12.5}
+                c="dimmed"
+              >
                 Khóa bồi dưỡng
               </Anchor>
               <Text fz={12.5} c="dimmed">
@@ -836,11 +1028,15 @@ export default function AdminKhoaChiTiet() {
                   <KhoaTrangThaiBadge trangThai={khoa.trang_thai} />
                 </Group>
                 <Text fz={13} c="dimmed">
-                  Mã khóa <b>{khoa.ma_khoa}</b> · {dinhDangNgay(khoa.thoi_gian_bat_dau)} –{' '}
-                  {dinhDangNgay(khoa.thoi_gian_ket_thuc)} · {khoa.lop_hoc.length} lớp học
+                  Mã khóa <b>{khoa.ma_khoa}</b> ·{" "}
+                  {dinhDangNgay(khoa.thoi_gian_bat_dau)} –{" "}
+                  {dinhDangNgay(khoa.thoi_gian_ket_thuc)} ·{" "}
+                  {khoa.lop_hoc.length} lớp học
                 </Text>
                 <Text fz={13} c="dimmed">
-                  Đặt hàng: {tenDonViDatHang.get(khoa.don_vi_dat_hang_id) ?? '—'} · Tổ chức: Trường ĐHSP TP.HCM
+                  Đặt hàng:{" "}
+                  {tenDonViDatHang.get(khoa.don_vi_dat_hang_id) ?? "—"} · Tổ
+                  chức: Trường ĐHSP TP.HCM
                 </Text>
               </Box>
 
@@ -866,12 +1062,16 @@ export default function AdminKhoaChiTiet() {
                       {
                         onSuccess: (k) =>
                           notifications.show({
-                            color: 'green',
+                            color: "green",
                             message: k.mo_dieu_chinh_muc
-                              ? 'Đã mở cho học viên điều chỉnh mức lớp học'
-                              : 'Đã đóng điều chỉnh mức lớp học',
+                              ? "Đã mở cho học viên điều chỉnh mức lớp học"
+                              : "Đã đóng điều chỉnh mức lớp học",
                           }),
-                        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+                        onError: (err) =>
+                          notifications.show({
+                            color: "red",
+                            message: thongDiepLoiChung(err),
+                          }),
                       },
                     )
                   }
@@ -880,11 +1080,13 @@ export default function AdminKhoaChiTiet() {
             )}
 
             {laQuanTri && <KhoiDotNhuCauMuc khoaId={khoaId} />}
-            {laQuanTri && <CauHinhDoiBuoi key={khoa.so_buoi_doi_toi_da} khoa={khoa} />}
+            {laQuanTri && (
+              <CauHinhDoiBuoi key={khoa.so_buoi_doi_toi_da} khoa={khoa} />
+            )}
             {laQuanTri && <CauHinhDiemDanhZoom khoa={khoa} />}
             <CanhBaoZoomThieuLink soBuoi={khoa.so_buoi_zoom_thieu_link} />
 
-            {khoa.pham_vi_hoc_vien === 'don_vi' && (
+            {khoa.pham_vi_hoc_vien === "don_vi" && (
               <Alert color="blue" variant="light">
                 Bạn đang xem các học viên thuộc đơn vị của mình trong khóa này.
               </Alert>
@@ -895,8 +1097,12 @@ export default function AdminKhoaChiTiet() {
                 <Tabs.Tab value="lop-hoc">Lớp học</Tabs.Tab>
                 <Tabs.Tab value="giai-doan">Giai đoạn</Tabs.Tab>
                 <Tabs.Tab value="cum">Cụm hỗ trợ Zalo</Tabs.Tab>
-                {laQuanTri && <Tabs.Tab value="ho-tro-gv">Hỗ trợ giảng viên</Tabs.Tab>}
-                {laQuanTri && <Tabs.Tab value="bang-kiem">Bảng kiểm chuẩn bị</Tabs.Tab>}
+                {laQuanTri && (
+                  <Tabs.Tab value="ho-tro-gv">Hỗ trợ giảng viên</Tabs.Tab>
+                )}
+                {laQuanTri && (
+                  <Tabs.Tab value="bang-kiem">Bảng kiểm chuẩn bị</Tabs.Tab>
+                )}
               </Tabs.List>
 
               {/* ---------------- Tab Lớp học ---------------- */}
@@ -906,9 +1112,12 @@ export default function AdminKhoaChiTiet() {
                     <>
                       <Group justify="flex-end">
                         {/* /import chỉ QuảnTrị gọi được — Trường không thấy nút này. */}
-                        {vaiTro === 'quan_tri' && (
+                        {vaiTro === "quan_tri" && (
                           <>
-                            <Button variant="default" onClick={() => setModalImport(true)}>
+                            <Button
+                              variant="default"
+                              onClick={() => setModalImport(true)}
+                            >
                               ⇪ Import Excel
                             </Button>
                             <Button
@@ -925,16 +1134,21 @@ export default function AdminKhoaChiTiet() {
                           + Tạo lớp mới
                         </Button>
                       </Group>
-                      {vaiTro === 'quan_tri' && (
+                      {vaiTro === "quan_tri" && (
                         <Text size="xs" c="dimmed" ta="right">
-                          Mỗi học viên 1 dòng kèm kết quả đánh giá, mức học viên chọn và lớp hiện tại. Điền cột GĐ rồi
-                          nhập lại qua Nhập dữ liệu → Phân lớp học viên.
+                          Mỗi học viên 1 dòng kèm kết quả đánh giá, mức học viên
+                          chọn và lớp hiện tại. Điền cột GĐ rồi nhập lại qua
+                          Nhập dữ liệu → Phân lớp học viên.
                         </Text>
                       )}
                     </>
                   )}
-                  <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
-                    <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+                  <Paper withBorder radius={14} style={{ overflow: "hidden" }}>
+                    <Table
+                      highlightOnHover
+                      verticalSpacing="sm"
+                      horizontalSpacing="md"
+                    >
                       <Table.Thead>
                         <Table.Tr>
                           <Table.Th>Tên lớp</Table.Th>
@@ -965,20 +1179,28 @@ export default function AdminKhoaChiTiet() {
                               <Table.Tr>
                                 <Table.Td fw={600}>{lop.ten_lop}</Table.Td>
                                 <Table.Td>
-                                  <Badge color={MAU_LOAI_LOP[lop.loai_lop]} radius="xl">
+                                  <Badge
+                                    color={MAU_LOAI_LOP[lop.loai_lop]}
+                                    radius="xl"
+                                  >
                                     {NHAN_LOAI_LOP[lop.loai_lop]}
                                   </Badge>
                                 </Table.Td>
-                                <Table.Td>{lop.si_so_toi_da ?? '—'}</Table.Td>
+                                <Table.Td>{lop.si_so_toi_da ?? "—"}</Table.Td>
                                 <Table.Td>{lop.si_so_hien_tai ?? 0}</Table.Td>
                                 <Table.Td>
                                   {lop.nhan_su && lop.nhan_su.length > 0
-                                    ? lop.nhan_su.map((n) => n.ho_ten).join(', ')
-                                    : '—'}
+                                    ? lop.nhan_su
+                                        .map((n) => n.ho_ten)
+                                        .join(", ")
+                                    : "—"}
                                 </Table.Td>
                                 {laQuanTri && (
                                   <Table.Td>
-                                    <ChonNguoiHoTroLop khoaId={khoa.id} lop={lop} />
+                                    <ChonNguoiHoTroLop
+                                      khoaId={khoa.id}
+                                      lop={lop}
+                                    />
                                   </Table.Td>
                                 )}
                                 <Table.Td>
@@ -986,32 +1208,62 @@ export default function AdminKhoaChiTiet() {
                                 </Table.Td>
                                 <Table.Td>{lop.lich_hoc?.length ?? 0}</Table.Td>
                                 <Table.Td>
-                                  <Group gap={6} justify="flex-end" wrap="nowrap">
-                                    <Button variant="subtle" size="xs" onClick={() => toggleMoRongLop(lop.id)}>
-                                      {moRong ? 'Thu gọn ▴' : 'Xem chi tiết ▾'}
+                                  <Group
+                                    gap={6}
+                                    justify="flex-end"
+                                    wrap="nowrap"
+                                  >
+                                    <Button
+                                      variant="subtle"
+                                      size="xs"
+                                      onClick={() => toggleMoRongLop(lop.id)}
+                                    >
+                                      {moRong ? "Thu gọn ▴" : "Xem chi tiết ▾"}
                                     </Button>
                                     {laQuanTri && (
                                       <>
-                                        <Button variant="subtle" size="xs" onClick={() => setLopDiemDanh(lop)}>
+                                        <Button
+                                          variant="subtle"
+                                          size="xs"
+                                          onClick={() => setLopDiemDanh(lop)}
+                                        >
                                           Điểm danh
                                         </Button>
-                                        <Button variant="subtle" size="xs" onClick={() => moModalSuaLop(lop)}>
+                                        <Button
+                                          variant="subtle"
+                                          size="xs"
+                                          onClick={() => setLopTheoBuoi(lop)}
+                                        >
+                                          Theo buổi
+                                        </Button>
+                                        <Button
+                                          variant="subtle"
+                                          size="xs"
+                                          onClick={() => moModalSuaLop(lop)}
+                                        >
                                           Sửa
                                         </Button>
                                         <Button
                                           variant="subtle"
                                           size="xs"
-                                          color={lop.trang_thai === 'active' ? 'red' : 'green'}
+                                          color={
+                                            lop.trang_thai === "active"
+                                              ? "red"
+                                              : "green"
+                                          }
                                           onClick={() =>
                                             setXacNhanToggle({
-                                              loai: 'lop',
+                                              loai: "lop",
                                               id: lop.id,
                                               ten: lop.ten_lop,
-                                              dangHoatDong: lop.trang_thai === 'active',
+                                              dangHoatDong:
+                                                lop.trang_thai === "active",
                                             })
                                           }
                                         >
-                                          {lop.trang_thai === 'active' ? 'Vô hiệu hóa' : 'Kích hoạt lại'}
+                                          {lop.trang_thai === "active"
+                                            ? "Vô hiệu hóa"
+                                            : "Kích hoạt lại"}
                                         </Button>
                                       </>
                                     )}
@@ -1020,7 +1272,13 @@ export default function AdminKhoaChiTiet() {
                               </Table.Tr>
                               {moRong && (
                                 <Table.Tr key={`${lop.id}-mo-rong`}>
-                                  <Table.Td colSpan={laQuanTri ? 9 : 8} style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                                  <Table.Td
+                                    colSpan={laQuanTri ? 9 : 8}
+                                    style={{
+                                      backgroundColor:
+                                        "var(--mantine-color-gray-0)",
+                                    }}
+                                  >
                                     <Stack gap="md" py="xs">
                                       <Box>
                                         <Group justify="space-between" mb={6}>
@@ -1028,7 +1286,13 @@ export default function AdminKhoaChiTiet() {
                                             Buổi học
                                           </Text>
                                           {laQuanTri && (
-                                            <Button variant="light" size="xs" onClick={() => moModalThemBuoi(lop)}>
+                                            <Button
+                                              variant="light"
+                                              size="xs"
+                                              onClick={() =>
+                                                moModalThemBuoi(lop)
+                                              }
+                                            >
                                               + Thêm buổi học
                                             </Button>
                                           )}
@@ -1039,13 +1303,18 @@ export default function AdminKhoaChiTiet() {
                                           </Text>
                                         )}
                                         {(lop.lich_hoc ?? []).length > 0 && (
-                                          <Table verticalSpacing={6} horizontalSpacing="sm">
+                                          <Table
+                                            verticalSpacing={6}
+                                            horizontalSpacing="sm"
+                                          >
                                             <Table.Thead>
                                               <Table.Tr>
                                                 <Table.Th>Giai đoạn</Table.Th>
                                                 <Table.Th>Buổi</Table.Th>
                                                 <Table.Th>Thời gian</Table.Th>
-                                                <Table.Th>Địa điểm/link</Table.Th>
+                                                <Table.Th>
+                                                  Địa điểm/link
+                                                </Table.Th>
                                                 <Table.Th>Điểm học</Table.Th>
                                                 <Table.Th>Giảng viên</Table.Th>
                                                 <Table.Th>Trạng thái</Table.Th>
@@ -1053,58 +1322,128 @@ export default function AdminKhoaChiTiet() {
                                               </Table.Tr>
                                             </Table.Thead>
                                             <Table.Tbody>
-                                              {(lop.lich_hoc ?? []).map((lich) => (
-                                                <Table.Tr key={lich.id}>
-                                                  <Table.Td>{lich.giai_doan?.ten_giai_doan ?? '—'}</Table.Td>
-                                                  <Table.Td>{lich.buoi_so}</Table.Td>
-                                                  <Table.Td style={{ whiteSpace: 'nowrap' }}>
-                                                    {dinhDangNgayGio(lich.thoi_gian_bat_dau)} – {dinhDangNgayGio(lich.thoi_gian_ket_thuc)}
-                                                  </Table.Td>
-                                                  <Table.Td>{lich.dia_diem_hoac_link ?? '—'}</Table.Td>
-                                                  <Table.Td>
-                                                    {lich.diem_hoc ? (
-                                                      <>
-                                                        <Text fz={13}>{lich.diem_hoc.ten}</Text>
-                                                        {lich.phong && (
-                                                          <Text fz={12} c="dimmed">
-                                                            Phòng {lich.phong}
+                                              {(lop.lich_hoc ?? []).map(
+                                                (lich) => (
+                                                  <Table.Tr key={lich.id}>
+                                                    <Table.Td>
+                                                      {lich.giai_doan
+                                                        ?.ten_giai_doan ?? "—"}
+                                                    </Table.Td>
+                                                    <Table.Td>
+                                                      {lich.buoi_so}
+                                                    </Table.Td>
+                                                    <Table.Td
+                                                      style={{
+                                                        whiteSpace: "nowrap",
+                                                      }}
+                                                    >
+                                                      {dinhDangNgayGio(
+                                                        lich.thoi_gian_bat_dau,
+                                                      )}{" "}
+                                                      –{" "}
+                                                      {dinhDangNgayGio(
+                                                        lich.thoi_gian_ket_thuc,
+                                                      )}
+                                                    </Table.Td>
+                                                    <Table.Td>
+                                                      {lich.dia_diem_hoac_link ??
+                                                        "—"}
+                                                    </Table.Td>
+                                                    <Table.Td>
+                                                      {lich.diem_hoc ? (
+                                                        <>
+                                                          <Text fz={13}>
+                                                            {lich.diem_hoc.ten}
                                                           </Text>
-                                                        )}
-                                                      </>
-                                                    ) : lich.giai_doan?.hinh_thuc === 'truc_tiep' ? (
-                                                      <Text fz={12.5} c="red">
-                                                        Chưa có
-                                                      </Text>
-                                                    ) : (
-                                                      '—'
-                                                    )}
-                                                  </Table.Td>
-                                                  <Table.Td>
-                                                    {(lich.phan_cong ?? []).length === 0
-                                                      ? '—'
-                                                      : (lich.phan_cong ?? []).map((p) => (
-                                                          <Text key={p.id} fz={13}>
-                                                            {p.giang_vien.ho_ten}
-                                                            {p.vai_tro === 'ho_tro' ? ' (hỗ trợ)' : ''}
-                                                            {p.da_xac_nhan_gio ? ' ✓' : ''}
-                                                          </Text>
-                                                        ))}
-                                                  </Table.Td>
-                                                  <Table.Td>{NHAN_TRANG_THAI_LICH_HOC[lich.trang_thai]}</Table.Td>
-                                                  <Table.Td ta="right" style={{ whiteSpace: 'nowrap' }}>
-                                                    {laQuanTri && (
-                                                      <>
-                                                        <Button variant="subtle" size="xs" onClick={() => setBuoiPhanCong({ lop, lich })}>
-                                                          Giảng viên
-                                                        </Button>
-                                                        <Button variant="subtle" size="xs" onClick={() => moModalSuaBuoi(lop, lich)}>
-                                                          Sửa
-                                                        </Button>
-                                                      </>
-                                                    )}
-                                                  </Table.Td>
-                                                </Table.Tr>
-                                              ))}
+                                                          {lich.phong && (
+                                                            <Text
+                                                              fz={12}
+                                                              c="dimmed"
+                                                            >
+                                                              Phòng {lich.phong}
+                                                            </Text>
+                                                          )}
+                                                        </>
+                                                      ) : lich.giai_doan
+                                                          ?.hinh_thuc ===
+                                                        "truc_tiep" ? (
+                                                        <Text fz={12.5} c="red">
+                                                          Chưa có
+                                                        </Text>
+                                                      ) : (
+                                                        "—"
+                                                      )}
+                                                    </Table.Td>
+                                                    <Table.Td>
+                                                      {(lich.phan_cong ?? [])
+                                                        .length === 0
+                                                        ? "—"
+                                                        : (
+                                                            lich.phan_cong ?? []
+                                                          ).map((p) => (
+                                                            <Text
+                                                              key={p.id}
+                                                              fz={13}
+                                                            >
+                                                              {
+                                                                p.giang_vien
+                                                                  .ho_ten
+                                                              }
+                                                              {p.vai_tro ===
+                                                              "ho_tro"
+                                                                ? " (hỗ trợ)"
+                                                                : ""}
+                                                              {p.da_xac_nhan_gio
+                                                                ? " ✓"
+                                                                : ""}
+                                                            </Text>
+                                                          ))}
+                                                    </Table.Td>
+                                                    <Table.Td>
+                                                      {
+                                                        NHAN_TRANG_THAI_LICH_HOC[
+                                                          lich.trang_thai
+                                                        ]
+                                                      }
+                                                    </Table.Td>
+                                                    <Table.Td
+                                                      ta="right"
+                                                      style={{
+                                                        whiteSpace: "nowrap",
+                                                      }}
+                                                    >
+                                                      {laQuanTri && (
+                                                        <>
+                                                          <Button
+                                                            variant="subtle"
+                                                            size="xs"
+                                                            onClick={() =>
+                                                              setBuoiPhanCong({
+                                                                lop,
+                                                                lich,
+                                                              })
+                                                            }
+                                                          >
+                                                            Giảng viên
+                                                          </Button>
+                                                          <Button
+                                                            variant="subtle"
+                                                            size="xs"
+                                                            onClick={() =>
+                                                              moModalSuaBuoi(
+                                                                lop,
+                                                                lich,
+                                                              )
+                                                            }
+                                                          >
+                                                            Sửa
+                                                          </Button>
+                                                        </>
+                                                      )}
+                                                    </Table.Td>
+                                                  </Table.Tr>
+                                                ),
+                                              )}
                                             </Table.Tbody>
                                           </Table>
                                         )}
@@ -1116,7 +1455,13 @@ export default function AdminKhoaChiTiet() {
                                             Nhân sự
                                           </Text>
                                           {laQuanTri && (
-                                            <Button variant="light" size="xs" onClick={() => moModalThemNhanSu(lop)}>
+                                            <Button
+                                              variant="light"
+                                              size="xs"
+                                              onClick={() =>
+                                                moModalThemNhanSu(lop)
+                                              }
+                                            >
                                               + Thêm nhân sự
                                             </Button>
                                           )}
@@ -1129,10 +1474,21 @@ export default function AdminKhoaChiTiet() {
                                         {(lop.nhan_su ?? []).length > 0 && (
                                           <Stack gap={4}>
                                             {(lop.nhan_su ?? []).map((ns) => (
-                                              <Group key={ns.id} justify="space-between" wrap="nowrap">
+                                              <Group
+                                                key={ns.id}
+                                                justify="space-between"
+                                                wrap="nowrap"
+                                              >
                                                 <Text fz={13.5}>
-                                                  {ns.ho_ten} — {NHAN_VAI_TRO_NHAN_SU[ns.vai_tro]}
-                                                  {ns.so_dien_thoai ? ` · ${ns.so_dien_thoai}` : ''}
+                                                  {ns.ho_ten} —{" "}
+                                                  {
+                                                    NHAN_VAI_TRO_NHAN_SU[
+                                                      ns.vai_tro
+                                                    ]
+                                                  }
+                                                  {ns.so_dien_thoai
+                                                    ? ` · ${ns.so_dien_thoai}`
+                                                    : ""}
                                                 </Text>
                                                 {laQuanTri && (
                                                   <Button
@@ -1140,7 +1496,12 @@ export default function AdminKhoaChiTiet() {
                                                     size="xs"
                                                     color="red"
                                                     onClick={() =>
-                                                      setXacNhanXoa({ loai: 'nhan-su', lopId: lop.id, nhanSuId: ns.id, ten: ns.ho_ten })
+                                                      setXacNhanXoa({
+                                                        loai: "nhan-su",
+                                                        lopId: lop.id,
+                                                        nhanSuId: ns.id,
+                                                        ten: ns.ho_ten,
+                                                      })
                                                     }
                                                   >
                                                     Xóa
@@ -1174,8 +1535,12 @@ export default function AdminKhoaChiTiet() {
                       </Button>
                     </Group>
                   )}
-                  <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
-                    <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+                  <Paper withBorder radius={14} style={{ overflow: "hidden" }}>
+                    <Table
+                      highlightOnHover
+                      verticalSpacing="sm"
+                      horizontalSpacing="md"
+                    >
                       <Table.Thead>
                         <Table.Tr>
                           <Table.Th>Thứ tự</Table.Th>
@@ -1200,9 +1565,12 @@ export default function AdminKhoaChiTiet() {
                           <Table.Tr key={gd.id}>
                             <Table.Td>{gd.thu_tu}</Table.Td>
                             <Table.Td fw={600}>{gd.ten_giai_doan}</Table.Td>
-                            <Table.Td>{NHAN_HINH_THUC_GIAI_DOAN[gd.hinh_thuc]}</Table.Td>
-                            <Table.Td style={{ whiteSpace: 'nowrap' }}>
-                              {dinhDangNgay(gd.thoi_gian_bat_dau)} – {dinhDangNgay(gd.thoi_gian_ket_thuc)}
+                            <Table.Td>
+                              {NHAN_HINH_THUC_GIAI_DOAN[gd.hinh_thuc]}
+                            </Table.Td>
+                            <Table.Td style={{ whiteSpace: "nowrap" }}>
+                              {dinhDangNgay(gd.thoi_gian_bat_dau)} –{" "}
+                              {dinhDangNgay(gd.thoi_gian_ket_thuc)}
                             </Table.Td>
                             <Table.Td>
                               <BadgeHoatDong trangThai={gd.trang_thai} />
@@ -1210,23 +1578,34 @@ export default function AdminKhoaChiTiet() {
                             <Table.Td>
                               {laQuanTri && (
                                 <Group gap={6} justify="flex-end" wrap="nowrap">
-                                  <Button variant="subtle" size="xs" onClick={() => moModalSuaGiaiDoan(gd)}>
+                                  <Button
+                                    variant="subtle"
+                                    size="xs"
+                                    onClick={() => moModalSuaGiaiDoan(gd)}
+                                  >
                                     Sửa
                                   </Button>
                                   <Button
                                     variant="subtle"
                                     size="xs"
-                                    color={gd.trang_thai === 'active' ? 'red' : 'green'}
+                                    color={
+                                      gd.trang_thai === "active"
+                                        ? "red"
+                                        : "green"
+                                    }
                                     onClick={() =>
                                       setXacNhanToggle({
-                                        loai: 'giai-doan',
+                                        loai: "giai-doan",
                                         id: gd.id,
                                         ten: gd.ten_giai_doan,
-                                        dangHoatDong: gd.trang_thai === 'active',
+                                        dangHoatDong:
+                                          gd.trang_thai === "active",
                                       })
                                     }
                                   >
-                                    {gd.trang_thai === 'active' ? 'Vô hiệu hóa' : 'Kích hoạt lại'}
+                                    {gd.trang_thai === "active"
+                                      ? "Vô hiệu hóa"
+                                      : "Kích hoạt lại"}
                                   </Button>
                                 </Group>
                               )}
@@ -1249,8 +1628,12 @@ export default function AdminKhoaChiTiet() {
                       </Button>
                     </Group>
                   )}
-                  <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
-                    <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+                  <Paper withBorder radius={14} style={{ overflow: "hidden" }}>
+                    <Table
+                      highlightOnHover
+                      verticalSpacing="sm"
+                      horizontalSpacing="md"
+                    >
                       <Table.Thead>
                         <Table.Tr>
                           <Table.Th>Tên cụm</Table.Th>
@@ -1272,14 +1655,21 @@ export default function AdminKhoaChiTiet() {
                           </Table.Tr>
                         )}
                         {khoa.cum_hoc_vien.map((cum) => {
-                          const hrefZalo = cum.link_zalo ? chuanHoaLienKet(cum.link_zalo) : null;
+                          const hrefZalo = cum.link_zalo
+                            ? chuanHoaLienKet(cum.link_zalo)
+                            : null;
                           return (
                             <Table.Tr key={cum.id}>
                               <Table.Td fw={600}>{cum.ten_cum}</Table.Td>
                               <Table.Td>
                                 {cum.link_zalo ? (
                                   hrefZalo ? (
-                                    <Anchor href={hrefZalo} target="_blank" rel="noreferrer" fz={13.5}>
+                                    <Anchor
+                                      href={hrefZalo}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      fz={13.5}
+                                    >
                                       {cum.link_zalo}
                                     </Anchor>
                                   ) : (
@@ -1288,13 +1678,16 @@ export default function AdminKhoaChiTiet() {
                                     </Text>
                                   )
                                 ) : (
-                                  '—'
+                                  "—"
                                 )}
                               </Table.Td>
-                              <Table.Td>{cum.ghi_chu ?? '—'}</Table.Td>
+                              <Table.Td>{cum.ghi_chu ?? "—"}</Table.Td>
                               {laQuanTri && (
                                 <Table.Td>
-                                  <ChonNguoiHoTroCum khoaId={khoa.id} cum={cum} />
+                                  <ChonNguoiHoTroCum
+                                    khoaId={khoa.id}
+                                    cum={cum}
+                                  />
                                 </Table.Td>
                               )}
                               <Table.Td>
@@ -1302,24 +1695,39 @@ export default function AdminKhoaChiTiet() {
                               </Table.Td>
                               <Table.Td>
                                 {laQuanTri && (
-                                  <Group gap={6} justify="flex-end" wrap="nowrap">
-                                    <Button variant="subtle" size="xs" onClick={() => moModalSuaCum(cum)}>
+                                  <Group
+                                    gap={6}
+                                    justify="flex-end"
+                                    wrap="nowrap"
+                                  >
+                                    <Button
+                                      variant="subtle"
+                                      size="xs"
+                                      onClick={() => moModalSuaCum(cum)}
+                                    >
                                       Sửa
                                     </Button>
                                     <Button
                                       variant="subtle"
                                       size="xs"
-                                      color={cum.trang_thai === 'active' ? 'red' : 'green'}
+                                      color={
+                                        cum.trang_thai === "active"
+                                          ? "red"
+                                          : "green"
+                                      }
                                       onClick={() =>
                                         setXacNhanToggle({
-                                          loai: 'cum',
+                                          loai: "cum",
                                           id: cum.id,
                                           ten: cum.ten_cum,
-                                          dangHoatDong: cum.trang_thai === 'active',
+                                          dangHoatDong:
+                                            cum.trang_thai === "active",
                                         })
                                       }
                                     >
-                                      {cum.trang_thai === 'active' ? 'Vô hiệu hóa' : 'Kích hoạt lại'}
+                                      {cum.trang_thai === "active"
+                                        ? "Vô hiệu hóa"
+                                        : "Kích hoạt lại"}
                                     </Button>
                                   </Group>
                                 )}
@@ -1349,7 +1757,12 @@ export default function AdminKhoaChiTiet() {
       </Container>
 
       {/* ================= Modal: Sửa khóa (chỉ quan_tri) ================= */}
-      <Modal opened={modalSuaKhoa} onClose={() => setModalSuaKhoa(false)} title="Sửa khóa bồi dưỡng" centered>
+      <Modal
+        opened={modalSuaKhoa}
+        onClose={() => setModalSuaKhoa(false)}
+        title="Sửa khóa bồi dưỡng"
+        centered
+      >
         {formSuaKhoa && (
           <Stack gap="sm">
             <TextInput
@@ -1357,20 +1770,29 @@ export default function AdminKhoaChiTiet() {
               required
               value={formSuaKhoa.ma_khoa}
               error={loiSuaKhoa.ma_khoa}
-              onChange={(e) => { const v = e.currentTarget.value; setFormSuaKhoa((f) => (f ? { ...f, ma_khoa: v } : f)); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormSuaKhoa((f) => (f ? { ...f, ma_khoa: v } : f));
+              }}
             />
             <TextInput
               label="Tên khóa"
               required
               value={formSuaKhoa.ten_khoa}
               error={loiSuaKhoa.ten_khoa}
-              onChange={(e) => { const v = e.currentTarget.value; setFormSuaKhoa((f) => (f ? { ...f, ten_khoa: v } : f)); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormSuaKhoa((f) => (f ? { ...f, ten_khoa: v } : f));
+              }}
             />
             <TextInput
               label="Địa điểm"
               value={formSuaKhoa.dia_diem}
               error={loiSuaKhoa.dia_diem}
-              onChange={(e) => { const v = e.currentTarget.value; setFormSuaKhoa((f) => (f ? { ...f, dia_diem: v } : f)); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormSuaKhoa((f) => (f ? { ...f, dia_diem: v } : f));
+              }}
             />
             <Group grow>
               <TextInput
@@ -1379,7 +1801,12 @@ export default function AdminKhoaChiTiet() {
                 required
                 value={formSuaKhoa.thoi_gian_bat_dau}
                 error={loiSuaKhoa.thoi_gian_bat_dau}
-                onChange={(e) => { const v = e.currentTarget.value; setFormSuaKhoa((f) => (f ? { ...f, thoi_gian_bat_dau: v } : f)); }}
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  setFormSuaKhoa((f) =>
+                    f ? { ...f, thoi_gian_bat_dau: v } : f,
+                  );
+                }}
               />
               <TextInput
                 type="date"
@@ -1387,7 +1814,12 @@ export default function AdminKhoaChiTiet() {
                 required
                 value={formSuaKhoa.thoi_gian_ket_thuc}
                 error={loiSuaKhoa.thoi_gian_ket_thuc}
-                onChange={(e) => { const v = e.currentTarget.value; setFormSuaKhoa((f) => (f ? { ...f, thoi_gian_ket_thuc: v } : f)); }}
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  setFormSuaKhoa((f) =>
+                    f ? { ...f, thoi_gian_ket_thuc: v } : f,
+                  );
+                }}
               />
             </Group>
             <Select
@@ -1395,17 +1827,39 @@ export default function AdminKhoaChiTiet() {
               searchable
               filter={locTiengViet}
               data={nhomDonViDatHang}
-              value={laTruongDatHangSua ? null : formSuaKhoa.don_vi_dat_hang_id || null}
+              value={
+                laTruongDatHangSua
+                  ? null
+                  : formSuaKhoa.don_vi_dat_hang_id || null
+              }
               error={loiSuaKhoa.don_vi_dat_hang_id}
-              onChange={(v) => setFormSuaKhoa((f) => (f ? { ...f, don_vi_dat_hang_id: v ?? '' } : f))}
+              onChange={(v) =>
+                setFormSuaKhoa((f) =>
+                  f ? { ...f, don_vi_dat_hang_id: v ?? "" } : f,
+                )
+              }
             />
             <SelectDonViTimKiem
               label="Hoặc chọn trường (gõ tên để tìm)"
               loaiDonVi="truong"
-              value={laTruongDatHangSua ? formSuaKhoa.don_vi_dat_hang_id || null : null}
-              onChange={(id) => setFormSuaKhoa((f) => (f ? { ...f, don_vi_dat_hang_id: id ?? '' } : f))}
+              value={
+                laTruongDatHangSua
+                  ? formSuaKhoa.don_vi_dat_hang_id || null
+                  : null
+              }
+              onChange={(id) =>
+                setFormSuaKhoa((f) =>
+                  f ? { ...f, don_vi_dat_hang_id: id ?? "" } : f,
+                )
+              }
             />
-            <Button mt="sm" loading={capNhatKhoa.isPending} disabled={!formSuaKhoaHopLe} onClick={xuLySuaKhoa} fullWidth>
+            <Button
+              mt="sm"
+              loading={capNhatKhoa.isPending}
+              disabled={!formSuaKhoaHopLe}
+              onClick={xuLySuaKhoa}
+              fullWidth
+            >
               Lưu thay đổi
             </Button>
           </Stack>
@@ -1422,14 +1876,22 @@ export default function AdminKhoaChiTiet() {
       )}
 
       {/* ================= Modal: Tạo lớp ================= */}
-      <Modal opened={modalTaoLop} onClose={() => setModalTaoLop(false)} title="Tạo lớp mới" centered>
+      <Modal
+        opened={modalTaoLop}
+        onClose={() => setModalTaoLop(false)}
+        title="Tạo lớp mới"
+        centered
+      >
         <Stack gap="sm">
           <TextInput
             label="Tên lớp"
             required
             value={formTaoLop.ten_lop}
             error={loiTaoLop.ten_lop}
-            onChange={(e) => { const v = e.currentTarget.value; setFormTaoLop((f) => ({ ...f, ten_lop: v })); }}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setFormTaoLop((f) => ({ ...f, ten_lop: v }));
+            }}
           />
           <Select
             label="Loại lớp"
@@ -1437,26 +1899,45 @@ export default function AdminKhoaChiTiet() {
             data={TUY_CHON_LOAI_LOP}
             value={formTaoLop.loai_lop || null}
             error={loiTaoLop.loai_lop}
-            onChange={(v) => setFormTaoLop((f) => ({ ...f, loai_lop: (v as LoaiLop) || '' }))}
+            onChange={(v) =>
+              setFormTaoLop((f) => ({ ...f, loai_lop: (v as LoaiLop) || "" }))
+            }
           />
           <NumberInput
             label="Sĩ số tối đa"
             min={1}
             value={formTaoLop.si_so_toi_da}
             error={loiTaoLop.si_so_toi_da}
-            onChange={(v) => setFormTaoLop((f) => ({ ...f, si_so_toi_da: v === '' ? '' : String(v) }))}
+            onChange={(v) =>
+              setFormTaoLop((f) => ({
+                ...f,
+                si_so_toi_da: v === "" ? "" : String(v),
+              }))
+            }
           />
           <Text fz={12} c="dimmed">
-            Nhóm học viên và mức năng lực chỉ có thể đặt sau khi tạo lớp, qua nút "Sửa".
+            Nhóm học viên và mức năng lực chỉ có thể đặt sau khi tạo lớp, qua
+            nút "Sửa".
           </Text>
-          <Button mt="sm" loading={taoLop.isPending} disabled={!formTaoLopHopLe} onClick={xuLyTaoLop} fullWidth>
+          <Button
+            mt="sm"
+            loading={taoLop.isPending}
+            disabled={!formTaoLopHopLe}
+            onClick={xuLyTaoLop}
+            fullWidth
+          >
             Tạo lớp
           </Button>
         </Stack>
       </Modal>
 
       {/* ================= Modal: Sửa lớp ================= */}
-      <Modal opened={!!lopDangSua} onClose={() => setLopDangSua(null)} title="Sửa lớp học" centered>
+      <Modal
+        opened={!!lopDangSua}
+        onClose={() => setLopDangSua(null)}
+        title="Sửa lớp học"
+        centered
+      >
         {formSuaLop && (
           <Stack gap="sm">
             <TextInput
@@ -1464,7 +1945,10 @@ export default function AdminKhoaChiTiet() {
               required
               value={formSuaLop.ten_lop}
               error={loiSuaLop.ten_lop}
-              onChange={(e) => { const v = e.currentTarget.value; setFormSuaLop((f) => (f ? { ...f, ten_lop: v } : f)); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormSuaLop((f) => (f ? { ...f, ten_lop: v } : f));
+              }}
             />
             <Select
               label="Loại lớp"
@@ -1472,14 +1956,22 @@ export default function AdminKhoaChiTiet() {
               data={TUY_CHON_LOAI_LOP}
               value={formSuaLop.loai_lop || null}
               error={loiSuaLop.loai_lop}
-              onChange={(v) => setFormSuaLop((f) => (f ? { ...f, loai_lop: (v as LoaiLop) || '' } : f))}
+              onChange={(v) =>
+                setFormSuaLop((f) =>
+                  f ? { ...f, loai_lop: (v as LoaiLop) || "" } : f,
+                )
+              }
             />
             <NumberInput
               label="Sĩ số tối đa"
               min={1}
               value={formSuaLop.si_so_toi_da}
               error={loiSuaLop.si_so_toi_da}
-              onChange={(v) => setFormSuaLop((f) => (f ? { ...f, si_so_toi_da: v === '' ? '' : String(v) } : f))}
+              onChange={(v) =>
+                setFormSuaLop((f) =>
+                  f ? { ...f, si_so_toi_da: v === "" ? "" : String(v) } : f,
+                )
+              }
             />
             <NumberInput
               label="Nhóm học viên"
@@ -1488,17 +1980,31 @@ export default function AdminKhoaChiTiet() {
               max={20}
               value={formSuaLop.nhom_hoc_vien}
               error={loiSuaLop.nhom_hoc_vien}
-              onChange={(v) => setFormSuaLop((f) => (f ? { ...f, nhom_hoc_vien: v === '' ? '' : String(v) } : f))}
+              onChange={(v) =>
+                setFormSuaLop((f) =>
+                  f ? { ...f, nhom_hoc_vien: v === "" ? "" : String(v) } : f,
+                )
+              }
             />
             <Select
               label="Mức năng lực"
               data={TUY_CHON_MUC_NANG_LUC}
               value={formSuaLop.muc_nang_luc || null}
               error={loiSuaLop.muc_nang_luc}
-              onChange={(v) => setFormSuaLop((f) => (f ? { ...f, muc_nang_luc: (v as MucNangLuc) || '' } : f))}
+              onChange={(v) =>
+                setFormSuaLop((f) =>
+                  f ? { ...f, muc_nang_luc: (v as MucNangLuc) || "" } : f,
+                )
+              }
               clearable
             />
-            <Button mt="sm" loading={capNhatLop.isPending} disabled={!formSuaLopHopLe} onClick={xuLySuaLop} fullWidth>
+            <Button
+              mt="sm"
+              loading={capNhatLop.isPending}
+              disabled={!formSuaLopHopLe}
+              onClick={xuLySuaLop}
+              fullWidth
+            >
               Lưu thay đổi
             </Button>
           </Stack>
@@ -1506,7 +2012,12 @@ export default function AdminKhoaChiTiet() {
       </Modal>
 
       {/* ================= Modal: Thêm buổi học ================= */}
-      <Modal opened={!!modalThemBuoi} onClose={() => setModalThemBuoi(null)} title={`Thêm buổi học — ${modalThemBuoi?.ten_lop ?? ''}`} centered>
+      <Modal
+        opened={!!modalThemBuoi}
+        onClose={() => setModalThemBuoi(null)}
+        title={`Thêm buổi học — ${modalThemBuoi?.ten_lop ?? ""}`}
+        centered
+      >
         <Stack gap="sm">
           <Select
             label="Giai đoạn"
@@ -1514,11 +2025,14 @@ export default function AdminKhoaChiTiet() {
             data={tuyChonGiaiDoan}
             value={formBuoi.giai_doan_id || null}
             error={loiBuoi.giai_doan_id}
-            onChange={(v) => setFormBuoi((f) => ({ ...f, giai_doan_id: v ?? '' }))}
+            onChange={(v) =>
+              setFormBuoi((f) => ({ ...f, giai_doan_id: v ?? "" }))
+            }
           />
           {tuyChonGiaiDoan.length === 0 && (
             <Text fz={12} c="dimmed">
-              Khóa chưa có giai đoạn nào — tạo giai đoạn trước ở tab "Giai đoạn".
+              Khóa chưa có giai đoạn nào — tạo giai đoạn trước ở tab "Giai
+              đoạn".
             </Text>
           )}
           <NumberInput
@@ -1526,7 +2040,9 @@ export default function AdminKhoaChiTiet() {
             min={1}
             value={formBuoi.buoi_so}
             error={loiBuoi.buoi_so}
-            onChange={(v) => setFormBuoi((f) => ({ ...f, buoi_so: v === '' ? '' : String(v) }))}
+            onChange={(v) =>
+              setFormBuoi((f) => ({ ...f, buoi_so: v === "" ? "" : String(v) }))
+            }
           />
           <Group grow>
             <TextInput
@@ -1535,7 +2051,10 @@ export default function AdminKhoaChiTiet() {
               required
               value={formBuoi.thoi_gian_bat_dau}
               error={loiBuoi.thoi_gian_bat_dau}
-              onChange={(e) => { const v = e.currentTarget.value; setFormBuoi((f) => ({ ...f, thoi_gian_bat_dau: v })); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormBuoi((f) => ({ ...f, thoi_gian_bat_dau: v }));
+              }}
             />
             <TextInput
               type="datetime-local"
@@ -1543,14 +2062,20 @@ export default function AdminKhoaChiTiet() {
               required
               value={formBuoi.thoi_gian_ket_thuc}
               error={loiBuoi.thoi_gian_ket_thuc}
-              onChange={(e) => { const v = e.currentTarget.value; setFormBuoi((f) => ({ ...f, thoi_gian_ket_thuc: v })); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormBuoi((f) => ({ ...f, thoi_gian_ket_thuc: v }));
+              }}
             />
           </Group>
           <TextInput
             label="Địa điểm / link"
             value={formBuoi.dia_diem_hoac_link}
             error={loiBuoi.dia_diem_hoac_link}
-            onChange={(e) => { const v = e.currentTarget.value; setFormBuoi((f) => ({ ...f, dia_diem_hoac_link: v })); }}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setFormBuoi((f) => ({ ...f, dia_diem_hoac_link: v }));
+            }}
           />
           <Group grow align="flex-start">
             <SelectDiemHoc
@@ -1558,29 +2083,64 @@ export default function AdminKhoaChiTiet() {
               onChange={(v) => setFormBuoi((f) => ({ ...f, diem_hoc_id: v }))}
               required={buoiMoiCanDiemHoc}
               error={loiBuoi.diem_hoc_id}
-              description={buoiMoiCanDiemHoc ? 'Bắt buộc với giai đoạn trực tiếp' : undefined}
+              description={
+                buoiMoiCanDiemHoc
+                  ? "Bắt buộc với giai đoạn trực tiếp"
+                  : undefined
+              }
             />
             <TextInput
               label="Phòng"
               value={formBuoi.phong}
               error={loiBuoi.phong}
-              onChange={(e) => { const v = e.currentTarget.value; setFormBuoi((f) => ({ ...f, phong: v })); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormBuoi((f) => ({ ...f, phong: v }));
+              }}
             />
           </Group>
-          <Button mt="sm" loading={themLichHoc.isPending} disabled={!formBuoiHopLe} onClick={xuLyThemBuoi} fullWidth>
+          <Button
+            mt="sm"
+            loading={themLichHoc.isPending}
+            disabled={!formBuoiHopLe}
+            onClick={xuLyThemBuoi}
+            fullWidth
+          >
             Thêm buổi học
           </Button>
         </Stack>
       </Modal>
 
-      <ModalPhanCongBuoi khoaId={khoaId} buoi={buoiPhanCong} onClose={() => setBuoiPhanCong(null)} />
+      <ModalPhanCongBuoi
+        khoaId={khoaId}
+        buoi={buoiPhanCong}
+        onClose={() => setBuoiPhanCong(null)}
+      />
 
-      <Modal opened={!!lopDiemDanh} onClose={() => setLopDiemDanh(null)} title={`Điểm danh — ${lopDiemDanh?.ten_lop ?? ''}`} size="90%">
+      <Modal
+        opened={!!lopDiemDanh}
+        onClose={() => setLopDiemDanh(null)}
+        title={`Điểm danh — ${lopDiemDanh?.ten_lop ?? ""}`}
+        size="90%"
+      >
         {lopDiemDanh && <BangDiemDanhLop lopId={lopDiemDanh.id} />}
+      </Modal>
+      <Modal
+        opened={!!lopTheoBuoi}
+        onClose={() => setLopTheoBuoi(null)}
+        title={`Danh sách theo buổi — ${lopTheoBuoi?.ten_lop ?? ""}`}
+        size="90%"
+      >
+        {lopTheoBuoi && <TheoBuoi lopId={lopTheoBuoi.id} nguon="quan_tri" />}
       </Modal>
 
       {/* ================= Modal: Sửa buổi học ================= */}
-      <Modal opened={!!buoiDangSua} onClose={() => setBuoiDangSua(null)} title="Sửa buổi học" centered>
+      <Modal
+        opened={!!buoiDangSua}
+        onClose={() => setBuoiDangSua(null)}
+        title="Sửa buổi học"
+        centered
+      >
         {formSuaBuoi && (
           <Stack gap="sm">
             <NumberInput
@@ -1588,7 +2148,11 @@ export default function AdminKhoaChiTiet() {
               min={1}
               value={formSuaBuoi.buoi_so}
               error={loiSuaBuoi.buoi_so}
-              onChange={(v) => setFormSuaBuoi((f) => (f ? { ...f, buoi_so: v === '' ? '' : String(v) } : f))}
+              onChange={(v) =>
+                setFormSuaBuoi((f) =>
+                  f ? { ...f, buoi_so: v === "" ? "" : String(v) } : f,
+                )
+              }
             />
             <Group grow>
               <TextInput
@@ -1597,7 +2161,12 @@ export default function AdminKhoaChiTiet() {
                 required
                 value={formSuaBuoi.thoi_gian_bat_dau}
                 error={loiSuaBuoi.thoi_gian_bat_dau}
-                onChange={(e) => { const v = e.currentTarget.value; setFormSuaBuoi((f) => (f ? { ...f, thoi_gian_bat_dau: v } : f)); }}
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  setFormSuaBuoi((f) =>
+                    f ? { ...f, thoi_gian_bat_dau: v } : f,
+                  );
+                }}
               />
               <TextInput
                 type="datetime-local"
@@ -1605,28 +2174,47 @@ export default function AdminKhoaChiTiet() {
                 required
                 value={formSuaBuoi.thoi_gian_ket_thuc}
                 error={loiSuaBuoi.thoi_gian_ket_thuc}
-                onChange={(e) => { const v = e.currentTarget.value; setFormSuaBuoi((f) => (f ? { ...f, thoi_gian_ket_thuc: v } : f)); }}
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  setFormSuaBuoi((f) =>
+                    f ? { ...f, thoi_gian_ket_thuc: v } : f,
+                  );
+                }}
               />
             </Group>
             <TextInput
               label="Địa điểm / link"
               value={formSuaBuoi.dia_diem_hoac_link}
               error={loiSuaBuoi.dia_diem_hoac_link}
-              onChange={(e) => { const v = e.currentTarget.value; setFormSuaBuoi((f) => (f ? { ...f, dia_diem_hoac_link: v } : f)); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormSuaBuoi((f) =>
+                  f ? { ...f, dia_diem_hoac_link: v } : f,
+                );
+              }}
             />
             <Group grow align="flex-start">
               <SelectDiemHoc
                 value={formSuaBuoi.diem_hoc_id}
-                onChange={(v) => setFormSuaBuoi((f) => (f ? { ...f, diem_hoc_id: v } : f))}
+                onChange={(v) =>
+                  setFormSuaBuoi((f) => (f ? { ...f, diem_hoc_id: v } : f))
+                }
                 required={buoiSuaCanDiemHoc}
                 error={loiSuaBuoi.diem_hoc_id}
-                description={buoiSuaCanDiemHoc ? 'Bắt buộc với giai đoạn trực tiếp' : undefined}
+                description={
+                  buoiSuaCanDiemHoc
+                    ? "Bắt buộc với giai đoạn trực tiếp"
+                    : undefined
+                }
               />
               <TextInput
                 label="Phòng"
                 value={formSuaBuoi.phong}
                 error={loiSuaBuoi.phong}
-                onChange={(e) => { const v = e.currentTarget.value; setFormSuaBuoi((f) => (f ? { ...f, phong: v } : f)); }}
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  setFormSuaBuoi((f) => (f ? { ...f, phong: v } : f));
+                }}
               />
             </Group>
             <TextInput
@@ -1634,16 +2222,29 @@ export default function AdminKhoaChiTiet() {
               description="Ghi vào nhật ký khi đổi giờ/điểm học/phòng (để báo lại học viên, giảng viên)"
               value={formSuaBuoi.ly_do}
               error={loiSuaBuoi.ly_do}
-              onChange={(e) => { const v = e.currentTarget.value; setFormSuaBuoi((f) => (f ? { ...f, ly_do: v } : f)); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormSuaBuoi((f) => (f ? { ...f, ly_do: v } : f));
+              }}
             />
             <Select
               label="Trạng thái diễn ra"
               data={TUY_CHON_TRANG_THAI_LICH_HOC}
               value={formSuaBuoi.trang_thai}
-              onChange={(v) => setFormSuaBuoi((f) => (f ? { ...f, trang_thai: v as TrangThaiLichHoc } : f))}
+              onChange={(v) =>
+                setFormSuaBuoi((f) =>
+                  f ? { ...f, trang_thai: v as TrangThaiLichHoc } : f,
+                )
+              }
               allowDeselect={false}
             />
-            <Button mt="sm" loading={capNhatLichHoc.isPending} disabled={!formSuaBuoiHopLe} onClick={xuLySuaBuoi} fullWidth>
+            <Button
+              mt="sm"
+              loading={capNhatLichHoc.isPending}
+              disabled={!formSuaBuoiHopLe}
+              onClick={xuLySuaBuoi}
+              fullWidth
+            >
               Lưu thay đổi
             </Button>
           </Stack>
@@ -1651,14 +2252,22 @@ export default function AdminKhoaChiTiet() {
       </Modal>
 
       {/* ================= Modal: Thêm nhân sự ================= */}
-      <Modal opened={!!modalThemNhanSu} onClose={() => setModalThemNhanSu(null)} title={`Thêm nhân sự — ${modalThemNhanSu?.ten_lop ?? ''}`} centered>
+      <Modal
+        opened={!!modalThemNhanSu}
+        onClose={() => setModalThemNhanSu(null)}
+        title={`Thêm nhân sự — ${modalThemNhanSu?.ten_lop ?? ""}`}
+        centered
+      >
         <Stack gap="sm">
           <TextInput
             label="Họ tên"
             required
             value={formNhanSu.ho_ten}
             error={loiNhanSu.ho_ten}
-            onChange={(e) => { const v = e.currentTarget.value; setFormNhanSu((f) => ({ ...f, ho_ten: v })); }}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setFormNhanSu((f) => ({ ...f, ho_ten: v }));
+            }}
           />
           <Select
             label="Vai trò"
@@ -1666,22 +2275,41 @@ export default function AdminKhoaChiTiet() {
             data={TUY_CHON_VAI_TRO_NHAN_SU}
             value={formNhanSu.vai_tro || null}
             error={loiNhanSu.vai_tro}
-            onChange={(v) => setFormNhanSu((f) => ({ ...f, vai_tro: (v as VaiTroNhanSuLop) || '' }))}
+            onChange={(v) =>
+              setFormNhanSu((f) => ({
+                ...f,
+                vai_tro: (v as VaiTroNhanSuLop) || "",
+              }))
+            }
           />
           <TextInput
             label="Số điện thoại"
             value={formNhanSu.so_dien_thoai}
             error={loiNhanSu.so_dien_thoai}
-            onChange={(e) => { const v = e.currentTarget.value; setFormNhanSu((f) => ({ ...f, so_dien_thoai: v })); }}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setFormNhanSu((f) => ({ ...f, so_dien_thoai: v }));
+            }}
           />
-          <Button mt="sm" loading={themNhanSu.isPending} disabled={!formNhanSuHopLe} onClick={xuLyThemNhanSu} fullWidth>
+          <Button
+            mt="sm"
+            loading={themNhanSu.isPending}
+            disabled={!formNhanSuHopLe}
+            onClick={xuLyThemNhanSu}
+            fullWidth
+          >
             Thêm nhân sự
           </Button>
         </Stack>
       </Modal>
 
       {/* ================= Modal: Tạo giai đoạn ================= */}
-      <Modal opened={modalTaoGiaiDoan} onClose={() => setModalTaoGiaiDoan(false)} title="Tạo giai đoạn" centered>
+      <Modal
+        opened={modalTaoGiaiDoan}
+        onClose={() => setModalTaoGiaiDoan(false)}
+        title="Tạo giai đoạn"
+        centered
+      >
         <Stack gap="sm">
           <NumberInput
             label="Thứ tự"
@@ -1689,14 +2317,22 @@ export default function AdminKhoaChiTiet() {
             min={1}
             value={formTaoGiaiDoan.thu_tu}
             error={loiTaoGiaiDoan.thu_tu}
-            onChange={(v) => setFormTaoGiaiDoan((f) => ({ ...f, thu_tu: v === '' ? '' : String(v) }))}
+            onChange={(v) =>
+              setFormTaoGiaiDoan((f) => ({
+                ...f,
+                thu_tu: v === "" ? "" : String(v),
+              }))
+            }
           />
           <TextInput
             label="Tên giai đoạn"
             required
             value={formTaoGiaiDoan.ten_giai_doan}
             error={loiTaoGiaiDoan.ten_giai_doan}
-            onChange={(e) => { const v = e.currentTarget.value; setFormTaoGiaiDoan((f) => ({ ...f, ten_giai_doan: v })); }}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setFormTaoGiaiDoan((f) => ({ ...f, ten_giai_doan: v }));
+            }}
           />
           <Select
             label="Hình thức"
@@ -1704,7 +2340,12 @@ export default function AdminKhoaChiTiet() {
             data={TUY_CHON_HINH_THUC_GIAI_DOAN}
             value={formTaoGiaiDoan.hinh_thuc || null}
             error={loiTaoGiaiDoan.hinh_thuc}
-            onChange={(v) => setFormTaoGiaiDoan((f) => ({ ...f, hinh_thuc: (v as HinhThucGiaiDoan) || '' }))}
+            onChange={(v) =>
+              setFormTaoGiaiDoan((f) => ({
+                ...f,
+                hinh_thuc: (v as HinhThucGiaiDoan) || "",
+              }))
+            }
           />
           <Group grow>
             <TextInput
@@ -1713,7 +2354,10 @@ export default function AdminKhoaChiTiet() {
               required
               value={formTaoGiaiDoan.thoi_gian_bat_dau}
               error={loiTaoGiaiDoan.thoi_gian_bat_dau}
-              onChange={(e) => { const v = e.currentTarget.value; setFormTaoGiaiDoan((f) => ({ ...f, thoi_gian_bat_dau: v })); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormTaoGiaiDoan((f) => ({ ...f, thoi_gian_bat_dau: v }));
+              }}
             />
             <TextInput
               type="date"
@@ -1721,7 +2365,10 @@ export default function AdminKhoaChiTiet() {
               required
               value={formTaoGiaiDoan.thoi_gian_ket_thuc}
               error={loiTaoGiaiDoan.thoi_gian_ket_thuc}
-              onChange={(e) => { const v = e.currentTarget.value; setFormTaoGiaiDoan((f) => ({ ...f, thoi_gian_ket_thuc: v })); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormTaoGiaiDoan((f) => ({ ...f, thoi_gian_ket_thuc: v }));
+              }}
             />
           </Group>
           <TextInput
@@ -1729,23 +2376,40 @@ export default function AdminKhoaChiTiet() {
             description="Hiện cho học viên không được gán lớp ở giai đoạn này (vd link bài đánh giá)"
             value={formTaoGiaiDoan.link_hoac_dia_diem}
             error={loiTaoGiaiDoan.link_hoac_dia_diem}
-            onChange={(e) => { const v = e.currentTarget.value; setFormTaoGiaiDoan((f) => ({ ...f, link_hoac_dia_diem: v })); }}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setFormTaoGiaiDoan((f) => ({ ...f, link_hoac_dia_diem: v }));
+            }}
           />
           <Textarea
             label="Hướng dẫn"
             autosize
             minRows={2}
             value={formTaoGiaiDoan.huong_dan}
-            onChange={(e) => { const v = e.currentTarget.value; setFormTaoGiaiDoan((f) => ({ ...f, huong_dan: v })); }}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setFormTaoGiaiDoan((f) => ({ ...f, huong_dan: v }));
+            }}
           />
-          <Button mt="sm" loading={taoGiaiDoan.isPending} disabled={!formTaoGiaiDoanHopLe} onClick={xuLyTaoGiaiDoan} fullWidth>
+          <Button
+            mt="sm"
+            loading={taoGiaiDoan.isPending}
+            disabled={!formTaoGiaiDoanHopLe}
+            onClick={xuLyTaoGiaiDoan}
+            fullWidth
+          >
             Tạo giai đoạn
           </Button>
         </Stack>
       </Modal>
 
       {/* ================= Modal: Sửa giai đoạn ================= */}
-      <Modal opened={!!giaiDoanDangSua} onClose={() => setGiaiDoanDangSua(null)} title="Sửa giai đoạn" centered>
+      <Modal
+        opened={!!giaiDoanDangSua}
+        onClose={() => setGiaiDoanDangSua(null)}
+        title="Sửa giai đoạn"
+        centered
+      >
         {formSuaGiaiDoan && (
           <Stack gap="sm">
             <NumberInput
@@ -1754,14 +2418,21 @@ export default function AdminKhoaChiTiet() {
               min={1}
               value={formSuaGiaiDoan.thu_tu}
               error={loiSuaGiaiDoan.thu_tu}
-              onChange={(v) => setFormSuaGiaiDoan((f) => (f ? { ...f, thu_tu: v === '' ? '' : String(v) } : f))}
+              onChange={(v) =>
+                setFormSuaGiaiDoan((f) =>
+                  f ? { ...f, thu_tu: v === "" ? "" : String(v) } : f,
+                )
+              }
             />
             <TextInput
               label="Tên giai đoạn"
               required
               value={formSuaGiaiDoan.ten_giai_doan}
               error={loiSuaGiaiDoan.ten_giai_doan}
-              onChange={(e) => { const v = e.currentTarget.value; setFormSuaGiaiDoan((f) => (f ? { ...f, ten_giai_doan: v } : f)); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormSuaGiaiDoan((f) => (f ? { ...f, ten_giai_doan: v } : f));
+              }}
             />
             <Select
               label="Hình thức"
@@ -1769,7 +2440,11 @@ export default function AdminKhoaChiTiet() {
               data={TUY_CHON_HINH_THUC_GIAI_DOAN}
               value={formSuaGiaiDoan.hinh_thuc || null}
               error={loiSuaGiaiDoan.hinh_thuc}
-              onChange={(v) => setFormSuaGiaiDoan((f) => (f ? { ...f, hinh_thuc: (v as HinhThucGiaiDoan) || '' } : f))}
+              onChange={(v) =>
+                setFormSuaGiaiDoan((f) =>
+                  f ? { ...f, hinh_thuc: (v as HinhThucGiaiDoan) || "" } : f,
+                )
+              }
             />
             <Group grow>
               <TextInput
@@ -1778,7 +2453,12 @@ export default function AdminKhoaChiTiet() {
                 required
                 value={formSuaGiaiDoan.thoi_gian_bat_dau}
                 error={loiSuaGiaiDoan.thoi_gian_bat_dau}
-                onChange={(e) => { const v = e.currentTarget.value; setFormSuaGiaiDoan((f) => (f ? { ...f, thoi_gian_bat_dau: v } : f)); }}
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  setFormSuaGiaiDoan((f) =>
+                    f ? { ...f, thoi_gian_bat_dau: v } : f,
+                  );
+                }}
               />
               <TextInput
                 type="date"
@@ -1786,7 +2466,12 @@ export default function AdminKhoaChiTiet() {
                 required
                 value={formSuaGiaiDoan.thoi_gian_ket_thuc}
                 error={loiSuaGiaiDoan.thoi_gian_ket_thuc}
-                onChange={(e) => { const v = e.currentTarget.value; setFormSuaGiaiDoan((f) => (f ? { ...f, thoi_gian_ket_thuc: v } : f)); }}
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  setFormSuaGiaiDoan((f) =>
+                    f ? { ...f, thoi_gian_ket_thuc: v } : f,
+                  );
+                }}
               />
             </Group>
             <TextInput
@@ -1794,16 +2479,30 @@ export default function AdminKhoaChiTiet() {
               description="Hiện cho học viên không được gán lớp ở giai đoạn này (vd link bài đánh giá)"
               value={formSuaGiaiDoan.link_hoac_dia_diem}
               error={loiSuaGiaiDoan.link_hoac_dia_diem}
-              onChange={(e) => { const v = e.currentTarget.value; setFormSuaGiaiDoan((f) => (f ? { ...f, link_hoac_dia_diem: v } : f)); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormSuaGiaiDoan((f) =>
+                  f ? { ...f, link_hoac_dia_diem: v } : f,
+                );
+              }}
             />
             <Textarea
               label="Hướng dẫn"
               autosize
               minRows={2}
               value={formSuaGiaiDoan.huong_dan}
-              onChange={(e) => { const v = e.currentTarget.value; setFormSuaGiaiDoan((f) => (f ? { ...f, huong_dan: v } : f)); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormSuaGiaiDoan((f) => (f ? { ...f, huong_dan: v } : f));
+              }}
             />
-            <Button mt="sm" loading={capNhatGiaiDoan.isPending} disabled={!formSuaGiaiDoanHopLe} onClick={xuLySuaGiaiDoan} fullWidth>
+            <Button
+              mt="sm"
+              loading={capNhatGiaiDoan.isPending}
+              disabled={!formSuaGiaiDoanHopLe}
+              onClick={xuLySuaGiaiDoan}
+              fullWidth
+            >
               Lưu thay đổi
             </Button>
           </Stack>
@@ -1811,36 +2510,61 @@ export default function AdminKhoaChiTiet() {
       </Modal>
 
       {/* ================= Modal: Tạo cụm ================= */}
-      <Modal opened={modalTaoCum} onClose={() => setModalTaoCum(false)} title="Tạo cụm hỗ trợ Zalo" centered>
+      <Modal
+        opened={modalTaoCum}
+        onClose={() => setModalTaoCum(false)}
+        title="Tạo cụm hỗ trợ Zalo"
+        centered
+      >
         <Stack gap="sm">
           <TextInput
             label="Tên cụm"
             required
             value={formTaoCum.ten_cum}
             error={loiTaoCum.ten_cum}
-            onChange={(e) => { const v = e.currentTarget.value; setFormTaoCum((f) => ({ ...f, ten_cum: v })); }}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setFormTaoCum((f) => ({ ...f, ten_cum: v }));
+            }}
           />
           <TextInput
             label="Link Zalo"
             value={formTaoCum.link_zalo}
             error={loiTaoCum.link_zalo}
-            onChange={(e) => { const v = e.currentTarget.value; setFormTaoCum((f) => ({ ...f, link_zalo: v })); }}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setFormTaoCum((f) => ({ ...f, link_zalo: v }));
+            }}
           />
           <Textarea
             label="Ghi chú"
             value={formTaoCum.ghi_chu}
             error={loiTaoCum.ghi_chu}
-            onChange={(e) => { const v = e.currentTarget.value; setFormTaoCum((f) => ({ ...f, ghi_chu: v })); }}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              setFormTaoCum((f) => ({ ...f, ghi_chu: v }));
+            }}
             minRows={2}
           />
-          <Button mt="sm" loading={taoCum.isPending} disabled={!formTaoCumHopLe} onClick={xuLyTaoCum} fullWidth>
+          <Button
+            mt="sm"
+            loading={taoCum.isPending}
+            disabled={!formTaoCumHopLe}
+            onClick={xuLyTaoCum}
+            fullWidth
+          >
             Tạo cụm
           </Button>
         </Stack>
       </Modal>
 
       {/* ================= Modal: Sửa cụm ================= */}
-      <Modal opened={!!cumDangSua} onClose={() => setCumDangSua(null)} title="Sửa cụm hỗ trợ Zalo" centered>
+      <Modal
+        opened={!!cumDangSua}
+        onClose={() => setCumDangSua(null)}
+        title="Sửa cụm hỗ trợ Zalo"
+        centered
+      >
         {formSuaCum && (
           <Stack gap="sm">
             <TextInput
@@ -1848,22 +2572,37 @@ export default function AdminKhoaChiTiet() {
               required
               value={formSuaCum.ten_cum}
               error={loiSuaCum.ten_cum}
-              onChange={(e) => { const v = e.currentTarget.value; setFormSuaCum((f) => (f ? { ...f, ten_cum: v } : f)); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormSuaCum((f) => (f ? { ...f, ten_cum: v } : f));
+              }}
             />
             <TextInput
               label="Link Zalo"
               value={formSuaCum.link_zalo}
               error={loiSuaCum.link_zalo}
-              onChange={(e) => { const v = e.currentTarget.value; setFormSuaCum((f) => (f ? { ...f, link_zalo: v } : f)); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormSuaCum((f) => (f ? { ...f, link_zalo: v } : f));
+              }}
             />
             <Textarea
               label="Ghi chú"
               value={formSuaCum.ghi_chu}
               error={loiSuaCum.ghi_chu}
-              onChange={(e) => { const v = e.currentTarget.value; setFormSuaCum((f) => (f ? { ...f, ghi_chu: v } : f)); }}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                setFormSuaCum((f) => (f ? { ...f, ghi_chu: v } : f));
+              }}
               minRows={2}
             />
-            <Button mt="sm" loading={capNhatCum.isPending} disabled={!formSuaCumHopLe} onClick={xuLySuaCum} fullWidth>
+            <Button
+              mt="sm"
+              loading={capNhatCum.isPending}
+              disabled={!formSuaCumHopLe}
+              onClick={xuLySuaCum}
+              fullWidth
+            >
               Lưu thay đổi
             </Button>
           </Stack>
@@ -1874,7 +2613,7 @@ export default function AdminKhoaChiTiet() {
       <Modal
         opened={!!xacNhanToggle}
         onClose={() => setXacNhanToggle(null)}
-        title={xacNhanToggle?.dangHoatDong ? 'Vô hiệu hóa' : 'Kích hoạt lại'}
+        title={xacNhanToggle?.dangHoatDong ? "Vô hiệu hóa" : "Kích hoạt lại"}
         centered
       >
         {xacNhanToggle && (
@@ -1885,7 +2624,7 @@ export default function AdminKhoaChiTiet() {
                 : `Kích hoạt lại "${xacNhanToggle.ten}"?`}
             </Text>
             <Button
-              color={xacNhanToggle.dangHoatDong ? 'red' : 'green'}
+              color={xacNhanToggle.dangHoatDong ? "red" : "green"}
               loading={dangXuLyToggle}
               onClick={xuLyXacNhanToggle}
               fullWidth
@@ -1897,11 +2636,24 @@ export default function AdminKhoaChiTiet() {
       </Modal>
 
       {/* ================= Modal xác nhận: xóa nhân sự ================= */}
-      <Modal opened={!!xacNhanXoa} onClose={() => setXacNhanXoa(null)} title="Xác nhận" centered>
+      <Modal
+        opened={!!xacNhanXoa}
+        onClose={() => setXacNhanXoa(null)}
+        title="Xác nhận"
+        centered
+      >
         {xacNhanXoa && (
           <Stack gap="sm">
-            <Text fz={14}>Xóa nhân sự "{xacNhanXoa.ten}" khỏi lớp? Thao tác này xóa cứng, không thể hoàn tác.</Text>
-            <Button color="red" loading={xoaNhanSu.isPending} onClick={xuLyXacNhanXoa} fullWidth>
+            <Text fz={14}>
+              Xóa nhân sự "{xacNhanXoa.ten}" khỏi lớp? Thao tác này xóa cứng,
+              không thể hoàn tác.
+            </Text>
+            <Button
+              color="red"
+              loading={xoaNhanSu.isPending}
+              onClick={xuLyXacNhanXoa}
+              fullWidth
+            >
               Xác nhận
             </Button>
           </Stack>
@@ -1917,6 +2669,6 @@ export default function AdminKhoaChiTiet() {
  * `toISOString()` bất kể máy/CI đang chạy ở múi giờ nào (không hard-code +7 vì có thể sai trên CI). */
 function isoThanhInputDiaPhuong(isoUtc: string): string {
   const d = new Date(isoUtc);
-  const pad = (n: number) => String(n).padStart(2, '0');
+  const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
