@@ -71,7 +71,13 @@ pm2 logs boiduongnls-backend --lines 100 --nostream
 - `pm2 logs` không có lỗi lặp lại.
 - Trên web, đăng nhập Quản trị → **Khóa bồi dưỡng** → mở 1 khóa → dòng lớp có nút **"Theo buổi"** → chọn buổi: sĩ số trong ô chọn buổi, người "Đổi vào" (nền xanh), mục "Đã chuyển sang lớp khác". Bấm **Xuất buổi này** / **Xuất tất cả buổi** → tải được `ds-buoi-<yyyymmdd>.xlsx` (1 sheet/buổi).
 - Tài khoản người hỗ trợ học viên: tab "Theo buổi" ở trang lớp vẫn chạy như cũ.
-- (Tuỳ chọn) Nhật ký: Quản trị → Nhật ký, lọc "Xuất danh sách theo buổi (có ngày sinh)" thấy lần xuất vừa làm.
+- (Tuỳ chọn) Nhật ký ghi lần xuất vừa làm:
+
+```bash
+export DB_URL="$(grep '^DATABASE_URL=' ~/apps/boi-duong-nls/backend/.env | cut -d= -f2- | tr -d '"' | sed 's/?.*//')"
+psql "$DB_URL" -c "SELECT hanh_dong, thoi_gian FROM nhat_ky_hoat_dong WHERE hanh_dong = 'xuat_danh_sach_buoi' ORDER BY thoi_gian DESC LIMIT 3;"
+unset DB_URL
+```
 
 ## 5. Quay lui (nếu cần)
 
