@@ -5,11 +5,16 @@ import {
   trang_thai_de_nghi,
 } from '@prisma/client';
 import { chiaLo } from '../../common/utils/theo-lo.util';
+import {
+  CheDoChuyenCan,
+  MucLop,
+  congNhanLopKhac,
+} from '../../common/utils/chuyen-can.util';
 
 // ADR 0014 C5c/C6: dữ liệu "lớp cũ" của học viên khi import phân lớp chuyển
 // lớp. Nạp 1 lần cho cả khóa (không theo dòng) — file ~9.000 dòng tra từng
 // dòng sẽ 504. Chỉ học viên có đề nghị đổi buổi/học bù còn hiệu lực mới có mặt
-// trong Map; issue #36 (điểm danh lớp cũ) mở rộng thêm trường ở đây.
+// trong Map. Điểm danh lớp cũ (#36): napDiemDanhLopCu bên dưới.
 
 export const GHI_CHU_HUY_CHUYEN_LOP = 'Hủy tự động do chuyển lớp (nhập file)';
 
@@ -155,5 +160,99 @@ export function canhBaoHuyDeNghi(
         ? ` — trong đó ${daHoc} bản đã duyệt học viên đã điểm danh buổi chốt (sau khi hủy không còn tính thay buổi nguồn)`
         : '')
     );
+  });
+}
+
+// ---------------------------------------------------------------------
+// ADR 0014 C5a/C5b (issue #36): số buổi đã điểm danh ở lớp hiện tại (trước
+// khi ghi file) theo (học viên, giai đoạn) — 1 truy vấn gộp cho cả khóa, chỉ
+// có dòng khi đã điểm danh ≥ 1 buổi (mọi trạng thái).
+
+export interface DiemDanhLopCu {
+  lop_id: string;
+  ten_lop: string;
+  loai_lop: string;
+  muc_nang_luc: MucLop;
+  so_buoi: number;
+}
+
+export interface DiemDanhLopCuKhoa {
+  che_do: CheDoChuyenCan;
+  // hoc_vien_id -> giai_doan_id -> lớp hiện tại kèm số buổi đã điểm danh.
+  theo_hoc_vien: Map<string, Map<string, DiemDanhLopCu>>;
+}
+
+export async function napDiemDanhLopCu(
+  prisma: Pick<PrismaClient, '$queryRaw' | 'khoa_boi_duong'>,
+  khoaId: string,
+): Promise<DiemDanhLopCuKhoa> {
+  const [khoa, dong] = await Promise.all([
+    prisma.khoa_boi_duong.findUnique({
+      where: { id: khoaId },
+      select: { che_do_chuyen_can: true },
+    }),
+    prisma.$queryRaw<
+      (DiemDanhLopCu & { hoc_vien_id: string; giai_doan_id: string })[]
+    >`
+      SELECT dk.hoc_vien_id, pl.giai_doan_id, pl.lop_id, l.ten_lop,
+             l.loai_lop::text AS loai_lop, l.muc_nang_luc::text AS muc_nang_luc,
+             COUNT(DISTINCT lh.id)::int AS so_buoi
+      FROM phan_lop_giai_doan pl
+      JOIN dang_ky_hoc dk ON dk.id = pl.dang_ky_hoc_id
+      JOIN lop_hoc l ON l.id = pl.lop_id
+      JOIN lich_hoc_lop lh
+        ON lh.lop_id = pl.lop_id AND lh.giai_doan_id = pl.giai_doan_id
+      JOIN diem_danh dd
+        ON dd.lich_hoc_id = lh.id AND dd.dang_ky_hoc_id = dk.id
+      WHERE dk.khoa_id = ${khoaId}::uuid
+      GROUP BY dk.hoc_vien_id, pl.giai_doan_id, pl.lop_id, l.ten_lop,
+               l.loai_lop, l.muc_nang_luc`,
+  ]);
+  const theo_hoc_vien = new Map<string, Map<string, DiemDanhLopCu>>();
+  for (const { hoc_vien_id, giai_doan_id, ...d } of dong) {
+    const m = theo_hoc_vien.get(hoc_vien_id) ?? new Map();
+    m.set(giai_doan_id, d);
+    theo_hoc_vien.set(hoc_vien_id, m);
+  }
+  return {
+    che_do: khoa?.che_do_chuyen_can ?? 'theo_lop_hien_tai',
+    theo_hoc_vien,
+  };
+}
+
+// Kết luận công nhận dùng đúng quy tắc của tinhChuyenCan (trực tiếp luôn
+// tính; lớp Zoom khác theo congNhanLopKhac).
+export function canhBaoDiemDanhLopCu(
+  ma: string,
+  gan: { giai_doan_id: string; lop_id: string | null }[],
+  lopMoi: Map<string, { ten_lop: string; muc_nang_luc: MucLop }>,
+  diemDanh: DiemDanhLopCuKhoa,
+  hocVienId: string,
+  thuTuGiaiDoan: Map<string, number>,
+): string[] {
+  const cuaHv = diemDanh.theo_hoc_vien.get(hocVienId);
+  if (!cuaHv) return [];
+  return gan.flatMap((g) => {
+    const cu = cuaHv.get(g.giai_doan_id);
+    if (!cu || cu.lop_id === g.lop_id) return [];
+    const gd = `GĐ${thuTuGiaiDoan.get(g.giai_doan_id) ?? '?'}`;
+    const daDiemDanh = `đã điểm danh ${cu.so_buoi} buổi ở lớp "${cu.ten_lop}"`;
+    if (g.lop_id === null) {
+      return [
+        `Học viên "${ma}" gỡ khỏi lớp "${cu.ten_lop}" (${gd}): ${daDiemDanh} — điểm danh vẫn được giữ`,
+      ];
+    }
+    const moi = lopMoi.get(g.giai_doan_id);
+    const congNhan =
+      cu.loai_lop === 'truc_tiep' ||
+      congNhanLopKhac(diemDanh.che_do, cu.muc_nang_luc, moi?.muc_nang_luc);
+    const ketLuan = congNhan
+      ? 'được công nhận'
+      : diemDanh.che_do === 'cong_nhan_cung_muc'
+        ? 'không được công nhận (khác mức)'
+        : 'không được công nhận';
+    return [
+      `Học viên "${ma}" chuyển từ lớp "${cu.ten_lop}" sang lớp "${moi?.ten_lop ?? '?'}" (${gd}): ${daDiemDanh} — theo chế độ của khóa: ${ketLuan}`,
+    ];
   });
 }

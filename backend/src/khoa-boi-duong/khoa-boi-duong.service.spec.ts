@@ -87,6 +87,7 @@ describe('KhoaBoiDuongService', () => {
     nhan_su_thuc_dia: { findMany: jest.Mock };
     ket_qua_khao_sat: { findUnique: jest.Mock };
     cau_hinh_he_thong: { findUnique: jest.Mock };
+    $queryRaw: jest.Mock;
     $transaction: jest.Mock;
   };
   let scopeService: { canAccessDonVi: jest.Mock };
@@ -171,6 +172,7 @@ describe('KhoaBoiDuongService', () => {
       nhan_su_thuc_dia: { findMany: jest.fn().mockResolvedValue([]) },
       ket_qua_khao_sat: { findUnique: jest.fn().mockResolvedValue(null) },
       cau_hinh_he_thong: { findUnique: jest.fn().mockResolvedValue(null) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn(async (lenh: Promise<unknown>[]) =>
         Promise.all(lenh),
       ),
@@ -1468,9 +1470,9 @@ describe('KhoaBoiDuongService', () => {
       it('bước kiểm tra: nạp đề nghị/điểm danh 1 lần cho cả lượt (BoNhoPhanLop)', async () => {
         prisma.lop_hoc.findMany.mockResolvedValue(lopB);
         const boNho = taoBoNhoPhanLop();
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 50; i++) {
           await service.resolvePhanLopRow(
-            { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': 'Lớp B' },
+            { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': i % 2 ? 'Lớp B' : '-' },
             khoa,
             undefined,
             boNho,
@@ -1478,6 +1480,55 @@ describe('KhoaBoiDuongService', () => {
         }
         expect(prisma.doi_buoi_hoc.findMany).toHaveBeenCalledTimes(1);
         expect(prisma.diem_danh.findMany).toHaveBeenCalledTimes(1);
+        // #36: điểm danh lớp cũ + chế độ khóa cũng chỉ 1 lần/lượt.
+        expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+        expect(prisma.khoa_boi_duong.findUnique).toHaveBeenCalledTimes(1);
+      });
+
+      it('#36 bước kiểm tra: chuyển / gỡ lớp đã điểm danh ở lớp cũ -> cảnh báo; giữ nguyên -> không', async () => {
+        prisma.khoa_boi_duong.findUnique.mockResolvedValue({
+          che_do_chuyen_can: 'cong_nhan_cung_muc',
+        });
+        prisma.$queryRaw.mockResolvedValue([
+          {
+            hoc_vien_id: 'hv-1',
+            giai_doan_id: 'gd-2',
+            lop_id: 'lop-a',
+            ten_lop: 'Lớp A',
+            loai_lop: 'zoom',
+            muc_nang_luc: 'co_ban',
+            so_buoi: 2,
+          },
+        ]);
+        prisma.lop_hoc.findMany.mockResolvedValue([
+          { id: 'lop-b', ten_lop: 'Lớp B', loai_lop: 'zoom', muc_nang_luc: null },
+        ]);
+        prisma.dang_ky_hoc.findUnique.mockResolvedValue({ muc_dau_vao: null });
+        const chuyen = await service.resolvePhanLopRow(
+          { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': 'Lớp B' },
+          khoa,
+        );
+        expect(chuyen.error).toBeUndefined();
+        expect(chuyen.canhBao).toContain(
+          'chuyển từ lớp "Lớp A" sang lớp "Lớp B" (GĐ2): đã điểm danh 2 buổi ở lớp "Lớp A" — theo chế độ của khóa: không được công nhận (khác mức)',
+        );
+
+        const go = await service.resolvePhanLopRow(
+          { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': '-' },
+          khoa,
+        );
+        expect(go.canhBao).toContain(
+          'gỡ khỏi lớp "Lớp A" (GĐ2): đã điểm danh 2 buổi ở lớp "Lớp A" — điểm danh vẫn được giữ',
+        );
+
+        prisma.lop_hoc.findMany.mockResolvedValue([
+          { id: 'lop-a', ten_lop: 'Lớp A', loai_lop: 'zoom', muc_nang_luc: 'co_ban' },
+        ]);
+        const giu = await service.resolvePhanLopRow(
+          { so_dinh_danh_ca_nhan: '123456789012', 'gd:2': 'Lớp A' },
+          khoa,
+        );
+        expect(giu.canhBao ?? '').not.toContain('đã điểm danh');
       });
 
       it('bước xác nhận: chuyển lớp GĐ2 -> hủy d1,d2,d3 (không đụng GĐ3/lớp khác), người import, ghi chú, nhật ký, không email', async () => {
