@@ -82,10 +82,13 @@ import {
   buildDanhSachChiaLopWorkbook,
 } from './util/danh-sach-chia-lop-excel.util';
 import {
+  DiemDanhLopCuKhoa,
   GHI_CHU_HUY_CHUYEN_LOP,
   LopCuHocVien,
+  canhBaoDiemDanhLopCu,
   canhBaoHuyDeNghi,
   deNghiSeHuy,
+  napDiemDanhLopCu,
   napLopCuTheoKhoa,
 } from './util/lop-cu-phan-lop.util';
 
@@ -100,6 +103,8 @@ export interface BoNhoPhanLop {
   canhBaoGan: Map<string, Promise<string | undefined>>;
   // ADR 0014: đề nghị đổi buổi/học bù lớp cũ, nạp 1 lần cho cả khóa.
   lopCu?: Promise<Map<string, LopCuHocVien>>;
+  // ADR 0014 C5a/C5b: số buổi đã điểm danh ở lớp hiện tại, cả khóa.
+  diemDanhLopCu?: Promise<DiemDanhLopCuKhoa>;
 }
 
 export function taoBoNhoPhanLop(): BoNhoPhanLop {
@@ -2296,6 +2301,7 @@ export class KhoaBoiDuongService {
         orderBy: { thu_tu: 'asc' },
       }));
     const gan: { giai_doan_id: string; lop_id: string | null }[] = [];
+    const lopMoi = new Map<string, lop_hoc>();
     const canhBaoList: string[] = [];
     // Mức đầu vào của học viên: tra tối đa 1 lần/dòng, chỉ khi có lớp gắn mức.
     let mucDauVao:
@@ -2328,6 +2334,7 @@ export class KhoaBoiDuongService {
       }
       const lop = lops[0];
       gan.push({ giai_doan_id: gd.id, lop_id: lop.id });
+      lopMoi.set(gd.id, lop);
       const khoaCanhBao = `${lop.id}|${gd.id}`;
       let cbPromise = boNho.canhBaoGan.get(khoaCanhBao);
       if (!cbPromise) {
@@ -2360,16 +2367,28 @@ export class KhoaBoiDuongService {
       }
     }
 
+    const thuTuGiaiDoan = new Map(giaiDoanList.map((g) => [g.id, g.thu_tu]));
+    // ADR 0014 C5a/C5b: chuyển/gỡ lớp đã có điểm danh ở lớp cũ — chỉ cảnh báo.
+    if (gan.length > 0) {
+      boNho.diemDanhLopCu ??= napDiemDanhLopCu(this.prisma, khoa.id);
+      canhBaoList.push(
+        ...canhBaoDiemDanhLopCu(
+          ma,
+          gan,
+          lopMoi,
+          await boNho.diemDanhLopCu,
+          hocVien.id,
+          thuTuGiaiDoan,
+        ),
+      );
+    }
+
     // ADR 0014 C5c: chuyển lớp sẽ hủy đề nghị của lớp cũ — chỉ cảnh báo.
     if (gan.some((g) => g.lop_id)) {
       boNho.lopCu ??= napLopCuTheoKhoa(this.prisma, { khoa_id: khoa.id });
       const huy = deNghiSeHuy((await boNho.lopCu).get(hocVien.id), gan);
       canhBaoList.push(
-        ...canhBaoHuyDeNghi(
-          ma,
-          huy,
-          new Map(giaiDoanList.map((g) => [g.id, g.thu_tu])),
-        ),
+        ...canhBaoHuyDeNghi(ma, huy, thuTuGiaiDoan),
       );
     }
 

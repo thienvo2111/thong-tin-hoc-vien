@@ -520,6 +520,116 @@ describe('Phân lớp theo giai đoạn (e2e)', () => {
       }
     });
 
+    // ADR 0014 C5a/C5b (issue #36).
+    describe('cảnh báo điểm danh lớp cũ khi chuyển / gỡ lớp', () => {
+      let khoaDD: { id: string; ma_khoa: string };
+      const hv: Record<string, Awaited<ReturnType<typeof taoHocVienMoet>>> = {};
+      const dkIds: string[] = [];
+
+      beforeAll(async () => {
+        khoaDD = await taoKhoa();
+        // Khóa mới mặc định cong_nhan_cung_muc (ADR 0014 C3).
+        const gd2 = await taoGiaiDoan(khoaDD.id, 2);
+        const taoLopMuc = (ten: string, muc: 'co_ban' | 'nang_cao') =>
+          prisma.lop_hoc.create({
+            data: {
+              khoa_id: khoaDD.id,
+              loai_lop: 'zoom',
+              ten_lop: ten,
+              muc_nang_luc: muc,
+            },
+          });
+        const lopA = await taoLopMuc('DD Lớp A', 'co_ban');
+        await taoLopMuc('DD Lớp B', 'nang_cao');
+        await taoLopMuc('DD Lớp C', 'co_ban');
+        const a1 = await taoBuoi(lopA.id, gd2.id, 1);
+        const a2 = await taoBuoi(lopA.id, gd2.id, 2);
+        // [học viên, số buổi đã điểm danh ở lớp A]
+        for (const [ten, soBuoi] of [
+          ['khacMuc', 2],
+          ['cungMuc', 1],
+          ['go', 1],
+          ['giu', 1],
+          ['chuaDiemDanh', 0],
+        ] as const) {
+          hv[ten] = await taoHocVienMoet(uniqueSuffix());
+          const dk = await ghiDanh(hv[ten].hocVien.id, khoaDD.id);
+          dkIds.push(dk.id);
+          await prisma.phan_lop_giai_doan.create({
+            data: {
+              dang_ky_hoc_id: dk.id,
+              giai_doan_id: gd2.id,
+              lop_id: lopA.id,
+            },
+          });
+          const trangThai = ['co_mat', 'vang'] as const;
+          for (let i = 0; i < soBuoi; i++) {
+            await prisma.diem_danh.create({
+              data: {
+                dang_ky_hoc_id: dk.id,
+                lich_hoc_id: [a1, a2][i].id,
+                trang_thai: trangThai[i],
+                nguon: 'thu_cong',
+              },
+            });
+          }
+        }
+      });
+
+      it('kiểm tra: cảnh báo đúng số buổi + kết luận theo mức; gỡ lớp giữ điểm danh; giữ nguyên/chưa điểm danh không cảnh báo; xác nhận không đụng điểm danh', async () => {
+        const { importId, ketQua } = await taiLenPhanLop(khoaDD.ma_khoa, [
+          [...H, 'GĐ2'],
+          ['', hv.khacMuc.tenDangNhap, 'DD Lớp B'],
+          ['', hv.cungMuc.tenDangNhap, 'DD Lớp C'],
+          ['', hv.go.tenDangNhap, '-'],
+          ['', hv.giu.tenDangNhap, 'DD Lớp A'],
+          ['', hv.chuaDiemDanh.tenDangNhap, 'DD Lớp B'],
+        ]);
+        expect(ketQua.danh_sach_loi).toEqual([]);
+        const canhBao = (dong: number) =>
+          ketQua.danh_sach_canh_bao
+            .filter((c) => c.dong === dong)
+            .map((c) => c.ly_do)
+            .join('; ');
+        expect(canhBao(2)).toContain(
+          `Học viên "${hv.khacMuc.tenDangNhap}" chuyển từ lớp "DD Lớp A" sang lớp "DD Lớp B" (GĐ2): đã điểm danh 2 buổi ở lớp "DD Lớp A" — theo chế độ của khóa: không được công nhận (khác mức)`,
+        );
+        expect(canhBao(3)).toContain(
+          'sang lớp "DD Lớp C" (GĐ2): đã điểm danh 1 buổi ở lớp "DD Lớp A" — theo chế độ của khóa: được công nhận',
+        );
+        expect(canhBao(4)).toContain(
+          `Học viên "${hv.go.tenDangNhap}" gỡ khỏi lớp "DD Lớp A" (GĐ2): đã điểm danh 1 buổi ở lớp "DD Lớp A" — điểm danh vẫn được giữ`,
+        );
+        expect(canhBao(5)).not.toContain('đã điểm danh');
+        expect(canhBao(6)).not.toContain('đã điểm danh');
+
+        await xacNhan(importId);
+        expect(await phanLopCua36(hv.khacMuc.hocVien.id)).toEqual({
+          2: 'DD Lớp B',
+        });
+        expect(await phanLopCua36(hv.go.hocVien.id)).toEqual({});
+        expect(
+          await prisma.diem_danh.count({
+            where: { dang_ky_hoc_id: { in: dkIds } },
+          }),
+        ).toBe(5);
+      });
+
+      const phanLopCua36 = (hocVienId: string) =>
+        prisma.phan_lop_giai_doan
+          .findMany({
+            where: {
+              dang_ky_hoc: { hoc_vien_id: hocVienId, khoa_id: khoaDD.id },
+            },
+            include: { lop: true, giai_doan: true },
+          })
+          .then((r) =>
+            Object.fromEntries(
+              r.map((x) => [x.giai_doan.thu_tu, x.lop.ten_lop]),
+            ),
+          );
+    });
+
     // ADR 0014 C5c/C6/C7 (issue #35).
     describe('chuyển lớp tự hủy đề nghị đổi buổi/học bù của lớp cũ', () => {
       let khoaCL: { id: string; ma_khoa: string };
