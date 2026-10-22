@@ -73,6 +73,7 @@ import { CauHinhDoiBuoi } from './CauHinhDoiBuoi';
 import { KhoiDotNhuCauMuc } from './KhoiDotNhuCauMuc';
 import { CanhBaoZoomThieuLink } from './CanhBaoZoomThieuLink';
 import { BangDiemDanhLop } from '@/components/BangDiemDanhLop';
+import { TheoBuoi } from '@/pages/HoTro/HoTroLopChiTiet';
 
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 const MAU_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'blue', zoom: 'grape', vle: 'teal' };
@@ -236,6 +237,7 @@ export default function AdminKhoaChiTiet() {
   const laQuanTri = vaiTro === 'quan_tri';
   // ADR 0005 Z7 (issue #26): bảng điểm danh của 1 lớp, Quản trị sửa nhanh từng ô.
   const [lopDiemDanh, setLopDiemDanh] = useState<LopHoc | null>(null);
+  const [lopTheoBuoi, setLopTheoBuoi] = useState<LopHoc | null>(null);
   const { data: khoa, isLoading, isError, error } = useChiTietKhoa(id);
   const donVi = useDonViChoKhoa();
   // Chỉ gồm so_gddt + khac (danh mục nhỏ, xem useDonViChoKhoa) — Trường chọn qua SelectDonViTimKiem.
@@ -995,6 +997,9 @@ export default function AdminKhoaChiTiet() {
                                         <Button variant="subtle" size="xs" onClick={() => setLopDiemDanh(lop)}>
                                           Điểm danh
                                         </Button>
+                                        <Button variant="subtle" size="xs" onClick={() => setLopTheoBuoi(lop)}>
+                                          Theo buổi
+                                        </Button>
                                         <Button variant="subtle" size="xs" onClick={() => moModalSuaLop(lop)}>
                                           Sửa
                                         </Button>
@@ -1577,6 +1582,14 @@ export default function AdminKhoaChiTiet() {
 
       <Modal opened={!!lopDiemDanh} onClose={() => setLopDiemDanh(null)} title={`Điểm danh — ${lopDiemDanh?.ten_lop ?? ''}`} size="90%">
         {lopDiemDanh && <BangDiemDanhLop lopId={lopDiemDanh.id} />}
+      </Modal>
+      <Modal
+        opened={!!lopTheoBuoi}
+        onClose={() => setLopTheoBuoi(null)}
+        title={`Danh sách theo buổi — ${lopTheoBuoi?.ten_lop ?? ''}`}
+        size="90%"
+      >
+        {lopTheoBuoi && <TheoBuoi lopId={lopTheoBuoi.id} nguon="quan_tri" />}
       </Modal>
 
       {/* ================= Modal: Sửa buổi học ================= */}

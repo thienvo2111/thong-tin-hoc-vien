@@ -84,6 +84,7 @@ type HocVienDong = Prisma.hoc_vienGetPayload<{
 
 // Một buổi của lớp kèm điều chỉnh đổi buổi (ADR 0008 L7).
 type BuoiCuaLop = Awaited<ReturnType<HoTroHocVienService['dsBuoi']>>[number];
+type VaiTroXemBuoi = 'ho_tro_hoc_vien' | 'quan_tri';
 
 // ADR 0003 Lát 2 — tra cứu của người hỗ trợ học viên. Mọi hàm nhận caller.id
 // và lọc qua HoTroHocVienScopeService (chỉ đọc ở lát này).
@@ -616,15 +617,38 @@ export class HoTroHocVienService {
   // ADR 0008 L7 — danh sách THEO BUỔI của lớp được gắn. Đọc theo buổi đi qua
   // DoiBuoiHocQueryService (CONTEXT.md "Đổi buổi"): phân lớp − đổi ra + đổi
   // vào. Người đổi vào vẫn NGOÀI phạm vi sửa (L2); người đổi ra liệt kê riêng.
+  // Quản trị dùng chung logic, phạm vi toàn hệ thống (GET /lop/:id/buoi...).
   // ---------------------------------------------------------------------
 
-  async buoiCuaLop(nguoiDungId: string, lopId: string) {
-    await this.scope.damBaoLopCuaToi(nguoiDungId, lopId);
+  /** Hỗ trợ: lớp phải được gắn; quản trị: lớp phải tồn tại — ngoài phạm vi → 404. */
+  private async damBaoXemLop(
+    nguoiDungId: string,
+    vaiTro: VaiTroXemBuoi,
+    lopId: string,
+  ) {
+    if (vaiTro === 'ho_tro_hoc_vien') {
+      return this.scope.damBaoLopCuaToi(nguoiDungId, lopId);
+    }
+    const co = await this.prisma.lop_hoc.count({ where: { id: lopId } });
+    if (co === 0) throw new NotFoundAppException('Không tìm thấy lớp');
+  }
+
+  async buoiCuaLop(
+    nguoiDungId: string,
+    lopId: string,
+    vaiTro: VaiTroXemBuoi = 'ho_tro_hoc_vien',
+  ) {
+    await this.damBaoXemLop(nguoiDungId, vaiTro, lopId);
     return (await this.dsBuoi(lopId)).map((b) => b.item);
   }
 
-  async hocVienCuaBuoi(nguoiDungId: string, lopId: string, lichId: string) {
-    await this.scope.damBaoLopCuaToi(nguoiDungId, lopId);
+  async hocVienCuaBuoi(
+    nguoiDungId: string,
+    lopId: string,
+    lichId: string,
+    vaiTro: VaiTroXemBuoi = 'ho_tro_hoc_vien',
+  ) {
+    await this.damBaoXemLop(nguoiDungId, vaiTro, lopId);
     const [[lop], [buoi]] = await Promise.all([
       this.dauLop([lopId]),
       this.dsBuoi(lopId, lichId),
@@ -635,11 +659,11 @@ export class HoTroHocVienService {
 
   async xuatDanhSachBuoi(
     nguoiDungId: string,
-    vaiTro: 'ho_tro_hoc_vien',
+    vaiTro: VaiTroXemBuoi,
     lopId: string,
     lichId?: string,
   ): Promise<Buffer> {
-    await this.scope.damBaoLopCuaToi(nguoiDungId, lopId);
+    await this.damBaoXemLop(nguoiDungId, vaiTro, lopId);
     const [[lop], dsBuoi] = await Promise.all([
       this.dauLop([lopId]),
       this.dsBuoi(lopId, lichId),
@@ -653,7 +677,10 @@ export class HoTroHocVienService {
     }
     const buffer = await buildDanhSachBuoiWorkbook(sheets);
     await this.nhatKy.ghi({
-      hanh_dong: 'ho_tro_xuat_danh_sach_buoi',
+      hanh_dong:
+        vaiTro === 'quan_tri'
+          ? 'xuat_danh_sach_buoi'
+          : 'ho_tro_xuat_danh_sach_buoi',
       nguoi_dung: { id: nguoiDungId, vai_tro: vaiTro },
       chi_tiet: {
         lop_id: lopId,

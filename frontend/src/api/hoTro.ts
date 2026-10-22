@@ -107,28 +107,34 @@ export function xuatDanhSachLopHoTro(lopId?: string): Promise<Blob> {
   return apiFetchBlob(`/ho-tro-hoc-vien/lop/xuat${xayQueryString({ lop_id: lopId })}`);
 }
 
-// ADR 0008 L7: danh sách theo buổi (phân lớp − đổi ra + đổi vào).
-export function useBuoiCuaLop(lopId: string | undefined) {
+// ADR 0008 L7: danh sách theo buổi (phân lớp − đổi ra + đổi vào). Quản trị dùng
+// cùng logic, phạm vi toàn hệ thống, qua /lop/:id/buoi.
+export type NguonDanhSachBuoi = 'ho_tro' | 'quan_tri';
+
+const gocBuoi = (lopId: string | undefined, nguon: NguonDanhSachBuoi) =>
+  nguon === 'quan_tri' ? `/lop/${lopId}/buoi` : `/ho-tro-hoc-vien/lop/${lopId}/buoi`;
+
+export function useBuoiCuaLop(lopId: string | undefined, nguon: NguonDanhSachBuoi = 'ho_tro') {
   return useQuery({
-    queryKey: [...KHOA, 'lop', lopId, 'buoi'],
-    queryFn: () => apiFetch<BuoiCuaLopHoTro[]>(`/ho-tro-hoc-vien/lop/${lopId}/buoi`),
+    queryKey: [...KHOA, nguon, 'lop', lopId, 'buoi'],
+    queryFn: () => apiFetch<BuoiCuaLopHoTro[]>(gocBuoi(lopId, nguon)),
     enabled: !!lopId,
     retry: false,
   });
 }
 
-export function useHocVienCuaBuoi(lopId: string | undefined, lichId: string | null) {
+export function useHocVienCuaBuoi(lopId: string | undefined, lichId: string | null, nguon: NguonDanhSachBuoi = 'ho_tro') {
   return useQuery({
-    queryKey: [...KHOA, 'lop', lopId, 'buoi', lichId],
-    queryFn: () => apiFetch<DanhSachBuoiHoTro>(`/ho-tro-hoc-vien/lop/${lopId}/buoi/${lichId}/hoc-vien`),
+    queryKey: [...KHOA, nguon, 'lop', lopId, 'buoi', lichId],
+    queryFn: () => apiFetch<DanhSachBuoiHoTro>(`${gocBuoi(lopId, nguon)}/${lichId}/hoc-vien`),
     enabled: !!lopId && !!lichId,
     retry: false,
   });
 }
 
 /** Xuất .xlsx 1 buổi (lichId) hoặc mọi buổi của lớp — 1 sheet/buổi, có ngày sinh. */
-export function xuatDanhSachBuoiHoTro(lopId: string, lichId?: string): Promise<Blob> {
-  return apiFetchBlob(`/ho-tro-hoc-vien/lop/${lopId}/buoi/xuat${xayQueryString({ lich_id: lichId })}`);
+export function xuatDanhSachBuoiHoTro(lopId: string, lichId?: string, nguon: NguonDanhSachBuoi = 'ho_tro'): Promise<Blob> {
+  return apiFetchBlob(`${gocBuoi(lopId, nguon)}/xuat${xayQueryString({ lich_id: lichId })}`);
 }
 
 // --- Yêu cầu hỗ trợ theo cụm ∪ lớp (ADR 0003 Lát 4, ADR 0011 P2) ---

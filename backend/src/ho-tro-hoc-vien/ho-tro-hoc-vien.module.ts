@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { HocVienModule } from '../hoc-vien/hoc-vien.module';
 import { KhoaBoiDuongModule } from '../khoa-boi-duong/khoa-boi-duong.module';
 import { HoTroHocVienController } from './ho-tro-hoc-vien.controller';
+import { LopTheoBuoiController } from './lop-theo-buoi.controller';
 import { HoTroHocVienScopeService } from './ho-tro-hoc-vien-scope.service';
 import { HoTroHocVienService } from './ho-tro-hoc-vien.service';
 import { VanHanhHocVienService } from './van-hanh-hoc-vien.service';
@@ -20,7 +21,7 @@ import { TinhHinhDiHocModule } from '../tinh-hinh-di-hoc/tinh-hinh-di-hoc.module
     DoiBuoiHocQueryModule,
     TinhHinhDiHocModule,
   ],
-  controllers: [HoTroHocVienController],
+  controllers: [HoTroHocVienController, LopTheoBuoiController],
   providers: [
     HoTroHocVienScopeService,
     HoTroHocVienService,

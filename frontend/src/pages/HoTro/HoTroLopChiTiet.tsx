@@ -17,7 +17,13 @@ import {
   Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useBuoiCuaLop, useHocVienCuaBuoi, useHocVienCuaLop, xuatDanhSachBuoiHoTro } from '@/api/hoTro';
+import {
+  useBuoiCuaLop,
+  useHocVienCuaBuoi,
+  useHocVienCuaLop,
+  xuatDanhSachBuoiHoTro,
+  type NguonDanhSachBuoi,
+} from '@/api/hoTro';
 import type {
   BuoiCuaLopHoTro,
   DiemDanhBuoiHoTro,
@@ -150,12 +156,12 @@ function nhanBuoi(b: BuoiCuaLopHoTro): string {
   return `GĐ${b.giai_doan.thu_tu} – Buổi ${b.buoi_so} · ${ngay} ${dinhDangGio(b.thoi_gian_bat_dau)} · ${b.si_so} HV`;
 }
 
-function useXuatDanhSachBuoi(lopId: string) {
+function useXuatDanhSachBuoi(lopId: string, nguon: NguonDanhSachBuoi) {
   const [dangXuat, setDangXuat] = useState<string | null>(null);
   async function xuat(lichId?: string) {
     setDangXuat(lichId ?? 'tat-ca');
     try {
-      const blob = await xuatDanhSachBuoiHoTro(lopId, lichId);
+      const blob = await xuatDanhSachBuoiHoTro(lopId, lichId, nguon);
       const ngay = new Date().toISOString().slice(0, 10).replace(/-/g, '');
       taiFileTuBlob(blob, `ds-buoi-${ngay}.xlsx`);
     } catch (err) {
@@ -173,12 +179,14 @@ function buoiMacDinh(ds: BuoiCuaLopHoTro[]): string | null {
   return (ds.find((b) => new Date(b.thoi_gian_ket_thuc).getTime() >= now) ?? ds[ds.length - 1])?.lich_id ?? null;
 }
 
-function TheoBuoi({ lopId }: { lopId: string }) {
-  const dsBuoi = useBuoiCuaLop(lopId);
+/** Tab "Theo buổi" — dùng chung cho người hỗ trợ (lớp được gắn) và Quản trị (mọi lớp, AdminKhoaChiTiet). */
+export function TheoBuoi({ lopId, nguon = 'ho_tro' }: { lopId: string; nguon?: NguonDanhSachBuoi }) {
+  const dsBuoi = useBuoiCuaLop(lopId, nguon);
   const [chon, setChon] = useState<string | null>(null);
   const lichId = chon ?? (dsBuoi.data ? buoiMacDinh(dsBuoi.data) : null);
-  const ds = useHocVienCuaBuoi(lopId, lichId);
-  const { dangXuat, xuat } = useXuatDanhSachBuoi(lopId);
+  const ds = useHocVienCuaBuoi(lopId, lichId, nguon);
+  const { dangXuat, xuat } = useXuatDanhSachBuoi(lopId, nguon);
+  const linkHocVien = nguon === 'quan_tri' ? '/admin/hoc-vien' : '/ho-tro/hoc-vien';
   const buoi = dsBuoi.data?.find((b) => b.lich_id === lichId);
 
   if (dsBuoi.isLoading) return <Skeleton height={120} />;
@@ -238,11 +246,11 @@ function TheoBuoi({ lopId }: { lopId: string }) {
           <Text fz="sm" fw={600}>
             {moTaTongDiemDanh(ds.data.buoi.tong_diem_danh)}
           </Text>
-          <BangBuoi hocVien={ds.data.hoc_vien} trong="Buổi này chưa có học viên nào." />
+          <BangBuoi hocVien={ds.data.hoc_vien} trong="Buổi này chưa có học viên nào." linkHocVien={linkHocVien} />
           {ds.data.doi_ra.length > 0 && (
             <Stack gap="xs">
               <Title order={5}>Đã chuyển sang lớp khác (không học buổi này)</Title>
-              <BangBuoi hocVien={ds.data.doi_ra} trong="" />
+              <BangBuoi hocVien={ds.data.doi_ra} trong="" linkHocVien={linkHocVien} />
             </Stack>
           )}
         </>
@@ -292,7 +300,15 @@ function BadgeDiemDanh({ diemDanh }: { diemDanh: DiemDanhBuoiHoTro }) {
   );
 }
 
-function BangBuoi({ hocVien, trong }: { hocVien: HocVienCuaBuoi[]; trong: string }) {
+function BangBuoi({
+  hocVien,
+  trong,
+  linkHocVien,
+}: {
+  hocVien: HocVienCuaBuoi[];
+  trong: string;
+  linkHocVien: string;
+}) {
   return (
     <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
       <Table.ScrollContainer minWidth={1100}>
@@ -325,13 +341,13 @@ function BangBuoi({ hocVien, trong }: { hocVien: HocVienCuaBuoi[]; trong: string
                 <Table.Td>
                   {/* ADR 0011 P1: người đổi vào (đổi buổi đã duyệt còn hiệu lực) thuộc phạm vi → có link chi tiết. */}
                   {h.doi_buoi === null ? (
-                    <Anchor component={Link} to={`/ho-tro/hoc-vien/${h.hoc_vien_id}`} fw={600} fz="sm">
+                    <Anchor component={Link} to={`${linkHocVien}/${h.hoc_vien_id}`} fw={600} fz="sm">
                       {h.ho_ten}
                     </Anchor>
                   ) : (
                     <Group gap={6} wrap="nowrap">
                       {h.doi_buoi === 'vao' ? (
-                        <Anchor component={Link} to={`/ho-tro/hoc-vien/${h.hoc_vien_id}`} fw={600} fz="sm">
+                        <Anchor component={Link} to={`${linkHocVien}/${h.hoc_vien_id}`} fw={600} fz="sm">
                           {h.ho_ten}
                         </Anchor>
                       ) : (
