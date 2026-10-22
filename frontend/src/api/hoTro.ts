@@ -1,10 +1,5 @@
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
-import { apiFetch, apiFetchBlob } from "./client";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiFetch, apiFetchBlob } from './client';
 import type {
   BuoiCuaLopHoTro,
   BuoiHocHoTro,
@@ -20,7 +15,7 @@ import type {
   YeuCauHoTro,
   YeuCauHoTroChiTietHoTro,
   YeuCauHoTroHoTro,
-} from "./types";
+} from './types';
 
 // Khu người hỗ trợ học viên (ADR 0003) — mọi API tự lọc theo cụm được phân công ở backend.
 
@@ -42,49 +37,42 @@ export interface LocLichHocHoTro {
 function xayQueryString(params: object): string {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== "") qs.set(k, String(v));
+    if (v !== undefined && v !== '') qs.set(k, String(v));
   }
   const s = qs.toString();
-  return s ? `?${s}` : "";
+  return s ? `?${s}` : '';
 }
 
-const KHOA = ["ho-tro"] as const;
+const KHOA = ['ho-tro'] as const;
 
 export function useCumCuaToi(enabled = true) {
   return useQuery({
-    queryKey: [...KHOA, "cum-cua-toi"],
-    queryFn: () => apiFetch<CumCuaToi[]>("/ho-tro-hoc-vien/cum-cua-toi"),
+    queryKey: [...KHOA, 'cum-cua-toi'],
+    queryFn: () => apiFetch<CumCuaToi[]>('/ho-tro-hoc-vien/cum-cua-toi'),
     enabled,
   });
 }
 
 export function useDanhSachHocVienHoTro(params: LocHocVienHoTro) {
   return useQuery({
-    queryKey: [...KHOA, "hoc-vien", params],
-    queryFn: () =>
-      apiFetch<PaginatedResult<HocVienHoTroDong>>(
-        `/ho-tro-hoc-vien/hoc-vien${xayQueryString(params)}`,
-      ),
+    queryKey: [...KHOA, 'hoc-vien', params],
+    queryFn: () => apiFetch<PaginatedResult<HocVienHoTroDong>>(`/ho-tro-hoc-vien/hoc-vien${xayQueryString(params)}`),
     placeholderData: keepPreviousData,
   });
 }
 
 export function useChiTietHocVienHoTro(id: string | undefined) {
   return useQuery({
-    queryKey: [...KHOA, "hoc-vien", "chi-tiet", id],
-    queryFn: () =>
-      apiFetch<HocVienHoTroChiTiet>(`/ho-tro-hoc-vien/hoc-vien/${id}`),
+    queryKey: [...KHOA, 'hoc-vien', 'chi-tiet', id],
+    queryFn: () => apiFetch<HocVienHoTroChiTiet>(`/ho-tro-hoc-vien/hoc-vien/${id}`),
     enabled: !!id,
   });
 }
 
 export function useLichHocHoTro(params: LocLichHocHoTro) {
   return useQuery({
-    queryKey: [...KHOA, "lich-hoc", params],
-    queryFn: () =>
-      apiFetch<BuoiHocHoTro[]>(
-        `/ho-tro-hoc-vien/lich-hoc${xayQueryString(params)}`,
-      ),
+    queryKey: [...KHOA, 'lich-hoc', params],
+    queryFn: () => apiFetch<BuoiHocHoTro[]>(`/ho-tro-hoc-vien/lich-hoc${xayQueryString(params)}`),
     placeholderData: keepPreviousData,
   });
 }
@@ -99,17 +87,16 @@ export function xuatDanhSachHoTro(params: LocHocVienHoTro): Promise<Blob> {
 
 export function useLopCuaToi(enabled = true) {
   return useQuery({
-    queryKey: [...KHOA, "lop-cua-toi"],
-    queryFn: () => apiFetch<LopCuaToi[]>("/ho-tro-hoc-vien/lop-cua-toi"),
+    queryKey: [...KHOA, 'lop-cua-toi'],
+    queryFn: () => apiFetch<LopCuaToi[]>('/ho-tro-hoc-vien/lop-cua-toi'),
     enabled,
   });
 }
 
 export function useHocVienCuaLop(lopId: string | undefined) {
   return useQuery({
-    queryKey: [...KHOA, "lop", lopId],
-    queryFn: () =>
-      apiFetch<DanhSachLopHoTro>(`/ho-tro-hoc-vien/lop/${lopId}/hoc-vien`),
+    queryKey: [...KHOA, 'lop', lopId],
+    queryFn: () => apiFetch<DanhSachLopHoTro>(`/ho-tro-hoc-vien/lop/${lopId}/hoc-vien`),
     enabled: !!lopId,
     retry: false,
   });
@@ -117,57 +104,37 @@ export function useHocVienCuaLop(lopId: string | undefined) {
 
 /** Xuất .xlsx 1 lớp (lopId) hoặc mọi lớp của tôi — file có ngày sinh (ADR 0008 L5). */
 export function xuatDanhSachLopHoTro(lopId?: string): Promise<Blob> {
-  return apiFetchBlob(
-    `/ho-tro-hoc-vien/lop/xuat${xayQueryString({ lop_id: lopId })}`,
-  );
+  return apiFetchBlob(`/ho-tro-hoc-vien/lop/xuat${xayQueryString({ lop_id: lopId })}`);
 }
 
 // ADR 0008 L7: danh sách theo buổi (phân lớp − đổi ra + đổi vào). Quản trị dùng
 // cùng logic, phạm vi toàn hệ thống, qua /lop/:id/buoi.
-export type NguonDanhSachBuoi = "ho_tro" | "quan_tri";
+export type NguonDanhSachBuoi = 'ho_tro' | 'quan_tri';
 
 const gocBuoi = (lopId: string | undefined, nguon: NguonDanhSachBuoi) =>
-  nguon === "quan_tri"
-    ? `/lop/${lopId}/buoi`
-    : `/ho-tro-hoc-vien/lop/${lopId}/buoi`;
+  nguon === 'quan_tri' ? `/lop/${lopId}/buoi` : `/ho-tro-hoc-vien/lop/${lopId}/buoi`;
 
-export function useBuoiCuaLop(
-  lopId: string | undefined,
-  nguon: NguonDanhSachBuoi = "ho_tro",
-) {
+export function useBuoiCuaLop(lopId: string | undefined, nguon: NguonDanhSachBuoi = 'ho_tro') {
   return useQuery({
-    queryKey: [...KHOA, nguon, "lop", lopId, "buoi"],
+    queryKey: [...KHOA, nguon, 'lop', lopId, 'buoi'],
     queryFn: () => apiFetch<BuoiCuaLopHoTro[]>(gocBuoi(lopId, nguon)),
     enabled: !!lopId,
     retry: false,
   });
 }
 
-export function useHocVienCuaBuoi(
-  lopId: string | undefined,
-  lichId: string | null,
-  nguon: NguonDanhSachBuoi = "ho_tro",
-) {
+export function useHocVienCuaBuoi(lopId: string | undefined, lichId: string | null, nguon: NguonDanhSachBuoi = 'ho_tro') {
   return useQuery({
-    queryKey: [...KHOA, nguon, "lop", lopId, "buoi", lichId],
-    queryFn: () =>
-      apiFetch<DanhSachBuoiHoTro>(
-        `${gocBuoi(lopId, nguon)}/${lichId}/hoc-vien`,
-      ),
+    queryKey: [...KHOA, nguon, 'lop', lopId, 'buoi', lichId],
+    queryFn: () => apiFetch<DanhSachBuoiHoTro>(`${gocBuoi(lopId, nguon)}/${lichId}/hoc-vien`),
     enabled: !!lopId && !!lichId,
     retry: false,
   });
 }
 
 /** Xuất .xlsx 1 buổi (lichId) hoặc mọi buổi của lớp — 1 sheet/buổi, có ngày sinh. */
-export function xuatDanhSachBuoiHoTro(
-  lopId: string,
-  lichId?: string,
-  nguon: NguonDanhSachBuoi = "ho_tro",
-): Promise<Blob> {
-  return apiFetchBlob(
-    `${gocBuoi(lopId, nguon)}/xuat${xayQueryString({ lich_id: lichId })}`,
-  );
+export function xuatDanhSachBuoiHoTro(lopId: string, lichId?: string, nguon: NguonDanhSachBuoi = 'ho_tro'): Promise<Blob> {
+  return apiFetchBlob(`${gocBuoi(lopId, nguon)}/xuat${xayQueryString({ lich_id: lichId })}`);
 }
 
 // --- Yêu cầu hỗ trợ theo cụm ∪ lớp (ADR 0003 Lát 4, ADR 0011 P2) ---
@@ -182,11 +149,8 @@ export interface LocYeuCauHoTroHoTro {
 
 export function useYeuCauHoTroCuaCum(params: LocYeuCauHoTroHoTro) {
   return useQuery({
-    queryKey: [...KHOA, "yeu-cau", params],
-    queryFn: () =>
-      apiFetch<PaginatedResult<YeuCauHoTroHoTro>>(
-        `/ho-tro-hoc-vien/yeu-cau-ho-tro${xayQueryString(params)}`,
-      ),
+    queryKey: [...KHOA, 'yeu-cau', params],
+    queryFn: () => apiFetch<PaginatedResult<YeuCauHoTroHoTro>>(`/ho-tro-hoc-vien/yeu-cau-ho-tro${xayQueryString(params)}`),
     placeholderData: keepPreviousData,
   });
 }
@@ -194,39 +158,33 @@ export function useYeuCauHoTroCuaCum(params: LocYeuCauHoTroHoTro) {
 /** Số đếm trên menu — tải lại khi chuyển trang (không polling, ADR 0003 H13). */
 export function useDemYeuCauHoTroCuaCum() {
   return useQuery({
-    queryKey: [...KHOA, "yeu-cau", "dem"],
-    queryFn: () =>
-      apiFetch<{ cho_xu_ly: number }>("/ho-tro-hoc-vien/yeu-cau-ho-tro/dem"),
+    queryKey: [...KHOA, 'yeu-cau', 'dem'],
+    queryFn: () => apiFetch<{ cho_xu_ly: number }>('/ho-tro-hoc-vien/yeu-cau-ho-tro/dem'),
   });
 }
 
 export function layChiTietYeuCauHoTroCuaCum(id: string) {
-  return apiFetch<YeuCauHoTroChiTietHoTro>(
-    `/ho-tro-hoc-vien/yeu-cau-ho-tro/${id}`,
-  );
+  return apiFetch<YeuCauHoTroChiTietHoTro>(`/ho-tro-hoc-vien/yeu-cau-ho-tro/${id}`);
 }
 
 export function useChiTietYeuCauHoTroCuaCum(id: string | null) {
   return useQuery({
-    queryKey: [...KHOA, "yeu-cau", "chi-tiet", id],
+    queryKey: [...KHOA, 'yeu-cau', 'chi-tiet', id],
     queryFn: () => layChiTietYeuCauHoTroCuaCum(id!),
     enabled: !!id,
   });
 }
 
 export function traLoiYeuCauHoTroCuaCum(id: string, noi_dung_tra_loi: string) {
-  return apiFetch<YeuCauHoTro>(
-    `/ho-tro-hoc-vien/yeu-cau-ho-tro/${id}/tra-loi`,
-    {
-      method: "PATCH",
-      body: JSON.stringify({ noi_dung_tra_loi }),
-    },
-  );
+  return apiFetch<YeuCauHoTro>(`/ho-tro-hoc-vien/yeu-cau-ho-tro/${id}/tra-loi`, {
+    method: 'PATCH',
+    body: JSON.stringify({ noi_dung_tra_loi }),
+  });
 }
 
 export function useLamMoiYeuCauHoTroCuaCum() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: [...KHOA, "yeu-cau"] });
+  return () => qc.invalidateQueries({ queryKey: [...KHOA, 'yeu-cau'] });
 }
 
 // --- Can thiệp hồ sơ & tài khoản (ADR 0003 Lát 3) ---
@@ -251,10 +209,8 @@ export interface SuaHoSoHoTroDto {
 function useLamMoiChiTiet(hocVienId: string) {
   const qc = useQueryClient();
   return () => {
-    qc.invalidateQueries({
-      queryKey: [...KHOA, "hoc-vien", "chi-tiet", hocVienId],
-    });
-    qc.invalidateQueries({ queryKey: [...KHOA, "hoc-vien"] });
+    qc.invalidateQueries({ queryKey: [...KHOA, 'hoc-vien', 'chi-tiet', hocVienId] });
+    qc.invalidateQueries({ queryKey: [...KHOA, 'hoc-vien'] });
   };
 }
 
@@ -262,13 +218,10 @@ export function useSuaHoSoHoTro(hocVienId: string) {
   const lamMoi = useLamMoiChiTiet(hocVienId);
   return useMutation({
     mutationFn: (dto: SuaHoSoHoTroDto) =>
-      apiFetch<{ xac_nhan_bi_huy: boolean }>(
-        `/ho-tro-hoc-vien/hoc-vien/${hocVienId}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify(dto),
-        },
-      ),
+      apiFetch<{ xac_nhan_bi_huy: boolean }>(`/ho-tro-hoc-vien/hoc-vien/${hocVienId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(dto),
+      }),
     onSuccess: lamMoi,
   });
 }
@@ -276,12 +229,9 @@ export function useSuaHoSoHoTro(hocVienId: string) {
 export function useGuiLinkDatLaiMatKhauHoTro(hocVienId: string) {
   return useMutation({
     mutationFn: () =>
-      apiFetch<{ da_gui: true; email: string }>(
-        `/ho-tro-hoc-vien/hoc-vien/${hocVienId}/gui-link-dat-lai-mat-khau`,
-        {
-          method: "POST",
-        },
-      ),
+      apiFetch<{ da_gui: true; email: string }>(`/ho-tro-hoc-vien/hoc-vien/${hocVienId}/gui-link-dat-lai-mat-khau`, {
+        method: 'POST',
+      }),
   });
 }
 
@@ -289,10 +239,7 @@ export function useCapMatKhauTamHocVienHoTro(hocVienId: string) {
   const lamMoi = useLamMoiChiTiet(hocVienId);
   return useMutation({
     mutationFn: () =>
-      apiFetch<MatKhauTamResponse>(
-        `/ho-tro-hoc-vien/hoc-vien/${hocVienId}/cap-mat-khau-tam`,
-        { method: "POST" },
-      ),
+      apiFetch<MatKhauTamResponse>(`/ho-tro-hoc-vien/hoc-vien/${hocVienId}/cap-mat-khau-tam`, { method: 'POST' }),
     onSuccess: lamMoi,
     gcTime: 0,
   });
@@ -302,12 +249,9 @@ export function useMoKhoaTamHoTro(hocVienId: string) {
   const lamMoi = useLamMoiChiTiet(hocVienId);
   return useMutation({
     mutationFn: () =>
-      apiFetch<{ ten_dang_nhap: string; dang_bi_khoa: false }>(
-        `/ho-tro-hoc-vien/hoc-vien/${hocVienId}/mo-khoa-tam`,
-        {
-          method: "POST",
-        },
-      ),
+      apiFetch<{ ten_dang_nhap: string; dang_bi_khoa: false }>(`/ho-tro-hoc-vien/hoc-vien/${hocVienId}/mo-khoa-tam`, {
+        method: 'POST',
+      }),
     onSuccess: lamMoi,
   });
 }
