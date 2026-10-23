@@ -367,6 +367,51 @@ describe('KhoaBoiDuongService', () => {
       });
     });
 
+    it('lịch sử cấu hình: ghi nhật ký chỉ các trường thực sự đổi', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue({
+        ...khoaDaDuyet,
+        ten_khoa: 'Khóa A',
+        che_do_chuyen_can: 'theo_lop_hien_tai',
+        so_buoi_doi_toi_da: 0,
+      });
+      prisma.khoa_boi_duong.update.mockResolvedValue({
+        ...khoaDaDuyet,
+        ten_khoa: 'Khóa A',
+        che_do_chuyen_can: 'cong_nhan_lop_cu',
+        so_buoi_doi_toi_da: 0,
+      });
+      await service.capNhatKhoa(
+        'khoa-1',
+        { che_do_chuyen_can: 'cong_nhan_lop_cu', so_buoi_doi_toi_da: 0 },
+        quanTri,
+      );
+      expect(nhatKy.ghi).toHaveBeenCalledWith({
+        hanh_dong: 'cap_nhat_cau_hinh_khoa',
+        mo_ta: 'Khóa A: Chế độ chuyên cần khi chuyển lớp',
+        chi_tiet: {
+          khoa_id: 'khoa-1',
+          thay_doi: [
+            {
+              truong: 'che_do_chuyen_can',
+              truoc: 'theo_lop_hien_tai',
+              sau: 'cong_nhan_lop_cu',
+            },
+          ],
+        },
+      });
+    });
+
+    it('lịch sử cấu hình: PATCH không đổi gì -> không ghi nhật ký', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoaDaDuyet);
+      prisma.khoa_boi_duong.update.mockResolvedValue({ ...khoaDaDuyet });
+      await service.capNhatKhoa(
+        'khoa-1',
+        { thoi_gian_bat_dau: '2026-01-01' } as never,
+        quanTri,
+      );
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
+    });
+
     it('khóa đã da_duyet vẫn sửa được (D6: mọi trạng thái)', async () => {
       prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoaDaDuyet);
       prisma.khoa_boi_duong.update.mockResolvedValue(khoaDaDuyet);
@@ -1564,7 +1609,7 @@ describe('KhoaBoiDuongService', () => {
           'd3',
         ]);
         expect(suKien[2]).toMatchObject({
-          hanh_dong: 'duyet_doi_buoi',
+          hanh_dong: 'huy_doi_buoi_chuyen_lop',
           hoc_vien_id: 'hv-1',
           chi_tiet: {
             loai: 'hoc_bu',
@@ -1573,6 +1618,88 @@ describe('KhoaBoiDuongService', () => {
           },
         });
         expect(thongBaoService.guiDangKyHocPhanLop).not.toHaveBeenCalled();
+      });
+
+      it('nhật ký Phân lớp (nhập file) kèm điểm danh lớp cũ + nấc + số đề nghị bị hủy', async () => {
+        prisma.khoa_boi_duong.findUnique.mockResolvedValue({
+          ten_khoa: 'AG-2026',
+          che_do_chuyen_can: 'cong_nhan_lop_cu',
+        });
+        prisma.$queryRaw.mockResolvedValue([
+          {
+            hoc_vien_id: 'hv-1',
+            giai_doan_id: 'gd-2',
+            lop_id: 'lop-a',
+            ten_lop: 'Lớp A',
+            loai_lop: 'zoom',
+            muc_nang_luc: 'co_ban',
+            so_buoi: 2,
+          },
+        ]);
+        prisma.lop_hoc.findMany.mockResolvedValue([
+          { id: 'lop-b', ten_lop: 'Lớp B', muc_nang_luc: 'nang_cao' },
+        ]);
+        await service.commitPhanLop(
+          {
+            hoc_vien_id: 'hv-1',
+            khoa_id: 'khoa-1',
+            gan: [{ giai_doan_id: 'gd-2', lop_id: 'lop-b' }],
+          },
+          'nd-import',
+        );
+        expect(nhatKy.ghi).toHaveBeenCalledWith({
+          hanh_dong: 'phan_lop',
+          hoc_vien_id: 'hv-1',
+          mo_ta:
+            'AG-2026 — GĐ2 "Zoom": Lớp A → Lớp B (nhập file) — đã điểm danh 2 buổi ở lớp Lớp A, ' +
+            'được công nhận (nấc: bất kể mức); hủy 2 đổi buổi, 1 học bù',
+          chi_tiet: {
+            giai_doan_id: 'gd-2',
+            nguon: 'nhap_file',
+            diem_danh_lop_cu: {
+              so_buoi: 2,
+              cong_nhan: true,
+              che_do_chuyen_can: 'cong_nhan_lop_cu',
+            },
+            huy_de_nghi: { doi_buoi: 2, hoc_bu: 1, ids: ['d1', 'd2', 'd3'] },
+          },
+        });
+        // Ngoài lượt import: chỉ nạp điểm danh của 1 học viên.
+        expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      });
+
+      it('nhật ký gỡ lớp "-" có điểm danh -> "điểm danh vẫn được giữ", không hủy', async () => {
+        prisma.khoa_boi_duong.findUnique.mockResolvedValue({
+          ten_khoa: 'AG-2026',
+          che_do_chuyen_can: 'cong_nhan_cung_muc',
+        });
+        prisma.$queryRaw.mockResolvedValue([
+          {
+            hoc_vien_id: 'hv-1',
+            giai_doan_id: 'gd-2',
+            lop_id: 'lop-a',
+            ten_lop: 'Lớp A',
+            loai_lop: 'zoom',
+            muc_nang_luc: null,
+            so_buoi: 1,
+          },
+        ]);
+        await service.commitPhanLop(
+          {
+            hoc_vien_id: 'hv-1',
+            khoa_id: 'khoa-1',
+            gan: [{ giai_doan_id: 'gd-2', lop_id: null }],
+          },
+          'nd-import',
+        );
+        expect(nhatKy.ghi).toHaveBeenCalledWith(
+          expect.objectContaining({
+            hanh_dong: 'phan_lop',
+            mo_ta:
+              'AG-2026 — GĐ2 "Zoom": Lớp A → (gỡ lớp) (nhập file) — đã điểm danh 1 buổi, điểm danh vẫn được giữ',
+          }),
+        );
+        expect(prisma.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
       });
 
       it.each([

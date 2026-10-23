@@ -82,6 +82,7 @@ import {
   buildDanhSachChiaLopWorkbook,
 } from './util/danh-sach-chia-lop-excel.util';
 import {
+  DeNghiLopCu,
   DiemDanhLopCuKhoa,
   GHI_CHU_HUY_CHUYEN_LOP,
   LopCuHocVien,
@@ -90,7 +91,14 @@ import {
   deNghiSeHuy,
   napDiemDanhLopCu,
   napLopCuTheoKhoa,
+  phuLucNhatKyPhanLop,
 } from './util/lop-cu-phan-lop.util';
+import {
+  NHAN_TRUONG_CAU_HINH,
+  ThayDoiCauHinh,
+  hienThiGiaTriCauHinh,
+  soSanhCauHinhKhoa,
+} from './util/lich-su-cau-hinh-khoa.util';
 
 type LopHocVoiKhoa = lop_hoc & { khoa: khoa_boi_duong };
 
@@ -434,8 +442,9 @@ export class KhoaBoiDuongService {
       dto.thoi_gian_ket_thuc ?? khoa.thoi_gian_ket_thuc.toISOString();
     this.assertThoiGianHopLe(batDau, ketThuc, 'khóa', true);
 
+    let capNhat: khoa_boi_duong;
     try {
-      return await this.prisma.khoa_boi_duong.update({
+      capNhat = await this.prisma.khoa_boi_duong.update({
         where: { id },
         data: {
           ma_khoa: dto.ma_khoa?.trim(),
@@ -463,6 +472,65 @@ export class KhoaBoiDuongService {
     } catch (e) {
       throw this.mapUniqueViolation(e, 'Mã khóa đã tồn tại');
     }
+    // Lịch sử cấu hình khóa: chỉ ghi khi có trường thực sự đổi.
+    const thayDoi = soSanhCauHinhKhoa(khoa, capNhat);
+    if (thayDoi.length > 0) {
+      await this.nhatKy.ghi({
+        hanh_dong: 'cap_nhat_cau_hinh_khoa',
+        mo_ta:
+          `${capNhat.ten_khoa}: ` +
+          thayDoi.map((t) => NHAN_TRUONG_CAU_HINH[t.truong]).join(', '),
+        chi_tiet: { khoa_id: id, thay_doi: thayDoi },
+      });
+    }
+    return capNhat;
+  }
+
+  // GET /khoa-boi-duong/{id}/lich-su-cau-hinh (quan_tri) — mới nhất trước.
+  async lichSuCauHinhKhoa(id: string) {
+    await this.getKhoaOrThrow(id);
+    const ds = await this.prisma.nhat_ky_hoat_dong.findMany({
+      where: {
+        hanh_dong: 'cap_nhat_cau_hinh_khoa',
+        chi_tiet: { path: ['khoa_id'], equals: id },
+      },
+      orderBy: { thoi_gian: 'desc' },
+      take: 200,
+    });
+    const thayDoiCua = (n: (typeof ds)[number]) =>
+      ((n.chi_tiet as { thay_doi?: ThayDoiCauHinh[] } | null)?.thay_doi ??
+        []) as ThayDoiCauHinh[];
+    const donViIds = ds.flatMap((n) =>
+      thayDoiCua(n)
+        .filter((t) => t.truong === 'don_vi_dat_hang_id')
+        .flatMap((t) => [t.truoc, t.sau])
+        .filter((v): v is string => typeof v === 'string'),
+    );
+    const [tenNguoi, donVis] = await Promise.all([
+      this.nhatKy.tenNguoiDung(
+        ds.flatMap((n) => (n.nguoi_dung_id ? [n.nguoi_dung_id] : [])),
+      ),
+      donViIds.length > 0
+        ? this.prisma.don_vi_cong_tac.findMany({
+            where: { id: { in: [...new Set(donViIds)] } },
+            select: { id: true, ten_don_vi: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    const tenDonVi = new Map(donVis.map((d) => [d.id, d.ten_don_vi]));
+    return ds.map((n) => ({
+      id: n.id,
+      thoi_gian: n.thoi_gian,
+      nguoi_thuc_hien: n.nguoi_dung_id
+        ? (tenNguoi.get(n.nguoi_dung_id) ?? null)
+        : null,
+      thay_doi: thayDoiCua(n).map((t) => ({
+        ...t,
+        nhan: NHAN_TRUONG_CAU_HINH[t.truong] ?? t.truong,
+        truoc_hien_thi: hienThiGiaTriCauHinh(t.truong, t.truoc, tenDonVi),
+        sau_hien_thi: hienThiGiaTriCauHinh(t.truong, t.sau, tenDonVi),
+      })),
+    }));
   }
 
   // ADR 0005 Z6: chỉ chốt vắng buổi bắt đầu sau mốc bật — gửi bật khi đang
@@ -2036,6 +2104,9 @@ export class KhoaBoiDuongService {
     lopCu: string | null,
     lopMoi: string | null,
     nguon: 'thu_cong' | 'nhap_file',
+    phuLuc: { duoi: string; chi_tiet?: Record<string, unknown> } = {
+      duoi: '',
+    },
   ) {
     await this.nhatKy.ghi({
       hanh_dong: 'phan_lop',
@@ -2043,7 +2114,9 @@ export class KhoaBoiDuongService {
       mo_ta:
         `${dangKy.khoa.ten_khoa} — GĐ${giaiDoan.thu_tu} "${giaiDoan.ten_giai_doan}": ` +
         `${lopCu ?? '(chưa có lớp)'} → ${lopMoi ?? '(gỡ lớp)'}` +
-        (nguon === 'nhap_file' ? ' (nhập file)' : ''),
+        (nguon === 'nhap_file' ? ' (nhập file)' : '') +
+        phuLuc.duoi,
+      ...(phuLuc.chi_tiet ? { chi_tiet: phuLuc.chi_tiet } : {}),
     });
   }
 
@@ -2491,6 +2564,20 @@ export class KhoaBoiDuongService {
       const cu = lopHienTai.get(g.giai_doan_id);
       return !!g.lop_id && !!cu && cu !== g.lop_id;
     });
+    // ADR 0014: nhật ký chuyển/gỡ lớp kèm điểm danh lớp cũ — dùng dữ liệu đã
+    // nạp theo lô ở bước kiểm tra (boNho), ngoài lượt import thì nạp 1 học viên.
+    const coRoiLopCu = dto.gan.some((g) => {
+      const cu = lopHienTai.get(g.giai_doan_id);
+      return !!cu && cu !== g.lop_id;
+    });
+    const diemDanhLopCu = !coRoiLopCu
+      ? undefined
+      : boNho
+        ? await (boNho.diemDanhLopCu ??= napDiemDanhLopCu(
+            this.prisma,
+            dto.khoa_id,
+          ))
+        : await napDiemDanhLopCu(this.prisma, dto.khoa_id, dto.hoc_vien_id);
     let huy: ReturnType<typeof deNghiSeHuy> = [];
     if (coChuyenLop) {
       const lopCu = boNho
@@ -2542,11 +2629,11 @@ export class KhoaBoiDuongService {
       );
     }
     if (lenh.length > 0) await this.prisma.$transaction(lenh);
-    await this.ghiNhatKyNhapPhanLop(dto, dangKyCu);
+    await this.ghiNhatKyNhapPhanLop(dto, dangKyCu, diemDanhLopCu, huy);
     if (huy.length > 0) {
       await this.nhatKy.ghiNhieu(
         huy.map((d) => ({
-          hanh_dong: 'duyet_doi_buoi' as const,
+          hanh_dong: 'huy_doi_buoi_chuyen_lop' as const,
           hoc_vien_id: dto.hoc_vien_id,
           mo_ta:
             `${d.loai === 'hoc_bu' ? 'Hủy học bù' : 'Hủy đổi buổi'} lớp "${d.ten_lop}" — ` +
@@ -2711,6 +2798,8 @@ export class KhoaBoiDuongService {
         lop: { ten_lop: string };
       }[];
     } | null,
+    diemDanhLopCu?: DiemDanhLopCuKhoa,
+    huy: DeNghiLopCu[] = [],
   ) {
     const lopCu = new Map(
       (dangKyCu?.phan_lop_giai_doan ?? []).map((p) => [p.giai_doan_id, p]),
@@ -2733,9 +2822,10 @@ export class KhoaBoiDuongService {
       }),
       this.prisma.lop_hoc.findMany({
         where: { id: { in: doi.flatMap((g) => (g.lop_id ? [g.lop_id] : [])) } },
-        select: { id: true, ten_lop: true },
+        select: { id: true, ten_lop: true, muc_nang_luc: true },
       }),
     ]);
+    const diemDanhHv = diemDanhLopCu?.theo_hoc_vien.get(dto.hoc_vien_id);
     const chuThe = {
       hoc_vien_id: dto.hoc_vien_id,
       khoa: { ten_khoa: khoa?.ten_khoa ?? '' },
@@ -2743,15 +2833,21 @@ export class KhoaBoiDuongService {
     for (const g of doi) {
       const gd = giaiDoans.find((x) => x.id === g.giai_doan_id);
       if (!gd) continue;
-      const tenLopMoi = g.lop_id
-        ? (lops.find((l) => l.id === g.lop_id)?.ten_lop ?? g.lop_id)
-        : null;
+      const lopMoi = lops.find((l) => l.id === g.lop_id);
+      const tenLopMoi = g.lop_id ? (lopMoi?.ten_lop ?? g.lop_id) : null;
       await this.ghiPhanLop(
         chuThe,
         gd,
         lopCu.get(g.giai_doan_id)?.lop.ten_lop ?? null,
         tenLopMoi,
         'nhap_file',
+        phuLucNhatKyPhanLop(
+          g,
+          diemDanhHv?.get(g.giai_doan_id),
+          diemDanhLopCu?.che_do,
+          lopMoi?.muc_nang_luc,
+          huy,
+        ),
       );
     }
     if (doiCum) {

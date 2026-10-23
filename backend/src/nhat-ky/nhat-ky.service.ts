@@ -31,6 +31,8 @@ export type HanhDongNhatKy =
   | 'duyet_doi_lop'
   | 'de_nghi_doi_buoi'
   | 'duyet_doi_buoi'
+  | 'huy_doi_buoi_chuyen_lop'
+  | 'cap_nhat_cau_hinh_khoa'
   | 'xuat_thong_ke_doi_buoi'
   | 'dieu_chinh_muc_hoc'
   | 'sua_ma_dinh_danh_moet'
@@ -67,6 +69,8 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   duyet_doi_lop: 'Duyệt đổi lớp',
   de_nghi_doi_buoi: 'Đề nghị đổi buổi',
   duyet_doi_buoi: 'Duyệt đổi buổi',
+  huy_doi_buoi_chuyen_lop: 'Hủy đổi buổi/học bù do chuyển lớp',
+  cap_nhat_cau_hinh_khoa: 'Cập nhật cấu hình khóa',
   xuat_thong_ke_doi_buoi: 'Xuất thống kê đổi buổi (có danh sách học viên)',
   dieu_chinh_muc_hoc: 'Điều chỉnh mức lớp học',
   sua_ma_dinh_danh_moet: 'Quản trị sửa mã định danh MOET',
@@ -103,6 +107,8 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   duyet_doi_lop: 'hoc_tap',
   de_nghi_doi_buoi: 'hoc_tap',
   duyet_doi_buoi: 'hoc_tap',
+  huy_doi_buoi_chuyen_lop: 'hoc_tap',
+  cap_nhat_cau_hinh_khoa: 'hoc_tap',
   xuat_thong_ke_doi_buoi: 'tai_khoan',
   dieu_chinh_muc_hoc: 'hoc_tap',
   sua_ma_dinh_danh_moet: 'tai_khoan',
@@ -379,7 +385,7 @@ export class NhatKyService {
     return { hoc_vien: hocVien, muc };
   }
 
-  private async tenNguoiDung(ids: string[]) {
+  async tenNguoiDung(ids: string[]) {
     if (ids.length === 0) return new Map<string, string>();
     const ds = await this.prisma.nguoi_dung.findMany({
       where: { id: { in: [...new Set(ids)] } },

@@ -541,6 +541,87 @@ describe('Khóa bồi dưỡng & Lớp học (e2e)', () => {
       });
     });
 
+    // ADR 0014 (bổ sung nhật ký): lịch sử cấu hình khóa.
+    it('GET lich-su-cau-hinh: mỗi PATCH có đổi -> 1 dòng (trường đổi, cũ → mới, người thực hiện); không đổi -> không ghi; chỉ quan_tri', async () => {
+      const lichSu = () =>
+        request(app.getHttpServer())
+          .get(`/khoa-boi-duong/${khoaId}/lich-su-cau-hinh`)
+          .set('Authorization', `Bearer ${tokenQuanTri}`)
+          .expect(200)
+          .then(
+            (r) =>
+              r.body as {
+                thay_doi: Record<string, unknown>[];
+                nguoi_thuc_hien: string;
+              }[],
+          );
+      const truoc = (await lichSu()).length;
+      await request(app.getHttpServer())
+        .patch(`/khoa-boi-duong/${khoaId}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ che_do_chuyen_can: 'cong_nhan_lop_cu', so_buoi_doi_toi_da: 2 })
+        .expect(200);
+      await request(app.getHttpServer())
+        .patch(`/khoa-boi-duong/${khoaId}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ che_do_chuyen_can: 'cong_nhan_lop_cu' })
+        .expect(200);
+      const ds = await lichSu();
+      expect(ds).toHaveLength(truoc + 1);
+      expect(ds[0].nguoi_thuc_hien).toContain('(quản trị)');
+      expect(ds[0].thay_doi).toEqual([
+        {
+          truong: 'so_buoi_doi_toi_da',
+          nhan: 'Số buổi đổi tối đa',
+          truoc: 0,
+          sau: 2,
+          truoc_hien_thi: '0',
+          sau_hien_thi: '2',
+        },
+        {
+          truong: 'che_do_chuyen_can',
+          nhan: 'Chế độ chuyên cần khi chuyển lớp',
+          truoc: 'cong_nhan_cung_muc',
+          sau: 'cong_nhan_lop_cu',
+          truoc_hien_thi: 'Công nhận buổi đã có mặt ở lớp cũ cùng mức',
+          sau_hien_thi: 'Công nhận buổi đã có mặt ở lớp cũ (bất kể mức)',
+        },
+      ]);
+      // Đơn vị đặt hàng hiển thị bằng tên đơn vị.
+      await request(app.getHttpServer())
+        .patch(`/khoa-boi-duong/${khoaId}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({ don_vi_dat_hang_id: truong1.id })
+        .expect(200);
+      const [doiDonVi] = (await lichSu())[0].thay_doi;
+      const [cu, moi] = await Promise.all(
+        [soGddt.id, truong1.id].map((id) =>
+          prisma.don_vi_cong_tac.findUniqueOrThrow({ where: { id } }),
+        ),
+      );
+      expect(doiDonVi).toMatchObject({
+        truong: 'don_vi_dat_hang_id',
+        truoc_hien_thi: cu.ten_don_vi,
+        sau_hien_thi: moi.ten_don_vi,
+      });
+
+      await request(app.getHttpServer())
+        .get(`/khoa-boi-duong/${khoaId}/lich-su-cau-hinh`)
+        .set('Authorization', `Bearer ${tokenTruong1}`)
+        .expect(403);
+
+      // Trả cấu hình về như trước cho các test sau.
+      await request(app.getHttpServer())
+        .patch(`/khoa-boi-duong/${khoaId}`)
+        .set('Authorization', `Bearer ${tokenQuanTri}`)
+        .send({
+          che_do_chuyen_can: 'cong_nhan_cung_muc',
+          so_buoi_doi_toi_da: 0,
+          don_vi_dat_hang_id: soGddt.id,
+        })
+        .expect(200);
+    });
+
     // ADR 0005 (issue #23): công tắc + cấu hình tự điểm danh lớp Zoom.
     describe('Điểm danh lớp Zoom', () => {
       const patch = (body: object) =>
