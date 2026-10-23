@@ -157,6 +157,19 @@ function NoiDung({ d }: { d: TrangLop }) {
                           {d.buoi.map((b) => {
                             const dd = h.diem_danh[b.id];
                             const bv = h.bao_vang?.[b.id];
+                            const lk = h.diem_danh_lop_khac?.[b.id];
+                            if (!dd && !bv && lk) {
+                              return (
+                                <Badge
+                                  key={b.id}
+                                  mr={4}
+                                  variant="light"
+                                  color={lk.trang_thai === 'co_mat' ? 'green' : lk.trang_thai === 'vang' ? 'red' : 'orange'}
+                                >
+                                  B{b.buoi_so}: {lk.nhan}
+                                </Badge>
+                              );
+                            }
                             if (!dd && !bv) return null;
                             return (
                               <Badge

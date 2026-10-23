@@ -14,8 +14,17 @@ export interface ODiemDanh {
   nguon: NguonDiemDanh;
   ghi_chu: string | null;
   tu_diem_danh_luc: string | null;
-  cap_nhat_luc: string;
+  /** null ở ô lớp khác (ADR 0014). */
+  cap_nhat_luc: string | null;
   nguoi_sua: string | null;
+  /**
+   * ADR 0014: ô không có điểm danh tại buổi này nhưng được công nhận từ lớp khác (lớp cũ / học bù) theo chế độ
+   * chuyên cần của khóa — chỉ đọc, nhan = "Có mặt – ở lớp X"…
+   */
+  nguon_tinh?: 'lop_khac';
+  lop_tinh?: { id: string; ten_lop: string };
+  sua_duoc?: false;
+  nhan?: string;
 }
 
 export interface BangDiemDanh {

@@ -14,6 +14,8 @@ import {
   NhanDoiBuoi,
   nhanDoiBuoiTheoDangKy,
 } from '../doi-buoi-hoc/doi-buoi-hoc.view.util';
+import { napChuyenCan } from '../doi-buoi-hoc/nap-chuyen-can';
+import { OLopKhac, oLopKhacTheoBuoi } from '../diem-danh/o-lop-khac.util';
 
 // ADR 0004 G9 (issue #15): "Trang lớp" dùng chung — 1 hàm lấy đủ dữ liệu 1
 // đợt (lớp × giai đoạn) + 1 hàm thuần lọc trường theo vai trò (ma trận đặc tả
@@ -71,6 +73,11 @@ export interface HocVienDot {
   ket_qua: { ty_le_hoan_thanh: number | null; diem: number | null } | null;
   /** Spec đổi buổi §5: lich_hoc_id → đổi ra (sang lớp chốt) / đổi vào (từ lớp nguồn). */
   doi_buoi?: NhanDoiBuoi;
+  /**
+   * ADR 0014: lich_hoc_id → buổi được công nhận từ lớp khác (lớp cũ / học bù)
+   * theo tinhChuyenCan, chỉ ở buổi chưa có điểm danh tại lớp này. Chỉ đọc.
+   */
+  diem_danh_lop_khac?: Record<string, OLopKhac>;
 }
 
 // Học viên của 1 đợt (lớp × giai đoạn) — dùng cho cả phân lớp và người đổi buổi vào.
@@ -467,10 +474,21 @@ export class TrangLopService {
           })
         ).map(anhXaHocVienDot)
       : [];
-    return locTheoVaiTro(
-      apDungDoiBuoi(dot, siSo, dieuChinh, hocVienVao),
-      nguoiXem.vai_tro,
-      nguoiXem.giang_vien_id,
-    );
+    const trang = apDungDoiBuoi(dot, siSo, dieuChinh, hocVienVao);
+    const chuyenCan = await napChuyenCan(this.prisma, this.doiBuoi, [
+      ...coSan,
+    ]);
+    const buoiGd = dot.buoi.map((b) => ({ ...b, giai_doan_id: giaiDoanId }));
+    trang.hoc_vien = trang.hoc_vien.map((h) => {
+      const lopKhac = oLopKhacTheoBuoi(
+        buoiGd,
+        chuyenCan.get(h.dang_ky_hoc_id),
+        (id) => id in h.diem_danh || !!h.doi_buoi?.[id],
+      );
+      return Object.keys(lopKhac).length > 0
+        ? { ...h, diem_danh_lop_khac: lopKhac }
+        : h;
+    });
+    return locTheoVaiTro(trang, nguoiXem.vai_tro, nguoiXem.giang_vien_id);
   }
 }

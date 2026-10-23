@@ -59,7 +59,7 @@ export interface DauVaoDiemDanh {
   now: Date;
 }
 
-const nhanCoKetQua = (kq: KetQuaBuoiDiemDanh): string => {
+export const nhanCoKetQua = (kq: KetQuaBuoiDiemDanh): string => {
   const { dong } = kq;
   if (kq.tu_lop_cu) {
     if (kq.trang_thai === 'co_mat') return `Có mặt – ở lớp ${dong.ten_lop}`;
