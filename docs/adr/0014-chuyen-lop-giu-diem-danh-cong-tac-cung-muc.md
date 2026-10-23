@@ -45,3 +45,4 @@ Hiện trạng (main 10c3d00):
 - Đề nghị bị hủy do chuyển lớp trả lại lượt (từ chối/hủy trả lượt — ADR 0007/0012); `lyDoHuy` trả `huy_duyet` (có `nguoi_xu_ly`).
 - Màn Cấu hình điểm danh Zoom thêm lựa chọn thứ 3; nhãn nêu rõ "cùng mức" / "bất kể mức".
 - Giới hạn: vẫn không lưu lịch sử phân lớp — cảnh báo C5 chỉ dựa trên điểm danh và đề nghị hiện có của lớp cũ.
+- **Bảng điểm danh lớp và trang lớp dùng `tinhChuyenCan` (2026-10-23, không migration, chỉ đọc)**: trước đó `DiemDanhService.bangDiemDanh` (`GET /lop/{lopId}/diem-danh`) và `trang-lop.service` chỉ đọc `diem_danh` của buổi thuộc lớp đang xem, nên học viên chuyển A → B thấy trống ở các buổi đã có mặt tại A. Nay buổi chưa có dòng tại lớp đang xem được điền từ kết quả `tinhChuyenCan` theo nấc của khóa nếu kết quả đến từ lớp khác, gắn nhãn "Có mặt – ở lớp X" và **chỉ đọc** (`nguon_tinh: 'lop_khac'`, `sua_duoc: false`); dòng ở lớp cũ không bị ghi đè. Một chỗ tính duy nhất (C4) nay gồm cả 2 màn này.

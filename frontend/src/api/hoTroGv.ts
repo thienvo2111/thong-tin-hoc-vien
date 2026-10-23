@@ -3,6 +3,13 @@ import { apiFetch } from './client';
 import type { LoaiLop, TrangThaiActive, VaiTroNhanSuLop } from './types';
 
 // Khu người hỗ trợ giảng viên (ADR 0004) — API /ho-tro-giang-vien/*, backend tự lọc theo nhóm của khóa.
+/** ADR 0014: ô được công nhận từ lớp khác — chỉ đọc. */
+export interface DiemDanhLopKhac {
+  trang_thai: string;
+  nhan: string;
+  lop_tinh: { id: string; ten_lop: string };
+}
+
 export interface LopCuaToiGv {
   id: string;
   ten_lop: string;
@@ -77,6 +84,8 @@ export interface TrangLop {
     ket_qua: { ty_le_hoan_thanh: number | null; diem: number | null } | null;
     /** Spec đổi buổi §5: lich_hoc_id → đổi ra / đổi vào. */
     doi_buoi?: import('./doiBuoi').NhanDoiBuoi;
+    /** ADR 0014: lich_hoc_id → buổi được công nhận từ lớp khác (lớp cũ / học bù), chỉ ở buổi chưa có điểm danh tại lớp này. */
+    diem_danh_lop_khac?: Record<string, DiemDanhLopKhac>;
   }[];
   /** Người đổi buổi vào lớp này — không tính vào sĩ số lớp; chỉ có ô của buổi chốt. */
   hoc_vien_doi_vao?: TrangLop['hoc_vien'];

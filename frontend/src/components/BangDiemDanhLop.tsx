@@ -41,6 +41,7 @@ type HocVien = BangDiemDanh['hoc_vien'][number];
 
 /** Dòng nhỏ dưới trạng thái: nguồn tự điểm danh Zoom (giờ bấm) hoặc sửa tay. */
 function dauNguon(o: ODiemDanh): string | null {
+  if (o.nguon_tinh === 'lop_khac') return null;
   if (o.nguon === 'thu_cong') return o.nguoi_sua ? `sửa tay · ${o.nguoi_sua}` : 'sửa tay';
   if (o.tu_diem_danh_luc) return `Zoom ${dinhDangGio(o.tu_diem_danh_luc)}`;
   return null;
@@ -185,7 +186,7 @@ function NoiDungO({ o, baoVang }: { o: ODiemDanh | undefined; baoVang: string | 
   return (
     <>
       <Text fz="xs" fw={600} c={MAU[o.trang_thai]}>
-        {NHAN[o.trang_thai]}
+        {o.nguon_tinh === 'lop_khac' ? o.nhan : NHAN[o.trang_thai]}
       </Text>
       {dau && (
         <Text fz={10} c="dimmed" lineClamp={1}>
@@ -205,8 +206,14 @@ function OSua({ sua, hv, buoi }: { sua: ReturnType<typeof useSuaDiemDanh>; hv: H
   const nhan = `${hv.ho_ten} buổi ${buoi.buoi_so}`;
   const kieuO = { display: 'block', width: '100%', minHeight: 36, padding: 4, textAlign: 'center' as const };
 
-  if (!buoi.sua_duoc) {
-    const lyDo = buoi.ly_do ? LY_DO_KHOA[buoi.ly_do] : 'Chỉ xem';
+  // ADR 0014: buổi được công nhận từ lớp khác — chỉ đọc, không ghi đè dòng của lớp đó.
+  const lopKhac = o?.nguon_tinh === 'lop_khac';
+  if (!buoi.sua_duoc || lopKhac) {
+    const lyDo = lopKhac
+      ? `Điểm danh ở lớp ${o?.lop_tinh?.ten_lop ?? 'khác'} — chỉ xem`
+      : buoi.ly_do
+        ? LY_DO_KHOA[buoi.ly_do]
+        : 'Chỉ xem';
     return (
       <Tooltip label={lyDo} withArrow>
         <div style={{ ...kieuO, opacity: 0.6 }} aria-label={`${nhan}: ${lyDo}`} aria-disabled="true" title={lyDo}>

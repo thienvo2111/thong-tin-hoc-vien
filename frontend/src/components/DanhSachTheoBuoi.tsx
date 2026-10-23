@@ -5,6 +5,7 @@ import { dinhDangGio, dinhDangThuNgay } from '@/lib/ngay';
 
 const NHAN_MUC: Record<string, string> = { co_ban: 'Cơ bản', thanh_thao: 'Thành thạo', nang_cao: 'Nâng cao' };
 const NHAN_DIEM_DANH: Record<string, string> = { co_mat: 'Có mặt', vang: 'Vắng', vang_co_phep: 'Vắng có phép' };
+const MAU_LOP_KHAC: Record<string, string> = { co_mat: 'green', vang: 'red', vang_co_phep: 'orange' };
 
 type HocVien = TrangLop['hoc_vien'][number];
 type Buoi = TrangLop['buoi'][number];
@@ -48,6 +49,14 @@ function ODiemDanh({ h, lichId }: { h: HocVien; lichId: string }) {
     return (
       <Badge variant="light" color="orange" title={bv}>
         Báo vắng: {bv}
+      </Badge>
+    );
+  }
+  const lopKhac = h.diem_danh_lop_khac?.[lichId];
+  if (lopKhac) {
+    return (
+      <Badge variant="light" color={MAU_LOP_KHAC[lopKhac.trang_thai] ?? 'red'}>
+        {lopKhac.nhan}
       </Badge>
     );
   }
