@@ -526,6 +526,28 @@ describe('M7 — Điểm danh & vào Zoom', () => {
     expect(within(the[0]).queryByTestId('diem-danh-lop-cu')).not.toBeInTheDocument();
   });
 
+  it('khóa công nhận lớp cũ -> nhãn "Có mặt (lớp cũ)" thay nhãn Vắng/Đã đóng của lớp mới', async () => {
+    const mau = taoKhoaHocToiZoomMau();
+    const lich = mau[0].giai_doan[2].lop!.lich_hoc;
+    lich[3] = { ...lich[3], diem_danh_lop_cu: { trang_thai: 'co_mat', ten_lop: 'Lớp Zoom 07', cong_nhan: true } };
+    lich[2] = {
+      ...lich[2],
+      trang_thai_diem_danh: 'vang',
+      diem_danh_zoom: { ...lich[2].diem_danh_zoom!, trang_thai: 'vang' },
+      diem_danh_lop_cu: { trang_thai: 'co_mat', ten_lop: 'Lớp Zoom 07', cong_nhan: true },
+    };
+    server.use(http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json(mau)));
+    renderDaDangNhap();
+    const the = await theBuoiZoom();
+    expect(within(the[3]).getByText('Có mặt (lớp cũ)')).toBeInTheDocument();
+    expect(within(the[3]).queryByText('Đã đóng điểm danh')).not.toBeInTheDocument();
+    expect(within(the[2]).getByText('Có mặt (lớp cũ)')).toBeInTheDocument();
+    expect(within(the[2]).queryByText('Vắng')).not.toBeInTheDocument();
+    expect(within(the[2]).getByTestId('diem-danh-lop-cu')).toHaveTextContent(
+      'Buổi 3: đã có mặt ở Lớp Zoom 07 (lớp cũ)',
+    );
+  });
+
   it('lớp không bật điểm danh Zoom vẫn hiện dòng lớp cũ (vắng)', async () => {
     const mau = taoKhoaHocToiMau();
     const lich = mau[0].giai_doan[1].lop!.lich_hoc;

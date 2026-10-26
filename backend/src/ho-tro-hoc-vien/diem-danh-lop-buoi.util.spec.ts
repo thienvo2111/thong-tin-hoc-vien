@@ -305,6 +305,34 @@ describe('tinhChuyenCanLop', () => {
     ).toEqual({ co_mat: 0, da_dien_ra: 2 });
   });
 
+  it('có mặt ở lớp cũ, buổi chốt (học bù) chưa tới -> vẫn tính đã diễn ra + có mặt', () => {
+    const chot = new Map([
+      ['L2', { id: 'X9', thoi_gian_bat_dau: ngay('2026-10-31') }],
+    ]);
+    const ketQua = new Map([
+      [SLOT['L1'], { trang_thai: 'co_mat' as const, tu_lop_cu: true }],
+      [SLOT['L2'], { trang_thai: 'co_mat' as const, tu_lop_cu: true }],
+    ]);
+    expect(
+      tinhChuyenCanLop({
+        ...base,
+        giai_doan_ids: new Set(['G1']),
+        chot_cua_nguon: chot,
+        ket_qua: ketQua,
+      }),
+    ).toEqual({ co_mat: 2, da_dien_ra: 2 });
+  });
+
+  it('có mặt ở lớp cũ, buổi lớp mới còn ở tương lai -> tính đã diễn ra', () => {
+    const ketQua = new Map([
+      [SLOT['L3'], { trang_thai: 'co_mat' as const, tu_lop_cu: true }],
+    ]);
+    expect(tinhChuyenCanLop({ ...base, ket_qua: ketQua })).toEqual({
+      co_mat: 1,
+      da_dien_ra: 4,
+    });
+  });
+
   it('chỉ phân vào lớp ở 1 trong 2 giai đoạn -> chỉ tính buổi giai đoạn đó', () => {
     expect(
       tinhChuyenCanLop({
@@ -368,6 +396,28 @@ describe('tongDiHoc', () => {
       vang_co_phep: 1,
       da_bao_vang: 1,
       chua_diem_danh: 1,
+    });
+  });
+  it('kết quả từ lớp cũ ở buổi hiệu dụng tương lai (học bù chưa tới) -> vẫn đếm', () => {
+    expect(
+      tongDiHoc(
+        [
+          { ma: 'co_mat', bat_dau: qua, nguon_tinh: 'lop_khac' },
+          { ma: 'co_mat', bat_dau: toi, nguon_tinh: 'lop_khac' },
+          { ma: 'vang_co_phep', bat_dau: toi, nguon_tinh: 'lop_khac' },
+          // Lớp hiện tại ở tương lai vẫn không đếm.
+          { ma: 'co_mat', bat_dau: toi, nguon_tinh: 'lop_hien_tai' },
+          { ma: 'chua_den_gio', bat_dau: toi, nguon_tinh: null },
+        ],
+        now,
+      ),
+    ).toEqual({
+      da_dien_ra: 3,
+      co_mat: 2,
+      vang: 0,
+      vang_co_phep: 1,
+      da_bao_vang: 0,
+      chua_diem_danh: 0,
     });
   });
   it('rỗng -> toàn 0', () => {

@@ -144,7 +144,10 @@ export interface DauVaoChuyenCan {
   /** Buổi nguồn (của lớp này) → buổi chốt, theo đổi buổi đã duyệt còn hiệu lực. */
   chot_cua_nguon: ReadonlyMap<string, { id: string; thoi_gian_bat_dau: Date }>;
   /** Kết quả tinhChuyenCan của đăng ký: khoaBuoi(giai_doan, buoi_so) → trạng thái. */
-  ket_qua: ReadonlyMap<string, { trang_thai: TrangThaiDiemDanh }>;
+  ket_qua: ReadonlyMap<
+    string,
+    { trang_thai: TrangThaiDiemDanh; tu_lop_cu?: boolean }
+  >;
   now: Date;
 }
 
@@ -191,15 +194,18 @@ export function tinhChuyenCanLop(v: DauVaoChuyenCan): {
   let coMat = 0;
   let daDienRa = 0;
   for (const { nguon: l, hieu_dung: e } of buoiHieuDung(v)) {
-    if (e.thoi_gian_bat_dau.getTime() > v.now.getTime()) continue;
-    daDienRa += 1;
     const kq = v.ket_qua.get(khoaBuoi(l.giai_doan_id, l.buoi_so));
+    // Kết quả từ lớp cũ (đã học xong ở đó) → đã diễn ra dù E còn ở tương lai.
+    if (!kq?.tu_lop_cu && e.thoi_gian_bat_dau.getTime() > v.now.getTime()) {
+      continue;
+    }
+    daDienRa += 1;
     if (kq?.trang_thai === 'co_mat') coMat += 1;
   }
   return { co_mat: coMat, da_dien_ra: daDienRa };
 }
 
-/** Tổng tình hình đi học của 1 đăng ký (ADR 0010 T3) — chỉ buổi hiệu dụng đã bắt đầu. */
+/** Tổng tình hình đi học của 1 đăng ký (ADR 0010 T3) — buổi hiệu dụng đã bắt đầu hoặc tính từ lớp cũ. */
 export interface TongDiHoc {
   da_dien_ra: number;
   co_mat: number;
@@ -210,7 +216,11 @@ export interface TongDiHoc {
 }
 
 export function tongDiHoc(
-  ds: readonly { ma: MaDiemDanh; bat_dau: Date }[],
+  ds: readonly {
+    ma: MaDiemDanh;
+    bat_dau: Date;
+    nguon_tinh?: NguonTinh | null;
+  }[],
   now: Date,
 ): TongDiHoc {
   const tong: TongDiHoc = {
@@ -222,7 +232,11 @@ export function tongDiHoc(
     chua_diem_danh: 0,
   };
   for (const d of ds) {
-    if (d.bat_dau.getTime() > now.getTime()) continue;
+    // Kết quả từ lớp cũ (đã học xong ở đó) → đã diễn ra dù buổi hiệu dụng
+    // còn ở tương lai (vd học bù chưa tới, lịch lớp mới muộn hơn).
+    if (d.nguon_tinh !== 'lop_khac' && d.bat_dau.getTime() > now.getTime()) {
+      continue;
+    }
     tong.da_dien_ra += 1;
     if (d.ma !== 'chua_den_gio') tong[d.ma] += 1;
   }

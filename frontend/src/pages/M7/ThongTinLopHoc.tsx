@@ -458,7 +458,12 @@ function DanhSachBuoi({
                 Học bù
               </Badge>
             )}
-            {buoi.diem_danh_zoom ? (
+            {buoi.diem_danh_lop_cu?.cong_nhan && buoi.diem_danh_lop_cu.trang_thai === 'co_mat' ? (
+              // ADR 0014: khóa công nhận buổi đã có mặt ở lớp cũ -> thắng nhãn của lớp này.
+              <Badge size="sm" color="green" style={{ textTransform: 'none' }}>
+                Có mặt (lớp cũ)
+              </Badge>
+            ) : buoi.diem_danh_zoom ? (
               <NhanDiemDanhZoom dz={buoi.diem_danh_zoom} />
             ) : (
               buoi.trang_thai_diem_danh && (

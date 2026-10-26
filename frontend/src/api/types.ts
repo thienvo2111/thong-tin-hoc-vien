@@ -619,7 +619,8 @@ export interface LichHocLopToi {
   diem_danh_zoom?: DiemDanhZoomBuoi;
   // ADR 0005 Z8 (issue #27): buổi chưa có dòng ở lớp hiện tại nhưng đã có ở lớp cũ cùng giai
   // đoạn, cùng buoi_so (học viên chuyển lớp) — chỉ để hiển thị.
-  diem_danh_lop_cu?: { trang_thai: TrangThaiDiemDanh; ten_lop: string };
+  /** cong_nhan: nấc chuyên cần của khóa có tính buổi lớp cũ này không (ADR 0014). */
+  diem_danh_lop_cu?: { trang_thai: TrangThaiDiemDanh; ten_lop: string; cong_nhan?: boolean };
   // Đổi buổi học: buổi này là buổi chốt (thay cho buổi gốc của lớp được phân).
   da_doi_buoi?: boolean;
   /** Buổi gốc (lớp được phân) bị thay — để mở trang đề nghị và "Đổi lại". */

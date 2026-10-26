@@ -337,6 +337,7 @@ export class TinhHinhDiHocService {
         dongBuoi.map((b) => ({
           ma: b.diem_danh.ma,
           bat_dau: b.thoi_gian_bat_dau,
+          nguon_tinh: b.diem_danh.nguon_tinh,
         })),
         now,
       ),
@@ -552,15 +553,15 @@ export class TinhHinhDiHocService {
     return ds.map((dk) => ({
       ...this.dauDong(dk),
       tong: tongDiHoc(
-        (buoi.get(dk.id) ?? []).map((b) => ({
-          ma: tinhDiemDanhDong({
+        (buoi.get(dk.id) ?? []).map((b) => {
+          const { ma, nguon_tinh } = tinhDiemDanhDong({
             ket_qua: this.ketQuaSlot(chuyenCan, dk.id, b),
             bao_vang: bvMap.get(`${dk.id}|${b.e.id}`) ?? null,
             bat_dau: b.e.thoi_gian_bat_dau,
             now,
-          }).ma,
-          bat_dau: b.e.thoi_gian_bat_dau,
-        })),
+          });
+          return { ma, nguon_tinh, bat_dau: b.e.thoi_gian_bat_dau };
+        }),
         now,
       ),
     }));
