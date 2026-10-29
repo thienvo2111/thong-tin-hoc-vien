@@ -394,8 +394,12 @@ describe('Tình hình đi học + điểm danh bổ sung (e2e, ADR 0010)', () =>
     const an = ws.getRow(4);
     expect(an.getCell(2).value).toBe('Nguyễn An');
     expect(an.getCell(3).value).toBe(`00AN${SUF}`);
-    expect(an.getCell(6).value).toBe('GĐ1: Zoom A; GĐ2: Zoom C');
-    expect(an.getCell(7).value).toBe('0/3');
+    expect(ws.getRow(2).getCell(5).value).toBe('Xã/phường (trường)');
+    expect(ws.getRow(2).getCell(6).value).toBe('Tỉnh/thành (trường)');
+    expect(an.getCell(5).value).toBe(dv1.diaDanhXa.ten);
+    expect(an.getCell(6).value).toBe(dv1.diaDanhTinh.ten);
+    expect(an.getCell(8).value).toBe('GĐ1: Zoom A; GĐ2: Zoom C');
+    expect(an.getCell(9).value).toBe('0/3');
     const nk = await prisma.nhat_ky_hoat_dong.count({
       where: {
         hanh_dong: 'ho_tro_xuat_tinh_hinh_di_hoc',
