@@ -50,7 +50,12 @@ const CHON_DANG_KY = {
       id: true,
       ho_ten: true,
       ma_dinh_danh_moet: true,
-      don_vi_cong_tac: { select: { ten_don_vi: true } },
+      don_vi_cong_tac: {
+        select: {
+          ten_don_vi: true,
+          dia_ban: { select: { ten: true, parent: { select: { ten: true } } } },
+        },
+      },
     },
   },
   cum: { select: { ten_cum: true } },
@@ -516,6 +521,8 @@ export class TinhHinhDiHocService {
       ho_ten: dk.hoc_vien.ho_ten,
       ma_dinh_danh_moet: dk.hoc_vien.ma_dinh_danh_moet,
       don_vi_cong_tac_ten: dk.hoc_vien.don_vi_cong_tac.ten_don_vi,
+      don_vi_xa: dk.hoc_vien.don_vi_cong_tac.dia_ban.ten,
+      don_vi_tinh: dk.hoc_vien.don_vi_cong_tac.dia_ban.parent?.ten ?? null,
       cum: dk.cum?.ten_cum ?? null,
       lop_theo_giai_doan: dk.phan_lop_giai_doan
         .map((p) => ({

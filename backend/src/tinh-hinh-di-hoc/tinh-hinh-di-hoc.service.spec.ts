@@ -55,7 +55,10 @@ const dangKy = (
     id: `hv-${id}`,
     ho_ten,
     ma_dinh_danh_moet: `0${id}`,
-    don_vi_cong_tac: { ten_don_vi: 'THPT A' },
+    don_vi_cong_tac: {
+      ten_don_vi: 'THPT A',
+      dia_ban: { ten: 'Xã A', parent: { ten: 'Tỉnh A' } },
+    },
   },
   cum: { ten_cum: 'Cụm 1' },
   phan_lop_giai_doan: phanLop,
