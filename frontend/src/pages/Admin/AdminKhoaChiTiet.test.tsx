@@ -485,7 +485,11 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
 
     const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr');
     expect(dong).not.toBeNull();
-    await user.click(within(dong as HTMLElement).getByRole('button', { name: 'Sửa' }));
+    // "Sửa" nằm trong menu "⋯" của dòng lớp.
+    await user.click(
+      within(dong as HTMLElement).getByRole('button', { name: 'Thao tác khác cho lớp Lớp 01 – Nhóm cơ bản A' }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Sửa' }));
 
     const oTenLop = await screen.findByLabelText(/^Tên lớp/);
     await user.clear(oTenLop);
@@ -495,19 +499,23 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     expect(await screen.findByText('Lớp 01 – Đổi tên')).toBeInTheDocument();
   });
 
-  it('vô hiệu hóa lớp: xác nhận → badge chuyển "Đã vô hiệu hóa", nút đổi thành "Kích hoạt lại"', async () => {
+  it('vô hiệu hóa lớp: xác nhận → badge "Đã vô hiệu hóa" dưới tên, menu đổi thành "Kích hoạt lại"', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();
     renderTrang('khoa-1');
     await screen.findByText('Lớp 01 – Nhóm cơ bản A');
 
+    const nutMenu = { name: 'Thao tác khác cho lớp Lớp 01 – Nhóm cơ bản A' };
     const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
-    await user.click(within(dong).getByRole('button', { name: 'Vô hiệu hóa' }));
+    await user.click(within(dong).getByRole('button', nutMenu));
+    await user.click(await screen.findByRole('menuitem', { name: 'Vô hiệu hóa' }));
     await user.click(await screen.findByRole('button', { name: 'Xác nhận' }));
 
-    expect(await screen.findByText('Đã vô hiệu hóa')).toBeInTheDocument();
-    const dongSauKhi = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
-    expect(within(dongSauKhi).getByRole('button', { name: 'Kích hoạt lại' })).toBeInTheDocument();
+    const dongSauKhi = () => screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
+    expect(await within(dongSauKhi()).findByText('Đã vô hiệu hóa')).toBeInTheDocument();
+    await user.click(within(dongSauKhi()).getByRole('button', nutMenu));
+    expect(await screen.findByRole('menuitem', { name: 'Kích hoạt lại' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Vô hiệu hóa' })).not.toBeInTheDocument();
   });
 
   // T10 (issue #2): buổi thuộc giai đoạn trực tiếp phải chọn điểm học.
@@ -518,7 +526,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     renderTrang('khoa-1');
     await screen.findByText('Lớp 01 – Nhóm cơ bản A');
     const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
-    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết ▾' }));
+    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết lớp Lớp 01 – Nhóm cơ bản A' }));
     await user.click(await screen.findByRole('button', { name: '+ Thêm buổi học' }));
 
     const modal = await screen.findByRole('dialog');
@@ -590,7 +598,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     renderTrang('khoa-1');
     await screen.findByText('Lớp 01 – Nhóm cơ bản A');
     const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
-    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết ▾' }));
+    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết lớp Lớp 01 – Nhóm cơ bản A' }));
     await user.click(await screen.findByRole('button', { name: 'Giảng viên' }));
 
     const modal = await screen.findByRole('dialog');
@@ -617,7 +625,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     await screen.findByText('Lớp 01 – Nhóm cơ bản A');
 
     const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
-    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết ▾' }));
+    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết lớp Lớp 01 – Nhóm cơ bản A' }));
     expect(await screen.findByText('Nguyễn Văn Long — Giảng viên')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '+ Thêm nhân sự' }));
@@ -778,13 +786,13 @@ describe('Admin — Chi tiết khóa: phân lớp theo giai đoạn', () => {
     );
   }
 
-  it('bảng lớp có cột "Sĩ số hiện tại" lấy từ si_so_hien_tai', async () => {
+  it('bảng lớp có cột "Sĩ số" = si_so_hien_tai/si_so_toi_da (thanh sĩ số)', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
     renderTrang('khoa-1');
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
-    expect(screen.getByRole('columnheader', { name: 'Sĩ số hiện tại' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Sĩ số' })).toBeInTheDocument();
     const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
-    expect(within(dong).getByText('12')).toBeInTheDocument();
+    expect(within(dong).getByText('12/30')).toBeInTheDocument();
   });
 
   it('tạo giai đoạn kèm link + hướng dẫn -> body gửi đúng 2 field', async () => {
