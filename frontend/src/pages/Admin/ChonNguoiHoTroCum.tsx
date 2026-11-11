@@ -35,7 +35,7 @@ export function ChonNguoiHoTroLop({ khoaId, lop }: { khoaId: string; lop: LopHoc
       dangLuu={gan.isPending}
       luu={(ids, cb) => gan.mutate({ lopId: lop.id, nguoiDungIds: ids }, cb)}
       // Bảng lớp nhiều cột: giới hạn bề rộng để các pill xuống dòng bên trong ô, không kéo giãn dòng.
-      maw={240}
+      maw={200}
     />
   );
 }

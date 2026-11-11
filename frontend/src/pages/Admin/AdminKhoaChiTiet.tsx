@@ -1009,8 +1009,8 @@ export default function AdminKhoaChiTiet() {
                     </Group>
                   )}
                   <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
-                    <Table.ScrollContainer minWidth={laQuanTri ? 1080 : 820}>
-                      <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+                    <Table.ScrollContainer minWidth={laQuanTri ? 1000 : 760}>
+                      <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="xs">
                         <Table.Thead>
                           <Table.Tr style={{ whiteSpace: 'nowrap' }}>
                             <Table.Th w={40} />
@@ -1051,7 +1051,7 @@ export default function AdminKhoaChiTiet() {
                                       {moRong ? '▾' : '▸'}
                                     </ActionIcon>
                                   </Table.Td>
-                                  <Table.Td miw={180}>
+                                  <Table.Td miw={150}>
                                     {/* Bấm tên lớp cũng mở/thu gọn; nút ▸/▾ là điều khiển cho bàn phím/trình đọc màn hình. */}
                                     <Text fw={600} fz="sm" style={{ cursor: 'pointer' }} onClick={() => toggleMoRongLop(lop.id)}>
                                       {lop.ten_lop}
@@ -1068,7 +1068,7 @@ export default function AdminKhoaChiTiet() {
                                     </Badge>
                                   </Table.Td>
                                   <Table.Td>
-                                    <ThanhSiSo siSo={lop.si_so_hien_tai ?? 0} toiDa={lop.si_so_toi_da} w={120} />
+                                    <ThanhSiSo siSo={lop.si_so_hien_tai ?? 0} toiDa={lop.si_so_toi_da} w={80} />
                                   </Table.Td>
                                   <Table.Td>
                                     {lop.nhan_su && lop.nhan_su.length > 0
@@ -1084,10 +1084,10 @@ export default function AdminKhoaChiTiet() {
                                   <Table.Td style={{ whiteSpace: 'nowrap' }}>
                                     {laQuanTri && (
                                       <Group gap={4} justify="flex-end" wrap="nowrap">
-                                        <Button variant="subtle" size="xs" onClick={() => setLopDiemDanh(lop)}>
+                                        <Button variant="subtle" size="xs" px={6} onClick={() => setLopDiemDanh(lop)}>
                                           Điểm danh
                                         </Button>
-                                        <Button variant="subtle" size="xs" onClick={() => setLopTheoBuoi(lop)}>
+                                        <Button variant="subtle" size="xs" px={6} onClick={() => setLopTheoBuoi(lop)}>
                                           Theo buổi
                                         </Button>
                                         <Menu position="bottom-end" withinPortal>
