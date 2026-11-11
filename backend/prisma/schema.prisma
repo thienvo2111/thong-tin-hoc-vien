@@ -845,6 +845,8 @@ model khoa_boi_duong {
   // docs/database-ddl.sql comment tại đây.
   // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học (xuống mức thấp hơn).
   mo_dieu_chinh_muc       Boolean             @default(false)
+  // 2026-11-11: công tắc nút "Vào học VLE" theo khóa (mặc định tắt; VLE_LOGIN_KEY là công tắc tổng).
+  mo_vao_hoc_vle          Boolean             @default(false)
   // ADR 0007: số buổi tối đa học viên được đề nghị đổi (0 = tắt; CHECK 0–50 bằng raw SQL).
   so_buoi_doi_toi_da      Int                 @default(0) @db.SmallInt
   // ADR 0012: số buổi học bù tối đa mỗi học viên (0 = tắt; CHECK 0–50 bằng raw SQL).

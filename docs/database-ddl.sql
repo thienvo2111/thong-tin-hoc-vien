@@ -599,6 +599,9 @@ CREATE TABLE khoa_boi_duong (
     mo_dieu_chinh_muc   boolean NOT NULL DEFAULT false,
         -- 2026-10-08 (migration 20261008120000_dieu_chinh_muc_hoc): công tắc
         -- Quản trị bật/tắt cho học viên tự điều chỉnh mức lớp học.
+    mo_vao_hoc_vle      boolean NOT NULL DEFAULT false,
+        -- 2026-11-11 (migration 20261111090000_mo_vao_hoc_vle): công tắc
+        -- Quản trị bật/tắt nút "Vào học VLE" theo khóa (api-contract 10.2).
     -- ADR 0005 (issue #23, migration 20261009120000_diem_danh_zoom): tự điểm
     -- danh lớp Zoom — mốc bật (NULL = tắt), cửa sổ [bắt đầu − mở trước,
     -- bắt đầu + đóng sau] tính theo giờ bắt đầu buổi, chế độ chuyên cần (Z8).
