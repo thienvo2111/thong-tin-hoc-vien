@@ -34,6 +34,8 @@ export function ChonNguoiHoTroLop({ khoaId, lop }: { khoaId: string; lop: LopHoc
       nguoiHoTro={lop.nguoi_ho_tro}
       dangLuu={gan.isPending}
       luu={(ids, cb) => gan.mutate({ lopId: lop.id, nguoiDungIds: ids }, cb)}
+      // Bảng lớp nhiều cột: giới hạn bề rộng để các pill xuống dòng bên trong ô, không kéo giãn dòng.
+      maw={240}
     />
   );
 }
@@ -50,6 +52,7 @@ function ChonNguoiHoTro({
   dangLuu,
   canhBaoKhiTrong,
   luu,
+  maw,
 }: {
   ten: string;
   nhanO: string;
@@ -57,6 +60,8 @@ function ChonNguoiHoTro({
   dangLuu: boolean;
   canhBaoKhiTrong?: string;
   luu: (ids: string[], cb: CallbackLuu) => void;
+  /** Bề rộng tối đa ô chọn (gọn trong bảng); bỏ trống = như cũ (bảng cụm). */
+  maw?: number;
 }) {
   const dsHoTro = useDanhSachTaiKhoanHoTro({ trang_thai: 'active', page_size: 200 });
   const daChon = useMemo(() => (nguoiHoTro ?? []).map((n) => n.id), [nguoiHoTro]);
@@ -91,6 +96,7 @@ function ChonNguoiHoTro({
         disabled={dangLuu}
         size="xs"
         miw={200}
+        maw={maw}
       />
       {canhBaoKhiTrong && daChon.length === 0 && (
         <Badge color="red" variant="light" size="sm">
