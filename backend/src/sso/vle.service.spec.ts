@@ -24,16 +24,51 @@ describe('VleService — Vào học VLE (external-login P.CNTT)', () => {
     });
   });
 
+  // Dòng nhat_ky_hoat_dong giả lập — groupBy lọc đúng hanh_dong + hoc_vien_id
+  // như truy vấn thật để kiểm tra chỉ đếm 'vao_hoc_vle' của CHÍNH học viên.
+  interface DongNhatKy {
+    hanh_dong: string;
+    hoc_vien_id: string | null;
+    thoi_gian: Date;
+  }
+
   function taoPrisma(opts: {
     dangNhap?: { username: string | null; email_chup: string | null } | null;
     dangKy?: unknown;
+    nhatKy?: DongNhatKy[];
   }) {
+    const dongNhatKy = opts.nhatKy ?? [];
     return {
       dang_nhap_vle: {
         findUnique: jest.fn().mockResolvedValue(opts.dangNhap ?? null),
       },
       dang_ky_hoc: {
         findFirst: jest.fn().mockResolvedValue(opts.dangKy ?? null),
+      },
+      nhat_ky_hoat_dong: {
+        groupBy: jest.fn(
+          ({ where }: { where: { hanh_dong: string; hoc_vien_id: { in: string[] } } }) => {
+            const khop = dongNhatKy.filter(
+              (d) =>
+                d.hanh_dong === where.hanh_dong &&
+                d.hoc_vien_id !== null &&
+                where.hoc_vien_id.in.includes(d.hoc_vien_id),
+            );
+            const ids = [...new Set(khop.map((d) => d.hoc_vien_id))];
+            return Promise.resolve(
+              ids.map((id) => {
+                const cua = khop.filter((d) => d.hoc_vien_id === id);
+                return {
+                  hoc_vien_id: id,
+                  _count: { _all: cua.length },
+                  _max: {
+                    thoi_gian: new Date(Math.max(...cua.map((d) => d.thoi_gian.getTime()))),
+                  },
+                };
+              }),
+            );
+          },
+        ),
       },
     };
   }
@@ -70,6 +105,8 @@ describe('VleService — Vào học VLE (external-login P.CNTT)', () => {
       san_sang: false,
       ly_do: 'Chức năng vào học VLE chưa được cấu hình.',
       co_khoa_hoc: false,
+      so_lan_vao: 0,
+      lan_vao_gan_nhat: null,
     });
     expect('key' in kq).toBe(false);
   });
@@ -176,5 +213,65 @@ describe('VleService — Vào học VLE (external-login P.CNTT)', () => {
     );
     const kq = await service.trangThai(caller);
     expect(JSON.stringify(kq)).not.toContain('khoa-khong-duoc-lo');
+  });
+  describe('lượt vào VLE trong trangThai (so_lan_vao, lan_vao_gan_nhat)', () => {
+    it('chưa vào lần nào -> 0 / null', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      const service = new VleService(
+        taoPrisma({ dangNhap: { username: 'u1', email_chup: null } }) as never,
+        nhatKy as never,
+      );
+      const kq = await service.trangThai(caller);
+      expect(kq.so_lan_vao).toBe(0);
+      expect(kq.lan_vao_gan_nhat).toBeNull();
+    });
+
+    it('có lượt vào -> đếm đúng + lần gần nhất (ISO); chỉ tính vao_hoc_vle của CHÍNH học viên', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      const prisma = taoPrisma({
+        dangNhap: { username: 'u1', email_chup: null },
+        nhatKy: [
+          { hanh_dong: 'vao_hoc_vle', hoc_vien_id: 'hv-1', thoi_gian: new Date('2026-11-01T02:00:00Z') },
+          { hanh_dong: 'vao_hoc_vle', hoc_vien_id: 'hv-1', thoi_gian: new Date('2026-11-09T08:30:00Z') },
+          { hanh_dong: 'vao_hoc_vle', hoc_vien_id: 'hv-1', thoi_gian: new Date('2026-11-05T01:00:00Z') },
+          // Không tính: hành động khác của chính học viên, lượt vào của người khác.
+          { hanh_dong: 'dang_nhap', hoc_vien_id: 'hv-1', thoi_gian: new Date('2026-11-10T00:00:00Z') },
+          { hanh_dong: 'vao_hoc_vle', hoc_vien_id: 'hv-2', thoi_gian: new Date('2026-11-10T00:00:00Z') },
+        ],
+      });
+      const service = new VleService(prisma as never, nhatKy as never);
+      const kq = await service.trangThai(caller);
+      expect(kq.so_lan_vao).toBe(3);
+      expect(kq.lan_vao_gan_nhat).toBe('2026-11-09T08:30:00.000Z');
+      // 1 truy vấn gộp, lọc đúng hành động + học viên.
+      expect(prisma.nhat_ky_hoat_dong.groupBy).toHaveBeenCalledTimes(1);
+      expect(prisma.nhat_ky_hoat_dong.groupBy.mock.calls[0][0].where).toEqual({
+        hanh_dong: 'vao_hoc_vle',
+        hoc_vien_id: { in: ['hv-1'] },
+      });
+    });
+
+    it('chưa cấu hình / chưa có tài khoản -> vẫn trả lượt vào (không lỗi)', async () => {
+      const nk = [
+        { hanh_dong: 'vao_hoc_vle', hoc_vien_id: 'hv-1', thoi_gian: new Date('2026-11-02T03:00:00Z') },
+      ];
+      delete process.env.VLE_LOGIN_KEY;
+      const chuaCauHinh = await new VleService(
+        taoPrisma({ nhatKy: nk }) as never,
+        nhatKy as never,
+      ).trangThai(caller);
+      expect(chuaCauHinh).toMatchObject({ san_sang: false, so_lan_vao: 1 });
+
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      const chuaTaiKhoan = await new VleService(
+        taoPrisma({ dangNhap: null, nhatKy: nk }) as never,
+        nhatKy as never,
+      ).trangThai(caller);
+      expect(chuaTaiKhoan).toMatchObject({
+        san_sang: false,
+        so_lan_vao: 1,
+        lan_vao_gan_nhat: '2026-11-02T03:00:00.000Z',
+      });
+    });
   });
 });

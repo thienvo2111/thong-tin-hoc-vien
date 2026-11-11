@@ -8,6 +8,7 @@ import {
   VleChuaCoTaiKhoanException,
 } from '../common/exceptions/app.exceptions';
 import { parseVleCourseMap } from './util/vle-course-map.util';
+import { demLuotVaoVle, HANH_DONG_VAO_HOC_VLE } from './util/luot-vao-vle.util';
 import {
   GIAI_DOAN_MOC_ARGS,
   giaiDoanPhanLop,
@@ -32,6 +33,10 @@ export interface TrangThaiVle {
   san_sang: boolean;
   ly_do?: string;
   co_khoa_hoc: boolean;
+  /** Số "lượt vào VLE" của học viên (CONTEXT.md) — không phải điểm danh. */
+  so_lan_vao: number;
+  /** ISO 8601, null khi chưa vào lần nào. */
+  lan_vao_gan_nhat: string | null;
 }
 
 export interface FormVle {
@@ -68,19 +73,28 @@ export class VleService {
   }
 
   async trangThai(caller: AuthenticatedUser): Promise<TrangThaiVle> {
+    // Lượt vào VLE tính cả khi chưa cấu hình/chưa có tài khoản (nút bị ẩn
+    // hoặc disable thì FE không hiện, 0/null là đủ).
+    const luot = await this.luotVao(caller.hoc_vien_id!);
     if (!this.loginKey) {
       return {
         san_sang: false,
         ly_do: 'Chức năng vào học VLE chưa được cấu hình.',
         co_khoa_hoc: false,
+        ...luot,
       };
     }
     const match = await this.timKhop(caller.hoc_vien_id!);
     if (!match) {
-      return { san_sang: false, ly_do: THONG_BAO_CHUA_CO_TAI_KHOAN, co_khoa_hoc: false };
+      return {
+        san_sang: false,
+        ly_do: THONG_BAO_CHUA_CO_TAI_KHOAN,
+        co_khoa_hoc: false,
+        ...luot,
+      };
     }
     const idCourse = await this.layIdCourse(caller.hoc_vien_id!);
-    return { san_sang: true, co_khoa_hoc: idCourse !== undefined };
+    return { san_sang: true, co_khoa_hoc: idCourse !== undefined, ...luot };
   }
 
   async form(caller: AuthenticatedUser, ip: string | null): Promise<FormVle> {
@@ -100,12 +114,22 @@ export class VleService {
     // Không log key/toàn bộ fields — chỉ ghi kiểu khớp + id_course (ADR mục
     // 10.2 "Audit log"). Dùng chung nhat-ky (ip tự lấy từ ngữ cảnh request).
     await this.nhatKy.ghi({
-      hanh_dong: 'vao_hoc_vle',
+      hanh_dong: HANH_DONG_VAO_HOC_VLE,
       hoc_vien_id: hocVienId,
       chi_tiet: { khop_theo: match.loai, id_course: idCourse ?? null, ip },
     });
 
     return { action: this.loginUrl, fields };
+  }
+
+  private async luotVao(
+    hocVienId: string,
+  ): Promise<Pick<TrangThaiVle, 'so_lan_vao' | 'lan_vao_gan_nhat'>> {
+    const l = (await demLuotVaoVle(this.prisma, [hocVienId])).get(hocVienId);
+    return {
+      so_lan_vao: l?.so_lan_vao ?? 0,
+      lan_vao_gan_nhat: l?.lan_vao_gan_nhat?.toISOString() ?? null,
+    };
   }
 
   private async timKhop(hocVienId: string): Promise<KetQuaKhop | null> {
