@@ -9,7 +9,7 @@ import { dinhDangNgayGio } from '@/lib/ngay';
 export const trangThaiVleKey = ['sso', 'vle', 'trang-thai'] as const;
 
 /** Nút "Vào học VLE" (external-login P.CNTT, api-contract.md mục 10.2) — chỉ hiện ở lớp VLE.
- * Ẩn hẳn khi chức năng chưa được cấu hình; disable + hiện lý do khi học viên chưa có tài khoản VLE
+ * Ẩn hẳn khi `mo=false` (chưa cấu hình, hoặc Quản trị chưa bật "Mở vào học VLE" cho khóa); disable + hiện lý do khi học viên chưa có tài khoản VLE
  * (chưa có username/email để khớp sang VLE). Bấm nút mới gọi API lấy field rồi tự submit 1 form POST
  * (cùng tab) — field "key" buộc phải tới trình duyệt học viên (rủi ro đã được chủ sản phẩm chấp
  * nhận, xem api-contract.md mục 10.2), nên không gọi sẵn khi tải trang. */
@@ -23,7 +23,8 @@ export function NutVaoHocVle() {
 
   if (trangThai.isLoading || trangThai.isError) return null;
   const data = trangThai.data;
-  if (!data || data.ly_do === VLE_CHUA_CAU_HINH_LY_DO) return null;
+  // Giữ thêm kiểm tra câu "chưa cấu hình" như trước cho chắc.
+  if (!data || !data.mo || data.ly_do === VLE_CHUA_CAU_HINH_LY_DO) return null;
 
   return (
     <Stack gap={4} mt={6} style={{ alignSelf: 'flex-start' }}>

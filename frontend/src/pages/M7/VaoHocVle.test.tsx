@@ -9,7 +9,7 @@ import type { TrangThaiVle } from '@/api/sso';
 import { NutVaoHocVle } from './VaoHocVle';
 
 function datTrangThai(
-  body: { san_sang: boolean; ly_do?: string; co_khoa_hoc: boolean } & Partial<
+  body: { mo: boolean; san_sang: boolean; ly_do?: string; co_khoa_hoc: boolean } & Partial<
     Pick<TrangThaiVle, 'so_lan_vao' | 'lan_vao_gan_nhat'>
   >,
 ) {
@@ -35,13 +35,36 @@ describe('NutVaoHocVle (Vào học VLE, external-login P.CNTT)', () => {
   });
 
   it('chưa cấu hình -> ẩn hẳn nút, không hiện gì cả', async () => {
-    datTrangThai({ san_sang: false, ly_do: 'Chức năng vào học VLE chưa được cấu hình.', co_khoa_hoc: false });
+    datTrangThai({ mo: false, san_sang: false, ly_do: 'Chức năng vào học VLE chưa được cấu hình.', co_khoa_hoc: false });
     renderTrang(<NutVaoHocVle />);
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Vào học VLE' })).not.toBeInTheDocument());
   });
 
+  // Công tắc theo khóa (2026-11-11): Quản trị chưa bật "Mở vào học VLE" -> mo=false -> ẩn hẳn.
+  it('khóa chưa mở vào học VLE (mo=false) -> ẩn hẳn nút và dòng lượt vào', async () => {
+    datTrangThai({
+      mo: false,
+      san_sang: false,
+      ly_do: 'Khóa học chưa mở vào học VLE.',
+      co_khoa_hoc: false,
+      so_lan_vao: 2,
+    });
+    renderTrang(<NutVaoHocVle />);
+    await waitFor(() => expect(screen.queryByTestId('luot-vao-vle')).not.toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Vào học VLE' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Khóa học chưa mở vào học VLE.')).not.toBeInTheDocument();
+  });
+
+  it('khóa đã mở (mo=true) -> hiện nút', async () => {
+    datTrangThai({ mo: true, san_sang: true, co_khoa_hoc: true });
+    renderTrang(<NutVaoHocVle />);
+    expect(await screen.findByRole('button', { name: 'Vào học VLE' })).toBeEnabled();
+    expect(screen.getByTestId('luot-vao-vle')).toBeInTheDocument();
+  });
+
   it('chưa có tài khoản VLE -> nút disabled kèm lý do', async () => {
     datTrangThai({
+      mo: true,
       san_sang: false,
       ly_do: 'Chưa có tài khoản VLE. Vui lòng cập nhật email (không trùng người khác) để được cấp tài khoản.',
       co_khoa_hoc: false,
@@ -53,7 +76,7 @@ describe('NutVaoHocVle (Vào học VLE, external-login P.CNTT)', () => {
   });
 
   it('sẵn sàng -> nút bấm được, không hiện lý do', async () => {
-    datTrangThai({ san_sang: true, co_khoa_hoc: true });
+    datTrangThai({ mo: true, san_sang: true, co_khoa_hoc: true });
     renderTrang(<NutVaoHocVle />);
     const nut = await screen.findByRole('button', { name: 'Vào học VLE' });
     expect(nut).toBeEnabled();
@@ -61,7 +84,7 @@ describe('NutVaoHocVle (Vào học VLE, external-login P.CNTT)', () => {
   });
 
   it('bấm nút -> gọi API lấy form rồi tự submit đúng field (cùng tab)', async () => {
-    datTrangThai({ san_sang: true, co_khoa_hoc: true });
+    datTrangThai({ mo: true, san_sang: true, co_khoa_hoc: true });
     server.use(
       http.post('/sso/vle/form', () =>
         HttpResponse.json({
@@ -85,7 +108,7 @@ describe('NutVaoHocVle (Vào học VLE, external-login P.CNTT)', () => {
   });
 
   it('lỗi khi bấm nút -> hiện thông báo lỗi, không ném ngoại lệ', async () => {
-    datTrangThai({ san_sang: true, co_khoa_hoc: false });
+    datTrangThai({ mo: true, san_sang: true, co_khoa_hoc: false });
     server.use(
       http.post('/sso/vle/form', () =>
         HttpResponse.json({ error: { code: 'VLE_CHUA_CO_TAI_KHOAN', message: 'Chưa có tài khoản VLE lúc này.' } }, { status: 409 }),
@@ -99,21 +122,21 @@ describe('NutVaoHocVle (Vào học VLE, external-login P.CNTT)', () => {
   });
   // Lượt vào VLE (= số lần cấp form vào VLE thành công, không phải điểm danh) — dòng mờ dưới nút.
   it('đã vào VLE -> "Đã vào VLE 3 lần · gần nhất dd/MM/yyyy HH:mm" (giờ Việt Nam)', async () => {
-    datTrangThai({ san_sang: true, co_khoa_hoc: true, so_lan_vao: 3, lan_vao_gan_nhat: '2026-11-09T08:30:00.000Z' });
+    datTrangThai({ mo: true, san_sang: true, co_khoa_hoc: true, so_lan_vao: 3, lan_vao_gan_nhat: '2026-11-09T08:30:00.000Z' });
     renderTrang(<NutVaoHocVle />);
     expect(await screen.findByText('Đã vào VLE 3 lần · gần nhất 09/11/2026 15:30')).toBeInTheDocument();
     expect(screen.queryByText('Chưa vào VLE lần nào')).not.toBeInTheDocument();
   });
 
   it('chưa vào lần nào -> "Chưa vào VLE lần nào"', async () => {
-    datTrangThai({ san_sang: true, co_khoa_hoc: true, so_lan_vao: 0, lan_vao_gan_nhat: null });
+    datTrangThai({ mo: true, san_sang: true, co_khoa_hoc: true, so_lan_vao: 0, lan_vao_gan_nhat: null });
     renderTrang(<NutVaoHocVle />);
     expect(await screen.findByText('Chưa vào VLE lần nào')).toBeInTheDocument();
     expect(screen.queryByText(/Đã vào VLE/)).not.toBeInTheDocument();
   });
 
   it('chưa cấu hình -> không hiện dòng lượt vào (ẩn hẳn cùng nút)', async () => {
-    datTrangThai({ san_sang: false, ly_do: 'Chức năng vào học VLE chưa được cấu hình.', co_khoa_hoc: false, so_lan_vao: 2 });
+    datTrangThai({ mo: false, san_sang: false, ly_do: 'Chức năng vào học VLE chưa được cấu hình.', co_khoa_hoc: false, so_lan_vao: 2 });
     renderTrang(<NutVaoHocVle />);
     await waitFor(() => expect(screen.queryByTestId('luot-vao-vle')).not.toBeInTheDocument());
     expect(screen.queryByText(/Đã vào VLE/)).not.toBeInTheDocument();

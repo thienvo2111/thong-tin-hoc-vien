@@ -829,7 +829,7 @@ describe('M7 — thẻ lớp VLE', () => {
     server.use(
       http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json([khoaCoLopVle()])),
       http.get('/sso/vle/trang-thai', () =>
-        HttpResponse.json({ san_sang: true, co_khoa_hoc: true, so_lan_vao: 0, lan_vao_gan_nhat: null }),
+        HttpResponse.json({ mo: true, san_sang: true, co_khoa_hoc: true, so_lan_vao: 0, lan_vao_gan_nhat: null }),
       ),
     );
     renderDaDangNhap();
