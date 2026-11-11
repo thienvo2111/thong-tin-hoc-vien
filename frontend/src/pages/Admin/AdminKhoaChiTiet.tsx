@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
+  ActionIcon,
   Alert,
   Anchor,
   Badge,
@@ -9,9 +10,11 @@ import {
   Button,
   Container,
   Group,
+  Menu,
   Modal,
   NumberInput,
   Paper,
+  SegmentedControl,
   Select,
   Skeleton,
   Stack,
@@ -58,8 +61,9 @@ import { useToi } from '@/auth/AuthContext';
 import { chuanHoaLienKet } from '@/lib/lienKet';
 import { thongDiepLoiChung, loiFieldsThanhMap } from '@/lib/loiApi';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
-import { locTiengViet } from '@/lib/timKiemTiengViet';
+import { khopTimKiem, locTiengViet } from '@/lib/timKiemTiengViet';
 import { KhoaTrangThaiBadge } from '@/components/KhoaTrangThaiBadge';
+import { ThanhSiSo } from '@/components/ThanhSiSo';
 import { SelectDonViTimKiem } from '@/components/SelectDonViTimKiem';
 import { AdminPageHeader } from './AdminPageHeader';
 import { ModalImportLopHoc } from './ModalImportLopHoc';
@@ -79,6 +83,8 @@ import { TheoBuoi } from '@/pages/HoTro/HoTroLopChiTiet';
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 const MAU_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'blue', zoom: 'grape', vle: 'teal' };
 const TUY_CHON_LOAI_LOP = (Object.keys(NHAN_LOAI_LOP) as LoaiLop[]).map((v) => ({ value: v, label: NHAN_LOAI_LOP[v] }));
+// Thứ tự nút lọc loại lớp trên thanh công cụ bảng lớp (chỉ hiện loại có trong khóa).
+const THU_TU_LOC_LOAI_LOP: LoaiLop[] = ['zoom', 'truc_tiep', 'vle'];
 
 const NHAN_MUC_NANG_LUC: Record<MucNangLuc, string> = { co_ban: 'Cơ bản', thanh_thao: 'Thành thạo', nang_cao: 'Nâng cao' };
 const TUY_CHON_MUC_NANG_LUC = (Object.keys(NHAN_MUC_NANG_LUC) as MucNangLuc[]).map((v) => ({
@@ -330,6 +336,9 @@ export default function AdminKhoaChiTiet() {
   const [loiSuaLop, setLoiSuaLop] = useState<Record<string, string>>({});
 
   const [lopMoRong, setLopMoRong] = useState<Set<string>>(new Set());
+  // Bộ lọc bảng lớp (chỉ ở FE, trên khoa.lop_hoc đã tải).
+  const [tuKhoaLop, setTuKhoaLop] = useState('');
+  const [locLoaiLop, setLocLoaiLop] = useState<LoaiLop | 'tat_ca'>('tat_ca');
   const [modalImport, setModalImport] = useState(false);
   const [dangXuatChiaLop, setDangXuatChiaLop] = useState(false);
 
@@ -807,6 +816,17 @@ export default function AdminKhoaChiTiet() {
 
   const tuyChonGiaiDoan = (khoa?.giai_doan ?? []).map((g) => ({ value: g.id, label: `GĐ ${g.thu_tu} — ${g.ten_giai_doan}` }));
 
+  // --- Bảng lớp: lọc theo tên (không dấu, không phân biệt hoa thường) + loại lớp ----------
+  const tatCaLop = khoa?.lop_hoc ?? [];
+  const loaiLopCoTrongKhoa = THU_TU_LOC_LOAI_LOP.filter((l) => tatCaLop.some((lop) => lop.loai_lop === l));
+  // Loại đang chọn không còn trong khóa (vd vừa sửa loại lớp) → coi như "Tất cả".
+  const loaiLopDangLoc =
+    locLoaiLop !== 'tat_ca' && loaiLopCoTrongKhoa.includes(locLoaiLop) ? locLoaiLop : 'tat_ca';
+  const lopDaLoc = tatCaLop.filter(
+    (lop) => (loaiLopDangLoc === 'tat_ca' || lop.loai_lop === loaiLopDangLoc) && khopTimKiem(lop.ten_lop, tuKhoaLop),
+  );
+  const soCotBangLop = laQuanTri ? 8 : 7;
+
   return (
     <>
       <AdminPageHeader title="Chi tiết khóa bồi dưỡng" />
@@ -961,236 +981,290 @@ export default function AdminKhoaChiTiet() {
                       )}
                     </>
                   )}
+                  {khoa.lop_hoc.length > 0 && (
+                    <Group gap="sm" align="center">
+                      <TextInput
+                        aria-label="Tìm lớp"
+                        placeholder="Tìm lớp"
+                        size="xs"
+                        w={240}
+                        value={tuKhoaLop}
+                        onChange={(e) => setTuKhoaLop(e.currentTarget.value)}
+                      />
+                      {loaiLopCoTrongKhoa.length > 1 && (
+                        <SegmentedControl
+                          size="xs"
+                          aria-label="Lọc loại lớp"
+                          value={loaiLopDangLoc}
+                          onChange={(v) => setLocLoaiLop(v as LoaiLop | 'tat_ca')}
+                          data={[
+                            { value: 'tat_ca', label: 'Tất cả' },
+                            ...loaiLopCoTrongKhoa.map((l) => ({ value: l, label: NHAN_LOAI_LOP[l] })),
+                          ]}
+                        />
+                      )}
+                      <Text size="xs" c="dimmed">
+                        Hiện {lopDaLoc.length}/{khoa.lop_hoc.length} lớp
+                      </Text>
+                    </Group>
+                  )}
                   <Paper withBorder radius={14} style={{ overflow: 'hidden' }}>
-                    <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>Tên lớp</Table.Th>
-                          <Table.Th>Loại lớp</Table.Th>
-                          <Table.Th>Sĩ số tối đa</Table.Th>
-                          <Table.Th>Sĩ số hiện tại</Table.Th>
-                          <Table.Th>Giảng viên / nhân sự</Table.Th>
-                          {laQuanTri && <Table.Th>Người hỗ trợ lớp</Table.Th>}
-                          <Table.Th>Trạng thái</Table.Th>
-                          <Table.Th>Số buổi đã lên lịch</Table.Th>
-                          <Table.Th />
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {khoa.lop_hoc.length === 0 && (
-                          <Table.Tr>
-                            <Table.Td colSpan={laQuanTri ? 9 : 8}>
-                              <Text c="dimmed" ta="center" py="lg">
-                                Khóa chưa có lớp học nào.
-                              </Text>
-                            </Table.Td>
+                    <Table.ScrollContainer minWidth={laQuanTri ? 1000 : 760}>
+                      <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="xs">
+                        <Table.Thead>
+                          <Table.Tr style={{ whiteSpace: 'nowrap' }}>
+                            <Table.Th w={40} />
+                            <Table.Th>Tên lớp</Table.Th>
+                            <Table.Th>Loại</Table.Th>
+                            <Table.Th>Sĩ số</Table.Th>
+                            <Table.Th>Giảng viên / nhân sự</Table.Th>
+                            {laQuanTri && <Table.Th>Người hỗ trợ lớp</Table.Th>}
+                            <Table.Th ta="center">Số buổi</Table.Th>
+                            <Table.Th ta="right">Thao tác</Table.Th>
                           </Table.Tr>
-                        )}
-                        {khoa.lop_hoc.map((lop) => {
-                          const moRong = lopMoRong.has(lop.id);
-                          return (
-                            <Fragment key={lop.id}>
-                              <Table.Tr>
-                                <Table.Td fw={600}>{lop.ten_lop}</Table.Td>
-                                <Table.Td>
-                                  <Badge color={MAU_LOAI_LOP[lop.loai_lop]} radius="xl">
-                                    {NHAN_LOAI_LOP[lop.loai_lop]}
-                                  </Badge>
-                                </Table.Td>
-                                <Table.Td>{lop.si_so_toi_da ?? '—'}</Table.Td>
-                                <Table.Td>{lop.si_so_hien_tai ?? 0}</Table.Td>
-                                <Table.Td>
-                                  {lop.nhan_su && lop.nhan_su.length > 0
-                                    ? lop.nhan_su.map((n) => n.ho_ten).join(', ')
-                                    : '—'}
-                                </Table.Td>
-                                {laQuanTri && (
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {lopDaLoc.length === 0 && (
+                            <Table.Tr>
+                              <Table.Td colSpan={soCotBangLop}>
+                                <Text c="dimmed" ta="center" py="lg">
+                                  {khoa.lop_hoc.length === 0 ? 'Khóa chưa có lớp học nào.' : 'Không có lớp khớp bộ lọc.'}
+                                </Text>
+                              </Table.Td>
+                            </Table.Tr>
+                          )}
+                          {lopDaLoc.map((lop) => {
+                            const moRong = lopMoRong.has(lop.id);
+                            const dangHoatDong = lop.trang_thai === 'active';
+                            return (
+                              <Fragment key={lop.id}>
+                                {/* Lớp đã vô hiệu hóa: làm mờ cả dòng + nhãn dưới tên (thay cột Trạng thái cũ). */}
+                                <Table.Tr style={dangHoatDong ? undefined : { opacity: 0.55 }}>
                                   <Table.Td>
-                                    <ChonNguoiHoTroLop khoaId={khoa.id} lop={lop} />
+                                    <ActionIcon
+                                      variant="subtle"
+                                      color="gray"
+                                      aria-label={moRong ? `Thu gọn lớp ${lop.ten_lop}` : `Xem chi tiết lớp ${lop.ten_lop}`}
+                                      aria-expanded={moRong}
+                                      onClick={() => toggleMoRongLop(lop.id)}
+                                    >
+                                      {moRong ? '▾' : '▸'}
+                                    </ActionIcon>
                                   </Table.Td>
-                                )}
-                                <Table.Td>
-                                  <BadgeHoatDong trangThai={lop.trang_thai} />
-                                </Table.Td>
-                                <Table.Td>{lop.lich_hoc?.length ?? 0}</Table.Td>
-                                <Table.Td>
-                                  <Group gap={6} justify="flex-end" wrap="nowrap">
-                                    <Button variant="subtle" size="xs" onClick={() => toggleMoRongLop(lop.id)}>
-                                      {moRong ? 'Thu gọn ▴' : 'Xem chi tiết ▾'}
-                                    </Button>
+                                  <Table.Td miw={150}>
+                                    {/* Bấm tên lớp cũng mở/thu gọn; nút ▸/▾ là điều khiển cho bàn phím/trình đọc màn hình. */}
+                                    <Text fw={600} fz="sm" style={{ cursor: 'pointer' }} onClick={() => toggleMoRongLop(lop.id)}>
+                                      {lop.ten_lop}
+                                    </Text>
+                                    {!dangHoatDong && (
+                                      <Badge color="gray" variant="light" size="xs" mt={4}>
+                                        Đã vô hiệu hóa
+                                      </Badge>
+                                    )}
+                                  </Table.Td>
+                                  <Table.Td style={{ whiteSpace: 'nowrap' }}>
+                                    <Badge color={MAU_LOAI_LOP[lop.loai_lop]} variant="light" radius="xl">
+                                      {NHAN_LOAI_LOP[lop.loai_lop]}
+                                    </Badge>
+                                  </Table.Td>
+                                  <Table.Td>
+                                    <ThanhSiSo siSo={lop.si_so_hien_tai ?? 0} toiDa={lop.si_so_toi_da} w={80} />
+                                  </Table.Td>
+                                  <Table.Td>
+                                    {lop.nhan_su && lop.nhan_su.length > 0
+                                      ? lop.nhan_su.map((n) => n.ho_ten).join(', ')
+                                      : '—'}
+                                  </Table.Td>
+                                  {laQuanTri && (
+                                    <Table.Td>
+                                      <ChonNguoiHoTroLop khoaId={khoa.id} lop={lop} />
+                                    </Table.Td>
+                                  )}
+                                  <Table.Td ta="center">{lop.lich_hoc?.length ?? 0}</Table.Td>
+                                  <Table.Td style={{ whiteSpace: 'nowrap' }}>
                                     {laQuanTri && (
-                                      <>
-                                        <Button variant="subtle" size="xs" onClick={() => setLopDiemDanh(lop)}>
+                                      <Group gap={4} justify="flex-end" wrap="nowrap">
+                                        <Button variant="subtle" size="xs" px={6} onClick={() => setLopDiemDanh(lop)}>
                                           Điểm danh
                                         </Button>
-                                        <Button variant="subtle" size="xs" onClick={() => setLopTheoBuoi(lop)}>
+                                        <Button variant="subtle" size="xs" px={6} onClick={() => setLopTheoBuoi(lop)}>
                                           Theo buổi
                                         </Button>
-                                        <Button variant="subtle" size="xs" onClick={() => moModalSuaLop(lop)}>
-                                          Sửa
-                                        </Button>
-                                        <Button
-                                          variant="subtle"
-                                          size="xs"
-                                          color={lop.trang_thai === 'active' ? 'red' : 'green'}
-                                          onClick={() =>
-                                            setXacNhanToggle({
-                                              loai: 'lop',
-                                              id: lop.id,
-                                              ten: lop.ten_lop,
-                                              dangHoatDong: lop.trang_thai === 'active',
-                                            })
-                                          }
-                                        >
-                                          {lop.trang_thai === 'active' ? 'Vô hiệu hóa' : 'Kích hoạt lại'}
-                                        </Button>
-                                      </>
+                                        <Menu position="bottom-end" withinPortal>
+                                          <Menu.Target>
+                                            <ActionIcon
+                                              variant="subtle"
+                                              color="gray"
+                                              aria-label={`Thao tác khác cho lớp ${lop.ten_lop}`}
+                                            >
+                                              ⋯
+                                            </ActionIcon>
+                                          </Menu.Target>
+                                          <Menu.Dropdown>
+                                            <Menu.Item onClick={() => moModalSuaLop(lop)}>Sửa</Menu.Item>
+                                            <Menu.Divider />
+                                            <Menu.Item
+                                              color={dangHoatDong ? 'red' : 'green'}
+                                              onClick={() =>
+                                                setXacNhanToggle({
+                                                  loai: 'lop',
+                                                  id: lop.id,
+                                                  ten: lop.ten_lop,
+                                                  dangHoatDong,
+                                                })
+                                              }
+                                            >
+                                              {dangHoatDong ? 'Vô hiệu hóa' : 'Kích hoạt lại'}
+                                            </Menu.Item>
+                                          </Menu.Dropdown>
+                                        </Menu>
+                                      </Group>
                                     )}
-                                  </Group>
-                                </Table.Td>
-                              </Table.Tr>
-                              {moRong && (
-                                <Table.Tr key={`${lop.id}-mo-rong`}>
-                                  <Table.Td colSpan={laQuanTri ? 9 : 8} style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
-                                    <Stack gap="md" py="xs">
-                                      <Box>
-                                        <Group justify="space-between" mb={6}>
-                                          <Text fw={600} fz={13.5}>
-                                            Buổi học
-                                          </Text>
-                                          {laQuanTri && (
-                                            <Button variant="light" size="xs" onClick={() => moModalThemBuoi(lop)}>
-                                              + Thêm buổi học
-                                            </Button>
-                                          )}
-                                        </Group>
-                                        {(lop.lich_hoc ?? []).length === 0 && (
-                                          <Text c="dimmed" fz={13}>
-                                            Lớp chưa có buổi học nào.
-                                          </Text>
-                                        )}
-                                        {(lop.lich_hoc ?? []).length > 0 && (
-                                          <Table verticalSpacing={6} horizontalSpacing="sm">
-                                            <Table.Thead>
-                                              <Table.Tr>
-                                                <Table.Th>Giai đoạn</Table.Th>
-                                                <Table.Th>Buổi</Table.Th>
-                                                <Table.Th>Thời gian</Table.Th>
-                                                <Table.Th>Địa điểm/link</Table.Th>
-                                                <Table.Th>Điểm học</Table.Th>
-                                                <Table.Th>Giảng viên</Table.Th>
-                                                <Table.Th>Trạng thái</Table.Th>
-                                                <Table.Th />
-                                              </Table.Tr>
-                                            </Table.Thead>
-                                            <Table.Tbody>
-                                              {(lop.lich_hoc ?? []).map((lich) => (
-                                                <Table.Tr key={lich.id}>
-                                                  <Table.Td>{lich.giai_doan?.ten_giai_doan ?? '—'}</Table.Td>
-                                                  <Table.Td>{lich.buoi_so}</Table.Td>
-                                                  <Table.Td style={{ whiteSpace: 'nowrap' }}>
-                                                    {dinhDangNgayGio(lich.thoi_gian_bat_dau)} – {dinhDangNgayGio(lich.thoi_gian_ket_thuc)}
-                                                  </Table.Td>
-                                                  <Table.Td>{lich.dia_diem_hoac_link ?? '—'}</Table.Td>
-                                                  <Table.Td>
-                                                    {lich.diem_hoc ? (
-                                                      <>
-                                                        <Text fz={13}>{lich.diem_hoc.ten}</Text>
-                                                        {lich.phong && (
-                                                          <Text fz={12} c="dimmed">
-                                                            Phòng {lich.phong}
-                                                          </Text>
-                                                        )}
-                                                      </>
-                                                    ) : lich.giai_doan?.hinh_thuc === 'truc_tiep' ? (
-                                                      <Text fz={12.5} c="red">
-                                                        Chưa có
-                                                      </Text>
-                                                    ) : (
-                                                      '—'
-                                                    )}
-                                                  </Table.Td>
-                                                  <Table.Td>
-                                                    {(lich.phan_cong ?? []).length === 0
-                                                      ? '—'
-                                                      : (lich.phan_cong ?? []).map((p) => (
-                                                          <Text key={p.id} fz={13}>
-                                                            {p.giang_vien.ho_ten}
-                                                            {p.vai_tro === 'ho_tro' ? ' (hỗ trợ)' : ''}
-                                                            {p.da_xac_nhan_gio ? ' ✓' : ''}
-                                                          </Text>
-                                                        ))}
-                                                  </Table.Td>
-                                                  <Table.Td>{NHAN_TRANG_THAI_LICH_HOC[lich.trang_thai]}</Table.Td>
-                                                  <Table.Td ta="right" style={{ whiteSpace: 'nowrap' }}>
-                                                    {laQuanTri && (
-                                                      <>
-                                                        <Button variant="subtle" size="xs" onClick={() => setBuoiPhanCong({ lop, lich })}>
-                                                          Giảng viên
-                                                        </Button>
-                                                        <Button variant="subtle" size="xs" onClick={() => moModalSuaBuoi(lop, lich)}>
-                                                          Sửa
-                                                        </Button>
-                                                      </>
-                                                    )}
-                                                  </Table.Td>
-                                                </Table.Tr>
-                                              ))}
-                                            </Table.Tbody>
-                                          </Table>
-                                        )}
-                                      </Box>
-
-                                      <Box>
-                                        <Group justify="space-between" mb={6}>
-                                          <Text fw={600} fz={13.5}>
-                                            Nhân sự
-                                          </Text>
-                                          {laQuanTri && (
-                                            <Button variant="light" size="xs" onClick={() => moModalThemNhanSu(lop)}>
-                                              + Thêm nhân sự
-                                            </Button>
-                                          )}
-                                        </Group>
-                                        {(lop.nhan_su ?? []).length === 0 && (
-                                          <Text c="dimmed" fz={13}>
-                                            Lớp chưa có nhân sự nào.
-                                          </Text>
-                                        )}
-                                        {(lop.nhan_su ?? []).length > 0 && (
-                                          <Stack gap={4}>
-                                            {(lop.nhan_su ?? []).map((ns) => (
-                                              <Group key={ns.id} justify="space-between" wrap="nowrap">
-                                                <Text fz={13.5}>
-                                                  {ns.ho_ten} — {NHAN_VAI_TRO_NHAN_SU[ns.vai_tro]}
-                                                  {ns.so_dien_thoai ? ` · ${ns.so_dien_thoai}` : ''}
-                                                </Text>
-                                                {laQuanTri && (
-                                                  <Button
-                                                    variant="subtle"
-                                                    size="xs"
-                                                    color="red"
-                                                    onClick={() =>
-                                                      setXacNhanXoa({ loai: 'nhan-su', lopId: lop.id, nhanSuId: ns.id, ten: ns.ho_ten })
-                                                    }
-                                                  >
-                                                    Xóa
-                                                  </Button>
-                                                )}
-                                              </Group>
-                                            ))}
-                                          </Stack>
-                                        )}
-                                      </Box>
-                                    </Stack>
                                   </Table.Td>
                                 </Table.Tr>
-                              )}
-                            </Fragment>
-                          );
-                        })}
-                      </Table.Tbody>
-                    </Table>
+                                {moRong && (
+                                  <Table.Tr key={`${lop.id}-mo-rong`}>
+                                    <Table.Td colSpan={soCotBangLop} style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
+                                      <Stack gap="md" py="xs">
+                                        <Box>
+                                          <Group justify="space-between" mb={6}>
+                                            <Text fw={600} fz={13.5}>
+                                              Buổi học
+                                            </Text>
+                                            {laQuanTri && (
+                                              <Button variant="light" size="xs" onClick={() => moModalThemBuoi(lop)}>
+                                                + Thêm buổi học
+                                              </Button>
+                                            )}
+                                          </Group>
+                                          {(lop.lich_hoc ?? []).length === 0 && (
+                                            <Text c="dimmed" fz={13}>
+                                              Lớp chưa có buổi học nào.
+                                            </Text>
+                                          )}
+                                          {(lop.lich_hoc ?? []).length > 0 && (
+                                            <Table verticalSpacing={6} horizontalSpacing="sm">
+                                              <Table.Thead>
+                                                <Table.Tr>
+                                                  <Table.Th>Giai đoạn</Table.Th>
+                                                  <Table.Th>Buổi</Table.Th>
+                                                  <Table.Th>Thời gian</Table.Th>
+                                                  <Table.Th>Địa điểm/link</Table.Th>
+                                                  <Table.Th>Điểm học</Table.Th>
+                                                  <Table.Th>Giảng viên</Table.Th>
+                                                  <Table.Th>Trạng thái</Table.Th>
+                                                  <Table.Th />
+                                                </Table.Tr>
+                                              </Table.Thead>
+                                              <Table.Tbody>
+                                                {(lop.lich_hoc ?? []).map((lich) => (
+                                                  <Table.Tr key={lich.id}>
+                                                    <Table.Td>{lich.giai_doan?.ten_giai_doan ?? '—'}</Table.Td>
+                                                    <Table.Td>{lich.buoi_so}</Table.Td>
+                                                    <Table.Td style={{ whiteSpace: 'nowrap' }}>
+                                                      {dinhDangNgayGio(lich.thoi_gian_bat_dau)} – {dinhDangNgayGio(lich.thoi_gian_ket_thuc)}
+                                                    </Table.Td>
+                                                    <Table.Td>{lich.dia_diem_hoac_link ?? '—'}</Table.Td>
+                                                    <Table.Td>
+                                                      {lich.diem_hoc ? (
+                                                        <>
+                                                          <Text fz={13}>{lich.diem_hoc.ten}</Text>
+                                                          {lich.phong && (
+                                                            <Text fz={12} c="dimmed">
+                                                              Phòng {lich.phong}
+                                                            </Text>
+                                                          )}
+                                                        </>
+                                                      ) : lich.giai_doan?.hinh_thuc === 'truc_tiep' ? (
+                                                        <Text fz={12.5} c="red">
+                                                          Chưa có
+                                                        </Text>
+                                                      ) : (
+                                                        '—'
+                                                      )}
+                                                    </Table.Td>
+                                                    <Table.Td>
+                                                      {(lich.phan_cong ?? []).length === 0
+                                                        ? '—'
+                                                        : (lich.phan_cong ?? []).map((p) => (
+                                                            <Text key={p.id} fz={13}>
+                                                              {p.giang_vien.ho_ten}
+                                                              {p.vai_tro === 'ho_tro' ? ' (hỗ trợ)' : ''}
+                                                              {p.da_xac_nhan_gio ? ' ✓' : ''}
+                                                            </Text>
+                                                          ))}
+                                                    </Table.Td>
+                                                    <Table.Td>{NHAN_TRANG_THAI_LICH_HOC[lich.trang_thai]}</Table.Td>
+                                                    <Table.Td ta="right" style={{ whiteSpace: 'nowrap' }}>
+                                                      {laQuanTri && (
+                                                        <>
+                                                          <Button variant="subtle" size="xs" onClick={() => setBuoiPhanCong({ lop, lich })}>
+                                                            Giảng viên
+                                                          </Button>
+                                                          <Button variant="subtle" size="xs" onClick={() => moModalSuaBuoi(lop, lich)}>
+                                                            Sửa
+                                                          </Button>
+                                                        </>
+                                                      )}
+                                                    </Table.Td>
+                                                  </Table.Tr>
+                                                ))}
+                                              </Table.Tbody>
+                                            </Table>
+                                          )}
+                                        </Box>
+
+                                        <Box>
+                                          <Group justify="space-between" mb={6}>
+                                            <Text fw={600} fz={13.5}>
+                                              Nhân sự
+                                            </Text>
+                                            {laQuanTri && (
+                                              <Button variant="light" size="xs" onClick={() => moModalThemNhanSu(lop)}>
+                                                + Thêm nhân sự
+                                              </Button>
+                                            )}
+                                          </Group>
+                                          {(lop.nhan_su ?? []).length === 0 && (
+                                            <Text c="dimmed" fz={13}>
+                                              Lớp chưa có nhân sự nào.
+                                            </Text>
+                                          )}
+                                          {(lop.nhan_su ?? []).length > 0 && (
+                                            <Stack gap={4}>
+                                              {(lop.nhan_su ?? []).map((ns) => (
+                                                <Group key={ns.id} justify="space-between" wrap="nowrap">
+                                                  <Text fz={13.5}>
+                                                    {ns.ho_ten} — {NHAN_VAI_TRO_NHAN_SU[ns.vai_tro]}
+                                                    {ns.so_dien_thoai ? ` · ${ns.so_dien_thoai}` : ''}
+                                                  </Text>
+                                                  {laQuanTri && (
+                                                    <Button
+                                                      variant="subtle"
+                                                      size="xs"
+                                                      color="red"
+                                                      onClick={() =>
+                                                        setXacNhanXoa({ loai: 'nhan-su', lopId: lop.id, nhanSuId: ns.id, ten: ns.ho_ten })
+                                                      }
+                                                    >
+                                                      Xóa
+                                                    </Button>
+                                                  )}
+                                                </Group>
+                                              ))}
+                                            </Stack>
+                                          )}
+                                        </Box>
+                                      </Stack>
+                                    </Table.Td>
+                                  </Table.Tr>
+                                )}
+                              </Fragment>
+                            );
+                          })}
+                        </Table.Tbody>
+                      </Table>
+                    </Table.ScrollContainer>
                   </Paper>
                 </Stack>
               </Tabs.Panel>

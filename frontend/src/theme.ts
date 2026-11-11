@@ -94,5 +94,8 @@ export const theme = createTheme({
     Checkbox: { defaultProps: { size: 'md' } },
     Card: { defaultProps: { radius: 14 } }, // 12–14px theo token "Bo góc: card"
     Paper: { defaultProps: { radius: 14 } },
+    // Nhãn Badge có overflow:hidden nên trong bảng co cột về min-content thì bị cắt còn "Z."/"Đ…";
+    // max-content giữ Badge luôn đủ chữ (ô bảng tự giãn hoặc cuộn ngang).
+    Badge: { styles: { root: { minWidth: 'max-content' } } },
   },
 });

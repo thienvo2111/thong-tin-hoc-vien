@@ -485,7 +485,11 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
 
     const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr');
     expect(dong).not.toBeNull();
-    await user.click(within(dong as HTMLElement).getByRole('button', { name: 'Sửa' }));
+    // "Sửa" nằm trong menu "⋯" của dòng lớp.
+    await user.click(
+      within(dong as HTMLElement).getByRole('button', { name: 'Thao tác khác cho lớp Lớp 01 – Nhóm cơ bản A' }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Sửa' }));
 
     const oTenLop = await screen.findByLabelText(/^Tên lớp/);
     await user.clear(oTenLop);
@@ -495,19 +499,23 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     expect(await screen.findByText('Lớp 01 – Đổi tên')).toBeInTheDocument();
   });
 
-  it('vô hiệu hóa lớp: xác nhận → badge chuyển "Đã vô hiệu hóa", nút đổi thành "Kích hoạt lại"', async () => {
+  it('vô hiệu hóa lớp: xác nhận → badge "Đã vô hiệu hóa" dưới tên, menu đổi thành "Kích hoạt lại"', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
     const user = userEvent.setup();
     renderTrang('khoa-1');
     await screen.findByText('Lớp 01 – Nhóm cơ bản A');
 
+    const nutMenu = { name: 'Thao tác khác cho lớp Lớp 01 – Nhóm cơ bản A' };
     const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
-    await user.click(within(dong).getByRole('button', { name: 'Vô hiệu hóa' }));
+    await user.click(within(dong).getByRole('button', nutMenu));
+    await user.click(await screen.findByRole('menuitem', { name: 'Vô hiệu hóa' }));
     await user.click(await screen.findByRole('button', { name: 'Xác nhận' }));
 
-    expect(await screen.findByText('Đã vô hiệu hóa')).toBeInTheDocument();
-    const dongSauKhi = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
-    expect(within(dongSauKhi).getByRole('button', { name: 'Kích hoạt lại' })).toBeInTheDocument();
+    const dongSauKhi = () => screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
+    expect(await within(dongSauKhi()).findByText('Đã vô hiệu hóa')).toBeInTheDocument();
+    await user.click(within(dongSauKhi()).getByRole('button', nutMenu));
+    expect(await screen.findByRole('menuitem', { name: 'Kích hoạt lại' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Vô hiệu hóa' })).not.toBeInTheDocument();
   });
 
   // T10 (issue #2): buổi thuộc giai đoạn trực tiếp phải chọn điểm học.
@@ -518,7 +526,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     renderTrang('khoa-1');
     await screen.findByText('Lớp 01 – Nhóm cơ bản A');
     const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
-    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết ▾' }));
+    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết lớp Lớp 01 – Nhóm cơ bản A' }));
     await user.click(await screen.findByRole('button', { name: '+ Thêm buổi học' }));
 
     const modal = await screen.findByRole('dialog');
@@ -590,7 +598,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     renderTrang('khoa-1');
     await screen.findByText('Lớp 01 – Nhóm cơ bản A');
     const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
-    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết ▾' }));
+    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết lớp Lớp 01 – Nhóm cơ bản A' }));
     await user.click(await screen.findByRole('button', { name: 'Giảng viên' }));
 
     const modal = await screen.findByRole('dialog');
@@ -617,7 +625,7 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     await screen.findByText('Lớp 01 – Nhóm cơ bản A');
 
     const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
-    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết ▾' }));
+    await user.click(within(dong).getByRole('button', { name: 'Xem chi tiết lớp Lớp 01 – Nhóm cơ bản A' }));
     expect(await screen.findByText('Nguyễn Văn Long — Giảng viên')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '+ Thêm nhân sự' }));
@@ -778,13 +786,13 @@ describe('Admin — Chi tiết khóa: phân lớp theo giai đoạn', () => {
     );
   }
 
-  it('bảng lớp có cột "Sĩ số hiện tại" lấy từ si_so_hien_tai', async () => {
+  it('bảng lớp có cột "Sĩ số" = si_so_hien_tai/si_so_toi_da (thanh sĩ số)', async () => {
     db.nguoiDung.vai_tro = 'quan_tri';
     renderTrang('khoa-1');
     await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
-    expect(screen.getByRole('columnheader', { name: 'Sĩ số hiện tại' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Sĩ số' })).toBeInTheDocument();
     const dong = screen.getByText('Lớp 01 – Nhóm cơ bản A').closest('tr') as HTMLElement;
-    expect(within(dong).getByText('12')).toBeInTheDocument();
+    expect(within(dong).getByText('12/30')).toBeInTheDocument();
   });
 
   it('tạo giai đoạn kèm link + hướng dẫn -> body gửi đúng 2 field', async () => {
@@ -839,4 +847,172 @@ describe('Admin — Chi tiết khóa: phân lớp theo giai đoạn', () => {
     expect(new URL(urlUp[0]).pathname).toBe('/import/phan_lop_hoc_vien');
     expect(new URL(urlUp[0]).searchParams.get('ma_khoa')).toBe('AG-2026-014');
   }, 15_000);
+});
+
+// Bảng lớp gọn (nhiều lớp/khóa): cột Sĩ số gộp, bỏ cột Trạng thái, chevron mở rộng, menu "⋯", tìm/lọc lớp.
+describe('Admin — Chi tiết khóa: bảng lớp gọn', () => {
+  const TEN_LOP_1 = 'Lớp 01 – Nhóm cơ bản A';
+  const bangLop = () => screen.getByText(TEN_LOP_1).closest('table') as HTMLElement;
+  const dongLop = (ten: string) => screen.getByText(ten).closest('tr') as HTMLElement;
+
+  it('cột "Sĩ số" hiện 453/490, lớp không giới hạn chỉ hiện số; có "Số buổi", không còn cột "Trạng thái"', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const lopZoom = db.chiTietKhoa['khoa-1'].lop_hoc[1];
+    lopZoom.si_so_hien_tai = 453;
+    lopZoom.si_so_toi_da = 490;
+    db.chiTietKhoa['khoa-1'].lop_hoc[2].si_so_hien_tai = 7;
+    renderTrang('khoa-1');
+    await screen.findByText(TEN_LOP_1);
+
+    const tieuDe = within(bangLop())
+      .getAllByRole('columnheader')
+      .map((th) => th.textContent);
+    expect(tieuDe).toEqual(
+      expect.arrayContaining(['Tên lớp', 'Loại', 'Sĩ số', 'Giảng viên / nhân sự', 'Người hỗ trợ lớp', 'Số buổi']),
+    );
+    expect(tieuDe).not.toContain('Trạng thái');
+    expect(within(dongLop('Lớp Zoom 01')).getByText('453/490')).toBeInTheDocument();
+    expect(within(dongLop('Lớp Zoom 01')).getByTestId('thanh-si-so')).toBeInTheDocument();
+    // si_so_toi_da = null → chỉ số, không thanh.
+    expect(within(dongLop('Lớp VLE 01')).getByText('7')).toBeInTheDocument();
+    expect(within(dongLop('Lớp VLE 01')).queryByTestId('thanh-si-so')).not.toBeInTheDocument();
+    expect(within(dongLop(TEN_LOP_1)).queryByText('Đã vô hiệu hóa')).not.toBeInTheDocument();
+  });
+
+  it('lớp đã vô hiệu hóa: nhãn "Đã vô hiệu hóa", dòng mờ; menu "Kích hoạt lại" mở modal xác nhận', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    db.chiTietKhoa['khoa-1'].lop_hoc[1].trang_thai = 'ngung';
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText(TEN_LOP_1);
+
+    const dongNgung = dongLop('Lớp Zoom 01');
+    expect(within(dongNgung).getByText('Đã vô hiệu hóa')).toBeInTheDocument();
+    expect(dongNgung).toHaveStyle({ opacity: '0.55' });
+    expect(dongLop(TEN_LOP_1)).not.toHaveStyle({ opacity: '0.55' });
+
+    // Lớp đang hoạt động → menu có "Vô hiệu hóa", không có "Kích hoạt lại".
+    await user.click(within(dongLop(TEN_LOP_1)).getByRole('button', { name: `Thao tác khác cho lớp ${TEN_LOP_1}` }));
+    expect(await screen.findByRole('menuitem', { name: 'Vô hiệu hóa' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Kích hoạt lại' })).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('menuitem', { name: 'Vô hiệu hóa' })).not.toBeInTheDocument());
+
+    await user.click(within(dongNgung).getByRole('button', { name: 'Thao tác khác cho lớp Lớp Zoom 01' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Kích hoạt lại' }));
+    const modal = await screen.findByRole('dialog');
+    await user.click(within(modal).getByRole('button', { name: 'Xác nhận' }));
+    await waitFor(() => expect(within(dongLop('Lớp Zoom 01')).queryByText('Đã vô hiệu hóa')).not.toBeInTheDocument());
+  });
+
+  it('chevron mở/thu gọn dòng chi tiết (aria-expanded đổi); bấm tên lớp cũng mở/thu gọn', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText(TEN_LOP_1);
+
+    const nutMo = within(dongLop(TEN_LOP_1)).getByRole('button', { name: `Xem chi tiết lớp ${TEN_LOP_1}` });
+    expect(nutMo).toHaveAttribute('aria-expanded', 'false');
+    await user.click(nutMo);
+    const nutThu = within(dongLop(TEN_LOP_1)).getByRole('button', { name: `Thu gọn lớp ${TEN_LOP_1}` });
+    expect(nutThu).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByText('Nguyễn Văn Long — Giảng viên')).toBeInTheDocument();
+    // Dòng mở rộng trải đủ số cột của bảng (Quản trị: 8).
+    const oMoRong = screen.getByText('Nguyễn Văn Long — Giảng viên').closest('td') as HTMLElement;
+    expect(oMoRong).toHaveAttribute('colspan', '8');
+    expect(within(bangLop()).getAllByRole('columnheader')).toHaveLength(8);
+
+    await user.click(nutThu);
+    expect(screen.queryByText('Nguyễn Văn Long — Giảng viên')).not.toBeInTheDocument();
+
+    await user.click(screen.getByText(TEN_LOP_1));
+    expect(await screen.findByText('Nguyễn Văn Long — Giảng viên')).toBeInTheDocument();
+    await user.click(screen.getByText(TEN_LOP_1));
+    expect(screen.queryByText('Nguyễn Văn Long — Giảng viên')).not.toBeInTheDocument();
+    const nutSauCung = within(dongLop(TEN_LOP_1)).getByRole('button', { name: `Xem chi tiết lớp ${TEN_LOP_1}` });
+    expect(nutSauCung).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('ô "Tìm lớp" lọc theo tên không dấu, cập nhật số lớp; không khớp → thông báo bộ lọc', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText(TEN_LOP_1);
+    expect(screen.getByText('Hiện 3/3 lớp')).toBeInTheDocument();
+
+    const o = screen.getByRole('textbox', { name: 'Tìm lớp' });
+    await nhap(user, o, 'co ban');
+    expect(screen.getByText(TEN_LOP_1)).toBeInTheDocument();
+    expect(screen.queryByText('Lớp Zoom 01')).not.toBeInTheDocument();
+    expect(screen.queryByText('Lớp VLE 01')).not.toBeInTheDocument();
+    expect(screen.getByText('Hiện 1/3 lớp')).toBeInTheDocument();
+
+    await user.clear(o);
+    await nhap(user, o, 'KHÔNG CÓ LỚP NÀY');
+    expect(screen.getByText('Không có lớp khớp bộ lọc.')).toBeInTheDocument();
+    expect(screen.queryByText('Khóa chưa có lớp học nào.')).not.toBeInTheDocument();
+    expect(screen.getByText('Hiện 0/3 lớp')).toBeInTheDocument();
+    // Ô trống trải đủ số cột.
+    const oTrong = screen.getByText('Không có lớp khớp bộ lọc.').closest('td') as HTMLElement;
+    expect(oTrong).toHaveAttribute('colspan', '8');
+
+    await user.clear(o);
+    expect(screen.getByText('Hiện 3/3 lớp')).toBeInTheDocument();
+  });
+
+  it('lọc loại lớp: chỉ có các loại trong khóa; chọn Zoom → chỉ lớp Zoom; kết hợp với ô tìm', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText(TEN_LOP_1);
+
+    const giaTri = screen.getAllByRole('radio').map((r) => r.getAttribute('value'));
+    expect(giaTri).toEqual(['tat_ca', 'zoom', 'truc_tiep', 'vle']);
+    await user.click(screen.getByRole('radio', { name: 'Zoom' }));
+    expect(screen.getByText('Lớp Zoom 01')).toBeInTheDocument();
+    expect(screen.queryByText(TEN_LOP_1)).not.toBeInTheDocument();
+    expect(screen.queryByText('Lớp VLE 01')).not.toBeInTheDocument();
+    expect(screen.getByText('Hiện 1/3 lớp')).toBeInTheDocument();
+
+    await nhap(user, screen.getByRole('textbox', { name: 'Tìm lớp' }), 'co ban');
+    expect(screen.getByText('Không có lớp khớp bộ lọc.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('radio', { name: 'Tất cả' }));
+    expect(screen.getByText(TEN_LOP_1)).toBeInTheDocument();
+    expect(screen.getByText('Hiện 1/3 lớp')).toBeInTheDocument();
+  });
+
+  it('khóa chỉ có 1 loại lớp → ẩn bộ lọc loại; khóa chưa có lớp → không có thanh tìm/lọc', async () => {
+    db.nguoiDung.vai_tro = 'quan_tri';
+    const khoa1 = db.chiTietKhoa['khoa-1'];
+    khoa1.lop_hoc = khoa1.lop_hoc.filter((l) => l.loai_lop === 'truc_tiep');
+    const { unmount } = renderTrang('khoa-1');
+    await screen.findByText(TEN_LOP_1);
+    expect(screen.getByRole('textbox', { name: 'Tìm lớp' })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Tất cả' })).not.toBeInTheDocument();
+    unmount();
+
+    renderTrang('khoa-2');
+    expect(await screen.findByText('Khóa chưa có lớp học nào.')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Tìm lớp' })).not.toBeInTheDocument();
+  });
+
+  it('vai_tro=truong: không có menu "⋯", Điểm danh/Theo buổi, cột "Người hỗ trợ lớp"; vẫn tìm/mở rộng được', async () => {
+    db.nguoiDung.vai_tro = 'truong';
+    const user = userEvent.setup();
+    renderTrang('khoa-1');
+    await screen.findByText(TEN_LOP_1);
+
+    expect(screen.queryByRole('button', { name: /^Thao tác khác cho lớp/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Điểm danh' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Theo buổi' })).not.toBeInTheDocument();
+    const tieuDe = within(bangLop()).getAllByRole('columnheader');
+    expect(tieuDe.map((th) => th.textContent)).not.toContain('Người hỗ trợ lớp');
+    expect(tieuDe).toHaveLength(7);
+    expect(screen.getByRole('textbox', { name: 'Tìm lớp' })).toBeInTheDocument();
+
+    await user.click(within(dongLop(TEN_LOP_1)).getByRole('button', { name: `Xem chi tiết lớp ${TEN_LOP_1}` }));
+    const oMoRong = (await screen.findByText('Nguyễn Văn Long — Giảng viên')).closest('td') as HTMLElement;
+    expect(oMoRong).toHaveAttribute('colspan', '7');
+  });
 });
