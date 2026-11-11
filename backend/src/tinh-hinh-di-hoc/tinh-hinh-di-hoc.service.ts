@@ -34,6 +34,7 @@ import {
 } from '../doi-buoi-hoc/nap-chuyen-can';
 import { LocTinhHinhDiHocDto } from './tinh-hinh-di-hoc.dto';
 import { buildTinhHinhDiHocWorkbook } from './xuat-tinh-hinh-di-hoc.util';
+import { demLuotVaoVle } from '../sso/util/luot-vao-vle.util';
 
 /**
  * Phạm vi đăng ký học được xem (ADR 0010 T1, ADR 0011 P1/P4): người hỗ trợ =
@@ -191,14 +192,19 @@ export class TinhHinhDiHocService {
     const cat = <T>(x: T[]) => x.slice((page - 1) * pageSize, page * pageSize);
     if (!loc.co_vang && !loc.chua_diem_danh) {
       return paginate(
-        await this.tinhDong(cat(ds), now),
+        await this.ganLuotVaoVle(await this.tinhDong(cat(ds), now)),
         ds.length,
         page,
         pageSize,
       );
     }
     const loc2 = this.locTheoTong(await this.tinhDong(ds, now), loc);
-    return paginate(cat(loc2), loc2.length, page, pageSize);
+    return paginate(
+      await this.ganLuotVaoVle(cat(loc2)),
+      loc2.length,
+      page,
+      pageSize,
+    );
   }
 
   async xuat(
@@ -207,9 +213,11 @@ export class TinhHinhDiHocService {
     nguoiDung: Pick<AuthenticatedUser, 'id' | 'vai_tro'>,
     now: Date = new Date(),
   ): Promise<Buffer> {
-    const dong = this.locTheoTong(
-      await this.tinhDong(await this.locDangKy(phamVi, loc), now),
-      loc,
+    const dong = await this.ganLuotVaoVle(
+      this.locTheoTong(
+        await this.tinhDong(await this.locDangKy(phamVi, loc), now),
+        loc,
+      ),
     );
     const khoa = await this.prisma.khoa_boi_duong.findUnique({
       where: { id: loc.khoa_id },
@@ -564,6 +572,26 @@ export class TinhHinhDiHocService {
         now,
       ),
     }));
+  }
+
+  /**
+   * Gắn "lượt vào VLE" (CONTEXT.md) theo học viên vào dòng đã lọc phạm vi —
+   * 1 truy vấn gộp cho cả trang / file xuất, không N+1. Chỉ là số lần cấp
+   * form vào VLE, không ảnh hưởng tổng đi học/điểm danh.
+   */
+  private async ganLuotVaoVle<T extends { hoc_vien_id: string }>(ds: T[]) {
+    const luot = await demLuotVaoVle(
+      this.prisma,
+      ds.map((d) => d.hoc_vien_id),
+    );
+    return ds.map((d) => {
+      const l = luot.get(d.hoc_vien_id);
+      return {
+        ...d,
+        so_lan_vao_vle: l?.so_lan_vao ?? 0,
+        lan_vao_vle_gan_nhat: l?.lan_vao_gan_nhat ?? null,
+      };
+    });
   }
 
   /** Kết quả tinhChuyenCan của buổi (giai đoạn, buổi số của buổi nguồn L). */

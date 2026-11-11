@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import * as ExcelJS from 'exceljs';
 import { TinhHinhDiHocService } from './tinh-hinh-di-hoc.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DoiBuoiHocQueryService } from '../doi-buoi-hoc/doi-buoi-hoc-query.service';
@@ -150,6 +151,7 @@ describe('TinhHinhDiHocService', () => {
     diem_danh: { findMany: jest.Mock; findUnique: jest.Mock };
     bao_vang: { findMany: jest.Mock };
     khoa_boi_duong: { findUnique: jest.Mock };
+    nhat_ky_hoat_dong: { groupBy: jest.Mock };
     $queryRaw: jest.Mock;
   };
   let doiBuoi: { doiBuoiDaDuyetCuaDangKy: jest.Mock; lichTomTat: jest.Mock };
@@ -206,6 +208,8 @@ describe('TinhHinhDiHocService', () => {
           .fn()
           .mockResolvedValue({ ma_khoa: 'K1', ten_khoa: 'Khóa 1' }),
       },
+      // Lượt vào VLE: mặc định chưa ai vào.
+      nhat_ky_hoat_dong: { groupBy: jest.fn().mockResolvedValue([]) },
       // napChuyenCan: điểm danh mọi lớp (kèm buổi, lớp, chế độ khóa) / phân
       // lớp theo mảng đăng ký; tìm kiếm họ tên: rỗng.
       $queryRaw: jest.fn((sql: Prisma.Sql) => {
@@ -619,6 +623,82 @@ describe('TinhHinhDiHocService', () => {
       expect((await service.danhSach({}, loc(), NOW)).data[1].tong.co_mat).toBe(
         1,
       );
+    });
+  });
+
+  describe('lượt vào VLE (so_lan_vao_vle, lan_vao_vle_gan_nhat)', () => {
+    // An vào VLE 2 lần (gần nhất 09/11 15:30 giờ VN); Bình chưa vào lần nào.
+    const GAN_NHAT_AN = new Date('2026-11-09T08:30:00Z');
+    beforeEach(() => {
+      prisma.nhat_ky_hoat_dong.groupBy.mockResolvedValue([
+        {
+          hoc_vien_id: 'hv-dk-an',
+          _count: { _all: 2 },
+          _max: { thoi_gian: GAN_NHAT_AN },
+        },
+      ]);
+    });
+
+    it('danh sách: dòng có lượt vào -> số lần + gần nhất; chưa vào -> 0/null; 1 truy vấn gộp cho cả trang', async () => {
+      const kq = await service.danhSach({}, loc(), NOW);
+      expect(kq.data.map((x) => x.ho_ten)).toEqual(['Nguyễn An', 'Trần Bình']);
+      expect(kq.data[0]).toMatchObject({
+        so_lan_vao_vle: 2,
+        lan_vao_vle_gan_nhat: GAN_NHAT_AN,
+      });
+      expect(kq.data[1]).toMatchObject({
+        so_lan_vao_vle: 0,
+        lan_vao_vle_gan_nhat: null,
+      });
+      expect(prisma.nhat_ky_hoat_dong.groupBy).toHaveBeenCalledTimes(1);
+      const arg = prisma.nhat_ky_hoat_dong.groupBy.mock.calls[0][0];
+      expect(arg).toMatchObject({
+        by: ['hoc_vien_id'],
+        where: { hanh_dong: 'vao_hoc_vle' },
+        _count: { _all: true },
+        _max: { thoi_gian: true },
+      });
+      expect([...arg.where.hoc_vien_id.in].sort()).toEqual([
+        'hv-dk-an',
+        'hv-dk-binh',
+      ]);
+    });
+
+    it('danh sách lọc theo số đếm: chỉ gắn cho dòng của trang sau lọc', async () => {
+      const kq = await service.danhSach({}, loc({ co_vang: true }), NOW);
+      expect(kq.data).toEqual([
+        expect.objectContaining({ ho_ten: 'Nguyễn An', so_lan_vao_vle: 2 }),
+      ]);
+      expect(prisma.nhat_ky_hoat_dong.groupBy).toHaveBeenCalledTimes(1);
+      expect(
+        prisma.nhat_ky_hoat_dong.groupBy.mock.calls[0][0].where.hoc_vien_id.in,
+      ).toEqual(['hv-dk-an']);
+    });
+
+    it('phạm vi null -> không truy vấn lượt vào', async () => {
+      await service.danhSach(null, loc(), NOW);
+      expect(prisma.nhat_ky_hoat_dong.groupBy).not.toHaveBeenCalled();
+    });
+
+    it('xuất Excel: 2 cột "Số lần vào VLE", "Vào VLE gần nhất" ngay sau cột điểm danh, giờ VN dd/MM/yyyy HH:mm, trống khi chưa vào', async () => {
+      const buffer = await service.xuat({}, loc(), hoTro, NOW);
+      expect(prisma.nhat_ky_hoat_dong.groupBy).toHaveBeenCalledTimes(1);
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buffer as unknown as ExcelJS.Buffer);
+      const ws = wb.worksheets[0];
+      const hang = (i: number) => (ws.getRow(i).values as unknown[]).slice(1);
+      const tieuDe = hang(2);
+      const viTri = tieuDe.indexOf('Chưa điểm danh');
+      expect(tieuDe.slice(viTri + 1)).toEqual([
+        'Số lần vào VLE',
+        'Vào VLE gần nhất',
+      ]);
+      const an = hang(3);
+      const binh = hang(4);
+      expect(an[1]).toBe('Nguyễn An');
+      expect(an.slice(viTri + 1)).toEqual([2, '09/11/2026 15:30']);
+      expect(binh[1]).toBe('Trần Bình');
+      expect(binh.slice(viTri + 1)).toEqual([0, '']);
     });
   });
 

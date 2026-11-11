@@ -1,5 +1,6 @@
 import * as ExcelJS from 'exceljs';
 import { TongDiHoc } from '../ho-tro-hoc-vien/diem-danh-lop-buoi.util';
+import { formatVnDateTime } from '../common/utils/vn-datetime.util';
 
 // ADR 0010 T2: file xuất Tình hình đi học — đủ mọi dòng khớp bộ lọc (không
 // phân trang). Không có ngày sinh/CCCD; mã MOET để dạng văn bản (giữ số 0 đầu).
@@ -11,6 +12,9 @@ export interface DongXuatDiHoc {
   cum: string | null;
   lop_theo_giai_doan: { thu_tu: number; ten_lop: string }[];
   tong: TongDiHoc;
+  /** Lượt vào VLE (CONTEXT.md) — không phải điểm danh. */
+  so_lan_vao_vle: number;
+  lan_vao_vle_gan_nhat: Date | null;
 }
 
 export const COT_TINH_HINH_DI_HOC = [
@@ -25,6 +29,8 @@ export const COT_TINH_HINH_DI_HOC = [
   'Vắng có phép',
   'Đã báo vắng',
   'Chưa điểm danh',
+  'Số lần vào VLE',
+  'Vào VLE gần nhất',
 ];
 
 /** "GĐ1: Zoom 01; GĐ2: Trực tiếp 03" — lớp gốc theo thứ tự giai đoạn. */
@@ -55,6 +61,8 @@ export async function buildTinhHinhDiHocWorkbook(
       h.tong.vang_co_phep,
       h.tong.da_bao_vang,
       h.tong.chua_diem_danh,
+      h.so_lan_vao_vle,
+      h.lan_vao_vle_gan_nhat ? formatVnDateTime(h.lan_vao_vle_gan_nhat) : '',
     ]),
   );
   ws.columns.forEach((c) => (c.width = 14));
@@ -64,6 +72,7 @@ export async function buildTinhHinhDiHocWorkbook(
   ws.getColumn(3).width = 18;
   ws.getColumn(4).width = 36;
   ws.getColumn(6).width = 36;
+  ws.getColumn(13).width = 18;
   ws.views = [{ state: 'frozen', ySplit: 2 }];
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
