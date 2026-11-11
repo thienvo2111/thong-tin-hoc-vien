@@ -30,6 +30,7 @@ import { NhanSuLopRowDto } from '../khoa-boi-duong/dto/nhan-su-lop-row.dto';
 import { DiemDanhRowDto } from '../khoa-boi-duong/dto/diem-danh-row.dto';
 import { KetQuaGiaiDoanRowDto } from '../khoa-boi-duong/dto/ket-qua-giai-doan-row.dto';
 import { TaiKhoanVleRowDto } from './dto/tai-khoan-vle-row.dto';
+import { DangNhapVleRowDto } from './dto/dang-nhap-vle-row.dto';
 import { TaiKhoanDonViRowDto } from './dto/tai-khoan-don-vi-row.dto';
 import { TaiKhoanDonViService } from '../nguoi-dung/tai-khoan-don-vi.service';
 import { chuanHoaTenDangNhap } from '../nguoi-dung/tai-khoan-don-vi.util';
@@ -136,7 +137,7 @@ export class ImportService {
   assertSupported(loai: string): SupportedImportType {
     if (!isSupportedImportType(loai)) {
       throw new ValidationException(
-        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc, diem_danh, ket_qua_giai_doan, nhan_su_lop, tai_khoan_don_vi, ket_qua_khao_sat, giang_vien, phan_cong_giang_day)`,
+        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc, diem_danh, ket_qua_giai_doan, nhan_su_lop, tai_khoan_don_vi, ket_qua_khao_sat, giang_vien, phan_cong_giang_day, dang_nhap_vle)`,
       );
     }
     return loai;
@@ -797,6 +798,17 @@ export class ImportService {
           'vai_tro',
           'so_dien_thoai',
         ];
+      case 'dang_nhap_vle':
+        // Vào học VLE (external-login P.CNTT, 2026-11-10): mã học viên dùng
+        // chung HocVienResolver (mục 2 quy tắc #3, cả 2 cột tùy chọn — xem
+        // getColumnNotes). username/email: tùy chọn từng cột nhưng phải có
+        // ÍT NHẤT 1 (xem buildDangNhapVleDto).
+        return [
+          'so_dinh_danh_ca_nhan',
+          'ma_dinh_danh_moet',
+          'username',
+          'email',
+        ];
     }
   }
 
@@ -1023,6 +1035,17 @@ export class ImportService {
           'Tùy chọn — tối đa 20 ký tự. Để trống khi chạy lại file sẽ giữ nguyên số cũ.',
       };
     }
+    if (loai === 'dang_nhap_vle') {
+      return {
+        so_dinh_danh_ca_nhan:
+          'Tùy chọn — phải có ít nhất 1 trong 2 cột so_dinh_danh_ca_nhan/ma_dinh_danh_moet để xác định học viên. Có cả 2 thì phải trỏ cùng 1 hồ sơ.',
+        ma_dinh_danh_moet: 'Tùy chọn — xem ghi chú cột so_dinh_danh_ca_nhan.',
+        username:
+          'Tùy chọn — phải có ít nhất 1 trong 2 cột username/email. Không được trùng với học viên khác. Để trống = giữ nguyên giá trị hiện có.',
+        email:
+          'Tùy chọn — xem ghi chú cột username. Được chuẩn hóa viết thường trước khi lưu. Không được trùng với học viên khác. Để trống = giữ nguyên giá trị hiện có.',
+      };
+    }
     return {};
   }
 
@@ -1059,6 +1082,7 @@ export class ImportService {
       | KetQuaKhaoSatRowDto
       | GiangVienRowDto
       | PhanCongGiangDayRowDto
+      | DangNhapVleRowDto
     >
   > {
     switch (loai) {
@@ -1085,6 +1109,8 @@ export class ImportService {
         return this.buildHoSoMoetDto(raw);
       case 'tai_khoan_vle':
         return this.buildTaiKhoanVleDto(raw);
+      case 'dang_nhap_vle':
+        return this.buildDangNhapVleDto(raw, dupKeys);
       case 'ket_qua_danh_gia': {
         const resolved = await this.khoaBoiDuongService.resolveKetQuaDanhGiaRow(
           {
@@ -1289,7 +1315,8 @@ export class ImportService {
       | TaiKhoanDonViRowDto
       | KetQuaKhaoSatRowDto
       | GiangVienRowDto
-      | PhanCongGiangDayRowDto,
+      | PhanCongGiangDayRowDto
+      | DangNhapVleRowDto,
     dupKeys?: Set<string>,
   ): Promise<string | undefined> {
     try {
@@ -1320,6 +1347,9 @@ export class ImportService {
         // Không cần kiểm tra thêm: buildTaiKhoanVleDto() (buildDto) đã tra
         // cứu học viên qua resolveHocVienImportRow() rồi — upsert theo PK
         // hoc_vien_id nên không có ràng buộc trùng nào khác cần kiểm tra.
+      } else if (loai === 'dang_nhap_vle') {
+        // Không cần kiểm tra thêm: buildDangNhapVleDto() (buildDto) đã tra
+        // cứu học viên + kiểm trùng username/email (DB và trong file) rồi.
       } else if (loai === 'ket_qua_danh_gia') {
         // Không cần kiểm tra thêm: resolveKetQuaDanhGiaRow() (buildDto) đã
         // tra cứu học viên + khóa + dang_ky_hoc đã tồn tại rồi.
@@ -1387,7 +1417,8 @@ export class ImportService {
       | TaiKhoanDonViRowDto
       | KetQuaKhaoSatRowDto
       | GiangVienRowDto
-      | PhanCongGiangDayRowDto,
+      | PhanCongGiangDayRowDto
+      | DangNhapVleRowDto,
     importId: string,
     nguoiImportId: string,
     dupKeys?: Set<string>,
@@ -1415,6 +1446,8 @@ export class ImportService {
       return { hocVienChuaCoEmail };
     } else if (loai === 'tai_khoan_vle') {
       await this.commitTaiKhoanVle(dto as TaiKhoanVleRowDto, importId);
+    } else if (loai === 'dang_nhap_vle') {
+      await this.commitDangNhapVle(dto as DangNhapVleRowDto, importId);
     } else if (loai === 'ket_qua_khao_sat') {
       const d = dto as KetQuaKhaoSatRowDto;
       await this.ketQuaKhaoSatService.ghiKetQua(
@@ -1536,6 +1569,31 @@ export class ImportService {
     });
   }
 
+  // Vào học VLE (external-login P.CNTT, 2026-11-10): upsert theo PK
+  // hoc_vien_id — chạy lại file cập nhật ghi đè username/email cũ. Cột
+  // trống -> undefined trong data Prisma = không đụng tới cột (KHÔNG tự
+  // xóa về NULL, giống commitTaiKhoanVle).
+  private async commitDangNhapVle(
+    dto: DangNhapVleRowDto,
+    importId: string,
+  ): Promise<void> {
+    await this.prisma.dang_nhap_vle.upsert({
+      where: { hoc_vien_id: dto.hoc_vien_id },
+      create: {
+        hoc_vien_id: dto.hoc_vien_id,
+        username: dto.username,
+        email_chup: dto.email,
+        nguon_import_id: importId,
+      },
+      update: {
+        username: dto.username,
+        email_chup: dto.email,
+        nguon_import_id: importId,
+        cap_nhat_luc: new Date(),
+      },
+    });
+  }
+
   // SĐT lưu dạng number mất số 0 đầu (T4): đúng 9 chữ số, bắt đầu 3/5/7/8/9
   // -> tự thêm "0" + cảnh báo 🟡 (không chặn dòng). Các sai định dạng khác
   // (thiếu số khác, sai đầu số...) vẫn là lỗi 🔴 theo rule #20 như cũ, xử lý
@@ -1647,6 +1705,77 @@ export class ImportService {
       ten_dang_nhap_vle: raw.ten_dang_nhap_vle,
       mat_khau_tam: raw.mat_khau_tam || undefined,
       duong_dan: raw.duong_dan,
+    });
+  }
+
+  // Vào học VLE (external-login P.CNTT, 2026-11-10, docs/api-contract.md
+  // mục 10.2): dùng HocVienResolver dùng chung như tai_khoan_vle, rồi kiểm
+  // trùng username/email — CẢ trong file (dupKeys, theo quy ước namespaced
+  // key của buildTaiKhoanDonViDto) VÀ đã có trong hệ thống (DB, loại trừ
+  // chính học viên này) — khác tai_khoan_vle (không có ràng buộc trùng vì
+  // khóa upsert là PK hoc_vien_id). Email chuẩn hóa trim + viết thường;
+  // username chỉ trim (giữ nguyên hoa/thường để gửi đúng VLE, so khớp
+  // trùng không phân biệt hoa/thường).
+  private async buildDangNhapVleDto(
+    raw: Record<string, string>,
+    dupKeys?: Set<string>,
+  ): Promise<RowBuildResult<DangNhapVleRowDto>> {
+    const resolved = await resolveHocVienImportRow(this.prisma, {
+      so_dinh_danh_ca_nhan: raw.so_dinh_danh_ca_nhan,
+      ma_dinh_danh_moet: raw.ma_dinh_danh_moet,
+    });
+    if (resolved.error || !resolved.hocVien) {
+      return { error: resolved.error ?? 'Không xác định được học viên' };
+    }
+    const hocVienId = resolved.hocVien.id;
+    const username = raw.username?.trim() || undefined;
+    const email = raw.email?.trim().toLowerCase() || undefined;
+    if (!username && !email) {
+      return { error: 'Phải có ít nhất 1 trong 2 cột "username"/"email"' };
+    }
+
+    const khoaTrung: [string, string][] = [[`dnv-hv:${hocVienId}`, 'học viên']];
+    if (username) {
+      khoaTrung.push([`dnv-username:${username.toLowerCase()}`, 'username']);
+    }
+    if (email) khoaTrung.push([`dnv-email:${email}`, 'email']);
+    const trungFile = khoaTrung.find(([k]) => dupKeys?.has(k));
+    if (trungFile) {
+      return { error: `Trùng ${trungFile[1]} với một dòng khác trong file` };
+    }
+
+    if (username) {
+      const trungDb = await this.prisma.dang_nhap_vle.findFirst({
+        where: {
+          username: { equals: username, mode: 'insensitive' },
+          hoc_vien_id: { not: hocVienId },
+        },
+        select: { hoc_vien_id: true },
+      });
+      if (trungDb) {
+        return {
+          error: `Username "${username}" đã được dùng bởi học viên khác`,
+        };
+      }
+    }
+    if (email) {
+      const trungDb = await this.prisma.dang_nhap_vle.findFirst({
+        where: {
+          email_chup: { equals: email, mode: 'insensitive' },
+          hoc_vien_id: { not: hocVienId },
+        },
+        select: { hoc_vien_id: true },
+      });
+      if (trungDb) {
+        return { error: `Email "${email}" đã được dùng bởi học viên khác` };
+      }
+    }
+
+    khoaTrung.forEach(([k]) => dupKeys?.add(k));
+    return buildValidatedDto(DangNhapVleRowDto, {
+      hoc_vien_id: hocVienId,
+      username,
+      email,
     });
   }
 

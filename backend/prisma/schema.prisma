@@ -165,6 +165,9 @@ enum loai_danh_muc_import {
   // T11 (issue #3, 2026-10-07) — migration enum RIÊNG.
   giang_vien
   phan_cong_giang_day
+  // Vào học VLE (external-login P.CNTT, 2026-11-10) — cùng lý do như trên:
+  // thêm SAU CÙNG, migration riêng (xem migration *_dang_nhap_vle_enum).
+  dang_nhap_vle
 }
 
 /// Tình trạng 1 bài trên hệ thống khảo sát của 1 học viên (2026-10-04).
@@ -351,6 +354,7 @@ model nhat_ky_import {
   diem_danh_import         diem_danh[]
   ket_qua_giai_doan_import ket_qua_giai_doan[]
   giang_vien_import        giang_vien[]
+  dang_nhap_vle_import     dang_nhap_vle[]
 
   @@index([nguoi_import_id], map: "idx_import_nguoi")
   @@index([loai_danh_muc], map: "idx_import_loai")
@@ -627,6 +631,7 @@ model hoc_vien {
   yeu_cau_ho_tro     yeu_cau_ho_tro[]
   lich_su_thay_doi   lich_su_thay_doi_ho_so[]
   tai_khoan_vle      tai_khoan_vle?
+  dang_nhap_vle      dang_nhap_vle?
   ma_sso_mot_lan     ma_sso_mot_lan[]
   ket_qua_khao_sat   ket_qua_khao_sat[]
 
@@ -795,6 +800,22 @@ model tai_khoan_vle {
   lan_dau_xem_luc     DateTime? @db.Timestamptz(6)
   nguon_import_id     String?   @db.Uuid
   cap_nhat_luc        DateTime  @default(now()) @db.Timestamptz(6)
+
+  hoc_vien     hoc_vien        @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nguon_import nhat_ky_import? @relation(fields: [nguon_import_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+// Vào học VLE (external-login P.CNTT, 2026-11-10, docs/api-contract.md mục
+// 10.2) — username/email dùng để khớp sang hệ thống VLE khi học viên bấm
+// "Vào học VLE" (POST /sso/vle/form). KHÁC tai_khoan_vle (T15, luồng cấp
+// tài khoản VLE tạm) — bảng này chỉ lưu định danh để khớp đăng nhập, không
+// lưu mật khẩu. email_chup đã chuẩn hóa (trim + viết thường) khi import.
+model dang_nhap_vle {
+  hoc_vien_id     String    @id @db.Uuid
+  username        String?   @db.VarChar(100)
+  email_chup      String?   @db.VarChar(255)
+  nguon_import_id String?   @db.Uuid
+  cap_nhat_luc    DateTime  @default(now()) @db.Timestamptz(6)
 
   hoc_vien     hoc_vien        @relation(fields: [hoc_vien_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   nguon_import nhat_ky_import? @relation(fields: [nguon_import_id], references: [id], onDelete: NoAction, onUpdate: NoAction)

@@ -23,6 +23,7 @@ const CAC_GIA_TRI_ENUM_LOAI_DANH_MUC_IMPORT = [
   'ket_qua_giai_doan',
   'nhan_su_lop',
   'tai_khoan_don_vi',
+  'dang_nhap_vle',
 ] as const;
 
 function renderTrang(initialEntries = ['/admin/nhap-du-lieu']) {

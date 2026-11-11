@@ -54,6 +54,18 @@ describe('Tình hình đi học — người hỗ trợ', () => {
     expect(router.state.location.search).toContain('khoa_id=khoa-1');
   });
 
+  it('cột "Vào VLE": số lần + giờ gần nhất (giờ VN) trên dòng thứ 2; chưa vào -> "—"', async () => {
+    render(['/ho-tro/di-hoc?khoa_id=khoa-1']);
+    const bang = await screen.findByRole('table');
+    expect(within(bang).getByRole('columnheader', { name: 'Vào VLE' })).toBeInTheDocument();
+    const an = dongChua(within(bang).getByRole('button', { name: 'Nguyễn Văn An' }));
+    const oAn = cuoi(within(an).getAllByRole('cell'))!;
+    expect(within(oAn).getByText('3 lần')).toBeInTheDocument();
+    expect(within(oAn).getByText('09/11/2026 15:30')).toBeInTheDocument();
+    const khac = dongChua(within(bang).getByRole('button', { name: 'Học viên 01' }));
+    expect(cuoi(within(khac).getAllByRole('cell'))).toHaveTextContent(/^—$/);
+  });
+
   it('bộ lọc ghi lên URL và gửi đúng tham số; đổi bộ lọc về trang 1', async () => {
     const queries = ghiQueryDanhSach();
     const { router } = render(['/ho-tro/di-hoc?khoa_id=khoa-1&page=2']);

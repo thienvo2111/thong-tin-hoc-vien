@@ -556,7 +556,8 @@ export type LoaiDanhMucImport =
   | 'tai_khoan_don_vi'
   | 'ket_qua_khao_sat'
   | 'giang_vien'
-  | 'phan_cong_giang_day';
+  | 'phan_cong_giang_day'
+  | 'dang_nhap_vle';
 
 export interface TaoImportResponse {
   import_id: string;

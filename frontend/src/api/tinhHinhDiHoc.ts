@@ -54,6 +54,10 @@ export interface DongTinhHinhDiHoc {
   cum: string | null;
   lop_theo_giai_doan: LopTheoGiaiDoan[];
   tong: TongDiHoc;
+  /** Lượt vào VLE = số lần cấp form vào VLE thành công (không phải điểm danh). */
+  so_lan_vao_vle: number;
+  /** UTC ISO 8601; null khi chưa vào lần nào. */
+  lan_vao_vle_gan_nhat: string | null;
 }
 
 export interface KhoaLocDiHoc {

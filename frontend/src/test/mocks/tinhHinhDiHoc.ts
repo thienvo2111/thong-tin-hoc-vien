@@ -39,6 +39,9 @@ function taoDong(i: number): DongTinhHinhDiHoc {
     tong: an
       ? { da_dien_ra: 3, co_mat: 1, vang: 1, vang_co_phep: 0, da_bao_vang: 0, chua_diem_danh: 1 }
       : { da_dien_ra: 2, co_mat: 2, vang: 0, vang_co_phep: 0, da_bao_vang: 0, chua_diem_danh: 0 },
+    // Lượt vào VLE: An đã vào 3 lần, còn lại chưa vào.
+    so_lan_vao_vle: an ? 3 : 0,
+    lan_vao_vle_gan_nhat: an ? '2026-11-09T08:30:00.000Z' : null,
   };
 }
 

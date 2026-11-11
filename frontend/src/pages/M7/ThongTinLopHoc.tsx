@@ -23,6 +23,7 @@ import { StatusBanner } from '@/components/StatusBanner';
 import { nhanMucNangLuc } from '@/lib/mucNangLuc';
 import { ChonMucLopHoc } from './ChonMucLopHoc';
 import { CanhBaoDiemDanhZoom, NhanDiemDanhZoom, NutDiemDanhZoom, canNhacCungNgay } from './DiemDanhZoom';
+import { NutVaoHocVle } from './VaoHocVle';
 
 // T12 (mo-rong-nls-an-giang.md, 2026-09-30) — điểm danh nhập qua IMPORT EXCEL, không có giao diện
 // chấm tay. null (chưa điểm danh) không hiện badge nào — tránh gây nhầm học viên nghĩ là "vắng".
@@ -337,6 +338,7 @@ function TheGiaiDoan({
       {gd.lop ? (
         <Stack gap="sm">
           <Text fw={700}>{gd.lop.ten_lop}</Text>
+          {gd.lop.loai_lop === 'vle' && <NutVaoHocVle />}
           {gd.lop.nhan_su.length > 0 && (
             <Stack gap={4}>
               {gd.lop.nhan_su.map((ns) => (
@@ -347,7 +349,12 @@ function TheGiaiDoan({
               ))}
             </Stack>
           )}
-          <DanhSachBuoi lichHoc={gd.lop.lich_hoc} khoaDoiBuoi={khoaDoiBuoi} khoaId={khoaId} />
+          <DanhSachBuoi
+            lichHoc={gd.lop.lich_hoc}
+            khoaDoiBuoi={khoaDoiBuoi}
+            khoaId={khoaId}
+            laLopVle={gd.lop.loai_lop === 'vle'}
+          />
           {(gd.thuc_dia ?? []).length > 0 && (
             <Text size="sm">
               <b>Hỗ trợ tại điểm học:</b>{' '}
@@ -431,10 +438,13 @@ function DanhSachBuoi({
   lichHoc,
   khoaDoiBuoi,
   khoaId,
+  laLopVle = false,
 }: {
   lichHoc: LichHocLopToi[];
   khoaDoiBuoi?: string | null;
   khoaId?: string;
+  /** Lớp VLE: lối vào DUY NHẤT là nút "Vào học VLE" của thẻ — ẩn link/địa điểm từng buổi. */
+  laLopVle?: boolean;
 }) {
   if (lichHoc.length === 0) return null;
   // ADR 0005 (issue #24): buổi Zoom của khóa đã bật điểm danh — backend giấu link, trả diem_danh_zoom.
@@ -522,7 +532,8 @@ function DanhSachBuoi({
               )}
             </Box>
           )}
-          {buoi.dia_diem_hoac_link &&
+          {!laLopVle &&
+            buoi.dia_diem_hoac_link &&
             (() => {
               const href = chuanHoaLienKet(buoi.dia_diem_hoac_link);
               return href ? (

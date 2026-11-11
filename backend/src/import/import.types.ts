@@ -23,6 +23,9 @@ export const SUPPORTED_IMPORT_TYPES = [
   // T11 (issue #3): danh mục giảng viên + phân công giảng dạy.
   'giang_vien',
   'phan_cong_giang_day',
+  // Vào học VLE (external-login P.CNTT, 2026-11-10) — username/email để
+  // khớp sang VLE, xem docs/api-contract.md mục 10.2.
+  'dang_nhap_vle',
 ] as const satisfies readonly loai_danh_muc_import[];
 
 export type SupportedImportType = (typeof SUPPORTED_IMPORT_TYPES)[number];

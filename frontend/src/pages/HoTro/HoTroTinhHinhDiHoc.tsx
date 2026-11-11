@@ -292,12 +292,13 @@ export default function HoTroTinhHinhDiHoc({ cheDo = 'ho_tro' }: { cheDo?: CheDo
                     <Table.Th>Có phép</Table.Th>
                     <Table.Th>Báo vắng</Table.Th>
                     <Table.Th>Chưa điểm danh</Table.Th>
+                    <Table.Th>Vào VLE</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
                   {data.data.length === 0 && (
                     <Table.Tr>
-                      <Table.Td colSpan={10}>
+                      <Table.Td colSpan={11}>
                         <Text c="dimmed" ta="center" py="lg">
                           Không có học viên nào khớp bộ lọc.
                         </Text>
@@ -334,6 +335,20 @@ export default function HoTroTinhHinhDiHoc({ cheDo = 'ho_tro' }: { cheDo?: CheDo
                       <Table.Td>{h.tong.vang_co_phep}</Table.Td>
                       <Table.Td>{h.tong.da_bao_vang}</Table.Td>
                       <Table.Td c={h.tong.chua_diem_danh > 0 ? 'orange' : undefined}>{h.tong.chua_diem_danh}</Table.Td>
+                      <Table.Td>
+                        {h.so_lan_vao_vle > 0 ? (
+                          <>
+                            <Text fz="sm">{h.so_lan_vao_vle} lần</Text>
+                            {h.lan_vao_vle_gan_nhat && (
+                              <Text fz="xs" c="dimmed">
+                                {dinhDangNgayGio(h.lan_vao_vle_gan_nhat)}
+                              </Text>
+                            )}
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                      </Table.Td>
                     </Table.Tr>
                   ))}
                 </Table.Tbody>
