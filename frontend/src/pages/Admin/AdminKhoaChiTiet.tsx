@@ -262,6 +262,8 @@ export default function AdminKhoaChiTiet() {
   // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học — mutation riêng để không lẫn trạng thái
   // với form sửa khóa.
   const batTatDieuChinhMuc = useCapNhatKhoa(khoaId);
+  // 2026-11-11: công tắc nút "Vào học VLE" theo khóa — mutation riêng như trên.
+  const batTatVaoHocVle = useCapNhatKhoa(khoaId);
   const [modalSuaKhoa, setModalSuaKhoa] = useState(false);
   const [formSuaKhoa, setFormSuaKhoa] = useState<FormSuaKhoa | null>(null);
   const [loiSuaKhoa, setLoiSuaKhoa] = useState<Record<string, string>>({});
@@ -873,6 +875,28 @@ export default function AdminKhoaChiTiet() {
                             message: k.mo_dieu_chinh_muc
                               ? 'Đã mở cho học viên điều chỉnh mức lớp học'
                               : 'Đã đóng điều chỉnh mức lớp học',
+                          }),
+                        onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
+                      },
+                    )
+                  }
+                />
+                <Switch
+                  mt="md"
+                  label="Mở vào học VLE"
+                  description="Học viên đã được xếp lớp VLE thấy nút “Vào học VLE”; tắt thì nút ẩn. Có hiệu lực ngay."
+                  checked={khoa.mo_vao_hoc_vle}
+                  disabled={batTatVaoHocVle.isPending}
+                  onChange={(e) =>
+                    batTatVaoHocVle.mutate(
+                      { mo_vao_hoc_vle: e.currentTarget.checked },
+                      {
+                        onSuccess: (k) =>
+                          notifications.show({
+                            color: 'green',
+                            message: k.mo_vao_hoc_vle
+                              ? 'Đã mở vào học VLE cho khóa này'
+                              : 'Đã tắt vào học VLE cho khóa này',
                           }),
                         onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
                       },

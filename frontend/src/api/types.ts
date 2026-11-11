@@ -315,6 +315,8 @@ export interface KhoaBoiDuong {
   created_by: string | null;
   // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học (chỉ xuống mức thấp hơn).
   mo_dieu_chinh_muc: boolean;
+  // 2026-11-11: công tắc nút "Vào học VLE" theo khóa (api-contract.md mục 10.2).
+  mo_vao_hoc_vle: boolean;
   // ADR 0007: số buổi tối đa học viên được đề nghị đổi (0 = tắt).
   so_buoi_doi_toi_da: number;
   // ADR 0012: số buổi học bù tối đa mỗi học viên (0 = tắt).
