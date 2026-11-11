@@ -462,6 +462,7 @@ export class KhoaBoiDuongService {
             ? new Date(dto.thoi_gian_ket_thuc)
             : undefined,
           mo_dieu_chinh_muc: dto.mo_dieu_chinh_muc,
+          mo_vao_hoc_vle: dto.mo_vao_hoc_vle,
           so_buoi_doi_toi_da: dto.so_buoi_doi_toi_da,
           so_buoi_hoc_bu_toi_da: dto.so_buoi_hoc_bu_toi_da,
           bat_diem_danh_zoom_luc: this.mocBatDiemDanhZoom(

@@ -2,6 +2,7 @@ import { VleService } from './vle.service';
 import {
   VleChuaCauHinhException,
   VleChuaCoTaiKhoanException,
+  VleChuaMoException,
 } from '../common/exceptions/app.exceptions';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 
@@ -42,8 +43,12 @@ describe('VleService — Vào học VLE (external-login P.CNTT)', () => {
       dang_nhap_vle: {
         findUnique: jest.fn().mockResolvedValue(opts.dangNhap ?? null),
       },
+      // Mặc định: có đăng ký khóa đã duyệt, khóa BẬT mo_vao_hoc_vle, chưa có
+      // mức VLE. Truyền dangKy: null = không có đăng ký khóa đã duyệt nào.
       dang_ky_hoc: {
-        findFirst: jest.fn().mockResolvedValue(opts.dangKy ?? null),
+        findFirst: jest
+          .fn()
+          .mockResolvedValue('dangKy' in opts ? opts.dangKy : taoDangKyVle(null)),
       },
       nhat_ky_hoat_dong: {
         groupBy: jest.fn(
@@ -73,11 +78,12 @@ describe('VleService — Vào học VLE (external-login P.CNTT)', () => {
     };
   }
 
-  function taoDangKyVle(mucNangLuc: string | null) {
+  function taoDangKyVle(mucNangLuc: string | null, moVaoHocVle = true) {
     const homNay = new Date();
     return {
       muc_dau_vao: null,
       khoa: {
+        mo_vao_hoc_vle: moVaoHocVle,
         giai_doan: [
           {
             id: 'gd-1',
@@ -102,6 +108,7 @@ describe('VleService — Vào học VLE (external-login P.CNTT)', () => {
     const service = new VleService(taoPrisma({}) as never, nhatKy as never);
     const kq = await service.trangThai(caller);
     expect(kq).toEqual({
+      mo: false,
       san_sang: false,
       ly_do: 'Chức năng vào học VLE chưa được cấu hình.',
       co_khoa_hoc: false,
@@ -145,6 +152,7 @@ describe('VleService — Vào học VLE (external-login P.CNTT)', () => {
     process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
     const service = new VleService(taoPrisma({ dangNhap: null }) as never, nhatKy as never);
     const kq = await service.trangThai(caller);
+    expect(kq.mo).toBe(true);
     expect(kq.san_sang).toBe(false);
     expect(kq.ly_do).toContain('Chưa có tài khoản VLE');
   });
@@ -177,11 +185,12 @@ describe('VleService — Vào học VLE (external-login P.CNTT)', () => {
     expect(kq.fields.id_course).toBeUndefined();
   });
 
-  it('không có đăng ký/lớp VLE nào -> bỏ qua id_course, co_khoa_hoc=false', async () => {
+  it('khóa mở nhưng chưa có lớp VLE nào -> bỏ qua id_course, co_khoa_hoc=false', async () => {
     process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
     process.env.VLE_COURSE_MAP = 'co_ban:12,thanh_thao:13,nang_cao:14';
+    const dangKy = { ...taoDangKyVle(null), phan_lop_giai_doan: [] };
     const service = new VleService(
-      taoPrisma({ dangNhap: { username: 'u1', email_chup: null }, dangKy: null }) as never,
+      taoPrisma({ dangNhap: { username: 'u1', email_chup: null }, dangKy }) as never,
       nhatKy as never,
     );
     const kq = await service.trangThai(caller);
@@ -214,6 +223,137 @@ describe('VleService — Vào học VLE (external-login P.CNTT)', () => {
     const kq = await service.trangThai(caller);
     expect(JSON.stringify(kq)).not.toContain('khoa-khong-duoc-lo');
   });
+  // Công tắc theo khóa (2026-11-11): khoa_boi_duong.mo_vao_hoc_vle của khóa
+  // ĐÃ DUYỆT gần nhất — cùng đăng ký dùng để tính id_course.
+  describe('công tắc theo khóa (mo_vao_hoc_vle)', () => {
+    const KHOA_CHUA_MO = 'Khóa học chưa mở vào học VLE.';
+
+    it('khóa tắt -> mo=false, san_sang=false, lý do "chưa mở", KHÔNG tra tài khoản', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      const prisma = taoPrisma({
+        dangNhap: { username: 'u1', email_chup: null },
+        dangKy: taoDangKyVle('thanh_thao', false),
+      });
+      const kq = await new VleService(prisma as never, nhatKy as never).trangThai(caller);
+      expect(kq).toEqual({
+        mo: false,
+        san_sang: false,
+        ly_do: KHOA_CHUA_MO,
+        co_khoa_hoc: false,
+        so_lan_vao: 0,
+        lan_vao_gan_nhat: null,
+      });
+      expect(prisma.dang_nhap_vle.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('khóa tắt -> trangThai vẫn trả lượt vào, không lộ key', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-khong-duoc-lo';
+      const prisma = taoPrisma({
+        dangKy: taoDangKyVle(null, false),
+        nhatKy: [
+          { hanh_dong: 'vao_hoc_vle', hoc_vien_id: 'hv-1', thoi_gian: new Date('2026-11-02T03:00:00Z') },
+        ],
+      });
+      const kq = await new VleService(prisma as never, nhatKy as never).trangThai(caller);
+      expect(kq).toMatchObject({ mo: false, so_lan_vao: 1 });
+      expect(JSON.stringify(kq)).not.toContain('khoa-khong-duoc-lo');
+    });
+
+    it('khóa mở + có tài khoản -> mo=true, san_sang=true', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      process.env.VLE_COURSE_MAP = 'co_ban:12,thanh_thao:13,nang_cao:14';
+      const service = new VleService(
+        taoPrisma({
+          dangNhap: { username: 'u1', email_chup: null },
+          dangKy: taoDangKyVle('thanh_thao', true),
+        }) as never,
+        nhatKy as never,
+      );
+      const kq = await service.trangThai(caller);
+      expect(kq).toMatchObject({ mo: true, san_sang: true, co_khoa_hoc: true });
+      expect(kq.ly_do).toBeUndefined();
+    });
+
+    it('không có đăng ký khóa đã duyệt -> coi như tắt (mo=false)', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      const prisma = taoPrisma({ dangNhap: { username: 'u1', email_chup: null }, dangKy: null });
+      const kq = await new VleService(prisma as never, nhatKy as never).trangThai(caller);
+      expect(kq).toMatchObject({ mo: false, san_sang: false, ly_do: KHOA_CHUA_MO });
+      expect(prisma.dang_nhap_vle.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('thiếu key -> mo=false, không cần đọc công tắc khóa', async () => {
+      delete process.env.VLE_LOGIN_KEY;
+      const prisma = taoPrisma({ dangKy: taoDangKyVle(null, true) });
+      const kq = await new VleService(prisma as never, nhatKy as never).trangThai(caller);
+      expect(kq.mo).toBe(false);
+      expect(kq.ly_do).toBe('Chức năng vào học VLE chưa được cấu hình.');
+      expect(prisma.dang_ky_hoc.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('1 truy vấn đăng ký (khóa đã duyệt gần nhất) lấy cả công tắc lẫn mức VLE', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      process.env.VLE_COURSE_MAP = 'co_ban:12,thanh_thao:13,nang_cao:14';
+      const prisma = taoPrisma({
+        dangNhap: { username: 'u1', email_chup: null },
+        dangKy: taoDangKyVle('nang_cao', true),
+      });
+      const kq = await new VleService(prisma as never, nhatKy as never).form(caller, null);
+      expect(kq.fields.id_course).toBe('14');
+      expect(prisma.dang_ky_hoc.findFirst).toHaveBeenCalledTimes(1);
+      const args = prisma.dang_ky_hoc.findFirst.mock.calls[0][0];
+      expect(args.where).toEqual({ hoc_vien_id: 'hv-1', khoa: { trang_thai: 'da_duyet' } });
+      expect(args.orderBy).toEqual({ khoa: { ngay_duyet: 'desc' } });
+      expect(args.select.khoa.select.mo_vao_hoc_vle).toBe(true);
+    });
+
+    it('form(): khóa tắt -> 409 VLE_CHUA_MO, không ghi nhật ký, không tra tài khoản', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      const prisma = taoPrisma({
+        dangNhap: { username: 'u1', email_chup: null },
+        dangKy: taoDangKyVle('co_ban', false),
+      });
+      const service = new VleService(prisma as never, nhatKy as never);
+      const loi = await service.form(caller, '1.2.3.4').catch((e: unknown) => e);
+      expect(loi).toBeInstanceOf(VleChuaMoException);
+      const ex = loi as VleChuaMoException;
+      expect(ex.getStatus()).toBe(409);
+      expect(ex.getResponse()).toEqual({
+        error: { code: 'VLE_CHUA_MO', message: KHOA_CHUA_MO },
+      });
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
+      expect(prisma.dang_nhap_vle.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('form(): không có đăng ký khóa đã duyệt -> VLE_CHUA_MO', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      const service = new VleService(
+        taoPrisma({ dangNhap: { username: 'u1', email_chup: null }, dangKy: null }) as never,
+        nhatKy as never,
+      );
+      await expect(service.form(caller, null)).rejects.toBeInstanceOf(VleChuaMoException);
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
+    });
+
+    it('form(): thiếu key -> 503 trước cả khi khóa tắt', async () => {
+      delete process.env.VLE_LOGIN_KEY;
+      const prisma = taoPrisma({ dangKy: taoDangKyVle(null, false) });
+      const service = new VleService(prisma as never, nhatKy as never);
+      await expect(service.form(caller, null)).rejects.toBeInstanceOf(VleChuaCauHinhException);
+      expect(prisma.dang_ky_hoc.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('form(): khóa mở + chưa có tài khoản -> VLE_CHUA_CO_TAI_KHOAN (sau công tắc khóa)', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      const service = new VleService(
+        taoPrisma({ dangNhap: null, dangKy: taoDangKyVle(null, true) }) as never,
+        nhatKy as never,
+      );
+      await expect(service.form(caller, null)).rejects.toBeInstanceOf(VleChuaCoTaiKhoanException);
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
+    });
+  });
+
   describe('lượt vào VLE trong trangThai (so_lan_vao, lan_vao_gan_nhat)', () => {
     it('chưa vào lần nào -> 0 / null', async () => {
       process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';

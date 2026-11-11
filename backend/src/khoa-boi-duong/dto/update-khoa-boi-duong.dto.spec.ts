@@ -39,3 +39,24 @@ describe('UpdateKhoaBoiDuongDto — che_do_chuyen_can', () => {
     expect(await loi(v)).toHaveLength(1);
   });
 });
+
+// 2026-11-11: công tắc "Vào học VLE" theo khóa — chỉ nhận boolean.
+describe('UpdateKhoaBoiDuongDto — mo_vao_hoc_vle', () => {
+  const loi = async (v: unknown) =>
+    (await validate(plainToInstance(UpdateKhoaBoiDuongDto, { mo_vao_hoc_vle: v }))).filter(
+      (e) => e.property === 'mo_vao_hoc_vle',
+    );
+
+  it.each([true, false])('%s hợp lệ', async (v) => {
+    expect(await loi(v)).toHaveLength(0);
+  });
+
+  it.each(['true', 'co', 1, 0])('%p bị từ chối', async (v) => {
+    expect(await loi(v)).toHaveLength(1);
+  });
+
+  it('không gửi -> hợp lệ (tùy chọn)', async () => {
+    const ds = await validate(plainToInstance(UpdateKhoaBoiDuongDto, {}));
+    expect(ds.filter((e) => e.property === 'mo_vao_hoc_vle')).toHaveLength(0);
+  });
+});

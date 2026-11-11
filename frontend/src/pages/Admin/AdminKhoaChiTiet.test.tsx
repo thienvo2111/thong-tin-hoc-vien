@@ -205,6 +205,71 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
     });
   });
 
+  // 2026-11-11: công tắc nút "Vào học VLE" theo khóa (api-contract.md mục 10.2).
+  describe('Switch "Mở vào học VLE"', () => {
+    function ghiLaiPatch() {
+      const bodies: unknown[] = [];
+      server.use(
+        http.patch('/khoa-boi-duong/:id', async ({ params, request }) => {
+          const body = (await request.json()) as Record<string, unknown>;
+          bodies.push(body);
+          Object.assign(db.chiTietKhoa[params.id as string], body);
+          return HttpResponse.json(db.chiTietKhoa[params.id as string]);
+        }),
+      );
+      return bodies;
+    }
+
+    it('quan_tri: switch phản ánh mo_vao_hoc_vle; bật -> PATCH { mo_vao_hoc_vle: true }; tắt -> false', async () => {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      const bodies = ghiLaiPatch();
+      const user = userEvent.setup();
+      renderTrang('khoa-1');
+      const sw = await screen.findByRole('switch', { name: /Mở vào học VLE/ });
+      expect(sw).not.toBeChecked();
+      expect(screen.getByText(/thấy nút “Vào học VLE”; tắt thì nút ẩn/)).toBeInTheDocument();
+
+      await user.click(sw);
+      await waitFor(() => expect(sw).toBeChecked());
+      expect(bodies).toEqual([{ mo_vao_hoc_vle: true }]);
+      expect(await screen.findByText('Đã mở vào học VLE cho khóa này')).toBeInTheDocument();
+
+      await user.click(sw);
+      await waitFor(() => expect(sw).not.toBeChecked());
+      expect(bodies).toEqual([{ mo_vao_hoc_vle: true }, { mo_vao_hoc_vle: false }]);
+      expect(await screen.findByText('Đã tắt vào học VLE cho khóa này')).toBeInTheDocument();
+    });
+
+    it('quan_tri: khóa đang mở (mo_vao_hoc_vle=true) -> switch bật sẵn', async () => {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      db.chiTietKhoa['khoa-1'].mo_vao_hoc_vle = true;
+      renderTrang('khoa-1');
+      expect(await screen.findByRole('switch', { name: /Mở vào học VLE/ })).toBeChecked();
+    });
+
+    it('lỗi API: báo lỗi đỏ, switch giữ nguyên', async () => {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      server.use(
+        http.patch('/khoa-boi-duong/:id', () =>
+          HttpResponse.json({ error: { code: 'FORBIDDEN', message: 'Không có quyền' } }, { status: 403 }),
+        ),
+      );
+      const user = userEvent.setup();
+      renderTrang('khoa-1');
+      const sw = await screen.findByRole('switch', { name: /Mở vào học VLE/ });
+      await user.click(sw);
+      expect(await screen.findByText('Không có quyền')).toBeInTheDocument();
+      expect(sw).not.toBeChecked();
+    });
+
+    it('vai_tro khác quan_tri: không hiện switch', async () => {
+      db.nguoiDung.vai_tro = 'truong';
+      renderTrang('khoa-1');
+      await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+      expect(screen.queryByRole('switch', { name: /Mở vào học VLE/ })).not.toBeInTheDocument();
+    });
+  });
+
   // ADR 0005 (issue #23): cấu hình tự điểm danh lớp Zoom.
   describe('Khối "Điểm danh lớp Zoom"', () => {
     // Ghi lại body PATCH rồi trả undefined để rơi xuống handler mặc định (áp dụng ngữ nghĩa bật/giữ/tắt).

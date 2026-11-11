@@ -21,6 +21,8 @@ export function taoMaThuSso(maDinhDanhMoet: string, target?: SsoTarget) {
 export const VLE_CHUA_CAU_HINH_LY_DO = 'Chức năng vào học VLE chưa được cấu hình.';
 
 export interface TrangThaiVle {
+  /** Có VLE_LOGIN_KEY VÀ khóa bật mo_vao_hoc_vle (2026-11-11) — false thì ẩn hẳn nút. */
+  mo: boolean;
   san_sang: boolean;
   ly_do?: string;
   co_khoa_hoc: boolean;

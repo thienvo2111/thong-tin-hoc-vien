@@ -167,3 +167,19 @@ export class VleChuaCoTaiKhoanException extends HttpException {
     super({ error: { code: 'VLE_CHUA_CO_TAI_KHOAN', message } }, 409);
   }
 }
+
+// Vào học VLE (2026-11-11): khóa của học viên chưa bật công tắc
+// khoa_boi_duong.mo_vao_hoc_vle (hoặc học viên chưa có khóa đã duyệt).
+export class VleChuaMoException extends HttpException {
+  constructor() {
+    super(
+      {
+        error: {
+          code: 'VLE_CHUA_MO',
+          message: 'Khóa học chưa mở vào học VLE.',
+        },
+      },
+      409,
+    );
+  }
+}

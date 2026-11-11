@@ -152,6 +152,8 @@ export interface CapNhatKhoaDto {
   don_vi_dat_hang_id?: string;
   // 2026-10-08: công tắc cho học viên tự điều chỉnh mức lớp học.
   mo_dieu_chinh_muc?: boolean;
+  // 2026-11-11: công tắc nút "Vào học VLE" theo khóa.
+  mo_vao_hoc_vle?: boolean;
   // ADR 0007: 0 = tắt đề nghị đổi buổi.
   so_buoi_doi_toi_da?: number;
   // ADR 0012: 0 = tắt đăng ký học bù (0–50).

@@ -21,6 +21,7 @@ export const NHAN_TRUONG_CAU_HINH: Record<string, string> = {
   thoi_gian_bat_dau: 'Ngày bắt đầu',
   thoi_gian_ket_thuc: 'Ngày kết thúc',
   mo_dieu_chinh_muc: 'Học viên tự điều chỉnh mức',
+  mo_vao_hoc_vle: 'Mở vào học VLE',
   so_buoi_doi_toi_da: 'Số buổi đổi tối đa',
   so_buoi_hoc_bu_toi_da: 'Số buổi học bù tối đa',
   bat_diem_danh_zoom_luc: 'Tự điểm danh lớp Zoom',
@@ -71,6 +72,7 @@ export function hienThiGiaTriCauHinh(
         ? '(trống)'
         : (NHAN_CHE_DO_CHUYEN_CAN[String(v)] ?? String(v));
     case 'mo_dieu_chinh_muc':
+    case 'mo_vao_hoc_vle':
       return v ? 'Bật' : 'Tắt';
     case 'bat_diem_danh_zoom_luc':
       return v ? `Bật (từ ${formatVnDateTime(new Date(String(v)))})` : 'Tắt';
