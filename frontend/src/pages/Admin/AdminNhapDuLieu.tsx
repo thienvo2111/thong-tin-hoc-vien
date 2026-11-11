@@ -27,7 +27,7 @@ import { mauTrangThaiImport, nhanTrangThaiImport } from '@/lib/trangThaiImport';
 import { PanelXemTruocImport } from '@/components/PanelXemTruocImport';
 import { AdminPageHeader } from './AdminPageHeader';
 
-// 11 loại import THẬT hỗ trợ qua loai_danh_muc_import (docs/api-contract.md mục 5) — không bịa
+// 12 loại import THẬT hỗ trợ qua loai_danh_muc_import (docs/api-contract.md mục 5) — không bịa
 // thêm/bớt. Dùng Record<LoaiDanhMucImport, string> (thay vì mảng dò tìm) để TypeScript báo lỗi biên
 // dịch nếu sau này enum LoaiDanhMucImport (src/api/types.ts) có thêm giá trị mà quên bổ sung nhãn ở
 // đây — tránh tái diễn lỗi cột "Loại dữ liệu" bị bỏ trống do thiếu nhãn.
@@ -47,6 +47,8 @@ export const NHAN_LOAI_IMPORT: Record<LoaiDanhMucImport, string> = {
   ket_qua_khao_sat: 'Kết quả khảo sát (từ hệ thống khảo sát)',
   giang_vien: 'Danh mục giảng viên',
   phan_cong_giang_day: 'Phân công giảng viên vào buổi học',
+  // Vào học VLE (external-login P.CNTT, 2026-11-10) — username/email để khớp sang VLE.
+  dang_nhap_vle: 'Tài khoản đăng nhập VLE (username / email)',
 };
 
 const TUY_CHON_LOAI_IMPORT: { value: LoaiDanhMucImport; label: string }[] = Object.entries(NHAN_LOAI_IMPORT).map(

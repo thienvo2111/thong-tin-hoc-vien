@@ -900,6 +900,7 @@ export class HocVienService {
         ma_dinh_danh_moet: true,
         nguoi_dung_account: { select: { id: true } },
         tai_khoan_vle: { select: { ten_dang_nhap_vle: true } },
+        dang_nhap_vle: { select: { username: true, email_chup: true } },
         _count: {
           select: {
             dang_ky_hoc: true,
@@ -922,6 +923,8 @@ export class HocVienService {
       so_yeu_cau_ho_tro: hv._count.yeu_cau_ho_tro,
       co_tai_khoan: !!hv.nguoi_dung_account,
       ten_dang_nhap_vle: hv.tai_khoan_vle?.ten_dang_nhap_vle ?? null,
+      // Vào học VLE (external-login P.CNTT, 2026-11-10) — dang_nhap_vle.
+      co_dang_nhap_vle: !!hv.dang_nhap_vle,
     };
   }
 
@@ -1014,6 +1017,7 @@ export class HocVienService {
           where: { hoc_vien_id: id },
         });
         await tx.tai_khoan_vle.deleteMany({ where: { hoc_vien_id: id } });
+        await tx.dang_nhap_vle.deleteMany({ where: { hoc_vien_id: id } });
         await tx.nhat_ky_thong_bao.deleteMany({ where: { hoc_vien_id: id } });
         await tx.hang_doi_email.deleteMany({ where: { hoc_vien_id: id } });
         await tx.yeu_cau_ho_tro.deleteMany({ where: { hoc_vien_id: id } });
