@@ -755,3 +755,88 @@ describe('M7 — Điểm danh & vào Zoom', () => {
     });
   });
 });
+
+// Lớp VLE: lối vào DUY NHẤT là nút "Vào học VLE" — không có link "Vào học"/"Địa điểm" từng buổi,
+// không có link giai đoạn riêng; vẫn giữ giờ học + nhãn điểm danh của buổi.
+describe('M7 — thẻ lớp VLE', () => {
+  function khoaCoLopVle(): KhoaHocDangKy {
+    const goc = db.khoaHocToi[0];
+    const gdVle = goc.giai_doan[3];
+    const buoi = goc.giai_doan[2].lop!.lich_hoc[0];
+    return {
+      ...goc,
+      giai_doan: goc.giai_doan.map((g, i) =>
+        i === 3
+          ? {
+              ...gdVle,
+              link_hoac_dia_diem: 'https://vle.example.edu.vn/giai-doan-4',
+              lop: {
+                id: 'lop-vle-1',
+                ten_lop: 'Lớp VLE 01',
+                loai_lop: 'vle' as const,
+                si_so_toi_da: 500,
+                nhom_hoc_vien: null,
+                muc_nang_luc: 'co_ban' as const,
+                nhan_su: [],
+                lich_hoc: [
+                  {
+                    ...buoi,
+                    id: 'lh-vle-1',
+                    giai_doan_id: 'gd-4',
+                    dia_diem_hoac_link: 'https://vlebdhvs.hcmue.edu.vn/course/13',
+                    trang_thai: 'ket_thuc' as const,
+                    trang_thai_diem_danh: 'co_mat' as const,
+                  },
+                  {
+                    ...buoi,
+                    id: 'lh-vle-2',
+                    giai_doan_id: 'gd-4',
+                    buoi_so: 2,
+                    dia_diem_hoac_link: 'Phòng máy VLE',
+                    trang_thai_diem_danh: null,
+                  },
+                ],
+              },
+            }
+          : g,
+      ),
+    };
+  }
+
+  function renderLopVle() {
+    server.use(
+      http.get('/hoc-vien/toi/khoa-hoc', () => HttpResponse.json([khoaCoLopVle()])),
+      http.get('/sso/vle/trang-thai', () =>
+        HttpResponse.json({ san_sang: true, co_khoa_hoc: true, so_lan_vao: 0, lan_vao_gan_nhat: null }),
+      ),
+    );
+    renderDaDangNhap();
+  }
+
+  it('không có link "Vào học"/"Địa điểm" từng buổi, không link giai đoạn; vẫn có giờ học + nhãn điểm danh', async () => {
+    renderLopVle();
+    const gd4 = (await cacTheGiaiDoan())[3];
+    expect(await within(gd4).findByRole('button', { name: 'Vào học VLE' })).toBeInTheDocument();
+    expect(within(gd4).queryByRole('link', { name: 'Vào học' })).not.toBeInTheDocument();
+    expect(within(gd4).queryByText(/Địa điểm:/)).not.toBeInTheDocument();
+    expect(within(gd4).queryByRole('link', { name: 'Mở liên kết' })).not.toBeInTheDocument();
+    expect(within(gd4).queryByText(/vle\.example\.edu\.vn\/giai-doan-4/)).not.toBeInTheDocument();
+
+    const buoi = within(gd4).getAllByTestId('the-buoi');
+    expect(buoi).toHaveLength(2);
+    expect(within(buoi[0]).getByText('Buổi 1')).toBeInTheDocument();
+    expect(within(buoi[0]).getByText('Có mặt')).toBeInTheDocument();
+    expect(within(buoi[0]).getByText('12/10/2026 08:00 – 12/10/2026 11:00')).toBeInTheDocument();
+    expect(within(buoi[1]).getByText('Buổi 2')).toBeInTheDocument();
+  });
+
+  it('lớp zoom / trực tiếp cùng khóa vẫn giữ link "Vào học" và "Địa điểm" (không đổi)', async () => {
+    renderLopVle();
+    const the = await cacTheGiaiDoan();
+    expect(within(the[1]).getAllByText('Địa điểm: Hội trường A, THPT Long Xuyên')).toHaveLength(2);
+    expect(within(the[2]).getByRole('link', { name: 'Vào học' })).toHaveAttribute(
+      'href',
+      'https://vle.example.edu.vn/lop-1/buoi-2',
+    );
+  });
+});
