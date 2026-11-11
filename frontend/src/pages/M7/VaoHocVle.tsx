@@ -4,6 +4,7 @@ import { VLE_CHUA_CAU_HINH_LY_DO, layFormVle, layTrangThaiVle } from '@/api/sso'
 import { guiFormVle } from '@/lib/guiFormVle';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { StatusBanner } from '@/components/StatusBanner';
+import { dinhDangNgayGio } from '@/lib/ngay';
 
 export const trangThaiVleKey = ['sso', 'vle', 'trang-thai'] as const;
 
@@ -13,7 +14,8 @@ export const trangThaiVleKey = ['sso', 'vle', 'trang-thai'] as const;
  * (cùng tab) — field "key" buộc phải tới trình duyệt học viên (rủi ro đã được chủ sản phẩm chấp
  * nhận, xem api-contract.md mục 10.2), nên không gọi sẵn khi tải trang. */
 export function NutVaoHocVle() {
-  const trangThai = useQuery({ queryKey: trangThaiVleKey, queryFn: layTrangThaiVle });
+  // refetchOnWindowFocus (mặc định toàn app tắt): học viên vào VLE rồi quay lại tab -> thấy lượt vào mới.
+  const trangThai = useQuery({ queryKey: trangThaiVleKey, queryFn: layTrangThaiVle, refetchOnWindowFocus: true });
   const vaoHoc = useMutation({
     mutationFn: layFormVle,
     onSuccess: ({ action, fields }) => guiFormVle(action, fields),
@@ -41,6 +43,13 @@ export function NutVaoHocVle() {
           {data.ly_do}
         </Text>
       )}
+      {/* Lượt vào VLE = số lần cấp form vào VLE (không phải điểm danh). Sau khi bấm, trang chuyển
+          sang VLE nên không làm mới ngay — quay lại tab thì refetchOnWindowFocus tự cập nhật. */}
+      <Text size="xs" c="dimmed" data-testid="luot-vao-vle">
+        {data.so_lan_vao > 0
+          ? `Đã vào VLE ${data.so_lan_vao} lần${data.lan_vao_gan_nhat ? ` · gần nhất ${dinhDangNgayGio(data.lan_vao_gan_nhat)}` : ''}`
+          : 'Chưa vào VLE lần nào'}
+      </Text>
     </Stack>
   );
 }

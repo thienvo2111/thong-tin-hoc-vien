@@ -5,10 +5,17 @@ import { http, HttpResponse } from 'msw';
 import { server } from '@/test/mocks/server';
 import { renderTrang } from '@/test/testUtils';
 import { datToken } from '@/auth/tokenStore';
+import type { TrangThaiVle } from '@/api/sso';
 import { NutVaoHocVle } from './VaoHocVle';
 
-function datTrangThai(body: { san_sang: boolean; ly_do?: string; co_khoa_hoc: boolean }) {
-  server.use(http.get('/sso/vle/trang-thai', () => HttpResponse.json(body)));
+function datTrangThai(
+  body: { san_sang: boolean; ly_do?: string; co_khoa_hoc: boolean } & Partial<
+    Pick<TrangThaiVle, 'so_lan_vao' | 'lan_vao_gan_nhat'>
+  >,
+) {
+  server.use(
+    http.get('/sso/vle/trang-thai', () => HttpResponse.json({ so_lan_vao: 0, lan_vao_gan_nhat: null, ...body })),
+  );
 }
 
 describe('NutVaoHocVle (Vào học VLE, external-login P.CNTT)', () => {
@@ -89,5 +96,26 @@ describe('NutVaoHocVle (Vào học VLE, external-login P.CNTT)', () => {
     await userEvent.click(nut);
     expect(await screen.findByText('Chưa có tài khoản VLE lúc này.')).toBeInTheDocument();
     expect(submitSpy).not.toHaveBeenCalled();
+  });
+  // Lượt vào VLE (= số lần cấp form vào VLE thành công, không phải điểm danh) — dòng mờ dưới nút.
+  it('đã vào VLE -> "Đã vào VLE 3 lần · gần nhất dd/MM/yyyy HH:mm" (giờ Việt Nam)', async () => {
+    datTrangThai({ san_sang: true, co_khoa_hoc: true, so_lan_vao: 3, lan_vao_gan_nhat: '2026-11-09T08:30:00.000Z' });
+    renderTrang(<NutVaoHocVle />);
+    expect(await screen.findByText('Đã vào VLE 3 lần · gần nhất 09/11/2026 15:30')).toBeInTheDocument();
+    expect(screen.queryByText('Chưa vào VLE lần nào')).not.toBeInTheDocument();
+  });
+
+  it('chưa vào lần nào -> "Chưa vào VLE lần nào"', async () => {
+    datTrangThai({ san_sang: true, co_khoa_hoc: true, so_lan_vao: 0, lan_vao_gan_nhat: null });
+    renderTrang(<NutVaoHocVle />);
+    expect(await screen.findByText('Chưa vào VLE lần nào')).toBeInTheDocument();
+    expect(screen.queryByText(/Đã vào VLE/)).not.toBeInTheDocument();
+  });
+
+  it('chưa cấu hình -> không hiện dòng lượt vào (ẩn hẳn cùng nút)', async () => {
+    datTrangThai({ san_sang: false, ly_do: 'Chức năng vào học VLE chưa được cấu hình.', co_khoa_hoc: false, so_lan_vao: 2 });
+    renderTrang(<NutVaoHocVle />);
+    await waitFor(() => expect(screen.queryByTestId('luot-vao-vle')).not.toBeInTheDocument());
+    expect(screen.queryByText(/Đã vào VLE/)).not.toBeInTheDocument();
   });
 });

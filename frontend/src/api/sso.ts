@@ -24,6 +24,10 @@ export interface TrangThaiVle {
   san_sang: boolean;
   ly_do?: string;
   co_khoa_hoc: boolean;
+  /** Số "lượt vào VLE" = số lần cấp form vào VLE thành công — không phải điểm danh. */
+  so_lan_vao: number;
+  /** UTC ISO 8601; null khi chưa vào lần nào. */
+  lan_vao_gan_nhat: string | null;
 }
 
 export interface FormVle {
