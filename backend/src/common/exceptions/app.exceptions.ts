@@ -144,3 +144,26 @@ export class SsoChuaCauHinhException extends HttpException {
     );
   }
 }
+
+// Vào học VLE (external-login P.CNTT, 2026-11-10, docs/api-contract.md mục
+// 10.2): máy chủ chưa đặt VLE_LOGIN_KEY -> tắt hẳn chức năng.
+export class VleChuaCauHinhException extends HttpException {
+  constructor() {
+    super(
+      {
+        error: {
+          code: 'VLE_CHUA_CAU_HINH',
+          message: 'Chức năng vào học VLE chưa được cấu hình.',
+        },
+      },
+      503,
+    );
+  }
+}
+
+// Vào học VLE: học viên chưa có username/email để khớp sang VLE.
+export class VleChuaCoTaiKhoanException extends HttpException {
+  constructor(message: string) {
+    super({ error: { code: 'VLE_CHUA_CO_TAI_KHOAN', message } }, 409);
+  }
+}

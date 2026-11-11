@@ -4,11 +4,12 @@ import { SsoController } from './sso.controller';
 import { SsoService } from './sso.service';
 import { KetQuaKhaoSatService } from './ket-qua-khao-sat.service';
 import { ThangMucService } from './thang-muc.service';
+import { VleService } from './vle.service';
 
 @Module({
   imports: [HocVienModule],
   controllers: [SsoController],
-  providers: [SsoService, KetQuaKhaoSatService, ThangMucService],
+  providers: [SsoService, KetQuaKhaoSatService, ThangMucService, VleService],
   exports: [KetQuaKhaoSatService, ThangMucService],
 })
 export class SsoModule {}

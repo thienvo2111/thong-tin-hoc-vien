@@ -9,9 +9,11 @@ import {
   Logger,
   Query,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
+import { NguoiDungThrottlerGuard } from '../common/guards/nguoi-dung-throttler.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
@@ -19,6 +21,7 @@ import { SsoService } from './sso.service';
 import { CapMaSsoDto, DoiMaSsoDto, MaThuSsoDto } from './dto/sso.dto';
 import { KetQuaKhaoSatService } from './ket-qua-khao-sat.service';
 import { ThangMucService } from './thang-muc.service';
+import { VleService } from './vle.service';
 import { LuuThangMucDto } from './dto/thang-muc.dto';
 import { kiemTraApiKeyKhaoSat } from './sso-api-key';
 import {
@@ -38,6 +41,7 @@ export class SsoController {
     private readonly ssoService: SsoService,
     private readonly ketQuaKhaoSat: KetQuaKhaoSatService,
     private readonly thangMuc: ThangMucService,
+    private readonly vleService: VleService,
   ) {}
 
   @Roles('hoc_vien')
@@ -115,5 +119,22 @@ export class SsoController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.thangMuc.luu(dto.muc, user.id);
+  }
+
+  // Vào học VLE (external-login P.CNTT, 2026-11-10, api-contract.md mục
+  // 10.2). Route PHẢI nằm dưới /sso — Nginx đã proxy sẵn prefix này.
+  @Roles('hoc_vien')
+  @Get('vle/trang-thai')
+  vleTrangThai(@CurrentUser() user: AuthenticatedUser) {
+    return this.vleService.trangThai(user);
+  }
+
+  // Giới hạn tần suất THEO TÀI KHOẢN (không phải IP) — nhiều học viên có
+  // thể chung 1 phòng máy/NAT trường, đếm theo IP sẽ chặn chung cả phòng.
+  @Roles('hoc_vien')
+  @UseGuards(NguoiDungThrottlerGuard)
+  @Post('vle/form')
+  vleForm(@CurrentUser() user: AuthenticatedUser, @Req() req: Request) {
+    return this.vleService.form(user, req.ip ?? null);
   }
 }
