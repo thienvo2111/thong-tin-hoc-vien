@@ -52,6 +52,11 @@ export class UpdateKhoaBoiDuongDto {
   @IsBoolean()
   mo_dieu_chinh_muc?: boolean;
 
+  // 2026-11-11: công tắc nút "Vào học VLE" của khóa (api-contract mục 10.2).
+  @IsOptional()
+  @IsBoolean()
+  mo_vao_hoc_vle?: boolean;
+
   // ADR 0007: số buổi tối đa học viên được đề nghị đổi (0 = tắt). Khớp CHECK 0–50.
   @IsOptional()
   @IsInt()

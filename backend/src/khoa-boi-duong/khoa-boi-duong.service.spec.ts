@@ -401,6 +401,36 @@ describe('KhoaBoiDuongService', () => {
       });
     });
 
+    // 2026-11-11: công tắc "Vào học VLE" theo khóa (api-contract mục 10.2).
+    it('mo_vao_hoc_vle -> ghi đúng cột + lịch sử cấu hình nhãn "Mở vào học VLE"', async () => {
+      prisma.khoa_boi_duong.findUnique.mockResolvedValue({
+        ...khoaDaDuyet,
+        ten_khoa: 'Khóa A',
+        mo_vao_hoc_vle: false,
+      });
+      prisma.khoa_boi_duong.update.mockResolvedValue({
+        ...khoaDaDuyet,
+        ten_khoa: 'Khóa A',
+        mo_vao_hoc_vle: true,
+      });
+      await service.capNhatKhoa('khoa-1', { mo_vao_hoc_vle: true }, quanTri);
+      expect(prisma.khoa_boi_duong.update).toHaveBeenCalledWith({
+        where: { id: 'khoa-1' },
+        data: expect.objectContaining({
+          mo_vao_hoc_vle: true,
+          mo_dieu_chinh_muc: undefined,
+        }),
+      });
+      expect(nhatKy.ghi).toHaveBeenCalledWith({
+        hanh_dong: 'cap_nhat_cau_hinh_khoa',
+        mo_ta: 'Khóa A: Mở vào học VLE',
+        chi_tiet: {
+          khoa_id: 'khoa-1',
+          thay_doi: [{ truong: 'mo_vao_hoc_vle', truoc: false, sau: true }],
+        },
+      });
+    });
+
     it('lịch sử cấu hình: PATCH không đổi gì -> không ghi nhật ký', async () => {
       prisma.khoa_boi_duong.findUnique.mockResolvedValue(khoaDaDuyet);
       prisma.khoa_boi_duong.update.mockResolvedValue({ ...khoaDaDuyet });

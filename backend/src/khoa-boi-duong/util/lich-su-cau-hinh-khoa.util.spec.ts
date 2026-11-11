@@ -46,6 +46,8 @@ describe('hienThiGiaTriCauHinh', () => {
     ],
     ['mo_dieu_chinh_muc', true, 'Bật'],
     ['mo_dieu_chinh_muc', false, 'Tắt'],
+    ['mo_vao_hoc_vle', true, 'Bật'],
+    ['mo_vao_hoc_vle', false, 'Tắt'],
     ['bat_diem_danh_zoom_luc', null, 'Tắt'],
     [
       'bat_diem_danh_zoom_luc',
