@@ -23,6 +23,7 @@ import { StatusBanner } from '@/components/StatusBanner';
 import { nhanMucNangLuc } from '@/lib/mucNangLuc';
 import { ChonMucLopHoc } from './ChonMucLopHoc';
 import { CanhBaoDiemDanhZoom, NhanDiemDanhZoom, NutDiemDanhZoom, canNhacCungNgay } from './DiemDanhZoom';
+import { NutVaoHocVle } from './VaoHocVle';
 
 // T12 (mo-rong-nls-an-giang.md, 2026-09-30) — điểm danh nhập qua IMPORT EXCEL, không có giao diện
 // chấm tay. null (chưa điểm danh) không hiện badge nào — tránh gây nhầm học viên nghĩ là "vắng".
@@ -337,6 +338,7 @@ function TheGiaiDoan({
       {gd.lop ? (
         <Stack gap="sm">
           <Text fw={700}>{gd.lop.ten_lop}</Text>
+          {gd.lop.loai_lop === 'vle' && <NutVaoHocVle />}
           {gd.lop.nhan_su.length > 0 && (
             <Stack gap={4}>
               {gd.lop.nhan_su.map((ns) => (
