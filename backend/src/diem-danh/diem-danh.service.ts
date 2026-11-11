@@ -15,6 +15,8 @@ import {
   chiOCuaBuoi,
   nhanDoiBuoiTheoDangKy,
 } from '../doi-buoi-hoc/doi-buoi-hoc.view.util';
+import { napChuyenCan } from '../doi-buoi-hoc/nap-chuyen-can';
+import { oLopKhacTheoBuoi } from './o-lop-khac.util';
 
 const CHON_O = {
   lich_hoc_id: true,
@@ -173,6 +175,25 @@ export class DiemDanhService {
     });
     const theoTen = (a: { ho_ten: string }, b: { ho_ten: string }) =>
       a.ho_ten.localeCompare(b.ho_ten, 'vi');
+    // ADR 0014: ô chưa có dòng tại buổi nhưng tinhChuyenCan công nhận dòng ở
+    // lớp khác (lớp cũ / học bù) -> hiện chỉ đọc. Nạp 1 lần cho cả lớp.
+    const chuyenCan = await napChuyenCan(
+      this.prisma,
+      this.doiBuoi,
+      dsPhanLop.map((p) => p.dang_ky_hoc.id),
+    );
+    const buoiGd = dsBuoi.map((b) => ({ ...b, giai_doan_id: gdId }));
+    const kemLopKhac = (h: ReturnType<typeof dong>) => ({
+      ...h,
+      diem_danh: {
+        ...oLopKhacTheoBuoi(
+          buoiGd,
+          chuyenCan.get(h.dang_ky_hoc_id),
+          (id) => id in h.diem_danh || !!h.doi_buoi?.[id],
+        ),
+        ...h.diem_danh,
+      },
+    });
 
     return {
       lop,
@@ -183,7 +204,9 @@ export class DiemDanhService {
         ...quyenSuaDiemDanh(user.vai_tro, b.thoi_gian_bat_dau, now),
       })),
       // Học viên phân vào lớp gốc — số liệu cấp lớp không đổi (spec §5).
-      hoc_vien: dsPhanLop.map((p) => dong(p.dang_ky_hoc)).sort(theoTen),
+      hoc_vien: dsPhanLop
+        .map((p) => kemLopKhac(dong(p.dang_ky_hoc)))
+        .sort(theoTen),
       // Người đổi vào: danh sách riêng, chỉ mang ô của buổi chốt.
       hoc_vien_doi_vao: dsVao
         .map((dk) => {

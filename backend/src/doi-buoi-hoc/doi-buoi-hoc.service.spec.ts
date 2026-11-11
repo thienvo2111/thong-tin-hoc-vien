@@ -2303,6 +2303,17 @@ describe('DoiBuoiHocService trung lich', () => {
 // ---------------------------------------------------------------------------
 // ADR 0012 — học bù (loai = hoc_bu) dùng chung cơ chế đổi buổi.
 // ---------------------------------------------------------------------------
+const coMatLopCu = (che_do_chuyen_can: string, muc_nang_luc: string | null = 'co_ban') => ({
+  lich_hoc_id: 'lopCu-3',
+  trang_thai: 'co_mat',
+  lich_hoc: {
+    lop_id: 'lopCu',
+    giai_doan_id: 'gd1',
+    buoi_so: 3,
+    lop: { loai_lop: 'zoom', muc_nang_luc, khoa: { che_do_chuyen_can } },
+  },
+});
+
 describe('DoiBuoiHocService hoc bu (hoc vien)', () => {
   const dtoHb = { ...dto, loai: 'hoc_bu' as const, ly_do: 'Bi om hom do' };
   const gocDaQua = () => lich('ln', 'lopA', { thoi_gian_bat_dau: hqua });
@@ -2369,6 +2380,30 @@ describe('DoiBuoiHocService hoc bu (hoc vien)', () => {
       tx.diem_danh.findMany.mock.invocationCallOrder[0],
     );
     expect(tx.doi_buoi_hoc.create).not.toHaveBeenCalled();
+  });
+
+  it('gui: vang buoi goc nhung da co mat o lop cu duoc cong nhan (ADR 0014) -> 400 DA_CO_MAT', async () => {
+    const { svc, tx } = setupHb();
+    tx.diem_danh.findMany
+      .mockResolvedValueOnce([{ lich_hoc_id: 'ln', trang_thai: 'vang' }] as never)
+      .mockResolvedValueOnce([coMatLopCu('cong_nhan_lop_cu')] as never);
+    await expect(svc.gui(user, dtoHb)).rejects.toMatchObject(
+      loiVoi(400, 'Thầy/Cô đã có mặt buổi này, không cần học bù'),
+    );
+    expect(tx.diem_danh.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ trang_thai: 'co_mat', lich_hoc_id: { notIn: ['ln'] } }),
+      }),
+    );
+    expect(tx.doi_buoi_hoc.create).not.toHaveBeenCalled();
+  });
+
+  it('gui: co mat o lop cu nhung nac theo_lop_hien_tai -> van tao hoc bu', async () => {
+    const { svc, tx } = setupHb();
+    tx.diem_danh.findMany
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([coMatLopCu('theo_lop_hien_tai')] as never);
+    await expect(svc.gui(user, dtoHb)).resolves.toEqual({ id: 'moi' });
   });
 
   it.each(['vang', 'vang_co_phep'])('gui: buoi goc diem danh %s -> tao', async (t) => {
@@ -2525,10 +2560,16 @@ describe('DoiBuoiHocService hoc bu (tong quan / lua chon)', () => {
         : [lich('ln', 'lopA')],
     );
     p.lich_hoc_lop = { findMany: lichFindMany };
-    p.diem_danh.findMany = jest.fn(async () => [
-      { lich_hoc_id: 'p1', trang_thai: 'co_mat' },
-      { lich_hoc_id: 'p2', trang_thai: 'vang' },
-    ]);
+    // Truy vấn thứ 2 (trang_thai co_mat) = dòng lớp khác cùng buổi số (ADR 0014).
+    const coMatLopKhac: unknown[] = [];
+    p.diem_danh.findMany = jest.fn(async (a: any) =>
+      a.where.trang_thai === 'co_mat'
+        ? coMatLopKhac
+        : [
+            { lich_hoc_id: 'p1', trang_thai: 'co_mat' },
+            { lich_hoc_id: 'p2', trang_thai: 'vang' },
+          ],
+    );
     const row = (id: string, over: object) => ({
       id,
       trang_thai: 'cho_duyet',
@@ -2566,8 +2607,31 @@ describe('DoiBuoiHocService hoc bu (tong quan / lua chon)', () => {
         ['lc', lich('lc', 'lopC')],
       ]),
     );
-    return { ...s, lichFindMany };
+    return { ...s, lichFindMany, coMatLopKhac };
   }
+
+  it('tong quan: buoi da co mat o lop cu duoc cong nhan theo nac khoa -> khong hoc bu', async () => {
+    const s = setupTq();
+    const lopCu = (che_do_chuyen_can: string, muc_nang_luc: string | null) => ({
+      lich_hoc_id: 'a2',
+      trang_thai: 'co_mat',
+      lich_hoc: {
+        lop_id: 'lopCu',
+        giai_doan_id: 'gd1',
+        buoi_so: 3,
+        lop: { loai_lop: 'zoom', muc_nang_luc, khoa: { che_do_chuyen_can } },
+      },
+    });
+    // lich() mặc định: gd1, buổi 3 → khớp mọi buổi đã qua của lớp hiện tại.
+    s.coMatLopKhac.push(lopCu('cong_nhan_lop_cu', 'nang_cao'));
+    let r = await s.svc.tongQuanHocVien(user, 'k1');
+    expect(r.buoi_co_the_hoc_bu).toEqual([]);
+
+    const s2 = setupTq();
+    s2.coMatLopKhac.push(lopCu('theo_lop_hien_tai', null));
+    r = await s2.svc.tongQuanHocVien(user, 'k1');
+    expect(r.buoi_co_the_hoc_bu.map((b) => b.lich_nguon.id)).toEqual(['p2', 'p3']);
+  });
 
   it('tong quan: so_buoi_hoc_bu_toi_da, luot tach loai, buoi_co_the_hoc_bu (bo co_mat + da doi buoi), truy van co dinh', async () => {
     const s = setupTq();
@@ -2597,7 +2661,7 @@ describe('DoiBuoiHocService hoc bu (tong quan / lua chon)', () => {
       orderBy: { thoi_gian_bat_dau: 'desc' },
       take: 30,
     });
-    expect((s.prisma as any).diem_danh.findMany).toHaveBeenCalledTimes(1);
+    expect((s.prisma as any).diem_danh.findMany).toHaveBeenCalledTimes(2);
     expect((s.prisma as any).diem_danh.findMany).toHaveBeenCalledWith({
       where: { dang_ky_hoc_id: 'dk1', lich_hoc_id: { in: ['p1', 'p2', 'p3', 'p4'] } },
       select: { lich_hoc_id: true, trang_thai: true },
@@ -2814,6 +2878,30 @@ describe('DoiBuoiHocService hoc bu (nguoi duyet)', () => {
     );
     expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
     expect(nhatKy.ghi).not.toHaveBeenCalled();
+  });
+
+  it('duyet: da co mat o lop cu duoc cong nhan (ADR 0014) -> 400 DA_CO_MAT, khong cap nhat', async () => {
+    const { svc, tx } = setupD();
+    tx.diem_danh.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([coMatLopCu('cong_nhan_cung_muc')] as never);
+    await expect(svc.duyet(quanTri, 'x1', {})).rejects.toMatchObject({
+      status: 400,
+      response: {
+        error: expect.objectContaining({
+          message: 'Học viên đã có mặt buổi này, không cần học bù',
+        }),
+      },
+    });
+    expect(tx.doi_buoi_hoc.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('duyet: co mat o lop cu khac muc, nac cong_nhan_cung_muc -> van duyet hoc bu', async () => {
+    const { svc, tx } = setupD();
+    tx.diem_danh.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([coMatLopCu('cong_nhan_cung_muc', 'nang_cao')] as never);
+    await expect(svc.duyet(quanTri, 'x1', {})).resolves.toMatchObject({ trang_thai: 'da_duyet' });
   });
 
   it('duyet: buoi goc co doi buoi da_duyet -> 400 DA_DOI_BUOI, khong ha ban doi buoi', async () => {

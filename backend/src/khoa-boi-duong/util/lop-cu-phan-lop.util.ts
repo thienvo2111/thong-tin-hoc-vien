@@ -182,10 +182,15 @@ export interface DiemDanhLopCuKhoa {
   theo_hoc_vien: Map<string, Map<string, DiemDanhLopCu>>;
 }
 
+// hocVienId: chỉ nạp 1 học viên (commitPhanLop gọi ngoài lượt import).
 export async function napDiemDanhLopCu(
   prisma: Pick<PrismaClient, '$queryRaw' | 'khoa_boi_duong'>,
   khoaId: string,
+  hocVienId?: string,
 ): Promise<DiemDanhLopCuKhoa> {
+  const locHocVien = hocVienId
+    ? Prisma.sql`AND dk.hoc_vien_id = ${hocVienId}::uuid`
+    : Prisma.empty;
   const [khoa, dong] = await Promise.all([
     prisma.khoa_boi_duong.findUnique({
       where: { id: khoaId },
@@ -204,7 +209,7 @@ export async function napDiemDanhLopCu(
         ON lh.lop_id = pl.lop_id AND lh.giai_doan_id = pl.giai_doan_id
       JOIN diem_danh dd
         ON dd.lich_hoc_id = lh.id AND dd.dang_ky_hoc_id = dk.id
-      WHERE dk.khoa_id = ${khoaId}::uuid
+      WHERE dk.khoa_id = ${khoaId}::uuid ${locHocVien}
       GROUP BY dk.hoc_vien_id, pl.giai_doan_id, pl.lop_id, l.ten_lop,
                l.loai_lop, l.muc_nang_luc`,
   ]);
@@ -222,6 +227,17 @@ export async function napDiemDanhLopCu(
 
 // Kết luận công nhận dùng đúng quy tắc của tinhChuyenCan (trực tiếp luôn
 // tính; lớp Zoom khác theo congNhanLopKhac).
+export function congNhanDiemDanhLopCu(
+  cheDo: CheDoChuyenCan,
+  cu: DiemDanhLopCu,
+  mucLopMoi: MucLop | undefined,
+): boolean {
+  return (
+    cu.loai_lop === 'truc_tiep' ||
+    congNhanLopKhac(cheDo, cu.muc_nang_luc, mucLopMoi)
+  );
+}
+
 export function canhBaoDiemDanhLopCu(
   ma: string,
   gan: { giai_doan_id: string; lop_id: string | null }[],
@@ -243,9 +259,11 @@ export function canhBaoDiemDanhLopCu(
       ];
     }
     const moi = lopMoi.get(g.giai_doan_id);
-    const congNhan =
-      cu.loai_lop === 'truc_tiep' ||
-      congNhanLopKhac(diemDanh.che_do, cu.muc_nang_luc, moi?.muc_nang_luc);
+    const congNhan = congNhanDiemDanhLopCu(
+      diemDanh.che_do,
+      cu,
+      moi?.muc_nang_luc,
+    );
     const ketLuan = congNhan
       ? 'được công nhận'
       : diemDanh.che_do === 'cong_nhan_cung_muc'
@@ -255,4 +273,63 @@ export function canhBaoDiemDanhLopCu(
       `Học viên "${ma}" chuyển từ lớp "${cu.ten_lop}" sang lớp "${moi?.ten_lop ?? '?'}" (${gd}): ${daDiemDanh} — theo chế độ của khóa: ${ketLuan}`,
     ];
   });
+}
+
+// Tên nấc ngắn cho nhật ký (ghi nấc TẠI THỜI ĐIỂM chuyển lớp).
+export const NHAN_NAC_CHUYEN_CAN: Record<CheDoChuyenCan, string> = {
+  theo_lop_hien_tai: 'theo lớp hiện tại',
+  cong_nhan_cung_muc: 'cùng mức',
+  cong_nhan_lop_cu: 'bất kể mức',
+};
+
+// Phần đuôi nhật ký "Phân lớp" (nhập file) của 1 giai đoạn đổi lớp: điểm
+// danh ở lớp cũ + kết luận công nhận, và số đề nghị bị hủy (C6). Rỗng khi
+// không có gì để nói.
+export function phuLucNhatKyPhanLop(
+  g: { giai_doan_id: string; lop_id: string | null },
+  cu: DiemDanhLopCu | undefined,
+  cheDo: CheDoChuyenCan | undefined,
+  mucLopMoi: MucLop | undefined,
+  huy: DeNghiLopCu[],
+): { duoi: string; chi_tiet?: Record<string, unknown> } {
+  const phan: string[] = [];
+  const chiTiet: Record<string, unknown> = {};
+  if (cu && cheDo && cu.lop_id !== g.lop_id) {
+    if (g.lop_id === null) {
+      phan.push(`đã điểm danh ${cu.so_buoi} buổi, điểm danh vẫn được giữ`);
+      chiTiet.diem_danh_lop_cu = { so_buoi: cu.so_buoi, cong_nhan: null };
+    } else {
+      const congNhan = congNhanDiemDanhLopCu(cheDo, cu, mucLopMoi);
+      phan.push(
+        `đã điểm danh ${cu.so_buoi} buổi ở lớp ${cu.ten_lop}, ` +
+          `${congNhan ? 'được' : 'không được'} công nhận (nấc: ${NHAN_NAC_CHUYEN_CAN[cheDo]})`,
+      );
+      chiTiet.diem_danh_lop_cu = {
+        so_buoi: cu.so_buoi,
+        cong_nhan: congNhan,
+        che_do_chuyen_can: cheDo,
+      };
+    }
+  }
+  const huyGd = huy.filter((d) => d.giai_doan_id === g.giai_doan_id);
+  if (huyGd.length > 0) {
+    const hocBu = huyGd.filter((d) => d.loai === 'hoc_bu').length;
+    const doiBuoi = huyGd.length - hocBu;
+    phan.push(
+      'hủy ' +
+        [doiBuoi ? `${doiBuoi} đổi buổi` : '', hocBu ? `${hocBu} học bù` : '']
+          .filter(Boolean)
+          .join(', '),
+    );
+    chiTiet.huy_de_nghi = {
+      doi_buoi: doiBuoi,
+      hoc_bu: hocBu,
+      ids: huyGd.map((d) => d.id),
+    };
+  }
+  if (phan.length === 0) return { duoi: '' };
+  return {
+    duoi: ` — ${phan.join('; ')}`,
+    chi_tiet: { giai_doan_id: g.giai_doan_id, nguon: 'nhap_file', ...chiTiet },
+  };
 }

@@ -70,6 +70,7 @@ import { ChonNhomHoTroGv } from './ChonNhomHoTroGv';
 import { BangKiemEditor } from './BangKiemEditor';
 import { CauHinhDiemDanhZoom } from './CauHinhDiemDanhZoom';
 import { CauHinhDoiBuoi } from './CauHinhDoiBuoi';
+import { LichSuCauHinhKhoa } from './LichSuCauHinhKhoa';
 import { KhoiDotNhuCauMuc } from './KhoiDotNhuCauMuc';
 import { CanhBaoZoomThieuLink } from './CanhBaoZoomThieuLink';
 import { BangDiemDanhLop } from '@/components/BangDiemDanhLop';
@@ -899,6 +900,7 @@ export default function AdminKhoaChiTiet() {
                 <Tabs.Tab value="cum">Cụm hỗ trợ Zalo</Tabs.Tab>
                 {laQuanTri && <Tabs.Tab value="ho-tro-gv">Hỗ trợ giảng viên</Tabs.Tab>}
                 {laQuanTri && <Tabs.Tab value="bang-kiem">Bảng kiểm chuẩn bị</Tabs.Tab>}
+                {laQuanTri && <Tabs.Tab value="lich-su-cau-hinh">Lịch sử cấu hình</Tabs.Tab>}
               </Tabs.List>
 
               {/* ---------------- Tab Lớp học ---------------- */}
@@ -1346,6 +1348,11 @@ export default function AdminKhoaChiTiet() {
               {laQuanTri && (
                 <Tabs.Panel value="bang-kiem" pt="md">
                   <BangKiemEditor khoaId={khoa.id} />
+                </Tabs.Panel>
+              )}
+              {laQuanTri && (
+                <Tabs.Panel value="lich-su-cau-hinh" pt="md">
+                  <LichSuCauHinhKhoa khoaId={khoa.id} />
                 </Tabs.Panel>
               )}
             </Tabs>

@@ -93,6 +93,33 @@ export function useChiTietKhoa(id: string | undefined) {
   });
 }
 
+// ADR 0014 (bổ sung nhật ký): lịch sử PATCH cấu hình khóa, mới nhất trước — chỉ quan_tri. Nhãn/giá
+// trị hiển thị do server dựng; key nằm dưới ['admin','khoa-boi-duong'] nên useCapNhatKhoa tự làm mới.
+export interface ThayDoiCauHinhKhoa {
+  truong: string;
+  nhan: string;
+  truoc_hien_thi: string;
+  sau_hien_thi: string;
+}
+
+export interface LichSuCauHinhKhoa {
+  id: string;
+  thoi_gian: string;
+  nguoi_thuc_hien: string | null;
+  thay_doi: ThayDoiCauHinhKhoa[];
+}
+
+export function lichSuCauHinhKhoaKey(id: string) {
+  return ['admin', 'khoa-boi-duong', 'lich-su-cau-hinh', id] as const;
+}
+
+export function useLichSuCauHinhKhoa(id: string) {
+  return useQuery({
+    queryKey: lichSuCauHinhKhoaKey(id),
+    queryFn: () => apiFetch<LichSuCauHinhKhoa[]>(`/khoa-boi-duong/${id}/lich-su-cau-hinh`),
+  });
+}
+
 // Thêm 2026-10-09: Excel "Danh sách chia lớp" — chia lớp ngoài hệ thống rồi nhập lại thẳng qua
 // Nhập dữ liệu → Phân lớp học viên (xem KhoaBoiDuongService.xuatDanhSachChiaLop).
 export async function xuatDanhSachChiaLop(khoaId: string, maKhoa: string): Promise<void> {

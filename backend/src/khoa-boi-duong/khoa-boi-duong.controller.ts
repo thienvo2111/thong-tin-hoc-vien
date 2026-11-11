@@ -70,6 +70,13 @@ export class KhoaBoiDuongController {
     return this.khoaBoiDuongService.findOne(id, user);
   }
 
+  // ADR 0014 (bổ sung nhật ký): lịch sử PATCH cấu hình khóa.
+  @Roles('quan_tri')
+  @Get(':id/lich-su-cau-hinh')
+  lichSuCauHinh(@Param('id', ParseUUIDPipe) id: string) {
+    return this.khoaBoiDuongService.lichSuCauHinhKhoa(id);
+  }
+
   // Thêm 2026-10-09: Excel chia lớp để chia ngoài hệ thống rồi nhập lại thẳng
   // qua import phan_lop_hoc_vien (xem KhoaBoiDuongService.xuatDanhSachChiaLop).
   @Roles('quan_tri')

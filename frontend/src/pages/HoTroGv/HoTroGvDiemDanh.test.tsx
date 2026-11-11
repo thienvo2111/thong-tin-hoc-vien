@@ -104,6 +104,37 @@ describe('Hỗ trợ GV — bảng điểm danh lớp', () => {
     expect(screen.getAllByText(/Sĩ số buổi/)).toHaveLength(1);
   });
 
+  // ADR 0014: buổi được công nhận từ lớp khác (lớp cũ trước khi chuyển / học bù) — chỉ đọc.
+  it('ô lớp khác: hiện "Có mặt – ở lớp X", không cho sửa', async () => {
+    const bang = structuredClone(bangDiemDanhMock);
+    bang.hoc_vien[1] = {
+      ...bang.hoc_vien[1],
+      bao_vang: {},
+      diem_danh: {
+        'b-1': {
+          trang_thai: 'co_mat',
+          nguon: 'zoom',
+          ghi_chu: null,
+          tu_diem_danh_luc: null,
+          cap_nhat_luc: null,
+          nguoi_sua: null,
+          nguon_tinh: 'lop_khac',
+          lop_tinh: { id: 'lop-a', ten_lop: 'Lớp A' },
+          sua_duoc: false,
+          nhan: 'Có mặt – ở lớp Lớp A',
+        },
+      },
+    };
+    server.use(http.get('/lop/:lopId/diem-danh', () => HttpResponse.json(bang)));
+    render();
+    const o = await screen.findByLabelText('Lê Văn Vắng buổi 1: Điểm danh ở lớp Lớp A — chỉ xem');
+    expect(o).toHaveAttribute('aria-disabled', 'true');
+    expect(within(o).getByText('Có mặt – ở lớp Lớp A')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sửa điểm danh Lê Văn Vắng buổi 1' })).not.toBeInTheDocument();
+    // Ô thường cùng buổi vẫn sửa được.
+    expect(screen.getByRole('button', { name: 'Sửa điểm danh Trần Thị Học buổi 1' })).toBeInTheDocument();
+  });
+
   it('lớp không còn ai phân nhưng có người đổi vào → vẫn hiện bảng', async () => {
     const bang = structuredClone(bangDiemDanhMock);
     bang.hoc_vien = [];

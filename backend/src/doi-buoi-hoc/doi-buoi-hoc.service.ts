@@ -42,6 +42,7 @@ import {
   soLuotDaDung,
   thuTuHang,
 } from './doi-buoi-hoc.rules';
+import { napBuoiGocCoMatLopKhac } from './hoc-bu-cong-nhan';
 
 export interface DeNghiHocVien {
   id: string;
@@ -232,6 +233,12 @@ export class DoiBuoiHocService {
           select: { lich_hoc_id: true, trang_thai: true },
         })
       : [];
+    // ADR 0014: buổi đã được công nhận có mặt từ lớp khác → không học bù.
+    const coMatLopKhac = await napBuoiGocCoMatLopKhac(
+      this.prisma,
+      dangKy.id,
+      lichDaQua,
+    );
 
     const lichMap = await this.query.lichTomTat(
       deNghiRows.flatMap((d) =>
@@ -275,7 +282,12 @@ export class DoiBuoiHocService {
       so_luot_hoc_bu_da_dung: soLuotDaDung(deNghiRows, 'hoc_bu'),
       // B2 + B6: buổi đã qua, không có mặt, không có đổi buổi đã duyệt.
       buoi_co_the_hoc_bu: lichDaQua
-        .filter((l) => ttDiemDanh.get(l.id) !== 'co_mat' && !daDuyet.has(l.id))
+        .filter(
+          (l) =>
+            ttDiemDanh.get(l.id) !== 'co_mat' &&
+            !coMatLopKhac.has(l.id) &&
+            !daDuyet.has(l.id),
+        )
         .map((l) => {
           const duyet = hocBuDaDuyet.get(l.id) ?? null;
           const cho = hocBuCho.get(l.id) ?? null;
@@ -811,6 +823,10 @@ export class DoiBuoiHocService {
       const chot = lichMap.get(lichChotId);
       if (!nguon || !chot)
         throw new NotFoundAppException('Không tìm thấy buổi học');
+      const coMatLopKhac =
+        loai === 'hoc_bu'
+          ? await napBuoiGocCoMatLopKhac(tx, dn.dang_ky_hoc_id, [nguon])
+          : new Set<string>();
       const phanLop = await tx.phan_lop_giai_doan.findFirst({
         where: {
           dang_ky_hoc_id: dn.dang_ky_hoc_id,
@@ -843,9 +859,10 @@ export class DoiBuoiHocService {
           da_diem_danh_nguon: daDiemDanh.has(dn.lich_nguon_id),
           da_diem_danh_chot_cu:
             !!banCu?.lich_chot_id && daDiemDanh.has(banCu.lich_chot_id),
-          trang_thai_diem_danh_nguon:
-            diemDanh.find((d) => d.lich_hoc_id === dn.lich_nguon_id)
-              ?.trang_thai ?? null,
+          trang_thai_diem_danh_nguon: coMatLopKhac.has(dn.lich_nguon_id)
+            ? 'co_mat'
+            : (diemDanh.find((d) => d.lich_hoc_id === dn.lich_nguon_id)
+                ?.trang_thai ?? null),
           nguon_co_doi_buoi_da_duyet: !!banTruoc && !banCu,
         },
         now,
@@ -1460,6 +1477,10 @@ export class DoiBuoiHocService {
           select: { lich_hoc_id: true, trang_thai: true },
         });
         const daDiemDanh = new Set(diemDanh.map((d) => d.lich_hoc_id));
+        const coMatLopKhac =
+          x.loai === 'hoc_bu'
+            ? await napBuoiGocCoMatLopKhac(tx, x.dangKyId, [x.nguon])
+            : new Set<string>();
         const phanLop = await tx.phan_lop_giai_doan.findFirst({
           where: {
             dang_ky_hoc_id: x.dangKyId,
@@ -1486,9 +1507,10 @@ export class DoiBuoiHocService {
               buoi_chot_hien_tai: chotCu,
               da_diem_danh_nguon: daDiemDanh.has(x.nguon.id),
               da_diem_danh_chot: !!chotCuId && daDiemDanh.has(chotCuId),
-              trang_thai_diem_danh_nguon:
-                diemDanh.find((d) => d.lich_hoc_id === x.nguon.id)
-                  ?.trang_thai ?? null,
+              trang_thai_diem_danh_nguon: coMatLopKhac.has(x.nguon.id)
+                ? 'co_mat'
+                : (diemDanh.find((d) => d.lich_hoc_id === x.nguon.id)
+                    ?.trang_thai ?? null),
               // B6: kiểm TRƯỚC khi chạm unique uq_doi_buoi_* → 400, không 409/500.
               nguon_co_doi_buoi_da_duyet: banNguon.some((d) => !cungLoai(d)),
             },

@@ -116,6 +116,20 @@ describe('<DanhSachTheoBuoi />', () => {
     expect(screen.getByText('2 học viên')).toBeInTheDocument();
   });
 
+  it('ADR 0014: buổi chưa điểm danh ở lớp này nhưng được công nhận từ lớp khác → nhãn "Có mặt – ở lớp X"', async () => {
+    const user = userEvent.setup();
+    const d = dot();
+    d.hoc_vien[2] = {
+      ...d.hoc_vien[2],
+      diem_danh_lop_khac: {
+        b1: { trang_thai: 'co_mat', nhan: 'Có mặt – ở lớp TT-01', lop_tinh: { id: 'l0', ten_lop: 'TT-01' } },
+      },
+    };
+    renderTrang(<DanhSachTheoBuoi d={d} />);
+    await user.selectOptions(screen.getByLabelText('Buổi'), 'b1');
+    expect(within(screen.getByRole('table')).getByText('Có mặt – ở lớp TT-01')).toBeInTheDocument();
+  });
+
   it('cột SĐT chỉ hiện khi dữ liệu có SĐT (backend đã lọc theo vai trò)', () => {
     const d = dot();
     const { unmount } = renderTrang(<DanhSachTheoBuoi d={d} />);

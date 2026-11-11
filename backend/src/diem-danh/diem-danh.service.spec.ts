@@ -25,10 +25,12 @@ describe('DiemDanhService — đổi buổi', () => {
     phan_lop_giai_doan: { findMany: jest.Mock; count: jest.Mock };
     dang_ky_hoc: { findMany: jest.Mock };
     diem_danh: { upsert: jest.Mock };
+    $queryRaw: jest.Mock;
   };
   let doiBuoi: {
     dieuChinhTheoBuoi: jest.Mock;
     doiBuoiDaDuyetCuaDangKy: jest.Mock;
+    lichTomTat: jest.Mock;
   };
   let service: DiemDanhService;
 
@@ -88,6 +90,7 @@ describe('DiemDanhService — đổi buổi', () => {
           sua_boi: { ho_ten: 'QT' },
         }),
       },
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     doiBuoi = {
       dieuChinhTheoBuoi: jest.fn().mockResolvedValue(
@@ -108,6 +111,7 @@ describe('DiemDanhService — đổi buổi', () => {
         ]),
       ),
       doiBuoiDaDuyetCuaDangKy: jest.fn().mockResolvedValue([]),
+      lichTomTat: jest.fn().mockResolvedValue(new Map()),
     };
     service = new DiemDanhService(
       prisma as unknown as PrismaService,
@@ -222,5 +226,137 @@ describe('DiemDanhService — đổi buổi', () => {
       ),
     ).rejects.toBeInstanceOf(ValidationException);
     expect(prisma.diem_danh.upsert).not.toHaveBeenCalled();
+  });
+
+  // ADR 0014: ô lớp khác (lớp cũ trước khi chuyển / học bù) theo tinhChuyenCan.
+  describe('ô được công nhận từ lớp khác', () => {
+    const sqlCo = (q: unknown, chu: string) =>
+      (q as { strings: string[] }).strings.join('').includes(chu);
+    function gia(o: {
+      cheDo: string;
+      loaiLopCu?: string;
+      mucCu?: string | null;
+      mucMoi?: string | null;
+      trangThai?: string;
+    }) {
+      prisma.$queryRaw.mockImplementation((q: unknown) => {
+        if (sqlCo(q, 'FROM diem_danh')) {
+          return Promise.resolve([
+            {
+              dang_ky_hoc_id: 'dk-b',
+              lich_hoc_id: 'a-1',
+              trang_thai: o.trangThai ?? 'co_mat',
+              nguon: 'zoom',
+              tu_diem_danh_luc: null,
+              lop_id: 'lop-a',
+              giai_doan_id: 'gd-1',
+              buoi_so: 1,
+              loai_lop: o.loaiLopCu ?? 'zoom',
+              ten_lop: 'Lớp A',
+              muc_nang_luc: o.mucCu ?? null,
+              che_do_chuyen_can: o.cheDo,
+            },
+          ]);
+        }
+        return Promise.resolve([
+          {
+            dang_ky_hoc_id: 'dk-b',
+            giai_doan_id: 'gd-1',
+            lop_id: 'lop-b',
+            muc_nang_luc: o.mucMoi ?? null,
+          },
+        ]);
+      });
+      doiBuoi.dieuChinhTheoBuoi.mockResolvedValue(new Map());
+    }
+    const bang = () => service.bangDiemDanh(quanTri, 'lop-b', 'gd-1', now);
+
+    it.each([
+      ['cong_nhan_lop_cu', 'zoom', 'co_ban', 'nang_cao', true],
+      ['cong_nhan_cung_muc', 'zoom', 'co_ban', 'co_ban', true],
+      ['cong_nhan_cung_muc', 'zoom', null, null, true],
+      ['cong_nhan_cung_muc', 'zoom', 'co_ban', 'nang_cao', false],
+      ['theo_lop_hien_tai', 'zoom', 'co_ban', 'co_ban', false],
+      ['theo_lop_hien_tai', 'truc_tiep', 'co_ban', 'nang_cao', true],
+    ])(
+      'nấc %s, lớp cũ %s, mức %s -> %s: có ô lớp khác = %s',
+      async (cheDo, loaiLopCu, mucCu, mucMoi, co) => {
+        gia({ cheDo, loaiLopCu, mucCu, mucMoi });
+        const o = (await bang()).hoc_vien[0].diem_danh['b-1'];
+        if (!co) {
+          expect(o).toBeUndefined();
+          return;
+        }
+        expect(o).toMatchObject({
+          trang_thai: 'co_mat',
+          nhan: 'Có mặt – ở lớp Lớp A',
+          nguon_tinh: 'lop_khac',
+          lop_tinh: { id: 'lop-a', ten_lop: 'Lớp A' },
+          sua_duoc: false,
+        });
+      },
+    );
+
+    it('vắng có phép ở lớp cũ -> nhãn "Vắng có phép – ở lớp X"', async () => {
+      gia({ cheDo: 'cong_nhan_lop_cu', trangThai: 'vang_co_phep' });
+      expect((await bang()).hoc_vien[0].diem_danh['b-1']).toMatchObject({
+        nhan: 'Vắng có phép – ở lớp Lớp A',
+      });
+    });
+
+    it('đã có dòng tại buổi của lớp này -> giữ ô cũ (sửa được), không thay', async () => {
+      gia({ cheDo: 'cong_nhan_lop_cu' });
+      prisma.phan_lop_giai_doan.findMany.mockResolvedValue([
+        {
+          dang_ky_hoc: {
+            ...dk('dk-b', 'Bình Lớp B'),
+            diem_danh: [
+              {
+                lich_hoc_id: 'b-1',
+                trang_thai: 'vang',
+                nguon: 'ky_ten',
+                ghi_chu: null,
+                tu_diem_danh_luc: null,
+                cap_nhat_luc: now,
+                sua_boi: null,
+              },
+            ],
+          },
+        },
+      ]);
+      const o = (await bang()).hoc_vien[0].diem_danh['b-1'];
+      expect(o).toMatchObject({ trang_thai: 'vang', nguon: 'ky_ten' });
+      expect(o).not.toHaveProperty('nguon_tinh');
+    });
+
+    it('học viên đã đổi buổi ra khỏi buổi này -> không thêm ô lớp khác', async () => {
+      gia({ cheDo: 'cong_nhan_lop_cu' });
+      doiBuoi.dieuChinhTheoBuoi.mockResolvedValue(
+        new Map([
+          [
+            'b-1',
+            {
+              ra: [{ dang_ky_hoc_id: 'dk-b', lop_chot: { ten_lop: 'Lớp C' } }],
+              vao: [],
+            },
+          ],
+        ]),
+      );
+      const hv = (await bang()).hoc_vien[0];
+      expect(hv.doi_buoi).toEqual({ 'b-1': { loai: 'ra', lop: 'Lớp C' } });
+      expect(hv.diem_danh['b-1']).toBeUndefined();
+    });
+
+    it('nạp theo lô: 2 truy vấn SQL cho cả lớp dù nhiều học viên', async () => {
+      gia({ cheDo: 'cong_nhan_lop_cu' });
+      prisma.phan_lop_giai_doan.findMany.mockResolvedValue(
+        Array.from({ length: 30 }, (_, i) => ({
+          dang_ky_hoc: dk(`dk-${i}`, `HV ${i}`),
+        })),
+      );
+      await bang();
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+      expect(doiBuoi.doiBuoiDaDuyetCuaDangKy).toHaveBeenCalledTimes(1);
+    });
   });
 });
