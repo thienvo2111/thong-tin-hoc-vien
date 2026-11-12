@@ -24,6 +24,7 @@ const CAC_GIA_TRI_ENUM_LOAI_DANH_MUC_IMPORT = [
   'nhan_su_lop',
   'tai_khoan_don_vi',
   'dang_nhap_vle',
+  'diem_hoc',
 ] as const;
 
 function renderTrang(initialEntries = ['/admin/nhap-du-lieu']) {

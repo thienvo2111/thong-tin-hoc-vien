@@ -9,6 +9,7 @@ describe('isSupportedImportType', () => {
     'phan_lop_hoc_vien',
     'ket_qua_danh_gia',
     'lop_va_lich_hoc',
+    'diem_hoc',
   ])('%s được hỗ trợ', (loai) => {
     expect(isSupportedImportType(loai)).toBe(true);
   });
