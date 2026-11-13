@@ -37,6 +37,17 @@ describe('guiFormVle', () => {
     expect(formKhiSubmit?.isConnected).toBe(false);
   });
 
+  it('có target -> form.target = tên cửa sổ đó (Quản trị "Thử vào VLE" mở tab riêng)', () => {
+    let formKhiSubmit: HTMLFormElement | undefined;
+    vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(function (this: HTMLFormElement) {
+      formKhiSubmit = this;
+    });
+    guiFormVle('https://vle.example.com/login', { key: 'k', email: '', username: 'u' }, 'vle-thu');
+    expect(formKhiSubmit?.target).toBe('vle-thu');
+    expect(formKhiSubmit?.method).toBe('post');
+    expect(formKhiSubmit?.isConnected).toBe(false);
+  });
+
   it('không có field nào -> vẫn submit được form rỗng (không input)', () => {
     const submitSpy = vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(() => {});
     guiFormVle('https://vle.example.com/login', {});
