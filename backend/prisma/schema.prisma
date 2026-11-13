@@ -168,6 +168,8 @@ enum loai_danh_muc_import {
   // Vào học VLE (external-login P.CNTT, 2026-11-10) — cùng lý do như trên:
   // thêm SAU CÙNG, migration riêng (xem migration *_dang_nhap_vle_enum).
   dang_nhap_vle
+  // Danh mục điểm học (2026-11-12) — migration riêng (*_diem_hoc_import_enum).
+  diem_hoc
 }
 
 /// Tình trạng 1 bài trên hệ thống khảo sát của 1 học viên (2026-10-04).
