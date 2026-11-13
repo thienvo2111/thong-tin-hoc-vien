@@ -268,6 +268,26 @@ describe('Admin — Chi tiết khóa bồi dưỡng', () => {
       await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
       expect(screen.queryByRole('switch', { name: /Mở vào học VLE/ })).not.toBeInTheDocument();
     });
+
+    // 2026-11-13: Quản trị thử external-login VLE với tài khoản bất kỳ (POST /sso/vle/form-thu).
+    it('quan_tri: nút "Thử vào VLE…" mở modal thử vào VLE (cả khi khóa đang tắt)', async () => {
+      db.nguoiDung.vai_tro = 'quan_tri';
+      const user = userEvent.setup();
+      renderTrang('khoa-1');
+      const sw = await screen.findByRole('switch', { name: /Mở vào học VLE/ });
+      expect(sw).not.toBeChecked();
+      await user.click(screen.getByRole('button', { name: 'Thử vào VLE…' }));
+      const modal = await screen.findByRole('dialog', { name: 'Thử vào VLE' });
+      expect(within(modal).getByLabelText('Username hoặc email VLE')).toBeInTheDocument();
+      expect(within(modal).getByRole('button', { name: 'Mở VLE' })).toBeInTheDocument();
+    });
+
+    it('vai_tro khác quan_tri: không hiện nút "Thử vào VLE…"', async () => {
+      db.nguoiDung.vai_tro = 'truong';
+      renderTrang('khoa-1');
+      await screen.findByText('Bồi dưỡng NLS – Mức cơ bản');
+      expect(screen.queryByRole('button', { name: 'Thử vào VLE…' })).not.toBeInTheDocument();
+    });
   });
 
   // ADR 0005 (issue #23): cấu hình tự điểm danh lớp Zoom.

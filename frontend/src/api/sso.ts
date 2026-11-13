@@ -1,5 +1,6 @@
 import { apiFetch } from './client';
 import type { SsoTarget } from './hocVien';
+import type { MucNangLuc } from './types';
 
 // POST /sso/ma-thu (quan_tri) — mã THỬ để tích hợp với hệ thống khảo sát (api-contract.md mục 10).
 export interface MaThuSso {
@@ -50,4 +51,18 @@ export function layTrangThaiVle() {
 // duyệt (rủi ro đã được chủ sản phẩm chấp nhận, xem api-contract.md mục 10.2).
 export function layFormVle() {
   return apiFetch<FormVle>('/sso/vle/form', { method: 'POST' });
+}
+
+// POST /sso/vle/form-thu (quan_tri, 2026-11-13, api-contract.md mục 10.2) — Quản trị thử vào VLE với
+// username/email VLE bất kỳ + mức (kiểm VLE_COURSE_MAP). Bỏ qua công tắc "Mở vào học VLE" của khóa;
+// ghi nhật ký 'thu_vao_vle', KHÔNG tính lượt vào của học viên. Gửi đúng 1 trong username/email.
+export type VleFormThuDto = ({ username: string } | { email: string }) & { muc?: MucNangLuc };
+
+export interface FormVleThu extends FormVle {
+  /** id_course đã gửi cho VLE; null = không gửi (mức chưa có trong VLE_COURSE_MAP). */
+  id_course: number | null;
+}
+
+export function layFormVleThu(dto: VleFormThuDto) {
+  return apiFetch<FormVleThu>('/sso/vle/form-thu', { method: 'POST', body: JSON.stringify(dto) });
 }

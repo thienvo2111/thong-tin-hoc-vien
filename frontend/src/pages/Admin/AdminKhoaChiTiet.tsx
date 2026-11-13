@@ -77,6 +77,7 @@ import { CauHinhDoiBuoi } from './CauHinhDoiBuoi';
 import { LichSuCauHinhKhoa } from './LichSuCauHinhKhoa';
 import { KhoiDotNhuCauMuc } from './KhoiDotNhuCauMuc';
 import { CanhBaoZoomThieuLink } from './CanhBaoZoomThieuLink';
+import { ModalThuVaoVle } from './ModalThuVaoVle';
 import { BangDiemDanhLop } from '@/components/BangDiemDanhLop';
 import { TheoBuoi } from '@/pages/HoTro/HoTroLopChiTiet';
 
@@ -245,6 +246,7 @@ export default function AdminKhoaChiTiet() {
   // ADR 0005 Z7 (issue #26): bảng điểm danh của 1 lớp, Quản trị sửa nhanh từng ô.
   const [lopDiemDanh, setLopDiemDanh] = useState<LopHoc | null>(null);
   const [lopTheoBuoi, setLopTheoBuoi] = useState<LopHoc | null>(null);
+  const [moThuVaoVle, setMoThuVaoVle] = useState(false);
   const { data: khoa, isLoading, isError, error } = useChiTietKhoa(id);
   const donVi = useDonViChoKhoa();
   // Chỉ gồm so_gddt + khac (danh mục nhỏ, xem useDonViChoKhoa) — Trường chọn qua SelectDonViTimKiem.
@@ -923,6 +925,11 @@ export default function AdminKhoaChiTiet() {
                     )
                   }
                 />
+                {/* Quản trị thử external-login VLE với tài khoản bất kỳ (api-contract.md mục 10.2). */}
+                <Button variant="subtle" size="xs" mt="xs" onClick={() => setMoThuVaoVle(true)}>
+                  Thử vào VLE…
+                </Button>
+                <ModalThuVaoVle opened={moThuVaoVle} onClose={() => setMoThuVaoVle(false)} />
               </Paper>
             )}
 

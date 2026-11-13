@@ -1,10 +1,12 @@
 import { VleService } from './vle.service';
 import {
+  ValidationException,
   VleChuaCauHinhException,
   VleChuaCoTaiKhoanException,
   VleChuaMoException,
 } from '../common/exceptions/app.exceptions';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { demLuotVaoVle } from './util/luot-vao-vle.util';
 
 const ENV_KEYS = ['VLE_LOGIN_KEY', 'VLE_LOGIN_URL', 'VLE_COURSE_MAP'] as const;
 
@@ -412,6 +414,173 @@ describe('VleService — Vào học VLE (external-login P.CNTT)', () => {
         so_lan_vao: 1,
         lan_vao_gan_nhat: '2026-11-02T03:00:00.000Z',
       });
+    });
+  });
+  // Quản trị "Thử vào VLE" (POST /sso/vle/form-thu, 2026-11-13): username/email
+  // nhập tay + mức chọn tay; bỏ qua công tắc khóa và đăng ký học viên.
+  describe('formThu (quản trị thử vào VLE)', () => {
+    const quanTri = {
+      id: 'nd-qt',
+      vai_tro: 'quan_tri',
+      hoc_vien_id: null,
+    } as AuthenticatedUser;
+    const MAP = 'co_ban:12,thanh_thao:13,nang_cao:14';
+
+    function taoService(prisma = taoPrisma({})) {
+      return {
+        service: new VleService(prisma as never, nhatKy as never),
+        prisma,
+      };
+    }
+
+    it('username -> fields.username, email rỗng; action = VLE_LOGIN_URL', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      process.env.VLE_LOGIN_URL = 'https://vle.test/users/external-login';
+      const { service } = taoService();
+      const kq = await service.formThu(quanTri, { username: 'thu01' }, null);
+      expect(kq.action).toBe('https://vle.test/users/external-login');
+      expect(kq.fields).toEqual({
+        key: 'khoa-bi-mat',
+        username: 'thu01',
+        email: '',
+      });
+    });
+
+    it('chỉ email -> fields.email, username rỗng', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      const { service } = taoService();
+      const kq = await service.formThu(quanTri, { email: 'thu@x.com' }, null);
+      expect(kq.fields.email).toBe('thu@x.com');
+      expect(kq.fields.username).toBe('');
+    });
+
+    it('có cả username lẫn email -> username thắng, email gửi rỗng', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      const { service } = taoService();
+      const kq = await service.formThu(
+        quanTri,
+        { username: 'thu01', email: 'thu@x.com' },
+        null,
+      );
+      expect(kq.fields.username).toBe('thu01');
+      expect(kq.fields.email).toBe('');
+    });
+
+    it('không có username lẫn email -> 400 ValidationException, không ghi nhật ký', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      const { service } = taoService();
+      const loi = await service
+        .formThu(quanTri, {}, null)
+        .catch((e: unknown) => e);
+      expect(loi).toBeInstanceOf(ValidationException);
+      const ex = loi as ValidationException;
+      expect(ex.getStatus()).toBe(400);
+      expect(ex.getResponse()).toMatchObject({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Nhập username hoặc email VLE để thử',
+        },
+      });
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
+    });
+
+    it('mức có trong VLE_COURSE_MAP -> fields.id_course + id_course cấp trên', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      process.env.VLE_COURSE_MAP = MAP;
+      const { service } = taoService();
+      for (const [muc, id] of [
+        ['co_ban', 12],
+        ['thanh_thao', 13],
+        ['nang_cao', 14],
+      ] as const) {
+        const kq = await service.formThu(quanTri, { username: 'u', muc }, null);
+        expect(kq.fields.id_course).toBe(String(id));
+        expect(kq.id_course).toBe(id);
+      }
+    });
+
+    it('mức không có trong map -> không gửi id_course, id_course cấp trên = null', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      process.env.VLE_COURSE_MAP = 'co_ban:12';
+      const { service } = taoService();
+      const kq = await service.formThu(
+        quanTri,
+        { username: 'u', muc: 'nang_cao' },
+        null,
+      );
+      expect('id_course' in kq.fields).toBe(false);
+      expect(kq.id_course).toBeNull();
+    });
+
+    it('không chọn mức -> không gửi id_course, id_course cấp trên = null', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      process.env.VLE_COURSE_MAP = MAP;
+      const { service } = taoService();
+      const kq = await service.formThu(quanTri, { email: 'a@x.com' }, null);
+      expect('id_course' in kq.fields).toBe(false);
+      expect(kq.id_course).toBeNull();
+    });
+
+    it('thiếu VLE_LOGIN_KEY -> 503 VleChuaCauHinhException, không ghi nhật ký', async () => {
+      delete process.env.VLE_LOGIN_KEY;
+      const { service } = taoService();
+      const loi = await service
+        .formThu(quanTri, { username: 'u' }, null)
+        .catch((e: unknown) => e);
+      expect(loi).toBeInstanceOf(VleChuaCauHinhException);
+      expect((loi as VleChuaCauHinhException).getStatus()).toBe(503);
+      expect(nhatKy.ghi).not.toHaveBeenCalled();
+    });
+
+    it("nhật ký 'thu_vao_vle': có nguoi_dung của quản trị, không hoc_vien_id, không chứa key", async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-rat-bi-mat';
+      process.env.VLE_COURSE_MAP = MAP;
+      const { service } = taoService();
+      await service.formThu(
+        quanTri,
+        { email: 'thu@x.com', muc: 'thanh_thao' },
+        '9.9.9.9',
+      );
+      expect(nhatKy.ghi).toHaveBeenCalledTimes(1);
+      const suKien = nhatKy.ghi.mock.calls[0][0];
+      expect(suKien.hanh_dong).toBe('thu_vao_vle');
+      expect(suKien.nguoi_dung).toEqual({ id: 'nd-qt', vai_tro: 'quan_tri' });
+      expect(suKien.hoc_vien_id).toBeUndefined();
+      expect(suKien.chi_tiet).toEqual({
+        khop_theo: 'email',
+        gia_tri: 'thu@x.com',
+        id_course: 13,
+        ip: '9.9.9.9',
+      });
+      expect(JSON.stringify(suKien)).not.toContain('khoa-rat-bi-mat');
+    });
+
+    it('bỏ qua công tắc khóa + đăng ký học viên (khóa tắt vẫn thử được, không truy vấn DB)', async () => {
+      process.env.VLE_LOGIN_KEY = 'khoa-bi-mat';
+      const { service, prisma } = taoService(
+        taoPrisma({ dangNhap: null, dangKy: taoDangKyVle('co_ban', false) }),
+      );
+      const kq = await service.formThu(quanTri, { username: 'u' }, null);
+      expect(kq.fields.username).toBe('u');
+      expect(prisma.dang_ky_hoc.findFirst).not.toHaveBeenCalled();
+      expect(prisma.dang_nhap_vle.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("lượt vào VLE chỉ đếm 'vao_hoc_vle' — dòng 'thu_vao_vle' không được tính", async () => {
+      const prisma = taoPrisma({
+        nhatKy: [
+          {
+            hanh_dong: 'thu_vao_vle',
+            hoc_vien_id: 'hv-1',
+            thoi_gian: new Date('2026-11-12T00:00:00Z'),
+          },
+        ],
+      });
+      const kq = await demLuotVaoVle(prisma as never, ['hv-1']);
+      expect(kq.get('hv-1')).toBeUndefined();
+      expect(
+        prisma.nhat_ky_hoat_dong.groupBy.mock.calls[0][0].where.hanh_dong,
+      ).toBe('vao_hoc_vle');
     });
   });
 });
