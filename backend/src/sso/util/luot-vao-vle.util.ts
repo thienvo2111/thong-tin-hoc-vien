@@ -7,6 +7,11 @@ import { chiaLo } from '../../common/utils/theo-lo.util';
 // điểm danh, KHÔNG xác nhận VLE đăng nhập thành công.
 export const HANH_DONG_VAO_HOC_VLE = 'vao_hoc_vle';
 
+// Quản trị "Thử vào VLE" (POST /sso/vle/form-thu) — hành động RIÊNG, không có
+// hoc_vien_id, KHÔNG tính là lượt vào VLE (demLuotVaoVle chỉ lọc
+// HANH_DONG_VAO_HOC_VLE).
+export const HANH_DONG_THU_VAO_VLE = 'thu_vao_vle';
+
 export interface LuotVaoVle {
   so_lan_vao: number;
   lan_vao_gan_nhat: Date | null;

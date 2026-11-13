@@ -4,12 +4,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import {
+  ValidationException,
   VleChuaCauHinhException,
   VleChuaCoTaiKhoanException,
   VleChuaMoException,
 } from '../common/exceptions/app.exceptions';
 import { parseVleCourseMap } from './util/vle-course-map.util';
-import { demLuotVaoVle, HANH_DONG_VAO_HOC_VLE } from './util/luot-vao-vle.util';
+import {
+  demLuotVaoVle,
+  HANH_DONG_THU_VAO_VLE,
+  HANH_DONG_VAO_HOC_VLE,
+} from './util/luot-vao-vle.util';
+import { VleFormThuDto } from './dto/vle-form-thu.dto';
 import {
   GIAI_DOAN_MOC_ARGS,
   giaiDoanPhanLop,
@@ -55,6 +61,11 @@ export interface FormVle {
     username: string;
     id_course?: string;
   };
+}
+
+/** POST /sso/vle/form-thu — `fields` giống hệt luồng học viên + id_course đã gửi (null = không gửi). */
+export interface FormVleThu extends FormVle {
+  id_course: number | null;
 }
 
 interface DangKyVle {
@@ -153,6 +164,48 @@ export class VleService {
     });
 
     return { action: this.loginUrl, fields };
+  }
+
+  // Quản trị "Thử vào VLE" (2026-11-13): dựng form như form() nhưng với
+  // username/email do quản trị nhập + mức chọn tay. KHÔNG xét công tắc khóa
+  // (mo_vao_hoc_vle) lẫn đăng ký học viên — mục đích là thử TRƯỚC khi mở.
+  // Ghi nhật ký 'thu_vao_vle' (không hoc_vien_id) — không tính lượt vào VLE.
+  async formThu(
+    caller: AuthenticatedUser,
+    dto: VleFormThuDto,
+    ip: string | null,
+  ): Promise<FormVleThu> {
+    if (!this.loginKey) throw new VleChuaCauHinhException();
+    const match = this.khopThu(dto);
+    const idCourse = this.idCourse(dto.muc ?? null);
+    const fields: FormVle['fields'] = {
+      key: this.loginKey,
+      email: match.loai === 'email' ? match.gia_tri : '',
+      username: match.loai === 'username' ? match.gia_tri : '',
+    };
+    if (idCourse !== undefined) fields.id_course = String(idCourse);
+
+    await this.nhatKy.ghi({
+      hanh_dong: HANH_DONG_THU_VAO_VLE,
+      nguoi_dung: { id: caller.id, vai_tro: caller.vai_tro },
+      chi_tiet: {
+        khop_theo: match.loai,
+        gia_tri: match.gia_tri,
+        id_course: idCourse ?? null,
+        ip,
+      },
+    });
+
+    return { action: this.loginUrl, fields, id_course: idCourse ?? null };
+  }
+
+  // Cùng quy tắc timKhop: có username -> username, không thì email.
+  private khopThu(dto: VleFormThuDto): KetQuaKhop {
+    if (dto.username) return { loai: 'username', gia_tri: dto.username };
+    if (dto.email) return { loai: 'email', gia_tri: dto.email };
+    throw new ValidationException('Nhập username hoặc email VLE để thử', [
+      { field: 'username', message: 'Nhập username hoặc email VLE để thử' },
+    ]);
   }
 
   private async luotVao(

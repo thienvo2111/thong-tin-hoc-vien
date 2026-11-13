@@ -41,7 +41,8 @@ export type HanhDongNhatKy =
   | 'xuat_nhu_cau_muc_dot'
   | 'tao_hoc_vien_le'
   | 'ghi_danh_le'
-  | 'vao_hoc_vle';
+  | 'vao_hoc_vle'
+  | 'thu_vao_vle';
 
 const TIEU_DE: Record<HanhDongNhatKy, string> = {
   dang_nhap_thanh_cong: 'Đăng nhập thành công',
@@ -81,6 +82,7 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   tao_hoc_vien_le: 'Quản trị tạo tài khoản học viên',
   ghi_danh_le: 'Quản trị ghi danh vào khóa',
   vao_hoc_vle: 'Bấm "Vào học VLE"',
+  thu_vao_vle: 'Quản trị thử vào VLE',
 };
 
 const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
@@ -120,6 +122,7 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   tao_hoc_vien_le: 'tai_khoan',
   ghi_danh_le: 'hoc_tap',
   vao_hoc_vle: 'hoc_tap',
+  thu_vao_vle: 'tai_khoan',
 };
 
 const NHAN_VAI_TRO: Record<vai_tro_nguoi_dung, string> = {

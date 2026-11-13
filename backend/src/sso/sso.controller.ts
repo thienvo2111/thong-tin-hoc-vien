@@ -23,6 +23,7 @@ import { KetQuaKhaoSatService } from './ket-qua-khao-sat.service';
 import { ThangMucService } from './thang-muc.service';
 import { VleService } from './vle.service';
 import { LuuThangMucDto } from './dto/thang-muc.dto';
+import { VleFormThuDto } from './dto/vle-form-thu.dto';
 import { kiemTraApiKeyKhaoSat } from './sso-api-key';
 import {
   BaoKetQuaDto,
@@ -136,5 +137,18 @@ export class SsoController {
   @Post('vle/form')
   vleForm(@CurrentUser() user: AuthenticatedUser, @Req() req: Request) {
     return this.vleService.form(user, req.ip ?? null);
+  }
+
+  // Quản trị thử vào VLE với username/email bất kỳ + mức (kiểm VLE_COURSE_MAP
+  // trên production) — không cần tài khoản học viên, bỏ qua công tắc khóa.
+  @Roles('quan_tri')
+  @UseGuards(NguoiDungThrottlerGuard)
+  @Post('vle/form-thu')
+  vleFormThu(
+    @Body() dto: VleFormThuDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request,
+  ) {
+    return this.vleService.formThu(user, dto, req.ip ?? null);
   }
 }
