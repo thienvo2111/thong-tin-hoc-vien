@@ -36,6 +36,9 @@ HCMUE cần các trường phổ thông **xác nhận danh sách GV tham gia** v
 | M5 | Bảng **`hop_dong_boi_duong`**, UNIQUE (đợt, trường): trạng thái xác nhận danh sách + trạng thái hợp đồng (2 cột), Phần 3–4, cờ điểm học trực tiếp, **bản chụp Hồ sơ đơn vị JSONB** lúc nộp. Số lượng/giá trị tính từ danh sách khi nháp, chụp lại khi nộp. |
 | M6 | Mọi dòng danh sách **bắt buộc** gắn `don_vi_cong_tac` loại `truong` có sẵn; nạp Excel chặn dòng không khớp trường. |
 
+| U1 | Màn của trường trên Cổng đơn vị theo bố cục **"Việc cần làm theo chương trình"** (prototype #48, phương án C): thẻ **Hồ sơ đơn vị** dùng chung (badge thiếu/đủ) ở trên cùng, rồi mỗi đợt một thẻ có tiến độ và danh sách việc (Xác nhận danh sách, Thông tin hợp đồng kèm suất + giá trị, nút Nộp); đợt chưa mở hiện mờ. Mỗi việc mở toàn màn hình (mobile-first). Đây cũng là trang chủ của trường trên cổng. |
+| U2 | **Thông tin chuyển khoản** hiện trong phần hợp đồng, **suy ra, không lưu**: đơn vị tiếp nhận Trường ĐHSP TP.HCM; số tài khoản = `HCMUE` + 7 số mã QHNS của trường (tài khoản định danh theo đơn vị); Ngân hàng TMCP Đại Chúng Việt Nam (PVcomBank). Vì sai QHNS là chuyển nhầm tài khoản, ô QHNS phải hiện ngay số tài khoản ghép được để trường tự soát. |
+
 ## Lựa chọn đã loại
 
 - **Tách 2 hệ thống + trang hợp đồng riêng có SSO**: nhân đôi codebase, phải đồng bộ danh mục trường/tài khoản giữa các DB và dựng SSO — giá quá đắt cho vấn đề chỉ là thương hiệu.
