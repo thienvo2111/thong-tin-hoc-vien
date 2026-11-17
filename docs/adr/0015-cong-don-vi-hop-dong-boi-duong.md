@@ -38,6 +38,11 @@ HCMUE cần các trường phổ thông **xác nhận danh sách GV tham gia** v
 
 | U1 | Màn của trường trên Cổng đơn vị theo bố cục **"Việc cần làm theo chương trình"** (prototype #48, phương án C): thẻ **Hồ sơ đơn vị** dùng chung (badge thiếu/đủ) ở trên cùng, rồi mỗi đợt một thẻ có tiến độ và danh sách việc (Xác nhận danh sách, Thông tin hợp đồng kèm suất + giá trị, nút Nộp); đợt chưa mở hiện mờ. Mỗi việc mở toàn màn hình (mobile-first). Đây cũng là trang chủ của trường trên cổng. |
 | U2 | **Thông tin chuyển khoản** hiện trong phần hợp đồng, **suy ra, không lưu**: đơn vị tiếp nhận Trường ĐHSP TP.HCM; số tài khoản = `HCMUE` + 7 số mã QHNS của trường (tài khoản định danh theo đơn vị); Ngân hàng TMCP Đại Chúng Việt Nam (PVcomBank). Vì sai QHNS là chuyển nhầm tài khoản, ô QHNS phải hiện ngay số tài khoản ghép được để trường tự soát. |
+| O1 | Đầu ra cho Phòng KHTC: mỗi đợt 1 file Excel 3 sheet — **Hợp đồng** (1 dòng/trường, cột theo **đúng thứ tự bảng câu trả lời Google Form** + suất, giá trị, trạng thái, ngày nộp, STK chuyển khoản), **Danh sách GV** (phụ lục: trường, lớp, giai đoạn, suất), **Chi hỗ trợ** (HT 1.000.000 đ, KT 500.000 đ: họ tên, STK, ngân hàng). Không làm mẫu Word tự điền. |
+| O2 | Chỉ `quan_tri` xuất (trên Cổng đơn vị), gửi file cho KHTC; không thêm vai trò/tài khoản KHTC. |
+| O3 | Quyền xem: Quản trị và chính trường — tất cả; Sở/Phòng (trong phạm vi) — chỉ trạng thái, danh sách GV, suất, giá trị; **không** Phần 2, Phần 5, người nhận hợp đồng. |
+| O4 | STK cá nhân (Phần 5) che còn 4 số cuối ở danh sách quản trị, nút "Hiện" ở chi tiết; mỗi lần xuất file có Phần 5 ghi `nhat_ky_hoat_dong`; không mã hóa tầng ứng dụng. |
+| O5 | Phạm vi dừng ở **Đã nộp**; làm hợp đồng, ký, hóa đơn, thanh toán không theo dõi trên hệ thống. |
 
 ## Lựa chọn đã loại
 
