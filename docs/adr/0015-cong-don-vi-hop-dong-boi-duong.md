@@ -43,6 +43,10 @@ HCMUE cần các trường phổ thông **xác nhận danh sách GV tham gia** v
 | O3 | Quyền xem: Quản trị và chính trường — tất cả; Sở/Phòng (trong phạm vi) — chỉ trạng thái, danh sách GV, suất, giá trị; **không** Phần 2, Phần 5, người nhận hợp đồng. |
 | O4 | STK cá nhân (Phần 5) che còn 4 số cuối ở danh sách quản trị, nút "Hiện" ở chi tiết; mỗi lần xuất file có Phần 5 ghi `nhat_ky_hoat_dong`; không mã hóa tầng ứng dụng. |
 | O5 | Phạm vi dừng ở **Đã nộp**; làm hợp đồng, ký, hóa đơn, thanh toán không theo dõi trên hệ thống. |
+| P1 | Menu trường/Sở/Phòng trên Cổng đơn vị: **Trang chủ** (trường = bố cục U1; Sở/Phòng = bảng tiến độ các trường trong phạm vi theo đợt, không dữ liệu tài chính) · **Hồ sơ đơn vị** (chỉ trường) · nhóm **NLS** = 4 màn sẵn có (Tổng quan, Học viên, Khóa, Báo cáo — dùng lại component, chỉ hiện khi đơn vị có tham gia NLS) · **Danh mục trường** (chỉ Sở/Phòng) · **Hướng dẫn**. |
+| P2 | Menu Quản trị trên Cổng đơn vị: **Tiến độ đợt** (X7) · **Chương trình / Đợt** (tạo đợt, đơn giá, khoảng ngày QĐ, gắn khóa NLS) · **Danh sách tham gia** (nạp Excel, sửa dòng, duyệt đề nghị) · **Hợp đồng** (xem, mở lại, xuất O1) · **Đơn vị & tài khoản** (dùng lại Danh mục trường + tài khoản đơn vị của Người dùng, kể cả import hàng loạt). |
+| P3 | Đăng nhập nhầm cổng: tài khoản đơn vị ở boiduongnls (và học viên ở Cổng đơn vị) **không vào được**, thấy thông báo + link sang cổng đúng; chặn ở frontend theo tên miền, backend giữ nguyên (API vẫn giới hạn theo phạm vi). Không tự chuyển hướng vì 2 tên miền không chung phiên. |
+| P4 | Tên cổng: **"Cổng đơn vị – Bồi dưỡng giáo viên HCMUE"**; tên người gửi email trên cổng: **"HCMUE – Bồi dưỡng giáo viên"** (cấu hình, sửa được khi có tên miền). |
 
 ## Lựa chọn đã loại
 
