@@ -308,6 +308,15 @@ export const router = createBrowserRouter([
           },
         ],
       },
+      // PROTOTYPE ticket #48 — chỉ dev, không merge main.
+      ...(import.meta.env.DEV
+        ? [
+            {
+              path: '/prototype/khai-hop-dong',
+              lazy: () => import('@/pages/Prototype/KhaiHopDong').then((m) => ({ Component: m.default })),
+            },
+          ]
+        : []),
       {
         path: '*',
         lazy: () => import('@/pages/KhongTimThay').then((m) => ({ Component: m.default })),
