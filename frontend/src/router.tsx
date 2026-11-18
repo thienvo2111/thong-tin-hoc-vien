@@ -1,9 +1,10 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
+import { congHienTai } from '@/lib/congHienTai';
 
 // Mọi route dùng `lazy` (kể cả các layout thuần túy) — router.tsx được main.tsx import không-lazy,
 // nên bất kỳ import tĩnh nào ở đây sẽ vào chunk tải đầu tiên. M0 phải nhẹ (không Mantine form/dates/
 // TanStack Query) nên toàn bộ phần còn lại của cây route chỉ được nạp qua `lazy`.
-export const router = createBrowserRouter([
+export const routesNls: RouteObject[] = [
   {
     path: '/',
     lazy: () => import('@/pages/M0/TrangGioiThieu').then((m) => ({ Component: m.default })),
@@ -314,4 +315,50 @@ export const router = createBrowserRouter([
       },
     ],
   },
-]);
+];
+
+// Issue #55 / ADR 0015: Cổng đơn vị — cùng bản build, chọn theo hostname (lib/congHienTai.ts). Không có route NLS
+// (/toi, /admin…) nào ở đây: gõ tay vào chỉ ra 404.
+export const routesCongDonVi: RouteObject[] = [
+  {
+    lazy: () => import('@/app/KhungNoiBo').then((m) => ({ Component: m.default })),
+    children: [
+      {
+        path: '/',
+        lazy: () => import('@/pages/CongDonVi/TrangGocCongDonVi').then((m) => ({ Component: m.default })),
+      },
+      {
+        path: '/dang-nhap',
+        lazy: () => import('@/pages/CongDonVi/DangNhapCongDonVi').then((m) => ({ Component: m.default })),
+      },
+      {
+        path: '/huong-dan',
+        lazy: () => import('@/pages/CongDonVi/HuongDanCongDonVi').then((m) => ({ Component: m.default })),
+      },
+      {
+        lazy: () => import('@/auth/RequireAuth').then((m) => ({ Component: m.RequireAuth })),
+        children: [
+          {
+            path: '/doi-mat-khau',
+            lazy: () => import('@/pages/M2/DoiMatKhau').then((m) => ({ Component: m.default })),
+          },
+          {
+            lazy: () => import('@/pages/CongDonVi/CongDonViLayout').then((m) => ({ Component: m.default })),
+            children: [
+              {
+                path: '/trang-chu',
+                lazy: () => import('@/pages/CongDonVi/TrangChuCongDonVi').then((m) => ({ Component: m.default })),
+              },
+            ],
+          },
+        ],
+      },
+      {
+        path: '*',
+        lazy: () => import('@/pages/KhongTimThay').then((m) => ({ Component: m.default })),
+      },
+    ],
+  },
+];
+
+export const router = createBrowserRouter(congHienTai() === 'don_vi' ? routesCongDonVi : routesNls);

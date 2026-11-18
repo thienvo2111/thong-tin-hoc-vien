@@ -1,7 +1,11 @@
+import { congHienTai, type Cong } from './congHienTai';
+
 /** Trang chủ sau đăng nhập/đổi mật khẩu, theo vai_tro — dùng chung cho M1 (DangNhap) và M2 (DoiMatKhau)
  * để tránh lặp logic điều hướng (trước đây cả 2 nơi đều hardcode '/toi', khiến tài khoản quản trị
  * bị đẩy nhầm vào trang chủ học viên và treo loading vô hạn vì gọi API dành riêng cho hoc_vien). */
-export function trangChuTheoVaiTro(vaiTro: string | undefined): string {
+export function trangChuTheoVaiTro(vaiTro: string | undefined, cong: Cong = congHienTai()): string {
+  // Issue #55: Cổng đơn vị chỉ có 1 trang chủ cho mọi vai trò (sai cổng do RequireAuth chặn).
+  if (cong === 'don_vi') return '/trang-chu';
   if (vaiTro === 'hoc_vien') return '/toi';
   // ADR 0003: người hỗ trợ học viên có khu làm việc riêng, không vào /admin.
   if (vaiTro === 'ho_tro_hoc_vien') return '/ho-tro';

@@ -5,17 +5,33 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // Thay thẻ meta tĩnh trong index.html lúc build từ src/content/gioiThieu.ts
-// (Zalo/Facebook không chạy JS khi tạo bản xem trước — xem dac-ta-cong-hoc-vien.md § M0 "Chia sẻ & quảng bá")
+// (Zalo/Facebook không chạy JS khi tạo bản xem trước — xem dac-ta-cong-hoc-vien.md § M0 "Chia sẻ & quảng bá").
+// Issue #55: cong-don-vi.html (entry của Cổng đơn vị) lấy tiêu đề/mô tả từ src/content/congDonVi.ts, dùng chung ảnh chia sẻ.
+function docNoiDung(tep: string) {
+  const src = readFileSync(fileURLToPath(new URL(`./src/content/${tep}`, import.meta.url)), 'utf-8');
+  return (re: RegExp) => re.exec(src)?.[1] ?? '';
+}
+
 function metaTuNoiDung() {
+  // process.env không chứa biến trong frontend/.env — Cổng đơn vị lấy thêm từ env Vite đã nạp (cấu hình 1 chỗ trên VPS).
+  let envVite: Record<string, string> = {};
   return {
     name: 'meta-tu-noi-dung',
-    transformIndexHtml(html: string) {
-      const src = readFileSync(fileURLToPath(new URL('./src/content/gioiThieu.ts', import.meta.url)), 'utf-8');
-      const get = (re: RegExp) => re.exec(src)?.[1] ?? '';
-      const tieuDe = get(/tieuDe:\s*'([^']*)'/);
-      const moTa = get(/moTa:\s*'([^']*)'/);
-      const anh = get(/anhChiaSe:\s*'([^']*)'/);
-      const baseUrl = process.env.VITE_SITE_URL ?? '';
+    configResolved(config: { env: Record<string, string> }) {
+      envVite = config.env;
+    },
+    transformIndexHtml(html: string, ctx: { path?: string; filename?: string }) {
+      const getNls = docNoiDung('gioiThieu.ts');
+      const anh = getNls(/anhChiaSe:\s*'([^']*)'/);
+      let tieuDe = getNls(/tieuDe:\s*'([^']*)'/);
+      let moTa = getNls(/moTa:\s*'([^']*)'/);
+      let baseUrl = process.env.VITE_SITE_URL ?? '';
+      if ((ctx.filename ?? ctx.path ?? '').replace(/\\/g, '/').endsWith('/cong-don-vi.html')) {
+        const getDonVi = docNoiDung('congDonVi.ts');
+        tieuDe = getDonVi(/tenCong:\s*'([^']*)'/);
+        moTa = getDonVi(/moTa:\s*'([^']*)'/);
+        baseUrl = process.env.VITE_CONG_DON_VI_URL ?? envVite.VITE_CONG_DON_VI_URL ?? '';
+      }
       return html
         .replace(/__TIEU_DE__/g, tieuDe)
         .replace(/__MO_TA__/g, moTa)
@@ -35,6 +51,13 @@ export default defineConfig(({ mode }) => ({
   build: {
     target: 'es2018',
     sourcemap: mode === 'analyze',
+    // Issue #55: 2 entry HTML cùng 1 bản build — Nginx Cổng đơn vị fallback về cong-don-vi.html.
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        congDonVi: fileURLToPath(new URL('./cong-don-vi.html', import.meta.url)),
+      },
+    },
   },
   test: {
     environment: 'jsdom',

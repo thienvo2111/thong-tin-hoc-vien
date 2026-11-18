@@ -12,6 +12,8 @@ import { gioiThieu } from '@/content/gioiThieu';
 import { EMAIL_HO_TRO } from '@/content/hoTro';
 import { StatusBanner } from '@/components/StatusBanner';
 import { trangChuTheoVaiTro } from '@/lib/trangChuTheoVaiTro';
+import { daCauHinhCongDonVi, vaiTroDungCong } from '@/lib/congHienTai';
+import { ThongBaoSaiCong } from '@/components/ThongBaoSaiCong';
 import { docKieuDangNhapDaLuu, luuKieuDangNhap, nhapTheoKieu, type KieuDangNhap } from '@/lib/kieuDangNhap';
 import { ChonKieuDangNhap } from '@/components/ChonKieuDangNhap';
 import logoHcmue from '@/assets/logo-hcmue.png';
@@ -53,10 +55,11 @@ function PanelGioiThieu() {
 }
 
 export default function DangNhap() {
-  const { dangNhap } = useToi();
+  const { dangNhap, dangXuat } = useToi();
   const navigate = useNavigate();
   const [hienHuongDan, setHienHuongDan] = useState(false);
   const [kieuBanDau] = useState(docKieuDangNhapDaLuu);
+  const [saiCong, setSaiCong] = useState(false);
 
   const {
     register,
@@ -75,6 +78,12 @@ export default function DangNhap() {
     mutationFn: ({ ten_dang_nhap, mat_khau, kieu_dang_nhap }: DangNhapForm) =>
       dangNhap(ten_dang_nhap, mat_khau, kieu_dang_nhap),
     onSuccess: ({ phaiDoiMatKhau, vaiTro }) => {
+      // Issue #55 / ADR 0015 P3: tài khoản đơn vị đăng nhập tại Cổng đơn vị — báo + link, không chuyển hướng.
+      if (!vaiTroDungCong(vaiTro, 'nls', daCauHinhCongDonVi())) {
+        setSaiCong(true);
+        void dangXuat().catch(() => undefined);
+        return;
+      }
       navigate(phaiDoiMatKhau ? '/doi-mat-khau' : trangChuTheoVaiTro(vaiTro), { replace: true });
     },
   });
@@ -87,6 +96,7 @@ export default function DangNhap() {
   }
 
   function onSubmit(values: DangNhapForm) {
+    setSaiCong(false);
     mutation.mutate(values);
   }
 
@@ -141,6 +151,8 @@ export default function DangNhap() {
             <Anchor component={Link} to="/huong-dan#dang-nhap" size="sm">
               Lần đầu sử dụng? Xem hướng dẫn từng bước có hình minh họa
             </Anchor>
+
+            {saiCong && <ThongBaoSaiCong congDung="don_vi" />}
 
             {loiChung && (
               <StatusBanner loai="error">

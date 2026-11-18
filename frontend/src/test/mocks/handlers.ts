@@ -83,6 +83,15 @@ function loi(status: number, code: string, message: string, extra: Record<string
 }
 
 // Giả lập logic tìm tài khoản của backend (spec 2026-10-09 Q-A/Q-B) — đủ cho test FE, không đầy đủ như server.
+// Issue #55 (Cổng đơn vị): tài khoản không phải học viên, đăng nhập bằng tên tài khoản + mật khẩu riêng.
+export const MAT_KHAU_TAI_KHOAN_KHAC = 'MatKhauTam@1';
+export const TAI_KHOAN_KHAC_GIA_LAP: Record<string, { vai_tro: string; phai_doi_mat_khau: boolean }> = {
+  'truong-mau': { vai_tro: 'truong', phai_doi_mat_khau: false },
+  'truong-moi': { vai_tro: 'truong', phai_doi_mat_khau: true },
+  'so-mau': { vai_tro: 'so_gddt', phai_doi_mat_khau: false },
+  'quantri-mau': { vai_tro: 'quan_tri', phai_doi_mat_khau: false },
+};
+
 function khopTaiKhoanGiaLap(nhap: string, kieu: 'ma' | 'sdt' = 'ma') {
   const chiSo = (x: string) => x.replace(/\D/g, '');
   if (kieu === 'sdt') return chiSo(nhap) !== '' && chiSo(nhap) === chiSo(db.hoSo.so_dien_thoai_lien_he ?? '');
@@ -359,6 +368,17 @@ export const handlers = [
   // 2026-10-09: kieu_dang_nhap 'ma' (mặc định, khớp cả khi lệch số 0 đầu) | 'sdt' (khớp SĐT hồ sơ).
   http.post('/auth/dang-nhap', async ({ request }) => {
     const body = (await request.json()) as { ten_dang_nhap: string; mat_khau: string; kieu_dang_nhap?: 'ma' | 'sdt' };
+    const tkKhac = TAI_KHOAN_KHAC_GIA_LAP[body.ten_dang_nhap];
+    if (tkKhac) {
+      if (body.mat_khau !== MAT_KHAU_TAI_KHOAN_KHAC) {
+        return loi(401, 'UNAUTHORIZED', 'Tên tài khoản hoặc mật khẩu không đúng');
+      }
+      return HttpResponse.json({
+        token: 'token-gia-lap',
+        phai_doi_mat_khau: tkKhac.phai_doi_mat_khau,
+        nguoi_dung: { id: `nd-${body.ten_dang_nhap}`, ten_dang_nhap: body.ten_dang_nhap, vai_tro: tkKhac.vai_tro, hoc_vien_id: null },
+      });
+    }
     if (!khopTaiKhoanGiaLap(body.ten_dang_nhap, body.kieu_dang_nhap)) {
       return loi(401, 'UNAUTHORIZED', 'Mã định danh hoặc mật khẩu không đúng');
     }
