@@ -222,6 +222,7 @@ export class DanhSachThamGiaService {
           created_by: callerId,
         })),
       }),
+      this.taoHopDongNeuChuaCo(dot.id, donViIds),
     ]);
 
     const tong_suat = ds.reduce((t, d) => t + TY_LE_SUAT[d.giai_doan], 0);
@@ -300,14 +301,18 @@ export class DanhSachThamGiaService {
       await this.kiemTraTruong(dot.so_gddt_id, sau.don_vi_id);
     }
 
-    const moi = await this.prisma.danh_sach_tham_gia.update({
-      where: { id: cu.id },
-      data: {
-        ...sau,
-        ngay_sinh: chuoiSangNgay(sau.ngay_sinh),
-        updated_at: new Date(),
-      },
-    });
+    // Chuyển dòng sang trường khác → trường mới cũng phải có dòng hợp đồng (M5).
+    const [moi] = await this.prisma.$transaction([
+      this.prisma.danh_sach_tham_gia.update({
+        where: { id: cu.id },
+        data: {
+          ...sau,
+          ngay_sinh: chuoiSangNgay(sau.ngay_sinh),
+          updated_at: new Date(),
+        },
+      }),
+      this.taoHopDongNeuChuaCo(cu.dot_trien_khai_id, [sau.don_vi_id]),
+    ]);
     await this.nhatKy.ghi({
       hanh_dong: 'sua_dong_danh_sach',
       chi_tiet: {
@@ -330,21 +335,24 @@ export class DanhSachThamGiaService {
     const dot = await this.layDotHsg(dotId);
     await this.kiemTraTruong(dot.so_gddt_id, dto.don_vi_id);
     const giai_doan = dto.giai_doan ?? 'ca_hai';
-    const moi = await this.prisma.danh_sach_tham_gia.create({
-      data: {
-        dot_trien_khai_id: dot.id,
-        don_vi_id: dto.don_vi_id,
-        ho_ten: dto.ho_ten,
-        ngay_sinh: chuoiSangNgay(dto.ngay_sinh ?? null),
-        gioi_tinh: dto.gioi_tinh ?? null,
-        ma_goc: dto.ma_goc ?? null,
-        lop: dto.lop ?? null,
-        giai_doan,
-        ty_le_suat: dto.ty_le_suat ?? TY_LE_SUAT[giai_doan],
-        ghi_chu: dto.ghi_chu ?? null,
-        created_by: callerId,
-      },
-    });
+    const [moi] = await this.prisma.$transaction([
+      this.prisma.danh_sach_tham_gia.create({
+        data: {
+          dot_trien_khai_id: dot.id,
+          don_vi_id: dto.don_vi_id,
+          ho_ten: dto.ho_ten,
+          ngay_sinh: chuoiSangNgay(dto.ngay_sinh ?? null),
+          gioi_tinh: dto.gioi_tinh ?? null,
+          ma_goc: dto.ma_goc ?? null,
+          lop: dto.lop ?? null,
+          giai_doan,
+          ty_le_suat: dto.ty_le_suat ?? TY_LE_SUAT[giai_doan],
+          ghi_chu: dto.ghi_chu ?? null,
+          created_by: callerId,
+        },
+      }),
+      this.taoHopDongNeuChuaCo(dot.id, [dto.don_vi_id]),
+    ]);
     await this.nhatKy.ghi({
       hanh_dong: 'them_dong_danh_sach',
       chi_tiet: {
@@ -412,6 +420,20 @@ export class DanhSachThamGiaService {
       },
     });
     return { buffer, tenFile: tenFileXuatDanhSach(dot.ten, new Date()) };
+  }
+
+  /**
+   * ADR 0015 M5 (issue #60): mọi (đợt, trường) có ≥ 1 dòng danh sách đều có 1 dòng hop_dong_boi_duong.
+   * Đã có thì giữ nguyên (không đặt lại trạng thái); danh sách rỗng đi cũng không xóa.
+   */
+  private taoHopDongNeuChuaCo(dotId: string, donViIds: string[]) {
+    return this.prisma.hop_dong_boi_duong.createMany({
+      data: donViIds.map((don_vi_id) => ({
+        dot_trien_khai_id: dotId,
+        don_vi_id,
+      })),
+      skipDuplicates: true,
+    });
   }
 
   /** Đơn vị phải là trường đang hoạt động trong cây Sở của đợt (T7). */

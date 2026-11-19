@@ -3,8 +3,10 @@ import {
   TY_LE_SUAT,
   TruongPhamVi,
   chuanHoaTenTruong,
+  giaTriTamTinh,
   khopTruong,
   suatTuGiaiDoan,
+  tongSuat,
 } from './quy-tac-hop-dong';
 
 // ADR 0015 S1, S3: "Giai đoạn tham gia" → suất.
@@ -196,5 +198,83 @@ describe('khopTruong', () => {
       const kq = khopTruong(dong, PHAM_VI);
       expect(kq.don_vi_id && ids.has(kq.don_vi_id)).toBe(true);
     }
+  });
+});
+
+// ADR 0015 S1, S5 (issue #60): tổng suất chính xác (0,5 cộng dồn không lệch số thực).
+describe('tongSuat', () => {
+  const ds = (...suat: number[]) => suat.map((ty_le_suat) => ({ ty_le_suat }));
+
+  it('danh sách rỗng → 0', () => {
+    expect(tongSuat([])).toBe(0);
+  });
+
+  it('0,5 + 0,5 + 1 = 2 đúng tuyệt đối', () => {
+    expect(tongSuat(ds(0.5, 0.5, 1))).toBe(2);
+  });
+
+  it('số lẻ 0,5 giữ nguyên phần ,5', () => {
+    expect(tongSuat(ds(1, 0.5))).toBe(1.5);
+    expect(tongSuat(ds(0.5))).toBe(0.5);
+  });
+
+  it('682 người (341 người 0,5 + 341 người 1) = 511,5 — không trôi số thực', () => {
+    const lon = [
+      ...Array.from({ length: 341 }, () => 0.5),
+      ...Array.from({ length: 341 }, () => 1),
+    ];
+    expect(tongSuat(ds(...lon))).toBe(511.5);
+  });
+
+  it('nhận ty_le_suat dạng Decimal đã đổi sang number (0.5 / 1)', () => {
+    expect(tongSuat(ds(Number('0.5'), Number('1.0')))).toBe(1.5);
+  });
+});
+
+// ADR 0015 S5: giá trị = Σ suất × đơn giá, làm tròn đến đồng — quy tắc: làm tròn nửa lên (≥ 0,5 đồng → lên).
+describe('giaTriTamTinh', () => {
+  it('đơn giá null → null (chưa có đơn giá, không hiện số)', () => {
+    expect(giaTriTamTinh(12.5, null)).toBeNull();
+    expect(giaTriTamTinh(0, null)).toBeNull();
+  });
+
+  it('đơn giá 0 → 0', () => {
+    expect(giaTriTamTinh(12.5, 0)).toBe(0);
+  });
+
+  it('tổng suất 0 → 0', () => {
+    expect(giaTriTamTinh(0, 1_500_000)).toBe(0);
+  });
+
+  it('đơn giá chẵn: 12,5 × 1.500.000 = 18.750.000', () => {
+    expect(giaTriTamTinh(12.5, 1_500_000)).toBe(18_750_000);
+  });
+
+  it('đơn giá lẻ: 2,5 × 1.234.567 = 3.086.417,5 → 3.086.418 (nửa lên)', () => {
+    expect(giaTriTamTinh(2.5, 1_234_567)).toBe(3_086_418);
+  });
+
+  it('0,5 × 3 = 1,5 → 2 (nửa lên); 0,5 × 1 = 0,5 → 1', () => {
+    expect(giaTriTamTinh(0.5, 3)).toBe(2);
+    expect(giaTriTamTinh(0.5, 1)).toBe(1);
+  });
+
+  it('kết quả luôn là số nguyên đồng', () => {
+    for (const suat of [0.5, 1, 7.5, 511.5]) {
+      expect(Number.isInteger(giaTriTamTinh(suat, 1_234_567))).toBe(true);
+    }
+  });
+
+  it('quy mô lớn: 511,5 suất × 1.234.567 = 631.481.020,5 → 631.481.021', () => {
+    expect(giaTriTamTinh(511.5, 1_234_567)).toBe(631_481_021);
+  });
+
+  it('dùng cùng tongSuat: 0,5 + 0,5 + 1 suất × 1.000.001 = 2.000.002', () => {
+    const suat = tongSuat([
+      { ty_le_suat: 0.5 },
+      { ty_le_suat: 0.5 },
+      { ty_le_suat: 1 },
+    ]);
+    expect(giaTriTamTinh(suat, 1_000_001)).toBe(2_000_002);
   });
 });

@@ -37,8 +37,9 @@ describe('CongDonViLayout', () => {
 });
 
 describe('TrangChuCongDonVi', () => {
+  // Issue #60: trường có trang chủ riêng (TrangChuTruong.test.tsx); trang tạm còn cho Sở/Phòng/Quản trị.
   it('chào theo tên tài khoản, báo chức năng sắp có, có link Hướng dẫn', async () => {
-    db.nguoiDung.vai_tro = 'truong';
+    db.nguoiDung.vai_tro = 'so_gddt';
     datToken('token-gia-lap');
     renderVoiRouter([{ path: '/trang-chu', element: <TrangChuCongDonVi /> }], { initialEntries: ['/trang-chu'] });
     expect(await screen.findByText(new RegExp(`Xin chào, ${db.hoSo.ma_dinh_danh_moet}`))).toBeInTheDocument();
@@ -87,11 +88,11 @@ describe('routesCongDonVi', () => {
     expect(await screen.findByLabelText('Tên tài khoản')).toBeInTheDocument();
   });
 
-  it('/ đã đăng nhập (trường) → Trang chủ trong khung Cổng đơn vị', async () => {
+  it('/ đã đăng nhập (trường) → Trang chủ trường (U1) trong khung Cổng đơn vị', async () => {
     db.nguoiDung.vai_tro = 'truong';
     datToken('token-gia-lap');
     renderVoiRouter(routesCongDonVi, { initialEntries: ['/'] });
-    expect(await screen.findByText(new RegExp(`Xin chào, ${db.hoSo.ma_dinh_danh_moet}`))).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Việc cần làm' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Menu Cổng đơn vị' })).toBeInTheDocument();
   });
 

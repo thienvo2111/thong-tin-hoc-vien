@@ -174,6 +174,10 @@ describe('Sửa danh sách tham gia - Cổng đơn vị (e2e)', () => {
       await prisma.danh_sach_tham_gia.deleteMany({
         where: { dot_trien_khai_id: { in: dotIds } },
       });
+      // Issue #60: nạp/thêm dòng tạo kèm dòng hợp đồng (FK tới đợt) — dọn trước khi xóa đợt.
+      await prisma.hop_dong_boi_duong.deleteMany({
+        where: { dot_trien_khai_id: { in: dotIds } },
+      });
       await prisma.dot_trien_khai.deleteMany({ where: { id: { in: dotIds } } });
     }
     for (const u of [quanTri, truongUser, soUser]) {

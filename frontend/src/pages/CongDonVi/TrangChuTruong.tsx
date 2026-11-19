@@ -1,0 +1,143 @@
+import { Link } from 'react-router-dom';
+import { Alert, Badge, Button, Container, Group, Paper, SimpleGrid, Skeleton, Stack, Text, Title } from '@mantine/core';
+import { useDotCuaTruong, type TheDotTruong } from '@/api/truongDanhSach';
+import { thongDiepLoiChung } from '@/lib/loiApi';
+import { dinhDangNgayLich } from '@/lib/ngayLich';
+import { dinhDangSuat } from './danhSachThamGiaNhan';
+import { NHAN_CHUONG_TRINH_NGAN, TRANG_THAI_DANH_SACH, TRANG_THAI_HOP_DONG, dinhDangGiaTri } from './hopDongNhan';
+
+// Việc chưa mở ở lát này (#61 xác nhận, #64 hợp đồng + nộp) — chỉ hiện mờ để giữ bố cục U1.
+const VIEC_SAP_MO = ['Xác nhận danh sách', 'Thông tin hợp đồng', 'Nộp hợp đồng'];
+
+/** Trang chủ của trường trên Cổng đơn vị (issue #60, ADR 0015 U1 — prototype phương án C):
+ * thẻ Hồ sơ đơn vị ở trên cùng, rồi mỗi đợt có danh sách của trường là một thẻ việc cần làm. */
+export default function TrangChuTruong() {
+  const { data, isLoading, isError, error, refetch, isFetching } = useDotCuaTruong();
+
+  return (
+    <Container size="sm" py="lg" px="md">
+      <Stack gap="md">
+        <Title order={1} size="h3">
+          Việc cần làm
+        </Title>
+
+        <Paper withBorder radius="md" p="md" component="section" aria-label="Hồ sơ đơn vị">
+          <Group justify="space-between" wrap="nowrap" align="flex-start" gap="sm">
+            <div>
+              <Text fw={600}>Hồ sơ đơn vị</Text>
+              <Text size="sm" c="dimmed">
+                Khai một lần, dùng cho mọi chương trình
+              </Text>
+            </div>
+            <Badge color="gray" variant="light" style={{ flexShrink: 0 }}>
+              Sắp mở
+            </Badge>
+          </Group>
+        </Paper>
+
+        {isLoading && (
+          <Stack gap="md" aria-label="Đang tải">
+            <Skeleton height={180} radius="md" />
+            <Skeleton height={180} radius="md" />
+          </Stack>
+        )}
+
+        {isError && (
+          <Alert color="red" title="Không tải được danh sách đợt">
+            <Stack gap="sm" align="flex-start">
+              <Text size="sm">{thongDiepLoiChung(error)}</Text>
+              <Button size="sm" variant="light" color="red" onClick={() => refetch()} loading={isFetching}>
+                Thử lại
+              </Button>
+            </Stack>
+          </Alert>
+        )}
+
+        {data && data.length === 0 && (
+          <Paper withBorder radius="md" p="md">
+            <Text c="dimmed">Chưa có đợt bồi dưỡng nào cho trường</Text>
+          </Paper>
+        )}
+
+        {data?.map((the) => (
+          <TheDot key={the.dot.id} the={the} />
+        ))}
+      </Stack>
+    </Container>
+  );
+}
+
+function TheDot({ the }: { the: TheDotTruong }) {
+  const { dot } = the;
+  const ds = TRANG_THAI_DANH_SACH[the.trang_thai_danh_sach];
+  const hd = TRANG_THAI_HOP_DONG[the.trang_thai_hop_dong];
+  const idTieuDe = `dot-${dot.id}`;
+
+  return (
+    <Paper withBorder radius="md" p="md" component="article" aria-labelledby={idTieuDe}>
+      <Stack gap="sm">
+        <Group gap="xs">
+          <Badge variant="filled">{NHAN_CHUONG_TRINH_NGAN[dot.chuong_trinh]}</Badge>
+          <Badge color={ds.mau} variant="light">
+            Danh sách: {ds.nhan}
+          </Badge>
+          <Badge color={hd.mau} variant="light">
+            Hợp đồng: {hd.nhan}
+          </Badge>
+        </Group>
+        <div>
+          <Title order={2} size="h4" id={idTieuDe} style={{ overflowWrap: 'anywhere' }}>
+            {dot.ten}
+          </Title>
+          <Text size="sm" c="dimmed">
+            Hạn nộp: {dinhDangNgayLich(dot.han_nop_ngay)}
+          </Text>
+        </div>
+
+        <SimpleGrid cols={{ base: 2, xs: 3 }} spacing="sm" verticalSpacing="xs">
+          <SoLieu nhan="Số người" giaTri={String(the.so_nguoi)} />
+          <SoLieu nhan="Tổng suất" giaTri={dinhDangSuat(the.tong_suat)} />
+          <SoLieu nhan="Giá trị tạm tính" giaTri={dinhDangGiaTri(the.gia_tri_tam_tinh)} />
+        </SimpleGrid>
+
+        <Stack component="ul" gap="xs" m={0} p={0} style={{ listStyle: 'none' }} aria-label="Việc cần làm">
+          <li>
+            <Button component={Link} to={`/dot/${dot.id}/danh-sach`} variant="light" fullWidth justify="space-between">
+              Xem danh sách tham gia
+            </Button>
+          </li>
+          {VIEC_SAP_MO.map((viec) => (
+            <li key={viec}>
+              <Button
+                variant="default"
+                fullWidth
+                disabled
+                justify="space-between"
+                rightSection={
+                  <Badge color="gray" variant="light" size="sm">
+                    Sắp mở
+                  </Badge>
+                }
+              >
+                {viec}
+              </Button>
+            </li>
+          ))}
+        </Stack>
+      </Stack>
+    </Paper>
+  );
+}
+
+function SoLieu({ nhan, giaTri }: { nhan: string; giaTri: string }) {
+  return (
+    <div>
+      <Text size="xs" c="dimmed">
+        {nhan}
+      </Text>
+      <Text fw={600} style={{ overflowWrap: 'anywhere' }}>
+        {giaTri}
+      </Text>
+    </div>
+  );
+}

@@ -11,6 +11,28 @@ export const TY_LE_SUAT: Record<GiaiDoanThamGia, TyLeSuat> = {
   chi_gd2: 0.5,
 };
 
+/** Số nửa suất (0,5 → 1; 1 → 2) — tính bằng số nguyên để cộng dồn không lệch số thực. */
+function soNuaSuat(suat: number): number {
+  return Math.round(suat * 2);
+}
+
+/** ADR 0015 S1/X6: tổng suất của danh sách, chính xác tuyệt đối (0,5 + 0,5 + 1 = 2). */
+export function tongSuat(dong: readonly { ty_le_suat: number }[]): number {
+  return dong.reduce((t, d) => t + soNuaSuat(d.ty_le_suat), 0) / 2;
+}
+
+/**
+ * ADR 0015 S5: giá trị tạm tính = tổng suất × đơn giá, làm tròn đến đồng theo quy tắc nửa lên
+ * (x,5 đồng → x+1). Tính trên số nửa suất (số nguyên) nên không lệch số thực. Chưa có đơn giá → null.
+ */
+export function giaTriTamTinh(
+  tongSuat: number,
+  donGia: number | null,
+): number | null {
+  if (donGia === null) return null;
+  return Math.round((soNuaSuat(tongSuat) * donGia) / 2);
+}
+
 export class GiaiDoanKhongHopLeError extends Error {
   constructor(public readonly giaTri: string) {
     super(

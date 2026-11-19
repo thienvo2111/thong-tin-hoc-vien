@@ -276,6 +276,19 @@ enum giai_doan_tham_gia {
   chi_gd2
 }
 
+// ADR 0015 X1 (issue #60): trạng thái danh sách của 1 trường trong 1 đợt.
+enum trang_thai_danh_sach_truong {
+  cho_xac_nhan
+  da_xac_nhan
+  bao_sai_lech
+}
+
+// ADR 0015 M5 (issue #60): trạng thái hợp đồng của 1 trường trong 1 đợt.
+enum trang_thai_hop_dong {
+  chua_nop
+  da_nop
+}
+
 enum loai_dot_xac_nhan {
   kiem_tra_bo_sung
   xac_nhan_truoc_danh_gia
@@ -431,6 +444,8 @@ model don_vi_cong_tac {
   dot_trien_khai dot_trien_khai[] @relation("dot_trien_khai_so_gddt")
   // Issue #58: trường tính suất của dòng danh sách tham gia
   danh_sach_tham_gia danh_sach_tham_gia[]
+  // Issue #60: hợp đồng bồi dưỡng của trường theo đợt
+  hop_dong_boi_duong hop_dong_boi_duong[]
 
   @@index([loai_don_vi], map: "idx_don_vi_loai")
   @@index([dia_ban_id], map: "idx_don_vi_dia_ban")
@@ -530,6 +545,9 @@ model nguoi_dung {
 
   // Issue #58: Quản trị nạp danh sách tham gia
   danh_sach_tham_gia_created_by danh_sach_tham_gia[] @relation("danh_sach_tham_gia_created_by")
+
+  // Issue #60: người thao tác gần nhất trên hợp đồng bồi dưỡng (X1)
+  hop_dong_thao_tac_cuoi hop_dong_boi_duong[] @relation("hop_dong_thao_tac_cuoi")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -796,6 +814,7 @@ model dot_trien_khai {
   created_by_user nguoi_dung?     @relation("dot_trien_khai_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   danh_sach_tham_gia danh_sach_tham_gia[]
+  hop_dong_boi_duong hop_dong_boi_duong[]
 
   @@index([chuong_trinh], map: "idx_dot_trien_khai_chuong_trinh")
   @@index([so_gddt_id], map: "idx_dot_trien_khai_so_gddt")
@@ -829,6 +848,27 @@ model danh_sach_tham_gia {
 
   @@index([dot_trien_khai_id, don_vi_id], map: "idx_ds_tham_gia_dot_don_vi")
   @@index([hoc_vien_id], map: "idx_ds_tham_gia_hoc_vien")
+}
+
+// ADR 0015 M5/X1 (issue #60): 1 dòng cho mỗi (đợt, trường) có danh sách tham gia — nạp/thêm dòng tạo kèm.
+// Cột Phần 3–4, bản chụp hồ sơ, hạn riêng… thêm ở lát sau. thao_tac_cuoi_* = người + lúc thao tác gần nhất (X1).
+model hop_dong_boi_duong {
+  id                   String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dot_trien_khai_id    String                      @db.Uuid
+  don_vi_id            String                      @db.Uuid
+  trang_thai_danh_sach trang_thai_danh_sach_truong @default(cho_xac_nhan)
+  trang_thai_hop_dong  trang_thai_hop_dong         @default(chua_nop)
+  thao_tac_cuoi_boi    String?                     @db.Uuid
+  thao_tac_cuoi_luc    DateTime?                   @db.Timestamptz(6)
+  created_at           DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime                    @default(now()) @db.Timestamptz(6)
+
+  dot_trien_khai     dot_trien_khai  @relation(fields: [dot_trien_khai_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  don_vi             don_vi_cong_tac @relation(fields: [don_vi_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  thao_tac_cuoi_user nguoi_dung?     @relation("hop_dong_thao_tac_cuoi", fields: [thao_tac_cuoi_boi], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([dot_trien_khai_id, don_vi_id], map: "uq_hop_dong_dot_don_vi")
+  @@index([don_vi_id], map: "idx_hop_dong_don_vi")
 }
 
 model xac_nhan_ho_so {

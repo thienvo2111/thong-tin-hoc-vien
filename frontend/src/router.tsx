@@ -350,6 +350,17 @@ export const routesCongDonVi: RouteObject[] = [
                 lazy: () => import('@/pages/CongDonVi/TrangChuCongDonVi').then((m) => ({ Component: m.default })),
               },
               {
+                // Issue #60: màn việc của trường; vai trò khác → 404, không mount trang (không gọi API).
+                lazy: () => import('@/pages/CongDonVi/ChiTruongCong').then((m) => ({ Component: m.default })),
+                children: [
+                  {
+                    path: '/dot/:dotId/danh-sach',
+                    lazy: () =>
+                      import('@/pages/CongDonVi/DanhSachThamGiaTruong').then((m) => ({ Component: m.default })),
+                  },
+                ],
+              },
+              {
                 // Issue #56/#57: mọi /quan-tri/* chỉ quan_tri; vai trò khác → 404, không mount trang (không gọi API).
                 lazy: () => import('@/pages/CongDonVi/ChiQuanTriCong').then((m) => ({ Component: m.default })),
                 children: [

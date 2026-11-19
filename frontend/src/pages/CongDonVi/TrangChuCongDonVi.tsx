@@ -1,11 +1,20 @@
 import { Link } from 'react-router-dom';
-import { Anchor, Container, Paper, Stack, Text, Title } from '@mantine/core';
+import { Anchor, Center, Container, Loader, Paper, Stack, Text, Title } from '@mantine/core';
 import { useToi } from '@/auth/AuthContext';
 import { congDonVi } from '@/content/congDonVi';
+import TrangChuTruong from './TrangChuTruong';
 
-/** Trang chủ tạm của Cổng đơn vị (issue #55) — chức năng danh sách tham gia/hồ sơ đơn vị làm ở các issue sau. */
+/** Trang chủ Cổng đơn vị: trường → bố cục U1 (issue #60); vai trò khác giữ trang tạm (issue #55) tới lát sau (#71). */
 export default function TrangChuCongDonVi() {
-  const { nguoiDung } = useToi();
+  const { dangTai, nguoiDung } = useToi();
+  if (dangTai) {
+    return (
+      <Center mih="40vh">
+        <Loader />
+      </Center>
+    );
+  }
+  if (nguoiDung?.vai_tro === 'truong') return <TrangChuTruong />;
 
   return (
     <Container size="sm" py="lg">
