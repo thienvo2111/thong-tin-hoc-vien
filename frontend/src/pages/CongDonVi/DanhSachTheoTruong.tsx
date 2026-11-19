@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Alert, Button, Group, Paper, Skeleton, Stack, Table, Text, Title } from '@mantine/core';
+import { Alert, Badge, Button, Group, Paper, Skeleton, Stack, Table, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useDanhSachThamGia, xuatExcelDanhSach, type DongDanhSach, type TongHopTruong } from '@/api/danhSachThamGia';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayLich } from '@/lib/ngayLich';
 import { taiFileTuBlob } from '@/lib/taiFile';
-import { NHAN_GIAI_DOAN, dinhDangSuat } from './danhSachThamGiaNhan';
+import { NHAN_GIAI_DOAN, NHAN_Y_KIEN, dinhDangSuat } from './danhSachThamGiaNhan';
+import { TRANG_THAI_DANH_SACH } from './hopDongNhan';
 import { ModalDongDanhSach } from './ModalDongDanhSach';
 import { ModalXoaDong } from './ModalXoaDong';
 
@@ -72,6 +73,7 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
                     <Table.Th>Mã</Table.Th>
                     <Table.Th ta="right">Số người</Table.Th>
                     <Table.Th ta="right">Tổng suất</Table.Th>
+                    <Table.Th>Trạng thái</Table.Th>
                     <Table.Th />
                   </Table.Tr>
                 </Table.Thead>
@@ -82,6 +84,13 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
                       <Table.Td>{t.ma_don_vi}</Table.Td>
                       <Table.Td ta="right">{t.so_nguoi}</Table.Td>
                       <Table.Td ta="right">{dinhDangSuat(t.tong_suat)}</Table.Td>
+                      <Table.Td>
+                        {t.trang_thai_danh_sach && (
+                          <Badge color={TRANG_THAI_DANH_SACH[t.trang_thai_danh_sach].mau} variant="light">
+                            {TRANG_THAI_DANH_SACH[t.trang_thai_danh_sach].nhan}
+                          </Badge>
+                        )}
+                      </Table.Td>
                       <Table.Td>
                         <Button
                           size="xs"
@@ -127,7 +136,7 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
                 </Button>
               </Group>
             </Group>
-            <Table.ScrollContainer minWidth={820}>
+            <Table.ScrollContainer minWidth={920}>
               <Table striped withTableBorder fz="sm" aria-label={`Danh sách ${truong.ten_don_vi}`}>
                 <Table.Thead>
                   <Table.Tr>
@@ -138,6 +147,7 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
                     <Table.Th>Giai đoạn</Table.Th>
                     <Table.Th ta="right">Suất</Table.Th>
                     <Table.Th>Ghi chú</Table.Th>
+                    <Table.Th>Ý kiến trường</Table.Th>
                     <Table.Th />
                   </Table.Tr>
                 </Table.Thead>
@@ -151,6 +161,11 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
                       <Table.Td>{NHAN_GIAI_DOAN[d.giai_doan]}</Table.Td>
                       <Table.Td ta="right">{dinhDangSuat(d.ty_le_suat)}</Table.Td>
                       <Table.Td>{d.ghi_chu}</Table.Td>
+                      <Table.Td>
+                        <Badge color={NHAN_Y_KIEN[d.y_kien_truong ?? 'chua_co'].mau} variant="light">
+                          {NHAN_Y_KIEN[d.y_kien_truong ?? 'chua_co'].nhan}
+                        </Badge>
+                      </Table.Td>
                       <Table.Td>
                         <Group gap={4} wrap="nowrap">
                           <Button

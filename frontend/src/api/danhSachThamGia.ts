@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, apiFetchBlob } from './client';
+import type { TrangThaiDanhSachTruong, YKienTruong } from './truongDanhSach';
 
 // Issue #58 / ADR 0015 M3, M6, S1, S3, T7 — Quản trị nạp Excel danh sách HSG theo đợt (Cổng đơn vị).
 export type GiaiDoanThamGia = 'ca_hai' | 'chi_gd1' | 'chi_gd2';
@@ -68,7 +69,8 @@ export interface DongDanhSach {
   giai_doan: GiaiDoanThamGia;
   ty_le_suat: number;
   ghi_chu: string | null;
-  y_kien_truong: string | null;
+  /** Issue #61: ý kiến của trường; null = chưa có ý kiến. */
+  y_kien_truong: YKienTruong | null;
   hoc_vien_id: string | null;
 }
 
@@ -78,6 +80,8 @@ export interface TongHopTruong {
   ma_don_vi: string | null;
   so_nguoi: number;
   tong_suat: number;
+  /** Issue #61 / X1: null nếu trường chưa có dòng hợp đồng. */
+  trang_thai_danh_sach: TrangThaiDanhSachTruong | null;
 }
 
 export interface DanhSachThamGia {

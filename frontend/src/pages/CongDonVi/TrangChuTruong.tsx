@@ -6,8 +6,8 @@ import { dinhDangNgayLich } from '@/lib/ngayLich';
 import { dinhDangSuat } from './danhSachThamGiaNhan';
 import { NHAN_CHUONG_TRINH_NGAN, TRANG_THAI_DANH_SACH, TRANG_THAI_HOP_DONG, dinhDangGiaTri } from './hopDongNhan';
 
-// Việc chưa mở ở lát này (#61 xác nhận, #64 hợp đồng + nộp) — chỉ hiện mờ để giữ bố cục U1.
-const VIEC_SAP_MO = ['Xác nhận danh sách', 'Thông tin hợp đồng', 'Nộp hợp đồng'];
+// Việc chưa mở ở lát này (#64 hợp đồng + nộp) — chỉ hiện mờ để giữ bố cục U1.
+const VIEC_SAP_MO = ['Thông tin hợp đồng', 'Nộp hợp đồng'];
 
 /** Trang chủ của trường trên Cổng đơn vị (issue #60, ADR 0015 U1 — prototype phương án C):
  * thẻ Hồ sơ đơn vị ở trên cùng, rồi mỗi đợt có danh sách của trường là một thẻ việc cần làm. */
@@ -104,6 +104,23 @@ function TheDot({ the }: { the: TheDotTruong }) {
           <li>
             <Button component={Link} to={`/dot/${dot.id}/danh-sach`} variant="light" fullWidth justify="space-between">
               Xem danh sách tham gia
+            </Button>
+          </li>
+          {/* Issue #61: xác nhận ngay trên màn danh sách; nhãn trạng thái đi kèm việc. */}
+          <li>
+            <Button
+              component={Link}
+              to={`/dot/${dot.id}/danh-sach`}
+              variant="default"
+              fullWidth
+              justify="space-between"
+              rightSection={
+                <Badge color={ds.mau} variant="light" size="sm">
+                  {ds.nhan}
+                </Badge>
+              }
+            >
+              Xác nhận danh sách
             </Button>
           </li>
           {VIEC_SAP_MO.map((viec) => (

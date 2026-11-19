@@ -234,7 +234,9 @@ describe('Trang chủ trường + xem danh sách - Cổng đơn vị (e2e)', () 
       for (const h of hd) {
         expect(h.trang_thai_danh_sach).toBe('cho_xac_nhan');
         expect(h.trang_thai_hop_dong).toBe('chua_nop');
-        expect(h.thao_tac_cuoi_boi).toBeNull();
+        // Issue #61 / X1: nạp là thao tác của Quản trị → người thao tác cuối.
+        expect(h.thao_tac_cuoi_boi).toBe(nguoiDung[0].nguoiDung.id);
+        expect(h.thao_tac_cuoi_luc).toBeInstanceOf(Date);
       }
 
       expect((await nap(dot.chiB, [dong(ids.tB, 'GV Bịa Giang')])).status).toBe(
@@ -271,7 +273,7 @@ describe('Trang chủ trường + xem danh sách - Cổng đơn vị (e2e)', () 
       expect(cuaC).toHaveLength(1);
     });
 
-    it('thêm dòng cho trường đã có hop_dong → giữ nguyên dòng cũ (không tạo thêm, không đổi trạng thái)', async () => {
+    it('thêm dòng cho trường đã có hop_dong → không tạo thêm dòng; danh sách về Chờ xác nhận (X1, issue #61)', async () => {
       await prisma.hop_dong_boi_duong.update({
         where: {
           dot_trien_khai_id_don_vi_id: {
@@ -290,7 +292,7 @@ describe('Trang chủ trường + xem danh sách - Cổng đơn vị (e2e)', () 
         (h) => h.don_vi_id === ids.tC,
       );
       expect(cuaC).toHaveLength(1);
-      expect(cuaC[0].trang_thai_danh_sach).toBe('da_xac_nhan');
+      expect(cuaC[0].trang_thai_danh_sach).toBe('cho_xac_nhan');
     });
   });
 
@@ -390,7 +392,7 @@ describe('Trang chủ trường + xem danh sách - Cổng đơn vị (e2e)', () 
         so_nguoi: 2,
         tong_suat: 2,
         gia_tri_tam_tinh: 2_469_134,
-        trang_thai_danh_sach: 'da_xac_nhan',
+        trang_thai_danh_sach: 'cho_xac_nhan',
       });
     });
   });
@@ -417,6 +419,7 @@ describe('Trang chủ trường + xem danh sách - Cổng đơn vị (e2e)', () 
           'lop',
           'ngay_sinh',
           'ty_le_suat',
+          'y_kien_truong',
         ].sort(),
       );
       const binh = res.body.dong.find((d: { ho_ten: string }) =>
@@ -435,7 +438,10 @@ describe('Trang chủ trường + xem danh sách - Cổng đơn vị (e2e)', () 
         don_gia: 1_234_567,
         gia_tri_tam_tinh: 3_086_418,
         trang_thai_danh_sach: 'cho_xac_nhan',
+        co_the_xac_nhan: false,
+        ly_do_khong_xac_nhan: 'Còn 4 dòng chưa Đồng ý',
       });
+      expect(binh.y_kien_truong).toBeNull();
     });
 
     it('đợt chưa có đơn giá → gia_tri_tam_tinh null', async () => {

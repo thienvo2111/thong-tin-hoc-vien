@@ -49,7 +49,10 @@ export type HanhDongNhatKy =
   | 'sua_dong_danh_sach'
   | 'them_dong_danh_sach'
   | 'xoa_dong_danh_sach'
-  | 'xuat_danh_sach_tham_gia';
+  | 'xuat_danh_sach_tham_gia'
+  | 'y_kien_dong_danh_sach'
+  | 'dong_y_tat_ca_danh_sach'
+  | 'xac_nhan_danh_sach';
 
 const TIEU_DE: Record<HanhDongNhatKy, string> = {
   dang_nhap_thanh_cong: 'Đăng nhập thành công',
@@ -97,6 +100,9 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   them_dong_danh_sach: 'Quản trị thêm dòng danh sách tham gia',
   xoa_dong_danh_sach: 'Quản trị xóa dòng danh sách tham gia',
   xuat_danh_sach_tham_gia: 'Xuất danh sách tham gia (có ngày sinh)',
+  y_kien_dong_danh_sach: 'Trường cho ý kiến dòng danh sách tham gia',
+  dong_y_tat_ca_danh_sach: 'Trường đồng ý tất cả dòng chưa có ý kiến',
+  xac_nhan_danh_sach: 'Trường xác nhận danh sách tham gia',
 };
 
 const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
@@ -144,6 +150,9 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   them_dong_danh_sach: 'tai_khoan',
   xoa_dong_danh_sach: 'tai_khoan',
   xuat_danh_sach_tham_gia: 'tai_khoan',
+  y_kien_dong_danh_sach: 'tai_khoan',
+  dong_y_tat_ca_danh_sach: 'tai_khoan',
+  xac_nhan_danh_sach: 'tai_khoan',
 };
 
 const NHAN_VAI_TRO: Record<vai_tro_nguoi_dung, string> = {

@@ -123,7 +123,7 @@ describe('Sửa danh sách tham gia - Cổng đơn vị (e2e)', () => {
         lop: 'Lớp A',
         giai_doan: 'ca_hai',
         ty_le_suat: 1,
-        y_kien_truong: 'Trường đã xác nhận',
+        y_kien_truong: 'dong_y',
         updated_at: new Date('2026-01-01T00:00:00Z'),
         ...over,
       },
@@ -299,7 +299,7 @@ describe('Sửa danh sách tham gia - Cổng đơn vị (e2e)', () => {
           ho_ten: dong.ho_ten,
           ngay_sinh: '1990-02-01',
           lop: 'Lớp A',
-          y_kien_truong: 'Trường đã xác nhận',
+          y_kien_truong: 'dong_y',
         },
         sau: {
           don_vi_id: ids.t2,
@@ -370,7 +370,7 @@ describe('Sửa danh sách tham gia - Cổng đơn vị (e2e)', () => {
         giai_doan: 'ca_hai',
       });
       expect(res.status).toBe(200);
-      expect(res.body.y_kien_truong).toBe('Trường đã xác nhận');
+      expect(res.body.y_kien_truong).toBe('dong_y');
       expect(await nhatKyCua('sua_dong_danh_sach', dong.id)).toHaveLength(0);
       expect(
         await prisma.danh_sach_tham_gia.findUnique({ where: { id: dong.id } }),
@@ -506,7 +506,7 @@ describe('Sửa danh sách tham gia - Cổng đơn vị (e2e)', () => {
           giai_doan: 'ca_hai',
           ty_le_suat: 1,
           ghi_chu: 'ghi chú bịa',
-          y_kien_truong: 'Trường đã xác nhận',
+          y_kien_truong: 'dong_y',
           hoc_vien_id: null,
         },
         sau: null,
@@ -553,7 +553,7 @@ describe('Sửa danh sách tham gia - Cổng đơn vị (e2e)', () => {
             ho_ten,
             giai_doan: 'ca_hai',
             ty_le_suat: 1,
-            y_kien_truong: 'Đúng',
+            y_kien_truong: 'dong_y',
           },
         });
       // t1 = "Trường B…", t2 = "Trường A…": thứ tự xuất theo tên trường rồi họ tên.
@@ -599,7 +599,8 @@ describe('Sửa danh sách tham gia - Cổng đơn vị (e2e)', () => {
         0.5,
       ]);
       expect(sh.getRow(3).getCell(2).numFmt).toBe('dd/mm/yyyy');
-      expect(dong[3][10]).toBe('Đúng');
+      // Ý kiến xuất ra nhãn (issue #61), không phải mã.
+      expect(dong[3][10]).toBe('Đồng ý');
     });
 
     it('lọc 1 trường theo don_vi_id', async () => {

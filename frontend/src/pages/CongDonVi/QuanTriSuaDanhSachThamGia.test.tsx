@@ -38,7 +38,7 @@ function dongMau(p: Partial<DongDanhSach> = {}): DongDanhSach {
     giai_doan: 'ca_hai',
     ty_le_suat: 1,
     ghi_chu: null,
-    y_kien_truong: 'Đúng',
+    y_kien_truong: 'dong_y',
     hoc_vien_id: null,
     ...p,
   };
@@ -50,7 +50,14 @@ function renderTrang() {
   dbDotTrienKhai.ds = [dotMau(), dotMau({ id: 'dtk-nls', chuong_trinh: 'nls', ten: 'NLS đợt 1' })];
   dbDanhSachThamGia.danhSach = {
     tong_hop: [
-      { don_vi_id: 'tr-1', ten_don_vi: 'Trường THCS Mẫu Một', ma_don_vi: 'TR-MAU-001', so_nguoi: 2, tong_suat: 1.5 },
+      {
+        don_vi_id: 'tr-1',
+        ten_don_vi: 'Trường THCS Mẫu Một',
+        ma_don_vi: 'TR-MAU-001',
+        so_nguoi: 2,
+        tong_suat: 1.5,
+        trang_thai_danh_sach: 'da_xac_nhan',
+      },
     ],
     dong: [dongMau(), dongMau({ id: 'd2', ho_ten: 'GV Bịa Hai', giai_doan: 'chi_gd1', ty_le_suat: 0.5 })],
   };

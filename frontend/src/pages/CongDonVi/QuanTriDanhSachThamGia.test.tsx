@@ -153,6 +153,7 @@ describe('QuanTriDanhSachThamGia — xác nhận nạp', () => {
               ma_don_vi: 'TR-MAU-001',
               so_nguoi: 1,
               tong_suat: 1,
+              trang_thai_danh_sach: 'cho_xac_nhan',
             },
           ],
           dong: [],
@@ -243,11 +244,25 @@ describe('QuanTriDanhSachThamGia — xác nhận nạp', () => {
 });
 
 describe('QuanTriDanhSachThamGia — danh sách theo trường', () => {
-  it('bảng tổng hợp (tên, mã, số người, tổng suất) và xem từng người của 1 trường', async () => {
+  it('bảng tổng hợp (tên, mã, số người, tổng suất, trạng thái) và xem từng người của 1 trường (kèm ý kiến)', async () => {
     dbDanhSachThamGia.danhSach = {
       tong_hop: [
-        { don_vi_id: 'tr-1', ten_don_vi: 'Trường THCS Mẫu Một', ma_don_vi: 'TR-MAU-001', so_nguoi: 2, tong_suat: 1.5 },
-        { don_vi_id: 'tr-2', ten_don_vi: 'Trường THCS&THPT Mẫu Hai', ma_don_vi: null, so_nguoi: 1, tong_suat: 1 },
+        {
+          don_vi_id: 'tr-1',
+          ten_don_vi: 'Trường THCS Mẫu Một',
+          ma_don_vi: 'TR-MAU-001',
+          so_nguoi: 2,
+          tong_suat: 1.5,
+          trang_thai_danh_sach: 'bao_sai_lech',
+        },
+        {
+          don_vi_id: 'tr-2',
+          ten_don_vi: 'Trường THCS&THPT Mẫu Hai',
+          ma_don_vi: null,
+          so_nguoi: 1,
+          tong_suat: 1,
+          trang_thai_danh_sach: 'da_xac_nhan',
+        },
       ],
       dong: [
         {
@@ -261,7 +276,7 @@ describe('QuanTriDanhSachThamGia — danh sách theo trường', () => {
           giai_doan: 'ca_hai',
           ty_le_suat: 1,
           ghi_chu: 'ghi chú bịa',
-          y_kien_truong: null,
+          y_kien_truong: 'khong_dong_y',
           hoc_vien_id: null,
         },
         {
@@ -303,6 +318,9 @@ describe('QuanTriDanhSachThamGia — danh sách theo trường', () => {
     expect(within(hang1).getByText('TR-MAU-001')).toBeInTheDocument();
     expect(within(hang1).getByText('2')).toBeInTheDocument();
     expect(within(hang1).getByText('1,5')).toBeInTheDocument();
+    expect(within(hang1).getByText('Báo sai lệch')).toBeInTheDocument();
+    const hang2 = within(tongHop).getByText('Trường THCS&THPT Mẫu Hai').closest('tr') as HTMLElement;
+    expect(within(hang2).getByText('Đã xác nhận')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Xem danh sách Trường THCS Mẫu Một' }));
     const bang = await screen.findByRole('table', { name: 'Danh sách Trường THCS Mẫu Một' });
@@ -311,6 +329,10 @@ describe('QuanTriDanhSachThamGia — danh sách theo trường', () => {
     expect(within(bang).getByText('Chỉ GĐ1')).toBeInTheDocument();
     expect(within(bang).getByText('0,5')).toBeInTheDocument();
     expect(within(bang).queryByText('GV Bịa Ba')).not.toBeInTheDocument();
+    const dong1 = within(bang).getByText('GV Bịa Một').closest('tr') as HTMLElement;
+    expect(within(dong1).getByText('Không đồng ý')).toBeInTheDocument();
+    const dong2 = within(bang).getByText('GV Bịa Hai').closest('tr') as HTMLElement;
+    expect(within(dong2).getByText('Chưa có ý kiến')).toBeInTheDocument();
   }, 20000);
 
   it('đợt NLS: không có phần nạp Excel, vẫn xem được danh sách', async () => {

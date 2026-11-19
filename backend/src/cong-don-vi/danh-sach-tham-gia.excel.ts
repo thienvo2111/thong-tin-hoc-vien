@@ -5,6 +5,7 @@ import {
   GiaiDoanKhongHopLeError,
   GiaiDoanThamGia,
   TyLeSuat,
+  YKienTruong,
   suatTuGiaiDoan,
 } from './quy-tac-hop-dong';
 
@@ -299,6 +300,16 @@ const NHAN_GIAI_DOAN: Record<GiaiDoanThamGia, string> = {
   chi_gd2: 'Chỉ GĐ2',
 };
 
+// Issue #61: ý kiến lưu dạng mã → xuất nhãn; chưa có ý kiến → ô trống.
+const NHAN_Y_KIEN: Record<YKienTruong, string> = {
+  dong_y: 'Đồng ý',
+  khong_dong_y: 'Không đồng ý',
+};
+
+function nhanYKien(yKien: string | null): string | null {
+  return (yKien && NHAN_Y_KIEN[yKien as YKienTruong]) || null;
+}
+
 export async function taoFileXuatDanhSach(
   ds: DongXuatDanhSach[],
 ): Promise<Buffer> {
@@ -323,7 +334,7 @@ export async function taoFileXuatDanhSach(
       NHAN_GIAI_DOAN[d.giai_doan],
       d.ghi_chu,
       d.ty_le_suat,
-      d.y_kien_truong,
+      nhanYKien(d.y_kien_truong),
     ]);
   }
   return Buffer.from(await workbook.xlsx.writeBuffer());

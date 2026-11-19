@@ -185,7 +185,7 @@ describe('taoFileXuatDanhSach', () => {
       giai_doan: 'ca_hai',
       ty_le_suat: 0.5,
       ghi_chu: 'Thay giữa chừng',
-      y_kien_truong: 'Đúng',
+      y_kien_truong: 'dong_y',
     },
     {
       ho_ten: 'GV Bịa Hai',
@@ -226,8 +226,20 @@ describe('taoFileXuatDanhSach', () => {
     expect(sh.getRow(2).getCell(8).value).toBe('Cả 2');
     expect(sh.getRow(3).getCell(8).value).toBe('Chỉ GĐ2');
     expect(sh.getRow(2).getCell(10).value).toBe(0.5);
-    expect(sh.getRow(2).getCell(11).value).toBe('Đúng');
     expect(sh.getRow(3).getCell(2).value).toBeNull();
+  });
+
+  it('cột "Ý kiến của trường" ghi nhãn: Đồng ý / Không đồng ý / trống (issue #61)', async () => {
+    const sh = await moFile(
+      await taoFileXuatDanhSach([
+        DS[0],
+        DS[1],
+        { ...DS[1], y_kien_truong: 'khong_dong_y' },
+      ]),
+    );
+    expect(sh.getRow(2).getCell(11).value).toBe('Đồng ý');
+    expect(sh.getRow(3).getCell(11).value).toBeNull();
+    expect(sh.getRow(4).getCell(11).value).toBe('Không đồng ý');
   });
 
   it('xuất → đọc lại bằng bộ đọc file nạp: đúng dữ liệu, bỏ qua 2 cột thêm (suất suy lại từ giai đoạn)', async () => {

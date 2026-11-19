@@ -191,3 +191,53 @@ export function khopTruong(
   }
   return { trang_thai: ungVien.length > 1 ? 'nhieu_ket_qua' : 'khong_khop' };
 }
+
+// Issue #61 / ADR 0015 X1, X2: ý kiến của trường trên từng dòng + trạng thái danh sách của trường.
+// danh_sach_tham_gia.y_kien_truong chỉ giữ NULL (chưa có ý kiến) | 'dong_y' | 'khong_dong_y'.
+export const Y_KIEN_TRUONG = ['dong_y', 'khong_dong_y'] as const;
+export type YKienTruong = (typeof Y_KIEN_TRUONG)[number];
+export type TrangThaiDanhSach = 'cho_xac_nhan' | 'da_xac_nhan' | 'bao_sai_lech';
+
+/**
+ * X1: trạng thái sau khi trường đổi ý kiến 1 dòng (hoặc Đồng ý tất cả). Có dòng Không đồng ý → Báo sai
+ * lệch; hết dòng Không đồng ý → từ Báo sai lệch về Chờ xác nhận; Đã xác nhận mà có dòng không còn Đồng ý
+ * → Chờ xác nhận. Còn lại giữ nguyên (mọi dòng Đồng ý vẫn phải bấm Xác nhận).
+ */
+export function trangThaiSauYKien(
+  yKiens: readonly (YKienTruong | null)[],
+  hienTai: TrangThaiDanhSach,
+): TrangThaiDanhSach {
+  if (yKiens.some((y) => y === 'khong_dong_y')) return 'bao_sai_lech';
+  if (hienTai === 'bao_sai_lech') return 'cho_xac_nhan';
+  if (hienTai === 'da_xac_nhan' && !yKiens.every((y) => y === 'dong_y')) {
+    return 'cho_xac_nhan';
+  }
+  return hienTai;
+}
+
+export type KetQuaKiemTraXacNhan =
+  { hopLe: true } | { hopLe: false; lyDo: string };
+
+/**
+ * X2: Xác nhận danh sách chỉ hợp lệ khi có ≥ 1 dòng, mọi dòng Đồng ý và không còn đề nghị sửa chờ.
+ * soDeNghiCho dành cho bảng đề nghị ở lát sau (#62) — hiện luôn 0.
+ */
+export function kiemTraXacNhan(
+  yKiens: readonly (YKienTruong | null)[],
+  soDeNghiCho = 0,
+): KetQuaKiemTraXacNhan {
+  if (yKiens.length === 0) return { hopLe: false, lyDo: 'Danh sách trống' };
+  const chuaDongY = yKiens.filter((y) => y !== 'dong_y').length;
+  if (chuaDongY > 0) {
+    return { hopLe: false, lyDo: `Còn ${chuaDongY} dòng chưa Đồng ý` };
+  }
+  if (soDeNghiCho > 0) {
+    return { hopLe: false, lyDo: 'Còn đề nghị sửa đang chờ' };
+  }
+  return { hopLe: true };
+}
+
+/** X1: Quản trị tự sửa/thêm/xóa/nạp lại danh sách của 1 trường → về Chờ xác nhận từ mọi trạng thái. */
+export function trangThaiSauQuanTriSua(): TrangThaiDanhSach {
+  return 'cho_xac_nhan';
+}

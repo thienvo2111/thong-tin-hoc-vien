@@ -17,7 +17,7 @@ const DONG: DongDanhSachGoc = {
   giai_doan: 'ca_hai',
   ty_le_suat: 1,
   ghi_chu: null,
-  y_kien_truong: 'Trường đã xác nhận',
+  y_kien_truong: 'dong_y',
 };
 
 describe('apDungSua (issue #59, ADR 0015 S1/S2/S3/X1)', () => {
@@ -82,7 +82,7 @@ describe('khacBiet', () => {
       truoc: {
         giai_doan: 'ca_hai',
         ty_le_suat: 1,
-        y_kien_truong: 'Trường đã xác nhận',
+        y_kien_truong: 'dong_y',
       },
       sau: { giai_doan: 'chi_gd1', ty_le_suat: 0.5, y_kien_truong: null },
     });

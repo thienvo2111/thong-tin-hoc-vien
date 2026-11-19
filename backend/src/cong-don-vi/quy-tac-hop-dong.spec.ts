@@ -3,10 +3,15 @@ import {
   TY_LE_SUAT,
   TruongPhamVi,
   chuanHoaTenTruong,
+  TrangThaiDanhSach,
+  YKienTruong,
   giaTriTamTinh,
   khopTruong,
+  kiemTraXacNhan,
   suatTuGiaiDoan,
   tongSuat,
+  trangThaiSauQuanTriSua,
+  trangThaiSauYKien,
 } from './quy-tac-hop-dong';
 
 // ADR 0015 S1, S3: "Giai đoạn tham gia" → suất.
@@ -276,5 +281,105 @@ describe('giaTriTamTinh', () => {
       { ty_le_suat: 1 },
     ]);
     expect(giaTriTamTinh(suat, 1_000_001)).toBe(2_000_002);
+  });
+});
+
+// Issue #61 / ADR 0015 X1, X2: trạng thái danh sách của trường sau mỗi ý kiến.
+describe('trangThaiSauYKien', () => {
+  const DY: YKienTruong = 'dong_y';
+  const KDY: YKienTruong = 'khong_dong_y';
+  const TAT_CA: TrangThaiDanhSach[] = [
+    'cho_xac_nhan',
+    'da_xac_nhan',
+    'bao_sai_lech',
+  ];
+
+  it.each(TAT_CA)('có dòng Không đồng ý → bao_sai_lech (từ %s)', (hienTai) => {
+    expect(trangThaiSauYKien([DY, KDY, null], hienTai)).toBe('bao_sai_lech');
+    expect(trangThaiSauYKien([KDY], hienTai)).toBe('bao_sai_lech');
+    expect(trangThaiSauYKien([KDY, KDY, DY], hienTai)).toBe('bao_sai_lech');
+  });
+
+  it('bao_sai_lech hết dòng Không đồng ý → cho_xac_nhan (kể cả khi mọi dòng Đồng ý)', () => {
+    expect(trangThaiSauYKien([DY, null], 'bao_sai_lech')).toBe('cho_xac_nhan');
+    expect(trangThaiSauYKien([DY, DY], 'bao_sai_lech')).toBe('cho_xac_nhan');
+    expect(trangThaiSauYKien([null], 'bao_sai_lech')).toBe('cho_xac_nhan');
+  });
+
+  it('da_xac_nhan + có dòng bỏ ý kiến → cho_xac_nhan', () => {
+    expect(trangThaiSauYKien([DY, null], 'da_xac_nhan')).toBe('cho_xac_nhan');
+    expect(trangThaiSauYKien([null], 'da_xac_nhan')).toBe('cho_xac_nhan');
+  });
+
+  it('da_xac_nhan + mọi dòng vẫn Đồng ý → giữ da_xac_nhan', () => {
+    expect(trangThaiSauYKien([DY, DY], 'da_xac_nhan')).toBe('da_xac_nhan');
+  });
+
+  it('cho_xac_nhan không có Không đồng ý → giữ cho_xac_nhan (mọi dòng Đồng ý vẫn phải bấm Xác nhận)', () => {
+    expect(trangThaiSauYKien([DY, DY], 'cho_xac_nhan')).toBe('cho_xac_nhan');
+    expect(trangThaiSauYKien([DY, null], 'cho_xac_nhan')).toBe('cho_xac_nhan');
+    expect(trangThaiSauYKien([null, null], 'cho_xac_nhan')).toBe(
+      'cho_xac_nhan',
+    );
+  });
+
+  it('danh sách rỗng: cho_xac_nhan / da_xac_nhan giữ nguyên, bao_sai_lech → cho_xac_nhan', () => {
+    expect(trangThaiSauYKien([], 'cho_xac_nhan')).toBe('cho_xac_nhan');
+    expect(trangThaiSauYKien([], 'da_xac_nhan')).toBe('da_xac_nhan');
+    expect(trangThaiSauYKien([], 'bao_sai_lech')).toBe('cho_xac_nhan');
+  });
+});
+
+describe('kiemTraXacNhan', () => {
+  it('mọi dòng Đồng ý, không đề nghị chờ → hợp lệ', () => {
+    expect(kiemTraXacNhan(['dong_y'])).toEqual({ hopLe: true });
+    expect(kiemTraXacNhan(['dong_y', 'dong_y', 'dong_y'], 0)).toEqual({
+      hopLe: true,
+    });
+  });
+
+  it('danh sách rỗng → "Danh sách trống"', () => {
+    expect(kiemTraXacNhan([])).toEqual({
+      hopLe: false,
+      lyDo: 'Danh sách trống',
+    });
+  });
+
+  it('đếm cả dòng chưa có ý kiến và dòng Không đồng ý', () => {
+    expect(kiemTraXacNhan(['dong_y', null])).toEqual({
+      hopLe: false,
+      lyDo: 'Còn 1 dòng chưa Đồng ý',
+    });
+    expect(kiemTraXacNhan([null, 'khong_dong_y', 'dong_y', null])).toEqual({
+      hopLe: false,
+      lyDo: 'Còn 3 dòng chưa Đồng ý',
+    });
+    expect(kiemTraXacNhan(['khong_dong_y'])).toEqual({
+      hopLe: false,
+      lyDo: 'Còn 1 dòng chưa Đồng ý',
+    });
+  });
+
+  it('còn đề nghị sửa đang chờ → chặn (dù mọi dòng Đồng ý)', () => {
+    expect(kiemTraXacNhan(['dong_y'], 1)).toEqual({
+      hopLe: false,
+      lyDo: 'Còn đề nghị sửa đang chờ',
+    });
+  });
+
+  it('thứ tự lý do: trống trước, rồi dòng chưa Đồng ý, rồi đề nghị chờ', () => {
+    expect(kiemTraXacNhan([], 2)).toMatchObject({ lyDo: 'Danh sách trống' });
+    expect(kiemTraXacNhan([null], 2)).toMatchObject({
+      lyDo: 'Còn 1 dòng chưa Đồng ý',
+    });
+  });
+});
+
+// X1: Quản trị tự sửa/thêm/xóa/nạp lại danh sách của 1 trường → về Chờ xác nhận từ mọi trạng thái.
+// Không phụ thuộc trạng thái hiện tại nên không nhận tham số (service đặt bằng 1 lệnh cho mọi trường bị sửa);
+// e2e truong-xac-nhan kiểm đủ 3 trạng thái nguồn qua PATCH/POST/DELETE/nạp lại.
+describe('trangThaiSauQuanTriSua', () => {
+  it('luôn → cho_xac_nhan', () => {
+    expect(trangThaiSauQuanTriSua()).toBe('cho_xac_nhan');
   });
 });

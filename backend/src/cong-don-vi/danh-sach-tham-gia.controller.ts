@@ -132,8 +132,9 @@ export class DongDanhSachThamGiaController {
   sua(
     @Param('dongId', ParseUUIDPipe) dongId: string,
     @Body() dto: SuaDongDanhSachDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.service.suaDong(dongId, dto);
+    return this.service.suaDong(dongId, dto, user.id);
   }
 
   // DELETE kèm body JSON { ly_do } (cùng kiểu DELETE /hoc-vien/:id).
@@ -142,7 +143,8 @@ export class DongDanhSachThamGiaController {
   async xoa(
     @Param('dongId', ParseUUIDPipe) dongId: string,
     @Body() dto: LyDoDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    await this.service.xoaDong(dongId, dto.ly_do);
+    await this.service.xoaDong(dongId, dto.ly_do, user.id);
   }
 }

@@ -86,8 +86,8 @@ describe('Trang chủ trường (/trang-chu, vai trò truong)', () => {
     expect(screen.queryByLabelText('Đang tải')).not.toBeInTheDocument();
   });
 
-  it('việc cần làm: "Xem danh sách tham gia" mở /dot/:id/danh-sach; Xác nhận / Thông tin hợp đồng / Nộp bị khóa "Sắp mở"', async () => {
-    dbTruongDanhSach.the = [theDotMau()];
+  it('việc cần làm: "Xem danh sách tham gia" + "Xác nhận danh sách" (kèm trạng thái) mở /dot/:id/danh-sach; Thông tin hợp đồng / Nộp bị khóa "Sắp mở"', async () => {
+    dbTruongDanhSach.the = [theDotMau({ trang_thai_danh_sach: 'bao_sai_lech' })];
     dangNhap('truong');
     moTrang('/trang-chu');
     const the = await screen.findByRole('article', { name: 'HSG Đợt Bịa 2026' });
@@ -96,7 +96,13 @@ describe('Trang chủ trường (/trang-chu, vai trò truong)', () => {
       'href',
       '/dot/dot-hsg-1/danh-sach',
     );
-    for (const ten of ['Xác nhận danh sách', 'Thông tin hợp đồng', 'Nộp hợp đồng']) {
+    // Issue #61: việc "Xác nhận danh sách" đã mở, hiện trạng thái danh sách.
+    const xacNhan = within(viec).getByRole('link', { name: /Xác nhận danh sách/ });
+    expect(xacNhan).toHaveAttribute('href', '/dot/dot-hsg-1/danh-sach');
+    expect(xacNhan).toHaveTextContent('Báo sai lệch');
+    expect(xacNhan).not.toHaveTextContent('Sắp mở');
+    expect(within(viec).queryByRole('button', { name: /Xác nhận danh sách/ })).not.toBeInTheDocument();
+    for (const ten of ['Thông tin hợp đồng', 'Nộp hợp đồng']) {
       const nut = within(viec).getByRole('button', { name: new RegExp(ten) });
       expect(nut).toBeDisabled();
       expect(nut).toHaveTextContent('Sắp mở');
