@@ -8,7 +8,9 @@ import type { DonViCongTac } from '@/api/types';
 import { SelectDiaDanh } from '@/components/SelectDiaDanh';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { chuanHoaNfc } from '@/lib/nfc';
+import { useToi } from '@/auth/AuthContext';
 import { AdminPageHeader } from './AdminPageHeader';
+import { ModalThemTruong } from './ModalThemTruong';
 
 const KICH_THUOC_TRANG = 20;
 
@@ -17,6 +19,9 @@ const KICH_THUOC_TRANG = 20;
  * giao diện (scripts/_report_remap_truong.md) — KHÔNG import lại Excel. Chỉ sửa dia_ban_id (PATCH
  * đã có sẵn, UpdateDonViCongTacDto nhận thẳng field này). */
 export default function AdminDanhMucTruong() {
+  // Thêm trường: chỉ quan_tri (POST @Roles('quan_tri')); Sở/Phòng/Trường vào trang này qua RequireAdmin thì không thấy nút.
+  const laQuanTri = useToi().nguoiDung?.vai_tro === 'quan_tri';
+  const [moThem, setMoThem] = useState(false);
   const [tinhId, setTinhId] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [qDebounced] = useDebouncedValue(q, 300);
@@ -85,7 +90,16 @@ export default function AdminDanhMucTruong() {
 
   return (
     <>
-      <AdminPageHeader title="Danh mục trường" />
+      <AdminPageHeader
+        title="Danh mục trường"
+        actions={
+          laQuanTri && (
+            <Button color="accent" onClick={() => setMoThem(true)}>
+              + Thêm trường
+            </Button>
+          )
+        }
+      />
       <Container size="xl" py="lg" px={{ base: 'md', md: 28 }}>
         <Stack gap="md">
           <Group gap="sm" wrap="wrap">
@@ -205,6 +219,8 @@ export default function AdminDanhMucTruong() {
           </Button>
         </Stack>
       </Modal>
+
+      <ModalThemTruong opened={moThem} onClose={() => setMoThem(false)} />
     </>
   );
 }

@@ -350,9 +350,24 @@ export const routesCongDonVi: RouteObject[] = [
                 lazy: () => import('@/pages/CongDonVi/TrangChuCongDonVi').then((m) => ({ Component: m.default })),
               },
               {
-                // Issue #56: chỉ quan_tri (trang tự chặn vai trò khác → 404).
-                path: '/quan-tri/dot-trien-khai',
-                lazy: () => import('@/pages/CongDonVi/QuanTriDotTrienKhai').then((m) => ({ Component: m.default })),
+                // Issue #56/#57: mọi /quan-tri/* chỉ quan_tri; vai trò khác → 404, không mount trang (không gọi API).
+                lazy: () => import('@/pages/CongDonVi/ChiQuanTriCong').then((m) => ({ Component: m.default })),
+                children: [
+                  {
+                    path: '/quan-tri/dot-trien-khai',
+                    lazy: () => import('@/pages/CongDonVi/QuanTriDotTrienKhai').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/quan-tri/don-vi-tai-khoan',
+                    lazy: () =>
+                      import('@/pages/CongDonVi/QuanTriDonViTaiKhoan').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/quan-tri/nhap-tai-khoan-don-vi',
+                    lazy: () =>
+                      import('@/pages/CongDonVi/QuanTriNhapTaiKhoanDonVi').then((m) => ({ Component: m.default })),
+                  },
+                ],
               },
             ],
           },

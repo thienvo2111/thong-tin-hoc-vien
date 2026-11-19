@@ -1,23 +1,8 @@
 import { useState } from 'react';
-import {
-  Alert,
-  Badge,
-  Button,
-  Center,
-  Container,
-  Group,
-  Loader,
-  Paper,
-  Skeleton,
-  Stack,
-  Text,
-  Title,
-} from '@mantine/core';
-import { useToi } from '@/auth/AuthContext';
+import { Alert, Badge, Button, Container, Group, Paper, Skeleton, Stack, Text, Title } from '@mantine/core';
 import { useDanhSachDotTrienKhai, type DotTrienKhai } from '@/api/dotTrienKhai';
 import { thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayLich, dinhDangTien } from '@/lib/ngayLich';
-import KhongTimThay from '@/pages/KhongTimThay';
 import { ModalDotTrienKhai } from './ModalDotTrienKhai';
 
 const CHUA_CO = 'Chưa có';
@@ -61,7 +46,9 @@ function TheDot({ dot, onSua }: { dot: DotTrienKhai; onSua: () => void }) {
   );
 }
 
-function DanhSachDot() {
+/** Quản trị tạo/sửa đợt triển khai trên Cổng đơn vị (issue #56, ADR 0015 M1).
+ * Route bọc ChiQuanTriCong: vai trò khác → 404. */
+export default function QuanTriDotTrienKhai() {
   const { data, isLoading, isError, error } = useDanhSachDotTrienKhai();
   const [moForm, setMoForm] = useState(false);
   const [dangSua, setDangSua] = useState<DotTrienKhai | null>(null);
@@ -94,18 +81,4 @@ function DanhSachDot() {
       <ModalDotTrienKhai opened={moForm} onClose={() => setMoForm(false)} dot={dangSua} />
     </Container>
   );
-}
-
-/** Quản trị tạo/sửa đợt triển khai trên Cổng đơn vị (issue #56, ADR 0015 M1). Vai trò khác → 404. */
-export default function QuanTriDotTrienKhai() {
-  const { dangTai, nguoiDung } = useToi();
-  if (dangTai || !nguoiDung) {
-    return (
-      <Center mih="40vh">
-        <Loader />
-      </Center>
-    );
-  }
-  if (nguoiDung.vai_tro !== 'quan_tri') return <KhongTimThay />;
-  return <DanhSachDot />;
 }

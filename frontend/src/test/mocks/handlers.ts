@@ -684,6 +684,27 @@ export const handlers = [
     return HttpResponse.json({ data, total, page, page_size: pageSize });
   }),
 
+  // POST tạo đơn vị (quan_tri) — mô phỏng kiểm trùng mã của backend (409 + field ma_don_vi). Không ghi vào
+  // DON_VI (mảng dùng chung cả file test); test cần danh sách sau khi tạo thì tự server.use GET.
+  http.post('/danh-muc/don-vi-cong-tac', async ({ request }) => {
+    const body = (await request.json()) as {
+      ma_don_vi?: string;
+      ten_don_vi: string;
+      loai_don_vi: string;
+      dia_ban_id: string;
+      don_vi_cha_id?: string;
+    };
+    if (body.ma_don_vi && DON_VI.some((d) => d.ma_don_vi === body.ma_don_vi)) {
+      return loi(409, 'CONFLICT', `Mã đơn vị "${body.ma_don_vi}" đã tồn tại`, {
+        fields: [{ field: 'ma_don_vi', message: 'Mã đã tồn tại' }],
+      });
+    }
+    return HttpResponse.json(
+      { id: 'dv-moi', ...body, ma_don_vi: body.ma_don_vi ?? null, don_vi_cha_id: body.don_vi_cha_id ?? null },
+      { status: 201 },
+    );
+  }),
+
   http.patch('/danh-muc/don-vi-cong-tac/:id', async ({ params, request }) => {
     const body = (await request.json()) as { dia_ban_id?: string };
     const donVi = DON_VI.find((d) => d.id === params.id);

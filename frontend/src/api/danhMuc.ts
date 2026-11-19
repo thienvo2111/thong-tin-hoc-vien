@@ -117,6 +117,29 @@ export function useSuaDiaBanDonViCongTac() {
   });
 }
 
+// POST /danh-muc/don-vi-cong-tac (quan_tri, issue #57 / ADR 0015 T7) — thêm trường còn thiếu trong danh mục.
+// Backend tự chuẩn hóa NFC tên, kiểm trùng mã (409), dia_ban_id phải cấp phường/xã, don_vi_cha_id tồn tại.
+export interface TaoTruongDto {
+  ten_don_vi: string;
+  ma_don_vi?: string;
+  dia_ban_id: string;
+  don_vi_cha_id: string;
+}
+
+export function useTaoTruong() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: TaoTruongDto) =>
+      apiFetch<DonViCongTac>('/danh-muc/don-vi-cong-tac', {
+        method: 'POST',
+        body: JSON.stringify({ ...dto, loai_don_vi: 'truong' }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['danh-muc', 'don-vi-cong-tac'] });
+    },
+  });
+}
+
 export function layMonHoc(cap_hoc: string) {
   const qs = new URLSearchParams({ cap_hoc });
   return apiFetch<{ data: MonHoc[] }>(`/danh-muc/mon-hoc?${qs.toString()}`);

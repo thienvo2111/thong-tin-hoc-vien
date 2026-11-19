@@ -72,12 +72,13 @@ function BadgeTrangThaiImport({ trangThai, soDongLoi }: { trangThai: string; soD
 
 /** Nhập dữ liệu (Phase 5 redesign) — luồng 2 bước thật (docs/api-contract.md mục 5): tải file lên +
  * kiểm tra (POST /import/{loai}) rồi mới xác nhận nạp chính thức (POST /import/{id}/xac-nhan). */
-export default function AdminNhapDuLieu() {
+// `chiLoai` (Cổng đơn vị, issue #57): khóa cứng 1 loại — ẩn ô chọn loại, bỏ qua ?loai=, lịch sử chỉ loại đó.
+export default function AdminNhapDuLieu({ chiLoai }: { chiLoai?: LoaiDanhMucImport } = {}) {
   // ?loai=... (vd. nút "Nhập từ Excel" ở trang Người dùng) chọn sẵn loại import.
   const [searchParams] = useSearchParams();
   const loaiTuUrl = searchParams.get('loai');
   const [loai, setLoai] = useState<LoaiDanhMucImport>(
-    loaiTuUrl && loaiTuUrl in NHAN_LOAI_IMPORT ? (loaiTuUrl as LoaiDanhMucImport) : 'ho_so_nhan_su_moet',
+    chiLoai ?? (loaiTuUrl && loaiTuUrl in NHAN_LOAI_IMPORT ? (loaiTuUrl as LoaiDanhMucImport) : 'ho_so_nhan_su_moet'),
   );
   const [file, setFile] = useState<File | null>(null);
   const [importId, setImportId] = useState<string | undefined>();
@@ -92,7 +93,7 @@ export default function AdminNhapDuLieu() {
   const panelRef = useRef<HTMLDivElement>(null);
 
   const upload = useTaiLenImport();
-  const lichSu = useLichSuImport();
+  const lichSu = useLichSuImport(chiLoai ? { loai: chiLoai } : undefined);
   const taiMau = useMutation({
     mutationFn: () => taiMauExcel(loai, canKhoa ? (maKhoa ?? undefined) : undefined),
     onSuccess: (blob) => taiFileTuBlob(blob, `mau-${loai}.xlsx`),
@@ -149,13 +150,22 @@ export default function AdminNhapDuLieu() {
               <Text fz={14.5} fw={700}>
                 Tải file lên hệ thống
               </Text>
-              <Select
-                label="Loại dữ liệu"
-                data={TUY_CHON_LOAI_IMPORT}
-                value={loai}
-                onChange={(v) => setLoai((v as LoaiDanhMucImport) ?? loai)}
-                allowDeselect={false}
-              />
+              {chiLoai ? (
+                <Text fz="sm">
+                  <Text span c="dimmed" fz="sm">
+                    Loại dữ liệu:{' '}
+                  </Text>
+                  {NHAN_LOAI_IMPORT[chiLoai]}
+                </Text>
+              ) : (
+                <Select
+                  label="Loại dữ liệu"
+                  data={TUY_CHON_LOAI_IMPORT}
+                  value={loai}
+                  onChange={(v) => setLoai((v as LoaiDanhMucImport) ?? loai)}
+                  allowDeselect={false}
+                />
+              )}
               {canKhoa && (
                 <Select
                   label="Khóa bồi dưỡng"

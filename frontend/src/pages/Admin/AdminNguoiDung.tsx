@@ -74,8 +74,16 @@ const FORM_TAO_RONG: FormTao = { don_vi_id: '', ten_dang_nhap: '', ho_ten: '', e
 type XacNhan = { loai: 'cap_mat_khau' | 'khoa' | 'mo_khoa'; tk: TaiKhoanDonVi } | null;
 
 /** Trang Người dùng — tài khoản quản lý Sở/Phòng VHXH/Trường (ADR 0002). Chỉ quan_tri (route bọc
- * RequireQuanTri). Mật khẩu tạm chỉ giữ ở state `matKhau` cho tới khi đóng ModalMatKhauTam. */
-export default function AdminNguoiDung() {
+ * RequireQuanTri). Mật khẩu tạm chỉ giữ ở state `matKhau` cho tới khi đóng ModalMatKhauTam.
+ * Cổng đơn vị (issue #57) dùng lại trang này: đổi đích "Nhập từ Excel" và ẩn email kích hoạt (ADR 0015 T4 —
+ * chỉ mật khẩu tạm; email kích hoạt dẫn về tên miền NLS). Mặc định giữ nguyên hành vi trang NLS. */
+export default function AdminNguoiDung({
+  duongDanNhapExcel = '/admin/nhap-du-lieu?loai=tai_khoan_don_vi',
+  choGuiEmailKichHoat = true,
+}: {
+  duongDanNhapExcel?: string;
+  choGuiEmailKichHoat?: boolean;
+} = {}) {
   const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [qDebounced] = useDebouncedValue(q, 300);
@@ -164,7 +172,7 @@ export default function AdminNguoiDung() {
         ten_dang_nhap: formTao.ten_dang_nhap.trim() || undefined,
         ho_ten: formTao.ho_ten.trim() ? chuanHoaNfc(formTao.ho_ten.trim()) : undefined,
         email: formTao.email.trim() || undefined,
-        cach_cap: formTao.email.trim() ? formTao.cach_cap : 'mat_khau_tam',
+        cach_cap: choGuiEmailKichHoat && formTao.email.trim() ? formTao.cach_cap : 'mat_khau_tam',
       },
       {
         onSuccess: (kq) => {
@@ -259,7 +267,7 @@ export default function AdminNguoiDung() {
         title="Tài khoản đơn vị"
         actions={
           <Group gap="sm">
-            <Button variant="default" onClick={() => navigate('/admin/nhap-du-lieu?loai=tai_khoan_don_vi')}>
+            <Button variant="default" onClick={() => navigate(duongDanNhapExcel)}>
               Nhập từ Excel
             </Button>
             <Button
@@ -379,7 +387,7 @@ export default function AdminNguoiDung() {
                             <Menu.Dropdown>
                               <Menu.Item onClick={() => moSua(tk)}>Sửa</Menu.Item>
                               <Menu.Item onClick={() => setXacNhan({ loai: 'cap_mat_khau', tk })}>Cấp mật khẩu tạm</Menu.Item>
-                              {tk.email && <Menu.Item onClick={() => xuLyGuiEmail(tk)}>Gửi email kích hoạt</Menu.Item>}
+                              {choGuiEmailKichHoat && tk.email && <Menu.Item onClick={() => xuLyGuiEmail(tk)}>Gửi email kích hoạt</Menu.Item>}
                               {tk.trang_thai === 'active' ? (
                                 <Menu.Item color="red" onClick={() => setXacNhan({ loai: 'khoa', tk })}>
                                   Khóa
@@ -446,7 +454,11 @@ export default function AdminNguoiDung() {
           />
           <TextInput
             label="Email"
-            description="Không bắt buộc. Có email thì có thể gửi link kích hoạt thay cho mật khẩu tạm."
+            description={
+              choGuiEmailKichHoat
+                ? 'Không bắt buộc. Có email thì có thể gửi link kích hoạt thay cho mật khẩu tạm.'
+                : 'Không bắt buộc.'
+            }
             value={formTao.email}
             error={loiTao.email}
             onChange={(e) => {
@@ -461,7 +473,7 @@ export default function AdminNguoiDung() {
           >
             <Stack gap={6} mt={4}>
               <Radio value="mat_khau_tam" label="Sinh mật khẩu tạm" />
-              <Radio value="email" label="Gửi email kích hoạt" disabled={!coEmail} />
+              {choGuiEmailKichHoat && <Radio value="email" label="Gửi email kích hoạt" disabled={!coEmail} />}
             </Stack>
           </Radio.Group>
           <Button mt="sm" loading={taoTk.isPending} disabled={!formTao.don_vi_id} onClick={xuLyTao} fullWidth>

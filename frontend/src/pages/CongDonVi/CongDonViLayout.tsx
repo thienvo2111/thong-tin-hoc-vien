@@ -11,8 +11,11 @@ const MENU = [
   { to: '/trang-chu', nhan: 'Trang chủ' },
   { to: '/huong-dan', nhan: 'Hướng dẫn' },
 ];
-// Issue #56: mục chỉ hiện cho quan_tri.
-const MENU_QUAN_TRI = [{ to: '/quan-tri/dot-trien-khai', nhan: 'Chương trình / Đợt' }];
+// Issue #56/#57: mục chỉ hiện cho quan_tri.
+const MENU_QUAN_TRI = [
+  { to: '/quan-tri/dot-trien-khai', nhan: 'Chương trình / Đợt' },
+  { to: '/quan-tri/don-vi-tai-khoan', nhan: 'Đơn vị & tài khoản' },
+];
 
 /** Khung Cổng đơn vị (issue #55): header logo + tên cổng + tài khoản + Đăng xuất, menu ngang cuộn được trên điện thoại. */
 export default function CongDonViLayout() {
