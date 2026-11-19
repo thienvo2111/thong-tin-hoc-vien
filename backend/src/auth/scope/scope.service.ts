@@ -116,7 +116,9 @@ export class ScopeService {
     return scope;
   }
 
-  private async collectDescendantIds(rootId: string): Promise<string[]> {
+  // Đơn vị gốc + mọi đơn vị con (trực tiếp + gián tiếp). Public cho Cổng đơn vị
+  // (issue #58): trường trong phạm vi Sở của đợt triển khai.
+  async collectDescendantIds(rootId: string): Promise<string[]> {
     const visited = new Set<string>([rootId]);
     let frontier = [rootId];
     while (frontier.length > 0) {

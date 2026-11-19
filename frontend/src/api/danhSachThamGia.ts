@@ -1,0 +1,131 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiFetch, apiFetchBlob } from './client';
+
+// Issue #58 / ADR 0015 M3, M6, S1, S3, T7 — Quản trị nạp Excel danh sách HSG theo đợt (Cổng đơn vị).
+export type GiaiDoanThamGia = 'ca_hai' | 'chi_gd1' | 'chi_gd2';
+export type TrangThaiKhop = 'khop_ma' | 'khop_ten' | 'khong_khop' | 'thieu_truong' | 'nhieu_ket_qua';
+
+export interface TruongPhamVi {
+  id: string;
+  ma_don_vi: string | null;
+  ten_don_vi: string;
+}
+
+export interface DongXemTruoc {
+  /** Số dòng trên file Excel. */
+  so_dong: number;
+  ho_ten: string;
+  /** 'YYYY-MM-DD' hoặc null. */
+  ngay_sinh: string | null;
+  gioi_tinh: string | null;
+  ma_goc: string | null;
+  lop: string | null;
+  ma_truong: string | null;
+  ten_truong: string | null;
+  /** null khi giai đoạn sai (có lỗi). */
+  giai_doan: GiaiDoanThamGia | null;
+  ty_le_suat: 1 | 0.5 | null;
+  ghi_chu: string | null;
+  trang_thai_khop: TrangThaiKhop;
+  don_vi_id: string | null;
+  ten_don_vi_khop: string | null;
+  /** Có lỗi → không nạp được. */
+  loi: string[];
+}
+
+export interface KetQuaXemTruoc {
+  dong: DongXemTruoc[];
+  tong_hop: Record<TrangThaiKhop | 'loi' | 'tong', number>;
+}
+
+export interface DongNap {
+  so_dong: number;
+  don_vi_id: string;
+  ho_ten: string;
+  ngay_sinh: string | null;
+  gioi_tinh: string | null;
+  ma_goc: string | null;
+  lop: string | null;
+  giai_doan: GiaiDoanThamGia;
+  ty_le_suat: 1 | 0.5;
+  ghi_chu: string | null;
+}
+
+export interface KetQuaNap {
+  so_truong: number;
+  so_dong: number;
+  tong_suat: number;
+}
+
+export interface DongDanhSach {
+  id: string;
+  don_vi_id: string;
+  ho_ten: string;
+  ngay_sinh: string | null;
+  gioi_tinh: string | null;
+  ma_goc: string | null;
+  lop: string | null;
+  giai_doan: GiaiDoanThamGia;
+  ty_le_suat: number;
+  ghi_chu: string | null;
+  y_kien_truong: string | null;
+  hoc_vien_id: string | null;
+}
+
+export interface TongHopTruong {
+  don_vi_id: string;
+  ten_don_vi: string;
+  ma_don_vi: string | null;
+  so_nguoi: number;
+  tong_suat: number;
+}
+
+export interface DanhSachThamGia {
+  tong_hop: TongHopTruong[];
+  dong: DongDanhSach[];
+}
+
+const url = (dotId: string, duoi: string) => `/cong-don-vi/dot-trien-khai/${dotId}/${duoi}`;
+const danhSachKey = (dotId: string) => ['cong-don-vi', 'danh-sach-tham-gia', dotId] as const;
+
+export function taiMauDanhSach(dotId: string) {
+  return apiFetchBlob(url(dotId, 'danh-sach/mau-excel'));
+}
+
+export function xemTruocDanhSach(dotId: string, file: File) {
+  const form = new FormData();
+  form.append('file', file);
+  return apiFetch<KetQuaXemTruoc>(url(dotId, 'danh-sach/xem-truoc'), { method: 'POST', body: form });
+}
+
+export function napDanhSach(dotId: string, dong: DongNap[]) {
+  return apiFetch<KetQuaNap>(url(dotId, 'danh-sach/nap'), { method: 'POST', body: JSON.stringify({ dong }) });
+}
+
+export function useTruongTrongPhamVi(dotId: string | null) {
+  return useQuery({
+    queryKey: ['cong-don-vi', 'truong-trong-pham-vi', dotId],
+    queryFn: () => apiFetch<TruongPhamVi[]>(url(dotId as string, 'truong-trong-pham-vi')),
+    enabled: !!dotId,
+  });
+}
+
+export function useDanhSachThamGia(dotId: string | null) {
+  return useQuery({
+    queryKey: danhSachKey(dotId ?? ''),
+    queryFn: () => apiFetch<DanhSachThamGia>(url(dotId as string, 'danh-sach')),
+    enabled: !!dotId,
+  });
+}
+
+export function useXemTruocDanhSach() {
+  return useMutation({ mutationFn: ({ dotId, file }: { dotId: string; file: File }) => xemTruocDanhSach(dotId, file) });
+}
+
+export function useNapDanhSach() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dotId, dong }: { dotId: string; dong: DongNap[] }) => napDanhSach(dotId, dong),
+    onSuccess: (_kq, { dotId }) => queryClient.invalidateQueries({ queryKey: danhSachKey(dotId) }),
+  });
+}

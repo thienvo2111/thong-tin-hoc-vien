@@ -1,5 +1,6 @@
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { getOptionsToken } from '@nestjs/throttler';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { AppModule } from '../../src/app.module';
@@ -30,7 +31,8 @@ export async function createTestApp(
   }
   const moduleRef = await builder.compile();
 
-  const app = moduleRef.createNestApplication();
+  const app = moduleRef.createNestApplication<NestExpressApplication>();
+  app.useBodyParser('json', { limit: '1mb' });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

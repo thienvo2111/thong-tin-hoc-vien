@@ -269,6 +269,13 @@ enum chuong_trinh_boi_duong {
   hsg
 }
 
+// ADR 0015 S1/S3 (issue #58): giai đoạn tham gia của 1 dòng danh sách tham gia.
+enum giai_doan_tham_gia {
+  ca_hai
+  chi_gd1
+  chi_gd2
+}
+
 enum loai_dot_xac_nhan {
   kiem_tra_bo_sung
   xac_nhan_truoc_danh_gia
@@ -422,6 +429,8 @@ model don_vi_cong_tac {
   khoa_boi_duong khoa_boi_duong[]
   diem_hoc       diem_hoc[]
   dot_trien_khai dot_trien_khai[] @relation("dot_trien_khai_so_gddt")
+  // Issue #58: trường tính suất của dòng danh sách tham gia
+  danh_sach_tham_gia danh_sach_tham_gia[]
 
   @@index([loai_don_vi], map: "idx_don_vi_loai")
   @@index([dia_ban_id], map: "idx_don_vi_dia_ban")
@@ -518,6 +527,9 @@ model nguoi_dung {
 
   // ADR 0015 (issue #56): Quản trị tạo đợt triển khai
   dot_trien_khai_created_by dot_trien_khai[] @relation("dot_trien_khai_created_by")
+
+  // Issue #58: Quản trị nạp danh sách tham gia
+  danh_sach_tham_gia_created_by danh_sach_tham_gia[] @relation("danh_sach_tham_gia_created_by")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -638,6 +650,8 @@ model hoc_vien {
   nhat_ky_thong_bao  nhat_ky_thong_bao[]
   hang_doi_email     hang_doi_email[]
   xac_nhan_ho_so     xac_nhan_ho_so[]
+  // Issue #58: dòng danh sách tham gia gắn hồ sơ (NULL được; GV HSG không vào hoc_vien)
+  danh_sach_tham_gia danh_sach_tham_gia[]
   yeu_cau_ho_tro     yeu_cau_ho_tro[]
   lich_su_thay_doi   lich_su_thay_doi_ho_so[]
   tai_khoan_vle      tai_khoan_vle?
@@ -781,8 +795,40 @@ model dot_trien_khai {
   so_gddt         don_vi_cong_tac @relation("dot_trien_khai_so_gddt", fields: [so_gddt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   created_by_user nguoi_dung?     @relation("dot_trien_khai_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  danh_sach_tham_gia danh_sach_tham_gia[]
+
   @@index([chuong_trinh], map: "idx_dot_trien_khai_chuong_trinh")
   @@index([so_gddt_id], map: "idx_dot_trien_khai_so_gddt")
+}
+
+// ADR 0015 M3/M6/S1/S3/T7 (issue #58): Danh sách tham gia — mỗi dòng = 1 người trong (đợt, trường).
+// don_vi_id bắt buộc (trường tính suất, loại truong). ty_le_suat 1 / 0,5 (CHECK chk_ds_tham_gia_ty_le_suat
+// thêm bằng raw SQL trong migration). hoc_vien_id NULL được — GV HSG KHÔNG ghi vào hoc_vien.
+model danh_sach_tham_gia {
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dot_trien_khai_id String             @db.Uuid
+  don_vi_id         String             @db.Uuid
+  ho_ten            String             @db.VarChar(255)
+  ngay_sinh         DateTime?          @db.Date
+  gioi_tinh         String?            @db.VarChar(20)
+  ma_goc            String?            @db.VarChar(50)
+  lop               String?            @db.VarChar(100)
+  giai_doan         giai_doan_tham_gia @default(ca_hai)
+  ty_le_suat        Decimal            @db.Decimal(2, 1)
+  ghi_chu           String?
+  y_kien_truong     String?
+  hoc_vien_id       String?            @db.Uuid
+  created_by        String?            @db.Uuid
+  created_at        DateTime           @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime           @default(now()) @db.Timestamptz(6)
+
+  dot_trien_khai  dot_trien_khai  @relation(fields: [dot_trien_khai_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  don_vi          don_vi_cong_tac @relation(fields: [don_vi_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  hoc_vien        hoc_vien?       @relation(fields: [hoc_vien_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  created_by_user nguoi_dung?     @relation("danh_sach_tham_gia_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([dot_trien_khai_id, don_vi_id], map: "idx_ds_tham_gia_dot_don_vi")
+  @@index([hoc_vien_id], map: "idx_ds_tham_gia_hoc_vien")
 }
 
 model xac_nhan_ho_so {

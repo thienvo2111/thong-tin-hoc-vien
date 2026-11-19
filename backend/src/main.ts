@@ -32,6 +32,9 @@ async function bootstrap() {
   // cờ này. Production có 2 lớp proxy (HCMUE -> Nginx) nên phải đặt
   // TRUST_PROXY=loopback,10.0.197.1 — xem docTrustProxy.
   app.set('trust proxy', docTrustProxy(process.env.TRUST_PROXY));
+  // Issue #58: nạp danh sách tham gia gửi vài nghìn dòng JSON — mặc định 100kb
+  // quá nhỏ. 1mb = mức mặc định client_max_body_size của Nginx.
+  app.useBodyParser('json', { limit: '1mb' });
 
   // CORS_ORIGIN: danh sách origin được phép, phân cách bởi dấu phẩy (vd. FE
   // dev http://localhost:5173). Nếu không đặt: dev/test (NODE_ENV khác

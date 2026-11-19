@@ -1,11 +1,16 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from '../auth/auth.module';
 import { DotTrienKhaiController } from './dot-trien-khai.controller';
 import { DotTrienKhaiService } from './dot-trien-khai.service';
+import { DanhSachThamGiaController } from './danh-sach-tham-gia.controller';
+import { DanhSachThamGiaService } from './danh-sach-tham-gia.service';
 
 // ADR 0015: mọi API của Cổng đơn vị (tiền tố /cong-don-vi). PrismaService và
-// NhatKyService là @Global() nên không cần import module.
+// NhatKyService là @Global() nên không cần import module. AuthModule cho
+// ScopeService (trường trong phạm vi Sở của đợt, issue #58).
 @Module({
-  controllers: [DotTrienKhaiController],
-  providers: [DotTrienKhaiService],
+  imports: [AuthModule],
+  controllers: [DotTrienKhaiController, DanhSachThamGiaController],
+  providers: [DotTrienKhaiService, DanhSachThamGiaService],
 })
 export class CongDonViModule {}

@@ -367,6 +367,12 @@ export const routesCongDonVi: RouteObject[] = [
                     lazy: () =>
                       import('@/pages/CongDonVi/QuanTriNhapTaiKhoanDonVi').then((m) => ({ Component: m.default })),
                   },
+                  {
+                    // Issue #58: nạp Excel danh sách HSG + xem danh sách theo trường.
+                    path: '/quan-tri/danh-sach-tham-gia',
+                    lazy: () =>
+                      import('@/pages/CongDonVi/QuanTriDanhSachThamGia').then((m) => ({ Component: m.default })),
+                  },
                 ],
               },
             ],

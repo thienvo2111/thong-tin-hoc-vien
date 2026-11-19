@@ -15,6 +15,7 @@ const MENU = [
 const MENU_QUAN_TRI = [
   { to: '/quan-tri/dot-trien-khai', nhan: 'Chương trình / Đợt' },
   { to: '/quan-tri/don-vi-tai-khoan', nhan: 'Đơn vị & tài khoản' },
+  { to: '/quan-tri/danh-sach-tham-gia', nhan: 'Danh sách tham gia' },
 ];
 
 /** Khung Cổng đơn vị (issue #55): header logo + tên cổng + tài khoản + Đăng xuất, menu ngang cuộn được trên điện thoại. */
