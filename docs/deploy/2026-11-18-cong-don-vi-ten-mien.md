@@ -95,7 +95,7 @@ File: `/etc/nginx/sites-available/boiduongnls.hcmue.edu.vn` (do `05-install-ngin
 
        add_header Strict-Transport-Security "max-age=HSTS_MAX_AGE" always;
 
-       location ~ ^/(api|auth|hoc-vien|khoa-boi-duong|dot-xac-nhan|thong-bao|danh-muc|nguoi-dung|bao-cao|import|validate|lop|dang-ky-hoc|yeu-cau-ho-tro|cau-hinh-khao-sat|sso|ho-tro-hoc-vien|diem-hoc|giang-vien|ho-tro-giang-vien|bang-kiem|cong-giang-vien|van-hanh|thong-ke|lich-hoc|doi-buoi-hoc) {
+       location ~ ^/(api|auth|hoc-vien|khoa-boi-duong|dot-xac-nhan|thong-bao|danh-muc|nguoi-dung|bao-cao|import|validate|lop|dang-ky-hoc|yeu-cau-ho-tro|cau-hinh-khao-sat|sso|ho-tro-hoc-vien|diem-hoc|giang-vien|ho-tro-giang-vien|bang-kiem|cong-giang-vien|van-hanh|thong-ke|lich-hoc|doi-buoi-hoc|cong-don-vi) {
            proxy_pass http://127.0.0.1:3000;
            proxy_http_version 1.1;
            proxy_set_header Host $host;
@@ -121,6 +121,8 @@ File: `/etc/nginx/sites-available/boiduongnls.hcmue.edu.vn` (do `05-install-ngin
        }
    }
    ```
+
+   > **Tiền tố `cong-don-vi` (issue #56, API đợt triển khai):** khi bản có issue #56 lên VPS, block NLS **đang chạy** trong file site cũng phải thêm `|cong-don-vi` vào cuối danh sách `location ~ ^/(...)` (file site do `05-install-nginx.sh` sinh từ trước, không tự cập nhật). Thiếu thì `/cong-don-vi/...` rơi vào `index.html` và API hỏng âm thầm. Sửa xong: `sudo nginx -t && sudo systemctl reload nginx`; kiểm `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1/cong-don-vi/dot-trien-khai` → `401` (đã tới backend).
 
    Thay `HSTS_MAX_AGE` bằng giá trị đang dùng ở block NLS, cổng backend `3000` bằng `BACKEND_PORT` nếu khác. Lưu ý `try_files $uri /cong-don-vi.html` (không có `$uri/`) để `/` không rơi vào `index.html` của NLS.
 

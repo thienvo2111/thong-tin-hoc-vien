@@ -263,6 +263,12 @@ enum nguon_moc_nhu_cau {
   muc_chot
 }
 
+// ADR 0015 M2: chương trình bồi dưỡng của đợt triển khai (Cổng đơn vị).
+enum chuong_trinh_boi_duong {
+  nls
+  hsg
+}
+
 enum loai_dot_xac_nhan {
   kiem_tra_bo_sung
   xac_nhan_truoc_danh_gia
@@ -415,6 +421,7 @@ model don_vi_cong_tac {
   hoc_vien       hoc_vien[]
   khoa_boi_duong khoa_boi_duong[]
   diem_hoc       diem_hoc[]
+  dot_trien_khai dot_trien_khai[] @relation("dot_trien_khai_so_gddt")
 
   @@index([loai_don_vi], map: "idx_don_vi_loai")
   @@index([dia_ban_id], map: "idx_don_vi_dia_ban")
@@ -508,6 +515,9 @@ model nguoi_dung {
 
   // Issue #30: Quản trị xóa cứng học viên
   nhat_ky_xoa_hoc_vien nhat_ky_xoa_hoc_vien[] @relation("nhat_ky_xoa_hv_nguoi_xoa")
+
+  // ADR 0015 (issue #56): Quản trị tạo đợt triển khai
+  dot_trien_khai_created_by dot_trien_khai[] @relation("dot_trien_khai_created_by")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -748,6 +758,31 @@ model nhu_cau_muc_hoc_vien {
 
   @@unique([dot_id, dang_ky_hoc_id], map: "uq_nhu_cau_muc_dot_dang_ky")
   @@index([dang_ky_hoc_id], map: "idx_nhu_cau_muc_dang_ky")
+}
+
+// ADR 0015 M1/S4/S6/T1/T3 (issue #56): đợt triển khai của Cổng đơn vị — chương
+// trình, đơn giá (VNĐ, NULL = chưa có), khoảng ngày QĐ chỉ định thầu (cả hai
+// đầu tính, cùng NULL hoặc cùng có), hạn nộp (23:59:59 giờ VN ngày chọn; sửa
+// = gia hạn cả đợt), Sở GD&ĐT của đợt. CHECK (chk_dot_trien_khai_don_gia,
+// chk_dot_trien_khai_ngay_qd) thêm bằng raw SQL trong migration.
+model dot_trien_khai {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chuong_trinh chuong_trinh_boi_duong
+  ten          String                 @db.VarChar(255)
+  don_gia      Int?
+  ngay_qd_tu   DateTime?              @db.Date
+  ngay_qd_den  DateTime?              @db.Date
+  han_nop      DateTime               @db.Timestamptz(6)
+  so_gddt_id   String                 @db.Uuid
+  created_by   String?                @db.Uuid
+  created_at   DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime               @default(now()) @db.Timestamptz(6)
+
+  so_gddt         don_vi_cong_tac @relation("dot_trien_khai_so_gddt", fields: [so_gddt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  created_by_user nguoi_dung?     @relation("dot_trien_khai_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([chuong_trinh], map: "idx_dot_trien_khai_chuong_trinh")
+  @@index([so_gddt_id], map: "idx_dot_trien_khai_so_gddt")
 }
 
 model xac_nhan_ho_so {

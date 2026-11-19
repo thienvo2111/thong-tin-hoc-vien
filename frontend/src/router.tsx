@@ -349,6 +349,11 @@ export const routesCongDonVi: RouteObject[] = [
                 path: '/trang-chu',
                 lazy: () => import('@/pages/CongDonVi/TrangChuCongDonVi').then((m) => ({ Component: m.default })),
               },
+              {
+                // Issue #56: chỉ quan_tri (trang tự chặn vai trò khác → 404).
+                path: '/quan-tri/dot-trien-khai',
+                lazy: () => import('@/pages/CongDonVi/QuanTriDotTrienKhai').then((m) => ({ Component: m.default })),
+              },
             ],
           },
         ],

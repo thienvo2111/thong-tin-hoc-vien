@@ -11,12 +11,15 @@ const MENU = [
   { to: '/trang-chu', nhan: 'Trang chủ' },
   { to: '/huong-dan', nhan: 'Hướng dẫn' },
 ];
+// Issue #56: mục chỉ hiện cho quan_tri.
+const MENU_QUAN_TRI = [{ to: '/quan-tri/dot-trien-khai', nhan: 'Chương trình / Đợt' }];
 
 /** Khung Cổng đơn vị (issue #55): header logo + tên cổng + tài khoản + Đăng xuất, menu ngang cuộn được trên điện thoại. */
 export default function CongDonViLayout() {
   useTieuDeCongDonVi();
   const { nguoiDung, dangXuat } = useToi();
   const navigate = useNavigate();
+  const menu = nguoiDung?.vai_tro === 'quan_tri' ? [...MENU, ...MENU_QUAN_TRI] : MENU;
 
   async function xuLyDangXuat() {
     try {
@@ -54,7 +57,7 @@ export default function CongDonViLayout() {
             pb={8}
             wrap="nowrap"
           >
-            {MENU.map((m) => (
+            {menu.map((m) => (
               <NavLink key={m.to} to={m.to} style={{ textDecoration: 'none' }}>
                 {({ isActive }) => (
                   <Text

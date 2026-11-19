@@ -32,6 +32,7 @@ import { VanHanhModule } from './van-hanh/van-hanh.module';
 import { DiemDanhModule } from './diem-danh/diem-danh.module';
 import { DoiBuoiHocModule } from './doi-buoi-hoc/doi-buoi-hoc.module';
 import { TinhHinhDiHocModule } from './tinh-hinh-di-hoc/tinh-hinh-di-hoc.module';
+import { CongDonViModule } from './cong-don-vi/cong-don-vi.module';
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { TinhHinhDiHocModule } from './tinh-hinh-di-hoc/tinh-hinh-di-hoc.module'
     YeuCauHoTroModule,
     CauHinhKhaoSatModule,
     SsoModule,
+    CongDonViModule,
   ],
   controllers: [AppController],
   providers: [AppService],
