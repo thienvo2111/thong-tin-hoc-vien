@@ -35,7 +35,7 @@ export default function QuanTriDanhSachThamGia() {
         {dot?.chuong_trinh === 'nls' && (
           <Alert color="blue">Đợt NLS lấy danh sách từ khóa — chức năng này sẽ có ở bước sau.</Alert>
         )}
-        {dot && <DanhSachTheoTruong key={dot.id} dotId={dot.id} />}
+        {dot && <DanhSachTheoTruong key={dot.id} dotId={dot.id} choThem={dot.chuong_trinh === 'hsg'} />}
       </Stack>
     </Container>
   );

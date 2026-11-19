@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Res,
@@ -19,7 +21,13 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { DanhSachThamGiaService } from './danh-sach-tham-gia.service';
 import { taoFileMauDanhSach } from './danh-sach-tham-gia.excel';
-import { LocDanhSachDto, NapDanhSachDto } from './dto/danh-sach-tham-gia.dto';
+import {
+  LocDanhSachDto,
+  LyDoDto,
+  NapDanhSachDto,
+  SuaDongDanhSachDto,
+  ThemDongDanhSachDto,
+} from './dto/danh-sach-tham-gia.dto';
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
@@ -80,5 +88,61 @@ export class DanhSachThamGiaController {
     @Query() query: LocDanhSachDto,
   ) {
     return this.service.layDanhSach(id, query.don_vi_id);
+  }
+
+  // Issue #59 / ADR 0015 X3: thêm 1 dòng (HSG), bắt buộc lý do.
+  @Post('danh-sach')
+  themDong(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ThemDongDanhSachDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.service.themDong(id, dto, user.id);
+  }
+
+  // Issue #59 / ADR 0015 Y2: Excel danh sách hiện tại (có PII → no-store); cột giống file mẫu để nạp lại.
+  @Get('danh-sach/xuat-excel')
+  async xuatExcel(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: LocDanhSachDto,
+    @Res() res: Response,
+  ) {
+    const { buffer, tenFile } = await this.service.xuatExcel(
+      id,
+      query.don_vi_id,
+    );
+    res
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${tenFile}"`,
+        'Cache-Control': 'no-store',
+      })
+      .send(buffer);
+  }
+}
+
+// Issue #59 / ADR 0015 X3: Quản trị sửa/xóa từng dòng danh sách tham gia, bắt buộc lý do.
+@Roles('quan_tri')
+@Controller('cong-don-vi/danh-sach-tham-gia')
+export class DongDanhSachThamGiaController {
+  constructor(private readonly service: DanhSachThamGiaService) {}
+
+  @Patch(':dongId')
+  sua(
+    @Param('dongId', ParseUUIDPipe) dongId: string,
+    @Body() dto: SuaDongDanhSachDto,
+  ) {
+    return this.service.suaDong(dongId, dto);
+  }
+
+  // DELETE kèm body JSON { ly_do } (cùng kiểu DELETE /hoc-vien/:id).
+  @Delete(':dongId')
+  @HttpCode(204)
+  async xoa(
+    @Param('dongId', ParseUUIDPipe) dongId: string,
+    @Body() dto: LyDoDto,
+  ) {
+    await this.service.xoaDong(dongId, dto.ly_do);
   }
 }

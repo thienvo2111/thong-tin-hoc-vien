@@ -274,3 +274,57 @@ export async function taoFileMauDanhSach(): Promise<Buffer> {
     'Ưu tiên khớp theo mã trường; không có mã thì khớp theo tên trường';
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }
+
+// Issue #59: xuất danh sách hiện tại. Sheet 1 dùng đúng tiêu đề file mẫu để sửa rồi nạp lại được;
+// 2 cột thêm ở cuối chỉ để xem (bộ đọc bỏ qua cột lạ — suất khi nạp lại suy từ giai đoạn).
+export const COT_XUAT_THEM = ['Tỷ lệ suất', 'Ý kiến của trường'] as const;
+
+export interface DongXuatDanhSach {
+  ho_ten: string;
+  ngay_sinh: string | null;
+  gioi_tinh: string | null;
+  ma_goc: string | null;
+  lop: string | null;
+  ma_truong: string | null;
+  ten_truong: string;
+  giai_doan: GiaiDoanThamGia;
+  ty_le_suat: number;
+  ghi_chu: string | null;
+  y_kien_truong: string | null;
+}
+
+const NHAN_GIAI_DOAN: Record<GiaiDoanThamGia, string> = {
+  ca_hai: 'Cả 2',
+  chi_gd1: 'Chỉ GĐ1',
+  chi_gd2: 'Chỉ GĐ2',
+};
+
+export async function taoFileXuatDanhSach(
+  ds: DongXuatDanhSach[],
+): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Danh sach');
+  const tieuDe = [...COT_MAU.map(([, nhan]) => nhan), ...COT_XUAT_THEM];
+  sheet.addRow(tieuDe);
+  sheet.getRow(1).font = { bold: true };
+  tieuDe.forEach((_, i) => (sheet.getColumn(i + 1).width = 22));
+  // Text: giữ số 0 đầu của mã; ngày là ô ngày thật.
+  for (const c of [4, 6]) sheet.getColumn(c).numFmt = '@';
+  sheet.getColumn(2).numFmt = 'dd/mm/yyyy';
+  for (const d of ds) {
+    sheet.addRow([
+      d.ho_ten,
+      d.ngay_sinh ? new Date(`${d.ngay_sinh}T00:00:00.000Z`) : null,
+      d.gioi_tinh,
+      d.ma_goc,
+      d.lop,
+      d.ma_truong,
+      d.ten_truong,
+      NHAN_GIAI_DOAN[d.giai_doan],
+      d.ghi_chu,
+      d.ty_le_suat,
+      d.y_kien_truong,
+    ]);
+  }
+  return Buffer.from(await workbook.xlsx.writeBuffer());
+}

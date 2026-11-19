@@ -116,6 +116,25 @@ export const danhSachThamGiaHandlers = [
       tong_suat: dong.reduce((t, d) => t + d.ty_le_suat, 0),
     });
   }),
+  // Issue #59: sửa/thêm/xóa dòng + xuất Excel.
+  http.post(`${URL}/danh-sach`, async ({ request }) => {
+    const { ly_do: _lyDo, ...dong } = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({ id: 'd-moi', y_kien_truong: null, hoc_vien_id: null, ...dong }, { status: 201 });
+  }),
+  http.patch('/cong-don-vi/danh-sach-tham-gia/:dongId', async ({ params, request }) => {
+    const { ly_do: _lyDo, ...doi } = (await request.json()) as Record<string, unknown>;
+    const cu = dbDanhSachThamGia.danhSach.dong.find((d) => d.id === params.dongId);
+    if (!cu) return HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Không tìm thấy' } }, { status: 404 });
+    return HttpResponse.json({ ...cu, ...doi, y_kien_truong: null });
+  }),
+  http.delete('/cong-don-vi/danh-sach-tham-gia/:dongId', () => new HttpResponse(null, { status: 204 })),
+  http.get(
+    `${URL}/danh-sach/xuat-excel`,
+    () =>
+      new HttpResponse(new Blob(['xlsx']), {
+        headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      }),
+  ),
   http.get(
     `${URL}/danh-sach/mau-excel`,
     () =>

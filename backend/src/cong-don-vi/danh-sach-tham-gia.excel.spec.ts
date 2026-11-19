@@ -2,9 +2,12 @@ import * as ExcelJS from 'exceljs';
 import { ValidationException } from '../common/exceptions/app.exceptions';
 import {
   COT_MAU,
+  COT_XUAT_THEM,
+  DongXuatDanhSach,
   docFileDanhSach,
   docNgaySinh,
   taoFileMauDanhSach,
+  taoFileXuatDanhSach,
 } from './danh-sach-tham-gia.excel';
 
 // Dữ liệu bịa hoàn toàn — không có PII thật.
@@ -165,5 +168,104 @@ describe('docFileDanhSach', () => {
       undefined,
       ...COT_MAU.map(([, nhan]) => nhan),
     ]);
+  });
+});
+
+// Issue #59: xuất danh sách hiện tại — sửa trên Excel rồi nạp lại được.
+describe('taoFileXuatDanhSach', () => {
+  const DS: DongXuatDanhSach[] = [
+    {
+      ho_ten: 'GV Bịa Một',
+      ngay_sinh: '1990-02-01',
+      gioi_tinh: 'Nam',
+      ma_goc: '00123',
+      lop: 'Lớp A',
+      ma_truong: 'TR-MAU-001',
+      ten_truong: 'Trường THCS Mẫu Một',
+      giai_doan: 'ca_hai',
+      ty_le_suat: 0.5,
+      ghi_chu: 'Thay giữa chừng',
+      y_kien_truong: 'Đúng',
+    },
+    {
+      ho_ten: 'GV Bịa Hai',
+      ngay_sinh: null,
+      gioi_tinh: null,
+      ma_goc: null,
+      lop: null,
+      ma_truong: null,
+      ten_truong: 'Trường TH Mẫu Hai',
+      giai_doan: 'chi_gd2',
+      ty_le_suat: 0.5,
+      ghi_chu: null,
+      y_kien_truong: null,
+    },
+  ];
+
+  async function moFile(buf: Buffer) {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ExcelJS.Buffer);
+    return wb.worksheets[0];
+  }
+
+  it('dòng tiêu đề = đúng tiêu đề file mẫu + 2 cột thêm ở cuối', async () => {
+    const sh = await moFile(await taoFileXuatDanhSach(DS));
+    expect(sh.getRow(1).values).toEqual([
+      undefined,
+      ...COT_MAU.map(([, nhan]) => nhan),
+      ...COT_XUAT_THEM,
+    ]);
+    expect(COT_XUAT_THEM).toEqual(['Tỷ lệ suất', 'Ý kiến của trường']);
+  });
+
+  it('ngày sinh là ô ngày Excel định dạng dd/mm/yyyy; giai đoạn ghi nhãn; suất là số', async () => {
+    const sh = await moFile(await taoFileXuatDanhSach(DS));
+    const o = sh.getRow(2).getCell(2);
+    expect(o.value).toEqual(new Date(Date.UTC(1990, 1, 1)));
+    expect(o.numFmt).toBe('dd/mm/yyyy');
+    expect(sh.getRow(2).getCell(8).value).toBe('Cả 2');
+    expect(sh.getRow(3).getCell(8).value).toBe('Chỉ GĐ2');
+    expect(sh.getRow(2).getCell(10).value).toBe(0.5);
+    expect(sh.getRow(2).getCell(11).value).toBe('Đúng');
+    expect(sh.getRow(3).getCell(2).value).toBeNull();
+  });
+
+  it('xuất → đọc lại bằng bộ đọc file nạp: đúng dữ liệu, bỏ qua 2 cột thêm (suất suy lại từ giai đoạn)', async () => {
+    const ds = await docFileDanhSach(await taoFileXuatDanhSach(DS));
+    expect(ds).toEqual([
+      {
+        so_dong: 2,
+        ho_ten: 'GV Bịa Một',
+        ngay_sinh: '1990-02-01',
+        gioi_tinh: 'Nam',
+        ma_goc: '00123',
+        lop: 'Lớp A',
+        ma_truong: 'TR-MAU-001',
+        ten_truong: 'Trường THCS Mẫu Một',
+        giai_doan: 'ca_hai',
+        ty_le_suat: 1,
+        ghi_chu: 'Thay giữa chừng',
+        loi: [],
+      },
+      {
+        so_dong: 3,
+        ho_ten: 'GV Bịa Hai',
+        ngay_sinh: null,
+        gioi_tinh: null,
+        ma_goc: null,
+        lop: null,
+        ma_truong: null,
+        ten_truong: 'Trường TH Mẫu Hai',
+        giai_doan: 'chi_gd2',
+        ty_le_suat: 0.5,
+        ghi_chu: null,
+        loi: [],
+      },
+    ]);
+  });
+
+  it('danh sách rỗng → chỉ có dòng tiêu đề', async () => {
+    const buf = await taoFileXuatDanhSach([]);
+    expect(await docFileDanhSach(buf)).toEqual([]);
   });
 });

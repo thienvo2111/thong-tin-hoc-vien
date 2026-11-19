@@ -13,6 +13,7 @@ import {
   Matches,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import type { GiaiDoanThamGia, TyLeSuat } from '../quy-tac-hop-dong';
@@ -105,4 +106,88 @@ export class LocDanhSachDto {
   @IsOptional()
   @IsUUID('all', { message: 'don_vi_id không hợp lệ' })
   don_vi_id?: string;
+}
+
+// Issue #59 / ADR 0015 X3: mọi sửa/thêm/xóa dòng bắt buộc lý do.
+const MSG_LY_DO = { message: 'Nhập lý do (tối đa 500 ký tự)' };
+
+export class LyDoDto {
+  @Transform(trim)
+  @IsString(MSG_LY_DO)
+  @Length(1, 500, MSG_LY_DO)
+  ly_do!: string;
+}
+
+// Có gửi thì không được null (khác @IsOptional cho qua cả null).
+const coGui = (_: object, v: unknown) => v !== undefined;
+const MSG_DON_VI = { message: 'don_vi_id không hợp lệ' };
+const MSG_HO_TEN = { message: 'ho_ten không được trống, tối đa 255 ký tự' };
+const MSG_GIAI_DOAN = {
+  message: 'giai_doan phải là ca_hai, chi_gd1 hoặc chi_gd2',
+};
+
+// Trường chung của sửa/thêm 1 dòng; null = để trống.
+class TruongPhuDongDto extends LyDoDto {
+  @IsOptional()
+  @Matches(NGAY, MSG_NGAY)
+  @IsISO8601({ strict: true }, MSG_NGAY)
+  ngay_sinh?: string | null;
+
+  @IsOptional()
+  @Transform(trimHoacNull)
+  @IsString()
+  @MaxLength(20)
+  gioi_tinh?: string | null;
+
+  @IsOptional()
+  @Transform(trimHoacNull)
+  @IsString()
+  @MaxLength(50)
+  ma_goc?: string | null;
+
+  @IsOptional()
+  @Transform(trimHoacNull)
+  @IsString()
+  @MaxLength(100)
+  lop?: string | null;
+
+  @ValidateIf(coGui)
+  @IsIn(['ca_hai', 'chi_gd1', 'chi_gd2'], MSG_GIAI_DOAN)
+  giai_doan?: GiaiDoanThamGia;
+
+  // Được khác giai đoạn (S2/S3: Quản trị sửa tay, vd. thay giữa chừng mỗi người 0,5).
+  // Không gửi → suy từ giai đoạn.
+  @ValidateIf(coGui)
+  @IsIn([1, 0.5], { message: 'ty_le_suat phải là 1 hoặc 0.5' })
+  ty_le_suat?: TyLeSuat;
+
+  @IsOptional()
+  @Transform(trimHoacNull)
+  @IsString()
+  @MaxLength(2000)
+  ghi_chu?: string | null;
+}
+
+// PATCH /cong-don-vi/danh-sach-tham-gia/:dongId — chỉ đổi trường gửi lên.
+export class SuaDongDanhSachDto extends TruongPhuDongDto {
+  @ValidateIf(coGui)
+  @IsUUID('all', MSG_DON_VI)
+  don_vi_id?: string;
+
+  @ValidateIf(coGui)
+  @Transform(trim)
+  @IsString()
+  @Length(1, 255, MSG_HO_TEN)
+  ho_ten?: string;
+}
+
+// POST /cong-don-vi/dot-trien-khai/:id/danh-sach — thêm 1 dòng (đợt HSG); giai đoạn mặc định Cả 2.
+export class ThemDongDanhSachDto extends TruongPhuDongDto {
+  @IsUUID('all', MSG_DON_VI)
+  don_vi_id!: string;
+
+  @Transform(trim)
+  @IsString()
+  @Length(1, 255, MSG_HO_TEN)
+  ho_ten!: string;
 }

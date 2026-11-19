@@ -129,3 +129,68 @@ export function useNapDanhSach() {
     onSuccess: (_kq, { dotId }) => queryClient.invalidateQueries({ queryKey: danhSachKey(dotId) }),
   });
 }
+
+// Issue #59 / ADR 0015 X3: Quản trị sửa/thêm/xóa từng dòng (bắt buộc lý do) + xuất Excel danh sách hiện tại.
+export interface TruongDongDanhSach {
+  don_vi_id: string;
+  ho_ten: string;
+  ngay_sinh: string | null;
+  gioi_tinh: string | null;
+  ma_goc: string | null;
+  lop: string | null;
+  giai_doan: GiaiDoanThamGia;
+  ty_le_suat: 1 | 0.5;
+  ghi_chu: string | null;
+}
+
+/** PATCH: chỉ các trường đã đổi + lý do. */
+export type SuaDongDanhSach = Partial<TruongDongDanhSach> & { ly_do: string };
+export type ThemDongDanhSach = TruongDongDanhSach & { ly_do: string };
+
+export function suaDongDanhSach(dongId: string, body: SuaDongDanhSach) {
+  return apiFetch<DongDanhSach>(`/cong-don-vi/danh-sach-tham-gia/${dongId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export function themDongDanhSach(dotId: string, body: ThemDongDanhSach) {
+  return apiFetch<DongDanhSach>(url(dotId, 'danh-sach'), { method: 'POST', body: JSON.stringify(body) });
+}
+
+/** DELETE kèm body { ly_do }. */
+export function xoaDongDanhSach(dongId: string, ly_do: string) {
+  return apiFetch<void>(`/cong-don-vi/danh-sach-tham-gia/${dongId}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ ly_do }),
+  });
+}
+
+export function xuatExcelDanhSach(dotId: string, donViId?: string) {
+  const qs = donViId ? `?${new URLSearchParams({ don_vi_id: donViId })}` : '';
+  return apiFetchBlob(url(dotId, `danh-sach/xuat-excel${qs}`));
+}
+
+export function useSuaDongDanhSach(dotId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dongId, body }: { dongId: string; body: SuaDongDanhSach }) => suaDongDanhSach(dongId, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: danhSachKey(dotId) }),
+  });
+}
+
+export function useThemDongDanhSach(dotId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ThemDongDanhSach) => themDongDanhSach(dotId, body),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: danhSachKey(dotId) }),
+  });
+}
+
+export function useXoaDongDanhSach(dotId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ dongId, ly_do }: { dongId: string; ly_do: string }) => xoaDongDanhSach(dongId, ly_do),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: danhSachKey(dotId) }),
+  });
+}

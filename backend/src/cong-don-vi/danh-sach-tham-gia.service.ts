@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { giai_doan_tham_gia } from '@prisma/client';
+import type { danh_sach_tham_gia, giai_doan_tham_gia } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import { ScopeService } from '../auth/scope/scope.service';
@@ -14,9 +14,23 @@ import {
   TyLeSuat,
   khopTruong,
 } from './quy-tac-hop-dong';
-import { DongExcelDanhSach, docFileDanhSach } from './danh-sach-tham-gia.excel';
-import { DongNapDanhSachDto } from './dto/danh-sach-tham-gia.dto';
+import {
+  DongExcelDanhSach,
+  docFileDanhSach,
+  taoFileXuatDanhSach,
+} from './danh-sach-tham-gia.excel';
+import {
+  DongNapDanhSachDto,
+  SuaDongDanhSachDto,
+  ThemDongDanhSachDto,
+} from './dto/danh-sach-tham-gia.dto';
 import { chuoiSangNgay, ngaySangChuoi } from './dot-trien-khai.service';
+import {
+  DongDanhSachGoc,
+  apDungSua,
+  khacBiet,
+  tenFileXuatDanhSach,
+} from './sua-dong-danh-sach';
 
 export interface DongXemTruoc extends DongExcelDanhSach {
   trang_thai_khop: TrangThaiKhop;
@@ -51,6 +65,32 @@ export interface TongHopTruong {
   so_nguoi: number;
   tong_suat: number;
 }
+
+function giaTriGoc(d: danh_sach_tham_gia): DongDanhSachGoc {
+  return {
+    don_vi_id: d.don_vi_id,
+    ho_ten: d.ho_ten,
+    ngay_sinh: ngaySangChuoi(d.ngay_sinh),
+    gioi_tinh: d.gioi_tinh,
+    ma_goc: d.ma_goc,
+    lop: d.lop,
+    giai_doan: d.giai_doan,
+    ty_le_suat: Number(d.ty_le_suat) as TyLeSuat,
+    ghi_chu: d.ghi_chu,
+    y_kien_truong: d.y_kien_truong,
+  };
+}
+
+function toDongDanhSach(d: danh_sach_tham_gia): DongDanhSach {
+  return { id: d.id, ...giaTriGoc(d), hoc_vien_id: d.hoc_vien_id };
+}
+
+/** Bản chụp cả dòng cho nhật ký thêm/xóa. */
+function banChup(d: danh_sach_tham_gia) {
+  return { ...giaTriGoc(d), hoc_vien_id: d.hoc_vien_id };
+}
+
+const KHONG_THAY_DONG = 'Không tìm thấy dòng danh sách';
 
 /** Liệt kê số dòng ngắn gọn cho thông báo lỗi. */
 function lietKe(soDong: number[]): string {
@@ -237,21 +277,159 @@ export class DanhSachThamGiaService {
 
     return {
       tong_hop,
-      dong: dong.map((d): DongDanhSach => ({
-        id: d.id,
-        don_vi_id: d.don_vi_id,
-        ho_ten: d.ho_ten,
-        ngay_sinh: ngaySangChuoi(d.ngay_sinh),
-        gioi_tinh: d.gioi_tinh,
-        ma_goc: d.ma_goc,
-        lop: d.lop,
-        giai_doan: d.giai_doan,
-        ty_le_suat: Number(d.ty_le_suat) as TyLeSuat,
-        ghi_chu: d.ghi_chu,
-        y_kien_truong: d.y_kien_truong,
-        hoc_vien_id: d.hoc_vien_id,
-      })),
+      dong: dong.map(toDongDanhSach),
     };
+  }
+
+  // Issue #59 / ADR 0015 X3: Quản trị sửa/thêm/xóa từng dòng, bắt buộc lý do, ghi nhật ký.
+  // TODO(ADR 0015 X5): chặn sửa/thêm/xóa khi trường đã nộp hợp đồng — chờ bảng hop_dong_boi_duong.
+
+  /** Sửa 1 dòng: chỉ đổi trường gửi lên; có đổi → mất ý kiến trường (X1). Không đổi gì → trả nguyên, không ghi nhật ký. */
+  async suaDong(
+    dongId: string,
+    dto: SuaDongDanhSachDto,
+  ): Promise<DongDanhSach> {
+    const cu = await this.layDong(dongId);
+    const { ly_do, ...sua } = dto;
+    const truoc = giaTriGoc(cu);
+    const sau = apDungSua(truoc, sua);
+    const doi = khacBiet(truoc, sau);
+    if (!doi) return toDongDanhSach(cu);
+    if (sau.don_vi_id !== truoc.don_vi_id) {
+      const dot = await this.layDot(cu.dot_trien_khai_id);
+      await this.kiemTraTruong(dot.so_gddt_id, sau.don_vi_id);
+    }
+
+    const moi = await this.prisma.danh_sach_tham_gia.update({
+      where: { id: cu.id },
+      data: {
+        ...sau,
+        ngay_sinh: chuoiSangNgay(sau.ngay_sinh),
+        updated_at: new Date(),
+      },
+    });
+    await this.nhatKy.ghi({
+      hanh_dong: 'sua_dong_danh_sach',
+      chi_tiet: {
+        dot_trien_khai_id: moi.dot_trien_khai_id,
+        dong_id: moi.id,
+        don_vi_id: moi.don_vi_id,
+        ly_do,
+        ...doi,
+      },
+    });
+    return toDongDanhSach(moi);
+  }
+
+  /** Thêm 1 dòng vào đợt HSG; giai đoạn mặc định Cả 2, suất suy từ giai đoạn nếu không gửi. */
+  async themDong(
+    dotId: string,
+    dto: ThemDongDanhSachDto,
+    callerId: string,
+  ): Promise<DongDanhSach> {
+    const dot = await this.layDotHsg(dotId);
+    await this.kiemTraTruong(dot.so_gddt_id, dto.don_vi_id);
+    const giai_doan = dto.giai_doan ?? 'ca_hai';
+    const moi = await this.prisma.danh_sach_tham_gia.create({
+      data: {
+        dot_trien_khai_id: dot.id,
+        don_vi_id: dto.don_vi_id,
+        ho_ten: dto.ho_ten,
+        ngay_sinh: chuoiSangNgay(dto.ngay_sinh ?? null),
+        gioi_tinh: dto.gioi_tinh ?? null,
+        ma_goc: dto.ma_goc ?? null,
+        lop: dto.lop ?? null,
+        giai_doan,
+        ty_le_suat: dto.ty_le_suat ?? TY_LE_SUAT[giai_doan],
+        ghi_chu: dto.ghi_chu ?? null,
+        created_by: callerId,
+      },
+    });
+    await this.nhatKy.ghi({
+      hanh_dong: 'them_dong_danh_sach',
+      chi_tiet: {
+        dot_trien_khai_id: dot.id,
+        dong_id: moi.id,
+        don_vi_id: moi.don_vi_id,
+        ly_do: dto.ly_do,
+        truoc: null,
+        sau: banChup(moi),
+      },
+    });
+    return toDongDanhSach(moi);
+  }
+
+  /** Xóa cứng 1 dòng; nhật ký giữ bản chụp đầy đủ. */
+  async xoaDong(dongId: string, ly_do: string): Promise<void> {
+    const cu = await this.layDong(dongId);
+    const { count } = await this.prisma.danh_sach_tham_gia.deleteMany({
+      where: { id: cu.id },
+    });
+    if (count === 0) throw new NotFoundAppException(KHONG_THAY_DONG);
+    await this.nhatKy.ghi({
+      hanh_dong: 'xoa_dong_danh_sach',
+      chi_tiet: {
+        dot_trien_khai_id: cu.dot_trien_khai_id,
+        dong_id: cu.id,
+        don_vi_id: cu.don_vi_id,
+        ly_do,
+        truoc: banChup(cu),
+        sau: null,
+      },
+    });
+  }
+
+  /** Excel danh sách hiện tại của đợt (lọc 1 trường nếu có), theo tên trường rồi họ tên. */
+  async xuatExcel(dotId: string, donViId?: string) {
+    const dot = await this.layDot(dotId);
+    const ds = await this.prisma.danh_sach_tham_gia.findMany({
+      where: {
+        dot_trien_khai_id: dot.id,
+        ...(donViId ? { don_vi_id: donViId } : {}),
+      },
+      include: { don_vi: { select: { ten_don_vi: true, ma_don_vi: true } } },
+    });
+    ds.sort(
+      (a, b) =>
+        a.don_vi.ten_don_vi.localeCompare(b.don_vi.ten_don_vi, 'vi') ||
+        a.ho_ten.localeCompare(b.ho_ten, 'vi') ||
+        a.id.localeCompare(b.id),
+    );
+    const buffer = await taoFileXuatDanhSach(
+      ds.map((d) => ({
+        ...giaTriGoc(d),
+        ma_truong: d.don_vi.ma_don_vi,
+        ten_truong: d.don_vi.ten_don_vi,
+      })),
+    );
+    // Có PII → ghi nhật ký (chỉ số dòng, không họ tên/ngày sinh), như các export học viên.
+    await this.nhatKy.ghi({
+      hanh_dong: 'xuat_danh_sach_tham_gia',
+      chi_tiet: {
+        dot_trien_khai_id: dot.id,
+        don_vi_id: donViId ?? null,
+        so_dong: ds.length,
+      },
+    });
+    return { buffer, tenFile: tenFileXuatDanhSach(dot.ten, new Date()) };
+  }
+
+  /** Đơn vị phải là trường đang hoạt động trong cây Sở của đợt (T7). */
+  private async kiemTraTruong(soId: string, donViId: string) {
+    const phamVi = await this.truongCuaSo(soId);
+    if (!phamVi.some((t) => t.id === donViId)) {
+      const message =
+        'Đơn vị không phải trường đang hoạt động trong phạm vi Sở của đợt';
+      throw new ValidationException(message, [{ field: 'don_vi_id', message }]);
+    }
+  }
+
+  private async layDong(id: string) {
+    const dong = await this.prisma.danh_sach_tham_gia.findUnique({
+      where: { id },
+    });
+    if (!dong) throw new NotFoundAppException(KHONG_THAY_DONG);
+    return dong;
   }
 
   private async truongCuaSo(soId: string): Promise<TruongPhamVi[]> {
@@ -266,7 +444,7 @@ export class DanhSachThamGiaService {
   private async layDot(id: string) {
     const dot = await this.prisma.dot_trien_khai.findUnique({
       where: { id },
-      select: { id: true, chuong_trinh: true, so_gddt_id: true },
+      select: { id: true, ten: true, chuong_trinh: true, so_gddt_id: true },
     });
     if (!dot) throw new NotFoundAppException('Không tìm thấy đợt triển khai');
     return dot;
