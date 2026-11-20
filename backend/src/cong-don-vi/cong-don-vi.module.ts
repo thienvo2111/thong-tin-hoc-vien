@@ -11,6 +11,8 @@ import { TruongDanhSachController } from './truong-danh-sach.controller';
 import { TruongDanhSachService } from './truong-danh-sach.service';
 import { DeNghiSuaController } from './de-nghi-sua.controller';
 import { DeNghiSuaService } from './de-nghi-sua.service';
+import { HoSoDonViController } from './ho-so-don-vi.controller';
+import { HoSoDonViService } from './ho-so-don-vi.service';
 
 // ADR 0015: mọi API của Cổng đơn vị (tiền tố /cong-don-vi). PrismaService và
 // NhatKyService là @Global() nên không cần import module. AuthModule cho
@@ -23,12 +25,14 @@ import { DeNghiSuaService } from './de-nghi-sua.service';
     DongDanhSachThamGiaController,
     TruongDanhSachController,
     DeNghiSuaController,
+    HoSoDonViController,
   ],
   providers: [
     DotTrienKhaiService,
     DanhSachThamGiaService,
     TruongDanhSachService,
     DeNghiSuaService,
+    HoSoDonViService,
   ],
 })
 export class CongDonViModule {}

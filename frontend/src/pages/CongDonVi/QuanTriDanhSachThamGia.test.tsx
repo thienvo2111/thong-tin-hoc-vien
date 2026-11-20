@@ -321,6 +321,11 @@ describe('QuanTriDanhSachThamGia — danh sách theo trường', () => {
     expect(within(hang1).getByText('Báo sai lệch')).toBeInTheDocument();
     const hang2 = within(tongHop).getByText('Trường THCS&THPT Mẫu Hai').closest('tr') as HTMLElement;
     expect(within(hang2).getByText('Đã xác nhận')).toBeInTheDocument();
+    // Issue #63: link xem hồ sơ đơn vị (chỉ đọc) của từng trường.
+    expect(within(hang1).getByRole('link', { name: 'Hồ sơ đơn vị Trường THCS Mẫu Một' })).toHaveAttribute(
+      'href',
+      '/quan-tri/ho-so-don-vi/tr-1',
+    );
 
     await user.click(screen.getByRole('button', { name: 'Xem danh sách Trường THCS Mẫu Một' }));
     const bang = await screen.findByRole('table', { name: 'Danh sách Trường THCS Mẫu Một' });

@@ -55,7 +55,8 @@ export type HanhDongNhatKy =
   | 'xac_nhan_danh_sach'
   | 'gui_de_nghi_sua_danh_sach'
   | 'ap_dung_de_nghi_sua_danh_sach'
-  | 'tu_choi_de_nghi_sua_danh_sach';
+  | 'tu_choi_de_nghi_sua_danh_sach'
+  | 'cap_nhat_ho_so_don_vi';
 
 const TIEU_DE: Record<HanhDongNhatKy, string> = {
   dang_nhap_thanh_cong: 'Đăng nhập thành công',
@@ -109,6 +110,7 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   gui_de_nghi_sua_danh_sach: 'Trường gửi đề nghị sửa danh sách tham gia',
   ap_dung_de_nghi_sua_danh_sach: 'Quản trị áp dụng đề nghị sửa danh sách',
   tu_choi_de_nghi_sua_danh_sach: 'Quản trị từ chối đề nghị sửa danh sách',
+  cap_nhat_ho_so_don_vi: 'Trường cập nhật hồ sơ đơn vị',
 };
 
 const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
@@ -162,6 +164,7 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   gui_de_nghi_sua_danh_sach: 'tai_khoan',
   ap_dung_de_nghi_sua_danh_sach: 'tai_khoan',
   tu_choi_de_nghi_sua_danh_sach: 'tai_khoan',
+  cap_nhat_ho_so_don_vi: 'tai_khoan',
 };
 
 const NHAN_VAI_TRO: Record<vai_tro_nguoi_dung, string> = {

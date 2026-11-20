@@ -11,6 +11,8 @@ const MENU = [
   { to: '/trang-chu', nhan: 'Trang chủ' },
   { to: '/huong-dan', nhan: 'Hướng dẫn' },
 ];
+// Issue #63 / P1: "Hồ sơ đơn vị" chỉ cho trường, ngay sau Trang chủ.
+const MENU_TRUONG = [MENU[0], { to: '/ho-so-don-vi', nhan: 'Hồ sơ đơn vị' }, ...MENU.slice(1)];
 // Issue #56/#57: mục chỉ hiện cho quan_tri.
 const MENU_QUAN_TRI = [
   { to: '/quan-tri/dot-trien-khai', nhan: 'Chương trình / Đợt' },
@@ -23,7 +25,8 @@ export default function CongDonViLayout() {
   useTieuDeCongDonVi();
   const { nguoiDung, dangXuat } = useToi();
   const navigate = useNavigate();
-  const menu = nguoiDung?.vai_tro === 'quan_tri' ? [...MENU, ...MENU_QUAN_TRI] : MENU;
+  const vaiTro = nguoiDung?.vai_tro;
+  const menu = vaiTro === 'quan_tri' ? [...MENU, ...MENU_QUAN_TRI] : vaiTro === 'truong' ? MENU_TRUONG : MENU;
 
   async function xuLyDangXuat() {
     try {

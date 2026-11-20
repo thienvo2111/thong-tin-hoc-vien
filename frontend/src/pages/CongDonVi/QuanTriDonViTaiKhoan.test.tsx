@@ -52,7 +52,7 @@ describe('Menu Cổng đơn vị — Đơn vị & tài khoản', () => {
     expect(router.state.location.pathname).toBe(TRANG);
   });
 
-  it('trường không thấy "Đơn vị & tài khoản" — menu chỉ Trang chủ, Hướng dẫn', async () => {
+  it('trường không thấy "Đơn vị & tài khoản" — menu chỉ Trang chủ, Hồ sơ đơn vị, Hướng dẫn', async () => {
     moCong('/trang-chu', 'truong');
     const menu = await screen.findByRole('navigation', { name: 'Menu Cổng đơn vị' });
     await screen.findByText(String(db.hoSo.ma_dinh_danh_moet));
@@ -60,7 +60,7 @@ describe('Menu Cổng đơn vị — Đơn vị & tài khoản', () => {
       within(menu)
         .getAllByRole('link')
         .map((a) => a.textContent),
-    ).toEqual(['Trang chủ', 'Hướng dẫn']);
+    ).toEqual(['Trang chủ', 'Hồ sơ đơn vị', 'Hướng dẫn']);
   });
 });
 

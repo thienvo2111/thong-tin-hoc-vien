@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { Alert, Badge, Button, Group, Paper, Skeleton, Stack, Table, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -100,14 +101,26 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
                         </Group>
                       </Table.Td>
                       <Table.Td>
-                        <Button
-                          size="xs"
-                          variant={truong?.don_vi_id === t.don_vi_id ? 'filled' : 'default'}
-                          aria-label={`Xem danh sách ${t.ten_don_vi}`}
-                          onClick={() => setTruong(t)}
-                        >
-                          Xem
-                        </Button>
+                        <Group gap={4} wrap="nowrap">
+                          <Button
+                            size="xs"
+                            variant={truong?.don_vi_id === t.don_vi_id ? 'filled' : 'default'}
+                            aria-label={`Xem danh sách ${t.ten_don_vi}`}
+                            onClick={() => setTruong(t)}
+                          >
+                            Xem
+                          </Button>
+                          {/* Issue #63: Quản trị xem hồ sơ đơn vị (chỉ đọc) của trường. */}
+                          <Button
+                            component={Link}
+                            to={`/quan-tri/ho-so-don-vi/${t.don_vi_id}`}
+                            size="xs"
+                            variant="subtle"
+                            aria-label={`Hồ sơ đơn vị ${t.ten_don_vi}`}
+                          >
+                            Hồ sơ đơn vị
+                          </Button>
+                        </Group>
                       </Table.Td>
                     </Table.Tr>
                   ))}

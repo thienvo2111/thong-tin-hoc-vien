@@ -47,7 +47,7 @@ function ngheApiTruong() {
 const moTrang = (duongDan: string) => renderVoiRouter(routesCongDonVi, { initialEntries: [duongDan] });
 
 describe('Trang chủ trường (/trang-chu, vai trò truong)', () => {
-  it('đang tải → thẻ Hồ sơ đơn vị "Sắp mở" + thẻ đợt: chương trình, hạn nộp, số người, tổng suất 0,5, tiền, trạng thái', async () => {
+  it('đang tải → thẻ Hồ sơ đơn vị (badge, issue #63) + thẻ đợt: chương trình, hạn nộp, số người, tổng suất 0,5, tiền, trạng thái', async () => {
     dbTruongDanhSach.the = [
       theDotMau(),
       theDotMau({
@@ -65,7 +65,7 @@ describe('Trang chủ trường (/trang-chu, vai trò truong)', () => {
 
     expect(await screen.findByLabelText('Đang tải')).toBeInTheDocument();
     const hoSo = screen.getByRole('region', { name: 'Hồ sơ đơn vị' });
-    expect(within(hoSo).getByText('Sắp mở')).toBeInTheDocument();
+    expect(await within(hoSo).findByText('Chưa khai')).toBeInTheDocument();
 
     const hsg = await screen.findByRole('article', { name: 'HSG Đợt Bịa 2026' });
     expect(within(hsg).getByText('HSG')).toBeInTheDocument();

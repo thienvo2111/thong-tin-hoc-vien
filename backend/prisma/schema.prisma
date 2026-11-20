@@ -463,6 +463,9 @@ model don_vi_cong_tac {
   // Issue #62: đề nghị sửa danh sách của trường
   de_nghi_sua_danh_sach de_nghi_sua_danh_sach[]
 
+  // Issue #63 / ADR 0015 M4: hồ sơ đơn vị (1–1)
+  ho_so_don_vi ho_so_don_vi?
+
   @@index([loai_don_vi], map: "idx_don_vi_loai")
   @@index([dia_ban_id], map: "idx_don_vi_dia_ban")
   @@index([don_vi_cha_id], map: "idx_don_vi_cha")
@@ -568,6 +571,9 @@ model nguoi_dung {
   // Issue #62: người gửi / người xử lý đề nghị sửa danh sách (X2)
   de_nghi_sua_gui   de_nghi_sua_danh_sach[] @relation("de_nghi_sua_gui_boi")
   de_nghi_sua_xu_ly de_nghi_sua_danh_sach[] @relation("de_nghi_sua_xu_ly_boi")
+
+  // Issue #63: người cập nhật hồ sơ đơn vị gần nhất
+  ho_so_don_vi_cap_nhat ho_so_don_vi[] @relation("ho_so_don_vi_cap_nhat_boi")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -923,6 +929,42 @@ model de_nghi_sua_danh_sach {
 
   @@index([dot_trien_khai_id, don_vi_id, trang_thai], map: "idx_de_nghi_sua_dot_don_vi_trang_thai")
   @@index([dong_id], map: "idx_de_nghi_sua_dong")
+}
+
+/// ADR 0015 M4 (issue #63): hồ sơ đơn vị dùng chung mọi đợt; mọi cột nội dung NULL được (nháp, X4).
+/// KHÔNG có cột STK chuyển khoản — suy ra từ ma_qhns (U2). CHECK định dạng MST/QHNS/SĐT trong migration.
+model ho_so_don_vi {
+  don_vi_id        String   @id @db.Uuid
+  ten_truong       String?
+  dia_chi          String?
+  ma_so_thue       String?
+  nguoi_dai_dien   String?
+  sdt_dai_dien     String?
+  email_hoa_don    String?
+  so_tai_khoan     String?
+  ngan_hang        String?
+  chi_nhanh        String?
+  kho_bac          String?
+  mst_kho_bac      String?
+  ma_qhns          String?
+  ma_nguon         String?
+  ht_ho_ten        String?
+  ht_so_tai_khoan  String?
+  ht_ngan_hang     String?
+  kt_ho_ten        String?
+  kt_sdt           String?
+  kt_so_tai_khoan  String?
+  kt_ngan_hang     String?
+  dau_moi_csvc     String?
+  muc_dap_ung_csvc String?
+  luu_tru          String?
+  di_chuyen        String?
+  cap_nhat_boi     String?  @db.Uuid
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  don_vi            don_vi_cong_tac @relation(fields: [don_vi_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  cap_nhat_boi_user nguoi_dung?     @relation("ho_so_don_vi_cap_nhat_boi", fields: [cap_nhat_boi], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model xac_nhan_ho_so {

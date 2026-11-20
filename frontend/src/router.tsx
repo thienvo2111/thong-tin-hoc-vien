@@ -358,6 +358,11 @@ export const routesCongDonVi: RouteObject[] = [
                     lazy: () =>
                       import('@/pages/CongDonVi/DanhSachThamGiaTruong').then((m) => ({ Component: m.default })),
                   },
+                  {
+                    // Issue #63: Hồ sơ đơn vị của chính trường (ADR 0015 M4, U2).
+                    path: '/ho-so-don-vi',
+                    lazy: () => import('@/pages/CongDonVi/HoSoDonVi').then((m) => ({ Component: m.default })),
+                  },
                 ],
               },
               {
@@ -383,6 +388,11 @@ export const routesCongDonVi: RouteObject[] = [
                     path: '/quan-tri/danh-sach-tham-gia',
                     lazy: () =>
                       import('@/pages/CongDonVi/QuanTriDanhSachThamGia').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    // Issue #63: Quản trị xem (chỉ đọc) hồ sơ đơn vị của 1 trường.
+                    path: '/quan-tri/ho-so-don-vi/:donViId',
+                    lazy: () => import('@/pages/CongDonVi/HoSoDonViQuanTri').then((m) => ({ Component: m.default })),
                   },
                 ],
               },

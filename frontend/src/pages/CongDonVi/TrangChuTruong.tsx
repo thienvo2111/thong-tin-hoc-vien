@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom';
 import { Alert, Badge, Button, Container, Group, Paper, SimpleGrid, Skeleton, Stack, Text, Title } from '@mantine/core';
 import { useDotCuaTruong, type TheDotTruong } from '@/api/truongDanhSach';
+import { useHoSoDonVi } from '@/api/hoSoDonVi';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayLich } from '@/lib/ngayLich';
 import { dinhDangSuat } from './danhSachThamGiaNhan';
 import { NHAN_CHUONG_TRINH_NGAN, TRANG_THAI_DANH_SACH, TRANG_THAI_HOP_DONG, dinhDangGiaTri } from './hopDongNhan';
+import { BadgeHoSo } from './HoSoDonViChung';
 
 // Việc chưa mở ở lát này (#64 hợp đồng + nộp) — chỉ hiện mờ để giữ bố cục U1.
 const VIEC_SAP_MO = ['Thông tin hợp đồng', 'Nộp hợp đồng'];
@@ -21,19 +23,7 @@ export default function TrangChuTruong() {
           Việc cần làm
         </Title>
 
-        <Paper withBorder radius="md" p="md" component="section" aria-label="Hồ sơ đơn vị">
-          <Group justify="space-between" wrap="nowrap" align="flex-start" gap="sm">
-            <div>
-              <Text fw={600}>Hồ sơ đơn vị</Text>
-              <Text size="sm" c="dimmed">
-                Khai một lần, dùng cho mọi chương trình
-              </Text>
-            </div>
-            <Badge color="gray" variant="light" style={{ flexShrink: 0 }}>
-              Sắp mở
-            </Badge>
-          </Group>
-        </Paper>
+        <TheHoSoDonVi />
 
         {isLoading && (
           <Stack gap="md" aria-label="Đang tải">
@@ -64,6 +54,29 @@ export default function TrangChuTruong() {
         ))}
       </Stack>
     </Container>
+  );
+}
+
+/** Issue #63 / U1: thẻ Hồ sơ đơn vị dùng chung mọi đợt, badge Đủ thông tin / Còn thiếu N mục / Chưa khai. */
+function TheHoSoDonVi() {
+  const { data } = useHoSoDonVi();
+  return (
+    <Paper withBorder radius="md" p="md" component="section" aria-label="Hồ sơ đơn vị">
+      <Stack gap="sm">
+        <Group justify="space-between" wrap="nowrap" align="flex-start" gap="sm">
+          <div>
+            <Text fw={600}>Hồ sơ đơn vị</Text>
+            <Text size="sm" c="dimmed">
+              Khai một lần, dùng cho mọi chương trình
+            </Text>
+          </div>
+          {data && <BadgeHoSo data={data} />}
+        </Group>
+        <Button component={Link} to="/ho-so-don-vi" variant="light" fullWidth justify="space-between">
+          Xem / sửa hồ sơ đơn vị
+        </Button>
+      </Stack>
+    </Paper>
   );
 }
 

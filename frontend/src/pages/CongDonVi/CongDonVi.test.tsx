@@ -19,7 +19,7 @@ beforeEach(() => vi.stubEnv('VITE_CONG_DON_VI_HOSTNAME', window.location.hostnam
 afterEach(() => vi.unstubAllEnvs());
 
 describe('CongDonViLayout', () => {
-  it('hiện tên cổng, tên tài khoản, nút Đăng xuất; menu đúng 2 mục Trang chủ, Hướng dẫn; đặt document.title', async () => {
+  it('hiện tên cổng, tên tài khoản, nút Đăng xuất; menu của trường: Trang chủ, Hồ sơ đơn vị (issue #63), Hướng dẫn; đặt document.title', async () => {
     db.nguoiDung.vai_tro = 'truong';
     datToken('token-gia-lap');
     renderVoiRouter(
@@ -30,8 +30,8 @@ describe('CongDonViLayout', () => {
     expect(screen.getByRole('button', { name: 'Đăng xuất' })).toBeInTheDocument();
     const menu = screen.getByRole('navigation', { name: 'Menu Cổng đơn vị' });
     const lienKet = within(menu).getAllByRole('link');
-    expect(lienKet.map((a) => a.textContent)).toEqual(['Trang chủ', 'Hướng dẫn']);
-    expect(lienKet.map((a) => a.getAttribute('href'))).toEqual(['/trang-chu', '/huong-dan']);
+    expect(lienKet.map((a) => a.textContent)).toEqual(['Trang chủ', 'Hồ sơ đơn vị', 'Hướng dẫn']);
+    expect(lienKet.map((a) => a.getAttribute('href'))).toEqual(['/trang-chu', '/ho-so-don-vi', '/huong-dan']);
     expect(document.title).toBe(congDonVi.tenCong);
   });
 });
