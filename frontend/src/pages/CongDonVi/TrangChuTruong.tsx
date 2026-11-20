@@ -8,9 +8,6 @@ import { dinhDangSuat } from './danhSachThamGiaNhan';
 import { NHAN_CHUONG_TRINH_NGAN, TRANG_THAI_DANH_SACH, TRANG_THAI_HOP_DONG, dinhDangGiaTri } from './hopDongNhan';
 import { BadgeHoSo } from './HoSoDonViChung';
 
-// Việc chưa mở ở lát này (#64 hợp đồng + nộp) — chỉ hiện mờ để giữ bố cục U1.
-const VIEC_SAP_MO = ['Thông tin hợp đồng', 'Nộp hợp đồng'];
-
 /** Trang chủ của trường trên Cổng đơn vị (issue #60, ADR 0015 U1 — prototype phương án C):
  * thẻ Hồ sơ đơn vị ở trên cùng, rồi mỗi đợt có danh sách của trường là một thẻ việc cần làm. */
 export default function TrangChuTruong() {
@@ -136,23 +133,39 @@ function TheDot({ the }: { the: TheDotTruong }) {
               Xác nhận danh sách
             </Button>
           </li>
-          {VIEC_SAP_MO.map((viec) => (
-            <li key={viec}>
-              <Button
-                variant="default"
-                fullWidth
-                disabled
-                justify="space-between"
-                rightSection={
-                  <Badge color="gray" variant="light" size="sm">
-                    Sắp mở
-                  </Badge>
-                }
-              >
-                {viec}
-              </Button>
-            </li>
-          ))}
+          {/* Issue #64: Phần 3–4 + Nộp trên cùng màn hợp đồng của đợt. */}
+          <li>
+            <Button
+              component={Link}
+              to={`/dot/${dot.id}/hop-dong`}
+              variant="default"
+              fullWidth
+              justify="space-between"
+              rightSection={
+                <Badge color="blue" variant="light" size="sm">
+                  {dinhDangGiaTri(the.gia_tri_tam_tinh)}
+                </Badge>
+              }
+            >
+              Thông tin hợp đồng
+            </Button>
+          </li>
+          <li>
+            <Button
+              component={Link}
+              to={`/dot/${dot.id}/hop-dong`}
+              variant="default"
+              fullWidth
+              justify="space-between"
+              rightSection={
+                <Badge color={hd.mau} variant="light" size="sm">
+                  {hd.nhan}
+                </Badge>
+              }
+            >
+              Nộp hợp đồng
+            </Button>
+          </li>
         </Stack>
       </Stack>
     </Paper>

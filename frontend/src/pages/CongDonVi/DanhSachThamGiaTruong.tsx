@@ -98,6 +98,8 @@ function NoiDung({ dotId, ds }: { dotId: string; ds: DanhSachCuaTruong }) {
   const tt = TRANG_THAI_DANH_SACH[ds.trang_thai_danh_sach];
   const soChuaCoYKien = ds.dong.filter((d) => d.y_kien_truong === null).length;
   const daXacNhan = ds.trang_thai_danh_sach === 'da_xac_nhan';
+  // Issue #64 / X5: hợp đồng đã nộp → danh sách chỉ xem (ẩn ý kiến, đề nghị, Xác nhận).
+  const chiXem = ds.trang_thai_hop_dong === 'da_nop';
 
   const deNghiThem = ds.de_nghi.filter((d) => d.loai === 'them');
 
@@ -127,9 +129,15 @@ function NoiDung({ dotId, ds }: { dotId: string; ds: DanhSachCuaTruong }) {
         </Text>
       </Stack>
 
-      <Button variant="default" fullWidth onClick={() => setMoDeNghi({ dong: null })}>
-        Đề nghị thêm người
-      </Button>
+      {chiXem ? (
+        <Alert color="green" role="status">
+          Hợp đồng đã nộp — danh sách chỉ xem
+        </Alert>
+      ) : (
+        <Button variant="default" fullWidth onClick={() => setMoDeNghi({ dong: null })}>
+          Đề nghị thêm người
+        </Button>
+      )}
 
       {ds.dong.length === 0 ? (
         <Paper withBorder radius="md" p="md">
@@ -137,16 +145,18 @@ function NoiDung({ dotId, ds }: { dotId: string; ds: DanhSachCuaTruong }) {
         </Paper>
       ) : (
         <>
-          <Button
-            variant="light"
-            color="green"
-            fullWidth
-            disabled={soChuaCoYKien === 0 || dangGui}
-            loading={dongYTatCa.isPending}
-            onClick={() => dongYTatCa.mutate(undefined, { onError: baoLoi })}
-          >
-            Đồng ý tất cả dòng chưa có ý kiến
-          </Button>
+          {!chiXem && (
+            <Button
+              variant="light"
+              color="green"
+              fullWidth
+              disabled={soChuaCoYKien === 0 || dangGui}
+              loading={dongYTatCa.isPending}
+              onClick={() => dongYTatCa.mutate(undefined, { onError: baoLoi })}
+            >
+              Đồng ý tất cả dòng chưa có ý kiến
+            </Button>
+          )}
           <Stack component="ol" gap="sm" m={0} p={0} style={{ listStyle: 'none' }} aria-label="Người tham gia">
             {ds.dong.map((d) => (
               <TheNguoi
@@ -154,6 +164,7 @@ function NoiDung({ dotId, ds }: { dotId: string; ds: DanhSachCuaTruong }) {
                 d={d}
                 deNghi={ds.de_nghi.find((x) => x.dong_id === d.id)}
                 khoa={dangGui}
+                chiXem={chiXem}
                 onYKien={(y) => datYKien(d, y)}
               />
             ))}
@@ -178,7 +189,11 @@ function NoiDung({ dotId, ds }: { dotId: string; ds: DanhSachCuaTruong }) {
               Giá trị tạm tính: {ds.gia_tri_tam_tinh === null ? 'chưa có đơn giá' : dinhDangTien(ds.gia_tri_tam_tinh)}
             </Text>
           </div>
-          {daXacNhan ? (
+          {chiXem ? (
+            <Text c="green.8" fw={600}>
+              Hợp đồng đã nộp — danh sách chỉ xem.
+            </Text>
+          ) : daXacNhan ? (
             <Text c="green.8" fw={600}>
               Trường đã xác nhận danh sách này.
             </Text>
@@ -256,12 +271,15 @@ function TheNguoi({
   d,
   deNghi,
   khoa,
+  chiXem,
   onYKien,
 }: {
   d: DongDanhSachTruong;
   /** Đề nghị mới nhất của dòng (nếu có). */
   deNghi?: DeNghiCuaTruong;
   khoa: boolean;
+  /** Issue #64 / X5: hợp đồng đã nộp → không có nút ý kiến. */
+  chiXem: boolean;
   onYKien: (y: YKienTruong) => void;
 }) {
   const dongY = d.y_kien_truong === 'dong_y';
@@ -305,28 +323,30 @@ function TheNguoi({
             HCMUE từ chối đề nghị: {deNghi.ly_do_tu_choi}
           </Text>
         )}
-        <Group grow gap="xs" role="group" aria-label={`Ý kiến về ${d.ho_ten}`}>
-          <Button
-            size="sm"
-            color="green"
-            variant={dongY ? 'filled' : 'default'}
-            aria-pressed={dongY}
-            disabled={khoa || dangCho}
-            onClick={() => onYKien('dong_y')}
-          >
-            Đồng ý
-          </Button>
-          <Button
-            size="sm"
-            color="red"
-            variant={khongDongY ? 'filled' : 'default'}
-            aria-pressed={khongDongY}
-            disabled={khoa || dangCho}
-            onClick={() => onYKien('khong_dong_y')}
-          >
-            Không đồng ý
-          </Button>
-        </Group>
+        {!chiXem && (
+          <Group grow gap="xs" role="group" aria-label={`Ý kiến về ${d.ho_ten}`}>
+            <Button
+              size="sm"
+              color="green"
+              variant={dongY ? 'filled' : 'default'}
+              aria-pressed={dongY}
+              disabled={khoa || dangCho}
+              onClick={() => onYKien('dong_y')}
+            >
+              Đồng ý
+            </Button>
+            <Button
+              size="sm"
+              color="red"
+              variant={khongDongY ? 'filled' : 'default'}
+              aria-pressed={khongDongY}
+              disabled={khoa || dangCho}
+              onClick={() => onYKien('khong_dong_y')}
+            >
+              Không đồng ý
+            </Button>
+          </Group>
+        )}
       </Stack>
     </Paper>
   );

@@ -10,7 +10,7 @@ import {
   type DongXemTruoc,
   type KetQuaXemTruoc,
 } from '@/api/danhSachThamGia';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayLich } from '@/lib/ngayLich';
 import { taiFileTuBlob } from '@/lib/taiFile';
 import { NHAN_GIAI_DOAN, dinhDangSuat } from './danhSachThamGiaNhan';
@@ -85,6 +85,8 @@ export function NapDanhSachHsg({ dotId }: { dotId: string }) {
     });
   }, [xemTruoc, chonTay]);
   const soTruong = new Set(dongNap.map((d) => d.don_vi_id)).size;
+  // Issue #64 / X5: trường đã nộp hợp đồng (kể cả chọn tay) → server từ chối cả lần nạp.
+  const truongDaNop = (xemTruoc?.truong_da_nop ?? []).filter((t) => dongNap.some((d) => d.don_vi_id === t.don_vi_id));
   const soBoQua = (xemTruoc?.dong.length ?? 0) - dongNap.length;
 
   function taiMau() {
@@ -164,6 +166,12 @@ export function NapDanhSachHsg({ dotId }: { dotId: string }) {
             onChon={(soDong, id) => setChonTay((cu) => ({ ...cu, [soDong]: id }))}
           />
         )}
+        {truongDaNop.length > 0 && (
+          <Alert color="orange" title="Có trường đã nộp hợp đồng">
+            {truongDaNop.map((t) => t.ten_don_vi).join(', ')} đã nộp hợp đồng — nạp sẽ bị từ chối. Mở lại hợp đồng của
+            các trường này trước, hoặc bỏ các dòng đó khỏi file.
+          </Alert>
+        )}
         {xemTruoc && (
           <Group justify="space-between" wrap="wrap" gap="sm">
             <Text fz="sm" fw={600}>
@@ -181,7 +189,7 @@ export function NapDanhSachHsg({ dotId }: { dotId: string }) {
             Nạp {dongNap.length} dòng cho {soTruong} trường. Danh sách hiện có của {soTruong} trường này trong đợt sẽ bị
             thay thế; trường không có trong file giữ nguyên.
           </Text>
-          {napMut.isError && <Alert color="red">{thongDiepLoiChung(napMut.error)}</Alert>}
+          {napMut.isError && <Alert color="red">{thongDiepLoiXungDot(napMut.error)}</Alert>}
           <Group justify="flex-end" gap="sm">
             <Button variant="default" onClick={() => setMoXacNhan(false)}>
               Hủy
@@ -248,7 +256,14 @@ function BangXemTruoc({
                     size="xs"
                   />
                 ) : (
-                  (d.ten_don_vi_khop ?? '')
+                  <>
+                    {d.ten_don_vi_khop ?? ''}
+                    {d.da_nop && (
+                      <Badge color="orange" variant="light" ml={4}>
+                        Đã nộp HĐ
+                      </Badge>
+                    )}
+                  </>
                 )}
               </Table.Td>
               <Table.Td>{d.giai_doan ? NHAN_GIAI_DOAN[d.giai_doan] : ''}</Table.Td>

@@ -575,6 +575,9 @@ model nguoi_dung {
   // Issue #63: người cập nhật hồ sơ đơn vị gần nhất
   ho_so_don_vi_cap_nhat ho_so_don_vi[] @relation("ho_so_don_vi_cap_nhat_boi")
 
+  // Issue #64: người nộp hợp đồng bồi dưỡng (M5)
+  hop_dong_nop hop_dong_boi_duong[] @relation("hop_dong_nop_boi")
+
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
 }
@@ -880,7 +883,7 @@ model danh_sach_tham_gia {
 }
 
 // ADR 0015 M5/X1 (issue #60): 1 dòng cho mỗi (đợt, trường) có danh sách tham gia — nạp/thêm dòng tạo kèm.
-// Cột Phần 3–4, bản chụp hồ sơ, hạn riêng… thêm ở lát sau. thao_tac_cuoi_* = người + lúc thao tác gần nhất (X1).
+// Phần 3–4, nộp, bản chụp hồ sơ: issue #64; hạn riêng… thêm ở lát sau. thao_tac_cuoi_* = người + lúc thao tác gần nhất (X1).
 model hop_dong_boi_duong {
   id                   String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   dot_trien_khai_id    String                      @db.Uuid
@@ -891,10 +894,27 @@ model hop_dong_boi_duong {
   thao_tac_cuoi_luc    DateTime?                   @db.Timestamptz(6)
   created_at           DateTime                    @default(now()) @db.Timestamptz(6)
   updated_at           DateTime                    @default(now()) @db.Timestamptz(6)
+  // Issue #64: Phần 3 (người nhận bản giấy) + Phần 4 (QĐ chỉ định thầu), nháp được trước khi nộp (X4).
+  nguoi_nhan           String?
+  sdt_nguoi_nhan       String?
+  dia_chi_nhan         String?
+  ghi_chu              String?
+  so_qd                String?
+  ngay_qd              DateTime?                   @db.Date
+  diem_hoc_truc_tiep   Boolean                     @default(false)
+  // Nộp + bản chụp lúc nộp (M5) — không tính lại sau khi nộp. CHECK chk_hop_dong_* thêm bằng raw SQL.
+  nop_luc              DateTime?                   @db.Timestamptz(6)
+  nop_boi              String?                     @db.Uuid
+  ban_chup_ho_so       Json?
+  so_nguoi_luc_nop     Int?
+  tong_suat_luc_nop    Decimal?                    @db.Decimal(10, 1)
+  don_gia_luc_nop      Int?
+  gia_tri_luc_nop      BigInt?
 
   dot_trien_khai     dot_trien_khai  @relation(fields: [dot_trien_khai_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   don_vi             don_vi_cong_tac @relation(fields: [don_vi_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   thao_tac_cuoi_user nguoi_dung?     @relation("hop_dong_thao_tac_cuoi", fields: [thao_tac_cuoi_boi], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nop_boi_user       nguoi_dung?     @relation("hop_dong_nop_boi", fields: [nop_boi], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([dot_trien_khai_id, don_vi_id], map: "uq_hop_dong_dot_don_vi")
   @@index([don_vi_id], map: "idx_hop_dong_don_vi")

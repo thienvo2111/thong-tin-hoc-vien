@@ -51,6 +51,8 @@ export interface DanhSachCuaTruong {
   don_gia: number | null;
   gia_tri_tam_tinh: number | null;
   trang_thai_danh_sach: TrangThaiDanhSachTruong;
+  /** Issue #64 / X5: da_nop → danh sách chỉ xem. */
+  trang_thai_hop_dong: TrangThaiHopDong;
   /** X2: bật nút "Xác nhận danh sách" được không; không → lý do. */
   co_the_xac_nhan: boolean;
   ly_do_khong_xac_nhan: string | null;

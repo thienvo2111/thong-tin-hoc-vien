@@ -72,6 +72,7 @@ export function danhSachMau(p: Partial<DanhSachCuaTruong> = {}): DanhSachCuaTruo
     don_gia: 1_234_567,
     gia_tri_tam_tinh: 3_086_418,
     trang_thai_danh_sach: 'cho_xac_nhan',
+    trang_thai_hop_dong: 'chua_nop',
     co_the_xac_nhan: false,
     ly_do_khong_xac_nhan: null,
     de_nghi: [],

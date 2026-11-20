@@ -8,6 +8,7 @@ import { danhSachThamGiaHandlers } from './danhSachThamGia';
 import { truongDanhSachHandlers } from './truongDanhSach';
 import { deNghiSuaHandlers } from './deNghiSua';
 import { hoSoDonViHandlers } from './hoSoDonVi';
+import { hopDongHandlers } from './hopDong';
 import { DIA_DANH, DON_VI, MON_HOC, db } from './db';
 
 // QĐ10 (2026-09-30): dang_ky_hoc mẫu nằm rải trong db.khoaHocCuaHocVien (map theo hoc_vien_id) — tìm
@@ -114,6 +115,7 @@ export const handlers = [
   ...truongDanhSachHandlers,
   ...deNghiSuaHandlers,
   ...hoSoDonViHandlers,
+  ...hopDongHandlers,
   // ADR 0004 L4 (issue #17): bảng kiểm.
   http.get('/bang-kiem/quy-tac', () =>
     HttpResponse.json([

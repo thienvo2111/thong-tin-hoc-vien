@@ -236,3 +236,17 @@ describe('Màn danh sách của trường — Xác nhận danh sách (#61)', () 
     expect(screen.queryByRole('button', { name: 'Xác nhận danh sách' })).not.toBeInTheDocument();
   });
 });
+
+describe('Màn danh sách của trường — hợp đồng đã nộp (#64, X5)', () => {
+  it('đã nộp → chỉ xem: không nút ý kiến, Đồng ý tất cả, đề nghị thêm người, Xác nhận; có ghi chú', async () => {
+    moDanhSach(
+      voiYKien(['dong_y', 'dong_y', 'dong_y'], { trang_thai_danh_sach: 'da_xac_nhan', trang_thai_hop_dong: 'da_nop' }),
+    );
+    expect(await screen.findByText('Hợp đồng đã nộp — danh sách chỉ xem')).toBeInTheDocument();
+    expect(screen.getByText('GV Bịa An')).toBeInTheDocument();
+    expect(screen.queryByRole('group')).not.toBeInTheDocument();
+    for (const ten of ['Đồng ý tất cả dòng chưa có ý kiến', 'Đề nghị thêm người', 'Xác nhận danh sách']) {
+      expect(screen.queryByRole('button', { name: ten })).not.toBeInTheDocument();
+    }
+  });
+});

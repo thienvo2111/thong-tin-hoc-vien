@@ -35,7 +35,7 @@ export interface HoSoDonViPhanHoi {
   goi_y: { ten_truong: string };
 }
 
-function layDuLieu(hang: ho_so_don_vi): HoSoDonViDuLieu {
+export function layDuLieu(hang: ho_so_don_vi): HoSoDonViDuLieu {
   const kq = {} as HoSoDonViDuLieu;
   for (const t of TEN_TRUONG_HO_SO) kq[t] = hang[t];
   return kq;

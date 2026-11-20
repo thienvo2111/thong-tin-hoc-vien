@@ -72,21 +72,22 @@ describe('Trang chủ trường (/trang-chu, vai trò truong)', () => {
     expect(within(hsg).getByText('Hạn nộp: 31/12/2026')).toBeInTheDocument();
     expect(within(hsg).getByText('3')).toBeInTheDocument();
     expect(within(hsg).getByText('2,5')).toBeInTheDocument();
-    expect(within(hsg).getByText('3.086.418 đ')).toBeInTheDocument();
+    // Issue #64: giá trị hiện ở số liệu và ở việc "Thông tin hợp đồng".
+    expect(within(hsg).getAllByText('3.086.418 đ')).toHaveLength(2);
     expect(within(hsg).getByText('Danh sách: Chờ xác nhận')).toBeInTheDocument();
     expect(within(hsg).getByText('Hợp đồng: Chưa nộp')).toBeInTheDocument();
 
     const nls = screen.getByRole('article', { name: 'NLS Đợt Bịa' });
     expect(within(nls).getByText('NLS')).toBeInTheDocument();
     expect(within(nls).getByText('0,5')).toBeInTheDocument();
-    expect(within(nls).getByText('Chưa có đơn giá')).toBeInTheDocument();
+    expect(within(nls).getAllByText('Chưa có đơn giá')).toHaveLength(2);
     expect(within(nls).queryByText(/ đ$/)).not.toBeInTheDocument();
     expect(within(nls).getByText('Danh sách: Đã xác nhận')).toBeInTheDocument();
     expect(within(nls).getByText('Hợp đồng: Đã nộp')).toBeInTheDocument();
     expect(screen.queryByLabelText('Đang tải')).not.toBeInTheDocument();
   });
 
-  it('việc cần làm: "Xem danh sách tham gia" + "Xác nhận danh sách" (kèm trạng thái) mở /dot/:id/danh-sach; Thông tin hợp đồng / Nộp bị khóa "Sắp mở"', async () => {
+  it('việc cần làm: "Xem danh sách tham gia" + "Xác nhận danh sách" (kèm trạng thái) mở /dot/:id/danh-sach; Thông tin hợp đồng (giá trị) / Nộp hợp đồng (trạng thái) mở /dot/:id/hop-dong (issue #64)', async () => {
     dbTruongDanhSach.the = [theDotMau({ trang_thai_danh_sach: 'bao_sai_lech' })];
     dangNhap('truong');
     moTrang('/trang-chu');
@@ -102,11 +103,21 @@ describe('Trang chủ trường (/trang-chu, vai trò truong)', () => {
     expect(xacNhan).toHaveTextContent('Báo sai lệch');
     expect(xacNhan).not.toHaveTextContent('Sắp mở');
     expect(within(viec).queryByRole('button', { name: /Xác nhận danh sách/ })).not.toBeInTheDocument();
-    for (const ten of ['Thông tin hợp đồng', 'Nộp hợp đồng']) {
-      const nut = within(viec).getByRole('button', { name: new RegExp(ten) });
-      expect(nut).toBeDisabled();
-      expect(nut).toHaveTextContent('Sắp mở');
-    }
+    const thongTin = within(viec).getByRole('link', { name: /Thông tin hợp đồng/ });
+    expect(thongTin).toHaveAttribute('href', '/dot/dot-hsg-1/hop-dong');
+    expect(thongTin).toHaveTextContent('3.086.418 đ');
+    const nop = within(viec).getByRole('link', { name: /Nộp hợp đồng/ });
+    expect(nop).toHaveAttribute('href', '/dot/dot-hsg-1/hop-dong');
+    expect(nop).toHaveTextContent('Chưa nộp');
+    expect(within(the).queryByText('Sắp mở')).not.toBeInTheDocument();
+  });
+
+  it('đã nộp hợp đồng → việc "Nộp hợp đồng" hiện "Đã nộp"', async () => {
+    dbTruongDanhSach.the = [theDotMau({ trang_thai_hop_dong: 'da_nop' })];
+    dangNhap('truong');
+    moTrang('/trang-chu');
+    const the = await screen.findByRole('article', { name: 'HSG Đợt Bịa 2026' });
+    expect(within(the).getByRole('link', { name: /Nộp hợp đồng/ })).toHaveTextContent('Đã nộp');
   });
 
   it('bấm "Xem danh sách tham gia" → sang màn danh sách của đợt', async () => {

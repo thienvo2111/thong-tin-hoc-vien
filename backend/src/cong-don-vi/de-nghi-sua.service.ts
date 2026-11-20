@@ -21,7 +21,12 @@ import {
   BanChupDongDeNghi,
   banChupDongDeNghi,
 } from './truong-danh-sach.service';
-import { Tx, datTrangThaiTheoSaiLech, khoaHopDong } from './giao-dich-hop-dong';
+import {
+  DA_NOP_QUAN_TRI,
+  Tx,
+  datTrangThaiTheoSaiLech,
+  khoaHopDong,
+} from './giao-dich-hop-dong';
 
 /** 1 mục trong hàng đợi đề nghị của Quản trị. */
 export interface MucDeNghi {
@@ -93,7 +98,7 @@ interface KetQuaApDung {
 
 // Issue #62 / ADR 0015 X2: hàng đợi đề nghị của trường — Quản trị Áp dụng / Từ chối. Không phải đặt lại
 // kiểu X1: các dòng khác giữ nguyên ý kiến (trangThaiSauXuLyDeNghi).
-// TODO(ADR 0015 X5): chặn Áp dụng khi trường đã nộp hợp đồng (phải Mở lại hợp đồng trước) — lát hợp đồng.
+// Issue #64 / X5: trường đã nộp hợp đồng → Áp dụng / Từ chối trả 409 (phải Mở lại hợp đồng trước).
 // TODO(ADR 0015 Y2): dòng NLS (hoc_vien_id) — Áp dụng sửa thông tin cá nhân hỏi đồng bộ ngược hồ sơ học
 // viên; dòng HSG là dữ liệu gốc nên không đồng bộ gì — lát NLS.
 @Injectable()
@@ -136,7 +141,12 @@ export class DeNghiSuaService {
   async apDung(id: string, adminId: string): Promise<MucDeNghi> {
     const dn = await this.layChoXuLy(id);
     const kq = await this.prisma.$transaction(async (tx) => {
-      await khoaHopDong(tx, dn.dot_trien_khai_id, dn.don_vi_id);
+      await khoaHopDong(
+        tx,
+        dn.dot_trien_khai_id,
+        dn.don_vi_id,
+        DA_NOP_QUAN_TRI,
+      );
       let ketQua: KetQuaApDung;
       if (dn.loai === 'them') {
         ketQua = await this.themTuDeNghi(tx, dn, adminId);
@@ -180,7 +190,12 @@ export class DeNghiSuaService {
   async tuChoi(id: string, lyDo: string, adminId: string): Promise<MucDeNghi> {
     const dn = await this.layChoXuLy(id);
     await this.prisma.$transaction(async (tx) => {
-      await khoaHopDong(tx, dn.dot_trien_khai_id, dn.don_vi_id);
+      await khoaHopDong(
+        tx,
+        dn.dot_trien_khai_id,
+        dn.don_vi_id,
+        DA_NOP_QUAN_TRI,
+      );
       await this.danhDauDaXuLy(tx, dn.id, adminId, 'tu_choi', lyDo);
       // Dòng sửa/bớt (nếu còn, và còn thuộc trường đề nghị) về chưa có ý kiến.
       if (dn.dong_id) {

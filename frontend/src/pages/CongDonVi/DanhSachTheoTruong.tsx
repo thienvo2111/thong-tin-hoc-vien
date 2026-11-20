@@ -8,9 +8,12 @@ import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayLich } from '@/lib/ngayLich';
 import { taiFileTuBlob } from '@/lib/taiFile';
 import { NHAN_GIAI_DOAN, NHAN_Y_KIEN, dinhDangSuat } from './danhSachThamGiaNhan';
-import { TRANG_THAI_DANH_SACH } from './hopDongNhan';
+import { TRANG_THAI_DANH_SACH, TRANG_THAI_HOP_DONG } from './hopDongNhan';
 import { ModalDongDanhSach } from './ModalDongDanhSach';
 import { ModalXoaDong } from './ModalXoaDong';
+
+// Issue #64 / X5: trường đã nộp hợp đồng → Quản trị không sửa được danh sách tới khi Mở lại.
+const GHI_CHU_DA_NOP = 'Đã nộp hợp đồng — mở lại để sửa';
 
 /** Form sửa/thêm đang mở: dong null = thêm người (donViMacDinh = trường đang xem, nếu có). */
 type MoForm = { dong: DongDanhSach | null; donViMacDinh: string | null } | null;
@@ -31,6 +34,9 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
     onError: (err) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) }),
   });
   const dongCuaTruong = truong ? (data?.dong ?? []).filter((d) => d.don_vi_id === truong.don_vi_id) : [];
+  // Lấy trạng thái mới nhất từ tong_hop (sau Mở lại / nộp), không từ bản ghi lúc bấm "Xem".
+  const truongDaNop =
+    !!truong && data?.tong_hop.find((t) => t.don_vi_id === truong.don_vi_id)?.trang_thai_hop_dong === 'da_nop';
   const tongNguoi = data?.tong_hop.reduce((t, x) => t + x.so_nguoi, 0) ?? 0;
   const tongSuat = data?.tong_hop.reduce((t, x) => t + x.tong_suat, 0) ?? 0;
 
@@ -98,6 +104,11 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
                               {t.so_de_nghi_cho} đề nghị chờ
                             </Badge>
                           )}
+                          {t.trang_thai_hop_dong && (
+                            <Badge color={TRANG_THAI_HOP_DONG[t.trang_thai_hop_dong].mau} variant="light">
+                              HĐ: {TRANG_THAI_HOP_DONG[t.trang_thai_hop_dong].nhan}
+                            </Badge>
+                          )}
                         </Group>
                       </Table.Td>
                       <Table.Td>
@@ -120,6 +131,16 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
                           >
                             Hồ sơ đơn vị
                           </Button>
+                          {/* Issue #64: Quản trị xem hợp đồng (bản chụp hồ sơ) + Mở lại. */}
+                          <Button
+                            component={Link}
+                            to={`/quan-tri/hop-dong/${dotId}/${t.don_vi_id}`}
+                            size="xs"
+                            variant="subtle"
+                            aria-label={`Hợp đồng ${t.ten_don_vi}`}
+                          >
+                            Hợp đồng
+                          </Button>
                         </Group>
                       </Table.Td>
                     </Table.Tr>
@@ -132,14 +153,23 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
         {truong && (
           <Stack gap="xs">
             <Group justify="space-between" gap="sm">
-              <Title order={3} size="h5">
-                {truong.ten_don_vi}
-              </Title>
+              <div>
+                <Title order={3} size="h5">
+                  {truong.ten_don_vi}
+                </Title>
+                {truongDaNop && (
+                  <Text size="sm" c="orange.8">
+                    {GHI_CHU_DA_NOP}
+                  </Text>
+                )}
+              </div>
               <Group gap="xs">
                 {choThem && (
                   <Button
                     size="xs"
                     variant="default"
+                    disabled={truongDaNop}
+                    title={truongDaNop ? GHI_CHU_DA_NOP : undefined}
                     aria-label={`Thêm người vào ${truong.ten_don_vi}`}
                     onClick={() => setMoForm({ dong: null, donViMacDinh: truong.don_vi_id })}
                   >
@@ -199,6 +229,8 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
                           <Button
                             size="xs"
                             variant="subtle"
+                            disabled={truongDaNop}
+                            title={truongDaNop ? GHI_CHU_DA_NOP : undefined}
                             aria-label={`Sửa ${d.ho_ten}`}
                             onClick={() => setMoForm({ dong: d, donViMacDinh: null })}
                           >
@@ -208,6 +240,8 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
                             size="xs"
                             variant="subtle"
                             color="red"
+                            disabled={truongDaNop}
+                            title={truongDaNop ? GHI_CHU_DA_NOP : undefined}
                             aria-label={`Xóa ${d.ho_ten}`}
                             onClick={() => setDongXoa(d)}
                           >

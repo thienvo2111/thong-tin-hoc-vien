@@ -56,7 +56,10 @@ export type HanhDongNhatKy =
   | 'gui_de_nghi_sua_danh_sach'
   | 'ap_dung_de_nghi_sua_danh_sach'
   | 'tu_choi_de_nghi_sua_danh_sach'
-  | 'cap_nhat_ho_so_don_vi';
+  | 'cap_nhat_ho_so_don_vi'
+  | 'luu_nhap_hop_dong'
+  | 'nop_hop_dong'
+  | 'mo_lai_hop_dong';
 
 const TIEU_DE: Record<HanhDongNhatKy, string> = {
   dang_nhap_thanh_cong: 'Đăng nhập thành công',
@@ -111,6 +114,9 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   ap_dung_de_nghi_sua_danh_sach: 'Quản trị áp dụng đề nghị sửa danh sách',
   tu_choi_de_nghi_sua_danh_sach: 'Quản trị từ chối đề nghị sửa danh sách',
   cap_nhat_ho_so_don_vi: 'Trường cập nhật hồ sơ đơn vị',
+  luu_nhap_hop_dong: 'Trường lưu nháp thông tin hợp đồng',
+  nop_hop_dong: 'Trường nộp hợp đồng',
+  mo_lai_hop_dong: 'Quản trị mở lại hợp đồng',
 };
 
 const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
@@ -165,6 +171,9 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   ap_dung_de_nghi_sua_danh_sach: 'tai_khoan',
   tu_choi_de_nghi_sua_danh_sach: 'tai_khoan',
   cap_nhat_ho_so_don_vi: 'tai_khoan',
+  luu_nhap_hop_dong: 'tai_khoan',
+  nop_hop_dong: 'tai_khoan',
+  mo_lai_hop_dong: 'tai_khoan',
 };
 
 const NHAN_VAI_TRO: Record<vai_tro_nguoi_dung, string> = {

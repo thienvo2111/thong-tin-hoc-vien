@@ -24,8 +24,8 @@ export interface DinhNghiaTruong {
   dinh_dang?: DinhDangTruong;
 }
 
-const TOI_DA_TEXT = 255;
-const TOI_DA_TEXTAREA = 2000;
+export const TOI_DA_TEXT = 255;
+export const TOI_DA_TEXTAREA = 2000;
 
 function text<M extends string>(
   ma: M,
@@ -88,22 +88,27 @@ export const LOI_SDT = 'SĐT gồm 10 số, bắt đầu bằng 0';
 export const LOI_EMAIL = 'Email không hợp lệ';
 export const loiDoDai = (toiDa: number) => `Tối đa ${toiDa} ký tự`;
 
+/** SĐT 10 số bắt đầu bằng 0 — dùng chung hồ sơ đơn vị và Phần 3 hợp đồng (issue #64). */
+export const MAU_SDT = /^0\d{9}$/;
+
 const MAU: Record<DinhDangTruong, { mau: RegExp; loi: string }> = {
   mst: { mau: /^\d{10}(-\d{3})?$/, loi: LOI_MST },
   qhns: { mau: /^\d{7}$/, loi: LOI_QHNS },
-  sdt: { mau: /^0\d{9}$/, loi: LOI_SDT },
+  sdt: { mau: MAU_SDT, loi: LOI_SDT },
   email: { mau: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, loi: LOI_EMAIL },
 };
 
-/** trim (+ NFC); '' → null; SĐT bỏ dấu cách/dấu chấm. Khóa vắng → null. */
+/** 1 ô chữ: trim (+ NFC); '' / không phải chuỗi → null; SĐT bỏ dấu cách/dấu chấm. Dùng chung với hợp đồng. */
+export function chuanHoaChuoi(tho: unknown, laSdt = false): string | null {
+  let v = typeof tho === 'string' ? tho.normalize('NFC').trim() : '';
+  if (laSdt) v = v.replace(/[\s.]/g, '');
+  return v === '' ? null : v;
+}
+
+/** chuanHoaChuoi từng ô. Khóa vắng → null. */
 export function chuanHoaHoSo(input: HoSoDauVao): HoSoDonViDuLieu {
   const kq = {} as HoSoDonViDuLieu;
-  for (const t of TRUONG_HO_SO) {
-    const tho = input[t.ma];
-    let v = typeof tho === 'string' ? tho.normalize('NFC').trim() : '';
-    if (t.dinh_dang === 'sdt') v = v.replace(/[\s.]/g, '');
-    kq[t.ma] = v === '' ? null : v;
-  }
+  for (const t of TRUONG_HO_SO) kq[t.ma] = chuanHoaChuoi(input[t.ma], t.dinh_dang === 'sdt');
   return kq;
 }
 

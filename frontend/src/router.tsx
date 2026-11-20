@@ -359,6 +359,11 @@ export const routesCongDonVi: RouteObject[] = [
                       import('@/pages/CongDonVi/DanhSachThamGiaTruong').then((m) => ({ Component: m.default })),
                   },
                   {
+                    // Issue #64: thông tin hợp đồng (Phần 3–4) + Nộp hợp đồng của trường (ADR 0015 X4, M5).
+                    path: '/dot/:dotId/hop-dong',
+                    lazy: () => import('@/pages/CongDonVi/HopDongTruong').then((m) => ({ Component: m.default })),
+                  },
+                  {
                     // Issue #63: Hồ sơ đơn vị của chính trường (ADR 0015 M4, U2).
                     path: '/ho-so-don-vi',
                     lazy: () => import('@/pages/CongDonVi/HoSoDonVi').then((m) => ({ Component: m.default })),
@@ -393,6 +398,11 @@ export const routesCongDonVi: RouteObject[] = [
                     // Issue #63: Quản trị xem (chỉ đọc) hồ sơ đơn vị của 1 trường.
                     path: '/quan-tri/ho-so-don-vi/:donViId',
                     lazy: () => import('@/pages/CongDonVi/HoSoDonViQuanTri').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    // Issue #64: Quản trị xem hợp đồng 1 trường + Mở lại (ADR 0015 O3, O4, X5).
+                    path: '/quan-tri/hop-dong/:dotId/:donViId',
+                    lazy: () => import('@/pages/CongDonVi/HopDongQuanTri').then((m) => ({ Component: m.default })),
                   },
                 ],
               },

@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Alert, Button, Container, Group, Paper, Skeleton, Stack, Text, Title } from '@mantine/core';
 import { ApiError } from '@/api/client';
 import { useHoSoDonViQuanTri, type HoSoDonViPhanHoi } from '@/api/hoSoDonVi';
-import { NHOM_HO_SO, TRUONG_HO_SO, cheStk, type TruongHoSo } from '@/lib/hoSoDonVi';
+import { NHOM_HO_SO, TRUONG_HO_SO, cheStk, type HoSoDonViDuLieu, type TruongHoSo } from '@/lib/hoSoDonVi';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
 import { BadgeHoSo, MucConThieu, ThongTinChuyenKhoan } from './HoSoDonViChung';
@@ -66,24 +66,36 @@ function NoiDung({ data }: { data: HoSoDonViPhanHoi }) {
         </Stack>
       </Paper>
       {!hoSo && <Text c="dimmed">Trường chưa khai hồ sơ đơn vị.</Text>}
-      {hoSo &&
-        NHOM_HO_SO.map((nhom) => (
-          <Paper key={nhom.ma} withBorder radius="md" p="md" component="section" aria-labelledby={`qt-${nhom.ma}`}>
-            <Stack gap="xs">
-              <Title order={2} size="h4" id={`qt-${nhom.ma}`}>
-                {nhom.ten}
-              </Title>
-              {TRUONG_HO_SO.filter((t) => t.nhom === nhom.ma).map((t) => (
-                <Stack key={t.ma} gap="xs">
-                  <DongThongTin ma={t.ma} nhan={t.nhan} giaTri={hoSo[t.ma]} />
-                  {t.ma === 'ma_qhns' && <ThongTinChuyenKhoan maQhns={hoSo.ma_qhns} />}
-                </Stack>
-              ))}
-            </Stack>
-          </Paper>
-        ))}
+      {hoSo && <NhomHoSoChiDoc hoSo={hoSo} />}
     </>
   );
+}
+
+/** Các nhóm hồ sơ chỉ đọc, STK cá nhân che + "Hiện" (O4). Issue #64: dùng lại cho bản chụp trong hợp đồng. */
+export function NhomHoSoChiDoc({
+  hoSo,
+  idTien = 'qt',
+  capTieuDe = 2,
+}: {
+  hoSo: HoSoDonViDuLieu;
+  idTien?: string;
+  capTieuDe?: 2 | 3;
+}) {
+  return NHOM_HO_SO.map((nhom) => (
+    <Paper key={nhom.ma} withBorder radius="md" p="md" component="section" aria-labelledby={`${idTien}-${nhom.ma}`}>
+      <Stack gap="xs">
+        <Title order={capTieuDe} size="h4" id={`${idTien}-${nhom.ma}`}>
+          {nhom.ten}
+        </Title>
+        {TRUONG_HO_SO.filter((t) => t.nhom === nhom.ma).map((t) => (
+          <Stack key={t.ma} gap="xs">
+            <DongThongTin ma={t.ma} nhan={t.nhan} giaTri={hoSo[t.ma]} />
+            {t.ma === 'ma_qhns' && <ThongTinChuyenKhoan maQhns={hoSo.ma_qhns} />}
+          </Stack>
+        ))}
+      </Stack>
+    </Paper>
+  ));
 }
 
 function DongThongTin({ ma, nhan, giaTri }: { ma: TruongHoSo; nhan: string; giaTri: string | null }) {

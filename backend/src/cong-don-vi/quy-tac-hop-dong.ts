@@ -2,6 +2,19 @@
 // không DI — chỉ hàm thuần để test đơn vị và dùng lại ở mọi lát sau.
 import { isISO8601 } from 'class-validator';
 import type { DongDanhSachGoc } from './sua-dong-danh-sach';
+import {
+  HoSoDauVao,
+  LOI_KIEU,
+  LOI_SDT,
+  LOI_TRUONG_LA,
+  MAU_SDT,
+  TOI_DA_TEXT,
+  TOI_DA_TEXTAREA,
+  TRUONG_HO_SO,
+  chuanHoaChuoi,
+  loiDoDai,
+  tinhTrangHoSo,
+} from './ho-so-don-vi.quy-tac';
 
 export type GiaiDoanThamGia = 'ca_hai' | 'chi_gd1' | 'chi_gd2';
 
@@ -403,4 +416,258 @@ export function kiemTraGiaTriDeNghi(
   );
   if (Object.keys(doi).length === 0) return loiDeNghi(MSG_KHONG_DOI);
   return { hopLe: true, giaTri: doi as GiaTriDeNghi };
+}
+
+// Issue #64 / ADR 0015 S4, S5, S6, X4, X5, M5: Phần 3–4 của hợp đồng và điều kiện Nộp hợp đồng.
+// Frontend có bản sao ở frontend/src/lib/hopDong.ts — sửa ở đây thì sửa cả bên đó.
+
+/** S5: giá trị từ 50.000.000 đ (không cộng thuế GTGT) bắt buộc Phần 4. */
+export const NGUONG_PHAN_4 = 50_000_000;
+
+export function canPhan4(giaTri: number | null): boolean {
+  return giaTri !== null && giaTri !== undefined && giaTri >= NGUONG_PHAN_4;
+}
+
+/** Phần 3 (người nhận bản giấy hợp đồng) + Phần 4 (QĐ chỉ định thầu): các ô chữ lưu nháp được. */
+export const TRUONG_NHAP_HOP_DONG = [
+  'nguoi_nhan',
+  'sdt_nguoi_nhan',
+  'dia_chi_nhan',
+  'ghi_chu',
+  'so_qd',
+  'ngay_qd',
+] as const;
+export type TruongNhapHopDong = (typeof TRUONG_NHAP_HOP_DONG)[number];
+/** Khóa nhận được ở PUT hợp đồng: các ô chữ + cờ điểm học trực tiếp. */
+export const KHOA_NHAP_HOP_DONG = [
+  ...TRUONG_NHAP_HOP_DONG,
+  'diem_hoc_truc_tiep',
+] as const;
+export type KhoaNhapHopDong = (typeof KHOA_NHAP_HOP_DONG)[number];
+
+/** Bản nháp đã chuẩn hóa: ô trống = null, ngày dạng 'YYYY-MM-DD'. */
+export type NhapHopDong = Record<TruongNhapHopDong, string | null> & {
+  diem_hoc_truc_tiep: boolean;
+};
+export type NhapHopDongDauVao = Partial<
+  Record<TruongNhapHopDong, string | null | undefined>
+> & { diem_hoc_truc_tiep?: boolean | null };
+
+const TOI_DA_NHAP: Record<TruongNhapHopDong, number> = {
+  nguoi_nhan: TOI_DA_TEXT,
+  sdt_nguoi_nhan: TOI_DA_TEXT,
+  dia_chi_nhan: TOI_DA_TEXTAREA,
+  ghi_chu: TOI_DA_TEXTAREA,
+  so_qd: 100,
+  ngay_qd: 10,
+};
+
+export const LOI_NGAY_QD = 'Ngày QĐ phải là ngày dạng YYYY-MM-DD';
+export const LOI_CO_DIEM_HOC = 'Phải là true hoặc false';
+
+/** 'YYYY-MM-DD' hợp lệ (cùng quy tắc ngày như DTO). */
+function laNgay(v: string): boolean {
+  return NGAY.test(v) && isISO8601(v, { strict: true });
+}
+
+/** 'YYYY-MM-DD' → 'dd/mm/yyyy' (không qua Date — không lệch múi giờ). */
+export function ngayHienThi(ngay: string): string {
+  const [y, m, d] = ngay.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+/** trim (+ NFC) từng ô, '' → null, SĐT bỏ dấu cách/chấm; khóa vắng → null / false (PUT = thay toàn bộ). */
+export function chuanHoaNhapHopDong(input: NhapHopDongDauVao): NhapHopDong {
+  const kq = { diem_hoc_truc_tiep: input.diem_hoc_truc_tiep === true };
+  for (const k of TRUONG_NHAP_HOP_DONG) {
+    kq[k] = chuanHoaChuoi(input[k], k === 'sdt_nguoi_nhan');
+  }
+  return kq as NhapHopDong;
+}
+
+/**
+ * X4: lỗi ĐỊNH DẠNG Phần 3–4 (lưu nháp) — chỉ xét ô có giá trị: SĐT, độ dài, ngày QĐ.
+ * Thiếu ô bắt buộc không phải lỗi nháp (xem lyDoChanNop).
+ */
+export function kiemTraPhan3(input: NhapHopDongDauVao): {
+  loi: Partial<Record<TruongNhapHopDong, string>>;
+} {
+  const loi: Partial<Record<TruongNhapHopDong, string>> = {};
+  for (const k of TRUONG_NHAP_HOP_DONG) {
+    const v = input[k];
+    if (v === null || v === undefined || v === '') continue;
+    if (k === 'ngay_qd') {
+      if (!laNgay(v)) loi[k] = LOI_NGAY_QD;
+    } else if (v.length > TOI_DA_NHAP[k]) {
+      loi[k] = loiDoDai(TOI_DA_NHAP[k]);
+    } else if (k === 'sdt_nguoi_nhan' && !MAU_SDT.test(v)) {
+      loi[k] = LOI_SDT;
+    }
+  }
+  return { loi };
+}
+
+/**
+ * Đọc thân PUT thô: chỉ nhận KHOA_NHAP_HOP_DONG; ô chữ là chuỗi/null, cờ là boolean/null.
+ * ValidationPipe toàn cục chỉ whitelist (bỏ im lặng khóa lạ) nên kiểm tra tường minh — như docDauVaoHoSo.
+ */
+export function docDauVaoHopDong(body: unknown): {
+  duLieu: NhapHopDongDauVao;
+  loi: Record<string, string>;
+} {
+  const loi: Record<string, string> = {};
+  const duLieu: NhapHopDongDauVao = {};
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return { duLieu, loi: { body: 'Dữ liệu gửi lên phải là đối tượng JSON' } };
+  }
+  for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
+    const coGiaTri = v !== null && v !== undefined;
+    if (!(KHOA_NHAP_HOP_DONG as readonly string[]).includes(k)) {
+      loi[k] = LOI_TRUONG_LA;
+    } else if (k === 'diem_hoc_truc_tiep') {
+      if (coGiaTri && typeof v !== 'boolean') loi[k] = LOI_CO_DIEM_HOC;
+      else duLieu.diem_hoc_truc_tiep = v as boolean | null | undefined;
+    } else if (coGiaTri && typeof v !== 'string') {
+      loi[k] = LOI_KIEU;
+    } else {
+      duLieu[k as TruongNhapHopDong] = v as string | null | undefined;
+    }
+  }
+  return { duLieu, loi };
+}
+
+/** Tên các khóa khác nhau giữa bản cũ và bản mới — chỉ TÊN, không giá trị (nhật ký). */
+export function truongHopDongThayDoi(
+  cu: NhapHopDong,
+  moi: NhapHopDong,
+): KhoaNhapHopDong[] {
+  return KHOA_NHAP_HOP_DONG.filter((k) => cu[k] !== moi[k]);
+}
+
+export type MaLyDoChanNop =
+  | 'da_nop'
+  | 'danh_sach_chua_xac_nhan'
+  | 'chua_co_don_gia'
+  | 'ho_so_chua_du'
+  | 'thieu_hau_can'
+  | 'phan_3_chua_du'
+  | 'thieu_so_qd'
+  | 'thieu_ngay_qd'
+  | 'dot_chua_cau_hinh_ngay_qd'
+  | 'ngay_qd_ngoai_khoang';
+
+export interface LyDoChanNop {
+  ma: MaLyDoChanNop;
+  thong_diep: string;
+}
+
+export interface NguCanhNop {
+  trangThaiDanhSach: TrangThaiDanhSach;
+  trangThaiHopDong: 'chua_nop' | 'da_nop';
+  donGia: number | null;
+  /** Giá trị tạm tính (null khi chưa có đơn giá). */
+  giaTri: number | null;
+  /** Hồ sơ đơn vị hiện tại; null = chưa khai (thiếu mọi mục). */
+  hoSo: HoSoDauVao | null;
+  diemHocTrucTiep: boolean;
+  phan3: Pick<NhapHopDong, 'nguoi_nhan' | 'sdt_nguoi_nhan' | 'dia_chi_nhan'>;
+  phan4: Pick<NhapHopDong, 'so_qd' | 'ngay_qd'>;
+  /** S6: khoảng ngày QĐ của đợt ('YYYY-MM-DD', tính cả hai đầu). */
+  qdTu: string | null;
+  qdDen: string | null;
+}
+
+const TRUONG_HAU_CAN = TRUONG_HO_SO.filter((t) => t.nhom === 'hau_can').map(
+  (t) => t.ma,
+);
+const trong = (v: string | null | undefined) =>
+  v === null || v === undefined || v.trim() === '';
+
+const lyDo = (ma: MaLyDoChanNop, thong_diep: string): LyDoChanNop => ({
+  ma,
+  thong_diep,
+});
+
+/**
+ * X4, S4, S5, S6, M5: lý do chưa Nộp được hợp đồng, theo thứ tự hiển thị ([] = nộp được).
+ * Đã nộp → chỉ 'da_nop'. Phần 4 chỉ xét khi giá trị ≥ NGUONG_PHAN_4 (chưa có đơn giá → không xét).
+ */
+export function lyDoChanNop(ctx: NguCanhNop): LyDoChanNop[] {
+  if (ctx.trangThaiHopDong === 'da_nop') {
+    return [lyDo('da_nop', 'Hợp đồng đã nộp')];
+  }
+  const ds: LyDoChanNop[] = [];
+  if (ctx.trangThaiDanhSach !== 'da_xac_nhan') {
+    ds.push(lyDo('danh_sach_chua_xac_nhan', 'Danh sách chưa được xác nhận'));
+  }
+  if (ctx.donGia === null || ctx.donGia === undefined) {
+    ds.push(
+      lyDo('chua_co_don_gia', 'Đợt chưa có đơn giá — chờ HCMUE cập nhật'),
+    );
+  }
+  const soThieu = tinhTrangHoSo(ctx.hoSo).thieu.length;
+  if (soThieu > 0) {
+    ds.push(lyDo('ho_so_chua_du', `Hồ sơ đơn vị còn thiếu ${soThieu} mục`));
+  }
+  if (ctx.diemHocTrucTiep && TRUONG_HAU_CAN.some((t) => trong(ctx.hoSo?.[t]))) {
+    ds.push(
+      lyDo(
+        'thieu_hau_can',
+        'Trường là điểm học trực tiếp: cần khai đủ mục Hậu cần cơ sở trong Hồ sơ đơn vị',
+      ),
+    );
+  }
+  if (!phan3Du(ctx.phan3)) {
+    ds.push(
+      lyDo(
+        'phan_3_chua_du',
+        'Phần 3 (người nhận bản giấy hợp đồng) còn thiếu hoặc sai',
+      ),
+    );
+  }
+  if (canPhan4(ctx.giaTri)) ds.push(...lyDoPhan4(ctx));
+  return ds;
+}
+
+/** Phần 3: người nhận, SĐT, địa chỉ bắt buộc; không ô nào sai định dạng (ghi chú tùy chọn). */
+function phan3Du(phan3: NguCanhNop['phan3']): boolean {
+  const { nguoi_nhan, sdt_nguoi_nhan, dia_chi_nhan } = phan3;
+  if ([nguoi_nhan, sdt_nguoi_nhan, dia_chi_nhan].some(trong)) return false;
+  return Object.keys(kiemTraPhan3(phan3).loi).length === 0;
+}
+
+function lyDoPhan4(ctx: NguCanhNop): LyDoChanNop[] {
+  const ds: LyDoChanNop[] = [];
+  const { so_qd, ngay_qd } = ctx.phan4;
+  if (trong(so_qd)) {
+    ds.push(
+      lyDo('thieu_so_qd', 'Hợp đồng từ 50.000.000 đ cần số QĐ chỉ định thầu'),
+    );
+  }
+  const ngayHopLe = !trong(ngay_qd) && laNgay(ngay_qd);
+  if (!ngayHopLe) {
+    ds.push(
+      lyDo(
+        'thieu_ngay_qd',
+        'Hợp đồng từ 50.000.000 đ cần ngày QĐ chỉ định thầu',
+      ),
+    );
+  }
+  if (ctx.qdTu === null || ctx.qdDen === null) {
+    ds.push(
+      lyDo(
+        'dot_chua_cau_hinh_ngay_qd',
+        'Đợt chưa cấu hình khoảng ngày QĐ — chờ HCMUE',
+      ),
+    );
+  } else if (ngayHopLe && (ngay_qd < ctx.qdTu || ngay_qd > ctx.qdDen)) {
+    // Cùng dạng 'YYYY-MM-DD' nên so chuỗi = so ngày, không đụng múi giờ.
+    ds.push(
+      lyDo(
+        'ngay_qd_ngoai_khoang',
+        `Ngày QĐ phải từ ${ngayHienThi(ctx.qdTu)} đến ${ngayHienThi(ctx.qdDen)}`,
+      ),
+    );
+  }
+  return ds;
 }

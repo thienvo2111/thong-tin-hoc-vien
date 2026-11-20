@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, apiFetchBlob } from './client';
-import type { TrangThaiDanhSachTruong, YKienTruong } from './truongDanhSach';
+import type { TrangThaiDanhSachTruong, TrangThaiHopDong, YKienTruong } from './truongDanhSach';
 
 // Issue #58 / ADR 0015 M3, M6, S1, S3, T7 — Quản trị nạp Excel danh sách HSG theo đợt (Cổng đơn vị).
 export type GiaiDoanThamGia = 'ca_hai' | 'chi_gd1' | 'chi_gd2';
@@ -32,11 +32,15 @@ export interface DongXemTruoc {
   ten_don_vi_khop: string | null;
   /** Có lỗi → không nạp được. */
   loi: string[];
+  /** Issue #64 / X5: trường khớp đã nộp hợp đồng — nạp sẽ bị từ chối tới khi Mở lại. */
+  da_nop?: boolean;
 }
 
 export interface KetQuaXemTruoc {
   dong: DongXemTruoc[];
   tong_hop: Record<TrangThaiKhop | 'loi' | 'tong', number>;
+  /** Issue #64 / X5: mọi trường của đợt đã nộp hợp đồng (kể cả trường chọn tay). */
+  truong_da_nop?: { don_vi_id: string; ten_don_vi: string }[];
 }
 
 export interface DongNap {
@@ -86,6 +90,8 @@ export interface TongHopTruong {
   trang_thai_danh_sach: TrangThaiDanhSachTruong | null;
   /** Issue #62: số đề nghị chờ của trường. */
   so_de_nghi_cho?: number;
+  /** Issue #64 / X5: da_nop → Quản trị không sửa được danh sách trường này tới khi Mở lại. */
+  trang_thai_hop_dong?: TrangThaiHopDong | null;
 }
 
 export interface DanhSachThamGia {

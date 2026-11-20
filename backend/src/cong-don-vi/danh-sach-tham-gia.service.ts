@@ -3,11 +3,13 @@ import type {
   danh_sach_tham_gia,
   giai_doan_tham_gia,
   trang_thai_danh_sach_truong,
+  trang_thai_hop_dong,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import { ScopeService } from '../auth/scope/scope.service';
 import {
+  ConflictAppException,
   NotFoundAppException,
   ValidationException,
 } from '../common/exceptions/app.exceptions';
@@ -41,6 +43,7 @@ import {
   Tx,
   datTrangThaiTheoSaiLech,
   khoaNhieuHopDong,
+  khoaNhieuHopDongChuaNop,
   tuChoiDeNghiCuaDong,
 } from './giao-dich-hop-dong';
 
@@ -48,11 +51,15 @@ export interface DongXemTruoc extends DongExcelDanhSach {
   trang_thai_khop: TrangThaiKhop;
   don_vi_id: string | null;
   ten_don_vi_khop: string | null;
+  /** Issue #64 / X5: trường khớp đã nộp hợp đồng — nạp sẽ bị chặn tới khi Mở lại. */
+  da_nop: boolean;
 }
 
 export interface KetQuaXemTruoc {
   dong: DongXemTruoc[];
   tong_hop: Record<TrangThaiKhop | 'loi' | 'tong', number>;
+  /** Issue #64 / X5: mọi trường của đợt đã nộp hợp đồng (kể cả trường chọn tay ở bước xem trước). */
+  truong_da_nop: { don_vi_id: string; ten_don_vi: string }[];
 }
 
 export interface DongDanhSach {
@@ -82,6 +89,8 @@ export interface TongHopTruong {
   trang_thai_danh_sach: trang_thai_danh_sach_truong | null;
   /** Issue #62: số đề nghị chờ của trường (mọi loại). */
   so_de_nghi_cho: number;
+  /** Issue #64 / X5: đã nộp → Quản trị không sửa được danh sách trường này tới khi Mở lại. */
+  trang_thai_hop_dong: trang_thai_hop_dong | null;
 }
 
 export function giaTriGoc(d: danh_sach_tham_gia): DongDanhSachGoc {
@@ -112,6 +121,8 @@ const KHONG_THAY_DONG = 'Không tìm thấy dòng danh sách';
 // Issue #62: lý do tự Từ chối đề nghị khi Quản trị xóa / nạp lại dòng.
 export const LY_DO_TU_CHOI_XOA_DONG = 'Quản trị đã xóa dòng này';
 export const LY_DO_TU_CHOI_NAP_LAI = 'Quản trị đã nạp lại danh sách của trường';
+export const DA_NOP_NAP_LAI =
+  'Trường đã nộp hợp đồng — Mở lại hợp đồng trước khi nạp lại';
 // Nạp lại tới 5.000 dòng trong 1 transaction tương tác.
 const TIMEOUT_NAP_MS = 30000;
 
@@ -157,6 +168,8 @@ export class DanhSachThamGiaService {
     }
     const phamVi = await this.truongCuaSo(dot.so_gddt_id);
     const tenTheoId = new Map(phamVi.map((t) => [t.id, t.ten_don_vi]));
+    const truong_da_nop = await this.truongDaNop(dot.id);
+    const daNop = new Set(truong_da_nop.map((t) => t.don_vi_id));
 
     const tong_hop: KetQuaXemTruoc['tong_hop'] = {
       tong: dsExcel.length,
@@ -178,9 +191,10 @@ export class DanhSachThamGiaService {
         ten_don_vi_khop: kq.don_vi_id
           ? (tenTheoId.get(kq.don_vi_id) ?? null)
           : null,
+        da_nop: kq.don_vi_id ? daNop.has(kq.don_vi_id) : false,
       };
     });
-    return { dong, tong_hop };
+    return { dong, tong_hop, truong_da_nop };
   }
 
   /**
@@ -231,7 +245,9 @@ export class DanhSachThamGiaService {
     const tuChoi = await this.prisma.$transaction(
       async (tx) => {
         await this.taoHopDongNeuChuaCo(tx, dot.id, donViIds);
-        await khoaNhieuHopDong(tx, dot.id, donViIds);
+        const daNop = await khoaNhieuHopDong(tx, dot.id, donViIds);
+        // X5: trường đã nộp hợp đồng → không nạp gì cả (cả transaction hủy).
+        if (daNop.length > 0) await this.chanNapTruongDaNop(tx, daNop);
         const dongCu = {
           dot_trien_khai_id: dot.id,
           don_vi_id: { in: donViIds },
@@ -303,7 +319,11 @@ export class DanhSachThamGiaService {
       }),
       this.prisma.hop_dong_boi_duong.findMany({
         where: { dot_trien_khai_id: dot.id },
-        select: { don_vi_id: true, trang_thai_danh_sach: true },
+        select: {
+          don_vi_id: true,
+          trang_thai_danh_sach: true,
+          trang_thai_hop_dong: true,
+        },
       }),
       // Issue #62: đề nghị chờ của cả đợt (đếm theo trường + đánh dấu dòng).
       this.prisma.de_nghi_sua_danh_sach.findMany({
@@ -319,9 +339,7 @@ export class DanhSachThamGiaService {
       );
     }
     const dongCoDeNghi = new Set(deNghiCho.map((d) => d.dong_id));
-    const trangThai = new Map(
-      hopDong.map((h) => [h.don_vi_id, h.trang_thai_danh_sach]),
-    );
+    const theoTruong = new Map(hopDong.map((h) => [h.don_vi_id, h]));
     const donVi = await this.prisma.don_vi_cong_tac.findMany({
       where: { id: { in: nhom.map((n) => n.don_vi_id) } },
       select: { id: true, ten_don_vi: true, ma_don_vi: true },
@@ -334,8 +352,11 @@ export class DanhSachThamGiaService {
         ma_don_vi: theoId.get(n.don_vi_id)?.ma_don_vi ?? null,
         so_nguoi: n._count._all,
         tong_suat: Number(n._sum.ty_le_suat ?? 0),
-        trang_thai_danh_sach: trangThai.get(n.don_vi_id) ?? null,
+        trang_thai_danh_sach:
+          theoTruong.get(n.don_vi_id)?.trang_thai_danh_sach ?? null,
         so_de_nghi_cho: soChoTheoTruong.get(n.don_vi_id) ?? 0,
+        trang_thai_hop_dong:
+          theoTruong.get(n.don_vi_id)?.trang_thai_hop_dong ?? null,
       }))
       .sort((a, b) => a.ten_don_vi.localeCompare(b.ten_don_vi, 'vi'));
 
@@ -352,7 +373,7 @@ export class DanhSachThamGiaService {
   // Issue #61 / X1: mọi thay đổi của Quản trị đưa danh sách của trường bị ảnh hưởng về Chờ xác nhận
   // (issue #62: Báo sai lệch nếu trường còn dòng Không đồng ý / đề nghị chờ — trangThaiSauQuanTriSua).
   // Issue #62: sửa dòng đang có đề nghị chờ vẫn được — đề nghị giữ nguyên chờ Quản trị quyết định.
-  // TODO(ADR 0015 X5): chặn sửa/thêm/xóa khi trường đã nộp hợp đồng — chờ bảng hop_dong_boi_duong.
+  // Issue #64 / X5: trường đã nộp hợp đồng → sửa/thêm/xóa 409 (kiểm dưới khóa FOR UPDATE của hop_dong).
 
   /** Sửa 1 dòng: chỉ đổi trường gửi lên; có đổi → mất ý kiến trường (X1). Không đổi gì → trả nguyên, không ghi nhật ký. */
   async suaDong(
@@ -376,7 +397,8 @@ export class DanhSachThamGiaService {
     const moi = await this.prisma.$transaction(async (tx) => {
       // Chuyển dòng sang trường khác → trường mới cũng phải có dòng hợp đồng (M5).
       await this.taoHopDongNeuChuaCo(tx, cu.dot_trien_khai_id, [sau.don_vi_id]);
-      await khoaNhieuHopDong(tx, cu.dot_trien_khai_id, truongBiAnhHuong);
+      // X5: chuyển dòng giữa 2 trường → chặn nếu MỘT trong hai đã nộp hợp đồng.
+      await khoaNhieuHopDongChuaNop(tx, cu.dot_trien_khai_id, truongBiAnhHuong);
       const dong = await tx.danh_sach_tham_gia.update({
         where: { id: cu.id },
         data: {
@@ -417,7 +439,7 @@ export class DanhSachThamGiaService {
     const giai_doan = dto.giai_doan ?? 'ca_hai';
     const moi = await this.prisma.$transaction(async (tx) => {
       await this.taoHopDongNeuChuaCo(tx, dot.id, [dto.don_vi_id]);
-      await khoaNhieuHopDong(tx, dot.id, [dto.don_vi_id]);
+      await khoaNhieuHopDongChuaNop(tx, dot.id, [dto.don_vi_id]);
       const dong = await tx.danh_sach_tham_gia.create({
         data: {
           dot_trien_khai_id: dot.id,
@@ -461,7 +483,7 @@ export class DanhSachThamGiaService {
   ): Promise<void> {
     const cu = await this.layDong(dongId);
     const tuChoi = await this.prisma.$transaction(async (tx) => {
-      await khoaNhieuHopDong(tx, cu.dot_trien_khai_id, [cu.don_vi_id]);
+      await khoaNhieuHopDongChuaNop(tx, cu.dot_trien_khai_id, [cu.don_vi_id]);
       const tc = await tuChoiDeNghiCuaDong(
         tx,
         { id: cu.id },
@@ -527,6 +549,32 @@ export class DanhSachThamGiaService {
       },
     });
     return { buffer, tenFile: tenFileXuatDanhSach(dot.ten, new Date()) };
+  }
+
+  /** X5: các trường của đợt đã nộp hợp đồng (tên theo vần). */
+  private async truongDaNop(dotId: string) {
+    const ds = await this.prisma.hop_dong_boi_duong.findMany({
+      where: { dot_trien_khai_id: dotId, trang_thai_hop_dong: 'da_nop' },
+      select: { don_vi: { select: { id: true, ten_don_vi: true } } },
+    });
+    return ds
+      .map((h) => ({ don_vi_id: h.don_vi.id, ten_don_vi: h.don_vi.ten_don_vi }))
+      .sort((a, b) => a.ten_don_vi.localeCompare(b.ten_don_vi, 'vi'));
+  }
+
+  /** X5: nạp có trường đã nộp hợp đồng → 409 kèm tên các trường đó; transaction hủy, không nạp gì. */
+  private async chanNapTruongDaNop(tx: Tx, donViIds: string[]): Promise<never> {
+    const ds = await tx.don_vi_cong_tac.findMany({
+      where: { id: { in: donViIds } },
+      select: { id: true, ten_don_vi: true },
+    });
+    const ten = ds
+      .map((d) => d.ten_don_vi)
+      .sort((a, b) => a.localeCompare(b, 'vi'));
+    throw new ConflictAppException(
+      `${DA_NOP_NAP_LAI}: ${ten.join(', ')}`,
+      ds.map((d) => ({ field: d.id, message: d.ten_don_vi })),
+    );
   }
 
   /**

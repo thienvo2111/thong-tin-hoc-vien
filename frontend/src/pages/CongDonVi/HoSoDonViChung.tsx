@@ -32,7 +32,11 @@ export function MucConThieu({ data }: { data: HoSoDonViPhanHoi }) {
 
 /** U2: STK chuyển khoản cho HCMUE ghép từ mã QHNS — suy ra ngay khi gõ, không lưu. */
 export function ThongTinChuyenKhoan({ maQhns }: { maQhns: string | null | undefined }) {
-  const stk = stkChuyenKhoan(maQhns);
+  return <HopChuyenKhoan stk={stkChuyenKhoan(maQhns)} />;
+}
+
+/** Hộp thông tin chuyển khoản cho HCMUE từ STK đã có (issue #64: hợp đồng dùng STK của API / bản chụp). */
+export function HopChuyenKhoan({ stk }: { stk: string | null }) {
   return (
     <Paper
       withBorder

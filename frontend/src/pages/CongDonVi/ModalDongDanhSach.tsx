@@ -13,7 +13,7 @@ import {
   type GiaiDoanThamGia,
   type TruongDongDanhSach,
 } from '@/api/danhSachThamGia';
-import { loiFieldsThanhMap, thongDiepLoiChung } from '@/lib/loiApi';
+import { loiFieldsThanhMap, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { chuoiSangNgay, docNgayGo, ngaySangChuoi } from '@/lib/ngayLich';
 import { dongDanhSachSchema, type DongDanhSachForm } from '@/schemas/dongDanhSachThamGia';
 import { NHAN_GIAI_DOAN } from './danhSachThamGiaNhan';
@@ -117,7 +117,7 @@ export function ModalDongDanhSach({ opened, onClose, dotId, dong, donViMacDinh =
   }, [opened, dong, donViMacDinh, reset]);
 
   function baoLoi(err: unknown) {
-    setLoiChung(thongDiepLoiChung(err));
+    setLoiChung(thongDiepLoiXungDot(err));
     for (const [field, message] of Object.entries(loiFieldsThanhMap(err))) {
       if (field in dongDanhSachSchema.shape) setError(field as keyof DongDanhSachForm, { message });
     }

@@ -1,8 +1,11 @@
-// Bước dùng chung trong transaction trên danh sách của trường (issue #61, #62 / ADR 0015 X1, X2):
-// khóa dòng hop_dong_boi_duong, đọc "sai lệch đang mở", đặt trạng thái, tự từ chối đề nghị khi dòng bị xóa.
+// Bước dùng chung trong transaction trên danh sách của trường (issue #61, #62, #64 / ADR 0015 X1, X2, X5):
+// khóa dòng hop_dong_boi_duong (chặn khi đã nộp hợp đồng), đọc "sai lệch đang mở", đặt trạng thái, tự từ chối đề nghị khi dòng bị xóa.
 // Thứ tự khóa luôn là hop_dong trước rồi mới tới dòng danh sách / đề nghị — tránh deadlock.
-import type { Prisma } from '@prisma/client';
-import { NotFoundAppException } from '../common/exceptions/app.exceptions';
+import type { Prisma, trang_thai_hop_dong } from '@prisma/client';
+import {
+  ConflictAppException,
+  NotFoundAppException,
+} from '../common/exceptions/app.exceptions';
 import { TrangThaiDanhSach, YKienTruong } from './quy-tac-hop-dong';
 
 export type Tx = Prisma.TransactionClient;
@@ -16,35 +19,78 @@ export function thaoTacCuoi(userId: string) {
   return { thao_tac_cuoi_boi: userId, thao_tac_cuoi_luc: luc, updated_at: luc };
 }
 
+// Issue #64 / ADR 0015 X5: hợp đồng đã nộp → danh sách của trường chỉ xem, tới khi Quản trị Mở lại.
+export const DA_NOP_TRUONG = 'Hợp đồng đã nộp — danh sách chỉ xem';
+export const DA_NOP_QUAN_TRI =
+  'Trường đã nộp hợp đồng — Mở lại hợp đồng trước khi sửa danh sách';
+
+export interface TrangThaiDaKhoa {
+  danhSach: TrangThaiDanhSach;
+  hopDong: trang_thai_hop_dong;
+}
+
+/** Khóa FOR UPDATE + đọc cả 2 trạng thái của dòng hop_dong (đợt, trường). Không có → 404. */
+export async function khoaTrangThaiHopDong(
+  tx: Tx,
+  dotId: string,
+  donViId: string,
+): Promise<TrangThaiDaKhoa> {
+  const rows = await tx.$queryRaw<TrangThaiDaKhoa[]>`
+    SELECT trang_thai_danh_sach::text AS "danhSach", trang_thai_hop_dong::text AS "hopDong"
+    FROM hop_dong_boi_duong
+    WHERE dot_trien_khai_id = ${dotId}::uuid AND don_vi_id = ${donViId}::uuid
+    FOR UPDATE`;
+  if (rows.length === 0) throw new NotFoundAppException(KHONG_THAY_DANH_SACH);
+  return rows[0];
+}
+
 /**
  * Khóa dòng hop_dong_boi_duong của (đợt, trường) tới hết transaction — thao tác đồng thời trên cùng trường
- * chạy lần lượt, trạng thái tính trên dữ liệu mới nhất. Không có → 404.
+ * chạy lần lượt, trạng thái tính trên dữ liệu mới nhất. Không có → 404. X5: hợp đồng đã nộp → 409 với
+ * thông báo `loiDaNop` (mọi thao tác sửa danh sách đều truyền).
  */
 export async function khoaHopDong(
   tx: Tx,
   dotId: string,
   donViId: string,
+  loiDaNop: string,
 ): Promise<TrangThaiDanhSach> {
-  const rows = await tx.$queryRaw<{ trang_thai: TrangThaiDanhSach }[]>`
-    SELECT trang_thai_danh_sach::text AS trang_thai FROM hop_dong_boi_duong
-    WHERE dot_trien_khai_id = ${dotId}::uuid AND don_vi_id = ${donViId}::uuid
-    FOR UPDATE`;
-  if (rows.length === 0) throw new NotFoundAppException(KHONG_THAY_DANH_SACH);
-  return rows[0].trang_thai;
+  const { danhSach, hopDong } = await khoaTrangThaiHopDong(tx, dotId, donViId);
+  if (hopDong === 'da_nop') throw new ConflictAppException(loiDaNop);
+  return danhSach;
 }
 
-/** Khóa hop_dong của nhiều trường (thứ tự don_vi_id cố định). Trường chưa có dòng hợp đồng bị bỏ qua. */
+/**
+ * Khóa hop_dong của nhiều trường (thứ tự don_vi_id cố định). Trường chưa có dòng hợp đồng bị bỏ qua.
+ * Trả id các trường đã nộp hợp đồng (X5) — người gọi quyết định chặn.
+ */
 export async function khoaNhieuHopDong(
   tx: Tx,
   dotId: string,
   donViIds: string[],
-): Promise<void> {
-  if (donViIds.length === 0) return;
-  await tx.$queryRaw`
-    SELECT id FROM hop_dong_boi_duong
+): Promise<string[]> {
+  if (donViIds.length === 0) return [];
+  const rows = await tx.$queryRaw<
+    { don_vi_id: string; trang_thai_hop_dong: trang_thai_hop_dong }[]
+  >`
+    SELECT don_vi_id::text AS don_vi_id, trang_thai_hop_dong::text AS trang_thai_hop_dong
+    FROM hop_dong_boi_duong
     WHERE dot_trien_khai_id = ${dotId}::uuid AND don_vi_id = ANY(${donViIds}::uuid[])
     ORDER BY don_vi_id
     FOR UPDATE`;
+  return rows
+    .filter((r) => r.trang_thai_hop_dong === 'da_nop')
+    .map((r) => r.don_vi_id);
+}
+
+/** X5 cho Quản trị sửa/thêm/xóa dòng: khóa các trường, có trường đã nộp → 409. */
+export async function khoaNhieuHopDongChuaNop(
+  tx: Tx,
+  dotId: string,
+  donViIds: string[],
+): Promise<void> {
+  const daNop = await khoaNhieuHopDong(tx, dotId, donViIds);
+  if (daNop.length > 0) throw new ConflictAppException(DA_NOP_QUAN_TRI);
 }
 
 /** Ý kiến các dòng + số đề nghị chờ (mọi loại) của 1 trường trong đợt. */

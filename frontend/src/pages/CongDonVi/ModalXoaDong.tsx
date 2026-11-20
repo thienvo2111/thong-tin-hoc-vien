@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Button, Group, Modal, Stack, Text, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useXoaDongDanhSach, type DongDanhSach } from '@/api/danhSachThamGia';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiXungDot } from '@/lib/loiApi';
 
 interface Props {
   dotId: string;
@@ -39,7 +39,7 @@ export function ModalXoaDong({ dotId, dong, onClose }: Props) {
           notifications.show({ color: 'green', message: 'Đã xóa khỏi danh sách' });
           onClose();
         },
-        onError: (err) => setLoiChung(thongDiepLoiChung(err)),
+        onError: (err) => setLoiChung(thongDiepLoiXungDot(err)),
       },
     );
   }
