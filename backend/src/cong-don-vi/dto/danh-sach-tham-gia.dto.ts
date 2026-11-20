@@ -16,7 +16,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import type { GiaiDoanThamGia, TyLeSuat } from '../quy-tac-hop-dong';
+import { NGAY, type GiaiDoanThamGia, type TyLeSuat } from '../quy-tac-hop-dong';
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -27,7 +27,6 @@ const trimHoacNull = ({ value }: { value: unknown }) => {
   return s === '' ? null : s;
 };
 
-const NGAY = /^\d{4}-\d{2}-\d{2}$/;
 const MSG_NGAY = { message: 'ngay_sinh phải là ngày dạng YYYY-MM-DD' };
 export const SO_DONG_NAP_TOI_DA = 5000;
 

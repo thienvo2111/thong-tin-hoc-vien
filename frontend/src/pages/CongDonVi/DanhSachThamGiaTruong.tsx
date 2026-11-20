@@ -23,18 +23,22 @@ import {
   useXacNhanDanhSach,
   useYKienDong,
   type DanhSachCuaTruong,
+  type DeNghiCuaTruong,
   type DongDanhSachTruong,
   type YKienTruong,
 } from '@/api/truongDanhSach';
-import { thongDiepLoiChung } from '@/lib/loiApi';
+import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayLich, dinhDangTien } from '@/lib/ngayLich';
 import { tokenKhac } from '@/theme';
 import { NHAN_GIAI_DOAN, dinhDangSuat } from './danhSachThamGiaNhan';
 import { NHAN_CHUONG_TRINH_NGAN, TRANG_THAI_DANH_SACH } from './hopDongNhan';
+import { TRANG_THAI_DE_NGHI, moTaNguoi, thayDoiDeNghi } from './deNghiNhan';
+import { ModalDeNghiSua } from './ModalDeNghiSua';
 
 /** Màn "Xem danh sách tham gia" của trường (issue #60, ADR 0015 U1, X6): mỗi người một thẻ (mobile-first),
  * cuối màn tổng suất + giá trị tạm tính. Issue #61 (X1, X2): Đồng ý / Không đồng ý từng người, Đồng ý tất cả,
- * Xác nhận danh sách (chỉ bật khi mọi dòng Đồng ý). */
+ * Xác nhận danh sách (chỉ bật khi mọi dòng Đồng ý). Issue #62 (X2): Không đồng ý → đề nghị sửa / bớt người,
+ * đề nghị thêm người; HCMUE Áp dụng / Từ chối, trường thấy trạng thái từng đề nghị. */
 export default function DanhSachThamGiaTruong() {
   const { dotId = '' } = useParams();
   const { data, isLoading, isError, error, refetch, isFetching } = useDanhSachCuaTruong(dotId);
@@ -78,21 +82,33 @@ export default function DanhSachThamGiaTruong() {
   );
 }
 
-const baoLoi = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiChung(err) });
+// 409 (dòng đang có đề nghị chờ) → giữ thông điệp server.
+const baoLoi = (err: unknown) => notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
+
+/** Form đề nghị đang mở: dong null = đề nghị thêm người. */
+type MoDeNghi = { dong: DongDanhSachTruong | null } | null;
 
 function NoiDung({ dotId, ds }: { dotId: string; ds: DanhSachCuaTruong }) {
   const yKien = useYKienDong(dotId);
   const dongYTatCa = useDongYTatCa(dotId);
   const xacNhan = useXacNhanDanhSach(dotId);
   const [moXacNhan, setMoXacNhan] = useState(false);
+  const [moDeNghi, setMoDeNghi] = useState<MoDeNghi>(null);
   const dangGui = yKien.isPending || dongYTatCa.isPending || xacNhan.isPending;
   const tt = TRANG_THAI_DANH_SACH[ds.trang_thai_danh_sach];
   const soChuaCoYKien = ds.dong.filter((d) => d.y_kien_truong === null).length;
   const daXacNhan = ds.trang_thai_danh_sach === 'da_xac_nhan';
 
-  const datYKien = (d: DongDanhSachTruong, y: YKienTruong) =>
-    // Bấm lại ý kiến đang chọn → bỏ ý kiến (null).
+  const deNghiThem = ds.de_nghi.filter((d) => d.loai === 'them');
+
+  const datYKien = (d: DongDanhSachTruong, y: YKienTruong) => {
+    // Không đồng ý (chưa chọn) → mở form đề nghị; bấm lại ý kiến đang chọn → bỏ ý kiến (null).
+    if (y === 'khong_dong_y' && d.y_kien_truong !== 'khong_dong_y') {
+      setMoDeNghi({ dong: d });
+      return;
+    }
     yKien.mutate({ dongId: d.id, y_kien: d.y_kien_truong === y ? null : y }, { onError: baoLoi });
+  };
 
   return (
     <>
@@ -110,6 +126,10 @@ function NoiDung({ dotId, ds }: { dotId: string; ds: DanhSachCuaTruong }) {
           Hạn nộp: {dinhDangNgayLich(ds.dot.han_nop_ngay)} · {ds.dong.length} người
         </Text>
       </Stack>
+
+      <Button variant="default" fullWidth onClick={() => setMoDeNghi({ dong: null })}>
+        Đề nghị thêm người
+      </Button>
 
       {ds.dong.length === 0 ? (
         <Paper withBorder radius="md" p="md">
@@ -129,11 +149,19 @@ function NoiDung({ dotId, ds }: { dotId: string; ds: DanhSachCuaTruong }) {
           </Button>
           <Stack component="ol" gap="sm" m={0} p={0} style={{ listStyle: 'none' }} aria-label="Người tham gia">
             {ds.dong.map((d) => (
-              <TheNguoi key={d.id} d={d} khoa={dangGui} onYKien={(y) => datYKien(d, y)} />
+              <TheNguoi
+                key={d.id}
+                d={d}
+                deNghi={ds.de_nghi.find((x) => x.dong_id === d.id)}
+                khoa={dangGui}
+                onYKien={(y) => datYKien(d, y)}
+              />
             ))}
           </Stack>
         </>
       )}
+
+      {deNghiThem.length > 0 && <DeNghiThemNguoi ds={deNghiThem} />}
 
       <Box
         component="section"
@@ -177,6 +205,13 @@ function NoiDung({ dotId, ds }: { dotId: string; ds: DanhSachCuaTruong }) {
         </Stack>
       </Box>
 
+      <ModalDeNghiSua
+        opened={moDeNghi !== null}
+        onClose={() => setMoDeNghi(null)}
+        dotId={dotId}
+        dong={moDeNghi?.dong ?? null}
+      />
+
       <Modal opened={moXacNhan} onClose={() => setMoXacNhan(false)} title="Xác nhận danh sách" centered>
         <Stack gap="sm">
           {xacNhan.isError && (
@@ -209,9 +244,30 @@ function NoiDung({ dotId, ds }: { dotId: string; ds: DanhSachCuaTruong }) {
   );
 }
 
-function TheNguoi({ d, khoa, onYKien }: { d: DongDanhSachTruong; khoa: boolean; onYKien: (y: YKienTruong) => void }) {
+/** Tóm tắt ngắn đề nghị đang chờ của 1 dòng: "Họ tên: A → B" / "Đề nghị bớt người này". */
+function tomTatDeNghi(dn: DeNghiCuaTruong): string {
+  if (dn.loai === 'bot') return 'Đề nghị bớt người này';
+  return thayDoiDeNghi(dn.gia_tri, dn.gia_tri_cu)
+    .map((t) => `${t.nhan}: ${t.cu} → ${t.moi}`)
+    .join('; ');
+}
+
+function TheNguoi({
+  d,
+  deNghi,
+  khoa,
+  onYKien,
+}: {
+  d: DongDanhSachTruong;
+  /** Đề nghị mới nhất của dòng (nếu có). */
+  deNghi?: DeNghiCuaTruong;
+  khoa: boolean;
+  onYKien: (y: YKienTruong) => void;
+}) {
   const dongY = d.y_kien_truong === 'dong_y';
   const khongDongY = d.y_kien_truong === 'khong_dong_y';
+  const dangCho = deNghi?.trang_thai === 'cho';
+  const biTuChoi = deNghi?.trang_thai === 'tu_choi' && d.y_kien_truong === null;
   return (
     <Paper component="li" withBorder radius="md" p="sm">
       <Stack gap="xs">
@@ -234,13 +290,28 @@ function TheNguoi({ d, khoa, onYKien }: { d: DongDanhSachTruong; khoa: boolean; 
             </Text>
           )}
         </div>
+        {dangCho && deNghi && (
+          <Stack gap={2}>
+            <Badge color="yellow" variant="light" style={{ alignSelf: 'flex-start' }}>
+              Đang chờ HCMUE xử lý
+            </Badge>
+            <Text size="sm" style={{ overflowWrap: 'anywhere' }}>
+              {tomTatDeNghi(deNghi)}
+            </Text>
+          </Stack>
+        )}
+        {biTuChoi && deNghi && (
+          <Text size="sm" c="red.8" style={{ overflowWrap: 'anywhere' }}>
+            HCMUE từ chối đề nghị: {deNghi.ly_do_tu_choi}
+          </Text>
+        )}
         <Group grow gap="xs" role="group" aria-label={`Ý kiến về ${d.ho_ten}`}>
           <Button
             size="sm"
             color="green"
             variant={dongY ? 'filled' : 'default'}
             aria-pressed={dongY}
-            disabled={khoa}
+            disabled={khoa || dangCho}
             onClick={() => onYKien('dong_y')}
           >
             Đồng ý
@@ -250,18 +321,52 @@ function TheNguoi({ d, khoa, onYKien }: { d: DongDanhSachTruong; khoa: boolean; 
             color="red"
             variant={khongDongY ? 'filled' : 'default'}
             aria-pressed={khongDongY}
-            disabled={khoa}
+            disabled={khoa || dangCho}
             onClick={() => onYKien('khong_dong_y')}
           >
             Không đồng ý
           </Button>
         </Group>
-        {khongDongY && (
-          <Text size="sm" c="red.8">
-            Đề nghị sửa sẽ mở ở bước sau — liên hệ HCMUE nếu cần sửa gấp.
-          </Text>
-        )}
       </Stack>
     </Paper>
+  );
+}
+
+/** Issue #62: các đề nghị thêm người của trường kèm trạng thái. */
+function DeNghiThemNguoi({ ds }: { ds: DeNghiCuaTruong[] }) {
+  return (
+    <Stack component="section" gap="xs" aria-label="Đề nghị thêm người">
+      <Title order={2} size="h5">
+        Đề nghị thêm người
+      </Title>
+      <Stack component="ul" gap="xs" m={0} p={0} style={{ listStyle: 'none' }}>
+        {ds.map((dn) => {
+          const tt = TRANG_THAI_DE_NGHI[dn.trang_thai];
+          const chiTiet = moTaNguoi(dn.gia_tri).filter((m) => m.nhan !== 'Họ tên');
+          return (
+            <Paper component="li" key={dn.id} withBorder radius="md" p="sm">
+              <Group justify="space-between" wrap="nowrap" align="flex-start" gap="sm">
+                <Text fw={600} style={{ overflowWrap: 'anywhere' }}>
+                  {dn.gia_tri.ho_ten}
+                </Text>
+                <Badge color={tt.mau} variant="light" style={{ flexShrink: 0 }}>
+                  {tt.nhan}
+                </Badge>
+              </Group>
+              {chiTiet.length > 0 && (
+                <Text size="sm" c="dimmed" style={{ overflowWrap: 'anywhere' }}>
+                  {chiTiet.map((m) => `${m.nhan}: ${m.giaTri}`).join(' · ')}
+                </Text>
+              )}
+              {dn.trang_thai === 'tu_choi' && (
+                <Text size="sm" c="red.8" style={{ overflowWrap: 'anywhere' }}>
+                  Lý do từ chối: {dn.ly_do_tu_choi}
+                </Text>
+              )}
+            </Paper>
+          );
+        })}
+      </Stack>
+    </Stack>
   );
 }

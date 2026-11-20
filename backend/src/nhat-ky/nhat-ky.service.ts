@@ -52,7 +52,10 @@ export type HanhDongNhatKy =
   | 'xuat_danh_sach_tham_gia'
   | 'y_kien_dong_danh_sach'
   | 'dong_y_tat_ca_danh_sach'
-  | 'xac_nhan_danh_sach';
+  | 'xac_nhan_danh_sach'
+  | 'gui_de_nghi_sua_danh_sach'
+  | 'ap_dung_de_nghi_sua_danh_sach'
+  | 'tu_choi_de_nghi_sua_danh_sach';
 
 const TIEU_DE: Record<HanhDongNhatKy, string> = {
   dang_nhap_thanh_cong: 'Đăng nhập thành công',
@@ -103,6 +106,9 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   y_kien_dong_danh_sach: 'Trường cho ý kiến dòng danh sách tham gia',
   dong_y_tat_ca_danh_sach: 'Trường đồng ý tất cả dòng chưa có ý kiến',
   xac_nhan_danh_sach: 'Trường xác nhận danh sách tham gia',
+  gui_de_nghi_sua_danh_sach: 'Trường gửi đề nghị sửa danh sách tham gia',
+  ap_dung_de_nghi_sua_danh_sach: 'Quản trị áp dụng đề nghị sửa danh sách',
+  tu_choi_de_nghi_sua_danh_sach: 'Quản trị từ chối đề nghị sửa danh sách',
 };
 
 const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
@@ -153,6 +159,9 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   y_kien_dong_danh_sach: 'tai_khoan',
   dong_y_tat_ca_danh_sach: 'tai_khoan',
   xac_nhan_danh_sach: 'tai_khoan',
+  gui_de_nghi_sua_danh_sach: 'tai_khoan',
+  ap_dung_de_nghi_sua_danh_sach: 'tai_khoan',
+  tu_choi_de_nghi_sua_danh_sach: 'tai_khoan',
 };
 
 const NHAN_VAI_TRO: Record<vai_tro_nguoi_dung, string> = {

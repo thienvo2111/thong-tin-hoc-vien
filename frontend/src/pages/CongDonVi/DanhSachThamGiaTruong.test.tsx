@@ -21,7 +21,6 @@ beforeEach(() => vi.stubEnv('VITE_CONG_DON_VI_HOSTNAME', window.location.hostnam
 afterEach(() => vi.unstubAllEnvs());
 
 const URL_DS = '/cong-don-vi/truong/dot/:dotId/danh-sach';
-const GOI_Y_KHONG_DONG_Y = 'Đề nghị sửa sẽ mở ở bước sau — liên hệ HCMUE nếu cần sửa gấp.';
 
 interface YeuCau {
   method: string;
@@ -60,7 +59,6 @@ function voiYKien(yKien: DanhSachCuaTruong['dong'][number]['y_kien_truong'][], p
 
 const nhomYKien = (ten: string) => screen.getByRole('group', { name: `Ý kiến về ${ten}` });
 const nut = (ten: string, y: 'Đồng ý' | 'Không đồng ý') => within(nhomYKien(ten)).getByRole('button', { name: y });
-const theNguoi = (ten: string) => nhomYKien(ten).closest('li') as HTMLElement;
 const nutXacNhan = () => screen.getByRole('button', { name: 'Xác nhận danh sách' });
 const chip = () => screen.getByLabelText(/^Trạng thái danh sách:/);
 
@@ -85,23 +83,21 @@ describe('Màn danh sách của trường — ý kiến từng người (#61)', 
     expect(screen.getByText('Còn 2 dòng chưa Đồng ý — chưa xác nhận được.')).toBeInTheDocument();
   });
 
-  it('Không đồng ý → chip "Báo sai lệch" + gợi ý liên hệ HCMUE; bấm lại nút đang chọn gửi null và bỏ chọn', async () => {
+  // Issue #62: "Không đồng ý" mở form đề nghị (DeNghiSuaTruong.test.tsx) thay cho PUT khong_dong_y + gợi ý
+  // "Đề nghị sửa sẽ mở ở bước sau". Dòng đã Không đồng ý từ trước (không có đề nghị chờ) bấm lại vẫn bỏ chọn.
+  it('dòng đã Không đồng ý (không có đề nghị chờ) → bấm lại gửi null và bỏ chọn, chip về "Chờ xác nhận"', async () => {
     const yeuCau = ghiYeuCau();
     const user = userEvent.setup();
-    moDanhSach();
+    moDanhSach(voiYKien([null, 'khong_dong_y', null], { trang_thai_danh_sach: 'bao_sai_lech' }));
     await screen.findByRole('heading', { name: /Danh sách tham gia/ });
-
-    await user.click(nut('GV Bịa Bình', 'Không đồng ý'));
-    await waitFor(() => expect(chip()).toHaveTextContent('Báo sai lệch'));
+    expect(chip()).toHaveTextContent('Báo sai lệch');
     expect(nut('GV Bịa Bình', 'Không đồng ý')).toHaveAttribute('aria-pressed', 'true');
-    expect(within(theNguoi('GV Bịa Bình')).getByText(GOI_Y_KHONG_DONG_Y)).toBeInTheDocument();
-    expect(within(theNguoi('GV Bịa An')).queryByText(GOI_Y_KHONG_DONG_Y)).not.toBeInTheDocument();
 
     await user.click(nut('GV Bịa Bình', 'Không đồng ý'));
     await waitFor(() => expect(nut('GV Bịa Bình', 'Không đồng ý')).toHaveAttribute('aria-pressed', 'false'));
     expect(chip()).toHaveTextContent('Chờ xác nhận');
-    expect(screen.queryByText(GOI_Y_KHONG_DONG_Y)).not.toBeInTheDocument();
-    expect(yeuCau.map((y) => y.body)).toEqual([{ y_kien: 'khong_dong_y' }, { y_kien: null }]);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(yeuCau.map((y) => y.body)).toEqual([{ y_kien: null }]);
   });
 
   it('đang gửi ý kiến → mọi nút ý kiến + Đồng ý tất cả bị khóa tới khi xong', async () => {

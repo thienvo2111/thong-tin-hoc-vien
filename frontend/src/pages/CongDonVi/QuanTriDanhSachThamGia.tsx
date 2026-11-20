@@ -3,10 +3,12 @@ import { Alert, Container, Select, Skeleton, Stack, Title } from '@mantine/core'
 import { useDanhSachDotTrienKhai } from '@/api/dotTrienKhai';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { DanhSachTheoTruong } from './DanhSachTheoTruong';
+import { HangDoiDeNghi } from './HangDoiDeNghi';
 import { NapDanhSachHsg } from './NapDanhSachHsg';
 
 /** Quản trị: Danh sách tham gia theo đợt (issue #58, ADR 0015 M3/M6/T7). Nạp Excel chỉ cho đợt HSG;
- * xem danh sách cho mọi đợt. Route bọc ChiQuanTriCong: vai trò khác → 404. */
+ * xem danh sách cho mọi đợt. Route bọc ChiQuanTriCong: vai trò khác → 404.
+ * Issue #62: mục "Đề nghị của trường" — hàng đợi Áp dụng / Từ chối đề nghị sửa/thêm/bớt người. */
 export default function QuanTriDanhSachThamGia() {
   const { data, isLoading, isError, error } = useDanhSachDotTrienKhai();
   const [dotId, setDotId] = useState<string | null>(null);
@@ -35,6 +37,7 @@ export default function QuanTriDanhSachThamGia() {
         {dot?.chuong_trinh === 'nls' && (
           <Alert color="blue">Đợt NLS lấy danh sách từ khóa — chức năng này sẽ có ở bước sau.</Alert>
         )}
+        {dot && <HangDoiDeNghi key={`de-nghi-${dot.id}`} dotId={dot.id} />}
         {dot && <DanhSachTheoTruong key={dot.id} dotId={dot.id} choThem={dot.chuong_trinh === 'hsg'} />}
       </Stack>
     </Container>

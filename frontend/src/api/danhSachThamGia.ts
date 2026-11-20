@@ -72,6 +72,8 @@ export interface DongDanhSach {
   /** Issue #61: ý kiến của trường; null = chưa có ý kiến. */
   y_kien_truong: YKienTruong | null;
   hoc_vien_id: string | null;
+  /** Issue #62: dòng đang có đề nghị sửa/bớt chờ xử lý. */
+  co_de_nghi_cho?: boolean;
 }
 
 export interface TongHopTruong {
@@ -82,6 +84,8 @@ export interface TongHopTruong {
   tong_suat: number;
   /** Issue #61 / X1: null nếu trường chưa có dòng hợp đồng. */
   trang_thai_danh_sach: TrangThaiDanhSachTruong | null;
+  /** Issue #62: số đề nghị chờ của trường. */
+  so_de_nghi_cho?: number;
 }
 
 export interface DanhSachThamGia {
@@ -90,7 +94,7 @@ export interface DanhSachThamGia {
 }
 
 const url = (dotId: string, duoi: string) => `/cong-don-vi/dot-trien-khai/${dotId}/${duoi}`;
-const danhSachKey = (dotId: string) => ['cong-don-vi', 'danh-sach-tham-gia', dotId] as const;
+export const danhSachKey = (dotId: string) => ['cong-don-vi', 'danh-sach-tham-gia', dotId] as const;
 
 export function taiMauDanhSach(dotId: string) {
   return apiFetchBlob(url(dotId, 'danh-sach/mau-excel'));

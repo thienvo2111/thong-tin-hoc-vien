@@ -2,7 +2,10 @@ import {
   GiaiDoanKhongHopLeError,
   TY_LE_SUAT,
   TruongPhamVi,
+  DongDeNghi,
   chuanHoaTenTruong,
+  kiemTraGiaTriDeNghi,
+  trangThaiSauXuLyDeNghi,
   TrangThaiDanhSach,
   YKienTruong,
   giaTriTamTinh,
@@ -375,11 +378,262 @@ describe('kiemTraXacNhan', () => {
   });
 });
 
-// X1: Quản trị tự sửa/thêm/xóa/nạp lại danh sách của 1 trường → về Chờ xác nhận từ mọi trạng thái.
-// Không phụ thuộc trạng thái hiện tại nên không nhận tham số (service đặt bằng 1 lệnh cho mọi trường bị sửa);
-// e2e truong-xac-nhan kiểm đủ 3 trạng thái nguồn qua PATCH/POST/DELETE/nạp lại.
+// X1: Quản trị tự sửa/thêm/xóa/nạp lại danh sách của 1 trường → về Chờ xác nhận từ mọi trạng thái (không phụ
+// thuộc trạng thái hiện tại; e2e truong-xac-nhan kiểm đủ 3 trạng thái nguồn). Issue #62: còn dòng Không đồng
+// ý hoặc đề nghị chờ sau thao tác → Báo sai lệch (trước #62 hàm luôn trả cho_xac_nhan, không tham số).
 describe('trangThaiSauQuanTriSua', () => {
-  it('luôn → cho_xac_nhan', () => {
-    expect(trangThaiSauQuanTriSua()).toBe('cho_xac_nhan');
+  it('không còn sai lệch mở → cho_xac_nhan', () => {
+    expect(trangThaiSauQuanTriSua([])).toBe('cho_xac_nhan');
+    expect(trangThaiSauQuanTriSua([null, 'dong_y'])).toBe('cho_xac_nhan');
+    expect(trangThaiSauQuanTriSua(['dong_y', 'dong_y'], 0)).toBe(
+      'cho_xac_nhan',
+    );
+  });
+
+  it('còn dòng Không đồng ý → bao_sai_lech', () => {
+    expect(trangThaiSauQuanTriSua(['dong_y', 'khong_dong_y'])).toBe(
+      'bao_sai_lech',
+    );
+  });
+
+  it('còn đề nghị chờ (kể cả thêm người, danh sách rỗng) → bao_sai_lech', () => {
+    expect(trangThaiSauQuanTriSua([null, 'dong_y'], 1)).toBe('bao_sai_lech');
+    expect(trangThaiSauQuanTriSua([], 2)).toBe('bao_sai_lech');
+  });
+});
+
+// Issue #62 / X2: đề nghị chờ cũng là sai lệch khi trường đổi ý kiến.
+describe('trangThaiSauYKien — có đề nghị chờ', () => {
+  it.each(['cho_xac_nhan', 'da_xac_nhan', 'bao_sai_lech'] as const)(
+    'soDeNghiCho > 0 → bao_sai_lech dù mọi dòng Đồng ý (từ %s)',
+    (hienTai) => {
+      expect(trangThaiSauYKien(['dong_y', 'dong_y'], hienTai, 1)).toBe(
+        'bao_sai_lech',
+      );
+      expect(trangThaiSauYKien([], hienTai, 3)).toBe('bao_sai_lech');
+    },
+  );
+
+  it('soDeNghiCho = 0 tường minh giữ hành vi cũ', () => {
+    expect(trangThaiSauYKien(['dong_y'], 'bao_sai_lech', 0)).toBe(
+      'cho_xac_nhan',
+    );
+    expect(trangThaiSauYKien(['dong_y'], 'da_xac_nhan', 0)).toBe('da_xac_nhan');
+  });
+});
+
+describe('trangThaiSauXuLyDeNghi (#62)', () => {
+  it('hết dòng Không đồng ý và hết đề nghị chờ → cho_xac_nhan (kể cả mọi dòng Đồng ý)', () => {
+    expect(trangThaiSauXuLyDeNghi(['dong_y', 'dong_y'], 0)).toBe(
+      'cho_xac_nhan',
+    );
+    expect(trangThaiSauXuLyDeNghi(['dong_y', null], 0)).toBe('cho_xac_nhan');
+    expect(trangThaiSauXuLyDeNghi([], 0)).toBe('cho_xac_nhan');
+  });
+
+  it('còn dòng Không đồng ý → bao_sai_lech', () => {
+    expect(trangThaiSauXuLyDeNghi(['dong_y', 'khong_dong_y'], 0)).toBe(
+      'bao_sai_lech',
+    );
+  });
+
+  it('còn đề nghị chờ khác → bao_sai_lech', () => {
+    expect(trangThaiSauXuLyDeNghi(['dong_y'], 1)).toBe('bao_sai_lech');
+  });
+});
+
+// Issue #62 / X2: giá trị đề nghị của trường. Dữ liệu bịa.
+describe('kiemTraGiaTriDeNghi', () => {
+  const DONG: DongDeNghi = {
+    ho_ten: 'GV Bịa Một',
+    ngay_sinh: '1990-02-01',
+    gioi_tinh: 'Nữ',
+    lop: 'Toán 9',
+    giai_doan: 'ca_hai',
+  };
+  const loi = (lyDo: string | RegExp) => ({
+    hopLe: false,
+    lyDo: expect.stringMatching(lyDo),
+  });
+
+  describe('sua', () => {
+    it('chỉ trả các trường khác dòng hiện tại (đã trim)', () => {
+      expect(
+        kiemTraGiaTriDeNghi(
+          'sua',
+          { ho_ten: '  GV Bịa Hai ', lop: 'Toán 9', giai_doan: 'chi_gd2' },
+          DONG,
+        ),
+      ).toEqual({
+        hopLe: true,
+        giaTri: { ho_ten: 'GV Bịa Hai', giai_doan: 'chi_gd2' },
+      });
+    });
+
+    it('ô trống / null → null (xóa giá trị); ngày "" → null', () => {
+      expect(
+        kiemTraGiaTriDeNghi(
+          'sua',
+          { gioi_tinh: '  ', lop: null, ngay_sinh: '' },
+          DONG,
+        ),
+      ).toEqual({
+        hopLe: true,
+        giaTri: { gioi_tinh: null, lop: null, ngay_sinh: null },
+      });
+    });
+
+    it('đổi ngày sinh hợp lệ', () => {
+      expect(
+        kiemTraGiaTriDeNghi('sua', { ngay_sinh: '1991-12-31' }, DONG),
+      ).toEqual({ hopLe: true, giaTri: { ngay_sinh: '1991-12-31' } });
+    });
+
+    it('không khác gì / rỗng / thiếu dòng hiện tại → "Không có thay đổi nào…"', () => {
+      const msg = 'Không có thay đổi nào so với dòng hiện tại';
+      expect(
+        kiemTraGiaTriDeNghi('sua', { ho_ten: ' GV Bịa Một ' }, DONG),
+      ).toEqual({ hopLe: false, lyDo: msg });
+      expect(kiemTraGiaTriDeNghi('sua', {}, DONG)).toEqual({
+        hopLe: false,
+        lyDo: msg,
+      });
+      expect(kiemTraGiaTriDeNghi('sua', undefined, DONG)).toEqual({
+        hopLe: false,
+        lyDo: msg,
+      });
+      expect(kiemTraGiaTriDeNghi('sua', { ho_ten: 'Khác' })).toEqual({
+        hopLe: false,
+        lyDo: msg,
+      });
+    });
+
+    it.each([
+      'ty_le_suat',
+      'don_vi_id',
+      'ma_goc',
+      'ghi_chu',
+      'y_kien_truong',
+      'la',
+    ])('trường không đề nghị được "%s" → lỗi', (k) => {
+      expect(kiemTraGiaTriDeNghi('sua', { [k]: 'x' }, DONG)).toEqual(
+        loi(`Không đề nghị được "${k}"`),
+      );
+    });
+
+    it.each([
+      [{ ho_ten: '' }, /Họ tên không được trống/],
+      [{ ho_ten: '   ' }, /Họ tên không được trống/],
+      [{ ho_ten: null }, /Họ tên không được trống/],
+      [{ ho_ten: 12 }, /Họ tên không được trống/],
+      [{ ho_ten: 'a'.repeat(256) }, /tối đa 255/],
+      [{ ngay_sinh: '01/02/1990' }, /Ngày sinh phải là ngày dạng YYYY-MM-DD/],
+      [{ ngay_sinh: '1990-02-30' }, /Ngày sinh phải là ngày dạng YYYY-MM-DD/],
+      [{ ngay_sinh: 19900201 }, /Ngày sinh phải là ngày dạng YYYY-MM-DD/],
+      [{ gioi_tinh: 'x'.repeat(21) }, /Giới tính tối đa 20 ký tự/],
+      [{ gioi_tinh: 1 }, /Giới tính phải là chuỗi/],
+      [{ lop: 'x'.repeat(101) }, /Lớp\/môn tối đa 100 ký tự/],
+      [{ giai_doan: 'Cả 2' }, /Giai đoạn phải là/],
+      [{ giai_doan: 'toString' }, /Giai đoạn phải là/],
+      [{ giai_doan: null }, /Giai đoạn phải là/],
+    ])('giá trị sai %p → lỗi', (giaTri, lyDo) => {
+      expect(kiemTraGiaTriDeNghi('sua', giaTri, DONG)).toEqual(loi(lyDo));
+    });
+
+    it('biên độ dài: họ tên 255, giới tính 20, lớp 100 ký tự → hợp lệ', () => {
+      const giaTri = {
+        ho_ten: 'a'.repeat(255),
+        gioi_tinh: 'b'.repeat(20),
+        lop: 'c'.repeat(100),
+      };
+      expect(kiemTraGiaTriDeNghi('sua', giaTri, DONG)).toEqual({
+        hopLe: true,
+        giaTri,
+      });
+    });
+
+    it.each([[[]], ['chuỗi'], [5]])(
+      'gia_tri không phải đối tượng (%p) → lỗi',
+      (giaTri) => {
+        expect(kiemTraGiaTriDeNghi('sua', giaTri, DONG)).toEqual({
+          hopLe: false,
+          lyDo: 'Giá trị đề nghị không hợp lệ',
+        });
+      },
+    );
+  });
+
+  describe('them', () => {
+    it('chỉ họ tên → điền mặc định (null, giai đoạn Cả 2)', () => {
+      expect(kiemTraGiaTriDeNghi('them', { ho_ten: ' GV Bịa Mới ' })).toEqual({
+        hopLe: true,
+        giaTri: {
+          ho_ten: 'GV Bịa Mới',
+          ngay_sinh: null,
+          gioi_tinh: null,
+          lop: null,
+          giai_doan: 'ca_hai',
+        },
+      });
+    });
+
+    it('đủ trường → giữ nguyên giá trị đã chuẩn hóa', () => {
+      expect(
+        kiemTraGiaTriDeNghi('them', {
+          ho_ten: 'GV Bịa Mới',
+          ngay_sinh: '1992-05-06',
+          gioi_tinh: 'Nam',
+          lop: 'Văn 7',
+          giai_doan: 'chi_gd1',
+        }),
+      ).toEqual({
+        hopLe: true,
+        giaTri: {
+          ho_ten: 'GV Bịa Mới',
+          ngay_sinh: '1992-05-06',
+          gioi_tinh: 'Nam',
+          lop: 'Văn 7',
+          giai_doan: 'chi_gd1',
+        },
+      });
+    });
+
+    it.each([
+      [{}],
+      [undefined],
+      [null],
+      [{ lop: 'Toán 6' }],
+      [{ ho_ten: ' ' }],
+    ])('thiếu / trống họ tên (%p) → lỗi', (giaTri) => {
+      expect(kiemTraGiaTriDeNghi('them', giaTri)).toEqual(
+        loi(/Họ tên không được trống/),
+      );
+    });
+
+    it('thêm người cũng không đề nghị được suất', () => {
+      expect(
+        kiemTraGiaTriDeNghi('them', { ho_ten: 'GV Bịa', ty_le_suat: 0.5 }),
+      ).toEqual(loi('Không đề nghị được "ty_le_suat"'));
+    });
+  });
+
+  describe('bot', () => {
+    it('không kèm giá trị → {}', () => {
+      expect(kiemTraGiaTriDeNghi('bot', {}, DONG)).toEqual({
+        hopLe: true,
+        giaTri: {},
+      });
+      expect(kiemTraGiaTriDeNghi('bot', undefined, DONG)).toEqual({
+        hopLe: true,
+        giaTri: {},
+      });
+    });
+
+    it('có bất kỳ khóa nào → lỗi', () => {
+      expect(kiemTraGiaTriDeNghi('bot', { ho_ten: 'X' }, DONG)).toEqual({
+        hopLe: false,
+        lyDo: 'Đề nghị bớt người không kèm giá trị',
+      });
+    });
   });
 });

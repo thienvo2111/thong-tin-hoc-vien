@@ -15,7 +15,8 @@ import { ModalXoaDong } from './ModalXoaDong';
 type MoForm = { dong: DongDanhSach | null; donViMacDinh: string | null } | null;
 
 /** Danh sách tham gia của đợt: tổng hợp theo trường, chọn 1 trường để xem từng người (issue #58).
- * Issue #59: Quản trị sửa/xóa từng dòng, thêm người (đợt HSG), xuất Excel cả đợt hoặc 1 trường. */
+ * Issue #59: Quản trị sửa/xóa từng dòng, thêm người (đợt HSG), xuất Excel cả đợt hoặc 1 trường.
+ * Issue #62: số đề nghị chờ theo trường + đánh dấu dòng có đề nghị chờ. */
 export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem: boolean }) {
   const { data, isLoading, isError, error } = useDanhSachThamGia(dotId);
   const [truong, setTruong] = useState<TongHopTruong | null>(null);
@@ -85,11 +86,18 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
                       <Table.Td ta="right">{t.so_nguoi}</Table.Td>
                       <Table.Td ta="right">{dinhDangSuat(t.tong_suat)}</Table.Td>
                       <Table.Td>
-                        {t.trang_thai_danh_sach && (
-                          <Badge color={TRANG_THAI_DANH_SACH[t.trang_thai_danh_sach].mau} variant="light">
-                            {TRANG_THAI_DANH_SACH[t.trang_thai_danh_sach].nhan}
-                          </Badge>
-                        )}
+                        <Group gap={4}>
+                          {t.trang_thai_danh_sach && (
+                            <Badge color={TRANG_THAI_DANH_SACH[t.trang_thai_danh_sach].mau} variant="light">
+                              {TRANG_THAI_DANH_SACH[t.trang_thai_danh_sach].nhan}
+                            </Badge>
+                          )}
+                          {!!t.so_de_nghi_cho && (
+                            <Badge color="yellow" variant="light">
+                              {t.so_de_nghi_cho} đề nghị chờ
+                            </Badge>
+                          )}
+                        </Group>
                       </Table.Td>
                       <Table.Td>
                         <Button
@@ -162,9 +170,16 @@ export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem:
                       <Table.Td ta="right">{dinhDangSuat(d.ty_le_suat)}</Table.Td>
                       <Table.Td>{d.ghi_chu}</Table.Td>
                       <Table.Td>
-                        <Badge color={NHAN_Y_KIEN[d.y_kien_truong ?? 'chua_co'].mau} variant="light">
-                          {NHAN_Y_KIEN[d.y_kien_truong ?? 'chua_co'].nhan}
-                        </Badge>
+                        <Group gap={4} wrap="nowrap">
+                          <Badge color={NHAN_Y_KIEN[d.y_kien_truong ?? 'chua_co'].mau} variant="light">
+                            {NHAN_Y_KIEN[d.y_kien_truong ?? 'chua_co'].nhan}
+                          </Badge>
+                          {d.co_de_nghi_cho && (
+                            <Badge color="yellow" variant="light">
+                              Có đề nghị chờ
+                            </Badge>
+                          )}
+                        </Group>
                       </Table.Td>
                       <Table.Td>
                         <Group gap={4} wrap="nowrap">

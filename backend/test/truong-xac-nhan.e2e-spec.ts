@@ -563,7 +563,9 @@ describe('Trường cho ý kiến + xác nhận danh sách - Cổng đơn vị (
       });
     });
 
-    it('Quản trị thêm dòng vào danh sách Báo sai lệch → Chờ xác nhận, dòng mới chưa có ý kiến', async () => {
+    // Issue #62: trước đây → Chờ xác nhận; nay dòng An vẫn Không đồng ý sau khi thêm nên giữ Báo sai lệch
+    // (trangThaiSauQuanTriSua không cho hiện "Chờ xác nhận" khi còn sai lệch đang mở).
+    it('Quản trị thêm dòng vào danh sách Báo sai lệch (còn dòng Không đồng ý) → vẫn Báo sai lệch, dòng mới chưa có ý kiến', async () => {
       await yKien('truongA', dongId.An, 'khong_dong_y');
       expect((await hopDong(dot.d1, ids.tA)).trang_thai_danh_sach).toBe(
         'bao_sai_lech',
@@ -576,7 +578,8 @@ describe('Trường cho ý kiến + xác nhận danh sách - Cổng đơn vị (
       expect(res.body.y_kien_truong).toBeNull();
       dongId.Khoa = res.body.id;
       const hd = await hopDong(dot.d1, ids.tA);
-      expect(hd.trang_thai_danh_sach).toBe('cho_xac_nhan');
+      expect(hd.trang_thai_danh_sach).toBe('bao_sai_lech');
+      expect((await yKienCua(dot.d1, ids.tA)).An).toBe('khong_dong_y');
       expect(hd.thao_tac_cuoi_boi).toBe(userId.quanTri);
     });
 

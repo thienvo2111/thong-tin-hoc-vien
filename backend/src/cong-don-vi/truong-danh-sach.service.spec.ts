@@ -4,7 +4,7 @@ import { NhatKyService } from '../nhat-ky/nhat-ky.service';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { TruongDanhSachService } from './truong-danh-sach.service';
 
-// Issue #60, #61: tài khoản trường chưa gắn đơn vị → 403 rõ lý do, không truy vấn DB, không ghi nhật ký.
+// Issue #60, #61, #62: tài khoản trường chưa gắn đơn vị → 403 rõ lý do, không truy vấn DB, không ghi nhật ký.
 // (CHECK chk_nguoi_dung_scope chặn tạo tài khoản như vậy trong DB nên không e2e được.)
 describe('TruongDanhSachService — tài khoản trường không có don_vi_id', () => {
   const prisma = {
@@ -30,6 +30,14 @@ describe('TruongDanhSachService — tài khoản trường không có don_vi_id'
     ['datYKien', () => service.datYKien(user, DOT, DOT, 'dong_y')],
     ['dongYTatCa', () => service.dongYTatCa(user, DOT)],
     ['xacNhan', () => service.xacNhan(user, DOT)],
+    [
+      'guiDeNghi',
+      () =>
+        service.guiDeNghi(user, DOT, {
+          loai: 'them',
+          gia_tri: { ho_ten: 'GV Bịa' },
+        }),
+    ],
   ])('%s → 403 "chưa gắn đơn vị", không gọi DB', async (_ten, goi) => {
     const loi = await goi().catch((e: unknown) => e);
     expect(loi).toBeInstanceOf(ForbiddenException);

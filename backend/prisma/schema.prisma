@@ -289,6 +289,20 @@ enum trang_thai_hop_dong {
   da_nop
 }
 
+// ADR 0015 X2 (issue #62): loại đề nghị sửa danh sách của trường.
+enum loai_de_nghi_sua {
+  sua
+  them
+  bot
+}
+
+// ADR 0015 X2 (issue #62): trạng thái đề nghị sửa — HCMUE Áp dụng / Từ chối.
+enum trang_thai_de_nghi_sua {
+  cho
+  da_ap_dung
+  tu_choi
+}
+
 enum loai_dot_xac_nhan {
   kiem_tra_bo_sung
   xac_nhan_truoc_danh_gia
@@ -446,6 +460,8 @@ model don_vi_cong_tac {
   danh_sach_tham_gia danh_sach_tham_gia[]
   // Issue #60: hợp đồng bồi dưỡng của trường theo đợt
   hop_dong_boi_duong hop_dong_boi_duong[]
+  // Issue #62: đề nghị sửa danh sách của trường
+  de_nghi_sua_danh_sach de_nghi_sua_danh_sach[]
 
   @@index([loai_don_vi], map: "idx_don_vi_loai")
   @@index([dia_ban_id], map: "idx_don_vi_dia_ban")
@@ -548,6 +564,10 @@ model nguoi_dung {
 
   // Issue #60: người thao tác gần nhất trên hợp đồng bồi dưỡng (X1)
   hop_dong_thao_tac_cuoi hop_dong_boi_duong[] @relation("hop_dong_thao_tac_cuoi")
+
+  // Issue #62: người gửi / người xử lý đề nghị sửa danh sách (X2)
+  de_nghi_sua_gui   de_nghi_sua_danh_sach[] @relation("de_nghi_sua_gui_boi")
+  de_nghi_sua_xu_ly de_nghi_sua_danh_sach[] @relation("de_nghi_sua_xu_ly_boi")
 
   @@index([vai_tro], map: "idx_nguoi_dung_vai_tro")
   @@index([don_vi_id], map: "idx_nguoi_dung_don_vi")
@@ -813,8 +833,9 @@ model dot_trien_khai {
   so_gddt         don_vi_cong_tac @relation("dot_trien_khai_so_gddt", fields: [so_gddt_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   created_by_user nguoi_dung?     @relation("dot_trien_khai_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
-  danh_sach_tham_gia danh_sach_tham_gia[]
-  hop_dong_boi_duong hop_dong_boi_duong[]
+  danh_sach_tham_gia    danh_sach_tham_gia[]
+  hop_dong_boi_duong    hop_dong_boi_duong[]
+  de_nghi_sua_danh_sach de_nghi_sua_danh_sach[]
 
   @@index([chuong_trinh], map: "idx_dot_trien_khai_chuong_trinh")
   @@index([so_gddt_id], map: "idx_dot_trien_khai_so_gddt")
@@ -846,6 +867,8 @@ model danh_sach_tham_gia {
   hoc_vien        hoc_vien?       @relation(fields: [hoc_vien_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   created_by_user nguoi_dung?     @relation("danh_sach_tham_gia_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
+  de_nghi_sua_danh_sach de_nghi_sua_danh_sach[]
+
   @@index([dot_trien_khai_id, don_vi_id], map: "idx_ds_tham_gia_dot_don_vi")
   @@index([hoc_vien_id], map: "idx_ds_tham_gia_hoc_vien")
 }
@@ -869,6 +892,37 @@ model hop_dong_boi_duong {
 
   @@unique([dot_trien_khai_id, don_vi_id], map: "uq_hop_dong_dot_don_vi")
   @@index([don_vi_id], map: "idx_hop_dong_don_vi")
+}
+
+// ADR 0015 X2 (issue #62): đề nghị sửa/thêm/bớt người của trường — HCMUE Áp dụng / Từ chối.
+// dong_id NULL khi thêm người (CHECK) hoặc khi dòng đã bị xóa (SET NULL); gia_tri_cu = bản chụp dòng lúc gửi.
+// CHECK chk_de_nghi_sua_* và UNIQUE một phần uq_de_nghi_cho_theo_dong (1 đề nghị chờ / dòng) thêm bằng raw SQL.
+model de_nghi_sua_danh_sach {
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dot_trien_khai_id String                 @db.Uuid
+  don_vi_id         String                 @db.Uuid
+  dong_id           String?                @db.Uuid
+  loai              loai_de_nghi_sua
+  gia_tri           Json                   @default("{}")
+  gia_tri_cu        Json?
+  ly_do             String?
+  trang_thai        trang_thai_de_nghi_sua @default(cho)
+  ly_do_tu_choi     String?
+  gui_boi           String                 @db.Uuid
+  gui_luc           DateTime               @default(now()) @db.Timestamptz(6)
+  xu_ly_boi         String?                @db.Uuid
+  xu_ly_luc         DateTime?              @db.Timestamptz(6)
+  created_at        DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime               @default(now()) @db.Timestamptz(6)
+
+  dot_trien_khai dot_trien_khai      @relation(fields: [dot_trien_khai_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  don_vi         don_vi_cong_tac     @relation(fields: [don_vi_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  dong           danh_sach_tham_gia? @relation(fields: [dong_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  gui_boi_user   nguoi_dung          @relation("de_nghi_sua_gui_boi", fields: [gui_boi], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  xu_ly_boi_user nguoi_dung?         @relation("de_nghi_sua_xu_ly_boi", fields: [xu_ly_boi], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([dot_trien_khai_id, don_vi_id, trang_thai], map: "idx_de_nghi_sua_dot_don_vi_trang_thai")
+  @@index([dong_id], map: "idx_de_nghi_sua_dong")
 }
 
 model xac_nhan_ho_so {

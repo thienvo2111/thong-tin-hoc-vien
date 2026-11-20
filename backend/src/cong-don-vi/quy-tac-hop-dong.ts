@@ -1,7 +1,12 @@
 // Module thuần "Quy tắc hợp đồng" (ADR 0015, issue #58): không truy cập DB,
 // không DI — chỉ hàm thuần để test đơn vị và dùng lại ở mọi lát sau.
+import { isISO8601 } from 'class-validator';
+import type { DongDanhSachGoc } from './sua-dong-danh-sach';
 
 export type GiaiDoanThamGia = 'ca_hai' | 'chi_gd1' | 'chi_gd2';
+
+/** Ngày dạng 'YYYY-MM-DD' (dùng chung DTO + kiểm giá trị đề nghị). */
+export const NGAY = /^\d{4}-\d{2}-\d{2}$/;
 export type TyLeSuat = 1 | 0.5;
 
 /** ADR 0015 S1: học đủ mọi giai đoạn = 1 suất; chỉ một giai đoạn (GĐ1 hay GĐ2) = 0,5. */
@@ -198,16 +203,25 @@ export const Y_KIEN_TRUONG = ['dong_y', 'khong_dong_y'] as const;
 export type YKienTruong = (typeof Y_KIEN_TRUONG)[number];
 export type TrangThaiDanhSach = 'cho_xac_nhan' | 'da_xac_nhan' | 'bao_sai_lech';
 
+/** Còn "sai lệch đang mở": có dòng Không đồng ý hoặc còn đề nghị sửa chờ HCMUE xử lý (issue #62). */
+function conSaiLechMo(
+  yKiens: readonly (YKienTruong | null)[],
+  soDeNghiCho: number,
+): boolean {
+  return soDeNghiCho > 0 || yKiens.some((y) => y === 'khong_dong_y');
+}
+
 /**
- * X1: trạng thái sau khi trường đổi ý kiến 1 dòng (hoặc Đồng ý tất cả). Có dòng Không đồng ý → Báo sai
- * lệch; hết dòng Không đồng ý → từ Báo sai lệch về Chờ xác nhận; Đã xác nhận mà có dòng không còn Đồng ý
- * → Chờ xác nhận. Còn lại giữ nguyên (mọi dòng Đồng ý vẫn phải bấm Xác nhận).
+ * X1: trạng thái sau khi trường đổi ý kiến 1 dòng (hoặc Đồng ý tất cả, gửi đề nghị). Có dòng Không đồng ý
+ * hoặc còn đề nghị chờ (#62) → Báo sai lệch; hết → từ Báo sai lệch về Chờ xác nhận; Đã xác nhận mà có dòng
+ * không còn Đồng ý → Chờ xác nhận. Còn lại giữ nguyên (mọi dòng Đồng ý vẫn phải bấm Xác nhận).
  */
 export function trangThaiSauYKien(
   yKiens: readonly (YKienTruong | null)[],
   hienTai: TrangThaiDanhSach,
+  soDeNghiCho = 0,
 ): TrangThaiDanhSach {
-  if (yKiens.some((y) => y === 'khong_dong_y')) return 'bao_sai_lech';
+  if (conSaiLechMo(yKiens, soDeNghiCho)) return 'bao_sai_lech';
   if (hienTai === 'bao_sai_lech') return 'cho_xac_nhan';
   if (hienTai === 'da_xac_nhan' && !yKiens.every((y) => y === 'dong_y')) {
     return 'cho_xac_nhan';
@@ -219,8 +233,8 @@ export type KetQuaKiemTraXacNhan =
   { hopLe: true } | { hopLe: false; lyDo: string };
 
 /**
- * X2: Xác nhận danh sách chỉ hợp lệ khi có ≥ 1 dòng, mọi dòng Đồng ý và không còn đề nghị sửa chờ.
- * soDeNghiCho dành cho bảng đề nghị ở lát sau (#62) — hiện luôn 0.
+ * X2: Xác nhận danh sách chỉ hợp lệ khi có ≥ 1 dòng, mọi dòng Đồng ý và không còn đề nghị sửa chờ
+ * (soDeNghiCho = số đề nghị 'cho' của trường trong đợt, kể cả đề nghị thêm người — issue #62).
  */
 export function kiemTraXacNhan(
   yKiens: readonly (YKienTruong | null)[],
@@ -237,7 +251,156 @@ export function kiemTraXacNhan(
   return { hopLe: true };
 }
 
-/** X1: Quản trị tự sửa/thêm/xóa/nạp lại danh sách của 1 trường → về Chờ xác nhận từ mọi trạng thái. */
-export function trangThaiSauQuanTriSua(): TrangThaiDanhSach {
-  return 'cho_xac_nhan';
+/**
+ * X1: Quản trị tự sửa/thêm/xóa/nạp lại danh sách của 1 trường → Chờ xác nhận từ mọi trạng thái — trừ khi
+ * sau thao tác trường vẫn còn dòng Không đồng ý hoặc đề nghị chờ (#62): khi đó Báo sai lệch (không bao giờ
+ * hiện "Chờ xác nhận" khi còn sai lệch đang mở). yKiens = ý kiến các dòng của trường SAU thao tác.
+ */
+export function trangThaiSauQuanTriSua(
+  yKiens: readonly (YKienTruong | null)[],
+  soDeNghiCho = 0,
+): TrangThaiDanhSach {
+  return conSaiLechMo(yKiens, soDeNghiCho) ? 'bao_sai_lech' : 'cho_xac_nhan';
+}
+
+/**
+ * X2 (issue #62): sau khi Quản trị Áp dụng / Từ chối 1 đề nghị — KHÔNG đặt lại kiểu X1 (các dòng khác giữ
+ * ý kiến). Còn dòng Không đồng ý hoặc đề nghị chờ → Báo sai lệch; không → Chờ xác nhận (trường bấm Xác nhận
+ * lại). yKiens / soDeNghiCho tính SAU khi xử lý.
+ */
+export function trangThaiSauXuLyDeNghi(
+  yKiens: readonly (YKienTruong | null)[],
+  soDeNghiCho: number,
+): TrangThaiDanhSach {
+  return conSaiLechMo(yKiens, soDeNghiCho) ? 'bao_sai_lech' : 'cho_xac_nhan';
+}
+
+// Issue #62 / ADR 0015 X2: đề nghị sửa/thêm/bớt người của trường.
+export const LOAI_DE_NGHI = ['sua', 'them', 'bot'] as const;
+export type LoaiDeNghi = (typeof LOAI_DE_NGHI)[number];
+export const TRANG_THAI_DE_NGHI = ['cho', 'da_ap_dung', 'tu_choi'] as const;
+export type TrangThaiDeNghi = (typeof TRANG_THAI_DE_NGHI)[number];
+
+/**
+ * Thông tin trường được đề nghị. Suất, trường (don_vi_id), mã gốc, ghi chú là của HCMUE — trường không đề
+ * nghị được (đổi giai đoạn thì Áp dụng suy lại suất, S1/S3).
+ */
+export const TRUONG_DE_NGHI = [
+  'ho_ten',
+  'ngay_sinh',
+  'gioi_tinh',
+  'lop',
+  'giai_doan',
+] as const;
+export type TruongDeNghi = (typeof TRUONG_DE_NGHI)[number];
+export type GiaTriDeNghi = Partial<Pick<DongDanhSachGoc, TruongDeNghi>>;
+/** Giá trị dòng hiện tại để so sánh (ngày dạng 'YYYY-MM-DD'). */
+export type DongDeNghi = Pick<DongDanhSachGoc, TruongDeNghi>;
+
+export type KetQuaGiaTriDeNghi =
+  { hopLe: true; giaTri: GiaTriDeNghi } | { hopLe: false; lyDo: string };
+
+type KetQuaTruong =
+  { hopLe: true; giaTri: unknown } | { hopLe: false; lyDo: string };
+
+const loiDeNghi = (lyDo: string) => ({ hopLe: false as const, lyDo });
+const dung = (giaTri: unknown): KetQuaTruong => ({ hopLe: true, giaTri });
+
+const MSG_HO_TEN = 'Họ tên không được trống, tối đa 255 ký tự';
+const MSG_NGAY_SINH = 'Ngày sinh phải là ngày dạng YYYY-MM-DD';
+const MSG_GIAI_DOAN = 'Giai đoạn phải là ca_hai, chi_gd1 hoặc chi_gd2';
+const MSG_KHONG_DOI = 'Không có thay đổi nào so với dòng hiện tại';
+// Giới hạn = độ dài cột danh_sach_tham_gia (VARCHAR), giống DTO Quản trị sửa dòng.
+const DO_DAI: Record<'gioi_tinh' | 'lop', [number, string]> = {
+  gioi_tinh: [20, 'Giới tính'],
+  lop: [100, 'Lớp/môn'],
+};
+
+/** Chuỗi tùy chọn: trim, trống → null, quá dài → lỗi. */
+function chuoiHoacNull(v: unknown, k: 'gioi_tinh' | 'lop'): KetQuaTruong {
+  const [toiDa, nhan] = DO_DAI[k];
+  if (v === null) return dung(null);
+  if (typeof v !== 'string') return loiDeNghi(`${nhan} phải là chuỗi`);
+  const s = v.trim();
+  if (s.length > toiDa) return loiDeNghi(`${nhan} tối đa ${toiDa} ký tự`);
+  return dung(s === '' ? null : s);
+}
+
+/** Cùng quy tắc ngày như DTO (NGAY + ISO 8601 strict); null / '' = để trống. */
+function ngayHoacNull(v: unknown): KetQuaTruong {
+  if (v === null || v === '') return dung(null);
+  const hopLe =
+    typeof v === 'string' && NGAY.test(v) && isISO8601(v, { strict: true });
+  return hopLe ? dung(v) : loiDeNghi(MSG_NGAY_SINH);
+}
+
+function chuanHoaTruong(k: TruongDeNghi, v: unknown): KetQuaTruong {
+  if (k === 'ho_ten') {
+    const s = typeof v === 'string' ? v.trim() : '';
+    return s.length >= 1 && s.length <= 255 ? dung(s) : loiDeNghi(MSG_HO_TEN);
+  }
+  if (k === 'ngay_sinh') return ngayHoacNull(v);
+  if (k === 'giai_doan') {
+    const hopLe = typeof v === 'string' && Object.keys(TY_LE_SUAT).includes(v);
+    return hopLe ? dung(v) : loiDeNghi(MSG_GIAI_DOAN);
+  }
+  return chuoiHoacNull(v, k);
+}
+
+/**
+ * X2: kiểm + chuẩn hóa giá trị đề nghị của trường.
+ * - bot: không kèm giá trị ({}).
+ * - sua: một phần của TRUONG_DE_NGHI; trả CHỈ các trường khác dòng hiện tại; không khác gì → lỗi.
+ * - them: bắt buộc họ tên; ô trống → null; giai đoạn mặc định Cả 2.
+ */
+export function kiemTraGiaTriDeNghi(
+  loai: LoaiDeNghi,
+  giaTri: unknown,
+  dongHienTai?: DongDeNghi,
+): KetQuaGiaTriDeNghi {
+  const goc = giaTri ?? {};
+  if (typeof goc !== 'object' || Array.isArray(goc)) {
+    return loiDeNghi('Giá trị đề nghị không hợp lệ');
+  }
+  const khoa = Object.keys(goc);
+  if (loai === 'bot') {
+    return khoa.length === 0
+      ? { hopLe: true, giaTri: {} }
+      : loiDeNghi('Đề nghị bớt người không kèm giá trị');
+  }
+  const la = khoa.find(
+    (k) => !(TRUONG_DE_NGHI as readonly string[]).includes(k),
+  );
+  if (la !== undefined) {
+    return loiDeNghi(
+      `Không đề nghị được "${la}" — chỉ đề nghị họ tên, ngày sinh, giới tính, lớp/môn, giai đoạn`,
+    );
+  }
+  const moi: Record<string, unknown> = {};
+  for (const k of khoa as TruongDeNghi[]) {
+    const kq = chuanHoaTruong(k, (goc as Record<string, unknown>)[k]);
+    if ('lyDo' in kq) return kq;
+    moi[k] = kq.giaTri;
+  }
+
+  if (loai === 'them') {
+    if (moi.ho_ten === undefined) return loiDeNghi(MSG_HO_TEN);
+    const giaTriThem: GiaTriDeNghi = {
+      ho_ten: moi.ho_ten as string,
+      ngay_sinh: (moi.ngay_sinh ?? null) as string | null,
+      gioi_tinh: (moi.gioi_tinh ?? null) as string | null,
+      lop: (moi.lop ?? null) as string | null,
+      giai_doan: (moi.giai_doan ?? 'ca_hai') as GiaiDoanThamGia,
+    };
+    return { hopLe: true, giaTri: giaTriThem };
+  }
+
+  if (!dongHienTai) return loiDeNghi(MSG_KHONG_DOI);
+  const doi = Object.fromEntries(
+    Object.entries(moi).filter(
+      ([k, v]) => v !== dongHienTai[k as TruongDeNghi],
+    ),
+  );
+  if (Object.keys(doi).length === 0) return loiDeNghi(MSG_KHONG_DOI);
+  return { hopLe: true, giaTri: doi as GiaTriDeNghi };
 }

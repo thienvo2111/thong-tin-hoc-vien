@@ -54,6 +54,55 @@ export interface DanhSachCuaTruong {
   /** X2: bật nút "Xác nhận danh sách" được không; không → lý do. */
   co_the_xac_nhan: boolean;
   ly_do_khong_xac_nhan: string | null;
+  /** Issue #62: đề nghị của trường trong đợt, mới nhất trước. */
+  de_nghi: DeNghiCuaTruong[];
+  so_de_nghi_cho: number;
+}
+
+// Issue #62 / ADR 0015 X2: đề nghị sửa / thêm / bớt người của trường — HCMUE Áp dụng / Từ chối.
+export type LoaiDeNghi = 'sua' | 'them' | 'bot';
+export type TrangThaiDeNghi = 'cho' | 'da_ap_dung' | 'tu_choi';
+
+/** Thông tin trường được đề nghị (suất, trường, mã gốc, ghi chú là của HCMUE). */
+export interface GiaTriDeNghi {
+  ho_ten?: string;
+  ngay_sinh?: string | null;
+  gioi_tinh?: string | null;
+  lop?: string | null;
+  giai_doan?: GiaiDoanThamGia;
+}
+
+/** Bản chụp dòng lúc gửi đề nghị sửa/bớt. */
+export interface BanChupDong {
+  ho_ten: string;
+  ngay_sinh: string | null;
+  gioi_tinh: string | null;
+  lop: string | null;
+  giai_doan: GiaiDoanThamGia;
+  ty_le_suat: number;
+}
+
+export interface DeNghiCuaTruong {
+  id: string;
+  loai: LoaiDeNghi;
+  /** null khi thêm người hoặc dòng đã bị xóa. */
+  dong_id: string | null;
+  gia_tri: GiaTriDeNghi;
+  gia_tri_cu: BanChupDong | null;
+  /** Ghi chú / lý do của trường. */
+  ly_do: string | null;
+  trang_thai: TrangThaiDeNghi;
+  ly_do_tu_choi: string | null;
+  gui_luc: string;
+  xu_ly_luc: string | null;
+}
+
+/** POST de-nghi: sửa chỉ gửi trường đã đổi; bớt bắt buộc lý do; thêm không có dong_id. */
+export interface GuiDeNghi {
+  loai: LoaiDeNghi;
+  dong_id?: string;
+  gia_tri?: GiaTriDeNghi;
+  ly_do?: string;
 }
 
 const URL = '/cong-don-vi/truong/dot';
@@ -104,5 +153,11 @@ export function useDongYTatCa(dotId: string) {
 export function useXacNhanDanhSach(dotId: string) {
   return useThaoTacDanhSach(dotId, () =>
     apiFetch<DanhSachCuaTruong>(`${URL}/${dotId}/danh-sach/xac-nhan`, { method: 'POST' }),
+  );
+}
+
+export function useGuiDeNghi(dotId: string) {
+  return useThaoTacDanhSach(dotId, (body: GuiDeNghi) =>
+    apiFetch<DanhSachCuaTruong>(`${URL}/${dotId}/de-nghi`, { method: 'POST', body: JSON.stringify(body) }),
   );
 }
