@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type {
   chuong_trinh_boi_duong,
+  hop_dong_boi_duong,
   trang_thai_danh_sach_truong,
   trang_thai_hop_dong,
 } from '@prisma/client';
@@ -153,17 +154,61 @@ function chuyenKhoanTu(maQhns: string | null): ChuyenKhoan | null {
     : null;
 }
 
-/** Số liệu + hồ sơ dùng để hiển thị: trực tiếp khi chưa nộp, bản chụp khi đã nộp (M5). */
-function soLieu(nc: NguCanh) {
-  const h = nc.hopDong;
+/** Các cột của hop_dong_boi_duong cần để chọn số liệu trực tiếp hay bản chụp lúc nộp. */
+export type CotSoLieuHopDong = Pick<
+  hop_dong_boi_duong,
+  | 'trang_thai_hop_dong'
+  | 'so_nguoi_luc_nop'
+  | 'tong_suat_luc_nop'
+  | 'don_gia_luc_nop'
+  | 'gia_tri_luc_nop'
+  | 'ban_chup_ho_so'
+>;
+
+/** Số liệu tính trực tiếp từ danh sách hiện tại + đơn giá đợt + hồ sơ hiện tại (dùng khi chưa nộp). */
+export interface SoLieuTrucTiep {
+  so_nguoi: number;
+  tong_suat: number;
+  don_gia: number | null;
+  hoSo: HoSoDonViDuLieu | null;
+}
+
+/**
+ * M5: số liệu + hồ sơ của 1 hợp đồng — chưa nộp: tính trực tiếp (giá trị tạm tính S5); đã nộp: số liệu và
+ * bản chụp hồ sơ lúc nộp (không tính lại). Dùng chung cho màn hợp đồng và bảng Tiến độ đợt (issue #65).
+ */
+export function soLieuHopDong(h: CotSoLieuHopDong, trucTiep: SoLieuTrucTiep) {
   if (h.trang_thai_hop_dong === 'da_nop') {
-    const bc = h.ban_chup_ho_so as unknown as BanChupHoSo;
     return {
       so_nguoi: h.so_nguoi_luc_nop ?? 0,
       tong_suat: Number(h.tong_suat_luc_nop ?? 0),
       don_gia: h.don_gia_luc_nop,
       gia_tri: h.gia_tri_luc_nop === null ? null : Number(h.gia_tri_luc_nop),
-      hoSo: bc as HoSoDonViDuLieu,
+      hoSo: h.ban_chup_ho_so as unknown as HoSoDonViDuLieu,
+    };
+  }
+  return {
+    so_nguoi: trucTiep.so_nguoi,
+    tong_suat: trucTiep.tong_suat,
+    don_gia: trucTiep.don_gia,
+    gia_tri: giaTriTamTinh(trucTiep.tong_suat, trucTiep.don_gia),
+    hoSo: trucTiep.hoSo,
+  };
+}
+
+/** Số liệu + hồ sơ dùng để hiển thị: trực tiếp khi chưa nộp, bản chụp khi đã nộp (M5). */
+function soLieu(nc: NguCanh) {
+  const h = nc.hopDong;
+  const sl = soLieuHopDong(h, {
+    so_nguoi: nc.dong.length,
+    tong_suat: tongSuat(nc.dong),
+    don_gia: h.dot_trien_khai.don_gia,
+    hoSo: nc.hoSo,
+  });
+  if (h.trang_thai_hop_dong === 'da_nop') {
+    const bc = h.ban_chup_ho_so as unknown as BanChupHoSo;
+    return {
+      ...sl,
       chuyen_khoan: bc.stk_chuyen_khoan
         ? {
             stk: bc.stk_chuyen_khoan,
@@ -173,16 +218,7 @@ function soLieu(nc: NguCanh) {
         : null,
     };
   }
-  const tong_suat = tongSuat(nc.dong);
-  const don_gia = h.dot_trien_khai.don_gia;
-  return {
-    so_nguoi: nc.dong.length,
-    tong_suat,
-    don_gia,
-    gia_tri: giaTriTamTinh(tong_suat, don_gia),
-    hoSo: nc.hoSo,
-    chuyen_khoan: chuyenKhoanTu(nc.hoSo?.ma_qhns ?? null),
-  };
+  return { ...sl, chuyen_khoan: chuyenKhoanTu(nc.hoSo?.ma_qhns ?? null) };
 }
 
 function lyDoCua(nc: NguCanh, giaTri: number | null): LyDoChanNop[] {

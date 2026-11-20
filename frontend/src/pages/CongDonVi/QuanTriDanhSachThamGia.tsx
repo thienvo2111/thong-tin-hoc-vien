@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Alert, Container, Select, Skeleton, Stack, Title } from '@mantine/core';
 import { useDanhSachDotTrienKhai } from '@/api/dotTrienKhai';
 import { thongDiepLoiChung } from '@/lib/loiApi';
@@ -11,7 +12,9 @@ import { NapDanhSachHsg } from './NapDanhSachHsg';
  * Issue #62: mục "Đề nghị của trường" — hàng đợi Áp dụng / Từ chối đề nghị sửa/thêm/bớt người. */
 export default function QuanTriDanhSachThamGia() {
   const { data, isLoading, isError, error } = useDanhSachDotTrienKhai();
-  const [dotId, setDotId] = useState<string | null>(null);
+  // Issue #65: mở từ bảng Tiến độ đợt với ?dot=…&don_vi_id=… → chọn sẵn đợt và trường.
+  const [params] = useSearchParams();
+  const [dotId, setDotId] = useState<string | null>(params.get('dot'));
   const dot = data?.find((d) => d.id === dotId) ?? null;
 
   return (
@@ -38,7 +41,14 @@ export default function QuanTriDanhSachThamGia() {
           <Alert color="blue">Đợt NLS lấy danh sách từ khóa — chức năng này sẽ có ở bước sau.</Alert>
         )}
         {dot && <HangDoiDeNghi key={`de-nghi-${dot.id}`} dotId={dot.id} />}
-        {dot && <DanhSachTheoTruong key={dot.id} dotId={dot.id} choThem={dot.chuong_trinh === 'hsg'} />}
+        {dot && (
+          <DanhSachTheoTruong
+            key={dot.id}
+            dotId={dot.id}
+            choThem={dot.chuong_trinh === 'hsg'}
+            donViIdBanDau={dot.id === params.get('dot') ? params.get('don_vi_id') : null}
+          />
+        )}
       </Stack>
     </Container>
   );

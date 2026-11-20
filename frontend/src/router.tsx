@@ -375,6 +375,11 @@ export const routesCongDonVi: RouteObject[] = [
                 lazy: () => import('@/pages/CongDonVi/ChiQuanTriCong').then((m) => ({ Component: m.default })),
                 children: [
                   {
+                    // Issue #65: bảng Tiến độ đợt + Excel trường chưa xong (ADR 0015 X7, T5).
+                    path: '/quan-tri/tien-do-dot',
+                    lazy: () => import('@/pages/CongDonVi/QuanTriTienDoDot').then((m) => ({ Component: m.default })),
+                  },
+                  {
                     path: '/quan-tri/dot-trien-khai',
                     lazy: () => import('@/pages/CongDonVi/QuanTriDotTrienKhai').then((m) => ({ Component: m.default })),
                   },

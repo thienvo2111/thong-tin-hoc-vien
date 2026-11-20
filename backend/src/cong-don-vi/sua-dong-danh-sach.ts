@@ -84,11 +84,15 @@ export function slugTenDot(ten: string): string {
 
 const LECH_GIO_VN_MS = 7 * 60 * 60 * 1000;
 
-/** danh-sach-<slug đợt>-<YYYYMMDD theo giờ Việt Nam>.xlsx */
-export function tenFileXuatDanhSach(tenDot: string, luc: Date): string {
-  const ngay = new Date(luc.getTime() + LECH_GIO_VN_MS)
+/** YYYYMMDD theo giờ Việt Nam — phần ngày trong tên file xuất. */
+export function ngayTenFile(luc: Date): string {
+  return new Date(luc.getTime() + LECH_GIO_VN_MS)
     .toISOString()
     .slice(0, 10)
     .replace(/-/g, '');
-  return `danh-sach-${slugTenDot(tenDot)}-${ngay}.xlsx`;
+}
+
+/** danh-sach-<slug đợt>-<YYYYMMDD theo giờ Việt Nam>.xlsx */
+export function tenFileXuatDanhSach(tenDot: string, luc: Date): string {
+  return `danh-sach-${slugTenDot(tenDot)}-${ngayTenFile(luc)}.xlsx`;
 }

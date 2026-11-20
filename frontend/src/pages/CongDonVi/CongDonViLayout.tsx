@@ -13,8 +13,9 @@ const MENU = [
 ];
 // Issue #63 / P1: "Hồ sơ đơn vị" chỉ cho trường, ngay sau Trang chủ.
 const MENU_TRUONG = [MENU[0], { to: '/ho-so-don-vi', nhan: 'Hồ sơ đơn vị' }, ...MENU.slice(1)];
-// Issue #56/#57: mục chỉ hiện cho quan_tri.
+// Issue #56/#57: mục chỉ hiện cho quan_tri. Issue #65 / P2: "Tiến độ đợt" là mục quản trị đầu tiên.
 const MENU_QUAN_TRI = [
+  { to: '/quan-tri/tien-do-dot', nhan: 'Tiến độ đợt' },
   { to: '/quan-tri/dot-trien-khai', nhan: 'Chương trình / Đợt' },
   { to: '/quan-tri/don-vi-tai-khoan', nhan: 'Đơn vị & tài khoản' },
   { to: '/quan-tri/danh-sach-tham-gia', nhan: 'Danh sách tham gia' },

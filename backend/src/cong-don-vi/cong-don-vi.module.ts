@@ -18,6 +18,8 @@ import {
   HopDongTruongController,
 } from './hop-dong.controller';
 import { HopDongService } from './hop-dong.service';
+import { TienDoDotController } from './tien-do-dot.controller';
+import { TienDoDotService } from './tien-do-dot.service';
 
 // ADR 0015: mọi API của Cổng đơn vị (tiền tố /cong-don-vi). PrismaService và
 // NhatKyService là @Global() nên không cần import module. AuthModule cho
@@ -33,6 +35,7 @@ import { HopDongService } from './hop-dong.service';
     HoSoDonViController,
     HopDongTruongController,
     HopDongQuanTriController,
+    TienDoDotController,
   ],
   providers: [
     DotTrienKhaiService,
@@ -41,6 +44,7 @@ import { HopDongService } from './hop-dong.service';
     DeNghiSuaService,
     HoSoDonViService,
     HopDongService,
+    TienDoDotService,
   ],
 })
 export class CongDonViModule {}

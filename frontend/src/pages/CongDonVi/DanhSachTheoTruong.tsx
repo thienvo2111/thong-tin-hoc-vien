@@ -21,9 +21,19 @@ type MoForm = { dong: DongDanhSach | null; donViMacDinh: string | null } | null;
 /** Danh sách tham gia của đợt: tổng hợp theo trường, chọn 1 trường để xem từng người (issue #58).
  * Issue #59: Quản trị sửa/xóa từng dòng, thêm người (đợt HSG), xuất Excel cả đợt hoặc 1 trường.
  * Issue #62: số đề nghị chờ theo trường + đánh dấu dòng có đề nghị chờ. */
-export function DanhSachTheoTruong({ dotId, choThem }: { dotId: string; choThem: boolean }) {
+export function DanhSachTheoTruong({
+  dotId,
+  choThem,
+  donViIdBanDau = null,
+}: {
+  dotId: string;
+  choThem: boolean;
+  /** Issue #65: trường chọn sẵn (từ ?don_vi_id= của bảng Tiến độ đợt) cho tới khi bấm "Xem" trường khác. */
+  donViIdBanDau?: string | null;
+}) {
   const { data, isLoading, isError, error } = useDanhSachThamGia(dotId);
-  const [truong, setTruong] = useState<TongHopTruong | null>(null);
+  const [truongChon, setTruong] = useState<TongHopTruong | null>(null);
+  const truong = truongChon ?? data?.tong_hop.find((t) => t.don_vi_id === donViIdBanDau) ?? null;
   const [moForm, setMoForm] = useState<MoForm>(null);
   const [dongXoa, setDongXoa] = useState<DongDanhSach | null>(null);
   const xuat = useMutation({
