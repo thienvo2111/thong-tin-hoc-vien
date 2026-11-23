@@ -6,12 +6,14 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
 } from '@nestjs/common';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { DotTrienKhaiService } from './dot-trien-khai.service';
 import {
+  GanKhoaDotDto,
   SuaDotTrienKhaiDto,
   TaoDotTrienKhaiDto,
 } from './dto/dot-trien-khai.dto';
@@ -40,5 +42,16 @@ export class DotTrienKhaiController {
   @Patch('dot-trien-khai/:id')
   sua(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SuaDotTrienKhaiDto) {
     return this.service.sua(id, dto);
+  }
+
+  // Issue #68 / ADR 0015 M1: khóa NLS cho ô chọn + gắn (thay trọn tập khóa của đợt).
+  @Get('dot-trien-khai/:id/khoa-co-the-gan')
+  khoaCoTheGan(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.khoaCoTheGan(id);
+  }
+
+  @Put('dot-trien-khai/:id/khoa')
+  ganKhoa(@Param('id', ParseUUIDPipe) id: string, @Body() dto: GanKhoaDotDto) {
+    return this.service.ganKhoa(id, dto.khoa_ids);
   }
 }

@@ -41,6 +41,16 @@ function TheDot({ dot, onSua }: { dot: DotTrienKhai; onSua: () => void }) {
         <DongThongTin nhan="Đơn giá" giaTri={dot.don_gia === null ? CHUA_CO : dinhDangTien(dot.don_gia)} />
         <DongThongTin nhan="QĐ chỉ định thầu" giaTri={khoangQd} />
         <DongThongTin nhan="Hạn nộp" giaTri={dinhDangNgayLich(dot.han_nop_ngay)} />
+        {dot.chuong_trinh === 'nls' && (
+          <DongThongTin
+            nhan="Khóa NLS"
+            giaTri={
+              dot.khoa.length === 0
+                ? 'Chưa gắn'
+                : `${dot.khoa.length} khóa (${dot.khoa.map((k) => k.ma_khoa).join(', ')})`
+            }
+          />
+        )}
       </Stack>
     </Paper>
   );

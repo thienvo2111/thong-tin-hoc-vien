@@ -7,6 +7,7 @@ import {
   DongDanhSachThamGiaController,
 } from './danh-sach-tham-gia.controller';
 import { DanhSachThamGiaService } from './danh-sach-tham-gia.service';
+import { ChupDanhSachNlsService } from './chup-danh-sach-nls.service';
 import { TruongDanhSachController } from './truong-danh-sach.controller';
 import { TruongDanhSachService } from './truong-danh-sach.service';
 import { DeNghiSuaController } from './de-nghi-sua.controller';
@@ -44,6 +45,7 @@ import { TienDoDotService } from './tien-do-dot.service';
   providers: [
     DotTrienKhaiService,
     DanhSachThamGiaService,
+    ChupDanhSachNlsService,
     TruongDanhSachService,
     DeNghiSuaService,
     HoSoDonViService,

@@ -340,11 +340,11 @@ describe('QuanTriDanhSachThamGia — danh sách theo trường', () => {
     expect(within(dong2).getByText('Chưa có ý kiến')).toBeInTheDocument();
   }, 20000);
 
-  it('đợt NLS: không có phần nạp Excel, vẫn xem được danh sách', async () => {
+  it('đợt NLS: không có phần nạp Excel, có "Lấy danh sách từ khóa", vẫn xem được danh sách', async () => {
     const user = userEvent.setup();
     renderTrang();
     await chonDot(user, 'NLS – NLS đợt 1');
-    expect(await screen.findByText(/Đợt NLS lấy danh sách từ khóa/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Lấy danh sách từ khóa' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Nạp danh sách HSG' })).not.toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Danh sách theo trường' })).toBeInTheDocument();
   }, 20000);

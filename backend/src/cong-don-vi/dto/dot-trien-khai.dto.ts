@@ -1,5 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsIn,
   IsInt,
   IsISO8601,
@@ -94,4 +96,12 @@ export class SuaDotTrienKhaiDto {
   @ValidateIf(coGui)
   @IsUUID('all', MSG_SO)
   so_gddt_id?: string;
+}
+
+// PUT /cong-don-vi/dot-trien-khai/:id/khoa (quan_tri) — issue #68 / ADR 0015 M1: thay trọn tập khóa NLS của đợt.
+export class GanKhoaDotDto {
+  @IsArray({ message: 'khoa_ids phải là mảng' })
+  @ArrayMaxSize(200, { message: 'khoa_ids tối đa 200 khóa' })
+  @IsUUID('all', { each: true, message: 'khoa_ids có id không hợp lệ' })
+  khoa_ids!: string[];
 }

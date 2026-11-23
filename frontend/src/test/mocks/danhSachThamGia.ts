@@ -1,5 +1,12 @@
 import { http, HttpResponse } from 'msw';
-import type { DanhSachThamGia, DongXemTruoc, KetQuaXemTruoc, TruongPhamVi } from '@/api/danhSachThamGia';
+import type {
+  DanhSachThamGia,
+  DongXemTruoc,
+  KetQuaLayTuKhoa,
+  KetQuaXemTruoc,
+  TruongPhamVi,
+  XemTruocChup,
+} from '@/api/danhSachThamGia';
 
 // Issue #58: danh sách tham gia HSG (Cổng đơn vị) — CSDL giả trong bộ nhớ, reset sau mỗi test (setup.ts).
 // Tên người/trường đều bịa.
@@ -92,14 +99,64 @@ export function xemTruocMau(): KetQuaXemTruoc {
   };
 }
 
+/** Issue #68: xem trước "Lấy danh sách từ khóa" — tr-1 đã nộp (giữ nguyên), tr-2 có đề nghị chờ, tr-3 bị xóa hết. */
+export function xemTruocChupMau(): XemTruocChup {
+  const truong = (p: Partial<XemTruocChup['truong'][number]>) => ({
+    don_vi_id: 'tr-1',
+    ten: 'Trường THCS Mẫu Một',
+    ma: 'TR-MAU-001',
+    so_dong_moi: 0,
+    so_dong_cu: 0,
+    tong_suat_moi: 0,
+    da_nop: false,
+    co_de_nghi_cho: false,
+    ...p,
+  });
+  const tr3 = truong({ don_vi_id: 'tr-3', ten: 'Trường TH Mẫu Ba', ma: 'TR-MAU-003', so_dong_cu: 2 });
+  return {
+    so_khoa: 2,
+    so_dong: 5,
+    so_truong: 2,
+    tong_suat: 4,
+    truong: [
+      truong({ so_dong_moi: 3, so_dong_cu: 3, tong_suat_moi: 2.5, da_nop: true }),
+      truong({
+        don_vi_id: 'tr-2',
+        ten: 'Trường THCS&THPT Mẫu Hai',
+        ma: null,
+        so_dong_moi: 2,
+        so_dong_cu: 1,
+        tong_suat_moi: 1.5,
+        co_de_nghi_cho: true,
+      }),
+      tr3,
+    ],
+    bo_qua: {
+      chua_phan_lop: 4,
+      ngoai_pham_vi: [
+        {
+          hoc_vien_id: 'hv-x',
+          ho_ten: 'GV Bịa Ngoài',
+          don_vi_ten: 'Phòng Bịa',
+          ly_do: 'Đơn vị công tác không phải trường',
+        },
+      ],
+      trung_khoa: 1,
+    },
+    truong_bi_xoa: [tr3],
+  };
+}
+
 export const dbDanhSachThamGia = {
   xemTruoc: xemTruocMau(),
   danhSach: { tong_hop: [], dong: [] } as DanhSachThamGia,
+  xemTruocChup: xemTruocChupMau(),
 };
 
 export function datLaiDanhSachThamGiaMock() {
   dbDanhSachThamGia.xemTruoc = xemTruocMau();
   dbDanhSachThamGia.danhSach = { tong_hop: [], dong: [] };
+  dbDanhSachThamGia.xemTruocChup = xemTruocChupMau();
 }
 
 const URL = '/cong-don-vi/dot-trien-khai/:id';
@@ -108,6 +165,23 @@ export const danhSachThamGiaHandlers = [
   http.get(`${URL}/truong-trong-pham-vi`, () => HttpResponse.json(TRUONG_PHAM_VI)),
   http.get(`${URL}/danh-sach`, () => HttpResponse.json(dbDanhSachThamGia.danhSach)),
   http.post(`${URL}/danh-sach/xem-truoc`, () => HttpResponse.json(dbDanhSachThamGia.xemTruoc)),
+  // Issue #68: đợt NLS — chụp danh sách từ khóa.
+  http.post(`${URL}/danh-sach/lay-tu-khoa/xem-truoc`, () => HttpResponse.json(dbDanhSachThamGia.xemTruocChup)),
+  http.post(`${URL}/danh-sach/lay-tu-khoa`, () => {
+    const xt = dbDanhSachThamGia.xemTruocChup;
+    const thay = xt.truong.filter((t) => !t.da_nop);
+    const kq: KetQuaLayTuKhoa = {
+      so_khoa: xt.so_khoa,
+      so_dong: xt.so_dong,
+      so_truong: xt.so_truong,
+      bo_qua: xt.bo_qua,
+      so_dong_da_ghi: thay.reduce((t, x) => t + x.so_dong_moi, 0),
+      so_truong_da_thay: thay.length,
+      so_de_nghi_tu_choi: 1,
+      giu_nguyen_da_nop: xt.truong.filter((t) => t.da_nop).map((t) => ({ don_vi_id: t.don_vi_id, ten_don_vi: t.ten })),
+    };
+    return HttpResponse.json(kq);
+  }),
   http.post(`${URL}/danh-sach/nap`, async ({ request }) => {
     const { dong } = (await request.json()) as { dong: { don_vi_id: string; ty_le_suat: number }[] };
     return HttpResponse.json({

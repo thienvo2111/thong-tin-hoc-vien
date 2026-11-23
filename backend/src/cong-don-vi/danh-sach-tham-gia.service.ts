@@ -581,7 +581,7 @@ export class DanhSachThamGiaService {
    * ADR 0015 M5 (issue #60): mọi (đợt, trường) có ≥ 1 dòng danh sách đều có 1 dòng hop_dong_boi_duong.
    * Đã có thì giữ nguyên (không đặt lại trạng thái); danh sách rỗng đi cũng không xóa.
    */
-  private taoHopDongNeuChuaCo(tx: Tx, dotId: string, donViIds: string[]) {
+  taoHopDongNeuChuaCo(tx: Tx, dotId: string, donViIds: string[]) {
     return tx.hop_dong_boi_duong.createMany({
       data: donViIds.map((don_vi_id) => ({
         dot_trien_khai_id: dotId,
@@ -596,12 +596,7 @@ export class DanhSachThamGiaService {
    * Báo sai lệch nếu trường còn dòng Không đồng ý / đề nghị chờ (trangThaiSauQuanTriSua) + Quản trị là người
    * thao tác cuối. Dòng bị sửa đã mất ý kiến (apDungSua); dòng mới chưa có.
    */
-  private sauQuanTriSua(
-    tx: Tx,
-    dotId: string,
-    donViIds: string[],
-    callerId: string,
-  ) {
+  sauQuanTriSua(tx: Tx, dotId: string, donViIds: string[], callerId: string) {
     return datTrangThaiTheoSaiLech(
       tx,
       dotId,
@@ -612,7 +607,7 @@ export class DanhSachThamGiaService {
   }
 
   /** Nhật ký các đề nghị bị tự Từ chối (cùng hành động với Quản trị bấm Từ chối). */
-  private async ghiTuChoiTuDong(ds: DeNghiTuDongTuChoi[]) {
+  async ghiTuChoiTuDong(ds: DeNghiTuDongTuChoi[]) {
     if (ds.length === 0) return;
     await this.nhatKy.ghiNhieu(
       ds.map((chi_tiet) => ({

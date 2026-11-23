@@ -5,6 +5,7 @@ import { useDanhSachDotTrienKhai } from '@/api/dotTrienKhai';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { DanhSachTheoTruong } from './DanhSachTheoTruong';
 import { HangDoiDeNghi } from './HangDoiDeNghi';
+import { LayDanhSachTuKhoa } from './LayDanhSachTuKhoa';
 import { NapDanhSachHsg } from './NapDanhSachHsg';
 
 /** Quản trị: Danh sách tham gia theo đợt (issue #58, ADR 0015 M3/M6/T7). Nạp Excel chỉ cho đợt HSG;
@@ -37,9 +38,7 @@ export default function QuanTriDanhSachThamGia() {
           />
         )}
         {dot?.chuong_trinh === 'hsg' && <NapDanhSachHsg key={dot.id} dotId={dot.id} />}
-        {dot?.chuong_trinh === 'nls' && (
-          <Alert color="blue">Đợt NLS lấy danh sách từ khóa — chức năng này sẽ có ở bước sau.</Alert>
-        )}
+        {dot?.chuong_trinh === 'nls' && <LayDanhSachTuKhoa key={dot.id} dot={dot} />}
         {dot && <HangDoiDeNghi key={`de-nghi-${dot.id}`} dotId={dot.id} />}
         {dot && (
           <DanhSachTheoTruong

@@ -3,7 +3,9 @@ import { Prisma } from '@prisma/client';
 import type { chuong_trinh_boi_duong } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NhatKyService } from '../nhat-ky/nhat-ky.service';
+import { ScopeService } from '../auth/scope/scope.service';
 import {
+  ConflictAppException,
   NotFoundAppException,
   ValidationException,
 } from '../common/exceptions/app.exceptions';
@@ -12,6 +14,22 @@ import {
   TaoDotTrienKhaiDto,
 } from './dto/dot-trien-khai.dto';
 import { hanNopTuNgay, ngayVietNam } from './han-nop';
+
+/** Issue #68 / ADR 0015 M1: khóa NLS gắn vào đợt (ngày dạng 'YYYY-MM-DD'). */
+export interface KhoaCuaDot {
+  id: string;
+  ma_khoa: string;
+  ten_khoa: string;
+  thoi_gian_bat_dau: string;
+  thoi_gian_ket_thuc: string;
+}
+
+/** Khóa trong phạm vi Sở của đợt cho ô chọn — kèm đợt đang gắn (nếu có). */
+export interface KhoaCoTheGan extends KhoaCuaDot {
+  trang_thai: string;
+  dot_trien_khai_id: string | null;
+  dot_trien_khai_ten: string | null;
+}
 
 export interface DotTrienKhai {
   id: string;
@@ -23,13 +41,41 @@ export interface DotTrienKhai {
   han_nop: string;
   han_nop_ngay: string;
   so_gddt: { id: string; ten_don_vi: string };
+  /** Issue #68: khóa NLS đã gắn (HSG: luôn rỗng). */
+  khoa: KhoaCuaDot[];
   created_at: Date;
   updated_at: Date;
 }
 
+const CHON_KHOA = {
+  id: true,
+  ma_khoa: true,
+  ten_khoa: true,
+  thoi_gian_bat_dau: true,
+  thoi_gian_ket_thuc: true,
+} satisfies Prisma.khoa_boi_duongSelect;
+
 const BAO_GOM = {
   so_gddt: { select: { id: true, ten_don_vi: true } },
+  khoa_boi_duong: {
+    select: CHON_KHOA,
+    orderBy: [{ thoi_gian_bat_dau: 'asc' }, { ma_khoa: 'asc' }],
+  },
 } satisfies Prisma.dot_trien_khaiInclude;
+
+type KhoaChon = Prisma.khoa_boi_duongGetPayload<{ select: typeof CHON_KHOA }>;
+
+function toKhoaCuaDot(k: KhoaChon): KhoaCuaDot {
+  return {
+    id: k.id,
+    ma_khoa: k.ma_khoa,
+    ten_khoa: k.ten_khoa,
+    thoi_gian_bat_dau: ngaySangChuoi(k.thoi_gian_bat_dau) as string,
+    thoi_gian_ket_thuc: ngaySangChuoi(k.thoi_gian_ket_thuc) as string,
+  };
+}
+
+const LOI_DOT_HSG_GAN_KHOA = 'Đợt HSG không gắn khóa NLS';
 
 type DongDot = Prisma.dot_trien_khaiGetPayload<{ include: typeof BAO_GOM }>;
 
@@ -88,6 +134,7 @@ export class DotTrienKhaiService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly nhatKy: NhatKyService,
+    private readonly scope: ScopeService,
   ) {}
 
   async layDanhSach(): Promise<DotTrienKhai[]> {
@@ -164,6 +211,118 @@ export class DotTrienKhaiService {
     return this.toDto(moi);
   }
 
+  /** Issue #68: khóa do Sở của đợt hoặc đơn vị trực thuộc đặt hàng, mới bắt đầu trước. */
+  async khoaCoTheGan(id: string): Promise<KhoaCoTheGan[]> {
+    const dot = await this.layHoacLoi(id);
+    if (dot.chuong_trinh !== 'nls') {
+      throw new ValidationException(LOI_DOT_HSG_GAN_KHOA);
+    }
+    const phamVi = await this.scope.collectDescendantIds(dot.so_gddt_id);
+    const ds = await this.prisma.khoa_boi_duong.findMany({
+      where: { don_vi_dat_hang_id: { in: phamVi } },
+      select: {
+        ...CHON_KHOA,
+        trang_thai: true,
+        dot_trien_khai: { select: { id: true, ten: true } },
+      },
+      orderBy: [{ thoi_gian_bat_dau: 'desc' }, { ma_khoa: 'asc' }],
+    });
+    return ds.map((k) => ({
+      ...toKhoaCuaDot(k),
+      trang_thai: k.trang_thai,
+      dot_trien_khai_id: k.dot_trien_khai?.id ?? null,
+      dot_trien_khai_ten: k.dot_trien_khai?.ten ?? null,
+    }));
+  }
+
+  /**
+   * Issue #68 / ADR 0015 M1: thay trọn tập khóa NLS của đợt. Khóa phải do Sở của đợt (hoặc đơn vị trực thuộc)
+   * đặt hàng; khóa đang gắn đợt khác → 409 (gỡ ở đợt đó trước). Khóa bị bỏ → dot_trien_khai_id = NULL; danh
+   * sách đã chụp không đổi (bản chụp, không đọc sống).
+   */
+  async ganKhoa(id: string, khoaIds: string[]): Promise<DotTrienKhai> {
+    const dot = await this.layHoacLoi(id);
+    if (dot.chuong_trinh !== 'nls') {
+      throw new ValidationException(LOI_DOT_HSG_GAN_KHOA, [
+        { field: 'khoa_ids', message: LOI_DOT_HSG_GAN_KHOA },
+      ]);
+    }
+    const ids = [...new Set(khoaIds)];
+    await this.kiemTraKhoaTrongPhamVi(dot.so_gddt_id, ids);
+
+    const { truoc, sau } = await this.prisma.$transaction(async (tx) => {
+      const cu = await tx.khoa_boi_duong.findMany({
+        where: { dot_trien_khai_id: dot.id },
+        select: { id: true },
+      });
+      const { count } = await tx.khoa_boi_duong.updateMany({
+        where: {
+          id: { in: ids },
+          OR: [{ dot_trien_khai_id: null }, { dot_trien_khai_id: dot.id }],
+        },
+        data: { dot_trien_khai_id: dot.id },
+      });
+      if (count < ids.length) await this.chanKhoaDotKhac(tx, dot.id, ids);
+      await tx.khoa_boi_duong.updateMany({
+        where: { dot_trien_khai_id: dot.id, id: { notIn: ids } },
+        data: { dot_trien_khai_id: null },
+      });
+      return { truoc: cu.map((k) => k.id).sort(), sau: [...ids].sort() };
+    });
+    if (truoc.join() !== sau.join()) {
+      await this.nhatKy.ghi({
+        hanh_dong: 'gan_khoa_dot_trien_khai',
+        chi_tiet: { dot_trien_khai_id: dot.id, truoc, sau },
+      });
+    }
+    return this.layMot(dot.id);
+  }
+
+  private async kiemTraKhoaTrongPhamVi(soId: string, ids: string[]) {
+    if (ids.length === 0) return;
+    const [khoa, phamVi] = await Promise.all([
+      this.prisma.khoa_boi_duong.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, ma_khoa: true, don_vi_dat_hang_id: true },
+      }),
+      this.scope.collectDescendantIds(soId),
+    ]);
+    const coSan = new Set(khoa.map((k) => k.id));
+    if (ids.some((i) => !coSan.has(i))) {
+      const message = 'Có khóa không tồn tại';
+      throw new ValidationException(message, [{ field: 'khoa_ids', message }]);
+    }
+    const trongSo = new Set(phamVi);
+    const ngoai = khoa
+      .filter((k) => !trongSo.has(k.don_vi_dat_hang_id))
+      .map((k) => k.ma_khoa)
+      .sort();
+    if (ngoai.length > 0) {
+      const message = `Khóa không do Sở của đợt hoặc đơn vị trực thuộc đặt hàng: ${ngoai.join(', ')}`;
+      throw new ValidationException(message, [{ field: 'khoa_ids', message }]);
+    }
+  }
+
+  /** 409 kèm mã khóa + tên đợt đang gắn; transaction hủy. */
+  private async chanKhoaDotKhac(
+    tx: Prisma.TransactionClient,
+    dotId: string,
+    ids: string[],
+  ): Promise<never> {
+    const khac = await tx.khoa_boi_duong.findMany({
+      where: { id: { in: ids }, dot_trien_khai_id: { not: dotId } },
+      select: { ma_khoa: true, dot_trien_khai: { select: { ten: true } } },
+      orderBy: { ma_khoa: 'asc' },
+    });
+    const moTa = khac.map(
+      (k) => `${k.ma_khoa} (đợt ${k.dot_trien_khai?.ten ?? '?'})`,
+    );
+    throw new ConflictAppException(
+      `Khóa đã gắn đợt khác — gỡ ở đợt đó trước: ${moTa.join(', ')}`,
+      moTa.map((message) => ({ field: 'khoa_ids', message })),
+    );
+  }
+
   private async ghiNhatKySua(cu: DongDot, moi: DongDot) {
     const truoc = giaTriNhatKy(cu);
     const sau = giaTriNhatKy(moi);
@@ -213,6 +372,7 @@ export class DotTrienKhaiService {
       han_nop: d.han_nop.toISOString(),
       han_nop_ngay: ngayVietNam(d.han_nop),
       so_gddt: d.so_gddt,
+      khoa: d.khoa_boi_duong.map(toKhoaCuaDot),
       created_at: d.created_at,
       updated_at: d.updated_at,
     };

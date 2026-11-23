@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Button, Group, Modal, NumberInput, Select, Stack, TextInput } from '@mantine/core';
+import { Alert, Button, Group, Modal, NumberInput, Select, Stack, Text, TextInput } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import 'dayjs/locale/vi';
 import { notifications } from '@mantine/notifications';
@@ -11,6 +11,7 @@ import { useSuaDotTrienKhai, useTaoDotTrienKhai, type DotTrienKhai } from '@/api
 import { loiFieldsThanhMap, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { chuoiSangNgay, docNgayGo, ngaySangChuoi } from '@/lib/ngayLich';
 import { dotTrienKhaiSchema, type DotTrienKhaiForm } from '@/schemas/dotTrienKhai';
+import { KhoaNlsCuaDot } from './KhoaNlsCuaDot';
 
 export const NHAN_CHUONG_TRINH = { nls: 'NLS – Năng lực số', hsg: 'HSG – Bồi dưỡng học sinh giỏi' } as const;
 
@@ -79,6 +80,7 @@ export function ModalDotTrienKhai({ opened, onClose, dot }: Props) {
     handleSubmit,
     reset,
     setError,
+    watch,
     formState: { errors },
   } = useForm<DotTrienKhaiForm>({ resolver: zodResolver(dotTrienKhaiSchema), defaultValues: FORM_RONG });
 
@@ -231,8 +233,19 @@ export function ModalDotTrienKhai({ opened, onClose, dot }: Props) {
           <Button type="submit" loading={tao.isPending || sua.isPending} fullWidth>
             {dot ? 'Lưu thay đổi' : 'Tạo đợt'}
           </Button>
+          {!dot && watch('chuong_trinh') === 'nls' && (
+            <Text fz="sm" c="dimmed">
+              Tạo đợt xong, bấm Sửa để gắn khóa NLS.
+            </Text>
+          )}
         </Stack>
       </form>
+      {/* Issue #68: ngoài form chính — lưu khóa riêng, không gửi kèm thông tin đợt. */}
+      {dot?.chuong_trinh === 'nls' && (
+        <Stack mt="md">
+          <KhoaNlsCuaDot key={dot.id} dot={dot} />
+        </Stack>
+      )}
     </Modal>
   );
 }

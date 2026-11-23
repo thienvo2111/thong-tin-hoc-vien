@@ -208,3 +208,75 @@ export function useXoaDongDanhSach(dotId: string) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: danhSachKey(dotId) }),
   });
 }
+
+// Issue #68 / ADR 0015 M3, S3: đợt NLS — "Lấy danh sách từ khóa" (chụp từ ghi danh, không đọc sống).
+export interface TruongXemTruocChup {
+  don_vi_id: string;
+  ten: string;
+  ma: string | null;
+  so_dong_moi: number;
+  so_dong_cu: number;
+  tong_suat_moi: number;
+  /** X5: đã nộp hợp đồng → chụp giữ nguyên danh sách trường này. */
+  da_nop: boolean;
+  co_de_nghi_cho: boolean;
+}
+
+export interface NguoiNgoaiPhamVi {
+  hoc_vien_id: string;
+  ho_ten: string;
+  don_vi_ten: string;
+  ly_do: string;
+}
+
+export interface BoQuaChup {
+  chua_phan_lop: number;
+  ngoai_pham_vi: NguoiNgoaiPhamVi[];
+  trung_khoa: number;
+}
+
+export interface XemTruocChup {
+  so_khoa: number;
+  so_dong: number;
+  so_truong: number;
+  tong_suat: number;
+  truong: TruongXemTruocChup[];
+  bo_qua: BoQuaChup;
+  /** Trường chưa nộp đang có dòng nhưng bản chụp mới không có ai. */
+  truong_bi_xoa: TruongXemTruocChup[];
+}
+
+export interface KetQuaLayTuKhoa {
+  so_khoa: number;
+  so_dong: number;
+  so_truong: number;
+  bo_qua: BoQuaChup;
+  so_dong_da_ghi: number;
+  so_truong_da_thay: number;
+  so_de_nghi_tu_choi: number;
+  giu_nguyen_da_nop: { don_vi_id: string; ten_don_vi: string }[];
+}
+
+export function xemTruocLayTuKhoa(dotId: string) {
+  return apiFetch<XemTruocChup>(url(dotId, 'danh-sach/lay-tu-khoa/xem-truoc'), { method: 'POST' });
+}
+
+export function layTuKhoa(dotId: string) {
+  return apiFetch<KetQuaLayTuKhoa>(url(dotId, 'danh-sach/lay-tu-khoa'), { method: 'POST' });
+}
+
+export function useXemTruocLayTuKhoa() {
+  return useMutation({ mutationFn: (dotId: string) => xemTruocLayTuKhoa(dotId) });
+}
+
+export function useLayTuKhoa() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dotId: string) => layTuKhoa(dotId),
+    onSuccess: (_kq, dotId) => {
+      void queryClient.invalidateQueries({ queryKey: danhSachKey(dotId) });
+      // Đề nghị sửa/bớt trên dòng bị thay đã tự Từ chối.
+      void queryClient.invalidateQueries({ queryKey: ['cong-don-vi', 'de-nghi', dotId] });
+    },
+  });
+}

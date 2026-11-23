@@ -20,6 +20,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { DanhSachThamGiaService } from './danh-sach-tham-gia.service';
+import { ChupDanhSachNlsService } from './chup-danh-sach-nls.service';
 import { taoFileMauDanhSach } from './danh-sach-tham-gia.excel';
 import {
   LocDanhSachDto,
@@ -36,7 +37,10 @@ const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 @Roles('quan_tri')
 @Controller('cong-don-vi/dot-trien-khai/:id')
 export class DanhSachThamGiaController {
-  constructor(private readonly service: DanhSachThamGiaService) {}
+  constructor(
+    private readonly service: DanhSachThamGiaService,
+    private readonly chupNls: ChupDanhSachNlsService,
+  ) {}
 
   @Get('truong-trong-pham-vi')
   truongTrongPhamVi(@Param('id', ParseUUIDPipe) id: string) {
@@ -80,6 +84,22 @@ export class DanhSachThamGiaController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.service.nap(id, dto.dong, user.id);
+  }
+
+  // Issue #68 / ADR 0015 M3, S3: đợt NLS chụp danh sách từ ghi danh các khóa đã gắn. Xem trước không ghi gì.
+  @Post('danh-sach/lay-tu-khoa/xem-truoc')
+  @HttpCode(200)
+  xemTruocLayTuKhoa(@Param('id', ParseUUIDPipe) id: string) {
+    return this.chupNls.xemTruoc(id);
+  }
+
+  @Post('danh-sach/lay-tu-khoa')
+  @HttpCode(200)
+  layTuKhoa(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.chupNls.layTuKhoa(id, user.id);
   }
 
   @Get('danh-sach')

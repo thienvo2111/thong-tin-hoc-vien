@@ -845,6 +845,8 @@ model dot_trien_khai {
   danh_sach_tham_gia    danh_sach_tham_gia[]
   hop_dong_boi_duong    hop_dong_boi_duong[]
   de_nghi_sua_danh_sach de_nghi_sua_danh_sach[]
+  // Issue #68: khóa NLS gắn vào đợt (HSG: không có khóa).
+  khoa_boi_duong        khoa_boi_duong[]        @relation("khoa_dot_trien_khai")
 
   @@index([chuong_trinh], map: "idx_dot_trien_khai_chuong_trinh")
   @@index([so_gddt_id], map: "idx_dot_trien_khai_so_gddt")
@@ -1096,8 +1098,11 @@ model khoa_boi_duong {
   diem_danh_mo_truoc_phut Int                 @default(30) @db.SmallInt
   diem_danh_dong_sau_phut Int                 @default(120) @db.SmallInt
   che_do_chuyen_can       che_do_chuyen_can   @default(cong_nhan_cung_muc)
+  // ADR 0015 M1 (issue #68): đợt triển khai NLS của khóa (NULL = chưa gắn; 1 đợt nhiều khóa).
+  dot_trien_khai_id       String?             @db.Uuid
 
   don_vi_dat_hang don_vi_cong_tac @relation(fields: [don_vi_dat_hang_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  dot_trien_khai  dot_trien_khai? @relation("khoa_dot_trien_khai", fields: [dot_trien_khai_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   nguoi_duyet     nguoi_dung?     @relation("khoa_boi_duong_nguoi_duyet", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   created_by_user nguoi_dung?     @relation("khoa_boi_duong_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
@@ -1117,6 +1122,7 @@ model khoa_boi_duong {
   muc_kiem_tra muc_kiem_tra[]
 
   @@index([don_vi_dat_hang_id], map: "idx_khoa_don_vi")
+  @@index([dot_trien_khai_id], map: "idx_khoa_dot_trien_khai")
   @@index([trang_thai], map: "idx_khoa_trang_thai")
 }
 
