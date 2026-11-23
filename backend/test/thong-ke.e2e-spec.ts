@@ -1008,14 +1008,18 @@ describe('Thống kê dashboard (e2e)', () => {
     beforeAll(async () => {
       const dvCc = await taoDonVi('cc', 'truong', diaDanhIds[0]);
       khoaC = await taoKhoa('C', dvCc);
+      // Giai đoạn bao quanh lịch học (tương đối theo ngày chạy, không hết hạn).
+      const NGAY = 24 * 3600 * 1000;
+      const gdBatDau = new Date(Date.now() - 30 * NGAY);
+      const gdKetThuc = new Date(Date.now() + 60 * NGAY);
       const gd = await prisma.giai_doan_khoa.create({
         data: {
           khoa_id: khoaC,
           thu_tu: 1,
           ten_giai_doan: 'Zoom CC',
           hinh_thuc: 'truc_tuyen',
-          thoi_gian_bat_dau: new Date('2026-10-01'),
-          thoi_gian_ket_thuc: new Date('2027-01-31'),
+          thoi_gian_bat_dau: gdBatDau,
+          thoi_gian_ket_thuc: gdKetThuc,
         },
       });
       const gdTt = await prisma.giai_doan_khoa.create({
@@ -1024,8 +1028,8 @@ describe('Thống kê dashboard (e2e)', () => {
           thu_tu: 2,
           ten_giai_doan: 'Trực tiếp CC',
           hinh_thuc: 'truc_tiep',
-          thoi_gian_bat_dau: new Date('2026-10-01'),
-          thoi_gian_ket_thuc: new Date('2027-01-31'),
+          thoi_gian_bat_dau: gdBatDau,
+          thoi_gian_ket_thuc: gdKetThuc,
         },
       });
       const taoLop = async (
@@ -1170,7 +1174,7 @@ describe('Thống kê dashboard (e2e)', () => {
       }
     });
 
-    it('trang lớp học viên: B2 chưa có dòng ở lớp mới -> diem_danh_lop_cu', async () => {
+    it('trang lớp học viên: B1 vắng ở lớp mới / B2 chưa có dòng -> diem_danh_lop_cu', async () => {
       const res = await get('/hoc-vien/toi/khoa-hoc', tokHvChuyen);
       expect(res.status).toBe(200);
       const dk = (
@@ -1180,12 +1184,20 @@ describe('Thống kê dashboard (e2e)', () => {
         }[]
       ).find((d) => d.khoa.id === khoaC);
       const [b1, b2] = dk!.giai_doan[0].lop!.lich_hoc;
+      // ADR 0014 (6e2a450): lớp mới bị chốt vắng mà lớp cũ có mặt -> vẫn hiện
+      // lớp cũ; trạng thái lớp này giữ nguyên. Khóa đang theo_lop_hien_tai nên
+      // buổi lớp cũ không được công nhận (cong_nhan: false).
       expect(b1.trang_thai_diem_danh).toBe('vang');
-      expect(b1).not.toHaveProperty('diem_danh_lop_cu');
+      expect(b1.diem_danh_lop_cu).toEqual({
+        trang_thai: 'co_mat',
+        ten_lop: 'Zoom CC cũ',
+        cong_nhan: false,
+      });
       expect(b2.trang_thai_diem_danh).toBeNull();
       expect(b2.diem_danh_lop_cu).toEqual({
         trang_thai: 'co_mat',
         ten_lop: 'Zoom CC cũ',
+        cong_nhan: false,
       });
     });
   });

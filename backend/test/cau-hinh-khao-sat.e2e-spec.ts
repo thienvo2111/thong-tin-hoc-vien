@@ -166,7 +166,13 @@ describe('Cấu hình khảo sát đầu vào (e2e)', () => {
       .get('/cau-hinh-khao-sat')
       .expect(200);
     // khao_sat_dau_ra_mo không gửi -> lưu false (cấu hình khảo sát đầu ra).
-    expect(res.body.cau_hinh).toEqual({ ...hopLe, khao_sat_dau_ra_mo: false });
+    // khao_sat_dau_vao_mo không gửi -> suy từ hien_khao_sat (true) ||
+    // danh_gia_dau_vao_trong_cong.
+    expect(res.body.cau_hinh).toEqual({
+      ...hopLe,
+      khao_sat_dau_vao_mo: true,
+      khao_sat_dau_ra_mo: false,
+    });
     expect(res.body.cap_nhat_luc).toEqual(expect.any(String));
 
     const row = await prisma.cau_hinh_he_thong.findUnique({
@@ -192,6 +198,12 @@ describe('Cấu hình khảo sát đầu vào (e2e)', () => {
       .get('/cau-hinh-khao-sat')
       .expect(200);
     // khao_sat_dau_ra_mo không gửi -> lưu false (cấu hình khảo sát đầu ra).
-    expect(res.body.cau_hinh).toEqual({ ...moi, khao_sat_dau_ra_mo: false });
+    // khao_sat_dau_vao_mo không gửi -> suy từ hien_khao_sat (false) ||
+    // danh_gia_dau_vao_trong_cong (true) = true.
+    expect(res.body.cau_hinh).toEqual({
+      ...moi,
+      khao_sat_dau_vao_mo: true,
+      khao_sat_dau_ra_mo: false,
+    });
   });
 });
