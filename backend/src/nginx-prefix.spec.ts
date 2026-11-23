@@ -37,6 +37,19 @@ function tienToNginx(): string[] {
   return m[1].split('|');
 }
 
+// Cổng đơn vị tạm ở tiền tố đường dẫn (ADR 0015 T7): `location /cdv/ { try_files $uri /cong-don-vi.html; }`.
+function tienToCongDonViNginx(): string[] {
+  const conf = fs.readFileSync(
+    path.join(GOC, 'scripts/vps/05-install-nginx.sh'),
+    'utf8',
+  );
+  return [
+    ...conf.matchAll(
+      /location \/([\w-]+)\/ \{\s*try_files \\\$uri \/cong-don-vi\.html;/g,
+    ),
+  ].map((m) => m[1]);
+}
+
 function routeTrangFrontend(): string[] {
   const router = fs.readFileSync(
     path.join(GOC, 'frontend/src/router.tsx'),
@@ -63,5 +76,20 @@ describe('Nginx proxy đủ tiền tố controller backend', () => {
     expect(
       routeTrangFrontend().filter((r) => nginx.some((p) => r.startsWith(p))),
     ).toEqual([]);
+  });
+
+  // Tiền tố Cổng đơn vị (vd. /cdv) không được bị location proxy API nuốt (vd. /cong-don-vi, /danh-muc…) và
+  // ngược lại; cũng không trùng đoạn đầu route trang NLS.
+  it('tiền tố Cổng đơn vị theo đường dẫn (cdv) không khớp tiền tố proxy API nào, không trùng route trang', () => {
+    const congDonVi = tienToCongDonViNginx();
+    expect(congDonVi).toEqual(['cdv']);
+    const nginx = tienToNginx();
+    expect(
+      congDonVi.filter((c) =>
+        nginx.some((p) => c.startsWith(p) || p.startsWith(c)),
+      ),
+    ).toEqual([]);
+    const trang = new Set(routeTrangFrontend());
+    expect(congDonVi.filter((c) => trang.has(c))).toEqual([]);
   });
 });

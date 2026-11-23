@@ -72,6 +72,24 @@ server {
         add_header Strict-Transport-Security "max-age=${HSTS_MAX_AGE}" always;
     }
 
+    # Cong don vi TAM o tien to /cdv cua cung ten mien (ADR 0015 T7, khi chua co ten mien thu hai). Chi co tac dung khi
+    # frontend build voi VITE_CONG_DON_VI_DUONG_DAN=/cdv; khong bat thi /cdv/... chi ra trang 404 cua SPA nhu truoc.
+    # "cdv" KHONG duoc la tien to cua/trung prefix API o tren (location ~ ^/(...) khong neo cuoi) - nginx-prefix.spec.ts kiem.
+    # absolute_redirect off: Location tuong doi, khong bi doi thanh http:// (TLS terminate o proxy HCMUE).
+    location = /cdv {
+        absolute_redirect off;
+        return 301 /cdv/;
+    }
+
+    location /cdv/ {
+        try_files \$uri /cong-don-vi.html;
+    }
+
+    location = /cong-don-vi.html {
+        add_header Cache-Control "no-cache" always;
+        add_header Strict-Transport-Security "max-age=${HSTS_MAX_AGE}" always;
+    }
+
     location ~* \.(js|css|svg|png|jpg|jpeg|gif|ico|woff2?)$ {
         expires 30d;
         add_header Cache-Control "public, immutable";

@@ -12,6 +12,14 @@ function docNoiDung(tep: string) {
   return (re: RegExp) => re.exec(src)?.[1] ?? '';
 }
 
+function gocCuaUrl(url: string) {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url;
+  }
+}
+
 function metaTuNoiDung() {
   // process.env không chứa biến trong frontend/.env — Cổng đơn vị lấy thêm từ env Vite đã nạp (cấu hình 1 chỗ trên VPS).
   let envVite: Record<string, string> = {};
@@ -26,16 +34,19 @@ function metaTuNoiDung() {
       let tieuDe = getNls(/tieuDe:\s*'([^']*)'/);
       let moTa = getNls(/moTa:\s*'([^']*)'/);
       let baseUrl = process.env.VITE_SITE_URL ?? '';
+      let gocAnh = baseUrl;
       if ((ctx.filename ?? ctx.path ?? '').replace(/\\/g, '/').endsWith('/cong-don-vi.html')) {
         const getDonVi = docNoiDung('congDonVi.ts');
         tieuDe = getDonVi(/tenCong:\s*'([^']*)'/);
         moTa = getDonVi(/moTa:\s*'([^']*)'/);
         baseUrl = process.env.VITE_CONG_DON_VI_URL ?? envVite.VITE_CONG_DON_VI_URL ?? '';
+        // Chế độ đường dẫn (URL dạng https://…/cdv): ảnh chia sẻ ở gốc origin, không nằm dưới /cdv.
+        gocAnh = gocCuaUrl(baseUrl);
       }
       return html
         .replace(/__TIEU_DE__/g, tieuDe)
         .replace(/__MO_TA__/g, moTa)
-        .replace(/__ANH_CHIA_SE__/g, anh.startsWith('http') ? anh : `${baseUrl}${anh}`)
+        .replace(/__ANH_CHIA_SE__/g, anh.startsWith('http') ? anh : `${gocAnh}${anh}`)
         .replace(/__SITE_URL__/g, baseUrl);
     },
   };

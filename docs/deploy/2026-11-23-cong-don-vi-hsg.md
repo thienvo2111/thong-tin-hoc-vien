@@ -6,7 +6,8 @@
 Deploy theo **2 nhịp**:
 
 - **Nhịp A — đưa code + migration lên, Cổng đơn vị còn "ngủ"** (làm được ngay). `VITE_CONG_DON_VI_HOSTNAME` để trống → bản build chạy **y như trước** trên boiduongnls; các API `/cong-don-vi/*` có trên backend nhưng chưa có giao diện nào gọi tới.
-- **Nhịp B — bật Cổng đơn vị trên tên miền thứ hai** (chờ IT HCMUE cấp tên miền, issue #51). Theo `docs/deploy/2026-11-18-cong-don-vi-ten-mien.md` + mục B dưới đây. **Không** chạy HSG trên boiduongnls kể cả tạm (ADR 0015 T7).
+- **Nhịp A+ — mở Cổng đơn vị TẠM ở `https://boiduongnls.hcmue.edu.vn/cdv`** (không cần tên miền mới; quyết định của người dùng 2026-11-23, sửa tạm ADR 0015 T7). Mục A+ dưới đây.
+- **Nhịp B — bật Cổng đơn vị trên tên miền thứ hai** (chờ IT HCMUE cấp tên miền, issue #51). Theo `docs/deploy/2026-11-18-cong-don-vi-ten-mien.md` + mục B dưới đây. Đã làm A+ thì xem thêm mục A+8 (chuyển `/cdv` sang tên miền mới).
 
 ## Thay đổi và ảnh hưởng dữ liệu
 
@@ -119,6 +120,140 @@ Kiểm thử tay trên boiduongnls (phải **như trước**):
 
 - Code: `git checkout <commit ở ~/truoc-cong-don-vi-*.txt>` rồi `bash 06-deploy.sh` (lưu ý script sẽ `checkout main` lại — muốn giữ commit cũ thì chạy tay các bước build/copy, hoặc revert trên `main` rồi deploy).
 - Migration: **không cần gỡ** — 8 migration chỉ thêm, code cũ không đọc bảng/cột mới. Chỉ khôi phục dump (`pg_restore`) khi dữ liệu cũ bị hỏng thật (không kỳ vọng).
+
+---
+
+## A+. Nhịp A+ — mở Cổng đơn vị tạm ở `https://boiduongnls.hcmue.edu.vn/cdv`
+
+Cổng đơn vị chạy ở tiền tố đường dẫn `/cdv` **của chính boiduongnls** (cùng origin, dùng luôn HTTPS sẵn có) cho tới khi IT HCMUE cấp tên miền thứ hai. Cùng 1 bản build: frontend nhận ra Cổng đơn vị khi đường dẫn là `/cdv` hoặc `/cdv/...` (biến `VITE_CONG_DON_VI_DUONG_DAN`); mọi đường dẫn khác vẫn là trang NLS.
+
+| Thay đổi | Ảnh hưởng dữ liệu |
+|---|---|
+| Frontend: chế độ đường dẫn `/cdv` (router `basename`), link "sang cổng đúng" trỏ `/cdv` | **Không migration, không sửa dữ liệu, không đổi backend** |
+| Nginx: thêm 3 `location` vào block NLS (`/cdv/...` → `cong-don-vi.html`) | Không |
+| Tài khoản `truong`/`so_gddt`/`phong_vhxh` **không dùng các trang NLS nữa** (thấy thông báo + link `/cdv`); học viên/hỗ trợ/giảng viên không vào được `/cdv`; `quan_tri` vào được cả 2 | Không (chặn ở frontend; quyền thật vẫn ở backend) |
+
+Điều kiện: Nhịp A đã xong và `main` trên VPS đã có commit chế độ đường dẫn — `grep -c VITE_CONG_DON_VI_DUONG_DAN ~/apps/boi-duong-nls/frontend/src/vite-env.d.ts` ra `1`.
+
+### A+1. Báo trước + đếm tài khoản bị ảnh hưởng (chỉ đọc)
+
+Ngay khi bật, đơn vị đang dùng boiduongnls phải chuyển sang `https://boiduongnls.hcmue.edu.vn/cdv` — **báo trước** cho trường/Sở/Phòng. Đếm số tài khoản và ghi commit đang chạy:
+
+```bash
+cd ~/apps/boi-duong-nls
+export DB_URL="$(grep '^DATABASE_URL=' backend/.env | cut -d= -f2- | tr -d '"' | sed 's/?.*//')"
+psql "$DB_URL" -c "SELECT vai_tro, count(*) FROM nguoi_dung WHERE vai_tro IN ('truong','so_gddt','phong_vhxh') GROUP BY 1;"
+unset DB_URL
+git log -1 --oneline | tee ~/truoc-cdv-$(date +%F).txt
+```
+
+### A+2. Nginx — thêm 3 `location` vào block NLS đang chạy (sudo)
+
+File site trên VPS sinh từ `05-install-nginx.sh` cũ nên phải sửa tay (script trong repo đã có sẵn 3 block này — chạy lại script cũng sinh đúng như vậy):
+
+```bash
+F=/etc/nginx/sites-available/boiduongnls.hcmue.edu.vn
+sudo cp "$F" "$F.bak-cdv-$(date +%F-%H%M)"
+grep -n 'location = /index.html\|location = /cdv\|cong-don-vi.html\|max-age=' "$F"
+sudo nano "$F"
+```
+
+- `grep` đã thấy `location = /cdv` hoặc `location = /cong-don-vi.html` trong block NLS → đã có, **không** thêm lần nữa (`location` trùng thì `nginx -t` báo lỗi).
+- Dán ngay **sau** khối `location = /index.html { ... }`, bên trong `server { ... }` của boiduongnls. Thay `86400` bằng giá trị `max-age=` đang dùng trong file:
+
+```nginx
+    # Cổng đơn vị tạm ở /cdv (ADR 0015 T7). absolute_redirect off: Location tương đối, không bị đổi thành http://.
+    location = /cdv {
+        absolute_redirect off;
+        return 301 /cdv/;
+    }
+
+    location /cdv/ {
+        try_files $uri /cong-don-vi.html;
+    }
+
+    location = /cong-don-vi.html {
+        add_header Cache-Control "no-cache" always;
+        add_header Strict-Transport-Security "max-age=86400" always;
+    }
+```
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+`/cdv` không trùng và không bị nuốt bởi tiền tố API nào trong `location ~ ^/(...)` (`backend/src/nginx-prefix.spec.ts` kiểm). Asset của Vite nằm ở `/assets/...` (gốc origin, không dưới `/cdv`) nên vẫn đi qua các `location` cũ.
+
+### A+3. `frontend/.env` (VPS)
+
+```bash
+cd ~/apps/boi-duong-nls/frontend
+cp .env .env.bak-cdv-$(date +%F)
+nano .env
+```
+
+```dotenv
+VITE_SITE_URL=https://boiduongnls.hcmue.edu.vn
+VITE_CONG_DON_VI_HOSTNAME=
+VITE_CONG_DON_VI_DUONG_DAN=/cdv
+VITE_CONG_DON_VI_URL=https://boiduongnls.hcmue.edu.vn/cdv
+```
+
+- `VITE_CONG_DON_VI_HOSTNAME` để **trống** (chưa có tên miền).
+- `VITE_CONG_DON_VI_DUONG_DAN` phải khớp tiền tố trong Nginx (`/cdv`); giá trị được chuẩn hóa (`cdv/`, `/CDV` đều thành `/cdv`).
+- `VITE_CONG_DON_VI_URL`: link "Mở Cổng đơn vị" ở trang NLS + `og:url` của `cong-don-vi.html` (ảnh chia sẻ vẫn lấy ở gốc origin). Để trống thì frontend tự suy `origin + /cdv`.
+- `VITE_API_BASE_URL` giữ nguyên (cùng origin, không ảnh hưởng).
+- Như B2: có SĐT hỗ trợ thật thì điền vào `frontend/src/content/congDonVi.ts` trên `main` trước khi build.
+
+### A+4. Build + đưa lên
+
+```bash
+cd ~/apps/boi-duong-nls/scripts/vps
+bash 06-deploy.sh
+```
+
+Đổi biến `VITE_*` **bắt buộc build lại** (biến nhúng lúc build). Lần này không có migration mới (`prisma migrate deploy` không làm gì).
+
+### A+5. Kiểm chứng
+
+```bash
+curl -s http://127.0.0.1/cdv/ | grep -o '<title>[^<]*'                       # Cổng đơn vị – Bồi dưỡng giáo viên HCMUE
+curl -s http://127.0.0.1/cdv/quan-tri/hop-dong | grep -o '<title>[^<]*'      # deep link → cũng Cổng đơn vị
+curl -s http://127.0.0.1/ | grep -o '<title>[^<]*'                           # Bồi dưỡng năng lực số cho giáo viên
+curl -s http://127.0.0.1/dang-nhap | grep -o '<title>[^<]*'                  # NLS như cũ
+curl -sI http://127.0.0.1/cdv | grep -i '^location'                          # Location: /cdv/ (tương đối)
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1/cong-don-vi/dot-trien-khai   # 401 = API vẫn tới backend
+grep -o 'src="/assets/[^"]*' /var/www/boiduongnls/cong-don-vi.html | head -1  # asset tuyệt đối /assets/...
+```
+
+Trên trình duyệt (điện thoại, trình duyệt Zalo, 360px):
+
+- `https://boiduongnls.hcmue.edu.vn/cdv` → màn đăng nhập Cổng đơn vị; tài khoản trường → đổi mật khẩu lần đầu → `/cdv/trang-chu`; bấm menu, F5 ở `/cdv/...` vẫn đúng trang.
+- `https://boiduongnls.hcmue.edu.vn/` và `/dang-nhap` → trang NLS như cũ; học viên đăng nhập như trước.
+- Tài khoản trường đăng nhập ở `/dang-nhap` (NLS) → "Tài khoản đơn vị đăng nhập tại Cổng đơn vị" + link `https://boiduongnls.hcmue.edu.vn/cdv`.
+- Học viên đăng nhập ở `/cdv` → "Tài khoản này dùng trên trang Bồi dưỡng năng lực số" + link về trang NLS.
+
+### A+6. Hệ quả người dùng thấy
+
+- Đơn vị (trường/Sở/Phòng) **không vào các trang NLS** nữa — dùng nhóm menu **NLS** trong `/cdv`. Báo trước (A+1).
+- Cùng origin ⇒ **chung phiên trong 1 tab** (token ở `sessionStorage`): đăng nhập ở `/cdv` rồi mở `/` trong cùng tab sẽ thấy thông báo sai cổng (và ngược lại); Đăng xuất ở bên nào cũng là đăng xuất cả hai trong tab đó. Tab mới vẫn độc lập.
+- Email đặt lại mật khẩu/kích hoạt vẫn dẫn về trang NLS (`FRONTEND_URL`), như runbook 18/11.
+
+### A+7. Quay lui
+
+Không có dữ liệu để khôi phục. Trong `frontend/.env` để **trống** `VITE_CONG_DON_VI_DUONG_DAN` (và `VITE_CONG_DON_VI_URL`), chạy lại `bash 06-deploy.sh` → mọi tài khoản dùng trang NLS như trước. 3 `location` Nginx để nguyên cũng vô hại (`/cdv/...` chỉ ra trang "Không tìm thấy trang"); muốn gỡ hẳn thì khôi phục `$F.bak-cdv-*` rồi `sudo nginx -t && sudo systemctl reload nginx`.
+
+### A+8. Khi có tên miền thứ hai (về chế độ hostname — chỉ đổi cấu hình)
+
+1. Làm runbook `2026-11-18-cong-don-vi-ten-mien.md` (server block thứ hai, `VITE_CONG_DON_VI_HOSTNAME=TEN_MIEN_CONG_DON_VI`, `VITE_CONG_DON_VI_URL=https://TEN_MIEN_CONG_DON_VI`), **để trống** `VITE_CONG_DON_VI_DUONG_DAN`, build + deploy.
+2. Trong block NLS, thay 2 `location` `/cdv` bằng chuyển hướng sang tên miền mới (giữ link Zalo/bookmark cũ); `location = /cong-don-vi.html` giữ nguyên:
+
+   ```nginx
+   location = /cdv { return 301 https://TEN_MIEN_CONG_DON_VI/; }
+   location /cdv/ { rewrite ^/cdv/(.*)$ https://TEN_MIEN_CONG_DON_VI/$1 permanent; }
+   ```
+
+   `sudo nginx -t && sudo systemctl reload nginx`. Phiên đăng nhập không đi theo (khác origin) — đơn vị đăng nhập lại 1 lần.
 
 ---
 

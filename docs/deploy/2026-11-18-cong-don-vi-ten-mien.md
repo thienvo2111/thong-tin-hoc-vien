@@ -11,6 +11,8 @@
 
 **Công tắc:** `VITE_CONG_DON_VI_HOSTNAME` trống/không khai báo → bản build chạy **y như trước** (không chặn ai, không có Cổng đơn vị). Vì biến `VITE_*` được nhúng lúc build, đổi biến xong **phải build lại** frontend.
 
+> **Chế độ tạm khi chưa có tên miền (2026-11-23):** Cổng đơn vị có thể chạy ở `https://boiduongnls.hcmue.edu.vn/cdv` (biến `VITE_CONG_DON_VI_DUONG_DAN=/cdv` + 3 `location` trong block NLS) — xem mục **A+** của `docs/deploy/2026-11-23-cong-don-vi-hsg.md`. Làm runbook này sau chế độ tạm thì để trống `VITE_CONG_DON_VI_DUONG_DAN` và chuyển hướng `/cdv` sang tên miền mới (mục A+8).
+
 Mọi lệnh chạy trên VPS bằng user thường (trừ chỗ ghi `sudo`). Repo: `~/apps/boi-duong-nls`. Dưới đây `TEN_MIEN_CONG_DON_VI` là tên miền HCMUE cấp (chưa có — thay bằng giá trị thật).
 
 ## 0. Việc của IT HCMUE (đường găng — làm trước)

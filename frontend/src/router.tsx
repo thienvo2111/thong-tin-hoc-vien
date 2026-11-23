@@ -1,5 +1,5 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
-import { congHienTai } from '@/lib/congHienTai';
+import { viTriCongHienTai } from '@/lib/congHienTai';
 
 // Mọi route dùng `lazy` (kể cả các layout thuần túy) — router.tsx được main.tsx import không-lazy,
 // nên bất kỳ import tĩnh nào ở đây sẽ vào chunk tải đầu tiên. M0 phải nhẹ (không Mantine form/dates/
@@ -317,8 +317,8 @@ export const routesNls: RouteObject[] = [
   },
 ];
 
-// Issue #55 / ADR 0015: Cổng đơn vị — cùng bản build, chọn theo hostname (lib/congHienTai.ts). Không có route NLS
-// (/toi, /admin…) nào ở đây: gõ tay vào chỉ ra 404. Issue #70: 4 màn NLS của đơn vị ở /nls/*.
+// Issue #55 / ADR 0015: Cổng đơn vị — cùng bản build, chọn theo hostname hoặc tiền tố đường dẫn (lib/congHienTai.ts).
+// Không có route NLS (/toi, /admin…) nào ở đây: gõ tay vào chỉ ra 404. Issue #70: 4 màn NLS của đơn vị ở /nls/*.
 export const routesCongDonVi: RouteObject[] = [
   {
     lazy: () => import('@/app/KhungNoiBo').then((m) => ({ Component: m.default })),
@@ -477,4 +477,10 @@ export const routesCongDonVi: RouteObject[] = [
   },
 ];
 
-export const router = createBrowserRouter(congHienTai() === 'don_vi' ? routesCongDonVi : routesNls);
+// Chế độ đường dẫn (VITE_CONG_DON_VI_DUONG_DAN, vd. /cdv): basename = tiền tố — mọi Link/navigate/Navigate trong cổng
+// tự nằm dưới /cdv, route giữ nguyên dạng gốc ('/trang-chu'…).
+const viTri = viTriCongHienTai();
+export const router = createBrowserRouter(
+  viTri.cong === 'don_vi' ? routesCongDonVi : routesNls,
+  viTri.basename ? { basename: viTri.basename } : undefined,
+);
