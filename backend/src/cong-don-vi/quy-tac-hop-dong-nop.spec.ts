@@ -63,6 +63,8 @@ function nguCanh(them: Partial<NguCanhNop> = {}): NguCanhNop {
     phan4: { so_qd: null, ngay_qd: null },
     qdTu: '2026-11-01',
     qdDen: '2026-11-30',
+    hanHieuLuc: new Date('2026-12-05T16:59:59Z'),
+    now: new Date('2026-12-01T03:00:00Z'),
     ...them,
   };
 }
@@ -198,6 +200,55 @@ describe('lyDoChanNop (X4, S4, S5, S6, M5)', () => {
         }),
       ),
     ).toEqual([{ ma: 'da_nop', thong_diep: 'Hợp đồng đã nộp' }]);
+  });
+
+  describe('T2 hạn nộp (issue #66)', () => {
+    const HAN = new Date('2026-12-05T16:59:59.000Z');
+    const HET_HAN = {
+      ma: 'da_het_han',
+      thong_diep: 'Đã hết hạn ngày 05/12/2026 — liên hệ HCMUE để được gia hạn',
+    };
+
+    it('đúng mốc 23:59:59 giờ VN → còn hạn, nộp được', () => {
+      expect(lyDoChanNop(nguCanh({ hanHieuLuc: HAN, now: HAN }))).toEqual([]);
+    });
+
+    it('sau mốc 1 ms → da_het_han', () => {
+      expect(
+        lyDoChanNop(
+          nguCanh({
+            hanHieuLuc: HAN,
+            now: new Date('2026-12-05T16:59:59.001Z'),
+          }),
+        ),
+      ).toEqual([HET_HAN]);
+    });
+
+    it('hết hạn: da_het_han đứng đầu, các lý do khác vẫn liệt kê', () => {
+      expect(
+        ma(
+          nguCanh({
+            hanHieuLuc: HAN,
+            now: new Date('2026-12-06T01:00:00Z'),
+            trangThaiDanhSach: 'cho_xac_nhan',
+            donGia: null,
+            giaTri: null,
+          }),
+        ),
+      ).toEqual(['da_het_han', 'danh_sach_chua_xac_nhan', 'chua_co_don_gia']);
+    });
+
+    it('đã nộp + hết hạn → chỉ da_nop (X5 trước hạn)', () => {
+      expect(
+        ma(
+          nguCanh({
+            trangThaiHopDong: 'da_nop',
+            hanHieuLuc: HAN,
+            now: new Date('2026-12-06T01:00:00Z'),
+          }),
+        ),
+      ).toEqual(['da_nop']);
+    });
   });
 
   it.each(['cho_xac_nhan', 'bao_sai_lech'] as const)(

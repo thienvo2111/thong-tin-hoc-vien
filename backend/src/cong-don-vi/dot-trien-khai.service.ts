@@ -11,6 +11,7 @@ import {
   SuaDotTrienKhaiDto,
   TaoDotTrienKhaiDto,
 } from './dto/dot-trien-khai.dto';
+import { hanNopTuNgay, ngayVietNam } from './han-nop';
 
 export interface DotTrienKhai {
   id: string;
@@ -32,19 +33,8 @@ const BAO_GOM = {
 
 type DongDot = Prisma.dot_trien_khaiGetPayload<{ include: typeof BAO_GOM }>;
 
-const LECH_GIO_VN_MS = 7 * 60 * 60 * 1000;
-
-/** ADR 0015 T1: hạn nộp tính đến hết ngày chọn theo giờ Việt Nam (UTC+7, không đổi giờ theo mùa). */
-export function hanNopTuNgay(ngay: string): Date {
-  return new Date(`${ngay}T23:59:59+07:00`);
-}
-
-/** Ngày lịch (YYYY-MM-DD) của một thời điểm theo giờ Việt Nam. */
-export function ngayVietNam(thoiDiem: Date): string {
-  return new Date(thoiDiem.getTime() + LECH_GIO_VN_MS)
-    .toISOString()
-    .slice(0, 10);
-}
+// Issue #66: hanNopTuNgay / ngayVietNam chuyển sang quy tắc thuần han-nop.ts — giữ export cũ cho nơi đang dùng.
+export { hanNopTuNgay, ngayVietNam };
 
 /** Cột DATE: Prisma đọc/ghi Date lúc 00:00Z. */
 export function chuoiSangNgay(ngay: string | null): Date | null {

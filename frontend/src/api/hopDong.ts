@@ -5,12 +5,14 @@ import type { ChuongTrinhBoiDuong } from './dotTrienKhai';
 import type { TrangThaiDanhSachTruong, TrangThaiHopDong } from './truongDanhSach';
 import type { HoSoDonViDuLieu } from '@/lib/hoSoDonVi';
 import type { NhapHopDong } from '@/lib/hopDong';
+import { laLoiHetHan, type ThongTinHan } from '@/lib/hanNop';
 
 // Issue #64 / ADR 0015 M5, S4–S6, X4, X5: hợp đồng — nháp Phần 3–4, Nộp, Quản trị xem / Mở lại.
 
 /** Mã lý do chưa nộp được (backend lyDoChanNop). */
 export type MaLyDoChanNop =
   | 'da_nop'
+  | 'da_het_han'
   | 'danh_sach_chua_xac_nhan'
   | 'chua_co_don_gia'
   | 'ho_so_chua_du'
@@ -34,7 +36,8 @@ export type BanChupHoSo = HoSoDonViDuLieu & {
   chup_luc: string;
 };
 
-export interface HopDongPhanHoi {
+/** Issue #66: + han_rieng / han_hieu_luc / han_hieu_luc_ngay / da_het_han (server tính). */
+export interface HopDongPhanHoi extends ThongTinHan {
   dot: {
     id: string;
     ten: string;
@@ -91,6 +94,12 @@ function useThaoTacHopDong<V>(dotId: string, goi: (v: V) => Promise<HopDongPhanH
       void queryClient.invalidateQueries({ queryKey: ['cong-don-vi', 'truong', 'dot'], exact: true });
       void queryClient.invalidateQueries({ queryKey: ['cong-don-vi', 'truong', 'dot', dotId, 'danh-sach'] });
     },
+    // Issue #66 / T2: 403 HET_HAN_DOT → tải lại hợp đồng + thẻ đợt để vào chế độ chỉ xem.
+    onError: (err) => {
+      if (!laLoiHetHan(err)) return;
+      void queryClient.invalidateQueries({ queryKey: keyTruong(dotId) });
+      void queryClient.invalidateQueries({ queryKey: ['cong-don-vi', 'truong', 'dot'], exact: true });
+    },
   });
 }
 
@@ -122,6 +131,28 @@ export function useMoLaiHopDong(dotId: string, donViId: string) {
     onSuccess: (data) => {
       queryClient.setQueryData(keyQuanTri(dotId, donViId), data);
       void queryClient.invalidateQueries({ queryKey: danhSachQuanTriKey(dotId) });
+    },
+  });
+}
+
+/** Issue #66 / ADR 0015 T3: PUT han-rieng — ngày 'YYYY-MM-DD' hoặc null (bỏ hạn riêng), lý do bắt buộc. */
+export interface DatHanRieng {
+  donViId: string;
+  han_rieng: string | null;
+  ly_do: string;
+}
+
+export function useDatHanRieng(dotId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ donViId, han_rieng, ly_do }: DatHanRieng) =>
+      apiFetch<ThongTinHan>(`${urlQuanTri(dotId, donViId)}/han-rieng`, {
+        method: 'PUT',
+        body: JSON.stringify({ han_rieng, ly_do }),
+      }),
+    onSuccess: (_kq, { donViId }) => {
+      void queryClient.invalidateQueries({ queryKey: ['cong-don-vi', 'tien-do-dot', dotId] });
+      void queryClient.invalidateQueries({ queryKey: keyQuanTri(dotId, donViId) });
     },
   });
 }

@@ -15,6 +15,20 @@ import {
   loiDoDai,
   tinhTrangHoSo,
 } from './ho-so-don-vi.quy-tac';
+import { daHetHan, thongDiepHetHan } from './han-nop';
+
+// Issue #66 / ADR 0015 T1–T3: quy tắc hạn nộp nằm ở han-nop.ts — xuất lại để dùng chung một chỗ.
+export {
+  daHetHan,
+  hanHieuLuc,
+  hanNopTuNgay,
+  hanRiengTuNgay,
+  ngayVietNam,
+  soNgayConLai,
+  thongDiepHetHan,
+  thongTinHan,
+} from './han-nop';
+export type { ThongTinHan } from './han-nop';
 
 export type GiaiDoanThamGia = 'ca_hai' | 'chi_gd1' | 'chi_gd2';
 
@@ -546,6 +560,7 @@ export function truongHopDongThayDoi(
 
 export type MaLyDoChanNop =
   | 'da_nop'
+  | 'da_het_han'
   | 'danh_sach_chua_xac_nhan'
   | 'chua_co_don_gia'
   | 'ho_so_chua_du'
@@ -575,6 +590,9 @@ export interface NguCanhNop {
   /** S6: khoảng ngày QĐ của đợt ('YYYY-MM-DD', tính cả hai đầu). */
   qdTu: string | null;
   qdDen: string | null;
+  /** T1/T3: hạn hiệu lực của trường (han_rieng ?? han_nop) và thời điểm xét (server). */
+  hanHieuLuc: Date;
+  now: Date;
 }
 
 const TRUONG_HAU_CAN = TRUONG_HO_SO.filter((t) => t.nhom === 'hau_can').map(
@@ -589,14 +607,18 @@ const lyDo = (ma: MaLyDoChanNop, thong_diep: string): LyDoChanNop => ({
 });
 
 /**
- * X4, S4, S5, S6, M5: lý do chưa Nộp được hợp đồng, theo thứ tự hiển thị ([] = nộp được).
- * Đã nộp → chỉ 'da_nop'. Phần 4 chỉ xét khi giá trị ≥ NGUONG_PHAN_4 (chưa có đơn giá → không xét).
+ * X4, S4, S5, S6, M5, T2: lý do chưa Nộp được hợp đồng, theo thứ tự hiển thị ([] = nộp được).
+ * Đã nộp → chỉ 'da_nop'. Hết hạn hiệu lực → 'da_het_han' đứng đầu (các lý do khác vẫn liệt kê).
+ * Phần 4 chỉ xét khi giá trị ≥ NGUONG_PHAN_4 (chưa có đơn giá → không xét).
  */
 export function lyDoChanNop(ctx: NguCanhNop): LyDoChanNop[] {
   if (ctx.trangThaiHopDong === 'da_nop') {
     return [lyDo('da_nop', 'Hợp đồng đã nộp')];
   }
   const ds: LyDoChanNop[] = [];
+  if (daHetHan(ctx.hanHieuLuc, ctx.now)) {
+    ds.push(lyDo('da_het_han', thongDiepHetHan(ctx.hanHieuLuc)));
+  }
   if (ctx.trangThaiDanhSach !== 'da_xac_nhan') {
     ds.push(lyDo('danh_sach_chua_xac_nhan', 'Danh sách chưa được xác nhận'));
   }

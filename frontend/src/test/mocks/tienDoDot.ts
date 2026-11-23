@@ -12,6 +12,10 @@ export function dongTienDoMau(p: Partial<DongTienDo> = {}): DongTienDo {
     trang_thai_danh_sach: 'cho_xac_nhan',
     trang_thai_hop_dong: 'chua_nop',
     nop_luc: null,
+    han_rieng: null,
+    han_hieu_luc: '2026-12-31T16:59:59.000Z',
+    han_hieu_luc_ngay: '2026-12-31',
+    qua_han: false,
     so_de_nghi_cho: 0,
     ho_so_du: false,
     co_ho_so: true,
@@ -62,17 +66,24 @@ export const dbTienDoDot = {
   /** Theo id đợt; đợt không có → 404. */
   theoDot: {} as Record<string, DongTienDo[]>,
   donGia: 1_500_000 as number | null,
+  /** Issue #66: thân các lần PUT han-rieng đã nhận (để test kiểm). */
+  hanRiengDaGui: [] as { dotId: string; donViId: string; body: unknown }[],
 };
 
 export function datLaiTienDoDotMock() {
   dbTienDoDot.theoDot = {};
   dbTienDoDot.donGia = 1_500_000;
+  dbTienDoDot.hanRiengDaGui = [];
 }
+
+/** "Hôm nay" của mock gia hạn riêng (cố định, không đọc đồng hồ). */
+export const HOM_NAY_MOCK = '2026-11-23';
 
 function khopLoc(d: DongTienDo, loc: LocTienDo): boolean {
   if (loc === 'chua_xac_nhan_ds') return d.trang_thai_danh_sach !== 'da_xac_nhan';
   if (loc === 'bao_sai_lech') return d.trang_thai_danh_sach === 'bao_sai_lech';
   if (loc === 'chua_nop_hd') return d.trang_thai_hop_dong !== 'da_nop';
+  if (loc === 'qua_han') return d.qua_han;
   return true;
 }
 
@@ -93,6 +104,7 @@ function tienDoCua(dotId: string, loc: LocTienDo): TienDoDot {
       so_da_xac_nhan_ds: ds.filter((d) => d.trang_thai_danh_sach === 'da_xac_nhan').length,
       so_bao_sai_lech: ds.filter((d) => d.trang_thai_danh_sach === 'bao_sai_lech').length,
       so_da_nop: ds.filter((d) => d.trang_thai_hop_dong === 'da_nop').length,
+      so_qua_han: ds.filter((d) => d.qua_han).length,
       tong_nguoi: ds.reduce((t, d) => t + d.so_nguoi, 0),
       tong_suat: ds.reduce((t, d) => t + d.tong_suat * 2, 0) / 2,
       tong_gia_tri: coGiaTri.length ? coGiaTri.reduce((t, d) => t + (d.gia_tri as number), 0) : null,
@@ -122,6 +134,42 @@ export const tienDoDotHandlers = [
     if (!dbTienDoDot.theoDot[params.id as string]) return loi(404, 'NOT_FOUND', 'Không tìm thấy đợt triển khai');
     return new HttpResponse(new Blob(['xlsx-gia']), {
       headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    });
+  }),
+
+  // Issue #66 / T3: gia hạn riêng 1 trường — kiểm như backend (lý do bắt buộc, ngày hợp lệ ≥ HOM_NAY_MOCK).
+  http.put('/cong-don-vi/dot-trien-khai/:dotId/hop-dong/:donViId/han-rieng', async ({ params, request }) => {
+    const dotId = params.dotId as string;
+    const donViId = params.donViId as string;
+    const body = (await request.json()) as { han_rieng?: string | null; ly_do?: string };
+    dbTienDoDot.hanRiengDaGui.push({ dotId, donViId, body });
+    const fields: { field: string; message: string }[] = [];
+    if (!body.ly_do?.trim()) fields.push({ field: 'ly_do', message: 'Nhập lý do (tối đa 500 ký tự)' });
+    if (body.han_rieng !== null && !/^\d{4}-\d{2}-\d{2}$/.test(body.han_rieng ?? '')) {
+      fields.push({ field: 'han_rieng', message: 'han_rieng phải là ngày dạng YYYY-MM-DD hoặc null' });
+    } else if (body.han_rieng && body.han_rieng < HOM_NAY_MOCK) {
+      fields.push({ field: 'han_rieng', message: 'Hạn riêng phải từ hôm nay trở đi' });
+    }
+    if (fields.length) {
+      return HttpResponse.json(
+        { error: { code: 'VALIDATION_ERROR', message: fields[0].message, fields } },
+        { status: 400 },
+      );
+    }
+    const dong = (dbTienDoDot.theoDot[dotId] ?? []).find((d) => d.don_vi.id === donViId);
+    if (!dong) return loi(404, 'NOT_FOUND', 'Không tìm thấy danh sách của trường cho đợt này');
+    const ngay = body.han_rieng ?? '2026-12-31';
+    Object.assign(dong, {
+      han_rieng: body.han_rieng ? `${body.han_rieng}T16:59:59.000Z` : null,
+      han_hieu_luc: `${ngay}T16:59:59.000Z`,
+      han_hieu_luc_ngay: ngay,
+      qua_han: false,
+    });
+    return HttpResponse.json({
+      han_rieng: dong.han_rieng,
+      han_hieu_luc: dong.han_hieu_luc,
+      han_hieu_luc_ngay: dong.han_hieu_luc_ngay,
+      da_het_han: false,
     });
   }),
 ];

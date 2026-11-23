@@ -5,7 +5,7 @@ import type { TrangThaiDanhSachTruong, TrangThaiHopDong } from './truongDanhSach
 
 // Issue #65 / ADR 0015 X7, T5: bảng Tiến độ đợt của Quản trị + Excel trường chưa xong (kèm người liên hệ).
 
-export const LOC_TIEN_DO = ['tat_ca', 'chua_xac_nhan_ds', 'bao_sai_lech', 'chua_nop_hd'] as const;
+export const LOC_TIEN_DO = ['tat_ca', 'chua_xac_nhan_ds', 'bao_sai_lech', 'chua_nop_hd', 'qua_han'] as const;
 export type LocTienDo = (typeof LOC_TIEN_DO)[number];
 
 export interface DongTienDo {
@@ -17,6 +17,11 @@ export interface DongTienDo {
   trang_thai_danh_sach: TrangThaiDanhSachTruong;
   trang_thai_hop_dong: TrangThaiHopDong;
   nop_luc: string | null;
+  /** Issue #66: hạn riêng (ISO | null), hạn hiệu lực (ISO + 'YYYY-MM-DD' giờ VN), quá hạn = hết hạn ∧ chưa nộp. */
+  han_rieng: string | null;
+  han_hieu_luc: string;
+  han_hieu_luc_ngay: string;
+  qua_han: boolean;
   so_de_nghi_cho: number;
   ho_so_du: boolean;
   /** false = trường chưa khai Hồ sơ đơn vị. */
@@ -30,6 +35,7 @@ export interface TongHopTienDo {
   so_da_xac_nhan_ds: number;
   so_bao_sai_lech: number;
   so_da_nop: number;
+  so_qua_han: number;
   tong_nguoi: number;
   tong_suat: number;
   tong_gia_tri: number | null;

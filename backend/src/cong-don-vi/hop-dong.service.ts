@@ -40,7 +40,18 @@ import {
   ngaySangChuoi,
   ngayVietNam,
 } from './dot-trien-khai.service';
-import { Tx, khoaTrangThaiHopDong, thaoTacCuoi } from './giao-dich-hop-dong';
+import {
+  Tx,
+  khoaHopDongTruong,
+  khoaTrangThaiHopDong,
+  thaoTacCuoi,
+} from './giao-dich-hop-dong';
+import {
+  ThongTinHan,
+  hanHieuLuc,
+  hanRiengTuNgay,
+  thongTinHan,
+} from './han-nop';
 
 /** M5: bản chụp Hồ sơ đơn vị lúc nộp — đủ mọi trường hồ sơ + thông tin chuyển khoản suy ra (U2). */
 export type BanChupHoSo = HoSoDonViDuLieu & {
@@ -56,7 +67,8 @@ export interface ChuyenKhoan {
   ngan_hang: string;
 }
 
-export interface HopDongPhanHoi {
+/** Issue #66 / T1–T3: han_rieng / han_hieu_luc / da_het_han của trường (server tính); dot.han_nop = hạn đợt. */
+export interface HopDongPhanHoi extends ThongTinHan {
   dot: {
     id: string;
     ten: string;
@@ -221,7 +233,7 @@ function soLieu(nc: NguCanh) {
   return { ...sl, chuyen_khoan: chuyenKhoanTu(nc.hoSo?.ma_qhns ?? null) };
 }
 
-function lyDoCua(nc: NguCanh, giaTri: number | null): LyDoChanNop[] {
+function lyDoCua(nc: NguCanh, giaTri: number | null, now: Date): LyDoChanNop[] {
   const h = nc.hopDong;
   const nhap = nhapCua(h);
   return lyDoChanNop({
@@ -235,15 +247,17 @@ function lyDoCua(nc: NguCanh, giaTri: number | null): LyDoChanNop[] {
     phan4: nhap,
     qdTu: ngaySangChuoi(h.dot_trien_khai.ngay_qd_tu),
     qdDen: ngaySangChuoi(h.dot_trien_khai.ngay_qd_den),
+    hanHieuLuc: hanHieuLuc(h.dot_trien_khai.han_nop, h.han_rieng),
+    now,
   });
 }
 
-function phanHoi(nc: NguCanh): HopDongPhanHoi {
+function phanHoi(nc: NguCanh, now: Date = new Date()): HopDongPhanHoi {
   const h = nc.hopDong;
   const d = h.dot_trien_khai;
   const nhap = nhapCua(h);
   const sl = soLieu(nc);
-  const ly_do_chan = lyDoCua(nc, sl.gia_tri);
+  const ly_do_chan = lyDoCua(nc, sl.gia_tri, now);
   const tinhTrang = tinhTrangHoSo(sl.hoSo);
   const daNop = h.trang_thai_hop_dong === 'da_nop';
   return {
@@ -278,6 +292,7 @@ function phanHoi(nc: NguCanh): HopDongPhanHoi {
     ly_do_chan,
     nop_luc: h.nop_luc ? h.nop_luc.toISOString() : null,
     ban_chup_ho_so: daNop ? (h.ban_chup_ho_so as unknown as BanChupHoSo) : null,
+    ...thongTinHan(d.han_nop, h.han_rieng, now),
   };
 }
 
@@ -306,7 +321,8 @@ function banChupCu(h: HopDongDayDu) {
 
 // Issue #64 / ADR 0015 M5, S4–S6, X4, X5, U2, O3: Phần 3–4 hợp đồng, Nộp (kèm điều kiện chặn + bản chụp hồ
 // sơ), Quản trị xem / Mở lại. Trường: đơn vị luôn lấy từ token. Mọi ghi đều khóa hop_dong FOR UPDATE.
-// TODO(ADR 0015 T2): chặn lưu nháp / nộp khi đã quá hạn nộp của đợt (hạn riêng) — lát hạn nộp (#66).
+// Issue #66 / T2, T3: trường lưu nháp / nộp sau hạn hiệu lực → 403 HET_HAN_DOT (X5 xét trước); Quản trị gia hạn
+// riêng 1 trường (lý do bắt buộc, nhật ký) và không bị hạn chặn.
 @Injectable()
 export class HopDongService {
   constructor(
@@ -342,10 +358,7 @@ export class HopDongService {
     }
 
     const thayDoi = await this.prisma.$transaction(async (tx) => {
-      const nc = await this.khoaVaTai(tx, dotId, donViId);
-      if (nc.hopDong.trang_thai_hop_dong === 'da_nop') {
-        throw new ConflictAppException(DA_NOP_LIEN_HE);
-      }
+      const nc = await this.truongKhoaVaTai(tx, dotId, donViId);
       const doi = truongHopDongThayDoi(nhapCua(nc.hopDong), moi);
       if (doi.length) {
         await tx.hop_dong_boi_duong.update({
@@ -380,13 +393,10 @@ export class HopDongService {
   async nop(user: AuthenticatedUser, dotId: string): Promise<HopDongPhanHoi> {
     const donViId = this.donViCua(user);
     const ketQua = await this.prisma.$transaction(async (tx) => {
-      const nc = await this.khoaVaTai(tx, dotId, donViId);
+      const nc = await this.truongKhoaVaTai(tx, dotId, donViId);
       const h = nc.hopDong;
-      if (h.trang_thai_hop_dong === 'da_nop') {
-        throw new ConflictAppException(DA_NOP_LIEN_HE);
-      }
       const sl = soLieu(nc);
-      const lyDo = lyDoCua(nc, sl.gia_tri);
+      const lyDo = lyDoCua(nc, sl.gia_tri, new Date());
       if (lyDo.length) {
         throw new ValidationException(
           'Chưa nộp được hợp đồng',
@@ -486,9 +496,54 @@ export class HopDongService {
     return this.quanTriXem(dotId, donViId);
   }
 
-  /** Khóa FOR UPDATE dòng hop_dong rồi đọc ngữ cảnh mới nhất trong cùng transaction. */
+  /**
+   * T3: Quản trị đặt / bỏ hạn riêng của 1 trường (ngày 'YYYY-MM-DD' → 23:59:59 giờ VN; null = theo hạn đợt).
+   * Ngày phải từ hôm nay (giờ VN) trở đi. Cho phép cả khi đã nộp (vô hại). Nhật ký gia_han_rieng_hop_dong.
+   */
+  async datHanRieng(
+    dotId: string,
+    donViId: string,
+    ngay: string | null,
+    lyDo: string,
+  ): Promise<ThongTinHan> {
+    const now = new Date();
+    if (ngay !== null && ngay < ngayVietNam(now)) {
+      const message = 'Hạn riêng phải từ hôm nay trở đi';
+      throw new ValidationException(message, [{ field: 'han_rieng', message }]);
+    }
+    const moi = ngay === null ? null : hanRiengTuNgay(ngay);
+    const kq = await this.prisma.$transaction(async (tx) => {
+      const k = await khoaTrangThaiHopDong(tx, dotId, donViId);
+      const h = await tx.hop_dong_boi_duong.update({
+        where: theoTruong(dotId, donViId),
+        data: { han_rieng: moi, updated_at: new Date() },
+        select: { id: true },
+      });
+      return { hopDongId: h.id, truoc: k.hanRieng, hanNop: k.hanNop };
+    });
+    await this.nhatKy.ghi({
+      hanh_dong: 'gia_han_rieng_hop_dong',
+      chi_tiet: {
+        dot_trien_khai_id: dotId,
+        don_vi_id: donViId,
+        hop_dong_id: kq.hopDongId,
+        truoc: kq.truoc ? kq.truoc.toISOString() : null,
+        sau: moi ? moi.toISOString() : null,
+        ly_do: lyDo,
+      },
+    });
+    return thongTinHan(kq.hanNop, moi, now);
+  }
+
+  /** Khóa FOR UPDATE dòng hop_dong rồi đọc ngữ cảnh mới nhất trong cùng transaction (Quản trị — không xét hạn). */
   private async khoaVaTai(tx: Tx, dotId: string, donViId: string) {
     await khoaTrangThaiHopDong(tx, dotId, donViId);
+    return this.taiNguCanh(tx, dotId, donViId);
+  }
+
+  /** Trường: khóa + X5 (đã nộp → 409) rồi T2 (hết hạn → 403 HET_HAN_DOT), rồi đọc ngữ cảnh. */
+  private async truongKhoaVaTai(tx: Tx, dotId: string, donViId: string) {
+    await khoaHopDongTruong(tx, dotId, donViId, DA_NOP_LIEN_HE);
     return this.taiNguCanh(tx, dotId, donViId);
   }
 

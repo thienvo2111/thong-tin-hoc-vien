@@ -156,9 +156,13 @@ describe('QuanTriTienDoDot — bảng và số liệu', () => {
     };
     await bang();
     await user.click(screen.getByRole('link', { name: 'Danh sách Trường THCS Mẫu Một' }));
-    expect(await screen.findByRole('heading', { name: 'Danh sách tham gia' })).toBeInTheDocument();
-    expect(await screen.findByRole('textbox', { name: 'Đợt triển khai' })).toHaveValue('HSG – HSG An Giang 2026');
-    expect(await screen.findByRole('table', { name: 'Danh sách Trường THCS Mẫu Một' })).toBeInTheDocument();
+    // Trang đích tải lười (nặng) — chạy cả bộ song song có thể quá mốc chờ mặc định của findBy.
+    const choLau = { timeout: 15000 };
+    expect(await screen.findByRole('heading', { name: 'Danh sách tham gia' }, choLau)).toBeInTheDocument();
+    expect(await screen.findByRole('textbox', { name: 'Đợt triển khai' }, choLau)).toHaveValue(
+      'HSG – HSG An Giang 2026',
+    );
+    expect(await screen.findByRole('table', { name: 'Danh sách Trường THCS Mẫu Một' }, choLau)).toBeInTheDocument();
   }, 20000);
 });
 
@@ -209,7 +213,7 @@ describe('QuanTriTienDoDot — đợt, lọc, tìm', () => {
 
   it('loc lạ trên URL → gửi tat_ca', async () => {
     const urls = batUrl('tien-do');
-    moTrang('?dot=dtk-1&loc=qua_han');
+    moTrang('?dot=dtk-1&loc=qua-han'); // 'qua_han' hợp lệ từ issue #66
     await bang();
     expect(urls[0].searchParams.get('loc')).toBe('tat_ca');
   });
@@ -376,5 +380,173 @@ describe('Phân quyền — Tiến độ đợt', () => {
   it('quan_tri mở /quan-tri/tien-do-dot trong khung Cổng đơn vị → thấy trang', async () => {
     moTrang();
     expect(await screen.findByRole('heading', { name: 'Tiến độ đợt' })).toBeInTheDocument();
+  });
+});
+
+async function goNgay(user: User, nhan: RegExp, giaTri: string) {
+  const o = screen.getByLabelText(nhan);
+  await user.clear(o);
+  await user.type(o, giaTri);
+  await user.tab(); // blur đóng lịch; Escape sẽ đóng cả Modal
+}
+
+// Issue #66 / ADR 0015 T2, T3: cột Hạn, lọc Quá hạn, Gia hạn riêng 1 trường (lý do bắt buộc). Mọi giá trị đều BỊA.
+describe('QuanTriTienDoDot — hạn nộp (issue #66)', () => {
+  /** Một: hạn riêng 20/12; Hai: quá hạn (hạn đợt 20/11 đã qua, chưa nộp); Ba, Bốn: theo đợt. */
+  function chuanBiHan() {
+    const ds = dsTienDoMau();
+    Object.assign(ds[0], {
+      han_rieng: '2026-12-20T16:59:59.000Z',
+      han_hieu_luc: '2026-12-20T16:59:59.000Z',
+      han_hieu_luc_ngay: '2026-12-20',
+    });
+    Object.assign(ds[1], {
+      han_hieu_luc: '2026-11-20T16:59:59.000Z',
+      han_hieu_luc_ngay: '2026-11-20',
+      qua_han: true,
+    });
+    return ds;
+  }
+
+  function moTrangHan() {
+    chuanBi();
+    dbTienDoDot.theoDot['dtk-1'] = chuanBiHan();
+    return renderVoiRouter(routesCongDonVi, { initialEntries: [`${TRANG}?dot=dtk-1`] });
+  }
+
+  const giaHanCua = (ten: string) => screen.getByRole('button', { name: `Gia hạn riêng ${ten}` });
+  // Hộp thoại tải lười (lần đầu biên dịch @mantine/dates chậm) → chờ lâu hơn mặc định.
+  const hop = () => screen.findByRole('dialog', { name: 'Gia hạn riêng' }, { timeout: 10000 });
+
+  it('cột Hạn: dd/mm/yyyy, badge "Hạn riêng" / đỏ "Quá hạn"; chip "Quá hạn (1)" gửi loc=qua_han', async () => {
+    const urls = batUrl('tien-do');
+    moTrangHan();
+    const b = await bang();
+    expect(within(b).getByRole('columnheader', { name: 'Hạn' })).toBeInTheDocument();
+    const mot = dongCua(b, 'Trường THCS Mẫu Một');
+    expect(within(mot).getByText('20/12/2026')).toBeInTheDocument();
+    expect(within(mot).getByText('Hạn riêng')).toBeInTheDocument();
+    expect(within(mot).queryByText('Quá hạn')).not.toBeInTheDocument();
+    const hai = dongCua(b, 'Trường THCS Mẫu Hai');
+    expect(within(hai).getByText('20/11/2026')).toBeInTheDocument();
+    expect(within(hai).getByText('Quá hạn')).toBeInTheDocument();
+    expect(within(dongCua(b, 'Trường THPT Mẫu Bốn')).getByText('31/12/2026')).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await chonLoc(user, 'Quá hạn (1)');
+    await waitFor(() => expect(urls[urls.length - 1]?.searchParams.get('loc')).toBe('qua_han'));
+    await waitFor(async () => expect(tenCacTruong(await bang())).toEqual(['Trường THCS Mẫu Hai']));
+    expect(screen.getByRole('radio', { name: 'Quá hạn (1)' })).toBeChecked();
+  });
+
+  it('Gia hạn riêng: thiếu lý do → báo lỗi, KHÔNG gửi; đủ → PUT {han_rieng: YYYY-MM-DD, ly_do}, thông báo, tải lại', async () => {
+    const urls = batUrl('tien-do');
+    moTrangHan();
+    await bang();
+    const user = userEvent.setup();
+    await user.click(giaHanCua('Trường THCS Mẫu Hai'));
+    const h = await hop();
+    expect(within(h).getByText('Hạn hiện tại: 20/11/2026 (theo đợt)')).toBeInTheDocument();
+    expect(within(h).queryByLabelText(/Bỏ hạn riêng/)).not.toBeInTheDocument();
+    await goNgay(user, /Hạn riêng đến hết ngày/, '28/12/2026');
+    await user.click(within(h).getByRole('button', { name: 'Lưu' }));
+    expect(await within(h).findByText('Nhập lý do gia hạn')).toBeInTheDocument();
+    expect(dbTienDoDot.hanRiengDaGui).toEqual([]);
+
+    const soLanTai = urls.length;
+    await user.type(within(h).getByLabelText(/Lý do/), '  Trường xin thêm thời gian (bịa) ');
+    await user.click(within(h).getByRole('button', { name: 'Lưu' }));
+    await waitFor(() =>
+      expect(dbTienDoDot.hanRiengDaGui).toEqual([
+        {
+          dotId: 'dtk-1',
+          donViId: 'tr-2',
+          body: { han_rieng: '2026-12-28', ly_do: 'Trường xin thêm thời gian (bịa)' },
+        },
+      ]),
+    );
+    expect((await screen.findAllByText('Đã gia hạn riêng Trường THCS Mẫu Hai đến 28/12/2026')).length).toBeGreaterThan(
+      0,
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Gia hạn riêng' })).not.toBeInTheDocument());
+    await waitFor(() => expect(urls.length).toBeGreaterThan(soLanTai));
+    await waitFor(async () => {
+      const hai = dongCua(await bang(), 'Trường THCS Mẫu Hai');
+      expect(within(hai).getByText('28/12/2026')).toBeInTheDocument();
+      expect(within(hai).getByText('Hạn riêng')).toBeInTheDocument();
+    });
+  });
+
+  it('"Bỏ hạn riêng" (khi đang có) → gửi han_rieng null, không cần chọn ngày', async () => {
+    moTrangHan();
+    await bang();
+    const user = userEvent.setup();
+    await user.click(giaHanCua('Trường THCS Mẫu Một'));
+    const h = await hop();
+    expect(within(h).getByText('Hạn hiện tại: 20/12/2026 (hạn riêng)')).toBeInTheDocument();
+    await user.click(within(h).getByLabelText(/Bỏ hạn riêng/));
+    expect(within(h).queryByLabelText(/Hạn riêng đến hết ngày/)).not.toBeInTheDocument();
+    await user.type(within(h).getByLabelText(/Lý do/), 'Trường đã xong việc (bịa)');
+    await user.click(within(h).getByRole('button', { name: 'Lưu' }));
+    await waitFor(() =>
+      expect(dbTienDoDot.hanRiengDaGui.map((g) => g.body)).toEqual([
+        { han_rieng: null, ly_do: 'Trường đã xong việc (bịa)' },
+      ]),
+    );
+    expect((await screen.findAllByText('Đã bỏ hạn riêng của Trường THCS Mẫu Một')).length).toBeGreaterThan(0);
+  });
+
+  it('server 400 field han_rieng / ly_do → gắn vào đúng ô, hộp thoại vẫn mở', async () => {
+    server.use(
+      http.put('/cong-don-vi/dot-trien-khai/:dotId/hop-dong/:donViId/han-rieng', () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'Hạn riêng phải từ hôm nay trở đi',
+              fields: [
+                { field: 'han_rieng', message: 'Hạn riêng phải từ hôm nay trở đi' },
+                { field: 'ly_do', message: 'Nhập lý do (tối đa 500 ký tự)' },
+              ],
+            },
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    moTrangHan();
+    await bang();
+    const user = userEvent.setup();
+    await user.click(giaHanCua('Trường THCS Mẫu Hai'));
+    const h = await hop();
+    await goNgay(user, /Hạn riêng đến hết ngày/, '28/12/2026');
+    await user.type(within(h).getByLabelText(/Lý do/), 'Bịa');
+    await user.click(within(h).getByRole('button', { name: 'Lưu' }));
+    expect(await within(h).findByText('Hạn riêng phải từ hôm nay trở đi')).toBeInTheDocument();
+    expect(within(h).getByText('Nhập lý do (tối đa 500 ký tự)')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Gia hạn riêng' })).toBeInTheDocument();
+  });
+
+  it('màn hẹp: thẻ trường có Hạn + "Quá hạn" + nút Gia hạn riêng', async () => {
+    const goc = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: query.includes('max-width'),
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    try {
+      moTrangHan();
+      const the = await screen.findByRole('article', { name: 'Trường THCS Mẫu Hai' });
+      expect(within(the).getByText('20/11/2026')).toBeInTheDocument();
+      expect(within(the).getByText('Quá hạn')).toBeInTheDocument();
+      expect(within(the).getByRole('button', { name: 'Gia hạn riêng Trường THCS Mẫu Hai' })).toBeInTheDocument();
+    } finally {
+      window.matchMedia = goc;
+    }
   });
 });

@@ -60,7 +60,8 @@ export type HanhDongNhatKy =
   | 'luu_nhap_hop_dong'
   | 'nop_hop_dong'
   | 'mo_lai_hop_dong'
-  | 'xuat_tien_do_dot';
+  | 'xuat_tien_do_dot'
+  | 'gia_han_rieng_hop_dong';
 
 const TIEU_DE: Record<HanhDongNhatKy, string> = {
   dang_nhap_thanh_cong: 'Đăng nhập thành công',
@@ -119,6 +120,7 @@ const TIEU_DE: Record<HanhDongNhatKy, string> = {
   nop_hop_dong: 'Trường nộp hợp đồng',
   mo_lai_hop_dong: 'Quản trị mở lại hợp đồng',
   xuat_tien_do_dot: 'Xuất Excel trường chưa xong (có người liên hệ)',
+  gia_han_rieng_hop_dong: 'Quản trị gia hạn riêng hợp đồng của trường',
 };
 
 const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
@@ -177,6 +179,7 @@ const NHOM: Record<HanhDongNhatKy, NhomDongThoiGian> = {
   nop_hop_dong: 'tai_khoan',
   mo_lai_hop_dong: 'tai_khoan',
   xuat_tien_do_dot: 'tai_khoan',
+  gia_han_rieng_hop_dong: 'tai_khoan',
 };
 
 const NHAN_VAI_TRO: Record<vai_tro_nguoi_dung, string> = {

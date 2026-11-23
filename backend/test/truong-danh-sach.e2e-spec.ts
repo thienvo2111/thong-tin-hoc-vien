@@ -346,6 +346,11 @@ describe('Trang chủ trường + xem danh sách - Cổng đơn vị (e2e)', () 
         gia_tri_tam_tinh: 3_086_418,
         trang_thai_danh_sach: 'cho_xac_nhan',
         trang_thai_hop_dong: 'chua_nop',
+        // Issue #66: hạn hiệu lực của trường (không hạn riêng → hạn đợt).
+        han_rieng: null,
+        han_hieu_luc: '2026-12-20T16:59:59.000Z',
+        han_hieu_luc_ngay: '2026-12-20',
+        da_het_han: false,
       });
     });
 

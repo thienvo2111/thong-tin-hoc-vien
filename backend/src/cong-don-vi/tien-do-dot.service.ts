@@ -11,6 +11,7 @@ import { tinhTrangHoSo } from './ho-so-don-vi.quy-tac';
 import { layDuLieu } from './ho-so-don-vi.service';
 import { soLieuHopDong } from './hop-dong.service';
 import { ngayVietNam } from './dot-trien-khai.service';
+import { thongTinHan } from './han-nop';
 import {
   LocTienDo,
   TongHopTienDo,
@@ -18,6 +19,7 @@ import {
   khopLoc,
   locTienDo,
   mocMuonHon,
+  quaHan,
   tongHopTienDo,
 } from './tien-do-dot';
 import {
@@ -36,6 +38,11 @@ export interface DongTienDo {
   trang_thai_danh_sach: trang_thai_danh_sach_truong;
   trang_thai_hop_dong: trang_thai_hop_dong;
   nop_luc: string | null;
+  /** Issue #66 / T1–T3: hạn riêng (ISO | null), hạn hiệu lực (ISO + ngày VN), quá hạn = hết hạn ∧ chưa nộp. */
+  han_rieng: string | null;
+  han_hieu_luc: string;
+  han_hieu_luc_ngay: string;
+  qua_han: boolean;
   so_de_nghi_cho: number;
   /** tinhTrangHoSo đủ (đã nộp: bản chụp lúc nộp); false khi chưa khai. */
   ho_so_du: boolean;
@@ -110,6 +117,8 @@ export class TienDoDotService {
         so_de_nghi_cho: d.so_de_nghi_cho,
         ho_so: tinhTrangHoSoCua(d),
         trang_thai_hop_dong: d.trang_thai_hop_dong,
+        han_hieu_luc_ngay: d.han_hieu_luc_ngay,
+        co_han_rieng: d.han_rieng !== null,
         thao_tac_cuoi_luc: thaoTacCuoi,
         lien_he: lienHe,
       })),
@@ -170,7 +179,9 @@ export class TienDoDotService {
     const demDeNghi = new Map(deNghi.map((x) => [x.don_vi_id, x._count._all]));
     const hoSoTheo = new Map(hoSo.map((h) => [h.don_vi_id, layDuLieu(h)]));
 
+    const now = new Date();
     const ds: DongNoiBo[] = hopDong.map((h) => {
+      const han = thongTinHan(d.han_nop, h.han_rieng, now);
       const dem = demDong.get(h.don_vi_id);
       const hoSoHienTai = hoSoTheo.get(h.don_vi_id) ?? null;
       const sl = soLieuHopDong(h, {
@@ -197,6 +208,10 @@ export class TienDoDotService {
         trang_thai_danh_sach: h.trang_thai_danh_sach,
         trang_thai_hop_dong: h.trang_thai_hop_dong,
         nop_luc: h.nop_luc ? h.nop_luc.toISOString() : null,
+        han_rieng: han.han_rieng,
+        han_hieu_luc: han.han_hieu_luc,
+        han_hieu_luc_ngay: han.han_hieu_luc_ngay,
+        qua_han: quaHan(han.da_het_han, h.trang_thai_hop_dong),
         so_de_nghi_cho: demDeNghi.get(h.don_vi_id) ?? 0,
         ho_so_du: sl.hoSo ? tinhTrangHoSo(sl.hoSo).du : false,
         co_ho_so: sl.hoSo !== null,

@@ -227,3 +227,35 @@ describe('Danh sách theo trường — trường đã nộp hợp đồng (X5)'
     expect(screen.getByText(/Trường THCS Mẫu Một đã nộp hợp đồng — nạp sẽ bị từ chối/)).toBeInTheDocument();
   });
 });
+
+// Issue #66 / ADR 0015 T1, T3: Quản trị thấy hạn hiệu lực (chỉ xem) của trường.
+describe('Quản trị xem hợp đồng — hạn hiệu lực (issue #66)', () => {
+  it('không hạn riêng → "Hạn hiệu lực: dd/mm/yyyy (theo hạn đợt)"', async () => {
+    await moHopDong();
+    const tt = screen.getByRole('status', { name: 'Trạng thái hợp đồng' });
+    expect(within(tt).getByText('Hạn hiệu lực: 31/12/2026 (theo hạn đợt)')).toBeInTheDocument();
+  });
+
+  it('có hạn riêng, chưa nộp, đã hết hạn → kèm hạn đợt và "đã hết hạn"', async () => {
+    await moHopDong(
+      hopDongQuanTriMau({
+        trang_thai_hop_dong: 'chua_nop',
+        nop_luc: null,
+        nop_boi: null,
+        ban_chup_ho_so: null,
+        ho_so_hien_tai: hoSoMau(),
+        ly_do_chan: lyDo('da_het_han'),
+        co_the_nop: false,
+        han_rieng: '2026-12-05T16:59:59.000Z',
+        han_hieu_luc: '2026-12-05T16:59:59.000Z',
+        han_hieu_luc_ngay: '2026-12-05',
+        da_het_han: true,
+      }),
+    );
+    const tt = screen.getByRole('status', { name: 'Trạng thái hợp đồng' });
+    expect(
+      within(tt).getByText('Hạn hiệu lực: 05/12/2026 (hạn riêng; hạn đợt 31/12/2026) — đã hết hạn'),
+    ).toBeInTheDocument();
+    expect(within(tt).getByText('Đã hết hạn ngày 05/12/2026 — liên hệ HCMUE để được gia hạn')).toBeInTheDocument();
+  });
+});

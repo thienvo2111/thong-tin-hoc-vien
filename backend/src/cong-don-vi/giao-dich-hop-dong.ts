@@ -4,9 +4,11 @@
 import type { Prisma, trang_thai_hop_dong } from '@prisma/client';
 import {
   ConflictAppException,
+  HetHanDotException,
   NotFoundAppException,
 } from '../common/exceptions/app.exceptions';
 import { TrangThaiDanhSach, YKienTruong } from './quy-tac-hop-dong';
+import { daHetHan, hanHieuLuc, thongDiepHetHan } from './han-nop';
 
 export type Tx = Prisma.TransactionClient;
 
@@ -27,21 +29,59 @@ export const DA_NOP_QUAN_TRI =
 export interface TrangThaiDaKhoa {
   danhSach: TrangThaiDanhSach;
   hopDong: trang_thai_hop_dong;
+  /** Issue #66 / T1, T3: hạn của đợt + hạn riêng của trường (đọc cùng truy vấn khóa). */
+  hanNop: Date;
+  hanRieng: Date | null;
 }
 
-/** Khóa FOR UPDATE + đọc cả 2 trạng thái của dòng hop_dong (đợt, trường). Không có → 404. */
+/**
+ * Khóa FOR UPDATE dòng hop_dong (đợt, trường) + đọc 2 trạng thái và hạn (đợt, riêng). Không có → 404.
+ * Chỉ khóa dòng hop_dong (FOR UPDATE OF h) — không khóa dòng đợt.
+ */
 export async function khoaTrangThaiHopDong(
   tx: Tx,
   dotId: string,
   donViId: string,
 ): Promise<TrangThaiDaKhoa> {
   const rows = await tx.$queryRaw<TrangThaiDaKhoa[]>`
-    SELECT trang_thai_danh_sach::text AS "danhSach", trang_thai_hop_dong::text AS "hopDong"
-    FROM hop_dong_boi_duong
-    WHERE dot_trien_khai_id = ${dotId}::uuid AND don_vi_id = ${donViId}::uuid
-    FOR UPDATE`;
+    SELECT h.trang_thai_danh_sach::text AS "danhSach", h.trang_thai_hop_dong::text AS "hopDong",
+      d.han_nop AS "hanNop", h.han_rieng AS "hanRieng"
+    FROM hop_dong_boi_duong h
+    JOIN dot_trien_khai d ON d.id = h.dot_trien_khai_id
+    WHERE h.dot_trien_khai_id = ${dotId}::uuid AND h.don_vi_id = ${donViId}::uuid
+    FOR UPDATE OF h`;
   if (rows.length === 0) throw new NotFoundAppException(KHONG_THAY_DANH_SACH);
   return rows[0];
+}
+
+/**
+ * Issue #66 / ADR 0015 T2: quá hạn hiệu lực (han_rieng ?? han_nop) → 403 HET_HAN_DOT. Chỉ gọi cho thao tác
+ * của trường — Quản trị không bị hạn chặn. `now` = đồng hồ server.
+ */
+export function chanNeuHetHan(
+  han: Pick<TrangThaiDaKhoa, 'hanNop' | 'hanRieng'>,
+  now: Date = new Date(),
+): void {
+  const hieuLuc = hanHieuLuc(han.hanNop, han.hanRieng);
+  if (daHetHan(hieuLuc, now)) {
+    throw new HetHanDotException(thongDiepHetHan(hieuLuc));
+  }
+}
+
+/**
+ * Thao tác của TRƯỜNG trên danh sách / hợp đồng 1 đợt: khóa hop_dong, rồi X5 (đã nộp → 409 `loiDaNop`)
+ * trước, T2 (hết hạn → 403 HET_HAN_DOT) sau — trong cùng transaction. Trả trạng thái đã khóa.
+ */
+export async function khoaHopDongTruong(
+  tx: Tx,
+  dotId: string,
+  donViId: string,
+  loiDaNop: string,
+): Promise<TrangThaiDaKhoa> {
+  const k = await khoaTrangThaiHopDong(tx, dotId, donViId);
+  if (k.hopDong === 'da_nop') throw new ConflictAppException(loiDaNop);
+  chanNeuHetHan(k);
+  return k;
 }
 
 /**

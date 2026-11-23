@@ -8,6 +8,7 @@ import { hoSoMau } from './hoSoDonVi';
 
 export const LY_DO: Record<MaLyDoChanNop, string> = {
   da_nop: 'Hợp đồng đã nộp',
+  da_het_han: 'Đã hết hạn ngày 05/12/2026 — liên hệ HCMUE để được gia hạn',
   danh_sach_chua_xac_nhan: 'Danh sách chưa được xác nhận',
   chua_co_don_gia: 'Đợt chưa có đơn giá — chờ HCMUE cập nhật',
   ho_so_chua_du: 'Hồ sơ đơn vị còn thiếu 3 mục',
@@ -55,6 +56,10 @@ export function hopDongMau(p: Partial<HopDongPhanHoi> = {}): HopDongPhanHoi {
     ly_do_chan,
     nop_luc: null,
     ban_chup_ho_so: null,
+    han_rieng: null,
+    han_hieu_luc: '2026-12-31T16:59:59.000Z',
+    han_hieu_luc_ngay: '2026-12-31',
+    da_het_han: false,
     ...p,
   };
 }
@@ -115,6 +120,14 @@ const loi = (status: number, code: string, message: string, fields?: { field: st
 const khongThay = () => loi(404, 'NOT_FOUND', 'Không tìm thấy hợp đồng của trường cho đợt này');
 const trong = (v: string | null) => !v || !v.trim();
 
+/** Issue #66 / T2: hết hạn → 403 HET_HAN_DOT (X5 đã nộp xét trước). */
+const hetHan = (hd: HopDongPhanHoi) =>
+  loi(
+    403,
+    'HET_HAN_DOT',
+    `Đã hết hạn ngày ${hd.han_hieu_luc_ngay.split('-').reverse().join('/')} — liên hệ HCMUE để được gia hạn`,
+  );
+
 const MA_PHAN_3_4: MaLyDoChanNop[] = ['phan_3_chua_du', 'thieu_so_qd', 'thieu_ngay_qd'];
 
 /** Bản rút gọn lyDoChanNop của backend: tính lại phần phụ thuộc Phần 3–4 sau khi lưu nháp. */
@@ -141,6 +154,7 @@ export const hopDongHandlers = [
     if (hd.trang_thai_hop_dong === 'da_nop') {
       return loi(409, 'CONFLICT', 'Hợp đồng đã nộp — liên hệ HCMUE nếu cần mở lại');
     }
+    if (hd.da_het_han) return hetHan(hd);
     const nhap = (await request.json()) as NhapHopDong;
     const fields = Object.entries(kiemTraPhan3(nhap).loi).map(([field, message]) => ({ field, message }));
     if (fields.length) return loi(400, 'VALIDATION_ERROR', 'Thông tin hợp đồng chưa hợp lệ', fields);
@@ -167,6 +181,7 @@ export const hopDongHandlers = [
     if (hd.trang_thai_hop_dong === 'da_nop') {
       return loi(409, 'CONFLICT', 'Hợp đồng đã nộp — liên hệ HCMUE nếu cần mở lại');
     }
+    if (hd.da_het_han) return hetHan(hd);
     if (hd.ly_do_chan.length) {
       return loi(
         400,

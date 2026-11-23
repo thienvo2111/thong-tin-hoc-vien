@@ -27,6 +27,7 @@ import { useHopDongTruong, useLuuNhapHopDong, useNopHopDong, type HopDongPhanHoi
 import { NHAN_TRUONG_HOP_DONG, TRUONG_NHAP_HOP_DONG, type TruongNhapHopDong } from '@/lib/hopDong';
 import { loiFieldsThanhMap, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
+import { SDT_HO_TRO_CONG_DON_VI, laLoiHetHan, thongBaoChiXemHetHan } from '@/lib/hanNop';
 import { chuoiSangNgay, dinhDangNgayLich, docNgayGo } from '@/lib/ngayLich';
 import { formSangNhap, hopDongSchema, type HopDongForm } from '@/schemas/hopDong';
 import { NHAN_CHUONG_TRINH_NGAN, TRANG_THAI_HOP_DONG } from './hopDongNhan';
@@ -102,6 +103,8 @@ export default function HopDongTruong() {
 
 function NoiDung({ dotId, data }: { dotId: string; data: HopDongPhanHoi }) {
   const daNop = data.trang_thai_hop_dong === 'da_nop';
+  // Issue #66 / T2: hết hạn (server da_het_han) → chỉ xem như đã nộp: không form, không Lưu nháp / Nộp.
+  const hetHan = data.da_het_han && !daNop;
   const hd = TRANG_THAI_HOP_DONG[data.trang_thai_hop_dong];
   return (
     <>
@@ -126,10 +129,20 @@ function NoiDung({ dotId, data }: { dotId: string; data: HopDongPhanHoi }) {
         </Alert>
       )}
 
+      {hetHan && (
+        <Alert color="red" role="status">
+          {thongBaoChiXemHetHan(data.han_hieu_luc_ngay, SDT_HO_TRO_CONG_DON_VI)}
+        </Alert>
+      )}
+
       <SoLieuHopDong data={data} />
       <HoSoVaChuyenKhoan data={data} />
 
-      {daNop ? <ThongTinPhan34 data={data} /> : <FormHopDong key={data.nop_luc ?? 'nhap'} dotId={dotId} data={data} />}
+      {daNop || hetHan ? (
+        <ThongTinPhan34 data={data} />
+      ) : (
+        <FormHopDong key={data.nop_luc ?? 'nhap'} dotId={dotId} data={data} />
+      )}
     </>
   );
 }
@@ -184,6 +197,8 @@ function FormHopDong({ dotId, data }: { dotId: string; data: HopDongPhanHoi }) {
         notifications.show({ color: 'green', message: 'Đã lưu nháp thông tin hợp đồng' });
       },
       onError: (err) => {
+        // Issue #66: hết hạn → form sẽ được thay bằng chế độ chỉ xem (tải lại) — báo bằng thông báo nổi.
+        if (laLoiHetHan(err)) notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
         setLoiChung(thongDiepLoiXungDot(err));
         for (const [field, message] of Object.entries(loiFieldsThanhMap(err))) {
           if ((TRUONG_NHAP_HOP_DONG as readonly string[]).includes(field)) {
@@ -199,6 +214,9 @@ function FormHopDong({ dotId, data }: { dotId: string; data: HopDongPhanHoi }) {
       onSuccess: () => {
         setMoNop(false);
         notifications.show({ color: 'green', message: 'Đã nộp hợp đồng' });
+      },
+      onError: (err) => {
+        if (laLoiHetHan(err)) notifications.show({ color: 'red', message: thongDiepLoiXungDot(err) });
       },
     });
   }

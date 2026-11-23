@@ -910,6 +910,8 @@ model hop_dong_boi_duong {
   tong_suat_luc_nop    Decimal?                    @db.Decimal(10, 1)
   don_gia_luc_nop      Int?
   gia_tri_luc_nop      BigInt?
+  // Issue #66 / ADR 0015 T3: hạn riêng của trường (23:59:59 giờ VN); NULL = theo hạn của đợt.
+  han_rieng            DateTime?                   @db.Timestamptz(6)
 
   dot_trien_khai     dot_trien_khai  @relation(fields: [dot_trien_khai_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   don_vi             don_vi_cong_tac @relation(fields: [don_vi_id], references: [id], onDelete: NoAction, onUpdate: NoAction)

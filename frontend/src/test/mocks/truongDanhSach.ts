@@ -25,6 +25,10 @@ export function theDotMau(p: Partial<TheDotTruong> = {}): TheDotTruong {
     gia_tri_tam_tinh: 3_086_418,
     trang_thai_danh_sach: 'cho_xac_nhan',
     trang_thai_hop_dong: 'chua_nop',
+    han_rieng: null,
+    han_hieu_luc: '2026-12-31T16:59:59.000Z',
+    han_hieu_luc_ngay: '2026-12-31',
+    da_het_han: false,
     ...p,
   };
 }
@@ -77,6 +81,10 @@ export function danhSachMau(p: Partial<DanhSachCuaTruong> = {}): DanhSachCuaTruo
     ly_do_khong_xac_nhan: null,
     de_nghi: [],
     so_de_nghi_cho: 0,
+    han_rieng: null,
+    han_hieu_luc: '2026-12-31T16:59:59.000Z',
+    han_hieu_luc_ngay: '2026-12-31',
+    da_het_han: false,
     ...p,
   };
   return 'co_the_xac_nhan' in p ? ds : tinhLai(ds);
@@ -117,7 +125,12 @@ function trangThaiSauYKien(ds: DanhSachCuaTruong): TrangThaiDanhSachTruong {
   return ds.trang_thai_danh_sach;
 }
 
+/** Issue #66: thông điệp HET_HAN_DOT của backend (thongDiepHetHan). */
+export const thongDiepHetHanMau = (ngay: string) =>
+  `Đã hết hạn ngày ${ngay.split('-').reverse().join('/')} — liên hệ HCMUE để được gia hạn`;
+
 function lyDoKhongXacNhan(ds: DanhSachCuaTruong): string | null {
+  if (ds.da_het_han) return thongDiepHetHanMau(ds.han_hieu_luc_ngay);
   if (ds.dong.length === 0) return 'Danh sách trống';
   const con = ds.dong.filter((d) => d.y_kien_truong !== 'dong_y').length;
   if (con > 0) return `Còn ${con} dòng chưa Đồng ý`;
@@ -128,6 +141,13 @@ function tinhLai(ds: DanhSachCuaTruong): DanhSachCuaTruong {
   const ly_do_khong_xac_nhan = lyDoKhongXacNhan(ds);
   return { ...ds, co_the_xac_nhan: ly_do_khong_xac_nhan === null, ly_do_khong_xac_nhan, so_de_nghi_cho: soCho(ds) };
 }
+
+/** Issue #66 / T2: đợt hết hạn với trường → mọi thao tác ghi 403 HET_HAN_DOT. */
+const hetHan = (ds: DanhSachCuaTruong) =>
+  HttpResponse.json(
+    { error: { code: 'HET_HAN_DOT', message: thongDiepHetHanMau(ds.han_hieu_luc_ngay) } },
+    { status: 403 },
+  );
 
 const xungDot = (message: string) => HttpResponse.json({ error: { code: 'CONFLICT', message } }, { status: 409 });
 
@@ -157,6 +177,7 @@ export const truongDanhSachHandlers = [
     const dotId = params.dotId as string;
     const ds = dbTruongDanhSach.danhSach[dotId];
     if (!ds) return khongThay();
+    if (ds.da_het_han) return hetHan(ds);
     const { y_kien } = (await request.json()) as { y_kien: YKienTruong | null };
     if (ds.de_nghi.some((d) => d.dong_id === params.dongId && d.trang_thai === 'cho')) {
       return xungDot('Dòng đang có đề nghị chờ HCMUE xử lý');
@@ -170,6 +191,7 @@ export const truongDanhSachHandlers = [
     const dotId = params.dotId as string;
     const ds = dbTruongDanhSach.danhSach[dotId];
     if (!ds) return khongThay();
+    if (ds.da_het_han) return hetHan(ds);
     const dong = ds.dong.map((d) => (d.y_kien_truong === null ? { ...d, y_kien_truong: 'dong_y' as const } : d));
     const moi = { ...ds, dong };
     dbTruongDanhSach.danhSach[dotId] = tinhLai({ ...moi, trang_thai_danh_sach: trangThaiSauYKien(moi) });
@@ -179,6 +201,7 @@ export const truongDanhSachHandlers = [
     const dotId = params.dotId as string;
     const ds = dbTruongDanhSach.danhSach[dotId];
     if (!ds) return khongThay();
+    if (ds.da_het_han) return hetHan(ds);
     const lyDo = lyDoKhongXacNhan(ds);
     if (lyDo) return HttpResponse.json({ error: { code: 'VALIDATION_ERROR', message: lyDo } }, { status: 400 });
     dbTruongDanhSach.danhSach[dotId] = tinhLai({ ...ds, trang_thai_danh_sach: 'da_xac_nhan' });
@@ -189,6 +212,7 @@ export const truongDanhSachHandlers = [
     const dotId = params.dotId as string;
     const ds = dbTruongDanhSach.danhSach[dotId];
     if (!ds) return khongThay();
+    if (ds.da_het_han) return hetHan(ds);
     const body = (await request.json()) as GuiDeNghi;
     if (body.loai === 'bot' && !body.ly_do) {
       return HttpResponse.json(

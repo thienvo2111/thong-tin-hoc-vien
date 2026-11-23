@@ -19,6 +19,7 @@ import { ApiError } from '@/api/client';
 import { useHopDongQuanTri, useMoLaiHopDong, type HopDongQuanTri as HopDong } from '@/api/hopDong';
 import { loiFieldsThanhMap, thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
+import { dinhDangNgayLich } from '@/lib/ngayLich';
 import { TRANG_THAI_DANH_SACH, TRANG_THAI_HOP_DONG } from './hopDongNhan';
 import { DanhSachLyDoChan, SoLieuHopDong, ThongTinPhan34 } from './HopDongChung';
 import { NhomHoSoChiDoc } from './HoSoDonViQuanTri';
@@ -86,6 +87,12 @@ function NoiDung({ dotId, donViId, data }: { dotId: string; donViId: string; dat
               Danh sách: {ds.nhan}
             </Badge>
           </Group>
+          {/* Issue #66 / T1, T3: hạn hiệu lực (chỉ xem) — gia hạn riêng ở bảng Tiến độ đợt. */}
+          <Text size="sm">
+            Hạn hiệu lực: {dinhDangNgayLich(data.han_hieu_luc_ngay)}
+            {data.han_rieng ? ` (hạn riêng; hạn đợt ${dinhDangNgayLich(data.dot.han_nop_ngay)})` : ' (theo hạn đợt)'}
+            {data.da_het_han && !daNop ? ' — đã hết hạn' : ''}
+          </Text>
           {daNop && data.nop_luc && (
             <Text size="sm">
               Nộp lúc {dinhDangNgayGio(data.nop_luc)}

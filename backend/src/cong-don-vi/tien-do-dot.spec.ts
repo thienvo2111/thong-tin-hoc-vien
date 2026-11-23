@@ -7,6 +7,7 @@ import {
   khopLoc,
   locTienDo,
   mocMuonHon,
+  quaHan,
   tongHopTienDo,
 } from './tien-do-dot';
 import {
@@ -34,6 +35,7 @@ const dong = (
   so_nguoi: 1,
   tong_suat: 1,
   gia_tri: 1000,
+  qua_han: false,
   ...p,
 });
 
@@ -47,6 +49,7 @@ const B = dong('B', 'bao_sai_lech', 'chua_nop', {
   so_nguoi: 1,
   tong_suat: 0.5,
   gia_tri: 500_000,
+  qua_han: true,
 });
 const C = dong('C', 'da_xac_nhan', 'chua_nop');
 const D = dong('D', 'da_xac_nhan', 'da_nop', {
@@ -68,6 +71,7 @@ describe('locTienDo / khopLoc', () => {
     ['chua_xac_nhan_ds', ['A', 'B', 'E']],
     ['bao_sai_lech', ['B']],
     ['chua_nop_hd', ['A', 'B', 'C', 'E']],
+    ['qua_han', ['B']],
   ])('%s → %j (giữ thứ tự)', (loc, mongDoi) => {
     expect(ten(locTienDo(TAT_CA, loc))).toEqual(mongDoi);
   });
@@ -76,13 +80,21 @@ describe('locTienDo / khopLoc', () => {
     for (const loc of LOC_TIEN_DO) expect(locTienDo([], loc)).toEqual([]);
   });
 
-  it('LOC_TIEN_DO đúng 4 giá trị, tat_ca đầu tiên', () => {
+  it('LOC_TIEN_DO đúng 5 giá trị, tat_ca đầu tiên', () => {
     expect(LOC_TIEN_DO).toEqual([
       'tat_ca',
       'chua_xac_nhan_ds',
       'bao_sai_lech',
       'chua_nop_hd',
+      'qua_han',
     ]);
+  });
+
+  it('quaHan: hết hạn ∧ chưa nộp; đã nộp sau hạn không quá hạn', () => {
+    expect(quaHan(true, 'chua_nop')).toBe(true);
+    expect(quaHan(true, 'da_nop')).toBe(false);
+    expect(quaHan(false, 'chua_nop')).toBe(false);
+    expect(quaHan(false, 'da_nop')).toBe(false);
   });
 
   it('đã nộp nhưng (lý thuyết) chưa xác nhận vẫn vào chua_xac_nhan_ds, không vào chua_nop_hd', () => {
@@ -131,6 +143,7 @@ describe('tongHopTienDo', () => {
       so_da_xac_nhan_ds: 2,
       so_bao_sai_lech: 1,
       so_da_nop: 1,
+      so_qua_han: 1,
       tong_nguoi: 14,
       tong_suat: 11.5,
       tong_gia_tri: 2_500_000 + 500_000 + 1000 + 7_777_777 + 0,
@@ -159,6 +172,7 @@ describe('tongHopTienDo', () => {
       so_da_xac_nhan_ds: 0,
       so_bao_sai_lech: 0,
       so_da_nop: 0,
+      so_qua_han: 0,
       tong_nguoi: 0,
       tong_suat: 0,
       tong_gia_tri: null,
@@ -243,6 +257,8 @@ describe('Excel trường chưa xong', () => {
     so_de_nghi_cho: 2,
     ho_so: 'con_thieu',
     trang_thai_hop_dong: 'chua_nop',
+    han_hieu_luc_ngay: '2026-12-05',
+    co_han_rieng: true,
     thao_tac_cuoi_luc: new Date('2026-11-20T03:04:00Z'),
     lien_he: {
       nguoi: 'Người Liên Hệ Bịa',
@@ -283,13 +299,16 @@ describe('Excel trường chưa xong', () => {
       2,
       'Còn thiếu',
       'Chưa nộp',
+      new Date('2026-12-05T00:00:00Z'), // ô ngày hạn hiệu lực 05/12/2026
+      'Có',
       new Date('2026-11-20T10:04:00Z'), // 03:04 UTC = 10:04 giờ VN
       'Người Liên Hệ Bịa',
       '0900000001',
       'lienhe@mau.test',
     ]);
     expect(sh.getRow(2).getCell(6).numFmt).toBe('#,##0');
-    expect(sh.getRow(2).getCell(11).numFmt).toBe('dd/mm/yyyy hh:mm');
+    expect(sh.getRow(2).getCell(11).numFmt).toBe('dd/mm/yyyy');
+    expect(sh.getRow(2).getCell(13).numFmt).toBe('dd/mm/yyyy hh:mm');
   });
 
   it('chưa khai hồ sơ → "Chưa khai hồ sơ" ở Người liên hệ, SĐT/email trống; giá trị null → ô trống', async () => {
@@ -301,6 +320,7 @@ describe('Excel trường chưa xong', () => {
           gia_tri: null,
           thao_tac_cuoi_luc: null,
           trang_thai_danh_sach: 'cho_xac_nhan',
+          co_han_rieng: false,
         }),
       ]),
     );
@@ -308,9 +328,11 @@ describe('Excel trường chưa xong', () => {
     expect(r[5]).toBeUndefined();
     expect(r[6]).toBe('Chờ xác nhận');
     expect(r[8]).toBe('Chưa khai');
-    expect(r[10]).toBeUndefined();
-    expect(r[11]).toBe(CHUA_KHAI_HO_SO);
-    expect(r.length).toBe(12); // SĐT, email trống (ô trống cuối dòng không có trong values)
+    expect(r[10]).toEqual(new Date('2026-12-05T00:00:00Z'));
+    expect(r[11]).toBeUndefined(); // không có hạn riêng → ô trống
+    expect(r[12]).toBeUndefined();
+    expect(r[13]).toBe(CHUA_KHAI_HO_SO);
+    expect(r.length).toBe(14); // SĐT, email trống (ô trống cuối dòng không có trong values)
   });
 
   it('không có trường nào → file hợp lệ chỉ có dòng tiêu đề', async () => {

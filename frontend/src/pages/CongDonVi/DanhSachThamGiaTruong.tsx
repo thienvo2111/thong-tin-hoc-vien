@@ -29,6 +29,7 @@ import {
 } from '@/api/truongDanhSach';
 import { thongDiepLoiChung, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayLich, dinhDangTien } from '@/lib/ngayLich';
+import { SDT_HO_TRO_CONG_DON_VI, thongBaoChiXemHetHan } from '@/lib/hanNop';
 import { tokenKhac } from '@/theme';
 import { NHAN_GIAI_DOAN, dinhDangSuat } from './danhSachThamGiaNhan';
 import { NHAN_CHUONG_TRINH_NGAN, TRANG_THAI_DANH_SACH } from './hopDongNhan';
@@ -99,7 +100,10 @@ function NoiDung({ dotId, ds }: { dotId: string; ds: DanhSachCuaTruong }) {
   const soChuaCoYKien = ds.dong.filter((d) => d.y_kien_truong === null).length;
   const daXacNhan = ds.trang_thai_danh_sach === 'da_xac_nhan';
   // Issue #64 / X5: hợp đồng đã nộp → danh sách chỉ xem (ẩn ý kiến, đề nghị, Xác nhận).
-  const chiXem = ds.trang_thai_hop_dong === 'da_nop';
+  // Issue #66 / T2: hết hạn (server da_het_han) → cũng chỉ xem.
+  const daNop = ds.trang_thai_hop_dong === 'da_nop';
+  const hetHan = ds.da_het_han && !daNop;
+  const chiXem = daNop || hetHan;
 
   const deNghiThem = ds.de_nghi.filter((d) => d.loai === 'them');
 
@@ -129,9 +133,13 @@ function NoiDung({ dotId, ds }: { dotId: string; ds: DanhSachCuaTruong }) {
         </Text>
       </Stack>
 
-      {chiXem ? (
+      {daNop ? (
         <Alert color="green" role="status">
           Hợp đồng đã nộp — danh sách chỉ xem
+        </Alert>
+      ) : hetHan ? (
+        <Alert color="red" role="status">
+          {thongBaoChiXemHetHan(ds.han_hieu_luc_ngay, SDT_HO_TRO_CONG_DON_VI)}
         </Alert>
       ) : (
         <Button variant="default" fullWidth onClick={() => setMoDeNghi({ dong: null })}>
@@ -189,9 +197,13 @@ function NoiDung({ dotId, ds }: { dotId: string; ds: DanhSachCuaTruong }) {
               Giá trị tạm tính: {ds.gia_tri_tam_tinh === null ? 'chưa có đơn giá' : dinhDangTien(ds.gia_tri_tam_tinh)}
             </Text>
           </div>
-          {chiXem ? (
+          {daNop ? (
             <Text c="green.8" fw={600}>
               Hợp đồng đã nộp — danh sách chỉ xem.
+            </Text>
+          ) : hetHan ? (
+            <Text c="red.8" fw={600}>
+              Đã hết hạn — danh sách chỉ xem.
             </Text>
           ) : daXacNhan ? (
             <Text c="green.8" fw={600}>
@@ -278,7 +290,7 @@ function TheNguoi({
   /** Đề nghị mới nhất của dòng (nếu có). */
   deNghi?: DeNghiCuaTruong;
   khoa: boolean;
-  /** Issue #64 / X5: hợp đồng đã nộp → không có nút ý kiến. */
+  /** Issue #64 / X5, #66 / T2: đã nộp hoặc hết hạn → không có nút ý kiến. */
   chiXem: boolean;
   onYKien: (y: YKienTruong) => void;
 }) {

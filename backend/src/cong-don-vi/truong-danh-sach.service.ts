@@ -29,11 +29,12 @@ import {
   trangThaiSauYKien,
 } from './quy-tac-hop-dong';
 import { ngaySangChuoi, ngayVietNam } from './dot-trien-khai.service';
+import { ThongTinHan, thongDiepHetHan, thongTinHan } from './han-nop';
 import {
   DA_NOP_TRUONG,
   KHONG_THAY_DANH_SACH,
   Tx,
-  khoaHopDong,
+  khoaHopDongTruong,
   saiLechCuaTruong,
   thaoTacCuoi,
 } from './giao-dich-hop-dong';
@@ -47,7 +48,8 @@ export interface DotCuaTruong {
   han_nop_ngay: string;
 }
 
-export interface TheDotTruong {
+/** Issue #66 / T1–T3: dot.han_nop = hạn đợt; han_rieng / han_hieu_luc / da_het_han của CHÍNH trường (server tính). */
+export interface TheDotTruong extends ThongTinHan {
   dot: DotCuaTruong;
   so_nguoi: number;
   tong_suat: number;
@@ -95,7 +97,7 @@ export interface DeNghiCuaTruong {
   xu_ly_luc: string | null;
 }
 
-export interface DanhSachCuaTruong {
+export interface DanhSachCuaTruong extends ThongTinHan {
   dot: DotCuaTruong;
   dong: DongDanhSachTruong[];
   tong_suat: number;
@@ -104,7 +106,7 @@ export interface DanhSachCuaTruong {
   trang_thai_danh_sach: trang_thai_danh_sach_truong;
   /** Issue #64 / X5: da_nop → danh sách chỉ xem. */
   trang_thai_hop_dong: trang_thai_hop_dong;
-  /** X2: nút "Xác nhận danh sách" bật được không; không → lý do (tiếng Việt). */
+  /** X2: nút "Xác nhận danh sách" bật được không; không → lý do (tiếng Việt). T2: hết hạn → false. */
   co_the_xac_nhan: boolean;
   ly_do_khong_xac_nhan: string | null;
   /** Issue #62: đề nghị của trường trong đợt, mới nhất trước. */
@@ -183,8 +185,8 @@ function trungDeNghiCho(e: unknown): never {
 // Issue #61 / X1, X2: trường Đồng ý / Không đồng ý từng dòng và Xác nhận danh sách.
 // Issue #62 / X2: trường gửi đề nghị sửa/thêm/bớt người — không sửa trực tiếp dữ liệu nào.
 // Phạm vi luôn lấy từ don_vi_id trong token, không nhận tham số đơn vị từ client.
-// Issue #64 / X5: trường đã nộp hợp đồng → ý kiến/xác nhận/gửi đề nghị trả 409 (khoaHopDong, dưới khóa FOR UPDATE).
-// TODO(ADR 0015 T2): chặn ý kiến/xác nhận/gửi đề nghị khi đã quá hạn nộp của đợt — lát hạn nộp.
+// Issue #64 / X5: trường đã nộp hợp đồng → ý kiến/xác nhận/gửi đề nghị trả 409; issue #66 / T2: quá hạn hiệu
+// lực → 403 HET_HAN_DOT (khoaHopDongTruong, dưới khóa FOR UPDATE; X5 xét trước hạn). GET vẫn xem được.
 @Injectable()
 export class TruongDanhSachService {
   constructor(
@@ -200,6 +202,7 @@ export class TruongDanhSachService {
       include: { dot_trien_khai: { select: CHON_DOT } },
     });
     if (hopDong.length === 0) return [];
+    const now = new Date();
 
     const suatTheoDot = await this.prisma.danh_sach_tham_gia.findMany({
       where: {
@@ -234,6 +237,7 @@ export class TruongDanhSachService {
           ...soLieu,
           trang_thai_danh_sach: h.trang_thai_danh_sach,
           trang_thai_hop_dong: h.trang_thai_hop_dong,
+          ...thongTinHan(h.dot_trien_khai.han_nop, h.han_rieng, now),
         };
       })
       .sort(
@@ -283,6 +287,17 @@ export class TruongDanhSachService {
       dong.map((d) => d.y_kien_truong),
       so_de_nghi_cho,
     );
+    const han = thongTinHan(
+      hopDong.dot_trien_khai.han_nop,
+      hopDong.han_rieng,
+      new Date(),
+    );
+    // strictNullChecks tắt → thu hẹp union bằng 'in', không bằng hopLe.
+    const lyDoKhongXacNhan = han.da_het_han
+      ? thongDiepHetHan(new Date(han.han_hieu_luc))
+      : 'lyDo' in kiemTra
+        ? kiemTra.lyDo
+        : null;
     return {
       dot: toDot(hopDong.dot_trien_khai),
       dong,
@@ -291,9 +306,8 @@ export class TruongDanhSachService {
       gia_tri_tam_tinh: giaTriTamTinh(tong_suat, don_gia),
       trang_thai_danh_sach: hopDong.trang_thai_danh_sach,
       trang_thai_hop_dong: hopDong.trang_thai_hop_dong,
-      co_the_xac_nhan: kiemTra.hopLe,
-      // strictNullChecks tắt → thu hẹp union bằng 'in', không bằng hopLe.
-      ly_do_khong_xac_nhan: 'lyDo' in kiemTra ? kiemTra.lyDo : null,
+      co_the_xac_nhan: kiemTra.hopLe && !han.da_het_han,
+      ly_do_khong_xac_nhan: lyDoKhongXacNhan,
       de_nghi: deNghi.map((d) => ({
         id: d.id,
         loai: d.loai,
@@ -307,6 +321,7 @@ export class TruongDanhSachService {
         xu_ly_luc: d.xu_ly_luc ? d.xu_ly_luc.toISOString() : null,
       })),
       so_de_nghi_cho,
+      ...han,
     };
   }
 
@@ -323,7 +338,12 @@ export class TruongDanhSachService {
     const donViId = this.donViCua(user);
     // undefined = không đổi gì (gửi lại đúng ý kiến đang có) → không ghi, không nhật ký.
     const truoc = await this.prisma.$transaction(async (tx) => {
-      const hienTai = await khoaHopDong(tx, dotId, donViId, DA_NOP_TRUONG);
+      const { danhSach: hienTai } = await khoaHopDongTruong(
+        tx,
+        dotId,
+        donViId,
+        DA_NOP_TRUONG,
+      );
       const dong = await tx.danh_sach_tham_gia.findFirst({
         where: { id: dongId, dot_trien_khai_id: dotId, don_vi_id: donViId },
         select: { y_kien_truong: true },
@@ -363,7 +383,12 @@ export class TruongDanhSachService {
   ): Promise<DanhSachCuaTruong> {
     const donViId = this.donViCua(user);
     const soDong = await this.prisma.$transaction(async (tx) => {
-      const hienTai = await khoaHopDong(tx, dotId, donViId, DA_NOP_TRUONG);
+      const { danhSach: hienTai } = await khoaHopDongTruong(
+        tx,
+        dotId,
+        donViId,
+        DA_NOP_TRUONG,
+      );
       const { count } = await tx.danh_sach_tham_gia.updateMany({
         where: {
           dot_trien_khai_id: dotId,
@@ -400,7 +425,12 @@ export class TruongDanhSachService {
   ): Promise<DanhSachCuaTruong> {
     const donViId = this.donViCua(user);
     const ketQua = await this.prisma.$transaction(async (tx) => {
-      const hienTai = await khoaHopDong(tx, dotId, donViId, DA_NOP_TRUONG);
+      const { danhSach: hienTai } = await khoaHopDongTruong(
+        tx,
+        dotId,
+        donViId,
+        DA_NOP_TRUONG,
+      );
       const [ds, soDeNghiCho] = await Promise.all([
         tx.danh_sach_tham_gia.findMany({
           where: { dot_trien_khai_id: dotId, don_vi_id: donViId },
@@ -453,7 +483,12 @@ export class TruongDanhSachService {
     const dongId = this.kiemTraLoaiDeNghi(dto);
     const deNghi = await this.prisma
       .$transaction(async (tx) => {
-        const hienTai = await khoaHopDong(tx, dotId, donViId, DA_NOP_TRUONG);
+        const { danhSach: hienTai } = await khoaHopDongTruong(
+          tx,
+          dotId,
+          donViId,
+          DA_NOP_TRUONG,
+        );
         let dong: danh_sach_tham_gia | null = null;
         if (dongId) {
           dong = await tx.danh_sach_tham_gia.findFirst({

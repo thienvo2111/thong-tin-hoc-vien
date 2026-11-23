@@ -4,6 +4,7 @@ import { useDotCuaTruong, type TheDotTruong } from '@/api/truongDanhSach';
 import { useHoSoDonVi } from '@/api/hoSoDonVi';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgayLich } from '@/lib/ngayLich';
+import { NGUONG_GAP, SDT_HO_TRO_CONG_DON_VI, nhanHan, nhanHetHanNgan, trangThaiHan } from '@/lib/hanNop';
 import { dinhDangSuat } from './danhSachThamGiaNhan';
 import { NHAN_CHUONG_TRINH_NGAN, TRANG_THAI_DANH_SACH, TRANG_THAI_HOP_DONG, dinhDangGiaTri } from './hopDongNhan';
 import { BadgeHoSo } from './HoSoDonViChung';
@@ -77,11 +78,36 @@ function TheHoSoDonVi() {
   );
 }
 
-function TheDot({ the }: { the: TheDotTruong }) {
+/** Issue #66 / ADR 0015 T1: "Còn N ngày" (cam khi ≤ 3), "Hạn cuối hôm nay", đỏ "Đã hết hạn ngày dd/mm – liên hệ HCMUE". */
+function ChipHan({ the, now }: { the: TheDotTruong; now: Date }) {
+  const tt = trangThaiHan(the, now);
+  if (tt.loai === 'het_han') {
+    return (
+      <Badge color="red" variant="filled" tt="none" h="auto" py={4} styles={{ label: { whiteSpace: 'normal' } }}>
+        {nhanHetHanNgan(the.han_hieu_luc_ngay, SDT_HO_TRO_CONG_DON_VI)}
+      </Badge>
+    );
+  }
+  const gap = tt.loai === 'hom_nay' || tt.soNgay <= NGUONG_GAP;
+  return (
+    <Badge color={gap ? 'orange' : 'blue'} variant="light" tt="none">
+      {nhanHan(the, now)}
+    </Badge>
+  );
+}
+
+function TheDot({ the, now = new Date() }: { the: TheDotTruong; now?: Date }) {
   const { dot } = the;
   const ds = TRANG_THAI_DANH_SACH[the.trang_thai_danh_sach];
   const hd = TRANG_THAI_HOP_DONG[the.trang_thai_hop_dong];
   const idTieuDe = `dot-${dot.id}`;
+  // Issue #66 / T2: hết hạn (chưa nộp) → các việc vẫn mở được nhưng chỉ xem.
+  const chiXem = the.da_het_han && the.trang_thai_hop_dong !== 'da_nop';
+  const nhanChiXem = (
+    <Badge color="gray" variant="light" size="sm">
+      Chỉ xem
+    </Badge>
+  );
 
   return (
     <Paper withBorder radius="md" p="md" component="article" aria-labelledby={idTieuDe}>
@@ -102,7 +128,17 @@ function TheDot({ the }: { the: TheDotTruong }) {
           <Text size="sm" c="dimmed">
             Hạn nộp: {dinhDangNgayLich(dot.han_nop_ngay)}
           </Text>
+          {the.han_rieng && (
+            <Text size="sm" c="dimmed">
+              Hạn riêng của trường: {dinhDangNgayLich(the.han_hieu_luc_ngay)}
+            </Text>
+          )}
         </div>
+        {the.trang_thai_hop_dong !== 'da_nop' && (
+          <div>
+            <ChipHan the={the} now={now} />
+          </div>
+        )}
 
         <SimpleGrid cols={{ base: 2, xs: 3 }} spacing="sm" verticalSpacing="xs">
           <SoLieu nhan="Số người" giaTri={String(the.so_nguoi)} />
@@ -125,9 +161,13 @@ function TheDot({ the }: { the: TheDotTruong }) {
               fullWidth
               justify="space-between"
               rightSection={
-                <Badge color={ds.mau} variant="light" size="sm">
-                  {ds.nhan}
-                </Badge>
+                chiXem ? (
+                  nhanChiXem
+                ) : (
+                  <Badge color={ds.mau} variant="light" size="sm">
+                    {ds.nhan}
+                  </Badge>
+                )
               }
             >
               Xác nhận danh sách
@@ -142,9 +182,13 @@ function TheDot({ the }: { the: TheDotTruong }) {
               fullWidth
               justify="space-between"
               rightSection={
-                <Badge color="blue" variant="light" size="sm">
-                  {dinhDangGiaTri(the.gia_tri_tam_tinh)}
-                </Badge>
+                chiXem ? (
+                  nhanChiXem
+                ) : (
+                  <Badge color="blue" variant="light" size="sm">
+                    {dinhDangGiaTri(the.gia_tri_tam_tinh)}
+                  </Badge>
+                )
               }
             >
               Thông tin hợp đồng
@@ -158,9 +202,13 @@ function TheDot({ the }: { the: TheDotTruong }) {
               fullWidth
               justify="space-between"
               rightSection={
-                <Badge color={hd.mau} variant="light" size="sm">
-                  {hd.nhan}
-                </Badge>
+                chiXem ? (
+                  nhanChiXem
+                ) : (
+                  <Badge color={hd.mau} variant="light" size="sm">
+                    {hd.nhan}
+                  </Badge>
+                )
               }
             >
               Nộp hợp đồng

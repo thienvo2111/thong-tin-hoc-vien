@@ -92,6 +92,14 @@ export class DotNhuCauDongException extends HttpException {
   }
 }
 
+// Issue #66 / ADR 0015 T2: 403 khi trường thao tác trên danh sách / hợp đồng của đợt sau hạn hiệu lực
+// (han_rieng ?? han_nop). Cùng kiểu DOT_XAC_NHAN_DONG: hết thời hạn → không có quyền thao tác, chỉ xem.
+export class HetHanDotException extends HttpException {
+  constructor(message: string) {
+    super({ error: { code: 'HET_HAN_DOT', message } }, 403);
+  }
+}
+
 // Dùng bởi Dịch vụ Import (mỗi dòng file) để biến lỗi ném ra từ đúng 1 bộ
 // quy tắc validate dùng chung (ValidationException/ConflictAppException của
 // các *_hoc.service.ts) thành 1 chuỗi lý do ngắn gọn cho cột "Lý do".

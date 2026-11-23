@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from './client';
 import type { GiaiDoanThamGia } from './danhSachThamGia';
 import type { ChuongTrinhBoiDuong } from './dotTrienKhai';
+import { laLoiHetHan, type ThongTinHan } from '@/lib/hanNop';
 
 // Issue #60 / ADR 0015 U1, X6, S5: trường xem đợt + danh sách tham gia của chính trường (Cổng đơn vị).
 export type TrangThaiDanhSachTruong = 'cho_xac_nhan' | 'da_xac_nhan' | 'bao_sai_lech';
@@ -19,7 +20,8 @@ export interface DotCuaTruong {
   han_nop_ngay: string;
 }
 
-export interface TheDotTruong {
+/** Issue #66: + han_rieng / han_hieu_luc / han_hieu_luc_ngay / da_het_han (server tính) của chính trường. */
+export interface TheDotTruong extends ThongTinHan {
   dot: DotCuaTruong;
   so_nguoi: number;
   tong_suat: number;
@@ -44,7 +46,8 @@ export interface DongDanhSachTruong {
   y_kien_truong: YKienTruong | null;
 }
 
-export interface DanhSachCuaTruong {
+/** Issue #66: da_het_han → chỉ xem (như da_nop). */
+export interface DanhSachCuaTruong extends ThongTinHan {
   dot: DotCuaTruong;
   dong: DongDanhSachTruong[];
   tong_suat: number;
@@ -132,6 +135,12 @@ function useThaoTacDanhSach<V>(dotId: string, goi: (v: V) => Promise<DanhSachCua
     mutationFn: goi,
     onSuccess: (ds) => {
       queryClient.setQueryData(danhSachKey(dotId), ds);
+      void queryClient.invalidateQueries({ queryKey: ['cong-don-vi', 'truong', 'dot'], exact: true });
+    },
+    // Issue #66 / T2: server báo hết hạn (403 HET_HAN_DOT) → tải lại để màn hình vào chế độ chỉ xem.
+    onError: (err) => {
+      if (!laLoiHetHan(err)) return;
+      void queryClient.invalidateQueries({ queryKey: danhSachKey(dotId) });
       void queryClient.invalidateQueries({ queryKey: ['cong-don-vi', 'truong', 'dot'], exact: true });
     },
   });

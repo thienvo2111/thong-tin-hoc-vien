@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import {
@@ -31,16 +31,21 @@ import {
 } from '@/api/tienDoDot';
 import { thongDiepLoiChung } from '@/lib/loiApi';
 import { dinhDangNgay, dinhDangNgayGio } from '@/lib/ngay';
+import { dinhDangNgayLich } from '@/lib/ngayLich';
 import { taiFileTuBlob } from '@/lib/taiFile';
 import { khopTimKiem } from '@/lib/timKiemTiengViet';
 import { dinhDangSuat } from './danhSachThamGiaNhan';
 import { TRANG_THAI_DANH_SACH, TRANG_THAI_HOP_DONG, dinhDangGiaTri } from './hopDongNhan';
+
+// Issue #66: hộp thoại Gia hạn riêng (kèm @mantine/dates) chỉ tải khi mở — trang bảng không nặng thêm.
+const ModalGiaHanRieng = lazy(() => import('./ModalGiaHanRieng').then((m) => ({ default: m.ModalGiaHanRieng })));
 
 const NHAN_LOC: Record<LocTienDo, string> = {
   tat_ca: 'Tất cả',
   chua_xac_nhan_ds: 'Chưa xác nhận DS',
   bao_sai_lech: 'Báo sai lệch',
   chua_nop_hd: 'Chưa nộp HĐ',
+  qua_han: 'Quá hạn',
 };
 
 function soTheoLoc(t: TongHopTienDo): Record<LocTienDo, number> {
@@ -49,6 +54,7 @@ function soTheoLoc(t: TongHopTienDo): Record<LocTienDo, number> {
     chua_xac_nhan_ds: t.so_truong - t.so_da_xac_nhan_ds,
     bao_sai_lech: t.so_bao_sai_lech,
     chua_nop_hd: t.so_truong - t.so_da_nop,
+    qua_han: t.so_qua_han,
   };
 }
 
@@ -74,6 +80,8 @@ export default function QuanTriTienDoDot() {
   const locParam = params.get('loc');
   const loc: LocTienDo = laLoc(locParam) ? locParam : 'tat_ca';
   const [tuKhoa, setTuKhoa] = useState('');
+  // Issue #66 / T3: trường đang mở "Gia hạn riêng".
+  const [giaHan, setGiaHan] = useState<DongTienDo | null>(null);
   const tienDo = useTienDoDot(dotId, loc);
   const nhoMan = useMediaQuery('(max-width: 48em)');
 
@@ -171,11 +179,16 @@ export default function QuanTriTienDoDot() {
             ) : nhoMan ? (
               <Stack gap="sm" aria-label="Tiến độ theo trường">
                 {dong.map((d) => (
-                  <TheTruong key={d.don_vi.id} d={d} dotId={dotId} />
+                  <TheTruong key={d.don_vi.id} d={d} dotId={dotId} onGiaHan={setGiaHan} />
                 ))}
               </Stack>
             ) : (
-              <BangTienDo dong={dong} dotId={dotId} />
+              <BangTienDo dong={dong} dotId={dotId} onGiaHan={setGiaHan} />
+            )}
+            {giaHan && (
+              <Suspense fallback={null}>
+                <ModalGiaHanRieng dotId={dotId} dong={giaHan} onClose={() => setGiaHan(null)} />
+              </Suspense>
             )}
           </>
         )}
@@ -248,9 +261,30 @@ function BadgeHoSo({ d }: { d: DongTienDo }) {
   );
 }
 
+/** Issue #66: hạn hiệu lực dd/mm/yyyy + "Hạn riêng" khi có + đỏ "Quá hạn" (hết hạn, chưa nộp). */
+function HanTruong({ d }: { d: DongTienDo }) {
+  return (
+    <Group gap={4}>
+      <Text size="sm">{dinhDangNgayLich(d.han_hieu_luc_ngay)}</Text>
+      {d.han_rieng && (
+        <Badge color="blue" variant="light" tt="none">
+          Hạn riêng
+        </Badge>
+      )}
+      {d.qua_han && (
+        <Badge color="red" variant="filled" tt="none">
+          Quá hạn
+        </Badge>
+      )}
+    </Group>
+  );
+}
+
 const thaoTacCuoi = (d: DongTienDo) => (d.thao_tac_cuoi_luc ? dinhDangNgayGio(d.thao_tac_cuoi_luc) : '—');
 
-function LienKetDong({ d, dotId }: { d: DongTienDo; dotId: string }) {
+type GiaHan = (d: DongTienDo) => void;
+
+function LienKetDong({ d, dotId, onGiaHan }: { d: DongTienDo; dotId: string; onGiaHan: GiaHan }) {
   return (
     <Group gap={4} wrap="nowrap">
       <Button
@@ -271,6 +305,9 @@ function LienKetDong({ d, dotId }: { d: DongTienDo; dotId: string }) {
       >
         Hợp đồng
       </Button>
+      <Button size="xs" variant="subtle" aria-label={`Gia hạn riêng ${d.don_vi.ten}`} onClick={() => onGiaHan(d)}>
+        Gia hạn riêng
+      </Button>
     </Group>
   );
 }
@@ -288,9 +325,9 @@ function TenTruong({ d }: { d: DongTienDo }) {
   );
 }
 
-function BangTienDo({ dong, dotId }: { dong: DongTienDo[]; dotId: string }) {
+function BangTienDo({ dong, dotId, onGiaHan }: { dong: DongTienDo[]; dotId: string; onGiaHan: GiaHan }) {
   return (
-    <Table.ScrollContainer minWidth={1100}>
+    <Table.ScrollContainer minWidth={1280}>
       <Table striped withTableBorder fz="sm" aria-label="Tiến độ theo trường">
         <Table.Thead>
           <Table.Tr>
@@ -301,6 +338,7 @@ function BangTienDo({ dong, dotId }: { dong: DongTienDo[]; dotId: string }) {
             <Table.Th>Danh sách</Table.Th>
             <Table.Th>Hồ sơ</Table.Th>
             <Table.Th>Hợp đồng</Table.Th>
+            <Table.Th>Hạn</Table.Th>
             <Table.Th>Thao tác gần nhất</Table.Th>
             <Table.Th />
           </Table.Tr>
@@ -323,9 +361,12 @@ function BangTienDo({ dong, dotId }: { dong: DongTienDo[]; dotId: string }) {
               <Table.Td>
                 <BadgeHopDong d={d} />
               </Table.Td>
+              <Table.Td>
+                <HanTruong d={d} />
+              </Table.Td>
               <Table.Td>{thaoTacCuoi(d)}</Table.Td>
               <Table.Td>
-                <LienKetDong d={d} dotId={dotId} />
+                <LienKetDong d={d} dotId={dotId} onGiaHan={onGiaHan} />
               </Table.Td>
             </Table.Tr>
           ))}
@@ -336,7 +377,7 @@ function BangTienDo({ dong, dotId }: { dong: DongTienDo[]; dotId: string }) {
 }
 
 /** Màn hẹp: mỗi trường 1 thẻ xếp dọc — không cuộn ngang trang ở 360px. */
-function TheTruong({ d, dotId }: { d: DongTienDo; dotId: string }) {
+function TheTruong({ d, dotId, onGiaHan }: { d: DongTienDo; dotId: string; onGiaHan: GiaHan }) {
   return (
     <Paper withBorder radius="md" p="sm" component="article" aria-label={d.don_vi.ten}>
       <Stack gap={6}>
@@ -360,10 +401,16 @@ function TheTruong({ d, dotId }: { d: DongTienDo; dotId: string }) {
           </Text>
           <BadgeHopDong d={d} />
         </Group>
+        <Group gap="xs">
+          <Text size="xs" c="dimmed">
+            Hạn
+          </Text>
+          <HanTruong d={d} />
+        </Group>
         <Text size="xs" c="dimmed">
           Thao tác gần nhất: {thaoTacCuoi(d)}
         </Text>
-        <LienKetDong d={d} dotId={dotId} />
+        <LienKetDong d={d} dotId={dotId} onGiaHan={onGiaHan} />
       </Stack>
     </Paper>
   );

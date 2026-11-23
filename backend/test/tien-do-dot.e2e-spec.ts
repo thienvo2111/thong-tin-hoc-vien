@@ -449,6 +449,7 @@ describe('Tiến độ đợt - Cổng đơn vị (e2e)', () => {
         so_da_xac_nhan_ds: 2,
         so_bao_sai_lech: 1,
         so_da_nop: 1,
+        so_qua_han: 0, // issue #66: hạn đợt 31/12/2026 chưa tới
         tong_nguoi: 3 + 2 + 1 + 7 + 0,
         tong_suat: 11.5,
         tong_gia_tri: 3_086_418 + 1_851_851 + DON_GIA + 8_024_686,
@@ -470,7 +471,8 @@ describe('Tiến độ đợt - Cổng đơn vị (e2e)', () => {
     });
 
     it('loc không hợp lệ → 400 VALIDATION_ERROR (cả 2 endpoint)', async () => {
-      const r1 = await layTienDo(dot1, 'qua_han');
+      // 'qua_han' hợp lệ từ issue #66 — dùng giá trị khác.
+      const r1 = await layTienDo(dot1, 'qua-han');
       expect(r1.status).toBe(400);
       expect(r1.body.error.code).toBe('VALIDATION_ERROR');
       const r2 = await taiExcel(dot1, 'xyz');
@@ -504,6 +506,8 @@ describe('Tiến độ đợt - Cổng đơn vị (e2e)', () => {
       'Đề nghị chờ',
       'Hồ sơ đơn vị',
       'Trạng thái hợp đồng',
+      'Hạn hiệu lực', // issue #66
+      'Hạn riêng',
       'Thao tác gần nhất',
       'Người liên hệ',
       'SĐT liên hệ',
@@ -530,7 +534,8 @@ describe('Tiến độ đợt - Cổng đơn vị (e2e)', () => {
         ten.E,
       ]);
       const [a, b, c, e] = dong.slice(1);
-      expect(a.slice(0, 12)).toEqual([
+      const HAN_DOT = new Date('2026-12-31T00:00:00Z'); // issue #66: ô ngày hạn hiệu lực
+      expect(a.slice(0, 14)).toEqual([
         1,
         expect.stringMatching(/^TDD-/),
         ten.A,
@@ -541,26 +546,32 @@ describe('Tiến độ đợt - Cổng đơn vị (e2e)', () => {
         0,
         'Còn thiếu',
         'Chưa nộp',
+        HAN_DOT,
+        undefined,
         undefined,
         'Người Liên Hệ A Bịa',
       ]);
-      expect(a[12]).toBe('0900000021');
+      expect(a[14]).toBe('0900000021');
       // B chưa khai hồ sơ: "Chưa khai hồ sơ", không SĐT/email.
-      expect(b.slice(6, 12)).toEqual([
+      expect(b.slice(6, 14)).toEqual([
         'Báo sai lệch',
         1,
         'Chưa khai',
         'Chưa nộp',
+        HAN_DOT,
+        undefined,
         undefined,
         'Chưa khai hồ sơ',
       ]);
-      expect(b.length).toBe(12);
+      expect(b.length).toBe(14);
       // C: liên hệ đủ từ hồ sơ; thao tác gần nhất theo giờ Việt Nam (02:30 UTC → 09:30).
       expect(c.slice(6)).toEqual([
         'Đã xác nhận',
         0,
         'Đủ',
         'Chưa nộp',
+        HAN_DOT,
+        undefined,
         new Date('2026-11-18T09:30:00Z'),
         'Người Liên Hệ C Bịa',
         '0900000011',
