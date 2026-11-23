@@ -18,6 +18,8 @@ import {
   HopDongTruongController,
 } from './hop-dong.controller';
 import { HopDongService } from './hop-dong.service';
+import { HopDongDotController } from './hop-dong-dot.controller';
+import { HopDongDotService } from './hop-dong-dot.service';
 import { TienDoDotController } from './tien-do-dot.controller';
 import { TienDoDotService } from './tien-do-dot.service';
 
@@ -34,6 +36,8 @@ import { TienDoDotService } from './tien-do-dot.service';
     DeNghiSuaController,
     HoSoDonViController,
     HopDongTruongController,
+    // Trước HopDongQuanTriController: /hop-dong/xuat-khtc không được rơi vào /hop-dong/:donViId.
+    HopDongDotController,
     HopDongQuanTriController,
     TienDoDotController,
   ],
@@ -44,6 +48,7 @@ import { TienDoDotService } from './tien-do-dot.service';
     DeNghiSuaService,
     HoSoDonViService,
     HopDongService,
+    HopDongDotService,
     TienDoDotService,
   ],
 })

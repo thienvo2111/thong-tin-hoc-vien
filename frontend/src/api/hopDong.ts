@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from './client';
+import { apiFetch, apiFetchBlob } from './client';
 import { danhSachKey as danhSachQuanTriKey } from './danhSachThamGia';
 import type { ChuongTrinhBoiDuong } from './dotTrienKhai';
 import type { TrangThaiDanhSachTruong, TrangThaiHopDong } from './truongDanhSach';
@@ -79,6 +79,8 @@ const urlTruong = (dotId: string) => `/cong-don-vi/truong/dot/${dotId}/hop-dong`
 const urlQuanTri = (dotId: string, donViId: string) => `/cong-don-vi/dot-trien-khai/${dotId}/hop-dong/${donViId}`;
 const keyTruong = (dotId: string) => ['cong-don-vi', 'truong', 'dot', dotId, 'hop-dong'] as const;
 const keyQuanTri = (dotId: string, donViId: string) => ['cong-don-vi', 'quan-tri', 'hop-dong', dotId, donViId] as const;
+/** Issue #67: danh sách hợp đồng của đợt (Quản trị). */
+const keyDanhSachHopDong = (dotId: string | null) => ['cong-don-vi', 'quan-tri', 'hop-dong', dotId] as const;
 
 export function useHopDongTruong(dotId: string) {
   return useQuery({ queryKey: keyTruong(dotId), queryFn: () => apiFetch<HopDongPhanHoi>(urlTruong(dotId)) });
@@ -131,6 +133,7 @@ export function useMoLaiHopDong(dotId: string, donViId: string) {
     onSuccess: (data) => {
       queryClient.setQueryData(keyQuanTri(dotId, donViId), data);
       void queryClient.invalidateQueries({ queryKey: danhSachQuanTriKey(dotId) });
+      void queryClient.invalidateQueries({ queryKey: keyDanhSachHopDong(dotId), exact: true });
     },
   });
 }
@@ -153,6 +156,55 @@ export function useDatHanRieng(dotId: string) {
     onSuccess: (_kq, { donViId }) => {
       void queryClient.invalidateQueries({ queryKey: ['cong-don-vi', 'tien-do-dot', dotId] });
       void queryClient.invalidateQueries({ queryKey: keyQuanTri(dotId, donViId) });
+      void queryClient.invalidateQueries({ queryKey: keyDanhSachHopDong(dotId), exact: true });
     },
   });
+}
+
+/** Issue #67 / ADR 0015 O4, P2: 1 dòng danh sách hợp đồng của đợt — STK cá nhân CHỈ dạng đã che (*_che). */
+export interface DongHopDongQuanTri {
+  don_vi: { id: string; ma: string | null; ten: string };
+  trang_thai_danh_sach: TrangThaiDanhSachTruong;
+  trang_thai_hop_dong: TrangThaiHopDong;
+  nop_luc: string | null;
+  so_nguoi: number;
+  tong_suat: number;
+  /** null = chưa có đơn giá. Đã nộp: giá trị lúc nộp. */
+  gia_tri: number | null;
+  han_hieu_luc_ngay: string;
+  qua_han: boolean;
+  /** Đã nộp: từ bản chụp lúc nộp; chưa nộp: từ hồ sơ hiện tại (null khi chưa khai). */
+  ht_ho_ten: string | null;
+  ht_so_tai_khoan_che: string | null;
+  kt_ho_ten: string | null;
+  kt_so_tai_khoan_che: string | null;
+}
+
+export interface DanhSachHopDongDot {
+  dot: {
+    id: string;
+    ten: string;
+    chuong_trinh: ChuongTrinhBoiDuong;
+    don_gia: number | null;
+    han_nop: string;
+    han_nop_ngay: string;
+  };
+  /** Mọi trường của đợt, theo tên trường. */
+  items: DongHopDongQuanTri[];
+}
+
+const urlDanhSachHopDong = (dotId: string) => `/cong-don-vi/dot-trien-khai/${dotId}/hop-dong`;
+/** O1: Excel 3 sheet cho Phòng KHTC (hợp đồng đã nộp) — có STK cá nhân đầy đủ, server ghi nhật ký mỗi lần xuất. */
+export const urlXuatKhtc = (dotId: string) => `${urlDanhSachHopDong(dotId)}/xuat-khtc`;
+
+export function useDanhSachHopDong(dotId: string | null) {
+  return useQuery({
+    queryKey: keyDanhSachHopDong(dotId),
+    queryFn: () => apiFetch<DanhSachHopDongDot>(urlDanhSachHopDong(dotId as string)),
+    enabled: !!dotId,
+  });
+}
+
+export function xuatKhtc(dotId: string) {
+  return apiFetchBlob(urlXuatKhtc(dotId));
 }

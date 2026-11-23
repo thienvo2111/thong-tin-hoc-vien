@@ -20,7 +20,7 @@ import {
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { useDanhSachDotTrienKhai, type DotTrienKhai } from '@/api/dotTrienKhai';
+import { useDanhSachDotTrienKhai } from '@/api/dotTrienKhai';
 import {
   LOC_TIEN_DO,
   useTienDoDot,
@@ -36,6 +36,7 @@ import { taiFileTuBlob } from '@/lib/taiFile';
 import { khopTimKiem } from '@/lib/timKiemTiengViet';
 import { dinhDangSuat } from './danhSachThamGiaNhan';
 import { TRANG_THAI_DANH_SACH, TRANG_THAI_HOP_DONG, dinhDangGiaTri } from './hopDongNhan';
+import { dotDangChon } from './dotMacDinh';
 
 // Issue #66: hộp thoại Gia hạn riêng (kèm @mantine/dates) chỉ tải khi mở — trang bảng không nặng thêm.
 const ModalGiaHanRieng = lazy(() => import('./ModalGiaHanRieng').then((m) => ({ default: m.ModalGiaHanRieng })));
@@ -58,12 +59,6 @@ function soTheoLoc(t: TongHopTienDo): Record<LocTienDo, number> {
   };
 }
 
-/** Mặc định: đợt có hạn nộp muộn nhất (đợt đang chạy gần đây nhất). */
-function dotMacDinh(ds: DotTrienKhai[]): string | null {
-  if (ds.length === 0) return null;
-  return ds.reduce((a, b) => (b.han_nop > a.han_nop ? b : a)).id;
-}
-
 const laLoc = (v: string | null): v is LocTienDo => !!v && (LOC_TIEN_DO as readonly string[]).includes(v);
 
 const lienKetDanhSach = (dotId: string, donViId: string) =>
@@ -75,8 +70,7 @@ const lienKetHopDong = (dotId: string, donViId: string) => `/quan-tri/hop-dong/$
 export default function QuanTriTienDoDot() {
   const [params, setParams] = useSearchParams();
   const dsDot = useDanhSachDotTrienKhai();
-  const dotId =
-    (dsDot.data?.some((d) => d.id === params.get('dot')) ? params.get('dot') : null) ?? dotMacDinh(dsDot.data ?? []);
+  const dotId = dotDangChon(dsDot.data, params.get('dot'));
   const locParam = params.get('loc');
   const loc: LocTienDo = laLoc(locParam) ? locParam : 'tat_ca';
   const [tuKhoa, setTuKhoa] = useState('');

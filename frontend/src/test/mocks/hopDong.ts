@@ -1,5 +1,13 @@
 import { http, HttpResponse } from 'msw';
-import type { HopDongPhanHoi, HopDongQuanTri, LyDoChanNop, MaLyDoChanNop } from '@/api/hopDong';
+import type {
+  DanhSachHopDongDot,
+  DongHopDongQuanTri,
+  HopDongPhanHoi,
+  HopDongQuanTri,
+  LyDoChanNop,
+  MaLyDoChanNop,
+} from '@/api/hopDong';
+import { cheStk } from '@/lib/hoSoDonVi';
 import { kiemTraPhan3, type NhapHopDong } from '@/lib/hopDong';
 import { MAU_SDT } from '@/lib/hoSoDonVi';
 import { hoSoMau } from './hoSoDonVi';
@@ -104,15 +112,89 @@ export function hopDongQuanTriMau(p: Partial<HopDongQuanTri> = {}): HopDongQuanT
   };
 }
 
+/** Issue #67: STK đầy đủ BỊA của Hiệu trưởng / Kế toán — danh sách chỉ được thấy dạng che (cheStk). */
+export const STK_HT_MAU = '9999888877776666';
+export const STK_KT_MAU = '5555444433332222';
+
+export function dongHopDongQuanTriMau(p: Partial<DongHopDongQuanTri> = {}): DongHopDongQuanTri {
+  return {
+    don_vi: { id: 'tr-1', ma: 'TR-MAU-001', ten: 'Trường THCS Mẫu Một' },
+    trang_thai_danh_sach: 'da_xac_nhan',
+    trang_thai_hop_dong: 'da_nop',
+    nop_luc: '2026-11-20T03:04:00.000Z',
+    so_nguoi: 3,
+    tong_suat: 2.5,
+    gia_tri: 3_750_000,
+    han_hieu_luc_ngay: '2026-12-31',
+    qua_han: false,
+    ht_ho_ten: 'Hiệu Trưởng Bịa Một',
+    ht_so_tai_khoan_che: cheStk(STK_HT_MAU),
+    kt_ho_ten: 'Kế Toán Bịa Một',
+    kt_so_tai_khoan_che: cheStk(STK_KT_MAU),
+    ...p,
+  };
+}
+
+/** 3 trường: Một đã nộp, Hai chưa nộp (báo sai lệch, quá hạn), Ba chưa khai hồ sơ (không có HT/KT). */
+export function dsHopDongMau(): DongHopDongQuanTri[] {
+  return [
+    dongHopDongQuanTriMau(),
+    dongHopDongQuanTriMau({
+      don_vi: { id: 'tr-2', ma: 'TR-MAU-002', ten: 'Trường THCS Mẫu Hai' },
+      trang_thai_danh_sach: 'bao_sai_lech',
+      trang_thai_hop_dong: 'chua_nop',
+      nop_luc: null,
+      so_nguoi: 1,
+      tong_suat: 0.5,
+      gia_tri: 750_000,
+      qua_han: true,
+      ht_ho_ten: 'Hiệu Trưởng Bịa Hai',
+      ht_so_tai_khoan_che: cheStk('1111222233334444'),
+      kt_ho_ten: 'Kế Toán Bịa Hai',
+      kt_so_tai_khoan_che: cheStk('6666777788889999'),
+    }),
+    dongHopDongQuanTriMau({
+      don_vi: { id: 'tr-3', ma: null, ten: 'Trường Tiểu học Mẫu Ba' },
+      trang_thai_danh_sach: 'cho_xac_nhan',
+      trang_thai_hop_dong: 'chua_nop',
+      nop_luc: null,
+      so_nguoi: 2,
+      tong_suat: 2,
+      gia_tri: null,
+      ht_ho_ten: null,
+      ht_so_tai_khoan_che: null,
+      kt_ho_ten: null,
+      kt_so_tai_khoan_che: null,
+    }),
+  ];
+}
+
 export const dbHopDong = {
   truong: {} as Record<string, HopDongPhanHoi>,
   /** Khóa `${dotId}/${donViId}`. */
   quanTri: {} as Record<string, HopDongQuanTri>,
+  /** Issue #67: danh sách hợp đồng theo id đợt; đợt không có → 404. */
+  danhSach: {} as Record<string, DongHopDongQuanTri[]>,
 };
 
 export function datLaiHopDongMock() {
   dbHopDong.truong = {};
   dbHopDong.quanTri = {};
+  dbHopDong.danhSach = {};
+}
+
+function danhSachCua(dotId: string): DanhSachHopDongDot {
+  return {
+    dot: {
+      id: dotId,
+      ten: 'HSG An Giang 2026',
+      chuong_trinh: 'hsg',
+      don_gia: 1_500_000,
+      han_nop: '2026-12-31T16:59:59.000Z',
+      han_nop_ngay: '2026-12-31',
+    },
+    items: dbHopDong.danhSach[dotId],
+  };
 }
 
 const loi = (status: number, code: string, message: string, fields?: { field: string; message: string }[]) =>
@@ -200,6 +282,18 @@ export const hopDongHandlers = [
       ban_chup_ho_so: daNop.ban_chup_ho_so,
     };
     return HttpResponse.json(dbHopDong.truong[dotId]);
+  }),
+  // Issue #67: danh sách hợp đồng của đợt + Excel KHTC. xuat-khtc phải đứng TRƯỚC '/hop-dong/:donViId'.
+  http.get('/cong-don-vi/dot-trien-khai/:dotId/hop-dong', ({ params }) => {
+    const dotId = params.dotId as string;
+    if (!dbHopDong.danhSach[dotId]) return loi(404, 'NOT_FOUND', 'Không tìm thấy đợt triển khai');
+    return HttpResponse.json(danhSachCua(dotId));
+  }),
+  http.get('/cong-don-vi/dot-trien-khai/:dotId/hop-dong/xuat-khtc', ({ params }) => {
+    if (!dbHopDong.danhSach[params.dotId as string]) return loi(404, 'NOT_FOUND', 'Không tìm thấy đợt triển khai');
+    return new HttpResponse(new Blob(['xlsx-gia']), {
+      headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    });
   }),
   http.get('/cong-don-vi/dot-trien-khai/:dotId/hop-dong/:donViId', ({ params }) => {
     const hd = dbHopDong.quanTri[`${params.dotId}/${params.donViId}`];

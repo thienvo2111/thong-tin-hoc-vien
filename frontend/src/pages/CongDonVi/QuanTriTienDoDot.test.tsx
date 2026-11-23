@@ -351,6 +351,7 @@ describe('Phân quyền — Tiến độ đợt', () => {
       'Chương trình / Đợt',
       'Đơn vị & tài khoản',
       'Danh sách tham gia',
+      'Hợp đồng',
     ]);
   });
 

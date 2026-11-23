@@ -405,6 +405,11 @@ export const routesCongDonVi: RouteObject[] = [
                     lazy: () => import('@/pages/CongDonVi/HoSoDonViQuanTri').then((m) => ({ Component: m.default })),
                   },
                   {
+                    // Issue #67: danh sách hợp đồng của đợt (STK che) + Excel 3 sheet cho KHTC (ADR 0015 O1, O4, P2).
+                    path: '/quan-tri/hop-dong',
+                    lazy: () => import('@/pages/CongDonVi/QuanTriHopDong').then((m) => ({ Component: m.default })),
+                  },
+                  {
                     // Issue #64: Quản trị xem hợp đồng 1 trường + Mở lại (ADR 0015 O3, O4, X5).
                     path: '/quan-tri/hop-dong/:dotId/:donViId',
                     lazy: () => import('@/pages/CongDonVi/HopDongQuanTri').then((m) => ({ Component: m.default })),

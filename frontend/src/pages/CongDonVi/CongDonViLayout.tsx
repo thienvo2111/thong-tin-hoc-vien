@@ -19,6 +19,8 @@ const MENU_QUAN_TRI = [
   { to: '/quan-tri/dot-trien-khai', nhan: 'Chương trình / Đợt' },
   { to: '/quan-tri/don-vi-tai-khoan', nhan: 'Đơn vị & tài khoản' },
   { to: '/quan-tri/danh-sach-tham-gia', nhan: 'Danh sách tham gia' },
+  // Issue #67 / P2: Hợp đồng (xem, xuất Excel cho KHTC).
+  { to: '/quan-tri/hop-dong', nhan: 'Hợp đồng' },
 ];
 
 /** Khung Cổng đơn vị (issue #55): header logo + tên cổng + tài khoản + Đăng xuất, menu ngang cuộn được trên điện thoại. */
