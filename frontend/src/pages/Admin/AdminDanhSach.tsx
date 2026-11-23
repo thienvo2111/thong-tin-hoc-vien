@@ -29,6 +29,7 @@ import { TrangThaiBadge } from '@/components/TrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
 import { ModalTaoHocVienLe } from './ModalTaoHocVienLe';
 import { TabHocVienDaXoa } from './TabHocVienDaXoa';
+import { useDuongDanAdmin } from './duongDanAdmin';
 
 const KICH_THUOC_TRANG = 20;
 
@@ -56,6 +57,7 @@ const TUY_CHON_CAP_GIANG_DAY = [
 export default function AdminDanhSach() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const dd = useDuongDanAdmin();
   const { nguoiDung } = useToi();
   const [moTaoLe, setMoTaoLe] = useState(false);
 
@@ -199,11 +201,7 @@ export default function AdminDanhSach() {
                 </Table.Tr>
               )}
               {data.data.map((hv) => (
-                <Table.Tr
-                  key={hv.id}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(`/admin/hoc-vien/${hv.id}`)}
-                >
+                <Table.Tr key={hv.id} style={{ cursor: 'pointer' }} onClick={() => navigate(dd.hocVien(hv.id))}>
                   <Table.Td fw={600}>{hv.ho_ten ?? '(Chưa có tên)'}</Table.Td>
                   <Table.Td>{hv.so_dinh_danh_ca_nhan ?? '—'}</Table.Td>
                   <Table.Td>{hv.don_vi_cong_tac_id ? (donViMap.get(hv.don_vi_cong_tac_id) ?? '—') : '—'}</Table.Td>

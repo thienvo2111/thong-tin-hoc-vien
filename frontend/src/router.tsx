@@ -318,7 +318,7 @@ export const routesNls: RouteObject[] = [
 ];
 
 // Issue #55 / ADR 0015: Cổng đơn vị — cùng bản build, chọn theo hostname (lib/congHienTai.ts). Không có route NLS
-// (/toi, /admin…) nào ở đây: gõ tay vào chỉ ra 404.
+// (/toi, /admin…) nào ở đây: gõ tay vào chỉ ra 404. Issue #70: 4 màn NLS của đơn vị ở /nls/*.
 export const routesCongDonVi: RouteObject[] = [
   {
     lazy: () => import('@/app/KhungNoiBo').then((m) => ({ Component: m.default })),
@@ -367,6 +367,38 @@ export const routesCongDonVi: RouteObject[] = [
                     // Issue #63: Hồ sơ đơn vị của chính trường (ADR 0015 M4, U2).
                     path: '/ho-so-don-vi',
                     lazy: () => import('@/pages/CongDonVi/HoSoDonVi').then((m) => ({ Component: m.default })),
+                  },
+                ],
+              },
+              {
+                // Issue #70 / ADR 0015 P1: nhóm NLS = 4 màn dùng chung với /admin/* của boiduongnls (đường dẫn
+                // qua DuongDanAdminProvider). Chỉ trường/Phòng/Sở có học viên NLS; còn lại (kể cả quan_tri) → 404.
+                lazy: () => import('@/pages/CongDonVi/ChiDonViNls').then((m) => ({ Component: m.default })),
+                children: [
+                  { path: '/nls', element: <Navigate to="/nls/tong-quan" replace /> },
+                  {
+                    path: '/nls/tong-quan',
+                    lazy: () => import('@/pages/Admin/AdminTongQuan').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/nls/hoc-vien',
+                    lazy: () => import('@/pages/Admin/AdminDanhSach').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/nls/hoc-vien/:id',
+                    lazy: () => import('@/pages/Admin/AdminHocVienChiTiet').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/nls/khoa',
+                    lazy: () => import('@/pages/Admin/AdminKhoaBoiDuong').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/nls/khoa/:id',
+                    lazy: () => import('@/pages/Admin/AdminKhoaChiTiet').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/nls/bao-cao',
+                    lazy: () => import('@/pages/Admin/AdminBaoCao').then((m) => ({ Component: m.default })),
                   },
                 ],
               },

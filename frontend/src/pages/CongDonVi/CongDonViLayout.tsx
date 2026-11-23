@@ -1,6 +1,8 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Box, Button, Group, Image, ScrollArea, Text } from '@mantine/core';
 import { useToi } from '@/auth/AuthContext';
+import { useChuongTrinhCuaToi, VAI_TRO_DON_VI_NLS } from '@/api/congDonVi';
+import { DUONG_DAN_NLS } from '@/pages/Admin/duongDanAdmin';
 import { congDonVi } from '@/content/congDonVi';
 import logoHcmue from '@/assets/logo-hcmue.png';
 import { tokenKhac } from '@/theme';
@@ -22,6 +24,38 @@ const MENU_QUAN_TRI = [
   // Issue #67 / P2: Hợp đồng (xem, xuất Excel cho KHTC).
   { to: '/quan-tri/hop-dong', nhan: 'Hợp đồng' },
 ];
+// Issue #70 / P1: nhóm NLS (4 màn dùng chung với boiduongnls) — chỉ đơn vị có học viên NLS.
+const MENU_NLS = [
+  { to: DUONG_DAN_NLS.tongQuan(), nhan: 'Tổng quan' },
+  { to: DUONG_DAN_NLS.hocVien(), nhan: 'Học viên' },
+  { to: DUONG_DAN_NLS.khoa(), nhan: 'Khóa' },
+  { to: DUONG_DAN_NLS.baoCao(), nhan: 'Báo cáo' },
+];
+
+function MucMenu({ to, nhan }: { to: string; nhan: string }) {
+  return (
+    <NavLink to={to} style={{ textDecoration: 'none' }}>
+      {({ isActive }) => (
+        <Text
+          component="span"
+          px="md"
+          py={6}
+          fw={600}
+          fz="sm"
+          c={isActive ? 'white' : 'gray.4'}
+          style={{
+            display: 'inline-flex',
+            borderRadius: 8,
+            whiteSpace: 'nowrap',
+            background: isActive ? 'rgba(255,255,255,.14)' : 'transparent',
+          }}
+        >
+          {nhan}
+        </Text>
+      )}
+    </NavLink>
+  );
+}
 
 /** Khung Cổng đơn vị (issue #55): header logo + tên cổng + tài khoản + Đăng xuất, menu ngang cuộn được trên điện thoại. */
 export default function CongDonViLayout() {
@@ -30,6 +64,9 @@ export default function CongDonViLayout() {
   const navigate = useNavigate();
   const vaiTro = nguoiDung?.vai_tro;
   const menu = vaiTro === 'quan_tri' ? [...MENU, ...MENU_QUAN_TRI] : vaiTro === 'truong' ? MENU_TRUONG : MENU;
+  const laDonViNls = VAI_TRO_DON_VI_NLS.includes(vaiTro ?? '');
+  // Ẩn khi đang tải/lỗi; quan_tri, học viên… không gọi API.
+  const coNls = useChuongTrinhCuaToi(laDonViNls).data?.nls === true;
 
   async function xuLyDangXuat() {
     try {
@@ -68,27 +105,28 @@ export default function CongDonViLayout() {
             wrap="nowrap"
           >
             {menu.map((m) => (
-              <NavLink key={m.to} to={m.to} style={{ textDecoration: 'none' }}>
-                {({ isActive }) => (
-                  <Text
-                    component="span"
-                    px="md"
-                    py={6}
-                    fw={600}
-                    fz="sm"
-                    c={isActive ? 'white' : 'gray.4'}
-                    style={{
-                      display: 'inline-flex',
-                      borderRadius: 8,
-                      whiteSpace: 'nowrap',
-                      background: isActive ? 'rgba(255,255,255,.14)' : 'transparent',
-                    }}
-                  >
-                    {m.nhan}
-                  </Text>
-                )}
-              </NavLink>
+              <MucMenu key={m.to} to={m.to} nhan={m.nhan} />
             ))}
+            {coNls && (
+              <Group role="group" aria-label="NLS" gap={4} wrap="nowrap">
+                {/* Nhãn nhóm + vạch ngăn: cùng 1 hàng cuộn ngang với menu trên điện thoại. */}
+                <Text
+                  component="span"
+                  aria-hidden
+                  fz="xs"
+                  fw={700}
+                  c="gray.5"
+                  pl="sm"
+                  ml={4}
+                  style={{ borderLeft: '1px solid rgba(255,255,255,.3)', whiteSpace: 'nowrap', letterSpacing: 0.4 }}
+                >
+                  NLS
+                </Text>
+                {MENU_NLS.map((m) => (
+                  <MucMenu key={m.to} to={m.to} nhan={m.nhan} />
+                ))}
+              </Group>
+            )}
           </Group>
         </ScrollArea>
       </Box>

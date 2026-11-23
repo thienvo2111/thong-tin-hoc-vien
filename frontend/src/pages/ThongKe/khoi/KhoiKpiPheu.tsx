@@ -5,6 +5,7 @@ import { usePheu, type LocThongKe } from '@/api/thongKe';
 import type { PheuResult } from '@/api/types';
 import { KhoiThongKe } from '../KhoiThongKe';
 import { dinhDangTyLe } from '../mauMuc';
+import { useDuongDanAdmin } from '@/pages/Admin/duongDanAdmin';
 
 /** a/b, null khi mẫu số 0 (hiển thị "—", không NaN%). */
 function tyLe(a: number, b: number): number | null {
@@ -84,6 +85,7 @@ function dungPheu(d: PheuResult) {
 export function KhoiKpiPheu({ loc }: { loc: LocThongKe }) {
   const query = usePheu(loc);
   const d = query.data;
+  const dd = useDuongDanAdmin();
 
   return (
     <Stack gap="md">
@@ -111,7 +113,7 @@ export function KhoiKpiPheu({ loc }: { loc: LocThongKe }) {
                 p="sm"
                 radius="md"
                 component={Link}
-                to="/admin/hoc-vien?trang_thai=cho_duyet"
+                to={`${dd.hocVien()}?trang_thai=cho_duyet`}
                 aria-label="Hồ sơ chờ duyệt: Xem danh sách"
                 data-testid="kpi-cho-duyet"
                 style={{ textDecoration: 'none', color: 'inherit' }}

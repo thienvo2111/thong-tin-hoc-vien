@@ -6,6 +6,7 @@ import { loiFieldsThanhMap, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { SelectDonViTimKiem } from '@/components/SelectDonViTimKiem';
 import { ChonKhoaVaCum } from './ChonKhoaVaCum';
+import { useDuongDanAdmin } from './duongDanAdmin';
 
 const FORM_RONG = {
   ma_dinh_danh_moet: '',
@@ -61,6 +62,7 @@ function thanhDto(f: FormTaoLe): TaoHocVienLeDto {
 /** Quản trị tạo lẻ 1 học viên (POST /hoc-vien/tao-le) — thay import MOET cho vài trường hợp lẻ. */
 export function ModalTaoHocVienLe({ opened, onClose }: { opened: boolean; onClose: () => void }) {
   const navigate = useNavigate();
+  const dd = useDuongDanAdmin();
   const tao = useTaoHocVienLe();
   const [form, setForm] = useState<FormTaoLe>(FORM_RONG);
   const [loi, setLoi] = useState<Record<string, string>>({});
@@ -114,7 +116,7 @@ export function ModalTaoHocVienLe({ opened, onClose }: { opened: boolean; onClos
             <Button variant="default" onClick={lamMoi}>
               Thêm học viên khác
             </Button>
-            <Button onClick={() => navigate(`/admin/hoc-vien/${ketQua.hoc_vien_id}`)}>Xem hồ sơ</Button>
+            <Button onClick={() => navigate(dd.hocVien(ketQua.hoc_vien_id))}>Xem hồ sơ</Button>
           </Group>
         </Stack>
       ) : (

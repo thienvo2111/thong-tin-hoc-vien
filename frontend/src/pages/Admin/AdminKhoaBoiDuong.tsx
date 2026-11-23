@@ -27,6 +27,7 @@ import { locTiengViet } from '@/lib/timKiemTiengViet';
 import { KhoaTrangThaiBadge } from '@/components/KhoaTrangThaiBadge';
 import { SelectDonViTimKiem } from '@/components/SelectDonViTimKiem';
 import { AdminPageHeader } from './AdminPageHeader';
+import { useDuongDanAdmin } from './duongDanAdmin';
 
 const KICH_THUOC_TRANG = 20;
 
@@ -62,6 +63,7 @@ const FORM_RONG: FormTaoKhoa = {
  * Không bịa thêm cột không có trong response thật (theo quy ước dự án). */
 export default function AdminKhoaBoiDuong() {
   const navigate = useNavigate();
+  const dd = useDuongDanAdmin();
   const { nguoiDung } = useToi();
   const laQuanTri = nguoiDung?.vai_tro === 'quan_tri';
 
@@ -137,7 +139,7 @@ export default function AdminKhoaBoiDuong() {
         onSuccess: (khoa) => {
           notifications.show({ color: 'green', message: `Đã tạo khóa "${khoa.ten_khoa}"` });
           setModalMoTao(false);
-          navigate(`/admin/khoa-boi-duong/${khoa.id}`);
+          navigate(dd.khoa(khoa.id));
         },
         onError: (err) => {
           const fields = loiFieldsThanhMap(err);
@@ -234,11 +236,7 @@ export default function AdminKhoaBoiDuong() {
                     </Table.Tr>
                   )}
                   {data.data.map((khoa) => (
-                    <Table.Tr
-                      key={khoa.id}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/admin/khoa-boi-duong/${khoa.id}`)}
-                    >
+                    <Table.Tr key={khoa.id} style={{ cursor: 'pointer' }} onClick={() => navigate(dd.khoa(khoa.id))}>
                       <Table.Td fw={600}>{khoa.ma_khoa}</Table.Td>
                       <Table.Td>{khoa.ten_khoa}</Table.Td>
                       <Table.Td>{tenDonViDatHang.get(khoa.don_vi_dat_hang_id) ?? '—'}</Table.Td>

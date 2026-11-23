@@ -31,6 +31,7 @@ import { TrangThaiBadge } from '@/components/TrangThaiBadge';
 import { AdminPageHeader } from './AdminPageHeader';
 import { PhanLopTheoGiaiDoan } from './PhanLopTheoGiaiDoan';
 import { ChonKhoaVaCum } from './ChonKhoaVaCum';
+import { useDuongDanAdmin } from './duongDanAdmin';
 
 // Placeholder tối thiểu cho phase này (yêu cầu phase 3 mục 4: "chưa cần đẹp, sẽ hoàn thiện ở phase
 // sau") — hiện vài field chính từ GET /hoc-vien/{id}, không phải màn chi tiết đầy đủ.
@@ -253,6 +254,7 @@ function khopXacNhanXoa(nhap: string, hoTen: string, maMoet: string | null) {
 function XoaHocVien(props: { hocVienId: string; hoTen: string; maMoet: string | null }) {
   const { hocVienId } = props;
   const navigate = useNavigate();
+  const dd = useDuongDanAdmin();
   const queryClient = useQueryClient();
   const xoa = useXoaHocVien(hocVienId);
   const [mo, setMo] = useState(false);
@@ -287,7 +289,7 @@ function XoaHocVien(props: { hocVienId: string; hoTen: string; maMoet: string | 
         onSuccess: () => {
           notifications.show({ color: 'green', message: `Đã xóa học viên ${hoTen || giaTriXacNhan}` });
           setMo(false);
-          navigate('/admin/hoc-vien', { replace: true });
+          navigate(dd.hocVien(), { replace: true });
         },
       },
     );

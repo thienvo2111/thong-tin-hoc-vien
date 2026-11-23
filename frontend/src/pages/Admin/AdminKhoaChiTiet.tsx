@@ -80,6 +80,7 @@ import { CanhBaoZoomThieuLink } from './CanhBaoZoomThieuLink';
 import { ModalThuVaoVle } from './ModalThuVaoVle';
 import { BangDiemDanhLop } from '@/components/BangDiemDanhLop';
 import { TheoBuoi } from '@/pages/HoTro/HoTroLopChiTiet';
+import { useDuongDanAdmin } from './duongDanAdmin';
 
 const NHAN_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'Trực tiếp', zoom: 'Zoom', vle: 'VLE' };
 const MAU_LOAI_LOP: Record<LoaiLop, string> = { truc_tiep: 'blue', zoom: 'grape', vle: 'teal' };
@@ -240,6 +241,7 @@ interface FormSuaKhoa {
 export default function AdminKhoaChiTiet() {
   const { id } = useParams<{ id: string }>();
   const khoaId = id ?? '';
+  const dd = useDuongDanAdmin();
   const { nguoiDung } = useToi();
   const vaiTro = nguoiDung?.vai_tro ?? '';
   const laQuanTri = vaiTro === 'quan_tri';
@@ -846,7 +848,7 @@ export default function AdminKhoaChiTiet() {
         {khoa && (
           <Stack gap="lg">
             <Breadcrumbs fz={12.5}>
-              <Anchor component={Link} to="/admin/khoa-boi-duong" fz={12.5} c="dimmed">
+              <Anchor component={Link} to={dd.khoa()} fz={12.5} c="dimmed">
                 Khóa bồi dưỡng
               </Anchor>
               <Text fz={12.5} c="dimmed">
