@@ -27,6 +27,12 @@ import {
   datTrangThaiTheoSaiLech,
   khoaHopDong,
 } from './giao-dich-hop-dong';
+import { DongBoHoSoNlsService } from './dong-bo-ho-so-nls.service';
+import {
+  KetQuaDongBo,
+  giaTriCaNhanDaDoi,
+  nhatKyDongBo,
+} from './dong-bo-ho-so-nls';
 
 /** 1 mục trong hàng đợi đề nghị của Quản trị. */
 export interface MucDeNghi {
@@ -34,9 +40,13 @@ export interface MucDeNghi {
   don_vi: { id: string; ten: string };
   loai: LoaiDeNghi;
   dong_id: string | null;
-  /** Giá trị hiện tại của dòng (null nếu thêm người hoặc dòng đã bị xóa). */
+  /** Giá trị hiện tại của dòng (null nếu thêm người hoặc dòng đã bị xóa). hoc_vien_id: dòng NLS (Y2). */
   dong_hien_tai:
-    (BanChupDongDeNghi & { y_kien_truong: YKienTruong | null }) | null;
+    | (BanChupDongDeNghi & {
+        y_kien_truong: YKienTruong | null;
+        hoc_vien_id: string | null;
+      })
+    | null;
   gia_tri: GiaTriDeNghi;
   gia_tri_cu: BanChupDongDeNghi | null;
   ly_do: string | null;
@@ -75,6 +85,7 @@ function toMuc(d: DeNghiDayDu): MucDeNghi {
       ? {
           ...banChupDongDeNghi(d.dong),
           y_kien_truong: d.dong.y_kien_truong as YKienTruong | null,
+          hoc_vien_id: d.dong.hoc_vien_id,
         }
       : null,
     gia_tri: d.gia_tri as GiaTriDeNghi,
@@ -96,16 +107,22 @@ interface KetQuaApDung {
   sau: Record<string, unknown> | null;
 }
 
+/** Issue #69 / Y2: response Áp dụng kèm kết quả đồng bộ hồ sơ (null = không đồng bộ). */
+export type MucDeNghiSauApDung = MucDeNghi & { dong_bo: KetQuaDongBo | null };
+
+const LY_DO_DONG_BO = 'Cổng đơn vị: áp dụng đề nghị sửa danh sách tham gia';
+
 // Issue #62 / ADR 0015 X2: hàng đợi đề nghị của trường — Quản trị Áp dụng / Từ chối. Không phải đặt lại
 // kiểu X1: các dòng khác giữ nguyên ý kiến (trangThaiSauXuLyDeNghi).
 // Issue #64 / X5: trường đã nộp hợp đồng → Áp dụng / Từ chối trả 409 (phải Mở lại hợp đồng trước).
-// TODO(ADR 0015 Y2): dòng NLS (hoc_vien_id) — Áp dụng sửa thông tin cá nhân hỏi đồng bộ ngược hồ sơ học
-// viên; dòng HSG là dữ liệu gốc nên không đồng bộ gì — lát NLS.
+// Issue #69 / ADR 0015 Y2: Áp dụng đề nghị sửa trên dòng NLS (hoc_vien_id) — Quản trị chọn cập nhật luôn hồ sơ
+// học viên (họ tên, ngày sinh, giới tính) trong cùng transaction; dòng HSG là dữ liệu gốc nên không đồng bộ.
 @Injectable()
 export class DeNghiSuaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly nhatKy: NhatKyService,
+    private readonly dongBoHoSo: DongBoHoSoNlsService,
   ) {}
 
   /** Hàng đợi theo đợt: mặc định 'cho' (cũ nhất trước); đã xử lý thì mới nhất trước. Kèm tổng số chờ của đợt. */
@@ -138,9 +155,14 @@ export class DeNghiSuaService {
   }
 
   /** Áp dụng: ghi giá trị đề nghị vào danh sách; dòng (sửa/thêm) thành Đồng ý; bớt → xóa dòng. */
-  async apDung(id: string, adminId: string): Promise<MucDeNghi> {
+  async apDung(
+    id: string,
+    adminId: string,
+    dongBoHoSo = false,
+  ): Promise<MucDeNghiSauApDung> {
     const dn = await this.layChoXuLy(id);
-    const kq = await this.prisma.$transaction(async (tx) => {
+    if (dongBoHoSo) this.dongBoHoSo.chanLoaiDeNghi(dn.loai);
+    const { dongBo, ...kq } = await this.prisma.$transaction(async (tx) => {
       await khoaHopDong(
         tx,
         dn.dot_trien_khai_id,
@@ -148,6 +170,7 @@ export class DeNghiSuaService {
         DA_NOP_QUAN_TRI,
       );
       let ketQua: KetQuaApDung;
+      let dongBo: KetQuaDongBo | null = null;
       if (dn.loai === 'them') {
         ketQua = await this.themTuDeNghi(tx, dn, adminId);
         await this.danhDauDaXuLy(tx, dn.id, adminId, 'da_ap_dung');
@@ -156,6 +179,15 @@ export class DeNghiSuaService {
         if (dn.loai === 'sua') {
           if (!dong) throw new ConflictAppException(DONG_DA_XOA);
           ketQua = await this.suaTuDeNghi(tx, dn, dong);
+          if (dongBoHoSo) {
+            dongBo = await this.dongBoHoSo.dongBo(
+              tx,
+              dong.hoc_vien_id,
+              giaTriCaNhanDaDoi(ketQua.sau),
+              adminId,
+              LY_DO_DONG_BO,
+            );
+          }
           await this.danhDauDaXuLy(tx, dn.id, adminId, 'da_ap_dung');
         } else {
           // Đánh dấu trước rồi mới xóa: dong_id của đề nghị về NULL theo FK.
@@ -171,7 +203,7 @@ export class DeNghiSuaService {
         }
       }
       await this.sauXuLy(tx, dn, adminId);
-      return ketQua;
+      return { ...ketQua, dongBo };
     });
     await this.nhatKy.ghi({
       hanh_dong: 'ap_dung_de_nghi_sua_danh_sach',
@@ -181,9 +213,10 @@ export class DeNghiSuaService {
         de_nghi_id: dn.id,
         loai: dn.loai,
         ...kq,
+        ...nhatKyDongBo(dongBo),
       },
     });
-    return this.layMuc(id);
+    return { ...(await this.layMuc(id)), dong_bo: dongBo };
   }
 
   /** Từ chối (bắt buộc lý do): dòng sửa/bớt về chưa có ý kiến; danh sách không đổi. */

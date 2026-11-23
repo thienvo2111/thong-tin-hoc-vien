@@ -7,6 +7,7 @@ import type {
   TruongPhamVi,
   XemTruocChup,
 } from '@/api/danhSachThamGia';
+import type { HoSoHocVienNls } from '@/lib/dongBoHoSoNls';
 
 // Issue #58: danh sách tham gia HSG (Cổng đơn vị) — CSDL giả trong bộ nhớ, reset sau mỗi test (setup.ts).
 // Tên người/trường đều bịa.
@@ -151,12 +152,15 @@ export const dbDanhSachThamGia = {
   xemTruoc: xemTruocMau(),
   danhSach: { tong_hop: [], dong: [] } as DanhSachThamGia,
   xemTruocChup: xemTruocChupMau(),
+  /** Issue #69: hồ sơ học viên NLS theo id dòng; không có → 404 (dòng HSG). */
+  hoSoHocVien: {} as Record<string, HoSoHocVienNls>,
 };
 
 export function datLaiDanhSachThamGiaMock() {
   dbDanhSachThamGia.xemTruoc = xemTruocMau();
   dbDanhSachThamGia.danhSach = { tong_hop: [], dong: [] };
   dbDanhSachThamGia.xemTruocChup = xemTruocChupMau();
+  dbDanhSachThamGia.hoSoHocVien = {};
 }
 
 const URL = '/cong-don-vi/dot-trien-khai/:id';
@@ -196,12 +200,22 @@ export const danhSachThamGiaHandlers = [
     return HttpResponse.json({ id: 'd-moi', y_kien_truong: null, hoc_vien_id: null, ...dong }, { status: 201 });
   }),
   http.patch('/cong-don-vi/danh-sach-tham-gia/:dongId', async ({ params, request }) => {
-    const { ly_do: _lyDo, ...doi } = (await request.json()) as Record<string, unknown>;
+    const { ly_do: _lyDo, dong_bo_ho_so_hoc_vien: _dongBo, ...doi } = (await request.json()) as Record<string, unknown>;
     const cu = dbDanhSachThamGia.danhSach.dong.find((d) => d.id === params.dongId);
     if (!cu) return HttpResponse.json({ error: { code: 'NOT_FOUND', message: 'Không tìm thấy' } }, { status: 404 });
     return HttpResponse.json({ ...cu, ...doi, y_kien_truong: null });
   }),
   http.delete('/cong-don-vi/danh-sach-tham-gia/:dongId', () => new HttpResponse(null, { status: 204 })),
+  http.get('/cong-don-vi/danh-sach-tham-gia/:dongId/ho-so-hoc-vien', ({ params }) => {
+    const hs = dbDanhSachThamGia.hoSoHocVien[params.dongId as string];
+    if (!hs) {
+      return HttpResponse.json(
+        { error: { code: 'NOT_FOUND', message: 'Dòng không gắn hồ sơ học viên NLS' } },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json(hs);
+  }),
   http.get(
     `${URL}/danh-sach/xuat-excel`,
     () =>

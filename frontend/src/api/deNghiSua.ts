@@ -9,8 +9,8 @@ export interface MucDeNghi {
   don_vi: { id: string; ten: string };
   loai: LoaiDeNghi;
   dong_id: string | null;
-  /** Giá trị hiện tại của dòng; null khi thêm người hoặc dòng đã bị xóa. */
-  dong_hien_tai: (BanChupDong & { y_kien_truong: YKienTruong | null }) | null;
+  /** Giá trị hiện tại của dòng; null khi thêm người hoặc dòng đã bị xóa. hoc_vien_id: dòng NLS (issue #69). */
+  dong_hien_tai: (BanChupDong & { y_kien_truong: YKienTruong | null; hoc_vien_id?: string | null }) | null;
   gia_tri: GiaTriDeNghi;
   gia_tri_cu: BanChupDong | null;
   ly_do: string | null;
@@ -53,9 +53,13 @@ function useXuLyDeNghi<V>(dotId: string, goi: (v: V) => Promise<MucDeNghi>) {
   });
 }
 
+/** Issue #69 / Y2: dongBo có giá trị → gửi dong_bo_ho_so_hoc_vien; không có → không gửi body (như trước). */
 export function useApDungDeNghi(dotId: string) {
-  return useXuLyDeNghi(dotId, (id: string) =>
-    apiFetch<MucDeNghi>(`/cong-don-vi/de-nghi-sua/${id}/ap-dung`, { method: 'POST' }),
+  return useXuLyDeNghi(dotId, ({ id, dongBo }: { id: string; dongBo?: boolean }) =>
+    apiFetch<MucDeNghi>(`/cong-don-vi/de-nghi-sua/${id}/ap-dung`, {
+      method: 'POST',
+      ...(dongBo === undefined ? {} : { body: JSON.stringify({ dong_bo_ho_so_hoc_vien: dongBo }) }),
+    }),
   );
 }
 

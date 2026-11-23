@@ -21,6 +21,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
 import { DanhSachThamGiaService } from './danh-sach-tham-gia.service';
 import { ChupDanhSachNlsService } from './chup-danh-sach-nls.service';
+import { DongBoHoSoNlsService } from './dong-bo-ho-so-nls.service';
 import { taoFileMauDanhSach } from './danh-sach-tham-gia.excel';
 import {
   LocDanhSachDto,
@@ -146,7 +147,16 @@ export class DanhSachThamGiaController {
 @Roles('quan_tri')
 @Controller('cong-don-vi/danh-sach-tham-gia')
 export class DongDanhSachThamGiaController {
-  constructor(private readonly service: DanhSachThamGiaService) {}
+  constructor(
+    private readonly service: DanhSachThamGiaService,
+    private readonly dongBo: DongBoHoSoNlsService,
+  ) {}
+
+  // Issue #69 / ADR 0015 Y2: hồ sơ học viên NLS hiện tại của dòng — xem trước cũ → mới. Chỉ đọc.
+  @Get(':dongId/ho-so-hoc-vien')
+  hoSoHocVien(@Param('dongId', ParseUUIDPipe) dongId: string) {
+    return this.dongBo.xemHoSo(dongId);
+  }
 
   @Patch(':dongId')
   sua(

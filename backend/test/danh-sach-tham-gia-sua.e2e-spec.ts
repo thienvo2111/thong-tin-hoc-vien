@@ -275,6 +275,8 @@ describe('Sửa danh sách tham gia - Cổng đơn vị (e2e)', () => {
         ghi_chu: null,
         y_kien_truong: null,
         hoc_vien_id: null,
+        // Issue #69 / Y2: không chọn đồng bộ hồ sơ → null.
+        dong_bo: null,
       });
       const db = await prisma.danh_sach_tham_gia.findUniqueOrThrow({
         where: { id: dong.id },

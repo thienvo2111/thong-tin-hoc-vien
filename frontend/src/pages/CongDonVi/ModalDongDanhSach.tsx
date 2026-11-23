@@ -5,18 +5,24 @@ import { Alert, Button, Group, Modal, Select, Stack, TextInput, Textarea } from 
 import { DateInput } from '@mantine/dates';
 import 'dayjs/locale/vi';
 import { notifications } from '@mantine/notifications';
+import { useQueryClient } from '@tanstack/react-query';
 import {
+  hoSoHocVienKey,
+  layHoSoHocVienCuaDong,
   useSuaDongDanhSach,
   useThemDongDanhSach,
   useTruongTrongPhamVi,
   type DongDanhSach,
   type GiaiDoanThamGia,
+  type SuaDongDanhSach,
   type TruongDongDanhSach,
 } from '@/api/danhSachThamGia';
+import { giaTriCaNhanTu, truongKhacHoSo, type HoSoHocVienNls, type TruongKhacHoSo } from '@/lib/dongBoHoSoNls';
 import { loiFieldsThanhMap, thongDiepLoiXungDot } from '@/lib/loiApi';
 import { chuoiSangNgay, docNgayGo, ngaySangChuoi } from '@/lib/ngayLich';
 import { dongDanhSachSchema, type DongDanhSachForm } from '@/schemas/dongDanhSachThamGia';
 import { NHAN_GIAI_DOAN } from './danhSachThamGiaNhan';
+import { ModalDongBoHoSoNls } from './ModalDongBoHoSoNls';
 
 const SUAT_THEO_GIAI_DOAN: Record<GiaiDoanThamGia, '1' | '0.5'> = { ca_hai: '1', chi_gd1: '0.5', chi_gd2: '0.5' };
 
@@ -88,6 +94,14 @@ export function ModalDongDanhSach({ opened, onClose, dotId, dong, donViMacDinh =
   const them = useThemDongDanhSach(dotId);
   const { data: dsTruong } = useTruongTrongPhamVi(opened ? dotId : null);
   const [loiChung, setLoiChung] = useState<string | null>(null);
+  // Issue #69 / ADR 0015 Y2: dòng NLS đổi thông tin cá nhân khác hồ sơ → hỏi cập nhật luôn hồ sơ học viên.
+  const queryClient = useQueryClient();
+  const [dangDoiChieu, setDangDoiChieu] = useState(false);
+  const [choDongBo, setChoDongBo] = useState<{
+    body: SuaDongDanhSach;
+    khac: TruongKhacHoSo[];
+    hoSo: HoSoHocVienNls;
+  } | null>(null);
 
   const luaChonTruong = (dsTruong ?? []).map((t) => ({
     value: t.id,
@@ -114,6 +128,7 @@ export function ModalDongDanhSach({ opened, onClose, dotId, dong, donViMacDinh =
     if (!opened) return;
     reset(formTuDong(dong, donViMacDinh));
     setLoiChung(null);
+    setChoDongBo(null);
   }, [opened, dong, donViMacDinh, reset]);
 
   function baoLoi(err: unknown) {
@@ -140,8 +155,53 @@ export function ModalDongDanhSach({ opened, onClose, dotId, dong, donViMacDinh =
       setLoiChung('Chưa có thay đổi nào để lưu');
       return;
     }
-    sua.mutate({ dongId: dong.id, body: { ...doi, ly_do } }, { onSuccess: xong('Đã lưu thay đổi'), onError: baoLoi });
+    const dongId = dong.id;
+    const body: SuaDongDanhSach = { ...doi, ly_do };
+    const guiSua = () => sua.mutate({ dongId, body }, { onSuccess: xong('Đã lưu thay đổi'), onError: baoLoi });
+    const caNhan = giaTriCaNhanTu(doi);
+    // Dòng HSG hoặc không đổi thông tin cá nhân → lưu như cũ, không hỏi.
+    if (!dong.hoc_vien_id || Object.keys(caNhan).length === 0) {
+      guiSua();
+      return;
+    }
+    setDangDoiChieu(true);
+    queryClient
+      .fetchQuery({
+        queryKey: hoSoHocVienKey(dongId),
+        queryFn: () => layHoSoHocVienCuaDong(dongId),
+        staleTime: 0,
+        retry: false,
+      })
+      .then((hoSo) => {
+        const khac = truongKhacHoSo(hoSo, caNhan);
+        if (khac.length > 0) setChoDongBo({ body, khac, hoSo });
+        else guiSua();
+      })
+      // Không lấy được hồ sơ (vd. học viên đã bị xóa) → chỉ sửa danh sách.
+      .catch(() => guiSua())
+      .finally(() => setDangDoiChieu(false));
   }
+
+  function chonDongBo(dongBo: boolean) {
+    if (!choDongBo || !dong) return;
+    const { body } = choDongBo;
+    setChoDongBo(null);
+    sua.mutate(
+      { dongId: dong.id, body: { ...body, dong_bo_ho_so_hoc_vien: dongBo } },
+      {
+        onSuccess: () => {
+          notifications.show({
+            color: 'green',
+            message: dongBo ? 'Đã lưu thay đổi và cập nhật hồ sơ NLS' : 'Đã lưu thay đổi',
+          });
+          onClose();
+        },
+        onError: baoLoi,
+      },
+    );
+  }
+
+  const tenTruong = (id: string) => dsTruong?.find((t) => t.id === id)?.ten_don_vi;
 
   return (
     <Modal opened={opened} onClose={onClose} title={dong ? 'Sửa thông tin' : 'Thêm người'} centered>
@@ -235,11 +295,20 @@ export function ModalDongDanhSach({ opened, onClose, dotId, dong, donViMacDinh =
           </Group>
           <TextInput label="Ghi chú" {...register('ghi_chu')} error={errors.ghi_chu?.message} />
           <Textarea label="Lý do" required autosize minRows={2} {...register('ly_do')} error={errors.ly_do?.message} />
-          <Button type="submit" loading={sua.isPending || them.isPending} fullWidth>
+          <Button type="submit" loading={sua.isPending || them.isPending || dangDoiChieu} fullWidth>
             {dong ? 'Lưu thay đổi' : 'Thêm người'}
           </Button>
         </Stack>
       </form>
+      <ModalDongBoHoSoNls
+        opened={opened && !!choDongBo}
+        onClose={() => setChoDongBo(null)}
+        khac={choDongBo?.khac ?? []}
+        hoSo={choDongBo?.hoSo ?? null}
+        onChon={chonDongBo}
+        tenTruong={tenTruong}
+        zIndex={300}
+      />
     </Modal>
   );
 }

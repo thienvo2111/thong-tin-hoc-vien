@@ -46,6 +46,12 @@ import {
   khoaNhieuHopDongChuaNop,
   tuChoiDeNghiCuaDong,
 } from './giao-dich-hop-dong';
+import { DongBoHoSoNlsService } from './dong-bo-ho-so-nls.service';
+import {
+  KetQuaDongBo,
+  giaTriCaNhanDaDoi,
+  nhatKyDongBo,
+} from './dong-bo-ho-so-nls';
 
 export interface DongXemTruoc extends DongExcelDanhSach {
   trang_thai_khop: TrangThaiKhop;
@@ -139,6 +145,7 @@ export class DanhSachThamGiaService {
     private readonly prisma: PrismaService,
     private readonly nhatKy: NhatKyService,
     private readonly scope: ScopeService,
+    private readonly dongBoHoSo: DongBoHoSoNlsService,
   ) {}
 
   /** Trường (loại truong, đang hoạt động) thuộc cây Sở của đợt — phạm vi khớp/chọn tay (T7). */
@@ -374,19 +381,26 @@ export class DanhSachThamGiaService {
   // (issue #62: Báo sai lệch nếu trường còn dòng Không đồng ý / đề nghị chờ — trangThaiSauQuanTriSua).
   // Issue #62: sửa dòng đang có đề nghị chờ vẫn được — đề nghị giữ nguyên chờ Quản trị quyết định.
   // Issue #64 / X5: trường đã nộp hợp đồng → sửa/thêm/xóa 409 (kiểm dưới khóa FOR UPDATE của hop_dong).
+  // Issue #69 / Y2: dòng NLS + dong_bo_ho_so_hoc_vien → thông tin cá nhân đã đổi (kể cả trường công tác) ghi luôn
+  // vào hồ sơ học viên trong cùng transaction; giai đoạn, suất, lớp, ghi chú, mã gốc không bao giờ đồng bộ.
 
   /** Sửa 1 dòng: chỉ đổi trường gửi lên; có đổi → mất ý kiến trường (X1). Không đổi gì → trả nguyên, không ghi nhật ký. */
   async suaDong(
     dongId: string,
     dto: SuaDongDanhSachDto,
     callerId: string,
-  ): Promise<DongDanhSach> {
+  ): Promise<DongDanhSach & { dong_bo: KetQuaDongBo | null }> {
     const cu = await this.layDong(dongId);
-    const { ly_do, ...sua } = dto;
+    const { ly_do, dong_bo_ho_so_hoc_vien, ...sua } = dto;
     const truoc = giaTriGoc(cu);
     const sau = apDungSua(truoc, sua);
     const doi = khacBiet(truoc, sau);
-    if (!doi) return toDongDanhSach(cu);
+    const giaTriCaNhan = giaTriCaNhanDaDoi(doi?.sau ?? null);
+    // Cờ bật mà dòng HSG / không đổi trường cá nhân nào → 400 (kiểm trước khi ghi gì).
+    if (dong_bo_ho_so_hoc_vien) {
+      this.dongBoHoSo.chanKhongDongBoDuoc(cu.hoc_vien_id, giaTriCaNhan);
+    }
+    if (!doi) return { ...toDongDanhSach(cu), dong_bo: null };
     if (sau.don_vi_id !== truoc.don_vi_id) {
       const dot = await this.layDot(cu.dot_trien_khai_id);
       await this.kiemTraTruong(dot.so_gddt_id, sau.don_vi_id);
@@ -394,7 +408,7 @@ export class DanhSachThamGiaService {
 
     // Chuyển trường → cả trường cũ (mất 1 dòng) lẫn trường mới đều tính lại trạng thái.
     const truongBiAnhHuong = [...new Set([truoc.don_vi_id, sau.don_vi_id])];
-    const moi = await this.prisma.$transaction(async (tx) => {
+    const { moi, dongBo } = await this.prisma.$transaction(async (tx) => {
       // Chuyển dòng sang trường khác → trường mới cũng phải có dòng hợp đồng (M5).
       await this.taoHopDongNeuChuaCo(tx, cu.dot_trien_khai_id, [sau.don_vi_id]);
       // X5: chuyển dòng giữa 2 trường → chặn nếu MỘT trong hai đã nộp hợp đồng.
@@ -413,7 +427,16 @@ export class DanhSachThamGiaService {
         truongBiAnhHuong,
         callerId,
       );
-      return dong;
+      const dongBo = dong_bo_ho_so_hoc_vien
+        ? await this.dongBoHoSo.dongBo(
+            tx,
+            cu.hoc_vien_id,
+            giaTriCaNhan,
+            callerId,
+            `Cổng đơn vị: ${ly_do}`,
+          )
+        : null;
+      return { moi: dong, dongBo };
     });
     await this.nhatKy.ghi({
       hanh_dong: 'sua_dong_danh_sach',
@@ -423,9 +446,10 @@ export class DanhSachThamGiaService {
         don_vi_id: moi.don_vi_id,
         ly_do,
         ...doi,
+        ...nhatKyDongBo(dongBo),
       },
     });
-    return toDongDanhSach(moi);
+    return { ...toDongDanhSach(moi), dong_bo: dongBo };
   }
 
   /** Thêm 1 dòng vào đợt HSG; giai đoạn mặc định Cả 2, suất suy từ giai đoạn nếu không gửi. */

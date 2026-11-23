@@ -719,12 +719,18 @@ export class HocVienService {
   // dùng cho import_moet — tu_dang_ky vẫn có PATCH /hoc-vien/toi riêng cho
   // chính học viên). Vẫn ghi lịch sử + hủy xác nhận nếu đang có đợt mở trùng
   // lúc sửa, để dữ liệu nhất quán dù ai sửa.
+  //
+  // ADR 0015 Y2 (issue #69): `dongBo` — Cổng đơn vị đồng bộ thông tin cá nhân
+  // từ danh sách tham gia về hồ sơ. Ghi trong transaction CỦA NƠI GỌI (danh
+  // sách + hồ sơ cùng thành/bại) và LUÔN ghi lịch sử kèm lý do (như hỗ trợ
+  // sửa hộ — kể cả hồ sơ tu_dang_ky). Không truyền → hành vi y như cũ.
   async suaHoSoByAdmin(
     id: string,
     dto: UpdateHocVienDto,
-    caller: AuthenticatedUser,
+    caller: Pick<AuthenticatedUser, 'id' | 'vai_tro'>,
+    dongBo?: { tx: Prisma.TransactionClient; lyDo: string },
   ) {
-    const existing = await this.prisma.hoc_vien.findUnique({
+    const existing = await (dongBo?.tx ?? this.prisma).hoc_vien.findUnique({
       where: { id },
       include: { chuyen_mon: true },
     });
@@ -740,7 +746,9 @@ export class HocVienService {
       dto,
       { id: caller.id, vai_tro: caller.vai_tro },
       dot,
-      existing.nguon_tao === 'import_moet',
+      dongBo ? true : existing.nguon_tao === 'import_moet',
+      dongBo?.lyDo ?? null,
+      dongBo?.tx,
     );
   }
 
@@ -1139,6 +1147,10 @@ export class HocVienService {
     dot: dot_xac_nhan | null,
     ghiLichSu: boolean,
     lyDo: string | null = null,
+    // ADR 0015 Y2: có → ghi trong transaction của nơi gọi (không mở transaction
+    // riêng). Nơi gọi duy nhất (Cổng đơn vị) không đổi email nên không có
+    // email xác minh gửi trước khi transaction ngoài commit.
+    txNgoai?: Prisma.TransactionClient,
   ) {
     const merged: HocVienValidateInput = {
       ho_ten: dto.ho_ten ?? existing.ho_ten,
@@ -1190,7 +1202,8 @@ export class HocVienService {
       emailMoi !== undefined && emailMoi !== existing.email_lien_he;
 
     try {
-      const { updated, xacNhanBiHuy } = await this.prisma.$transaction(
+      const { updated, xacNhanBiHuy } = await this.trongGiaoDich(
+        txNgoai,
         async (tx) => {
           const updated = await tx.hoc_vien.update({
             where: { id: existing.id },
@@ -1272,6 +1285,15 @@ export class HocVienService {
       }
       throw e;
     }
+  }
+
+  // ADR 0015 Y2: chạy `ghi` trong transaction có sẵn của nơi gọi, hoặc mở
+  // transaction mới như trước nay.
+  private trongGiaoDich<T>(
+    txNgoai: Prisma.TransactionClient | undefined,
+    ghi: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return txNgoai ? ghi(txNgoai) : this.prisma.$transaction(ghi);
   }
 
   // Thêm 2026-09-30: tạo token_xac_thuc (loai='xac_minh_email', hết hạn sau

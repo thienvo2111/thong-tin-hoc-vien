@@ -17,11 +17,13 @@ import {
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useApDungDeNghi, useHangDoiDeNghi, useTuChoiDeNghi, type MucDeNghi } from '@/api/deNghiSua';
-import { useDanhSachThamGia } from '@/api/danhSachThamGia';
+import { useDanhSachThamGia, useHoSoHocVienCuaDong } from '@/api/danhSachThamGia';
 import type { TrangThaiDeNghi } from '@/api/truongDanhSach';
 import { thongDiepLoiXungDot } from '@/lib/loiApi';
 import { dinhDangNgayGio } from '@/lib/ngay';
+import { giaTriCaNhanTu, truongKhacHoSo, type GiaTriCaNhanMoi } from '@/lib/dongBoHoSoNls';
 import { NHAN_LOAI_DE_NGHI, TRANG_THAI_DE_NGHI, moTaNguoi, thayDoiDeNghi } from './deNghiNhan';
+import { ModalDongBoHoSoNls } from './ModalDongBoHoSoNls';
 
 const LOC_TRANG_THAI = (Object.keys(TRANG_THAI_DE_NGHI) as TrangThaiDeNghi[]).map((value) => ({
   value,
@@ -184,17 +186,62 @@ function TheDeNghi({ dn, onApDung, onTuChoi }: { dn: MucDeNghi; onApDung: () => 
   );
 }
 
+/** Issue #69 / Y2: thông tin cá nhân đề nghị đổi thật so với dòng hiện tại (họ tên, ngày sinh, giới tính). */
+function giaTriCaNhanDeNghi(dn: MucDeNghi): GiaTriCaNhanMoi {
+  const doi = Object.fromEntries(
+    Object.entries(dn.gia_tri).filter(([k, v]) => v !== (dn.dong_hien_tai as Record<string, unknown> | null)?.[k]),
+  );
+  return giaTriCaNhanTu(doi);
+}
+
 function ModalApDung({ dotId, dn, onClose }: { dotId: string; dn: MucDeNghi | null; onClose: () => void }) {
   const apDung = useApDungDeNghi(dotId);
   const { reset } = apDung;
   useEffect(() => reset(), [dn, reset]);
+  // Issue #69 / ADR 0015 Y2: đề nghị sửa trên dòng NLS → so với hồ sơ học viên; có khác → hỏi đồng bộ.
+  // Dòng HSG / thêm / bớt → hộp xác nhận thường. Không lấy được hồ sơ → hộp thường (chỉ sửa danh sách).
+  const coHoSo = !!dn && dn.loai === 'sua' && !!dn.dong_id && !!dn.dong_hien_tai?.hoc_vien_id;
+  const hoSo = useHoSoHocVienCuaDong(coHoSo ? dn.dong_id : null);
+  const khac = coHoSo && hoSo.data ? truongKhacHoSo(hoSo.data, giaTriCaNhanDeNghi(dn)) : [];
+  const dangTaiHoSo = coHoSo && hoSo.isLoading;
+  const loi = apDung.isError ? thongDiepLoiXungDot(apDung.error) : null;
+
+  function gui(dongBo?: boolean) {
+    if (!dn) return;
+    apDung.mutate(
+      { id: dn.id, dongBo },
+      {
+        onSuccess: () => {
+          notifications.show({
+            color: 'green',
+            message: dongBo ? 'Đã áp dụng đề nghị và cập nhật hồ sơ NLS' : 'Đã áp dụng đề nghị',
+          });
+          onClose();
+        },
+      },
+    );
+  }
+
+  if (khac.length > 0) {
+    return (
+      <ModalDongBoHoSoNls
+        opened={!!dn}
+        onClose={onClose}
+        khac={khac}
+        hoSo={hoSo.data ?? null}
+        onChon={gui}
+        dangGui={apDung.isPending}
+        loi={loi}
+      />
+    );
+  }
 
   return (
     <Modal opened={!!dn} onClose={onClose} title="Áp dụng đề nghị" centered>
       <Stack gap="sm">
-        {apDung.isError && (
+        {loi && (
           <Alert color="red" role="alert">
-            {thongDiepLoiXungDot(apDung.error)}
+            {loi}
           </Alert>
         )}
         {dn && (
@@ -203,22 +250,16 @@ function ModalApDung({ dotId, dn, onClose }: { dotId: string; dn: MucDeNghi | nu
             chuyển thành Đồng ý.
           </Text>
         )}
+        {dangTaiHoSo && (
+          <Text size="sm" c="dimmed">
+            Đang đối chiếu hồ sơ học viên NLS…
+          </Text>
+        )}
         <Group justify="flex-end" gap="sm">
           <Button variant="default" onClick={onClose}>
             Hủy
           </Button>
-          <Button
-            loading={apDung.isPending}
-            onClick={() =>
-              dn &&
-              apDung.mutate(dn.id, {
-                onSuccess: () => {
-                  notifications.show({ color: 'green', message: 'Đã áp dụng đề nghị' });
-                  onClose();
-                },
-              })
-            }
-          >
+          <Button loading={apDung.isPending} disabled={dangTaiHoSo} onClick={() => gui()}>
             Áp dụng
           </Button>
         </Group>

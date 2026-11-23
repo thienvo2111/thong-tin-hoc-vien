@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsISO8601,
@@ -121,6 +122,9 @@ export class LyDoDto {
 const coGui = (_: object, v: unknown) => v !== undefined;
 const MSG_DON_VI = { message: 'don_vi_id không hợp lệ' };
 const MSG_HO_TEN = { message: 'ho_ten không được trống, tối đa 255 ký tự' };
+export const MSG_DONG_BO = {
+  message: 'dong_bo_ho_so_hoc_vien phải là true hoặc false',
+};
 const MSG_GIAI_DOAN = {
   message: 'giai_doan phải là ca_hai, chi_gd1 hoặc chi_gd2',
 };
@@ -178,6 +182,11 @@ export class SuaDongDanhSachDto extends TruongPhuDongDto {
   @IsString()
   @Length(1, 255, MSG_HO_TEN)
   ho_ten?: string;
+
+  // Issue #69 / ADR 0015 Y2: dòng NLS — cập nhật luôn hồ sơ học viên (chỉ thông tin cá nhân). Mặc định không.
+  @IsOptional()
+  @IsBoolean(MSG_DONG_BO)
+  dong_bo_ho_so_hoc_vien?: boolean;
 }
 
 // POST /cong-don-vi/dot-trien-khai/:id/danh-sach — thêm 1 dòng (đợt HSG); giai đoạn mặc định Cả 2.

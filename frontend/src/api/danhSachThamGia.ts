@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, apiFetchBlob } from './client';
 import type { TrangThaiDanhSachTruong, TrangThaiHopDong, YKienTruong } from './truongDanhSach';
+import type { HoSoHocVienNls } from '@/lib/dongBoHoSoNls';
 
 // Issue #58 / ADR 0015 M3, M6, S1, S3, T7 — Quản trị nạp Excel danh sách HSG theo đợt (Cổng đơn vị).
 export type GiaiDoanThamGia = 'ca_hai' | 'chi_gd1' | 'chi_gd2';
@@ -157,8 +158,8 @@ export interface TruongDongDanhSach {
   ghi_chu: string | null;
 }
 
-/** PATCH: chỉ các trường đã đổi + lý do. */
-export type SuaDongDanhSach = Partial<TruongDongDanhSach> & { ly_do: string };
+/** PATCH: chỉ các trường đã đổi + lý do. Issue #69 / Y2: dòng NLS — cập nhật luôn hồ sơ học viên. */
+export type SuaDongDanhSach = Partial<TruongDongDanhSach> & { ly_do: string; dong_bo_ho_so_hoc_vien?: boolean };
 export type ThemDongDanhSach = TruongDongDanhSach & { ly_do: string };
 
 export function suaDongDanhSach(dongId: string, body: SuaDongDanhSach) {
@@ -198,6 +199,25 @@ export function useThemDongDanhSach(dotId: string) {
   return useMutation({
     mutationFn: (body: ThemDongDanhSach) => themDongDanhSach(dotId, body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: danhSachKey(dotId) }),
+  });
+}
+
+/** Issue #69 / ADR 0015 Y2: hồ sơ học viên NLS hiện tại của dòng — xem trước cũ → mới (chỉ Quản trị). */
+export function layHoSoHocVienCuaDong(dongId: string) {
+  return apiFetch<HoSoHocVienNls>(`/cong-don-vi/danh-sach-tham-gia/${dongId}/ho-so-hoc-vien`);
+}
+
+export const hoSoHocVienKey = (dongId: string) => ['cong-don-vi', 'ho-so-hoc-vien', dongId] as const;
+
+/** Luôn lấy mới khi mở (hồ sơ có thể vừa đổi). dongId null → không gọi. */
+export function useHoSoHocVienCuaDong(dongId: string | null) {
+  return useQuery({
+    queryKey: hoSoHocVienKey(dongId ?? ''),
+    queryFn: () => layHoSoHocVienCuaDong(dongId as string),
+    enabled: !!dongId,
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
   });
 }
 
