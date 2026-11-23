@@ -116,6 +116,7 @@ describe('Xóa cứng học viên (e2e)', () => {
         where: { nguoi_sua_id: ndId },
       }),
       tai_khoan_vle: await prisma.tai_khoan_vle.count({ where: hv }),
+      dang_nhap_vle: await prisma.dang_nhap_vle.count({ where: hv }),
       nhat_ky_thong_bao: await prisma.nhat_ky_thong_bao.count({ where: hv }),
       hang_doi_email: await prisma.hang_doi_email.count({ where: hv }),
       yeu_cau_ho_tro: await prisma.yeu_cau_ho_tro.count({ where: hv }),
@@ -371,6 +372,10 @@ describe('Xóa cứng học viên (e2e)', () => {
         duong_dan: 'https://vle.test',
       },
     });
+    // Vào học VLE (external-login): xóa hồ sơ phải dọn cả dang_nhap_vle.
+    await prisma.dang_nhap_vle.create({
+      data: { hoc_vien_id: hv.id, username: `vle-${suf}` },
+    });
     await prisma.nhat_ky_thong_bao.create({
       data: {
         loai_su_kien: 'hoc_vien_xac_nhan',
@@ -483,6 +488,7 @@ describe('Xóa cứng học viên (e2e)', () => {
       so_yeu_cau_ho_tro: 1,
       co_tai_khoan: true,
       ten_dang_nhap_vle: `vle-${suf}`,
+      co_dang_nhap_vle: true,
     });
 
     const pheuTruoc = await http()
@@ -596,6 +602,7 @@ describe('Xóa cứng học viên (e2e)', () => {
       so_yeu_cau_ho_tro: 0,
       co_tai_khoan: false,
       ten_dang_nhap_vle: null,
+      co_dang_nhap_vle: false,
     });
     const res = await xoa(h.id, {
       ly_do: 'Nhập nhầm',
