@@ -52,27 +52,58 @@ export interface DongTienDo {
   thao_tac_cuoi_boi: { ho_ten: string; ten_dang_nhap: string } | null;
 }
 
+export interface DotTienDo {
+  id: string;
+  ten: string;
+  chuong_trinh: chuong_trinh_boi_duong;
+  don_gia: number | null;
+  han_nop: string;
+  han_nop_ngay: string;
+}
+
 export interface TienDoDot {
-  dot: {
-    id: string;
-    ten: string;
-    chuong_trinh: chuong_trinh_boi_duong;
-    don_gia: number | null;
-    han_nop: string;
-    han_nop_ngay: string;
-  };
+  dot: DotTienDo;
   tong_hop: TongHopTienDo;
   dong: DongTienDo[];
 }
 
 type LienHe = DongXuatTienDo['lien_he'];
-interface DongNoiBo {
+/** Dòng nội bộ: dòng Quản trị + mốc thao tác cuối (Date) + người liên hệ (cho Excel). */
+export interface DongNoiBo {
   dong: DongTienDo;
   thaoTacCuoi: Date | null;
   lienHe: LienHe;
 }
 
-const KHONG_THAY_DOT = 'Không tìm thấy đợt triển khai';
+/** Cột đợt cần cho bảng tiến độ (select Prisma). */
+export const CHON_DOT_TIEN_DO = {
+  id: true,
+  ten: true,
+  chuong_trinh: true,
+  don_gia: true,
+  han_nop: true,
+} as const;
+export interface DotTienDoGoc {
+  id: string;
+  ten: string;
+  chuong_trinh: chuong_trinh_boi_duong;
+  don_gia: number | null;
+  han_nop: Date;
+}
+
+/** Thông tin đợt trả ra API (chỉ các cột này — không cột QĐ, không người tạo). */
+export function dotTienDo(d: DotTienDoGoc): DotTienDo {
+  return {
+    id: d.id,
+    ten: d.ten,
+    chuong_trinh: d.chuong_trinh,
+    don_gia: d.don_gia,
+    han_nop: d.han_nop.toISOString(),
+    han_nop_ngay: ngayVietNam(d.han_nop),
+  };
+}
+
+export const KHONG_THAY_DOT = 'Không tìm thấy đợt triển khai';
 
 function tinhTrangHoSoCua(d: DongTienDo): TinhTrangHoSoTienDo {
   if (!d.co_ho_so) return 'chua_khai';
@@ -134,16 +165,29 @@ export class TienDoDotService {
   private async tai(dotId: string) {
     const d = await this.prisma.dot_trien_khai.findUnique({
       where: { id: dotId },
-      select: {
-        id: true,
-        ten: true,
-        chuong_trinh: true,
-        don_gia: true,
-        han_nop: true,
-      },
+      select: CHON_DOT_TIEN_DO,
     });
     if (!d) throw new NotFoundAppException(KHONG_THAY_DOT);
-    const theoDot = { dot_trien_khai_id: dotId };
+    const ds = (await this.taiDong([d], null)).get(d.id) ?? [];
+    return { dot: dotTienDo(d), ds };
+  }
+
+  /**
+   * Dòng tiến độ NỘI BỘ (đủ cột, kể cả người thao tác + liên hệ) của các đợt, theo đợt, xếp theo tên trường.
+   * `phamVi` = id đơn vị được xem (issue #71: Sở/Phòng) hoặc null = mọi trường (Quản trị). Số truy vấn cố
+   * định bất kể số đợt. Người gọi ngoài Quản trị PHẢI chiếu qua danh sách trắng trước khi trả ra API.
+   */
+  async taiDong(
+    dots: readonly DotTienDoGoc[],
+    phamVi: readonly string[] | null,
+  ): Promise<Map<string, DongNoiBo[]>> {
+    const ketQua = new Map<string, DongNoiBo[]>(dots.map((d) => [d.id, []]));
+    if (dots.length === 0) return ketQua;
+    // Cùng 1 điều kiện (đợt + phạm vi) cho hop_dong, danh sách, đề nghị và hồ sơ.
+    const theoDot = {
+      dot_trien_khai_id: { in: dots.map((d) => d.id) },
+      ...(phamVi ? { don_vi_id: { in: [...phamVi] } } : {}),
+    };
     const [hopDong, soDong, deNghi, hoSo] = await Promise.all([
       this.prisma.hop_dong_boi_duong.findMany({
         where: theoDot,
@@ -161,13 +205,13 @@ export class TienDoDotService {
         },
       }),
       this.prisma.danh_sach_tham_gia.groupBy({
-        by: ['don_vi_id'],
+        by: ['dot_trien_khai_id', 'don_vi_id'],
         where: theoDot,
         _count: { _all: true },
         _sum: { ty_le_suat: true },
       }),
       this.prisma.de_nghi_sua_danh_sach.groupBy({
-        by: ['don_vi_id'],
+        by: ['dot_trien_khai_id', 'don_vi_id'],
         where: { ...theoDot, trang_thai: 'cho' },
         _count: { _all: true },
       }),
@@ -175,14 +219,24 @@ export class TienDoDotService {
         where: { don_vi: { hop_dong_boi_duong: { some: theoDot } } },
       }),
     ]);
-    const demDong = new Map(soDong.map((x) => [x.don_vi_id, x]));
-    const demDeNghi = new Map(deNghi.map((x) => [x.don_vi_id, x._count._all]));
+    const khoa = (dotId: string, donViId: string) => `${dotId}|${donViId}`;
+    const demDong = new Map(
+      soDong.map((x) => [khoa(x.dot_trien_khai_id, x.don_vi_id), x]),
+    );
+    const demDeNghi = new Map(
+      deNghi.map((x) => [
+        khoa(x.dot_trien_khai_id, x.don_vi_id),
+        x._count._all,
+      ]),
+    );
     const hoSoTheo = new Map(hoSo.map((h) => [h.don_vi_id, layDuLieu(h)]));
+    const dotTheoId = new Map(dots.map((d) => [d.id, d]));
 
     const now = new Date();
-    const ds: DongNoiBo[] = hopDong.map((h) => {
+    for (const h of hopDong) {
+      const d = dotTheoId.get(h.dot_trien_khai_id) as DotTienDoGoc;
       const han = thongTinHan(d.han_nop, h.han_rieng, now);
-      const dem = demDong.get(h.don_vi_id);
+      const dem = demDong.get(khoa(h.dot_trien_khai_id, h.don_vi_id));
       const hoSoHienTai = hoSoTheo.get(h.don_vi_id) ?? null;
       const sl = soLieuHopDong(h, {
         so_nguoi: dem?._count._all ?? 0,
@@ -212,7 +266,8 @@ export class TienDoDotService {
         han_hieu_luc: han.han_hieu_luc,
         han_hieu_luc_ngay: han.han_hieu_luc_ngay,
         qua_han: quaHan(han.da_het_han, h.trang_thai_hop_dong),
-        so_de_nghi_cho: demDeNghi.get(h.don_vi_id) ?? 0,
+        so_de_nghi_cho:
+          demDeNghi.get(khoa(h.dot_trien_khai_id, h.don_vi_id)) ?? 0,
         ho_so_du: sl.hoSo ? tinhTrangHoSo(sl.hoSo).du : false,
         co_ho_so: sl.hoSo !== null,
         thao_tac_cuoi_luc: thaoTacCuoi ? thaoTacCuoi.toISOString() : null,
@@ -225,23 +280,15 @@ export class TienDoDotService {
             email: hoSoHienTai.email_hoa_don,
           }
         : null;
-      return { dong, thaoTacCuoi, lienHe };
-    });
-    ds.sort(
-      (a, b) =>
-        a.dong.don_vi.ten.localeCompare(b.dong.don_vi.ten, 'vi') ||
-        a.dong.don_vi.id.localeCompare(b.dong.don_vi.id),
-    );
-    return {
-      dot: {
-        id: d.id,
-        ten: d.ten,
-        chuong_trinh: d.chuong_trinh,
-        don_gia: d.don_gia,
-        han_nop: d.han_nop.toISOString(),
-        han_nop_ngay: ngayVietNam(d.han_nop),
-      },
-      ds,
-    };
+      ketQua.get(d.id)?.push({ dong, thaoTacCuoi, lienHe });
+    }
+    for (const ds of ketQua.values()) {
+      ds.sort(
+        (a, b) =>
+          a.dong.don_vi.ten.localeCompare(b.dong.don_vi.ten, 'vi') ||
+          a.dong.don_vi.id.localeCompare(b.dong.don_vi.id),
+      );
+    }
+    return ketQua;
   }
 }

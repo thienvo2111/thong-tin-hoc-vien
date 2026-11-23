@@ -371,6 +371,23 @@ export const routesCongDonVi: RouteObject[] = [
                 ],
               },
               {
+                // Issue #71 / ADR 0015 P1, O3: màn Sở/Phòng (danh sách GV 1 trường trong phạm vi, chỉ xem; Danh mục
+                // trường). Vai trò khác → 404, không mount trang. Tiền tố /don-vi — không dùng /danh-muc-… vì Nginx
+                // proxy mọi đường dẫn BẮT ĐẦU bằng "danh-muc" về backend (F5 sẽ hỏng).
+                lazy: () => import('@/pages/CongDonVi/ChiSoPhongCong').then((m) => ({ Component: m.default })),
+                children: [
+                  {
+                    path: '/don-vi/dot/:dotId/truong/:donViId',
+                    lazy: () =>
+                      import('@/pages/CongDonVi/DanhSachGvTruongSoPhong').then((m) => ({ Component: m.default })),
+                  },
+                  {
+                    path: '/don-vi/danh-muc-truong',
+                    lazy: () => import('@/pages/Admin/AdminDanhMucTruong').then((m) => ({ Component: m.default })),
+                  },
+                ],
+              },
+              {
                 // Issue #70 / ADR 0015 P1: nhóm NLS = 4 màn dùng chung với /admin/* của boiduongnls (đường dẫn
                 // qua DuongDanAdminProvider). Chỉ trường/Phòng/Sở có học viên NLS; còn lại (kể cả quan_tri) → 404.
                 lazy: () => import('@/pages/CongDonVi/ChiDonViNls').then((m) => ({ Component: m.default })),

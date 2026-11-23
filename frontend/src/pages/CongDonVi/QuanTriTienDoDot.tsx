@@ -37,29 +37,10 @@ import { khopTimKiem } from '@/lib/timKiemTiengViet';
 import { dinhDangSuat } from './danhSachThamGiaNhan';
 import { TRANG_THAI_DANH_SACH, TRANG_THAI_HOP_DONG, dinhDangGiaTri } from './hopDongNhan';
 import { dotDangChon } from './dotMacDinh';
+import { NHAN_LOC, laLoc, soTheoLoc } from './tienDoNhan';
 
 // Issue #66: hộp thoại Gia hạn riêng (kèm @mantine/dates) chỉ tải khi mở — trang bảng không nặng thêm.
 const ModalGiaHanRieng = lazy(() => import('./ModalGiaHanRieng').then((m) => ({ default: m.ModalGiaHanRieng })));
-
-const NHAN_LOC: Record<LocTienDo, string> = {
-  tat_ca: 'Tất cả',
-  chua_xac_nhan_ds: 'Chưa xác nhận DS',
-  bao_sai_lech: 'Báo sai lệch',
-  chua_nop_hd: 'Chưa nộp HĐ',
-  qua_han: 'Quá hạn',
-};
-
-function soTheoLoc(t: TongHopTienDo): Record<LocTienDo, number> {
-  return {
-    tat_ca: t.so_truong,
-    chua_xac_nhan_ds: t.so_truong - t.so_da_xac_nhan_ds,
-    bao_sai_lech: t.so_bao_sai_lech,
-    chua_nop_hd: t.so_truong - t.so_da_nop,
-    qua_han: t.so_qua_han,
-  };
-}
-
-const laLoc = (v: string | null): v is LocTienDo => !!v && (LOC_TIEN_DO as readonly string[]).includes(v);
 
 const lienKetDanhSach = (dotId: string, donViId: string) =>
   `/quan-tri/danh-sach-tham-gia?${new URLSearchParams({ dot: dotId, don_vi_id: donViId })}`;

@@ -149,22 +149,33 @@ describe('Trang chủ trường (/trang-chu, vai trò truong)', () => {
     expect(screen.queryByText('Không tải được danh sách đợt')).not.toBeInTheDocument();
   });
 
-  it.each(['so_gddt', 'phong_vhxh', 'quan_tri'])(
-    'vai trò %s giữ trang chủ tạm, không gọi API của trường',
-    async (vaiTro) => {
-      const { daGoi, go } = ngheApiTruong();
-      try {
-        dangNhap(vaiTro);
-        moTrang('/trang-chu');
-        expect(await screen.findByText(/Xin chào,/)).toBeInTheDocument();
-        expect(screen.getByText(/sắp có/)).toBeInTheDocument();
-        expect(screen.queryByText('Việc cần làm')).not.toBeInTheDocument();
-        expect(daGoi).toEqual([]);
-      } finally {
-        go();
-      }
-    },
-  );
+  it.each(['quan_tri'])('vai trò %s giữ trang chủ tạm, không gọi API của trường', async (vaiTro) => {
+    const { daGoi, go } = ngheApiTruong();
+    try {
+      dangNhap(vaiTro);
+      moTrang('/trang-chu');
+      expect(await screen.findByText(/Xin chào,/)).toBeInTheDocument();
+      expect(screen.getByText(/sắp có/)).toBeInTheDocument();
+      expect(screen.queryByText('Việc cần làm')).not.toBeInTheDocument();
+      expect(daGoi).toEqual([]);
+    } finally {
+      go();
+    }
+  });
+
+  // Issue #71: Sở/Phòng có trang chủ riêng (TrangChuSoPhong.test.tsx) — vẫn không gọi API của trường.
+  it.each(['so_gddt', 'phong_vhxh'])('vai trò %s → trang chủ Sở/Phòng, không gọi API của trường', async (vaiTro) => {
+    const { daGoi, go } = ngheApiTruong();
+    try {
+      dangNhap(vaiTro);
+      moTrang('/trang-chu');
+      expect(await screen.findByRole('heading', { name: 'Tiến độ các trường' })).toBeInTheDocument();
+      expect(screen.queryByText('Việc cần làm')).not.toBeInTheDocument();
+      expect(daGoi).toEqual([]);
+    } finally {
+      go();
+    }
+  });
 });
 
 describe('Màn danh sách tham gia của trường (/dot/:dotId/danh-sach)', () => {

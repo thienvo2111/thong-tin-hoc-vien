@@ -56,4 +56,12 @@ describe('Nginx proxy đủ tiền tố controller backend', () => {
     expect(trang.size).toBeGreaterThan(0);
     expect(tienToController().filter((p) => trang.has(p))).toEqual([]);
   });
+
+  // location ~ ^/(...) không neo cuối: /danh-muc-truong cũng khớp "danh-muc" → F5 trang rơi vào backend.
+  it('không route trang frontend nào BẮT ĐẦU bằng một tiền tố proxy Nginx (vd. /danh-muc-truong)', () => {
+    const nginx = tienToNginx();
+    expect(
+      routeTrangFrontend().filter((r) => nginx.some((p) => r.startsWith(p))),
+    ).toEqual([]);
+  });
 });

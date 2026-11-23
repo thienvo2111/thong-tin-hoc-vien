@@ -74,7 +74,7 @@ describe('duongDanAdmin — đường dẫn 4 màn theo cổng', () => {
 });
 
 describe('Menu nhóm NLS (CongDonViLayout)', () => {
-  it('trường có NLS → nhóm "NLS" với 4 liên kết /nls/…, sau các mục sẵn có', async () => {
+  it('trường có NLS → nhóm "NLS" với 4 liên kết /nls/…, sau Hồ sơ đơn vị, trước Hướng dẫn (issue #71 / P1)', async () => {
     giaLapChuongTrinh(true);
     dangNhap('truong');
     renderLayout();
@@ -93,7 +93,7 @@ describe('Menu nhóm NLS (CongDonViLayout)', () => {
       within(menu())
         .getAllByRole('link')
         .map((a) => a.textContent),
-    ).toEqual(['Trang chủ', 'Hồ sơ đơn vị', 'Hướng dẫn', 'Tổng quan', 'Học viên', 'Khóa', 'Báo cáo']);
+    ).toEqual(['Trang chủ', 'Hồ sơ đơn vị', 'Tổng quan', 'Học viên', 'Khóa', 'Báo cáo', 'Hướng dẫn']);
   });
 
   it('trường chỉ HSG (nls=false) → không có nhóm NLS, menu giữ nguyên', async () => {

@@ -37,9 +37,10 @@ describe('CongDonViLayout', () => {
 });
 
 describe('TrangChuCongDonVi', () => {
-  // Issue #60: trường có trang chủ riêng (TrangChuTruong.test.tsx); trang tạm còn cho Sở/Phòng/Quản trị.
+  // Issue #60/#71: trường (TrangChuTruong.test.tsx) và Sở/Phòng (TrangChuSoPhong.test.tsx) có trang chủ riêng;
+  // trang tạm còn cho Quản trị.
   it('chào theo tên tài khoản, báo chức năng sắp có, có link Hướng dẫn', async () => {
-    db.nguoiDung.vai_tro = 'so_gddt';
+    db.nguoiDung.vai_tro = 'quan_tri';
     datToken('token-gia-lap');
     renderVoiRouter([{ path: '/trang-chu', element: <TrangChuCongDonVi /> }], { initialEntries: ['/trang-chu'] });
     expect(await screen.findByText(new RegExp(`Xin chào, ${db.hoSo.ma_dinh_danh_moet}`))).toBeInTheDocument();

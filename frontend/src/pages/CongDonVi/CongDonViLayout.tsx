@@ -2,19 +2,22 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Box, Button, Group, Image, ScrollArea, Text } from '@mantine/core';
 import { useToi } from '@/auth/AuthContext';
 import { useChuongTrinhCuaToi, VAI_TRO_DON_VI_NLS } from '@/api/congDonVi';
+import { VAI_TRO_SO_PHONG } from '@/api/donViTienDo';
 import { DUONG_DAN_NLS } from '@/pages/Admin/duongDanAdmin';
 import { congDonVi } from '@/content/congDonVi';
 import logoHcmue from '@/assets/logo-hcmue.png';
 import { tokenKhac } from '@/theme';
 import { useTieuDeCongDonVi } from './useTieuDeCongDonVi';
 
-// ADR 0015 P1/P2: menu sẽ thêm Hồ sơ đơn vị, Danh sách tham gia… theo vai trò; hiện quản trị dùng chung menu này.
+// ADR 0015 P1/P2: menu theo vai trò; quản trị dùng MENU + MENU_QUAN_TRI.
 const MENU = [
   { to: '/trang-chu', nhan: 'Trang chủ' },
   { to: '/huong-dan', nhan: 'Hướng dẫn' },
 ];
 // Issue #63 / P1: "Hồ sơ đơn vị" chỉ cho trường, ngay sau Trang chủ.
-const MENU_TRUONG = [MENU[0], { to: '/ho-so-don-vi', nhan: 'Hồ sơ đơn vị' }, ...MENU.slice(1)];
+const MUC_HO_SO_DON_VI = { to: '/ho-so-don-vi', nhan: 'Hồ sơ đơn vị' };
+// Issue #71 / P1: "Danh mục trường" chỉ cho Sở/Phòng, sau nhóm NLS, trước Hướng dẫn.
+const MUC_DANH_MUC_TRUONG = { to: '/don-vi/danh-muc-truong', nhan: 'Danh mục trường' };
 // Issue #56/#57: mục chỉ hiện cho quan_tri. Issue #65 / P2: "Tiến độ đợt" là mục quản trị đầu tiên.
 const MENU_QUAN_TRI = [
   { to: '/quan-tri/tien-do-dot', nhan: 'Tiến độ đợt' },
@@ -63,7 +66,15 @@ export default function CongDonViLayout() {
   const { nguoiDung, dangXuat } = useToi();
   const navigate = useNavigate();
   const vaiTro = nguoiDung?.vai_tro;
-  const menu = vaiTro === 'quan_tri' ? [...MENU, ...MENU_QUAN_TRI] : vaiTro === 'truong' ? MENU_TRUONG : MENU;
+  // P1: Trang chủ · (trường: Hồ sơ đơn vị) · nhóm NLS · (Sở/Phòng: Danh mục trường) · Hướng dẫn.
+  const [menuTruoc, menuSau] =
+    vaiTro === 'quan_tri'
+      ? [[...MENU, ...MENU_QUAN_TRI], []]
+      : vaiTro === 'truong'
+        ? [[MENU[0], MUC_HO_SO_DON_VI], MENU.slice(1)]
+        : VAI_TRO_SO_PHONG.includes(vaiTro ?? '')
+          ? [[MENU[0]], [MUC_DANH_MUC_TRUONG, ...MENU.slice(1)]]
+          : [[MENU[0]], MENU.slice(1)];
   const laDonViNls = VAI_TRO_DON_VI_NLS.includes(vaiTro ?? '');
   // Ẩn khi đang tải/lỗi; quan_tri, học viên… không gọi API.
   const coNls = useChuongTrinhCuaToi(laDonViNls).data?.nls === true;
@@ -104,7 +115,7 @@ export default function CongDonViLayout() {
             pb={8}
             wrap="nowrap"
           >
-            {menu.map((m) => (
+            {menuTruoc.map((m) => (
               <MucMenu key={m.to} to={m.to} nhan={m.nhan} />
             ))}
             {coNls && (
@@ -127,6 +138,9 @@ export default function CongDonViLayout() {
                 ))}
               </Group>
             )}
+            {menuSau.map((m) => (
+              <MucMenu key={m.to} to={m.to} nhan={m.nhan} />
+            ))}
           </Group>
         </ScrollArea>
       </Box>

@@ -13,6 +13,7 @@ import { datLaiDeNghiSuaMock } from './mocks/deNghiSua';
 import { datLaiHoSoDonViMock } from './mocks/hoSoDonVi';
 import { datLaiHopDongMock } from './mocks/hopDong';
 import { datLaiTienDoDotMock } from './mocks/tienDoDot';
+import { datLaiDonViTienDoMock } from './mocks/donViTienDo';
 import { xoaToken } from '@/auth/tokenStore';
 
 // findBy*/waitFor mặc định chờ 1 giây — đủ khi chạy riêng 1 file, nhưng cả suite song song trên máy 4 nhân
@@ -75,6 +76,7 @@ afterEach(() => {
   datLaiHoSoDonViMock();
   datLaiHopDongMock();
   datLaiTienDoDotMock();
+  datLaiDonViTienDoMock();
   xoaToken();
   localStorage.clear();
   cleanup();
