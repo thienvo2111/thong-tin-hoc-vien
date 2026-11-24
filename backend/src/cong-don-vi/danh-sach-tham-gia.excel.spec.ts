@@ -171,6 +171,221 @@ describe('docFileDanhSach', () => {
   });
 });
 
+// File danh sách tổng hợp (sheet "ds"): tiêu đề văn bản phía trên, tiêu đề cột nhiều dòng, họ/tên và
+// ngày/tháng/năm sinh tách cột, "Đơn vị công tác", không có cột giai đoạn. Dữ liệu bịa hoàn toàn.
+describe('docFileDanhSach — file danh sách tổng hợp', () => {
+  const TIEU_DE_TONG_HOP = [
+    'TT',
+    'Mã số\nhọc viên',
+    'Họ và ',
+    'Tên',
+    'Ngày\nsinh',
+    'Tháng\nsinh',
+    'Năm\nsinh',
+    'Đơn vị công tác',
+    'Nơi sinh theo giấy khai sinh\n(Tỉnh/Thành phố)',
+    'Giới tính',
+    'Dân tộc',
+    'Mã lớp',
+    'Địa điểm giảng dạy',
+    'Thời gian giảng dạy',
+    'Giảng viên phụ trách',
+    'Link zalo',
+    'Ghi chú',
+  ];
+
+  function dongTongHop(
+    tt: number,
+    ho: string,
+    ten: string,
+    [ngay, thang, nam]: unknown[],
+    donVi: string,
+    over: { ma?: string; lop?: string; ghiChu?: string } = {},
+  ): unknown[] {
+    return [
+      tt,
+      over.ma ?? `HV-BIA-${tt}`,
+      ho,
+      ten,
+      ngay,
+      thang,
+      nam,
+      donVi,
+      'Tỉnh Bịa',
+      'Nữ',
+      'Kinh',
+      over.lop ?? 'HSG-L01',
+      'Phòng học bịa',
+      'Sáng thứ Bảy',
+      'GV bịa',
+      'https://example.invalid/zalo',
+      over.ghiChu ?? null,
+    ];
+  }
+
+  async function taoFileTongHop(
+    dong: unknown[][],
+    sheetPhu?: unknown[][],
+  ): Promise<Buffer> {
+    const wb = new ExcelJS.Workbook();
+    const sh = wb.addWorksheet('ds');
+    sh.addRow(['SỞ GIÁO DỤC BỊA', null, null, 'CỘNG HÒA BỊA']);
+    sh.addRow(['TRƯỜNG BỊA']);
+    sh.addRow([]);
+    sh.addRow(['DANH SÁCH TỔNG HỢP HỌC VIÊN (BỊA)']);
+    sh.addRow(['Lớp bồi dưỡng học sinh giỏi']);
+    sh.addRow([]);
+    sh.addRow(TIEU_DE_TONG_HOP);
+    dong.forEach((d) => sh.addRow(d));
+    if (sheetPhu) {
+      const phu = wb.addWorksheet('Bảng tổng hợp 1');
+      sheetPhu.forEach((d) => phu.addRow(d));
+    }
+    return Buffer.from(await wb.xlsx.writeBuffer());
+  }
+
+  it('đọc đúng: ghép họ + tên, ngày từ 3 cột, mã số học viên, mã lớp, đơn vị công tác, giai đoạn mặc định Cả 2', async () => {
+    const buf = await taoFileTongHop([
+      dongTongHop(1, 'Nguyễn Thị ', 'Bịa', [5, 3, 1990], 'Trường THCS Bịa', {
+        ma: '00123',
+        ghiChu: 'ghi chú bịa',
+      }),
+      dongTongHop(2, 'Trần', ' An ', ['07', '11', '1985'], 'Trường TH Mẫu'),
+    ]);
+    const ds = await docFileDanhSach(buf);
+    expect(ds).toEqual([
+      {
+        so_dong: 8,
+        ho_ten: 'Nguyễn Thị Bịa',
+        ngay_sinh: '1990-03-05',
+        gioi_tinh: 'Nữ',
+        ma_goc: '00123',
+        lop: 'HSG-L01',
+        ma_truong: null,
+        ten_truong: 'Trường THCS Bịa',
+        giai_doan: 'ca_hai',
+        ty_le_suat: 1,
+        ghi_chu: 'ghi chú bịa',
+        loi: [],
+      },
+      expect.objectContaining({
+        so_dong: 9,
+        ho_ten: 'Trần An',
+        ngay_sinh: '1985-11-07',
+        ma_goc: 'HV-BIA-2',
+        ten_truong: 'Trường TH Mẫu',
+        giai_doan: 'ca_hai',
+        ty_le_suat: 1,
+        loi: [],
+      }),
+    ]);
+  });
+
+  it('họ tên ghép chuẩn hóa NFC (chữ tổ hợp NFD)', async () => {
+    const hoNfd = 'Lê Văn'.normalize('NFD');
+    const buf = await taoFileTongHop([
+      dongTongHop(1, hoNfd, 'Thử', [1, 1, 1990], 'Trường Bịa'),
+    ]);
+    const [d] = await docFileDanhSach(buf);
+    expect(d.ho_ten).toBe('Lê Văn Thử'.normalize('NFC'));
+  });
+
+  it.each([
+    [[31, 2, 1990]],
+    [[1, 13, 1990]],
+    [[0, 1, 1990]],
+    [[1, 1, 90]],
+    [[1, null, 1990]],
+    [['abc', 1, 1990]],
+  ])('ngày/tháng/năm sai %p → lỗi dòng', async (ngay) => {
+    const buf = await taoFileTongHop([
+      dongTongHop(1, 'Phạm', 'Bịa', ngay, 'Trường Bịa'),
+    ]);
+    const [d] = await docFileDanhSach(buf);
+    expect(d.loi).toEqual(['Ngày sinh không hợp lệ (dùng dd/mm/yyyy)']);
+    expect(d.ngay_sinh).toBeNull();
+  });
+
+  it('cả 3 ô ngày/tháng/năm trống → ngày sinh null, không lỗi', async () => {
+    const buf = await taoFileTongHop([
+      dongTongHop(1, 'Phạm', 'Bịa', [null, null, null], 'Trường Bịa'),
+    ]);
+    const [d] = await docFileDanhSach(buf);
+    expect(d.ngay_sinh).toBeNull();
+    expect(d.loi).toEqual([]);
+  });
+
+  it('dòng cuối chỉ có tên trường → lỗi "Thiếu họ tên" (không thành người); dòng trống bỏ qua', async () => {
+    const chiCoTruong = new Array(17).fill(null);
+    chiCoTruong[7] = 'Trường THCS Bịa';
+    const buf = await taoFileTongHop([
+      dongTongHop(1, 'Võ', 'Bịa', [2, 2, 1992], 'Trường THCS Bịa'),
+      new Array(17).fill(null),
+      chiCoTruong,
+    ]);
+    const ds = await docFileDanhSach(buf);
+    expect(ds.map((d) => [d.so_dong, d.ho_ten, d.loi])).toEqual([
+      [8, 'Võ Bịa', []],
+      [10, '', ['Thiếu họ tên']],
+    ]);
+  });
+
+  it('có cột "Ngày sinh" đầy đủ (không có cột Tháng/Năm) → vẫn đọc như ngày đủ', async () => {
+    const buf = await taoFile([
+      ['Họ và', 'Tên', 'Ngày sinh', 'Đơn vị công tác'],
+      ['Đỗ', 'Bịa', '09/08/1991', 'Trường Bịa'],
+    ]);
+    const [d] = await docFileDanhSach(buf);
+    expect([d.ho_ten, d.ngay_sinh, d.loi]).toEqual([
+      'Đỗ Bịa',
+      '1991-08-09',
+      [],
+    ]);
+  });
+
+  it('"Họ đệm"/"Họ" + "Tên" cũng nhận là dòng tiêu đề', async () => {
+    for (const ho of ['Họ đệm', 'Họ']) {
+      const buf = await taoFile([
+        [ho, 'Tên', 'Tên trường'],
+        ['Hồ Thị', 'Bịa', 'Trường Bịa'],
+      ]);
+      const [d] = await docFileDanhSach(buf);
+      expect(d.ho_ten).toBe('Hồ Thị Bịa');
+    }
+  });
+
+  it('nhiều sheet: dùng sheet đầu tiên có dòng tiêu đề (bỏ qua sheet không có)', async () => {
+    const wb = new ExcelJS.Workbook();
+    wb.addWorksheet('Bìa').addRow(['Chỉ là trang bìa']);
+    const ds = wb.addWorksheet('ds');
+    ds.addRow(['Họ và tên', 'Tên trường']);
+    ds.addRow(['Ngô Bịa', 'Trường Bịa']);
+    const buf = Buffer.from(await wb.xlsx.writeBuffer());
+    const [d] = await docFileDanhSach(buf);
+    expect([d.so_dong, d.ho_ten]).toEqual([2, 'Ngô Bịa']);
+  });
+
+  it('sheet "ds" đứng đầu, sheet tổng hợp phía sau không ảnh hưởng', async () => {
+    const buf = await taoFileTongHop(
+      [dongTongHop(1, 'Lý', 'Bịa', [3, 4, 1993], 'Trường Bịa')],
+      [
+        ['Họ và tên', 'Tên trường'],
+        ['Người khác bịa', 'Trường khác'],
+      ],
+    );
+    const ds = await docFileDanhSach(buf);
+    expect(ds.map((d) => d.ho_ten)).toEqual(['Lý Bịa']);
+  });
+
+  it('không sheet nào có tiêu đề hợp lệ → 400', async () => {
+    const buf = await taoFile([
+      ['Họ và', 'Trường'],
+      ['A', 'B'],
+    ]);
+    expect(await loiCua(docFileDanhSach(buf))).toMatch(/Họ và tên/);
+  });
+});
+
 // Issue #59: xuất danh sách hiện tại — sửa trên Excel rồi nạp lại được.
 describe('taoFileXuatDanhSach', () => {
   const DS: DongXuatDanhSach[] = [

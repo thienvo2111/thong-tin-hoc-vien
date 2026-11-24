@@ -51,8 +51,11 @@ export const COT_MAU: [CotDanhSach, string][] = [
   ['ghi_chu', 'Ghi chú'],
 ];
 
-// Khóa: tiêu đề đã chuẩn hóa (bỏ dấu, bỏ phần trong ngoặc, bỏ '*').
-const BI_DANH: Record<string, CotDanhSach> = {
+// Cột chỉ dùng lúc đọc: file danh sách tổng hợp tách "Họ và" / "Tên" và Ngày / Tháng / Năm sinh.
+type CotDoc = CotDanhSach | 'ho' | 'ten' | 'thang_sinh' | 'nam_sinh';
+
+// Khóa: tiêu đề đã chuẩn hóa (bỏ dấu, bỏ phần trong ngoặc, bỏ '*', xuống dòng/khoảng trắng thừa → 1 dấu cách).
+const BI_DANH: Record<string, CotDoc> = {
   'ho ten': 'ho_ten',
   'ho va ten': 'ho_ten',
   'ngay sinh': 'ngay_sinh',
@@ -62,17 +65,27 @@ const BI_DANH: Record<string, CotDanhSach> = {
   'ma dinh danh': 'ma_goc',
   'ma gv': 'ma_goc',
   'ma giao vien': 'ma_goc',
+  'ma so hoc vien': 'ma_goc',
+  'ma hoc vien': 'ma_goc',
   lop: 'lop',
   'lop boi duong': 'lop',
+  'ma lop': 'lop',
   'ma truong': 'ma_truong',
   'ma don vi': 'ma_truong',
   truong: 'ten_truong',
   'ten truong': 'ten_truong',
   'don vi': 'ten_truong',
   'ten don vi': 'ten_truong',
+  'don vi cong tac': 'ten_truong',
   'giai doan tham gia': 'giai_doan',
   'giai doan': 'giai_doan',
   'ghi chu': 'ghi_chu',
+  'ho va': 'ho',
+  ho: 'ho',
+  'ho dem': 'ho',
+  ten: 'ten',
+  'thang sinh': 'thang_sinh',
+  'nam sinh': 'nam_sinh',
 };
 
 // Giới hạn độ dài theo cột DB (danh_sach_tham_gia).
@@ -135,67 +148,110 @@ export function docNgaySinh(raw: unknown): string | null | undefined {
   return undefined;
 }
 
+/** Dòng tiêu đề hợp lệ: có "Họ và tên", hoặc có cả "Họ và"/"Họ"/"Họ đệm" lẫn "Tên". */
 function timDongTieuDe(sheet: ExcelJS.Worksheet) {
   const soDong = Math.min(sheet.rowCount, SO_DONG_DO_TIEU_DE);
   const soCot = Math.max(sheet.columnCount, SO_COT_DO);
   for (let r = 1; r <= soDong; r++) {
     const row = sheet.getRow(r);
-    const cot = new Map<CotDanhSach, number>();
+    const cot = new Map<CotDoc, number>();
     for (let c = 1; c <= soCot; c++) {
       const loai =
         BI_DANH[chuanHoaTieuDe(cellToPlainText(row.getCell(c).value))];
       if (loai && !cot.has(loai)) cot.set(loai, c);
     }
-    if (cot.has('ho_ten')) return { dongTieuDe: r, cot };
+    if (cot.has('ho_ten') || (cot.has('ho') && cot.has('ten'))) {
+      return { dongTieuDe: r, cot };
+    }
   }
   return null;
 }
 
-async function moSheetDau(buffer: Buffer): Promise<ExcelJS.Worksheet> {
+/** Sheet đầu tiên (theo thứ tự trong file) có dòng tiêu đề hợp lệ trong 20 dòng đầu. */
+async function moSheetCoTieuDe(buffer: Buffer) {
   const workbook = new ExcelJS.Workbook();
   try {
     await workbook.xlsx.load(buffer as unknown as ExcelJS.Buffer);
   } catch {
     throw new ValidationException('Không đọc được file Excel (.xlsx)');
   }
-  const sheet = workbook.worksheets[0];
-  if (!sheet)
+  if (workbook.worksheets.length === 0)
     throw new ValidationException('File Excel không có sheet dữ liệu nào');
-  return sheet;
+  for (const sheet of workbook.worksheets) {
+    const tieuDe = timDongTieuDe(sheet);
+    if (tieuDe) return { sheet, ...tieuDe };
+  }
+  throw new ValidationException(
+    'Không tìm thấy dòng tiêu đề có cột "Họ và tên" (hoặc 2 cột "Họ và" + "Tên") trong 20 dòng đầu — tải file mẫu để xem đúng tên cột',
+  );
 }
 
-/** Đọc sheet đầu của file danh sách HSG → các dòng (bỏ dòng trống) kèm lỗi từng dòng. */
+/** Số nguyên dương từ ô số hoặc chữ số; trống → null; khác → undefined. */
+function soNguyen(raw: unknown): number | null | undefined {
+  const v = giaTriO(raw);
+  if (typeof v === 'number') {
+    return Number.isInteger(v) && v > 0 ? v : undefined;
+  }
+  const s = cellToPlainText(v).trim();
+  if (s === '') return null;
+  return /^\d{1,4}$/.test(s) ? +s : undefined;
+}
+
+/** Ngày sinh tách 3 cột Ngày / Tháng / Năm. Cả 3 trống → null; thiếu/sai → undefined. */
+function docNgaySinhTach(
+  ngay: unknown,
+  thang: unknown,
+  nam: unknown,
+): string | null | undefined {
+  const [d, m, y] = [soNguyen(ngay), soNguyen(thang), soNguyen(nam)];
+  if (d === null && m === null && y === null) return null;
+  if (!d || !m || !y) return undefined;
+  return ngayHopLe(y, m, d) ?? undefined;
+}
+
+/** Đọc file danh sách HSG (sheet đầu tiên có dòng tiêu đề) → các dòng (bỏ dòng trống) kèm lỗi từng dòng. */
 export async function docFileDanhSach(
   buffer: Buffer,
 ): Promise<DongExcelDanhSach[]> {
-  const sheet = await moSheetDau(buffer);
-  const tieuDe = timDongTieuDe(sheet);
-  if (!tieuDe) {
-    throw new ValidationException(
-      'Không tìm thấy dòng tiêu đề có cột "Họ và tên" trong 20 dòng đầu — tải file mẫu để xem đúng tên cột',
-    );
-  }
-  const { dongTieuDe, cot } = tieuDe;
+  const { sheet, dongTieuDe, cot } = await moSheetCoTieuDe(buffer);
   if (!cot.has('ma_truong') && !cot.has('ten_truong')) {
     throw new ValidationException(
       'File thiếu cột trường: cần cột "Mã trường" hoặc "Tên trường"',
     );
   }
+  // Có cột Tháng sinh + Năm sinh → cột "Ngày sinh" chỉ là số ngày.
+  const ngayTach = cot.has('thang_sinh') && cot.has('nam_sinh');
 
   const ketQua: DongExcelDanhSach[] = [];
   for (let r = dongTieuDe + 1; r <= sheet.rowCount; r++) {
     const row = sheet.getRow(r);
-    const rawCua = (k: CotDanhSach) => {
+    const rawCua = (k: CotDoc) => {
       const c = cot.get(k);
       return c === undefined ? null : row.getCell(c).value;
     };
-    const chu = (k: CotDanhSach) => cellToPlainText(giaTriO(rawCua(k))).trim();
+    const chu = (k: CotDoc) => cellToPlainText(giaTriO(rawCua(k))).trim();
     // Ô ngày (Date) thành chuỗi ISO, khác rỗng — chỉ dùng để nhận dòng trống; ngày đọc lại từ ô thô.
     const giaTri = Object.fromEntries(
       COT_MAU.map(([k]) => [k, chu(k)]),
     ) as Record<CotDanhSach, string>;
-    if (Object.values(giaTri).every((v) => v === '')) continue;
-    ketQua.push(taoDong(r, giaTri, rawCua('ngay_sinh')));
+    if (!cot.has('ho_ten')) {
+      giaTri.ho_ten = [chu('ho'), chu('ten')]
+        .filter((s) => s !== '')
+        .join(' ')
+        .normalize('NFC');
+    }
+    const ngayPhu = ngayTach ? chu('thang_sinh') + chu('nam_sinh') : '';
+    if (Object.values(giaTri).every((v) => v === '') && ngayPhu === '') {
+      continue;
+    }
+    const ngay_sinh = ngayTach
+      ? docNgaySinhTach(
+          rawCua('ngay_sinh'),
+          rawCua('thang_sinh'),
+          rawCua('nam_sinh'),
+        )
+      : docNgaySinh(rawCua('ngay_sinh'));
+    ketQua.push(taoDong(r, giaTri, ngay_sinh));
   }
   return ketQua;
 }
@@ -203,7 +259,7 @@ export async function docFileDanhSach(
 function taoDong(
   so_dong: number,
   g: Record<CotDanhSach, string>,
-  ngayRaw: unknown,
+  ngay_sinh: string | null | undefined,
 ): DongExcelDanhSach {
   const loi: string[] = [];
   if (!g.ho_ten) loi.push('Thiếu họ tên');
@@ -213,7 +269,6 @@ function taoDong(
   ][]) {
     if (g[k].length > toiDa) loi.push(`${nhan} dài quá ${toiDa} ký tự`);
   }
-  const ngay_sinh = docNgaySinh(ngayRaw);
   if (ngay_sinh === undefined) {
     loi.push('Ngày sinh không hợp lệ (dùng dd/mm/yyyy)');
   }

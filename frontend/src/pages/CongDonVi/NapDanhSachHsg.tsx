@@ -140,6 +140,10 @@ export function NapDanhSachHsg({ dotId }: { dotId: string }) {
           Trường khớp theo mã trường trước, rồi theo tên, chỉ trong phạm vi Sở của đợt. Nạp lại chỉ thay danh sách của
           các trường có trong file.
         </Text>
+        <Text fz="sm" c="dimmed">
+          Có thể nạp thẳng file danh sách tổng hợp (cột Họ và / Tên, Ngày/Tháng/Năm sinh, Đơn vị công tác, Mã lớp) —
+          không cần chuyển sang file mẫu.
+        </Text>
         <Group gap="sm" align="flex-end" wrap="wrap">
           <Button variant="default" onClick={taiMau}>
             Tải file mẫu

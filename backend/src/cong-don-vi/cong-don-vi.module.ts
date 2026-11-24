@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { HocVienModule } from '../hoc-vien/hoc-vien.module';
+import { NguoiDungModule } from '../nguoi-dung/nguoi-dung.module';
 import { DotTrienKhaiController } from './dot-trien-khai.controller';
 import { DotTrienKhaiService } from './dot-trien-khai.service';
 import {
@@ -29,13 +30,16 @@ import { ToiChuongTrinhController } from './toi-chuong-trinh.controller';
 import { ToiChuongTrinhService } from './toi-chuong-trinh.service';
 import { DonViTienDoController } from './don-vi-tien-do.controller';
 import { DonViTienDoService } from './don-vi-tien-do.service';
+import { TaiKhoanTruongDotController } from './tai-khoan-truong-dot.controller';
+import { TaiKhoanTruongDotService } from './tai-khoan-truong-dot.service';
 
 // ADR 0015: mọi API của Cổng đơn vị (tiền tố /cong-don-vi). PrismaService và
 // NhatKyService là @Global() nên không cần import module. AuthModule cho
 // ScopeService (trường trong phạm vi Sở của đợt, issue #58). HocVienModule cho đường sửa hồ sơ của Quản trị
 // (issue #69 / Y2: đồng bộ ngược thông tin cá nhân dòng NLS) — không vòng lặp (HocVienModule không import ngược).
+// NguoiDungModule cho TaiKhoanDonViService (T4: cấp tài khoản trường của đợt).
 @Module({
-  imports: [AuthModule, HocVienModule],
+  imports: [AuthModule, HocVienModule, NguoiDungModule],
   controllers: [
     DotTrienKhaiController,
     DanhSachThamGiaController,
@@ -50,6 +54,7 @@ import { DonViTienDoService } from './don-vi-tien-do.service';
     TienDoDotController,
     ToiChuongTrinhController,
     DonViTienDoController,
+    TaiKhoanTruongDotController,
   ],
   providers: [
     DotTrienKhaiService,
@@ -64,6 +69,7 @@ import { DonViTienDoService } from './don-vi-tien-do.service';
     DongBoHoSoNlsService,
     ToiChuongTrinhService,
     DonViTienDoService,
+    TaiKhoanTruongDotService,
   ],
 })
 export class CongDonViModule {}

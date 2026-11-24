@@ -8,6 +8,7 @@ import type {
   XemTruocChup,
 } from '@/api/danhSachThamGia';
 import type { HoSoHocVienNls } from '@/lib/dongBoHoSoNls';
+import type { KetQuaCapTaiKhoanTruong, TaiKhoanTruongCuaDot } from '@/api/taiKhoanTruongDot';
 
 // Issue #58: danh sách tham gia HSG (Cổng đơn vị) — CSDL giả trong bộ nhớ, reset sau mỗi test (setup.ts).
 // Tên người/trường đều bịa.
@@ -148,12 +149,56 @@ export function xemTruocChupMau(): XemTruocChup {
   };
 }
 
+/** ADR 0015 T4: tài khoản trường của đợt (dữ liệu bịa) — 1 đã đăng nhập, 1 chưa đăng nhập, 1 đã khóa, 2 chưa có. */
+export function taiKhoanTruongMau(): TaiKhoanTruongCuaDot {
+  return {
+    tong: { so_truong: 5, so_co_tai_khoan: 3, so_chua_co: 2, so_chua_dang_nhap: 1 },
+    truong: [
+      {
+        don_vi: { id: 'tr-1', ma: 'TR-MAU-001', ten: 'Trường THCS Mẫu Một' },
+        tai_khoan: {
+          id: 'tk-1',
+          ten_dang_nhap: 'tr-mau-001',
+          trang_thai: 'active',
+          lan_dang_nhap_cuoi: '2026-11-20T18:30:00.000Z',
+        },
+      },
+      { don_vi: { id: 'tr-2', ma: null, ten: 'Trường THCS&THPT Mẫu Hai' }, tai_khoan: null },
+      { don_vi: { id: 'tr-3', ma: 'TR-MAU-003', ten: 'Trường TH Mẫu Ba' }, tai_khoan: null },
+      {
+        don_vi: { id: 'tr-4', ma: 'TR-MAU-004', ten: 'Trường TH Mẫu Bốn' },
+        tai_khoan: { id: 'tk-4', ten_dang_nhap: 'tr-mau-004', trang_thai: 'active', lan_dang_nhap_cuoi: null },
+      },
+      {
+        don_vi: { id: 'tr-5', ma: 'TR-MAU-005', ten: 'Trường TH Mẫu Năm' },
+        tai_khoan: { id: 'tk-5', ten_dang_nhap: 'tr-mau-005', trang_thai: 'ngung', lan_dang_nhap_cuoi: null },
+      },
+    ],
+  };
+}
+
+/** Kết quả cấp mặc định: tạo 1 (Mẫu Ba), bỏ qua Mẫu Hai (không mã); file là base64 bịa (không phải xlsx thật). */
+export function ketQuaCapTaiKhoanMau(): KetQuaCapTaiKhoanTruong {
+  return {
+    so_tao: 1,
+    bo_qua: [
+      {
+        don_vi: { id: 'tr-2', ma: null, ten: 'Trường THCS&THPT Mẫu Hai' },
+        ly_do: 'Trường chưa có mã đơn vị — tạo tài khoản tay ở Đơn vị & tài khoản',
+      },
+    ],
+    file_mat_khau: btoa('xlsx-bia'),
+  };
+}
+
 export const dbDanhSachThamGia = {
   xemTruoc: xemTruocMau(),
   danhSach: { tong_hop: [], dong: [] } as DanhSachThamGia,
   xemTruocChup: xemTruocChupMau(),
   /** Issue #69: hồ sơ học viên NLS theo id dòng; không có → 404 (dòng HSG). */
   hoSoHocVien: {} as Record<string, HoSoHocVienNls>,
+  taiKhoanTruong: taiKhoanTruongMau(),
+  ketQuaCap: ketQuaCapTaiKhoanMau(),
 };
 
 export function datLaiDanhSachThamGiaMock() {
@@ -161,12 +206,17 @@ export function datLaiDanhSachThamGiaMock() {
   dbDanhSachThamGia.danhSach = { tong_hop: [], dong: [] };
   dbDanhSachThamGia.xemTruocChup = xemTruocChupMau();
   dbDanhSachThamGia.hoSoHocVien = {};
+  dbDanhSachThamGia.taiKhoanTruong = taiKhoanTruongMau();
+  dbDanhSachThamGia.ketQuaCap = ketQuaCapTaiKhoanMau();
 }
 
 const URL = '/cong-don-vi/dot-trien-khai/:id';
 
 export const danhSachThamGiaHandlers = [
   http.get(`${URL}/truong-trong-pham-vi`, () => HttpResponse.json(TRUONG_PHAM_VI)),
+  // ADR 0015 T4: tài khoản trường của đợt.
+  http.get(`${URL}/tai-khoan-truong`, () => HttpResponse.json(dbDanhSachThamGia.taiKhoanTruong)),
+  http.post(`${URL}/tai-khoan-truong/cap`, () => HttpResponse.json(dbDanhSachThamGia.ketQuaCap)),
   http.get(`${URL}/danh-sach`, () => HttpResponse.json(dbDanhSachThamGia.danhSach)),
   http.post(`${URL}/danh-sach/xem-truoc`, () => HttpResponse.json(dbDanhSachThamGia.xemTruoc)),
   // Issue #68: đợt NLS — chụp danh sách từ khóa.

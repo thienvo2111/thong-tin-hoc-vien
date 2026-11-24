@@ -7,10 +7,12 @@ import { DanhSachTheoTruong } from './DanhSachTheoTruong';
 import { HangDoiDeNghi } from './HangDoiDeNghi';
 import { LayDanhSachTuKhoa } from './LayDanhSachTuKhoa';
 import { NapDanhSachHsg } from './NapDanhSachHsg';
+import { TaiKhoanTruongCuaDot } from './TaiKhoanTruongCuaDot';
 
 /** Quản trị: Danh sách tham gia theo đợt (issue #58, ADR 0015 M3/M6/T7). Nạp Excel chỉ cho đợt HSG;
  * xem danh sách cho mọi đợt. Route bọc ChiQuanTriCong: vai trò khác → 404.
- * Issue #62: mục "Đề nghị của trường" — hàng đợi Áp dụng / Từ chối đề nghị sửa/thêm/bớt người. */
+ * Issue #62: mục "Đề nghị của trường" — hàng đợi Áp dụng / Từ chối đề nghị sửa/thêm/bớt người.
+ * ADR 0015 T4: mục "Tài khoản trường của đợt" — cấp tài khoản cho trường trong danh sách của đợt. */
 export default function QuanTriDanhSachThamGia() {
   const { data, isLoading, isError, error } = useDanhSachDotTrienKhai();
   // Issue #65: mở từ bảng Tiến độ đợt với ?dot=…&don_vi_id=… → chọn sẵn đợt và trường.
@@ -48,6 +50,7 @@ export default function QuanTriDanhSachThamGia() {
             donViIdBanDau={dot.id === params.get('dot') ? params.get('don_vi_id') : null}
           />
         )}
+        {dot && <TaiKhoanTruongCuaDot key={`tai-khoan-${dot.id}`} dotId={dot.id} />}
       </Stack>
     </Container>
   );
