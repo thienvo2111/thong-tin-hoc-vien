@@ -31,6 +31,8 @@ import { DiemDanhRowDto } from '../khoa-boi-duong/dto/diem-danh-row.dto';
 import { KetQuaGiaiDoanRowDto } from '../khoa-boi-duong/dto/ket-qua-giai-doan-row.dto';
 import { TaiKhoanVleRowDto } from './dto/tai-khoan-vle-row.dto';
 import { DangNhapVleRowDto } from './dto/dang-nhap-vle-row.dto';
+import { DiemHocRowDto } from './dto/diem-hoc-row.dto';
+import { normalizeNfcName } from '../common/utils/normalize-text.util';
 import { TaiKhoanDonViRowDto } from './dto/tai-khoan-don-vi-row.dto';
 import { TaiKhoanDonViService } from '../nguoi-dung/tai-khoan-don-vi.service';
 import { chuanHoaTenDangNhap } from '../nguoi-dung/tai-khoan-don-vi.util';
@@ -137,7 +139,7 @@ export class ImportService {
   assertSupported(loai: string): SupportedImportType {
     if (!isSupportedImportType(loai)) {
       throw new ValidationException(
-        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc, diem_danh, ket_qua_giai_doan, nhan_su_lop, tai_khoan_don_vi, ket_qua_khao_sat, giang_vien, phan_cong_giang_day, dang_nhap_vle)`,
+        `Loại import "${loai}" chưa được hỗ trợ ở phiên bản hiện tại (chỉ hỗ trợ: dia_danh, don_vi_cong_tac, mon_hoc, ho_so_nhan_su_moet, phan_lop_hoc_vien, tai_khoan_vle, ket_qua_danh_gia, lop_va_lich_hoc, diem_danh, ket_qua_giai_doan, nhan_su_lop, tai_khoan_don_vi, ket_qua_khao_sat, giang_vien, phan_cong_giang_day, dang_nhap_vle, diem_hoc)`,
       );
     }
     return loai;
@@ -798,6 +800,21 @@ export class ImportService {
           'vai_tro',
           'so_dien_thoai',
         ];
+      case 'diem_hoc':
+        // Danh mục điểm học (2026-11-12): khóa khớp ma_diem_hoc (đã có thì
+        // cập nhật, chưa có thì tạo) — xem buildDiemHocDto.
+        return [
+          'ma_diem_hoc',
+          'ten',
+          'dia_chi',
+          'ma_dia_ban',
+          'ma_don_vi',
+          'suc_chua',
+          'so_phong',
+          'nguoi_lien_he',
+          'sdt_lien_he',
+          'ghi_chu_csvc',
+        ];
       case 'dang_nhap_vle':
         // Vào học VLE (external-login P.CNTT, 2026-11-10): mã học viên dùng
         // chung HocVienResolver (mục 2 quy tắc #3, cả 2 cột tùy chọn — xem
@@ -1035,6 +1052,24 @@ export class ImportService {
           'Tùy chọn — tối đa 20 ký tự. Để trống khi chạy lại file sẽ giữ nguyên số cũ.',
       };
     }
+    if (loai === 'diem_hoc') {
+      return {
+        ma_diem_hoc:
+          'Bắt buộc — 1–30 ký tự: chữ không dấu, số, "_", "-", ".". Đã có trong hệ thống = cập nhật điểm học đó; chưa có = tạo mới.',
+        ten: 'Bắt buộc — tối đa 255 ký tự.',
+        dia_chi: 'Bắt buộc — tối đa 500 ký tự.',
+        ma_dia_ban:
+          'Bắt buộc — mã địa danh (xã/phường) trong danh mục địa danh của hệ thống.',
+        ma_don_vi:
+          'Tùy chọn — mã đơn vị công tác quản lý điểm học (vd trường đặt điểm). Để trống = giữ nguyên khi cập nhật.',
+        suc_chua: 'Tùy chọn — số nguyên dương (số học viên tối đa).',
+        so_phong:
+          'Tùy chọn — số nguyên dương; vượt số lớp học cùng lúc tại điểm sẽ có cảnh báo khi xếp lịch.',
+        nguoi_lien_he: 'Tùy chọn — tối đa 255 ký tự.',
+        sdt_lien_he: 'Tùy chọn — tối đa 20 ký tự.',
+        ghi_chu_csvc: 'Tùy chọn — ghi chú cơ sở vật chất.',
+      };
+    }
     if (loai === 'dang_nhap_vle') {
       return {
         so_dinh_danh_ca_nhan:
@@ -1083,6 +1118,7 @@ export class ImportService {
       | GiangVienRowDto
       | PhanCongGiangDayRowDto
       | DangNhapVleRowDto
+      | DiemHocRowDto
     >
   > {
     switch (loai) {
@@ -1111,6 +1147,8 @@ export class ImportService {
         return this.buildTaiKhoanVleDto(raw);
       case 'dang_nhap_vle':
         return this.buildDangNhapVleDto(raw, dupKeys);
+      case 'diem_hoc':
+        return this.buildDiemHocDto(raw, dupKeys);
       case 'ket_qua_danh_gia': {
         const resolved = await this.khoaBoiDuongService.resolveKetQuaDanhGiaRow(
           {
@@ -1316,7 +1354,8 @@ export class ImportService {
       | KetQuaKhaoSatRowDto
       | GiangVienRowDto
       | PhanCongGiangDayRowDto
-      | DangNhapVleRowDto,
+      | DangNhapVleRowDto
+      | DiemHocRowDto,
     dupKeys?: Set<string>,
   ): Promise<string | undefined> {
     try {
@@ -1350,6 +1389,9 @@ export class ImportService {
       } else if (loai === 'dang_nhap_vle') {
         // Không cần kiểm tra thêm: buildDangNhapVleDto() (buildDto) đã tra
         // cứu học viên + kiểm trùng username/email (DB và trong file) rồi.
+      } else if (loai === 'diem_hoc') {
+        // Không cần kiểm tra thêm: buildDiemHocDto() (buildDto) đã tra mã địa
+        // bàn/đơn vị + kiểm trùng mã trong file rồi; trùng mã trong DB = cập nhật.
       } else if (loai === 'ket_qua_danh_gia') {
         // Không cần kiểm tra thêm: resolveKetQuaDanhGiaRow() (buildDto) đã
         // tra cứu học viên + khóa + dang_ky_hoc đã tồn tại rồi.
@@ -1418,7 +1460,8 @@ export class ImportService {
       | KetQuaKhaoSatRowDto
       | GiangVienRowDto
       | PhanCongGiangDayRowDto
-      | DangNhapVleRowDto,
+      | DangNhapVleRowDto
+      | DiemHocRowDto,
     importId: string,
     nguoiImportId: string,
     dupKeys?: Set<string>,
@@ -1448,6 +1491,8 @@ export class ImportService {
       await this.commitTaiKhoanVle(dto as TaiKhoanVleRowDto, importId);
     } else if (loai === 'dang_nhap_vle') {
       await this.commitDangNhapVle(dto as DangNhapVleRowDto, importId);
+    } else if (loai === 'diem_hoc') {
+      await this.commitDiemHoc(dto as DiemHocRowDto, nguoiImportId);
     } else if (loai === 'ket_qua_khao_sat') {
       const d = dto as KetQuaKhaoSatRowDto;
       await this.ketQuaKhaoSatService.ghiKetQua(
@@ -1567,6 +1612,28 @@ export class ImportService {
         cap_nhat_luc: new Date(),
       },
     });
+  }
+
+  // Danh mục điểm học (2026-11-12): id có (buildDiemHocDto tìm thấy cùng
+  // ma_diem_hoc) = cập nhật, giữ trang_thai hiện có; cột tùy chọn undefined =
+  // Prisma không đụng tới cột (không null hóa). Chưa có = tạo, tao_boi =
+  // người import (giống DiemHocService.create).
+  private async commitDiemHoc(
+    dto: DiemHocRowDto,
+    nguoiImportId: string,
+  ): Promise<void> {
+    const { id, ...data } = dto;
+    const ten = normalizeNfcName(data.ten);
+    if (id) {
+      await this.prisma.diem_hoc.update({
+        where: { id },
+        data: { ...data, ten },
+      });
+    } else {
+      await this.prisma.diem_hoc.create({
+        data: { ...data, ten, tao_boi: nguoiImportId },
+      });
+    }
   }
 
   // Vào học VLE (external-login P.CNTT, 2026-11-10): upsert theo PK
@@ -1705,6 +1772,83 @@ export class ImportService {
       ten_dang_nhap_vle: raw.ten_dang_nhap_vle,
       mat_khau_tam: raw.mat_khau_tam || undefined,
       duong_dan: raw.duong_dan,
+    });
+  }
+
+  // Danh mục điểm học (2026-11-12): cùng luật với nhập tay (CreateDiemHocDto
+  // + DiemHocService.assertDiaBanVaDonVi) nhưng nhận MÃ thay cho uuid:
+  // ma_dia_ban -> dia_danh.ma, ma_don_vi -> don_vi_cong_tac.ma_don_vi. Trùng
+  // ma_diem_hoc trong file -> lỗi dòng sau (dupKeys); trùng trong DB -> cập nhật.
+  private async buildDiemHocDto(
+    raw: Record<string, string>,
+    dupKeys?: Set<string>,
+  ): Promise<RowBuildResult<DiemHocRowDto>> {
+    const ma = raw.ma_diem_hoc?.trim();
+    if (!ma) return { error: 'Thiếu cột "ma_diem_hoc"' };
+    if (!/^[A-Za-z0-9_.-]{1,30}$/.test(ma)) {
+      return {
+        error: 'Mã điểm học 1–30 ký tự: chữ không dấu, số, "_", "-", "."',
+      };
+    }
+    const khoaTrung = `dh-ma:${ma}`;
+    if (dupKeys?.has(khoaTrung)) {
+      return { error: 'Trùng ma_diem_hoc với một dòng khác trong file' };
+    }
+    const ten = raw.ten?.trim();
+    if (!ten) return { error: 'Thiếu cột "ten"' };
+    const diaChi = raw.dia_chi?.trim();
+    if (!diaChi) return { error: 'Thiếu cột "dia_chi"' };
+    const maDiaBan = raw.ma_dia_ban?.trim();
+    if (!maDiaBan) return { error: 'Thiếu cột "ma_dia_ban"' };
+    const diaBan = await this.prisma.dia_danh.findUnique({
+      where: { ma: maDiaBan },
+      select: { id: true },
+    });
+    if (!diaBan) return { error: `Mã địa bàn "${maDiaBan}" không tồn tại` };
+
+    let donViId: string | undefined;
+    const maDonVi = raw.ma_don_vi?.trim();
+    if (maDonVi) {
+      const donVi = await this.prisma.don_vi_cong_tac.findUnique({
+        where: { ma_don_vi: maDonVi },
+        select: { id: true },
+      });
+      if (!donVi) return { error: `Mã đơn vị "${maDonVi}" không tồn tại` };
+      donViId = donVi.id;
+    }
+
+    const soNguyenDuong = (cot: string): number | undefined | null => {
+      const v = raw[cot]?.trim();
+      if (!v) return undefined;
+      const n = Number(v);
+      return Number.isInteger(n) && n >= 1 ? n : null;
+    };
+    const sucChua = soNguyenDuong('suc_chua');
+    if (sucChua === null) {
+      return { error: 'Cột "suc_chua" phải là số nguyên dương' };
+    }
+    const soPhong = soNguyenDuong('so_phong');
+    if (soPhong === null) {
+      return { error: 'Cột "so_phong" phải là số nguyên dương' };
+    }
+
+    const hienCo = await this.prisma.diem_hoc.findUnique({
+      where: { ma_diem_hoc: ma },
+      select: { id: true },
+    });
+    dupKeys?.add(khoaTrung);
+    return buildValidatedDto(DiemHocRowDto, {
+      id: hienCo?.id,
+      ma_diem_hoc: ma,
+      ten,
+      dia_chi: diaChi,
+      dia_ban_id: diaBan.id,
+      don_vi_id: donViId,
+      suc_chua: sucChua,
+      so_phong: soPhong,
+      nguoi_lien_he: raw.nguoi_lien_he?.trim() || undefined,
+      sdt_lien_he: raw.sdt_lien_he?.trim() || undefined,
+      ghi_chu_csvc: raw.ghi_chu_csvc?.trim() || undefined,
     });
   }
 

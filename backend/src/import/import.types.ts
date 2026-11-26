@@ -26,6 +26,9 @@ export const SUPPORTED_IMPORT_TYPES = [
   // Vào học VLE (external-login P.CNTT, 2026-11-10) — username/email để
   // khớp sang VLE, xem docs/api-contract.md mục 10.2.
   'dang_nhap_vle',
+  // Danh mục điểm học (2026-11-12) — tạo/cập nhật theo ma_diem_hoc, cùng luật
+  // với nhập tay (DiemHocService), xem docs/api-contract.md mục 5.
+  'diem_hoc',
 ] as const satisfies readonly loai_danh_muc_import[];
 
 export type SupportedImportType = (typeof SUPPORTED_IMPORT_TYPES)[number];
