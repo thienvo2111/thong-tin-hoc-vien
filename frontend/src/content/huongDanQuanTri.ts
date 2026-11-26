@@ -216,15 +216,21 @@ export const huongDanQuanTri: {
     {
       id: 'danh-muc-truong',
       tieuDe: 'Danh mục trường',
-      moTa: 'Tra cứu trường và sửa địa bàn (phường/xã) của trường theo địa giới hiện tại.',
+      moTa: 'Tra cứu trường; bổ sung mã, sửa tên và địa bàn (phường/xã) của trường theo địa giới hiện tại.',
       vaiTro: 'tat_ca',
       manHinh: { nhan: 'Danh mục trường', duongDan: '/admin/danh-muc-truong' },
       buoc: [
         'Lọc theo tỉnh/thành, tìm theo tên trường.',
         '(Quản trị) Bấm [[Sửa địa bàn]], chọn Tỉnh/thành và Phường/xã đúng, bấm [[Lưu]]. Học viên chọn trường theo xã sẽ thấy trường ở đúng xã mới.',
+        '(Quản trị) Trường hiện "Chưa có mã": bấm [[Sửa]], nhập Mã đơn vị (và sửa tên nếu cần), bấm [[Lưu]]. Mã dùng làm tên đăng nhập (viết thường) khi cấp tài khoản trường.',
       ],
       ghiChu: [
-        { loai: 'info', tieuDe: 'Phạm vi sửa', noiDung: 'Chỉ sửa được địa bàn; tên và mã trường giữ nguyên theo danh mục.' },
+        {
+          loai: 'info',
+          tieuDe: 'Phạm vi sửa',
+          noiDung:
+            'Chỉ Quản trị sửa được mã, tên và địa bàn trường. Đổi mã không đổi tên đăng nhập của tài khoản trường đã cấp — sửa ở Đơn vị & tài khoản nếu cần.',
+        },
       ],
     },
     {

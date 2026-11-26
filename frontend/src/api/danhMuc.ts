@@ -1,4 +1,5 @@
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
+import { chuanHoaNfc } from '@/lib/nfc';
 import { apiFetch } from './client';
 import type { DiaDanh, DonViCongTac, MonHoc, PaginatedResult } from './types';
 
@@ -111,6 +112,28 @@ export function useSuaDiaBanDonViCongTac() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, diaBanId }: { id: string; diaBanId: string }) => suaDiaBanDonViCongTac(id, diaBanId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['danh-muc', 'don-vi-cong-tac'] });
+    },
+  });
+}
+
+// PATCH /danh-muc/don-vi-cong-tac/{id} (quan_tri) — bổ sung/sửa mã và tên trường. Chỉ gửi field có mặt
+// (nơi gọi chỉ truyền field đã đổi), chuẩn hóa NFC + trim. Trùng mã → 409 field ma_don_vi.
+export interface SuaThongTinTruongDto {
+  ma_don_vi?: string;
+  ten_don_vi?: string;
+}
+
+export function useSuaThongTinDonViCongTac() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, thayDoi }: { id: string; thayDoi: SuaThongTinTruongDto }) => {
+      const body: SuaThongTinTruongDto = {};
+      if (thayDoi.ma_don_vi !== undefined) body.ma_don_vi = chuanHoaNfc(thayDoi.ma_don_vi).trim();
+      if (thayDoi.ten_don_vi !== undefined) body.ten_don_vi = chuanHoaNfc(thayDoi.ten_don_vi).trim();
+      return apiFetch<DonViCongTac>(`/danh-muc/don-vi-cong-tac/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['danh-muc', 'don-vi-cong-tac'] });
     },

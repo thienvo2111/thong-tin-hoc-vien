@@ -10,6 +10,7 @@ import { thongDiepLoiChung } from '@/lib/loiApi';
 import { chuanHoaNfc } from '@/lib/nfc';
 import { useToi } from '@/auth/AuthContext';
 import { AdminPageHeader } from './AdminPageHeader';
+import { ModalSuaTruong } from './ModalSuaTruong';
 import { ModalThemTruong } from './ModalThemTruong';
 
 const KICH_THUOC_TRANG = 20;
@@ -19,9 +20,11 @@ const KICH_THUOC_TRANG = 20;
  * giao diện (scripts/_report_remap_truong.md) — KHÔNG import lại Excel. Chỉ sửa dia_ban_id (PATCH
  * đã có sẵn, UpdateDonViCongTacDto nhận thẳng field này). */
 export default function AdminDanhMucTruong() {
-  // Thêm trường: chỉ quan_tri (POST @Roles('quan_tri')); Sở/Phòng/Trường vào trang này qua RequireAdmin thì không thấy nút.
+  // Thêm/Sửa trường, Sửa địa bàn: chỉ quan_tri (POST/PATCH @Roles('quan_tri')); Sở/Phòng/Trường vào trang này
+  // (RequireAdmin, Cổng /don-vi/danh-muc-truong) chỉ xem — không thấy nút nào.
   const laQuanTri = useToi().nguoiDung?.vai_tro === 'quan_tri';
   const [moThem, setMoThem] = useState(false);
+  const [suaThongTin, setSuaThongTin] = useState<DonViCongTac | null>(null);
   const [tinhId, setTinhId] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [qDebounced] = useDebouncedValue(q, 300);
@@ -138,41 +141,61 @@ export default function AdminDanhMucTruong() {
             )}
 
             {data && (
-              <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md" style={{ opacity: isFetching ? 0.6 : 1 }}>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Tên trường</Table.Th>
-                    <Table.Th>Mã đơn vị</Table.Th>
-                    <Table.Th>Tỉnh</Table.Th>
-                    <Table.Th>Phường/xã hiện tại</Table.Th>
-                    <Table.Th />
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {data.data.length === 0 && (
+              <Table.ScrollContainer minWidth={laQuanTri ? 760 : 600}>
+                <Table
+                  highlightOnHover
+                  verticalSpacing="sm"
+                  horizontalSpacing="md"
+                  style={{ opacity: isFetching ? 0.6 : 1 }}
+                >
+                  <Table.Thead>
                     <Table.Tr>
-                      <Table.Td colSpan={5}>
-                        <Text c="dimmed" ta="center" py="lg">
-                          Không có trường nào khớp bộ lọc.
-                        </Text>
-                      </Table.Td>
+                      <Table.Th>Tên trường</Table.Th>
+                      <Table.Th>Mã đơn vị</Table.Th>
+                      <Table.Th>Tỉnh</Table.Th>
+                      <Table.Th>Phường/xã hiện tại</Table.Th>
+                      {laQuanTri && <Table.Th />}
                     </Table.Tr>
-                  )}
-                  {data.data.map((truong) => (
-                    <Table.Tr key={truong.id}>
-                      <Table.Td fw={600}>{truong.ten_don_vi}</Table.Td>
-                      <Table.Td>{truong.ma_don_vi ?? '—'}</Table.Td>
-                      <Table.Td>{truong.tinh_ten ?? '—'}</Table.Td>
-                      <Table.Td>{truong.dia_ban_ten}</Table.Td>
-                      <Table.Td ta="right">
-                        <Button size="xs" variant="default" onClick={() => moModalSua(truong)}>
-                          Sửa địa bàn
-                        </Button>
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {data.data.length === 0 && (
+                      <Table.Tr>
+                        <Table.Td colSpan={laQuanTri ? 5 : 4}>
+                          <Text c="dimmed" ta="center" py="lg">
+                            Không có trường nào khớp bộ lọc.
+                          </Text>
+                        </Table.Td>
+                      </Table.Tr>
+                    )}
+                    {data.data.map((truong) => (
+                      <Table.Tr key={truong.id}>
+                        <Table.Td fw={600}>{truong.ten_don_vi}</Table.Td>
+                        <Table.Td>
+                          {truong.ma_don_vi || (
+                            <Text span fz="sm" c="dimmed" fs="italic">
+                              Chưa có mã
+                            </Text>
+                          )}
+                        </Table.Td>
+                        <Table.Td>{truong.tinh_ten ?? '—'}</Table.Td>
+                        <Table.Td>{truong.dia_ban_ten}</Table.Td>
+                        {laQuanTri && (
+                          <Table.Td>
+                            <Group gap="xs" justify="flex-end" wrap="nowrap">
+                              <Button size="xs" variant="default" onClick={() => setSuaThongTin(truong)}>
+                                Sửa
+                              </Button>
+                              <Button size="xs" variant="default" onClick={() => moModalSua(truong)}>
+                                Sửa địa bàn
+                              </Button>
+                            </Group>
+                          </Table.Td>
+                        )}
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </Table.ScrollContainer>
             )}
           </Paper>
 
@@ -221,6 +244,7 @@ export default function AdminDanhMucTruong() {
       </Modal>
 
       <ModalThemTruong opened={moThem} onClose={() => setMoThem(false)} />
+      <ModalSuaTruong truong={suaThongTin} onClose={() => setSuaThongTin(null)} />
     </>
   );
 }

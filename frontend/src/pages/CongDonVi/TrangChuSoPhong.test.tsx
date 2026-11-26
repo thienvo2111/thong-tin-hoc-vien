@@ -468,6 +468,7 @@ describe('Guard ChiSoPhongCong + Danh mục trường', TEST_LAU, () => {
       expect(await screen.findByText('THPT Long Xuyên', undefined, CHO_LAU)).toBeInTheDocument();
       expect(router.state.location.pathname).toBe('/don-vi/danh-muc-truong');
       expect(screen.queryByRole('button', { name: /Thêm trường/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Sửa/ })).not.toBeInTheDocument();
     },
   );
 
